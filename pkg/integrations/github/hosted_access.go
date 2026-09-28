@@ -33,6 +33,7 @@ const (
 	allowUnverifiedDevelopmentRepositoriesEnv = "SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES"
 	hostedInstallationVerificationConcurrency = 8
 	hostedInstallRequestFallbackPageSize      = 8
+	hostedInstallRequestFallbackMaxAttempts   = 3
 	maxHostedDiscoveryErrors                  = 3
 )
 

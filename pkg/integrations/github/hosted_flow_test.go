@@ -829,6 +829,23 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	}))
 	assert.Equal(t, []int{1, 2}, discoveryPages)
 	assert.Equal(t, 2, unavailableAttempts)
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+	assert.Equal(t, []int{1, 2}, discoveryPages)
+	assert.Equal(t, hostedInstallRequestFallbackMaxAttempts, unavailableAttempts)
 }
 
 func TestSyncHostedAppPreservesLegacyFallbackWithOverlappingRequest(t *testing.T) {

@@ -488,10 +488,7 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 				)
 				installations = append(installations, recent...)
 				if nextPage >= 0 {
-					metadata.InstallRequestFallbackRetries = mergeFallbackRetries(
-						metadata.InstallRequestFallbackRetries,
-						retries,
-					)
+					addHostedInstallRequestFallbackRetries(metadata, retries)
 					advanceHostedInstallRequestFallback(metadata, nextPage, startedAt)
 				}
 			}
@@ -511,7 +508,8 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 				nil,
 			)
 			installations = append(installations, retried...)
-			metadata.InstallRequestFallbackRetries = mergeFallbackRetries(remaining, retries)
+			metadata.InstallRequestFallbackRetries = remaining
+			updateHostedInstallRequestFallbackRetries(metadata, retryBatch, retries)
 			if len(metadata.InstallRequestFallbackRetries) == 0 {
 				completeHostedInstallRequestFallback(metadata, startedAt)
 			}
@@ -668,20 +666,48 @@ func hostedInstallRequestFallbackScanIncomplete(metadata common.Metadata) bool {
 	return metadata.InstallRequestFallbackPage == 1 && metadata.InstallRequestFallbackRefreshedAt == ""
 }
 
-func mergeFallbackRetries(
-	existing []common.PendingInstallation,
+func addHostedInstallRequestFallbackRetries(
+	metadata *common.Metadata,
 	additional []common.PendingInstallation,
-) []common.PendingInstallation {
-	merged := slices.Clone(existing)
+) {
+	if metadata.InstallRequestFallbackRetryCounts == nil {
+		metadata.InstallRequestFallbackRetryCounts = map[string]int{}
+	}
 	for _, installation := range additional {
-		if slices.ContainsFunc(merged, func(candidate common.PendingInstallation) bool {
+		if slices.ContainsFunc(metadata.InstallRequestFallbackRetries, func(candidate common.PendingInstallation) bool {
 			return candidate.ID == installation.ID
 		}) {
 			continue
 		}
-		merged = append(merged, installation)
+		metadata.InstallRequestFallbackRetries = append(metadata.InstallRequestFallbackRetries, installation)
+		metadata.InstallRequestFallbackRetryCounts[installation.ID] = 1
 	}
-	return merged
+}
+
+func updateHostedInstallRequestFallbackRetries(
+	metadata *common.Metadata,
+	attempted []common.PendingInstallation,
+	failed []common.PendingInstallation,
+) {
+	if metadata.InstallRequestFallbackRetryCounts == nil {
+		metadata.InstallRequestFallbackRetryCounts = map[string]int{}
+	}
+	for _, installation := range attempted {
+		if !slices.ContainsFunc(failed, func(candidate common.PendingInstallation) bool {
+			return candidate.ID == installation.ID
+		}) {
+			delete(metadata.InstallRequestFallbackRetryCounts, installation.ID)
+			continue
+		}
+
+		attempts := metadata.InstallRequestFallbackRetryCounts[installation.ID] + 1
+		if attempts >= hostedInstallRequestFallbackMaxAttempts {
+			delete(metadata.InstallRequestFallbackRetryCounts, installation.ID)
+			continue
+		}
+		metadata.InstallRequestFallbackRetryCounts[installation.ID] = attempts
+		metadata.InstallRequestFallbackRetries = append(metadata.InstallRequestFallbackRetries, installation)
+	}
 }
 
 func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
@@ -690,6 +716,7 @@ func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
 	metadata.InstallRequestFallbackSince = ""
 	metadata.InstallRequestFallbackPage = 0
 	metadata.InstallRequestFallbackRetries = nil
+	metadata.InstallRequestFallbackRetryCounts = nil
 	metadata.InstallRequestFallbackRefreshedAt = ""
 }
 

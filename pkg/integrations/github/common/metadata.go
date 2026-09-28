@@ -63,6 +63,9 @@ type Metadata struct {
 	// InstallRequestFallbackRetries keeps candidates whose access check failed
 	// so a transient GitHub error cannot skip an approved installation.
 	InstallRequestFallbackRetries []PendingInstallation `mapstructure:"installRequestFallbackRetries" json:"installRequestFallbackRetries,omitempty"`
+	// InstallRequestFallbackRetryCounts prevents a permanently broken candidate
+	// from keeping compatibility discovery active forever.
+	InstallRequestFallbackRetryCounts map[string]int `mapstructure:"installRequestFallbackRetryCounts" json:"installRequestFallbackRetryCounts,omitempty"`
 	// InstallRequestFallbackRefreshedAt limits how often a completed scan starts
 	// again while GitHub can still make a late approval visible.
 	InstallRequestFallbackRefreshedAt string `mapstructure:"installRequestFallbackRefreshedAt" json:"installRequestFallbackRefreshedAt,omitempty"`
