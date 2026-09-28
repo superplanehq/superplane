@@ -680,9 +680,9 @@ func Test__DatadogSeedAsksForTenNewestErrors(t *testing.T) {
 	issues, err := newestDatadogSeedIssues(client, "checkout")
 	require.NoError(t, err)
 	assert.Equal(t, "service:checkout", query)
-	require.Len(t, issues, intakeDatadogSeedSize)
+	require.Len(t, issues, 12)
 	assert.Equal(t, datadogSeedIssueID(12), issues[0].ID)
-	assert.Equal(t, datadogSeedIssueID(3), issues[len(issues)-1].ID)
+	assert.Equal(t, datadogSeedIssueID(1), issues[len(issues)-1].ID)
 	assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/"+datadogSeedIssueID(12), issues[0].URL)
 }
 
@@ -753,6 +753,38 @@ func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherService(t *testing.T) {
 		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
 	assert.Empty(t, issues)
+}
+
+func Test__DatadogSeedFillsFromTheNextIssueWhenDetailsDisagree(t *testing.T) {
+	const droppedID = "22222222-2222-4222-8222-222222222222"
+	const keptID = "33333333-3333-4333-8333-333333333333"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, droppedID) {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + droppedID + `","type":"issue","attributes":{"error_message":"billing failed","service":"billing"}}}`))
+			return
+		}
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, keptID) {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + keptID + `","type":"issue","attributes":{"error_message":"checkout failed","service":"checkout"}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{
+		{ID: droppedID, Service: "checkout"},
+		{ID: keptID, Service: "checkout"},
+	})
+	require.Len(t, issues, 1)
+	assert.Equal(t, keptID, issues[0].ID)
+	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
 }
 
 func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {

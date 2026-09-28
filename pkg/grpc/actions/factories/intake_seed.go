@@ -702,8 +702,11 @@ func seedDatadogIssues(
 }
 
 func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
-	hydrated := make([]datadog.ErrorTrackingIssue, 0, len(issues))
+	hydrated := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize)
 	for _, issue := range issues {
+		if len(hydrated) >= intakeDatadogSeedSize {
+			break
+		}
 		loaded, err := client.LoadErrorTrackingIssue(issue.ID, func(format string, args ...any) {
 			log.Warnf(format, args...)
 		})
@@ -756,7 +759,7 @@ func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.
 		matched = append(matched, issue)
 	}
 
-	return datadog.NewestErrorTrackingIssues(matched, intakeDatadogSeedSize), nil
+	return datadog.NewestErrorTrackingIssues(matched, intakeDatadogSearchPageSize), nil
 }
 
 func seedKnownDatadogIssues(
