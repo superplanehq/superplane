@@ -81,8 +81,11 @@ services:
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       NO_ENCRYPTION: "yes"
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      # Sign-in is mocked in development. Set real GitHub OAuth credentials
+      # in .env to run the real "connect GitHub" identity flow like
+      # production; the placeholders keep the mocked sign-in buttons working.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-1234567890abcdefghijklmnopqrstuv}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-1234567890abcdefghijklmnopqrstuv}
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.

@@ -133,6 +133,54 @@ func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 	})
 }
 
+// FindGitHubLoginForUser returns the GitHub login of the account behind an
+// organization user. The explicit linked account wins; the GitHub sign-in
+// provider is a read-only fallback, because both prove the same identity
+// through the same OAuth app. Returns "" when the user has no GitHub identity.
+func FindGitHubLoginForUser(tx *gorm.DB, userID string) (string, error) {
+	parsedUserID, err := uuid.Parse(strings.TrimSpace(userID))
+	if err != nil {
+		return "", nil
+	}
+
+	var user User
+	err = tx.Where("id = ?", parsedUserID).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if user.AccountID == nil {
+		return "", nil
+	}
+
+	var linked AccountLinkedAccount
+	err = tx.
+		Where("account_id = ? AND provider = ?", *user.AccountID, ProviderGitHub).
+		First(&linked).
+		Error
+	if err == nil && strings.TrimSpace(linked.Username) != "" {
+		return strings.TrimSpace(linked.Username), nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", err
+	}
+
+	var provider AccountProvider
+	err = tx.
+		Where("account_id = ? AND provider = ?", *user.AccountID, ProviderGitHub).
+		First(&provider).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(provider.Username), nil
+}
+
 func DeleteAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string) error {
 	return tx.
 		Where("account_id = ? AND provider = ?", accountID, provider).

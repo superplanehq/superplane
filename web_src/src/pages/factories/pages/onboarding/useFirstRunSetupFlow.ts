@@ -293,6 +293,13 @@ function useFirstRunCommands(args: {
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
+      // Identity discovery can prefill the account picker before any GitHub
+      // round trip. Show the stored accounts in place; "Install on another
+      // account" still opens the GitHub install page.
+      if (!connection.requestConnection && connection.accountPicker) {
+        navigation.goToScreen("connect", "picker");
+        return false;
+      }
       await waitForBrowserPaint();
       return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
     });
