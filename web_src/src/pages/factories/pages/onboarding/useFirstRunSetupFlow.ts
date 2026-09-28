@@ -4,6 +4,7 @@ import { useMe } from "@/hooks/useMe";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
+import { githubSwitchAccountPath } from "@/lib/githubIdentityLinkGate";
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import {
   GITHUB_SETUP_INTEGRATION_PARAM,
@@ -293,6 +294,13 @@ function useFirstRunCommands(args: {
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
+      // Identity discovery can prefill the account picker before any GitHub
+      // round trip. Show the stored accounts in place; "Install on another
+      // account" still opens the GitHub install page.
+      if (!connection.requestConnection && connection.accountPicker) {
+        navigation.goToScreen("connect", "picker");
+        return false;
+      }
       await waitForBrowserPaint();
       return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
     });
@@ -322,6 +330,15 @@ function useFirstRunCommands(args: {
       return true;
     });
   };
+  // Replaces the linked GitHub identity through the provider account picker,
+  // so a member signed in to more than one GitHub account can pick another
+  // one. The return resumes the connect and discovery refills the options.
+  const switchGitHubAccount = () =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      await waitForBrowserPaint();
+      window.location.assign(githubSwitchAccountPath(`${window.location.pathname}${window.location.search}`));
+      return true;
+    });
   const selectTicketSource = (source: FirstRunTicketSource) => {
     if (source === "jira" && !jiraAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
@@ -334,6 +351,7 @@ function useFirstRunCommands(args: {
     continueFromTickets,
     continueFromAgent,
     installOnAnotherAccount,
+    switchGitHubAccount,
     selectTicketSource,
   };
 }
