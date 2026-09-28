@@ -204,11 +204,15 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
   });
 }
 
-export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & { requireUser?: boolean };
+export type FactoryWorkOrdersPageOptions = Partial<WorkOrdersPageQuery> & {
+  requireUser?: boolean;
+  enabled?: boolean;
+};
 
 export type FactoryBoardDoneQuery = {
   lineId?: string;
   results?: readonly FactoriesWorkOrderResult[];
+  enabled?: boolean;
 };
 
 export type FactoryBoardWorkOrdersOptions = FactoryWorkOrdersPageOptions & {
@@ -254,7 +258,10 @@ export function useFactoryWorkOrdersPage(
     },
     getNextPageParam: getWorkOrdersNextPageParam,
     initialPageParam: undefined as WorkOrdersPageCursor | undefined,
-    enabled: Boolean(organizationId && factoryId) && (!options?.requireUser || Boolean(pageQuery.userId)),
+    enabled:
+      options?.enabled !== false &&
+      Boolean(organizationId && factoryId) &&
+      (!options?.requireUser || Boolean(pageQuery.userId)),
     staleTime: 0,
     placeholderData: keepPreviousData,
   });
@@ -333,6 +340,7 @@ export function useFactoryBoardWorkOrders(
     ...shared,
     lineId: options?.done?.lineId,
     results: doneResults && doneResults.length > 0 ? doneResults : BOARD_DONE_RESULTS,
+    enabled: options?.done?.enabled,
   });
 
   return {

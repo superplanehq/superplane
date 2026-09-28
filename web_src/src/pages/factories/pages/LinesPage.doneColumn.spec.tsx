@@ -443,4 +443,43 @@ describe("LinesPage Done column", () => {
     }
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
   });
+
+  it("does not show the first line while a task link is still loading", () => {
+    useWorkOrder.mockReturnValue({ data: undefined, isLoading: true });
+    useFactoryBoardWorkOrders.mockClear();
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/77`]}>
+              <FactoriesLayoutContext.Provider
+                value={{
+                  organizationId: "org-1",
+                  factoryId: PRIMARY_FACTORY_ID,
+                  factoryKey: PRIMARY_FACTORY_KEY,
+                  factory: REFUND_FACTORY,
+                  factories: [REFUND_FACTORY],
+                  openCreateWorkOrder: vi.fn(),
+                }}
+              >
+                <Routes>
+                  <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
+                </Routes>
+              </FactoriesLayoutContext.Provider>
+            </MemoryRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Loading task…")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-done-column")).not.toBeInTheDocument();
+    expect(useFactoryBoardWorkOrders).toHaveBeenCalled();
+    for (const call of useFactoryBoardWorkOrders.mock.calls) {
+      const options = call[2] as { done?: { lineId?: string; enabled?: boolean } };
+      expect(options.done?.lineId).toBeUndefined();
+      expect(options.done?.enabled).toBe(false);
+    }
+  });
 });

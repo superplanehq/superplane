@@ -251,6 +251,16 @@ function boardWorkOrdersPageOptions(
   };
 }
 
+function boardWorkOrdersWhileTaskLineLoads(
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  return {
+    ...boardWorkOrdersPageOptions(state, undefined, currentUserId),
+    done: { enabled: false },
+  };
+}
+
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
   factory: FactoriesFactory | null | undefined,
@@ -320,13 +330,18 @@ export function LinesPage() {
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
   const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
-  const { data: taskForBoardLine } = useWorkOrder(organizationId, factoryId, taskLineOrderId);
+  const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
+    organizationId,
+    factoryId,
+    taskLineOrderId,
+  );
+  const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
   const selectedLineId = displayedBoardLineId(
     routeLineId,
     boardLineId,
     lines,
     taskForBoardLine,
-    firstFactoryLineId(factory),
+    taskLinePending ? undefined : firstFactoryLineId(factory),
   );
   const {
     workOrders,
@@ -338,7 +353,9 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
+    taskLinePending
+      ? boardWorkOrdersWhileTaskLineLoads(listState, currentUserId)
+      : boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -455,7 +472,7 @@ export function LinesPage() {
   }
 
   if (!selectedLine) {
-    if (routeOrderNumber && permalink.status === "loading") {
+    if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
         <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
