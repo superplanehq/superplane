@@ -68,6 +68,10 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
 
+// FeatureFactoryTaskConsole gates the unified task popup: one console
+// timeline with a summary panel instead of the Task and Automations tabs.
+const FeatureFactoryTaskConsole = "factory_task_console"
+
 func released() *bool {
 	v := true
 	return &v
@@ -88,6 +92,7 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
+	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 }
 
 func All() []Feature {

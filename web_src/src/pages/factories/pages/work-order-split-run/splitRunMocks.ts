@@ -152,6 +152,8 @@ export interface SplitRunPhase {
   canvas?: SplitRunCanvasModel;
   /** Line step index used to rerun this automation. */
   stepIndex?: number;
+  /** Run from an earlier dispatch. Console run history; hidden in the classic tabs. */
+  historyRun?: boolean;
   /** Ledger cost for this phase, in USD cents. Hidden when zero. */
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
@@ -667,7 +669,10 @@ function phasesForOrder(
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
-    ...prior.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, peers)),
+    ...prior.map((execution) => ({
+      ...executionToPhase(order, execution, apiChecks, demoArtifacts, peers),
+      historyRun: true,
+    })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];

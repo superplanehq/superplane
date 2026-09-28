@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -13,6 +13,14 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 import { SPLIT_RUN_SUPER503_RUNNING } from "./splitRunSuper503RunningFixture";
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
