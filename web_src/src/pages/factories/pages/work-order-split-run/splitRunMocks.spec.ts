@@ -512,7 +512,11 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
 
     expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
-    expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
+    const current = fixture.phases.find((phase) => phase.id === fixture.currentPhaseId);
+    expect(current?.name).toBe("Implement");
+    expect(current?.status).toBe("running");
+    const implementRuns = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementRuns.map((phase) => phase.status).sort()).toEqual(["failed", "running"]);
   });
 
   it("gives a rerun of the same step its own phase and run", () => {
@@ -563,6 +567,58 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implementPhases[0].runId).toBe("run-old");
     expect(implementPhases[1].runId).toBe("run-new");
     expect(implementPhases[1].status).toBe("running");
+    expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
+  });
+
+  it("keeps runs from earlier dispatches as history phases", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Rerun history",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-old",
+            createdAt: "2026-08-26T05:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl-old",
+                step: "Implement",
+                stepIndex: 0,
+                createdAt: "2026-08-26T05:00:01.000Z",
+                state: "STATE_FINISHED",
+                result: "RESULT_CANCELLED",
+                run: { id: "run-old", appId: "app-impl" },
+              },
+            ],
+          },
+          {
+            id: "d-new",
+            createdAt: "2026-08-26T06:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              {
+                id: "e-impl-new",
+                step: "Implement",
+                stepIndex: 0,
+                createdAt: "2026-08-26T06:00:01.000Z",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                run: { id: "run-new", appId: "app-impl" },
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    const implementPhases = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementPhases.map((phase) => phase.runId)).toEqual(["run-old", "run-new"]);
+    expect(implementPhases[0].id).not.toBe(implementPhases[1].id);
+    expect(implementPhases[0].status).toBe("cancelled");
     expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
   });
 
@@ -921,7 +977,14 @@ describe("line board work-order examples", () => {
 
   it("keeps ingest analysis, a branch, and a pull request on the failed implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER);
-    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "done-closure",
+    ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-106", "#506"]);
     expect(fixture.footerTone).toBe("failed");
@@ -1937,6 +2000,7 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-88", "#510"]);
@@ -1957,6 +2021,9 @@ describe("line board work-order examples", () => {
       text: "The work is done. The result met the goal.",
       actor,
     });
+    const closure = fixture.phases.find((phase) => phase.id === "done-closure");
+    expect(closure).toMatchObject({ name: "Done", componentName: "Completed", status: "passed" });
+    expect(closure?.description).toBe("Alex marked this task as successful.");
   });
 
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
@@ -1969,6 +2036,7 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-112", "#512"]);
@@ -1994,6 +2062,7 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-113", "#513"]);

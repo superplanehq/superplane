@@ -1,5 +1,6 @@
 import { formatCheckScore } from "../../../lib/workOrderChecks";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
+import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
 import { formatClock } from "./redesignFormat";
 
@@ -105,8 +106,11 @@ export function outputCountLabel(count: number, singular: string, plural: string
  * the run started and which model ran it.
  */
 export function runFooterLine(stage: AutomationStage): string {
-  const started = formatClock(stage.startedAt);
-  return [started ? `Started ${started}` : "", stage.model].filter(Boolean).join(" · ");
+  const clock = formatClock(stage.startedAt);
+  if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID) {
+    return clock ? `Closed ${clock}` : "";
+  }
+  return [clock ? `Started ${clock}` : "", stage.model].filter(Boolean).join(" · ");
 }
 
 /** Markdown and inline HTML down to the words, for a one-line header. */

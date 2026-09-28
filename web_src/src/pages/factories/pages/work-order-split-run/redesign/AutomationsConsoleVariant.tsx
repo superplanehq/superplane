@@ -29,11 +29,17 @@ import {
   History,
   Link2,
   Maximize2,
+  Minimize2,
   RotateCw,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import type { FactoriesFactoryPullRequest } from "@/api-client";
+
 import { OrgUserReference } from "../../../OrgUserReference";
+import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
+import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
+import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../../WorkOrderPullRequestInline";
 import { formatCheckScore, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
@@ -50,7 +56,12 @@ import {
 import { WorkOrderMarkdownArtifactDialog } from "../../../WorkOrderMarkdownArtifactDialog";
 import { fileArtifactIcon } from "../../../WorkOrderArtifactInline";
 import { SplitRunCheckPills } from "../SplitRunReview";
-import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
+import {
+  SPLIT_RUN_CLOSURE_PHASE_ID,
+  type SplitRunFixture,
+  type SplitRunPhase,
+  type SplitRunPhaseStatus,
+} from "../splitRunMocks";
 import { splitRunLinkedArtifacts, splitRunPhaseRunHref } from "../splitRunPopupModel";
 import { LiveAgentSteps } from "./LiveAgentSteps";
 import {
@@ -87,6 +98,7 @@ export function AutomationsConsoleVariant({
   orderNumber,
   lineId,
   taskDescription,
+  pullRequests,
   panelReview,
   canStopRun = false,
   actionBusy = false,
@@ -100,6 +112,8 @@ export function AutomationsConsoleVariant({
   lineId?: string;
   /** Task description markdown for the creation card body. */
   taskDescription?: string;
+  /** Pull requests tracked on this task, for the summary panel. */
+  pullRequests?: FactoriesFactoryPullRequest[];
   /** Decision note and actions for the summary panel. */
   panelReview?: ReactNode;
   /** True when this person can cancel a live canvas run. */
@@ -148,7 +162,7 @@ export function AutomationsConsoleVariant({
               </TimelineHeader>
               <TimelineContent className="mt-2 flex flex-col gap-3 text-foreground">
                 {column.automations.length === 0 ? (
-                  <span className={META_TEXT_CLASSNAME}>Not started</span>
+                  <span className={META_TEXT_CLASSNAME}>{index + 1 < currentColumn ? "Skipped" : "Not started"}</span>
                 ) : (
                   column.automations.map((automation) => (
                     <ConsoleAutomationCard
@@ -175,7 +189,13 @@ export function AutomationsConsoleVariant({
           ))}
         </Timeline>
       </section>
-      <ConsoleSummaryPanel fixture={fixture} outcome={outcome} stages={stages} panelReview={panelReview} />
+      <ConsoleSummaryPanel
+        fixture={fixture}
+        outcome={outcome}
+        stages={stages}
+        pullRequests={pullRequests}
+        panelReview={panelReview}
+      />
       <ConsoleRunsDrawer
         automation={openAutomation}
         open={openAutomation !== null}
@@ -220,12 +240,16 @@ interface ConsoleColumn {
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
   const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter((stage) => stage.appId);
   const closedBy = (stage: AutomationStage) => Boolean(closerAppId) && stage.appId === closerAppId;
+  const closerRuns = pullRequestStages.filter(closedBy);
+  const closure = groups.taskStages.filter((stage) => stage.id === SPLIT_RUN_CLOSURE_PHASE_ID);
   return CONSOLE_COLUMNS.map((column) => {
     const stages =
       column.id === "verify"
         ? pullRequestStages.filter((stage) => !closedBy(stage))
         : column.id === "done"
-          ? pullRequestStages.filter(closedBy)
+          ? closerRuns.length > 0
+            ? closerRuns
+            : closure
           : groups.taskStages
               .filter(isConsoleTaskStage)
               .filter((stage) => (column.names as readonly string[]).includes(stage.name));
@@ -433,14 +457,14 @@ function ConsoleFullLog({
         <StageStatusGlyph status={latest.status} />
         <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{automation.name}</span>
         <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{runMetaLine(latest)}</span>
-        {runHref ? (
-          <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-[12px]" asChild>
-            <Link href={runHref}>
-              <Maximize2 className="size-3.5" aria-hidden />
-              View run
-            </Link>
-          </Button>
-        ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" aria-label="Collapse full log" onClick={onBack} className={HEADER_ICON_BUTTON}>
+              <Minimize2 className="size-3.5" aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Collapse</TooltipContent>
+        </Tooltip>
       </div>
       {latest.description ? (
         <div className="text-[12.5px] leading-5 text-muted-foreground">
@@ -448,8 +472,16 @@ function ConsoleFullLog({
         </div>
       ) : null}
       <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} expandSteps />
-      <div className="border-t pt-3">
-        <span className={META_TEXT_CLASSNAME}>{runFooterLine(latest)}</span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
+        <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(latest)}</span>
+        {runHref ? (
+          <Button size="sm" variant="outline" className="ms-auto shrink-0 gap-1.5" asChild>
+            <Link href={runHref}>
+              <Maximize2 className="size-3.5" aria-hidden />
+              View run
+            </Link>
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -1017,18 +1049,21 @@ function ConsoleSummaryPanel({
   fixture,
   outcome,
   stages,
+  pullRequests,
   panelReview,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
   stages: AutomationStage[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   panelReview?: ReactNode;
 }) {
   const artifacts = splitRunLinkedArtifacts([
     ...new Map(stages.flatMap((stage) => stage.outputs.artifacts).map((artifact) => [artifact.id, artifact])).values(),
   ]);
   const checks = stages.flatMap((stage) => stage.checks);
-  const hasOutputs = outcome.pullRequests.length > 0 || artifacts.length > 0 || checks.length > 0;
+  const panelPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
+  const hasOutputs = artifacts.length > 0 || checks.length > 0;
   const spendRows = (fixture.usageByModel ?? []).map((row) => ({
     label: row.model?.split("/").at(-1) ?? row.provider ?? "",
     value: `$${(Number(row.costCents ?? 0) / 100).toFixed(2)}`,
@@ -1044,6 +1079,16 @@ function ConsoleSummaryPanel({
           {panelReview ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
         {panelReview ? <FramePanel className="py-3">{panelReview}</FramePanel> : null}
+        {panelPullRequests.length > 0 ? (
+          <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
+            <span className="text-[12px] font-medium text-muted-foreground">
+              {panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
+            </span>
+            {panelPullRequests.map((pullRequest, index) => (
+              <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} />
+            ))}
+          </FramePanel>
+        ) : null}
         <FramePanel className="flex flex-col gap-2 py-3">
           <SummaryRow label="Owner">
             <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
@@ -1062,9 +1107,6 @@ function ConsoleSummaryPanel({
         {hasOutputs ? (
           <FramePanel className="flex flex-col gap-2 py-3">
             <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
-            {outcome.pullRequests.map((pullRequest) => (
-              <WorkOrderPullRequestInline key={pullRequest.id} pullRequest={pullRequest} showTitle />
-            ))}
             {artifacts.map((artifact) => (
               <WorkOrderArtifactInline
                 key={artifact.id}
@@ -1081,6 +1123,35 @@ function ConsoleSummaryPanel({
         ) : null}
       </Frame>
     </aside>
+  );
+}
+
+/**
+ * One pull request, first-class: the title links to the provider, the
+ * chips below carry state and mergeability, as on the board card.
+ */
+function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRequest }) {
+  const href = safeExternalUrl(pullRequest.url);
+  const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="line-clamp-2 min-w-0 text-[13px] font-medium leading-5 text-foreground hover:underline"
+        >
+          {title}
+        </a>
+      ) : (
+        <span className="line-clamp-2 min-w-0 text-[13px] font-medium leading-5 text-foreground">{title}</span>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <WorkOrderPullRequestChip pullRequest={pullRequest} />
+        {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
+      </div>
+    </div>
   );
 }
 

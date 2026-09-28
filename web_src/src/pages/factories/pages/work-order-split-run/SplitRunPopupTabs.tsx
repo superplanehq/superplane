@@ -170,6 +170,7 @@ export function SplitRunPopupTabs({
           orderNumber={orderNumber}
           lineId={lineId}
           taskDescription={edits.description}
+          pullRequests={popupData.pullRequests}
           panelReview={panelReview}
           canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}
           actionBusy={footerActions.busy}

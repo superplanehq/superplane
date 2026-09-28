@@ -748,6 +748,18 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
   });
 
+  it("shows the pull request first-class in the summary panel", () => {
+    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
+
+    const panel = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-pull-requests");
+    expect(within(panel).getByText("Pull request")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: "#6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/pull/6812",
+    );
+    expect(within(panel).getByLabelText("Review pull request #6812.")).toBeInTheDocument();
+  });
+
   it("hides merge when the pull request is merged", () => {
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_MERGED") });
 

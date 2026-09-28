@@ -39,7 +39,11 @@ import {
   isScoreCheckName,
 } from "../../lib/confidenceScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import {
+  getWorkOrderDisplayStatus,
+  getWorkOrderDisplayStatusMeta,
+  type WorkOrderDisplayStatus,
+} from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import {
   parseWorkOrderMetric,
@@ -388,7 +392,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
-  const phases = phasesForOrder(order, executions, options, demoArtifacts);
+  const phases = [
+    ...phasesForOrder(order, executions, options, demoArtifacts),
+    ...closurePhaseForOrder(order, displayStatus, options?.closer),
+  ];
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
@@ -651,12 +658,83 @@ function phasesForOrder(
   demoArtifacts: boolean,
 ): SplitRunPhase[] {
   const apiChecks = options?.checks;
+  const prior = priorLineExecutions(order, options?.lineId, executions);
+  const peers = [...prior, ...executions];
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
+    ...prior.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, peers)),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
+}
+
+export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
+
+const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "rejected", "cancelled", "failed"]);
+
+/**
+ * The decision that closed the task, as a Done stage. Mirrors the
+ * creation stage in Backlog. The console shows it in Done when no
+ * closer automation run sits there.
+ */
+function closurePhaseForOrder(
+  order: FactoriesWorkOrder,
+  displayStatus: WorkOrderDisplayStatus,
+  closer?: { actor?: OrgUserDisplay; automationName?: string },
+): SplitRunPhase[] {
+  if (!CLOSED_DISPLAY_STATUSES.has(displayStatus)) {
+    return [];
+  }
+  const note = doneFooterForStatus(displayStatus, closer).note;
+  const sentence = note ? `${note.actor?.name ? `${note.actor.name} ` : ""}${note.headline}.` : undefined;
+  return [
+    {
+      id: SPLIT_RUN_CLOSURE_PHASE_ID,
+      name: "Done",
+      description: sentence,
+      status: closureStatus(displayStatus),
+      duration: "",
+      startedAt: order.updatedAt,
+      componentName: getWorkOrderDisplayStatusMeta(displayStatus).label,
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      canvasKey: null,
+    },
+  ];
+}
+
+function closureStatus(displayStatus: WorkOrderDisplayStatus): SplitRunPhaseStatus {
+  if (displayStatus === "completed") {
+    return "passed";
+  }
+  if (displayStatus === "cancelled") {
+    return "cancelled";
+  }
+  return "failed";
+}
+
+/**
+ * Executions from earlier dispatches of this line. A stop-and-rerun makes a
+ * new dispatch, so these are the earlier runs of the same steps. The console
+ * groups them with the current run as run history.
+ */
+function priorLineExecutions(
+  order: FactoriesWorkOrder,
+  lineId: string | null | undefined,
+  current: FactoriesWorkOrderExecution[],
+): FactoriesWorkOrderExecution[] {
+  const visible = visibleDispatchForLine(order, lineId);
+  if (!visible) {
+    return [];
+  }
+  const shown = new Set(current.map((execution) => execution.id));
+  return (order.lineDispatches ?? [])
+    .filter((dispatch) => dispatch.id !== visible.id && (!lineId || dispatch.line?.id === lineId))
+    .flatMap((dispatch) => dispatch.stepExecutions ?? [])
+    .filter((execution) => !shown.has(execution.id))
+    .sort((left, right) => (Date.parse(left.createdAt ?? "") || 0) - (Date.parse(right.createdAt ?? "") || 0));
 }
 
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
