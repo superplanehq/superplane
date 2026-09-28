@@ -45,7 +45,6 @@ export const FIRST_RUN_COPY = {
     installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
     openingGitHub: "Opening GitHub…",
     loadingAccounts: "Loading GitHub accounts…",
-    checkingMoreAccounts: "Checking for more GitHub accounts…",
     refreshError: "SuperPlane could not refresh your GitHub accounts.",
     tryAgain: "Try again",
     connectingAccount: (account: string) => `Connecting ${account}…`,

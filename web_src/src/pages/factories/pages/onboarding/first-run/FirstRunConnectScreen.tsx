@@ -65,24 +65,16 @@ function FirstRunGitHubAccountPicker({
   githubState,
   bindingInstallationId,
   disabled,
-  discoveringAccounts,
-  installAvailable,
-  syncError,
   onUseInstallation,
   onInstallOther,
-  onRetrySync,
 }: {
   installations: PendingGitHubInstallation[];
   githubAppSlug: string;
   githubState: string;
   bindingInstallationId?: string;
   disabled?: boolean;
-  discoveringAccounts?: boolean;
-  installAvailable?: boolean;
-  syncError?: string;
   onUseInstallation: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
-  onRetrySync?: () => void;
 }) {
   const binding = bindingInstallationId !== undefined || disabled;
   return (
@@ -103,24 +95,7 @@ function FirstRunGitHubAccountPicker({
             {copy.useAccount(installation.accountLogin)}
           </LoadingButton>
         ))}
-      {discoveringAccounts ? (
-        <p className="text-[13px] text-muted-foreground" role="status">
-          {copy.checkingMoreAccounts}
-        </p>
-      ) : null}
-      {syncError ? (
-        <div className="space-y-2">
-          <p className="text-[13px] text-destructive" role="alert">
-            {syncError}
-          </p>
-          {onRetrySync ? (
-            <LoadingButton type="button" size="sm" variant="outline" onClick={onRetrySync}>
-              {copy.tryAgain}
-            </LoadingButton>
-          ) : null}
-        </div>
-      ) : null}
-      {(!discoveringAccounts || syncError || installAvailable) && githubAppSlug !== "" ? (
+      {githubAppSlug !== "" ? (
         <p className="text-[13px] text-muted-foreground">
           {copy.missingAccount}{" "}
           <a
@@ -152,21 +127,13 @@ function connectScreenState({
   githubOrganizations,
   pendingInstallations,
   githubState,
-  discoveringAccounts,
-  installAvailable,
-  syncError,
 }: {
   installRequested: boolean;
   githubOrganizations: string[];
   pendingInstallations: PendingGitHubInstallation[];
   githubState: string;
-  discoveringAccounts: boolean;
-  installAvailable: boolean;
-  syncError?: string;
 }) {
-  const showAccountPicker =
-    githubState !== "" &&
-    (pendingInstallations.length >= 1 || (discoveringAccounts && (Boolean(syncError) || installAvailable)));
+  const showAccountPicker = pendingInstallations.length >= 1 && githubState !== "";
   // A requested organization is ready only after the server verifies at
   // least one repository that the member can use. An installation row with
   // no repositories can be stale and must not clear the waiting state.
@@ -189,8 +156,6 @@ export function FirstRunConnectScreen({
   loading = false,
   pickerExpected = false,
   installRequested = false,
-  discoveringAccounts = false,
-  installAvailable = false,
   githubOrganization = "",
   githubOrganizations,
   pendingInstallations = [],
@@ -213,8 +178,6 @@ export function FirstRunConnectScreen({
   /** True after GitHub returns, while the organization picker synchronizes. */
   pickerExpected?: boolean;
   installRequested?: boolean;
-  discoveringAccounts?: boolean;
-  installAvailable?: boolean;
   githubOrganization?: string;
   githubOrganizations?: string[];
   pendingInstallations?: PendingGitHubInstallation[];
@@ -239,9 +202,6 @@ export function FirstRunConnectScreen({
     githubOrganizations: requestedOrganizations,
     pendingInstallations,
     githubState,
-    discoveringAccounts,
-    installAvailable,
-    syncError,
   });
 
   return (
@@ -256,7 +216,7 @@ export function FirstRunConnectScreen({
       <div className="mt-8 space-y-6">
         {loading ? (
           <ConnectScreenLoading />
-        ) : syncError && pickerExpected && !showAccountPicker ? (
+        ) : syncError && pickerExpected ? (
           <ConnectScreenSyncError error={syncError} onRetry={onRetrySync} />
         ) : (
           <ConnectScreenBody
@@ -266,15 +226,11 @@ export function FirstRunConnectScreen({
             githubAppSlug={githubAppSlug}
             bindingInstallationId={bindingInstallationId}
             connecting={connecting}
-            discoveringAccounts={discoveringAccounts}
-            installAvailable={installAvailable}
-            syncError={syncError}
             showAccountPicker={showAccountPicker}
             waitingForApproval={waitingForApproval}
             onConnectGitHub={onConnectGitHub}
             onUseInstallation={onUseInstallation}
             onInstallOther={onInstallOther}
-            onRetrySync={onRetrySync}
           />
         )}
         <ConnectScreenError error={connectError} waitingForApproval={waitingForApproval} />
@@ -351,15 +307,11 @@ function ConnectScreenBody({
   githubAppSlug,
   bindingInstallationId,
   connecting,
-  discoveringAccounts,
-  installAvailable,
-  syncError,
   showAccountPicker,
   waitingForApproval,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
-  onRetrySync,
 }: {
   githubOrganizations: string[];
   pendingInstallations: PendingGitHubInstallation[];
@@ -367,15 +319,11 @@ function ConnectScreenBody({
   githubAppSlug: string;
   bindingInstallationId?: string;
   connecting: boolean;
-  discoveringAccounts: boolean;
-  installAvailable: boolean;
-  syncError?: string;
   showAccountPicker: boolean;
   waitingForApproval: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
-  onRetrySync?: () => void;
 }) {
   const organizationStatus = waitingForApproval ? (
     <FirstRunPendingOrganizationRows githubOrganizations={githubOrganizations} />
@@ -390,12 +338,8 @@ function ConnectScreenBody({
           githubState={githubState}
           bindingInstallationId={bindingInstallationId}
           disabled={connecting}
-          discoveringAccounts={discoveringAccounts}
-          installAvailable={installAvailable}
-          syncError={syncError}
           onUseInstallation={onUseInstallation}
           onInstallOther={onInstallOther}
-          onRetrySync={onRetrySync}
         />
       </FirstRunGithubStepper>
     );

@@ -1,6 +1,7 @@
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
@@ -11,7 +12,12 @@ import {
   GITHUB_SETUP_REQUEST_PARAM,
   GITHUB_SETUP_REQUEST_VALUE,
 } from "@/lib/integrationSetupReturn";
-import type { pendingGitHubRequestConnection, PendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
+import {
+  githubAccountPickerFromConnection,
+  pendingGitHubAccountPicker,
+  pendingGitHubRequestConnection,
+  type PendingGitHubAccountPicker,
+} from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -31,9 +37,7 @@ import {
   type OnboardingAgentGate,
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
-import { resolveGitHubConnection } from "./resolveGitHubConnection";
 import { clearGitHubSetupParams, useGitHubCallbackSync } from "./useGitHubCallbackSync";
-import { useGitHubDiscoveryPolling } from "./useGitHubDiscoveryPolling";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -123,19 +127,13 @@ function useGitHubConnectionState(model: OnboardingPageModel, organizationId: st
   const { data: me, isPending: meLoading } = useMe(true, organizationId);
   const [searchParams, setSearchParams] = useSearchParams();
   const callbackIntegrationId = searchParams.get(GITHUB_SETUP_INTEGRATION_PARAM)?.trim() || undefined;
-  const [discoveryIntegrationId, setDiscoveryIntegrationId] = useState<string>();
   const callbackSync = useGitHubCallbackSync({
     searchParams,
     setSearchParams,
     integrationId: callbackIntegrationId,
     syncGithubConnection: model.syncGithubConnection,
   });
-  const resolved = resolveGitHubConnection(model, me?.id, callbackIntegrationId, discoveryIntegrationId);
-  const activeDiscoveryId = resolved.accountPicker?.discoveringAccounts ? resolved.accountPicker.id : undefined;
-  useEffect(() => {
-    if (!activeDiscoveryId) return;
-    setDiscoveryIntegrationId(activeDiscoveryId);
-  }, [activeDiscoveryId]);
+  const resolved = resolveGitHubConnection(model, me?.id, callbackIntegrationId);
   const requestConnection = resolved.requestConnection;
   const callbackRequestPending =
     hasRequestMarker(searchParams) && (callbackSync.active || model.githubConnectionsLoading);
@@ -161,6 +159,24 @@ function useGitHubConnectionState(model: OnboardingPageModel, organizationId: st
     startOnPicker: startConnectOnPicker(searchParams),
     initialScreen: initialFirstRunScreen(searchParams),
   };
+}
+
+function resolveGitHubConnection(model: OnboardingPageModel, userId?: string, callbackIntegrationId?: string) {
+  const requestConnection = pendingGitHubRequestConnection(
+    model.githubConnections.allInstances,
+    userId,
+    callbackIntegrationId,
+  );
+  const preferredId = requestConnection?.id ?? callbackIntegrationId;
+  const preferredConnection = model.githubConnections.allInstances.find((item) => item.metadata?.id === preferredId);
+  const selectedConnection = model.githubConnections.readyInstances.find(
+    (item) => item.metadata?.id === model.selectedVcsConnectionId,
+  );
+  const accountPicker = preferredId
+    ? githubAccountPickerFromConnection(preferredConnection, userId)
+    : (pendingGitHubAccountPicker(model.githubConnections.allInstances, userId) ??
+      githubAccountPickerFromConnection(selectedConnection, userId));
+  return { requestConnection, accountPicker };
 }
 
 function hasRequestMarker(searchParams: URLSearchParams): boolean {
@@ -221,14 +237,12 @@ function useFirstRunNavigation(
       model.setup.issuesChoice,
       model.jiraProjectId,
     ),
-    pickerOpen,
     pickerShowing: pickerOpen && (Boolean(connection.accountPicker) || connection.callbackSyncActive),
     pickerLoading:
       pickerOpen &&
       (connection.callbackSyncActive
         ? connection.callbackSyncError === undefined
-        : (connection.accountPicker?.discoveringAccounts && connection.accountPicker.installations.length === 0) ||
-          (!connection.accountPicker && connection.sourcesLoading)),
+        : !connection.accountPicker && connection.sourcesLoading),
     closePicker: () => setPickerOpen(false),
     goToScreen,
   };
@@ -488,23 +502,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // Recheck while a request waits, and also while the picker is open: an
   // install request made on GitHub without a callback (for example when the
   // callback URL was unreachable) only surfaces through this sync.
-  const discoveryActive = connection.accountPicker?.discoveringAccounts === true;
-  const recheck = useGitHubDiscoveryPolling({
+  useRecheckGitHubInstallRequest(
     organizationId,
-    integrationId: connection.requestConnection?.id ?? connection.accountPicker?.id,
-    enabled:
-      navigation.screen === "connect" &&
+    connection.requestConnection?.id ?? connection.accountPicker?.id,
+    navigation.screen === "connect" &&
       !connection.callbackSyncActive &&
       (connection.installRequested || navigation.pickerShowing),
-    discoveryActive,
-    connectScreenOpen: navigation.screen === "connect",
-    pickerOpen: navigation.pickerOpen,
-    installRequested: connection.installRequested,
-    browserAction: connection.browserActionConnection,
-  });
-
-  const refreshFailed = recheck?.failed === true;
-  const retryGithubSync = connection.callbackSyncError ? connection.retryCallbackSync : recheck?.retry;
+  );
 
   return {
     ...navigation,
@@ -526,8 +530,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,
     accountPicker: connection.accountPicker,
     githubCallbackSyncError: connection.callbackSyncError,
-    githubRefreshFailed: refreshFailed,
-    retryGithubSync,
+    retryGithubCallbackSync: connection.retryCallbackSync,
     blockingAction: blocking.action,
     busy: blocking.busy || model.saving,
   };

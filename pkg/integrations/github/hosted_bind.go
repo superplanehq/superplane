@@ -25,6 +25,7 @@ var (
 	getAppInstallation              = getAppInstallationFromGitHub
 	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub
 	findAppUserInstallation         = findAppUserInstallationFromGitHub
+	resolveInstallationIdentity     = resolveInstallationIdentityFromGitHub
 	getRepositoryPermission         = getRepositoryPermissionFromGitHub
 )
 
@@ -412,6 +413,15 @@ func findAppUserInstallationFromGitHub(
 ) (*github.Installation, error) {
 	installation, _, err := client.Apps.FindUserInstallation(ctx, account)
 	return installation, err
+}
+
+func resolveInstallationIdentityFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	id int64,
+) (*github.User, error) {
+	user, _, err := client.Users.GetByID(ctx, id)
+	return user, err
 }
 
 func getRepositoryPermissionFromGitHub(

@@ -202,7 +202,6 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
     githubState: flow.accountPicker?.state,
     githubAppSlug: flow.accountPicker?.appSlug,
     githubLogin: flow.accountPicker?.githubLogin,
-    installAvailable: flow.accountPicker?.installAvailable,
   };
 }
 
@@ -321,12 +320,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        loading={flow.pickerLoading && !flow.githubRefreshFailed}
+        loading={flow.pickerLoading}
         pickerExpected={flow.pickerShowing}
-        discoveringAccounts={flow.accountPicker?.discoveringAccounts}
-        syncError={
-          flow.githubCallbackSyncError || flow.githubRefreshFailed ? FIRST_RUN_COPY.connect.refreshError : undefined
-        }
+        syncError={flow.githubCallbackSyncError}
         installRequested={flow.installRequested}
         githubOrganizations={flow.githubOrganizations}
         {...pickerPropsFor(flow)}
@@ -337,7 +333,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
-        onRetrySync={flow.retryGithubSync}
+        onRetrySync={flow.retryGithubCallbackSync}
       />
     );
   }
