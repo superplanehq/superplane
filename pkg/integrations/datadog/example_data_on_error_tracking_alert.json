@@ -1,12 +1,16 @@
 {
-  "id": "1234567",
-  "event_type": "error_tracking_alert",
-  "title": "[Triggered] checkout new issues",
-  "body": "InventoryTimeout: checkout failed: inventory timeout",
-  "alert_id": "98765",
-  "alert_transition": "Triggered",
-  "tags": "service:checkout,env:prod,monitor",
-  "alert_query": "error-tracking(\"service:checkout\").source(\"backend\").new().rollup(\"count\").by(\"@issue.id\").last(\"1d\") > 0",
-  "alert_scope": "service:checkout,env:prod",
-  "link": "https://app.datadoghq.com/monitors/98765"
+  "data": {
+    "alert_id": "98765",
+    "alert_query": "error-tracking(\"service:checkout\").source(\"backend\").new().rollup(\"count\").by(\"@issue.id\").last(\"1d\") > 0",
+    "alert_scope": "service:checkout,env:prod",
+    "alert_transition": "Triggered",
+    "body": "InventoryTimeout: checkout failed: inventory timeout",
+    "event_type": "error_tracking_alert",
+    "id": "1234567",
+    "link": "https://app.datadoghq.com/monitors/98765",
+    "tags": "service:checkout,env:prod,monitor",
+    "title": "[Triggered] checkout new issues"
+  },
+  "timestamp": "2026-09-27T19:51:32.010Z",
+  "type": "datadog.errorTrackingAlert"
 }

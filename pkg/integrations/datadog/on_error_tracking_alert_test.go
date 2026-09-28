@@ -473,11 +473,13 @@ func Test__OnErrorTrackingAlert__OnIntegrationMessage(t *testing.T) {
 func Test__OnErrorTrackingAlert__ExampleDataMatchesTrigger(t *testing.T) {
 	trigger := &OnErrorTrackingAlert{}
 	example := trigger.ExampleData()
+	message, _ := example["data"].(map[string]any)
+	require.NotNil(t, message)
 
 	events := &contexts.EventContext{}
 	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
 		Configuration: map[string]any{"service": "checkout"},
-		Message:       example,
+		Message:       message,
 		Events:        events,
 	})
 	require.NoError(t, err)

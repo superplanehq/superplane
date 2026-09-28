@@ -210,6 +210,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Datadog Error Tracking alerts.",
     iconSrc: datadogIcon,
     iconAlt: "Datadog",
+    tabLabel: "Datadog",
     listen: {
       kind: "webhook",
       label: "On Error Tracking alert",
