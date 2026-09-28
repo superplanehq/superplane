@@ -211,10 +211,17 @@ export function SplitRunPopupTabs({
         <AutomationsConsoleVariant
           fixture={consoleFixture}
           organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
           factoryKey={factoryKey}
           orderNumber={orderNumber}
           lineId={lineId}
           taskDescription={edits.description}
+          canEditDescription={edits.canEditDescription}
+          descriptionBusy={edits.descriptionBusy}
+          onDescriptionSave={edits.saveDescription}
+          source={fixture.source}
+          files={files}
           pullRequests={popupData.pullRequests}
           panelReview={panelReview}
           canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}

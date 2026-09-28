@@ -34,6 +34,10 @@ vi.mock("@/hooks/useFactoryData", () => {
   };
 });
 
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: () => true,

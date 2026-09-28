@@ -55,6 +55,10 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
@@ -88,6 +92,8 @@ import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/w
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
+import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
@@ -414,6 +420,30 @@ describe("WorkOrderSplitRunPopup", () => {
     const panel = screen.getByTestId("redesign-console-summary");
     expect(panel).toHaveTextContent("$0.73");
     expect(panel).toHaveTextContent("2.7k tokens");
+    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
+    expect(within(panel).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+  });
+
+  it("lists attached files in the console summary", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <LiveHeaderSpendProvider>
+                <AutomationsConsoleVariant
+                  fixture={SPLIT_RUN_RUNNING}
+                  source={SPLIT_RUN_RUNNING.source}
+                  files={[{ id: "file-bug", filename: "bug.png", downloadUrl: "https://cdn.example/bug.png" }]}
+                />
+              </LiveHeaderSpendProvider>
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("redesign-console-files")).toHaveTextContent("bug.png");
   });
 
   it("keeps the implement model off the header line while the task is running", () => {
@@ -434,6 +464,25 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("$0.00");
+  });
+
+  it("shows live run spend in the console summary while a step runs", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      fixture: runningImplementWithZeroSavedSpend(),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("$0.45");
+    });
+    expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("2.1k tokens");
   });
 
   it("shows planning tokens on a draft header while the agent runs and waits", async () => {
@@ -1297,6 +1346,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-task-description")).toHaveTextContent("emoji reactions");
+    expect(screen.getByTestId("split-run-description-edit")).toBeInTheDocument();
     const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(note).toHaveTextContent("This task is ready to start");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
@@ -1491,7 +1541,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
-    expect(screen.getByText("Risk score")).toBeInTheDocument();
+    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Risk score")).toBeInTheDocument();
   });
 
   it("shows the console when a GitHub automation created the draft", () => {

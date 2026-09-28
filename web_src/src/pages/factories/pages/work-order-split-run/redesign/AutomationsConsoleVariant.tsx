@@ -18,14 +18,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ArrowLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FilesFile } from "@/api-client";
 
-import {
-  SPLIT_RUN_CLOSURE_PHASE_ID,
-  type SplitRunFixture,
-  type SplitRunPhase,
-  type SplitRunPhaseStatus,
-} from "../splitRunMocks";
+import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
+import type { SplitRunSource } from "../splitRunSource";
 import { splitRunPhaseRunHref } from "../splitRunPopupModel";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleRunsDrawer } from "./ConsoleRunsDrawer";
@@ -35,8 +31,8 @@ import { LiveAgentSteps } from "./LiveAgentSteps";
 import { runFooterLine, runMetaLine } from "./consoleCardText";
 import {
   allStages,
-  isConsoleTaskStage,
   outcomeSummary,
+  stagesByConsoleColumn,
   stagesFromFixture,
   type AutomationStage,
   type ConsoleAutomation,
@@ -57,10 +53,17 @@ import { StageStatusGlyph } from "./redesignShared";
 export function AutomationsConsoleVariant({
   fixture,
   organizationId,
+  factoryId,
+  orderId,
   factoryKey,
   orderNumber,
   lineId,
   taskDescription,
+  canEditDescription = false,
+  descriptionBusy = false,
+  onDescriptionSave,
+  source,
+  files,
   pullRequests,
   panelReview,
   canStopRun = false,
@@ -70,11 +73,18 @@ export function AutomationsConsoleVariant({
 }: {
   fixture: SplitRunFixture;
   organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
   /** Task description markdown for the creation card body. */
   taskDescription?: string;
+  canEditDescription?: boolean;
+  descriptionBusy?: boolean;
+  onDescriptionSave?: (next: string) => void | Promise<void>;
+  source?: SplitRunSource;
+  files?: FilesFile[];
   /** Pull requests tracked on this task, for the summary panel. */
   pullRequests?: FactoriesFactoryPullRequest[];
   /** Decision note and actions for the summary panel. */
@@ -133,10 +143,16 @@ export function AutomationsConsoleVariant({
                       automation={automation}
                       phase={fixture.phases.find((phase) => phase.id === automation.latest.id)}
                       organizationId={organizationId}
+                      factoryId={factoryId}
+                      orderId={orderId}
                       factoryKey={factoryKey}
                       orderNumber={orderNumber}
                       lineId={lineId}
                       taskDescription={taskDescription}
+                      canEditDescription={canEditDescription}
+                      descriptionBusy={descriptionBusy}
+                      onDescriptionSave={onDescriptionSave}
+                      files={files}
                       defaultOpen={index + 1 === currentColumn}
                       canStopRun={canStopRun}
                       actionBusy={actionBusy}
@@ -158,6 +174,8 @@ export function AutomationsConsoleVariant({
         stages={stages}
         pullRequests={pullRequests}
         panelReview={panelReview}
+        source={source}
+        files={files}
       />
       <ConsoleRunsDrawer
         automation={openAutomation}
@@ -174,10 +192,10 @@ export function AutomationsConsoleVariant({
 }
 
 const CONSOLE_COLUMNS = [
-  { id: "backlog", title: "Backlog", names: ["Backlog", "Analysis"] },
-  { id: "implement", title: "Implement", names: ["Implement"] },
-  { id: "verify", title: "Verify", names: [] },
-  { id: "done", title: "Done", names: [] },
+  { id: "backlog", title: "Backlog" },
+  { id: "implement", title: "Implement" },
+  { id: "verify", title: "Verify" },
+  { id: "done", title: "Done" },
 ] as const;
 
 interface ConsoleColumn {
@@ -193,23 +211,12 @@ interface ConsoleColumn {
  * task: those sit in Done.
  */
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
-  const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter((stage) => stage.appId);
-  const closedBy = (stage: AutomationStage) => Boolean(closerAppId) && stage.appId === closerAppId;
-  const closerRuns = pullRequestStages.filter(closedBy);
-  const closure = groups.taskStages.filter((stage) => stage.id === SPLIT_RUN_CLOSURE_PHASE_ID);
-  return CONSOLE_COLUMNS.map((column) => {
-    const stages =
-      column.id === "verify"
-        ? pullRequestStages.filter((stage) => !closedBy(stage))
-        : column.id === "done"
-          ? closerRuns.length > 0
-            ? closerRuns
-            : closure
-          : groups.taskStages
-              .filter(isConsoleTaskStage)
-              .filter((stage) => (column.names as readonly string[]).includes(stage.name));
-    return { id: column.id, title: column.title, automations: automationsFromStages(stages) };
-  });
+  const byColumn = stagesByConsoleColumn(groups, closerAppId);
+  return CONSOLE_COLUMNS.map((column) => ({
+    id: column.id,
+    title: column.title,
+    automations: automationsFromStages(byColumn[column.id]),
+  }));
 }
 
 /** Timeline steps to fill: through the last column that has a run. */
@@ -249,10 +256,16 @@ function ConsoleAutomationCard({
   automation,
   phase,
   organizationId,
+  factoryId,
+  orderId,
   factoryKey,
   orderNumber,
   lineId,
   taskDescription,
+  canEditDescription,
+  descriptionBusy,
+  onDescriptionSave,
+  files,
   defaultOpen,
   canStopRun,
   actionBusy,
@@ -264,10 +277,16 @@ function ConsoleAutomationCard({
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
   taskDescription?: string;
+  canEditDescription?: boolean;
+  descriptionBusy?: boolean;
+  onDescriptionSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
   /** True for cards in the column the task is currently in. */
   defaultOpen: boolean;
   canStopRun: boolean;
@@ -333,7 +352,13 @@ function ConsoleAutomationCard({
               automation={automation}
               phase={shownPhase}
               organizationId={organizationId}
+              factoryId={factoryId}
+              orderId={orderId}
               taskDescription={taskDescription}
+              canEditDescription={canEditDescription}
+              descriptionBusy={descriptionBusy}
+              onDescriptionSave={onDescriptionSave}
+              files={files}
               runHref={runHref}
               onStop={stopRun}
               onRetry={rerunStep}

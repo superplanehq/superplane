@@ -1,6 +1,8 @@
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { headerSpendFromUsageSeries } from "../planningHeaderSpend";
+import { useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "../streamNotesFromLiveLog";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
@@ -56,6 +58,7 @@ export function LiveAgentSteps({
           line={line}
           organizationId={organizationId}
           canvasId={phase.appId ?? ""}
+          spendPhaseId={phase.id}
           onNotes={reportNotes}
         />
       ))}
@@ -68,30 +71,37 @@ function RunnerNotes({
   line,
   organizationId,
   canvasId,
+  spendPhaseId,
   onNotes,
 }: {
   line: SplitRunStreamLine;
   organizationId: string;
   canvasId: string;
+  spendPhaseId: string;
   onNotes: (lineId: string, notes: SplitRunStreamLine[]) => void;
 }) {
-  const notes = useRunnerLiveNotes(line, organizationId, canvasId);
+  const { notes, spend } = useRunnerLiveNotes(line, organizationId, canvasId);
+  useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
   useEffect(() => {
     onNotes(line.id, notes);
   }, [line.id, notes, onNotes]);
   return null;
 }
 
-function useRunnerLiveNotes(line: SplitRunStreamLine, organizationId: string, canvasId: string): SplitRunStreamLine[] {
+function useRunnerLiveNotes(
+  line: SplitRunStreamLine,
+  organizationId: string,
+  canvasId: string,
+): { notes: SplitRunStreamLine[]; spend: ReturnType<typeof headerSpendFromUsageSeries> } {
   const canStream = Boolean(canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming, usageSeries } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     liveLogFinishState(line.status),
     null,
     { organizationId, canvasId },
   );
-  return useMemo(() => {
+  const notes = useMemo(() => {
     if (!canStream) {
       return [];
     }
@@ -106,6 +116,7 @@ function useRunnerLiveNotes(line: SplitRunStreamLine, organizationId: string, ca
       }) ?? []
     );
   }, [canStream, error, isStreaming, line.id, line.nodeId, line.status, orphanLines, sections]);
+  return { notes, spend: headerSpendFromUsageSeries(usageSeries ?? []) };
 }
 
 function stoppedStepStatus(
