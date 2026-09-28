@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -30,6 +31,7 @@ type repositoryPermissionLookup func(context.Context, string, string, string) (*
 const (
 	allowUnverifiedDevelopmentRepositoriesEnv = "SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES"
 	hostedInstallationVerificationConcurrency = 8
+	hostedInstallRequestFallbackPageSize      = 8
 	maxHostedDiscoveryErrors                  = 3
 )
 
@@ -106,6 +108,33 @@ func discoverAccessibleInstallations(
 		return nil, fmt.Errorf("list GitHub App installations: %w", err)
 	}
 	return verifyAccessibleInstallations(ctx, integration, app, identity, installations, nil)
+}
+
+func discoverAccessibleRecentInstallations(
+	ctx context.Context,
+	integration core.IntegrationContext,
+	app common.HostedApp,
+	identity hostedGitHubIdentity,
+	since time.Time,
+	page int,
+) ([]common.PendingInstallation, int, error) {
+	appClient, err := newAppJWTClient(integration, app.ID)
+	if err != nil {
+		return nil, -1, fmt.Errorf("create GitHub App client: %w", err)
+	}
+
+	installations, nextPage, err := listRecentAppInstallations(
+		ctx,
+		appClient,
+		since,
+		page,
+		hostedInstallRequestFallbackPageSize,
+	)
+	if err != nil {
+		return nil, -1, fmt.Errorf("list recent GitHub App installations: %w", err)
+	}
+	accessible, err := verifyAccessibleInstallations(ctx, integration, app, identity, installations, nil)
+	return accessible, nextPage, err
 }
 
 func discoverAccessibleInstallationByID(

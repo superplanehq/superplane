@@ -56,8 +56,12 @@ type Metadata struct {
 	// the follow-up window so Sync can verify them directly without showing a
 	// waiting row or scanning every App installation.
 	InstallRequestDiscoveryAccounts []string `mapstructure:"installRequestDiscoveryAccounts" json:"installRequestDiscoveryAccounts,omitempty"`
-	// InstallRequestFallbackRefreshedAt limits compatibility scans for active
-	// follow-up windows saved before account tracking was available.
+	// InstallRequestFallbackSince and InstallRequestFallbackPage resume bounded
+	// compatibility scans for follow-up windows saved before account tracking.
+	InstallRequestFallbackSince string `mapstructure:"installRequestFallbackSince" json:"installRequestFallbackSince,omitempty"`
+	InstallRequestFallbackPage  int    `mapstructure:"installRequestFallbackPage" json:"installRequestFallbackPage,omitempty"`
+	// InstallRequestFallbackRefreshedAt limits how often a completed scan starts
+	// again while GitHub can still make a late approval visible.
 	InstallRequestFallbackRefreshedAt string `mapstructure:"installRequestFallbackRefreshedAt" json:"installRequestFallbackRefreshedAt,omitempty"`
 	// ObservedInstallRequestIDs records App requests visible before the local
 	// development flow opens GitHub. The request callback uses this baseline to

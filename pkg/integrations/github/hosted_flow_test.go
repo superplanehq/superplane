@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -744,12 +745,34 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return nil, nil
 	}
-	fullDiscoveryCalls := 0
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		fullDiscoveryCalls++
-		return []common.PendingInstallation{{ID: "22", AccountLogin: "approved", AccountType: "Organization"}}, nil
+		t.Fatal("legacy recovery must not list every App installation")
+		return nil, nil
 	}
-	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+	discoveryPages := []int{}
+	listRecentAppInstallations = func(
+		_ context.Context,
+		_ *gh.Client,
+		since time.Time,
+		page int,
+		perPage int,
+	) ([]common.PendingInstallation, int, error) {
+		discoveryPages = append(discoveryPages, page)
+		assert.False(t, since.IsZero())
+		assert.Equal(t, hostedInstallRequestFallbackPageSize, perPage)
+		if page == 2 {
+			return nil, 0, nil
+		}
+		assert.Equal(t, 1, page)
+		return []common.PendingInstallation{
+			{ID: "11", AccountLogin: "unavailable", AccountType: "Organization"},
+			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
+		}, 2, nil
+	}
+	newInstallationClient = func(_ core.IntegrationContext, _ int64, installationID string) (*gh.Client, error) {
+		if installationID == "11" {
+			return nil, errors.New("unavailable")
+		}
 		return gh.NewClient(nil), nil
 	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
@@ -776,7 +799,7 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	}))
 
 	metadata := integration.Metadata.(common.Metadata)
-	assert.Equal(t, 1, fullDiscoveryCalls)
+	assert.Equal(t, []int{1}, discoveryPages)
 	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
 	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
 		return installation.AccountLogin == "approved" && len(installation.Repositories) > 0
@@ -790,7 +813,91 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 		BaseURL:        "https://app.example",
 		Integration:    integration,
 	}))
-	assert.Equal(t, 1, fullDiscoveryCalls)
+	assert.Equal(t, []int{1, 2}, discoveryPages)
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+	assert.Equal(t, []int{1, 2}, discoveryPages)
+}
+
+func TestSyncHostedAppPreservesLegacyFallbackWithOverlappingRequest(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		t.Fatal("overlapping approval recovery must not list every App installation")
+		return nil, nil
+	}
+	listRecentAppInstallations = func(
+		context.Context,
+		*gh.Client,
+		time.Time,
+		int,
+		int,
+	) ([]common.PendingInstallation, int, error) {
+		return []common.PendingInstallation{{ID: "11", AccountLogin: "earlier", AccountType: "Organization"}}, 0, nil
+	}
+	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
+		assert.Equal(t, "later", account)
+		return &gh.Installation{
+			ID:      gh.Ptr(int64(22)),
+			Account: &gh.User{Login: gh.Ptr(account), Type: gh.Ptr("Organization")},
+		}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                        "csrf",
+			HostedApp:                    true,
+			StartedByGitHubLogin:         "development",
+			InstallRequestDiscoveryUntil: time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano),
+			InstallRequests: []common.InstallRequest{{
+				ID:             "2",
+				AccountLogin:   "later",
+				RequesterLogin: "member",
+				CreatedAt: time.Now().UTC().
+					Add(-installRequestResolutionGracePeriod - time.Second).
+					Format(time.RFC3339Nano),
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+
+	metadata := integration.Metadata.(common.Metadata)
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.AccountLogin == "earlier"
+	}))
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.AccountLogin == "later"
+	}))
 }
 
 func TestReconcileInstallRequestsPreservesOverlappingFollowUpAccounts(t *testing.T) {
@@ -1021,6 +1128,15 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 	installations := []common.PendingInstallation{{ID: "11", AccountLogin: "existing", AccountType: "User"}}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
 		return slices.Clone(installations), nil
+	}
+	listRecentAppInstallations = func(
+		context.Context,
+		*gh.Client,
+		time.Time,
+		int,
+		int,
+	) ([]common.PendingInstallation, int, error) {
+		return slices.Clone(installations), 0, nil
 	}
 	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
 		for _, installation := range installations {
@@ -1270,11 +1386,46 @@ func hostedRequestContext(
 	}, recorder
 }
 
+func TestListRecentAppInstallationsUsesBoundedPage(t *testing.T) {
+	since := time.Now().UTC().Truncate(time.Second)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installations", r.URL.Path)
+		assert.Equal(t, "2", r.URL.Query().Get("page"))
+		assert.Equal(t, "8", r.URL.Query().Get("per_page"))
+		assert.Equal(t, since.Format(time.RFC3339), r.URL.Query().Get("since"))
+		w.Header().Set("Link", `<https://api.github.com/app/installations?page=3>; rel="next"`)
+		_, _ = w.Write([]byte(`[{
+			"id": 22,
+			"account": {"login": "approved", "type": "Organization"}
+		}]`))
+	}))
+	defer server.Close()
+
+	client := gh.NewClient(server.Client())
+	client.BaseURL, _ = client.BaseURL.Parse(server.URL + "/")
+	installations, nextPage, err := listRecentAppInstallationsFromGitHub(
+		context.Background(),
+		client,
+		since,
+		2,
+		hostedInstallRequestFallbackPageSize,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 3, nextPage)
+	assert.Equal(t, []common.PendingInstallation{{
+		ID:           "22",
+		AccountLogin: "approved",
+		AccountType:  "Organization",
+	}}, installations)
+}
+
 func resetBindClientHooks() {
 	newInstallationClient = newClientForAppInstallation
 	newAppJWTClient = newClientForApp
 	listInstallationRepos = listInstallationRepositories
 	listAppInstallations = listAppInstallationsFromGitHub
+	listRecentAppInstallations = listRecentAppInstallationsFromGitHub
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 	getAppInstallation = getAppInstallationFromGitHub
 	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub

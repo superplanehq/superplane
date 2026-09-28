@@ -261,11 +261,11 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 
 type hostedInstallRequestDiscovery struct {
 	accounts []string
-	full     bool
+	fallback bool
 }
 
 func (d hostedInstallRequestDiscovery) required() bool {
-	return d.full || len(d.accounts) > 0
+	return d.fallback || len(d.accounts) > 0
 }
 
 func (g *GitHub) refreshHostedSetup(
@@ -284,12 +284,16 @@ func (g *GitHub) refreshHostedSetup(
 	}
 
 	now := time.Now().UTC()
+	if installRequestFollowUpDiscoveryActive(*metadata, now) &&
+		len(metadata.InstallRequestDiscoveryAccounts) == 0 {
+		ensureHostedInstallRequestFallback(metadata, now)
+	}
 	requestDiscovery := g.refreshHostedInstallRequests(ctx, app, metadata)
-	if !requestDiscovery.required() && installRequestFollowUpDiscoveryActive(*metadata, now) {
-		requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
-		// Connections that entered follow-up discovery before account tracking
-		// was added need the legacy fallback until their short window expires.
-		requestDiscovery.full = len(requestDiscovery.accounts) == 0 &&
+	if installRequestFollowUpDiscoveryActive(*metadata, now) {
+		if len(requestDiscovery.accounts) == 0 {
+			requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+		}
+		requestDiscovery.fallback = requestDiscovery.fallback ||
 			requiresHostedInstallRequestFallback(*metadata, now)
 	}
 	if requestDiscovery.required() {
@@ -444,33 +448,63 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 	startedAt := time.Now().UTC()
 	mode := "approval"
 	candidateCount := len(discovery.accounts)
-	var installations []common.PendingInstallation
-	if discovery.full {
-		mode = "approval_fallback"
-		candidateCount = -1
-		installations, err = discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
-	} else {
-		installations, err = discoverAccessibleInstallationsByAccount(
+	installations := []common.PendingInstallation{}
+	failures := []error{}
+	var fallbackErr error
+	if len(discovery.accounts) > 0 {
+		requested, discoveryErr := discoverAccessibleInstallationsByAccount(
 			requestContext,
 			ctx.Integration,
 			app,
 			*identity,
 			discovery.accounts,
 		)
+		installations = append(installations, requested...)
+		if discoveryErr != nil {
+			failures = append(failures, discoveryErr)
+		}
 	}
-	logHostedDiscovery(ctx, mode, candidateCount, len(installations), err, startedAt)
+	if discovery.fallback {
+		mode = "approval_fallback"
+		if len(discovery.accounts) > 0 {
+			mode = "approval_and_fallback"
+		}
+		candidateCount += hostedInstallRequestFallbackPageSize
+		since, parseErr := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackSince)
+		if parseErr != nil {
+			fallbackErr = fmt.Errorf("parse GitHub App fallback time: %w", parseErr)
+		} else {
+			var recent []common.PendingInstallation
+			var nextPage int
+			recent, nextPage, fallbackErr = discoverAccessibleRecentInstallations(
+				requestContext,
+				ctx.Integration,
+				app,
+				*identity,
+				since,
+				metadata.InstallRequestFallbackPage,
+			)
+			installations = append(installations, recent...)
+			if nextPage >= 0 {
+				advanceHostedInstallRequestFallback(metadata, nextPage, startedAt)
+			}
+		}
+	}
+	err = summarizeHostedDiscoveryErrors(failures)
+	logErr := err
+	if fallbackErr != nil {
+		logErr = summarizeHostedDiscoveryErrors([]error{err, fallbackErr})
+	}
+	logHostedDiscovery(ctx, mode, candidateCount, len(installations), logErr, startedAt)
 	metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
 	if err != nil {
 		return fmt.Errorf("failed to discover requested GitHub App installations: %w", err)
 	}
-	if discovery.full {
-		metadata.InstallationsRefreshedAt = startedAt.Format(time.RFC3339Nano)
-		metadata.InstallRequestFallbackRefreshedAt = startedAt.Format(time.RFC3339Nano)
-	}
 	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
-		metadata.InstallRequestDiscoveryUntil = ""
 		metadata.InstallRequestDiscoveryAccounts = nil
-		metadata.InstallRequestFallbackRefreshedAt = ""
+		if metadata.InstallRequestFallbackPage == 0 {
+			metadata.InstallRequestDiscoveryUntil = ""
+		}
 	}
 	return nil
 }
@@ -545,11 +579,50 @@ func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Ti
 }
 
 func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Time) bool {
+	if metadata.InstallRequestFallbackPage <= 0 {
+		return false
+	}
+	if metadata.InstallRequestFallbackPage > 1 {
+		return true
+	}
 	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackRefreshedAt)
 	if err != nil {
 		return true
 	}
 	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
+}
+
+func ensureHostedInstallRequestFallback(metadata *common.Metadata, now time.Time) {
+	if metadata.InstallRequestFallbackPage > 0 {
+		return
+	}
+
+	since := now.Add(-installRequestResolutionGracePeriod - installRequestFollowUpDiscoveryPeriod)
+	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
+	if err == nil {
+		since = discoverUntil.Add(-installRequestFollowUpDiscoveryPeriod - installRequestResolutionGracePeriod)
+	}
+	metadata.InstallRequestFallbackSince = since.Format(time.RFC3339Nano)
+	metadata.InstallRequestFallbackPage = 1
+	metadata.InstallRequestFallbackRefreshedAt = ""
+}
+
+func advanceHostedInstallRequestFallback(metadata *common.Metadata, nextPage int, now time.Time) {
+	if nextPage > 0 {
+		metadata.InstallRequestFallbackPage = nextPage
+		return
+	}
+
+	metadata.InstallRequestFallbackPage = 1
+	metadata.InstallRequestFallbackRefreshedAt = now.Format(time.RFC3339Nano)
+}
+
+func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
+	metadata.InstallRequestDiscoveryUntil = ""
+	metadata.InstallRequestDiscoveryAccounts = nil
+	metadata.InstallRequestFallbackSince = ""
+	metadata.InstallRequestFallbackPage = 0
+	metadata.InstallRequestFallbackRefreshedAt = ""
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {

@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ var (
 	newAppJWTClient                 = newClientForApp
 	listInstallationRepos           = listInstallationRepositories
 	listAppInstallations            = listAppInstallationsFromGitHub
+	listRecentAppInstallations      = listRecentAppInstallationsFromGitHub
 	listAppInstallationRequests     = listAppInstallationRequestsFromGitHub
 	getAppInstallation              = getAppInstallationFromGitHub
 	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub
@@ -190,6 +192,7 @@ func (g *GitHub) reconcileInstallRequests(
 	discovery := hostedInstallRequestDiscovery{}
 	if installRequestFollowUpDiscoveryActive(*metadata, now) {
 		discovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+		discovery.fallback = requiresHostedInstallRequestFallback(*metadata, now)
 	}
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
@@ -201,7 +204,8 @@ func (g *GitHub) reconcileInstallRequests(
 			continue
 		}
 		if request.AccountLogin == "" {
-			discovery.full = true
+			ensureHostedInstallRequestFallback(metadata, now)
+			discovery.fallback = true
 		} else if !slices.ContainsFunc(discovery.accounts, func(account string) bool {
 			return strings.EqualFold(account, request.AccountLogin)
 		}) {
@@ -217,14 +221,9 @@ func (g *GitHub) reconcileInstallRequests(
 	if followUpDiscovery {
 		metadata.InstallRequestDiscoveryUntil = now.Add(installRequestFollowUpDiscoveryPeriod).Format(time.RFC3339Nano)
 		metadata.InstallRequestDiscoveryAccounts = slices.Clone(discovery.accounts)
-		if len(discovery.accounts) > 0 {
-			metadata.InstallRequestFallbackRefreshedAt = ""
-		}
 	} else if len(unresolved) == 0 &&
 		(len(trackedRequests) > 0 || !installRequestFollowUpDiscoveryActive(*metadata, now)) {
-		metadata.InstallRequestDiscoveryUntil = ""
-		metadata.InstallRequestDiscoveryAccounts = nil
-		metadata.InstallRequestFallbackRefreshedAt = ""
+		clearHostedInstallRequestDiscovery(metadata)
 	}
 	return discovery, nil
 }
@@ -340,26 +339,56 @@ func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.C
 
 func listAppInstallationsFromGitHub(ctx context.Context, client *github.Client) ([]common.PendingInstallation, error) {
 	result := []common.PendingInstallation{}
-	opts := &github.ListOptions{PerPage: 100}
+	page := 1
 	for {
-		installations, response, err := client.Apps.ListInstallations(ctx, opts)
+		installations, nextPage, err := listRecentAppInstallationsFromGitHub(ctx, client, time.Time{}, page, 100)
 		if err != nil {
 			return nil, err
 		}
-
-		for _, installation := range installations {
-			result = append(result, common.PendingInstallation{
-				ID:           strconv.FormatInt(installation.GetID(), 10),
-				AccountLogin: installation.GetAccount().GetLogin(),
-				AccountType:  installation.GetAccount().GetType(),
-			})
-		}
-
-		if response == nil || response.NextPage == 0 {
+		result = append(result, installations...)
+		if nextPage == 0 {
 			return result, nil
 		}
-		opts.Page = response.NextPage
+		page = nextPage
 	}
+}
+
+func listRecentAppInstallationsFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	since time.Time,
+	page int,
+	perPage int,
+) ([]common.PendingInstallation, int, error) {
+	values := url.Values{}
+	values.Set("page", strconv.Itoa(page))
+	values.Set("per_page", strconv.Itoa(perPage))
+	if !since.IsZero() {
+		values.Set("since", since.UTC().Format(time.RFC3339))
+	}
+
+	request, err := client.NewRequest("GET", "app/installations?"+values.Encode(), nil)
+	if err != nil {
+		return nil, page, err
+	}
+	var responseInstallations []*github.Installation
+	response, err := client.Do(ctx, request, &responseInstallations)
+	if err != nil {
+		return nil, page, err
+	}
+
+	installations := make([]common.PendingInstallation, 0, len(responseInstallations))
+	for _, installation := range responseInstallations {
+		pending, err := pendingInstallationFromGitHub(installation)
+		if err != nil {
+			return nil, page, err
+		}
+		installations = append(installations, pending)
+	}
+	if response == nil {
+		return installations, 0, nil
+	}
+	return installations, response.NextPage, nil
 }
 
 func getAppInstallationFromGitHub(ctx context.Context, client *github.Client, id int64) (*github.Installation, error) {
