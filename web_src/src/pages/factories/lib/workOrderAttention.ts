@@ -2,6 +2,7 @@ import { CircleCheck, CircleX, LoaderCircle, type LucideIcon } from "lucide-reac
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
+import { workOrderExecutionCreditFailure } from "./workOrderFailureReason";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
@@ -112,6 +113,14 @@ export function getWorkOrderAttentionReason(
   } = {},
 ): WorkOrderAttentionReason | null {
   return getWorkOrderAttentionReasons(order, options)[0] ?? null;
+}
+
+/**
+ * Chip label for a failed task. A latest step that SuperPlane hosted credit
+ * blocked shows the credit reason. Other failures show Run failed.
+ */
+export function getWorkOrderFailedAttentionLabel(order: FactoriesWorkOrder): string {
+  return workOrderExecutionCreditFailure(latestExecution(order))?.label ?? WORK_ORDER_ATTENTION_LABEL.failed;
 }
 
 function latestExecution(order: FactoriesWorkOrder): FactoriesWorkOrderExecution | null {
