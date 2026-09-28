@@ -5,8 +5,10 @@ import {
   VELOCITY_PERIOD_OPTIONS,
   hasVelocityOutput,
   isVelocityPeriodDays,
+  roundedShares,
   toVelocityReport,
   velocityBreakdownSeries,
+  velocityLegendLabel,
   type VelocityIntakeSeries,
 } from "./factoryVelocityReport";
 
@@ -216,6 +218,56 @@ describe("VELOCITY_PERIOD_OPTIONS", () => {
     expect(isVelocityPeriodDays(30)).toBe(true);
     expect(isVelocityPeriodDays(1)).toBe(false);
     expect(isVelocityPeriodDays(90)).toBe(false);
+  });
+});
+
+describe("roundedShares", () => {
+  it("keeps exact halves", () => {
+    expect(roundedShares([55, 45])).toEqual([55, 45]);
+  });
+
+  it("gives the leftover point to the earliest equal share", () => {
+    expect(roundedShares([1, 1, 1])).toEqual([34, 33, 33]);
+  });
+
+  it("rounds 1 of 3 up on the larger count", () => {
+    expect(roundedShares([1, 2])).toEqual([33, 67]);
+  });
+
+  it("returns zeros when the total is zero", () => {
+    expect(roundedShares([0, 0])).toEqual([0, 0]);
+  });
+
+  it("gives the whole period to the only positive count", () => {
+    expect(roundedShares([5, 0])).toEqual([100, 0]);
+  });
+
+  it("gives a tied remainder to the larger count, then the earlier index", () => {
+    expect(roundedShares([4, 1, 1])).toEqual([67, 17, 16]);
+  });
+
+  it("adds up to 100 for every generated set with a positive total", () => {
+    for (let length = 1; length <= 6; length += 1) {
+      for (let seed = 0; seed < 24; seed += 1) {
+        const values = Array.from({ length }, (_, index) => (seed * (index + 3) + index * 5) % 19);
+        if (values.reduce((sum, value) => sum + value, 0) <= 0) continue;
+
+        const shares = roundedShares(values);
+
+        expect(shares.every((share) => Number.isInteger(share))).toBe(true);
+        expect(shares.reduce((sum, share) => sum + share, 0)).toBe(100);
+      }
+    }
+  });
+});
+
+describe("velocityLegendLabel", () => {
+  it("appends the whole-number share", () => {
+    expect(velocityLegendLabel("Automated via SuperPlane", 55)).toBe("Automated via SuperPlane (55%)");
+  });
+
+  it("returns the plain label when the share is missing", () => {
+    expect(velocityLegendLabel("Manual work", undefined)).toBe("Manual work");
   });
 });
 
