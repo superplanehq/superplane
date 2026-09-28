@@ -140,6 +140,18 @@ export function hostedGitHubStartedByLogin(metadata: unknown): string {
   return typeof login === "string" ? login : "";
 }
 
+export function hostedGitHubInstallationDiscoveryActive(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") return false;
+
+  const setupInstallationId = (metadata as { setupInstallationId?: unknown }).setupInstallationId;
+  if (typeof setupInstallationId === "string" && setupInstallationId !== "") return true;
+
+  const discovery = (metadata as { installationDiscovery?: unknown }).installationDiscovery;
+  if (!discovery || typeof discovery !== "object") return false;
+
+  return (discovery as { active?: unknown }).active === true && (discovery as { complete?: unknown }).complete !== true;
+}
+
 export function hostedGitHubAppSlug(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";

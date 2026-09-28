@@ -24,6 +24,7 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		State:         "pending",
 		IntegrationID: "11111111-1111-1111-1111-111111111111",
+		BrowserAction: &core.BrowserAction{URL: "https://github.com/apps/superplane/installations/new?state=csrf"},
 		Metadata: common.Metadata{
 			State:                    "csrf",
 			HostedApp:                true,
@@ -46,7 +47,9 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	assert.Empty(t, metadata.InstallationID)
 	assert.Empty(t, metadata.Repositories)
 	assert.Equal(t, "999", metadata.SetupInstallationID)
+	assert.NotEmpty(t, metadata.SetupInstallationReceivedAt)
 	assert.Empty(t, metadata.InstallationsRefreshedAt)
+	assert.Nil(t, integration.BrowserAction)
 	assert.Equal(
 		t,
 		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=complete&githubIntegrationId=11111111-1111-1111-1111-111111111111",
@@ -117,6 +120,82 @@ func TestSyncHostedAppVerifiesOnlyCallbackInstallation(t *testing.T) {
 	assert.Equal(t, "new-org", metadata.PendingInstallations[0].AccountLogin)
 	assert.Equal(t, "new-org/api", metadata.PendingInstallations[0].Repositories[0].Name)
 	assert.Equal(t, "existing", metadata.PendingInstallations[1].AccountLogin)
+}
+
+func TestSyncHostedAppRetriesCallbackUntilInstallationIsVisible(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	attempts := 0
+	getAppInstallation = func(_ context.Context, _ *gh.Client, id int64) (*gh.Installation, error) {
+		attempts++
+		if attempts == 1 {
+			return nil, githubNotFoundError()
+		}
+		return &gh.Installation{
+			ID:         gh.Ptr(id),
+			TargetType: gh.Ptr("Organization"),
+			Account:    &gh.User{Login: gh.Ptr("new-org"), Type: gh.Ptr("Organization")},
+		}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	repositoryAttempts := 0
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		repositoryAttempts++
+		if repositoryAttempts == 1 {
+			return nil, nil
+		}
+		return []common.Repository{{ID: 202, Name: "api"}}, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                 "csrf",
+			HostedApp:             true,
+			SetupInstallationID:   "22",
+			StartedByUserID:       "user-1",
+			InstallationDiscovery: &common.InstallationDiscovery{Complete: true},
+			GitHubApp:             common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+	ctx := core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Equal(t, "22", metadata.SetupInstallationID)
+	assert.Nil(t, integration.BrowserAction)
+	assert.Empty(t, metadata.PendingInstallations)
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
+	assert.Equal(t, "22", metadata.SetupInstallationID)
+	assert.Nil(t, integration.BrowserAction)
+	assert.Empty(t, metadata.PendingInstallations)
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.SetupInstallationID)
+	assert.Nil(t, integration.BrowserAction)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "new-org", metadata.PendingInstallations[0].AccountLogin)
 }
 
 func TestHostedSetupCallbackRejectsInvalidState(t *testing.T) {
@@ -264,7 +343,7 @@ func TestHostedBindDoesNotCheckUnrelatedInstallation(t *testing.T) {
 	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}}, metadata.Repositories)
 }
 
-func TestSyncHostedAppDoesNotDiscoverBeforeGitHubCallback(t *testing.T) {
+func TestSyncHostedAppDiscoversPersonalInstallationBeforeGitHubRedirect(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
@@ -277,13 +356,18 @@ func TestSyncHostedAppDoesNotDiscoverBeforeGitHubCallback(t *testing.T) {
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return nil, nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		t.Fatal("initial setup must not list every App installation")
-		return nil, nil
+	findAppUserInstallation = func(_ context.Context, _ *gh.Client, login string) (*gh.Installation, error) {
+		assert.Equal(t, "development", login)
+		return &gh.Installation{
+			ID:      gh.Ptr(int64(11)),
+			Account: &gh.User{Login: gh.Ptr("my-account"), Type: gh.Ptr("User")},
+		}, nil
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-		t.Fatal("initial setup must not verify an installation before the callback")
-		return nil, nil
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
 	integration := &contexts.IntegrationContext{State: "pending"}
 	syncCtx := core.SyncContext{
@@ -296,14 +380,199 @@ func TestSyncHostedAppDoesNotDiscoverBeforeGitHubCallback(t *testing.T) {
 	}
 
 	require.NoError(t, (&GitHub{}).Sync(syncCtx))
+	assert.Nil(t, integration.BrowserAction)
+	metadata := integration.Metadata.(common.Metadata)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "my-account", metadata.PendingInstallations[0].AccountLogin)
+	require.NotNil(t, metadata.InstallationDiscovery)
+	assert.True(t, metadata.InstallationDiscovery.Active)
+	assert.True(t, metadata.InstallationDiscovery.PersonalAccountChecked)
+}
+
+func TestSyncHostedAppMergesProgressiveInstallationPages(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	pages := []int{}
+	listRecentAppInstallations = func(
+		_ context.Context,
+		_ *gh.Client,
+		since time.Time,
+		page int,
+		perPage int,
+	) ([]common.PendingInstallation, int, error) {
+		assert.True(t, since.IsZero())
+		assert.Equal(t, hostedInitialDiscoveryPageSize, perPage)
+		pages = append(pages, page)
+		if page == 1 {
+			return []common.PendingInstallation{{ID: "11", AccountLogin: "my-account", AccountType: "User"}}, 2, nil
+		}
+		return []common.PendingInstallation{{ID: "22", AccountLogin: "my-org", AccountType: "Organization"}}, 0, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByUserID:      "user-1",
+			StartedByGitHubLogin: "development",
+			InstallationDiscovery: &common.InstallationDiscovery{
+				Active:                 true,
+				PersonalAccountChecked: true,
+				NextPage:               1,
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+	ctx := core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata := integration.Metadata.(common.Metadata)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.True(t, metadata.InstallationDiscovery.Active)
+	assert.Nil(t, integration.BrowserAction)
+
+	integration.Metadata = metadata
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
+	assert.Equal(t, []int{1, 2}, pages)
+	assert.Len(t, metadata.PendingInstallations, 2)
+	assert.False(t, metadata.InstallationDiscovery.Active)
+	assert.True(t, metadata.InstallationDiscovery.Complete)
+	assert.Nil(t, integration.BrowserAction)
+}
+
+func TestSyncHostedAppOpensInstallAfterCompleteEmptyDiscovery(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	listRecentAppInstallations = func(context.Context, *gh.Client, time.Time, int, int) ([]common.PendingInstallation, int, error) {
+		return nil, 0, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByUserID:      "user-1",
+			StartedByGitHubLogin: "development",
+			InstallationDiscovery: &common.InstallationDiscovery{
+				Active:                 true,
+				PersonalAccountChecked: true,
+				NextPage:               1,
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context: context.Background(), Logger: logrus.NewEntry(logrus.New()),
+		BaseURL: "https://app.example", Integration: integration,
+	}))
 	require.NotNil(t, integration.BrowserAction)
 	assert.Contains(t, integration.BrowserAction.URL, "github.com/apps/")
 	metadata := integration.Metadata.(common.Metadata)
-	assert.Empty(t, metadata.PendingInstallations)
-	assert.Empty(t, metadata.InstallationsRefreshedAt)
+	assert.True(t, metadata.InstallationDiscovery.Complete)
 }
 
-func TestSyncHostedAppDiscardsCallbackInstallationWithoutRepositories(t *testing.T) {
+func TestSyncHostedAppRetriesOnlyTransientInitialDiscoveryFailures(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	listRecentAppInstallations = func(ctx context.Context, _ *gh.Client, _ time.Time, _, perPage int) ([]common.PendingInstallation, int, error) {
+		deadline, ok := ctx.Deadline()
+		require.True(t, ok)
+		assert.LessOrEqual(t, time.Until(deadline), hostedInitialDiscoveryTimeout)
+		assert.Equal(t, hostedInitialDiscoveryPageSize, perPage)
+		return []common.PendingInstallation{
+			{ID: "11", AccountLogin: "temporary"},
+			{ID: "22", AccountLogin: "revoked"},
+		}, 0, nil
+	}
+	temporaryAttempts := 0
+	newInstallationClient = func(_ core.IntegrationContext, _ int64, installationID string) (*gh.Client, error) {
+		if installationID == "11" {
+			temporaryAttempts++
+			if temporaryAttempts == 1 {
+				return nil, context.DeadlineExceeded
+			}
+		}
+		if installationID == "22" {
+			return nil, errors.New("revoked")
+		}
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByUserID:      "user-1",
+			StartedByGitHubLogin: "development",
+			InstallationDiscovery: &common.InstallationDiscovery{
+				Active:                 true,
+				PersonalAccountChecked: true,
+				NextPage:               1,
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+	ctx := core.SyncContext{Context: context.Background(), Integration: integration}
+
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata := integration.Metadata.(common.Metadata)
+	require.Len(t, metadata.InstallationDiscovery.RetryCandidates, 1)
+	assert.Equal(t, "11", metadata.InstallationDiscovery.RetryCandidates[0].ID)
+	assert.True(t, metadata.InstallationDiscovery.Active)
+
+	integration.Metadata = metadata
+	require.NoError(t, (&GitHub{}).Sync(ctx))
+	metadata = integration.Metadata.(common.Metadata)
+	assert.True(t, metadata.InstallationDiscovery.Complete)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "temporary", metadata.PendingInstallations[0].AccountLogin)
+	assert.Equal(t, 2, temporaryAttempts)
+}
+
+func TestSyncHostedAppDiscardsCallbackInstallationWithoutRepositoriesAfterGracePeriod(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
@@ -335,10 +604,11 @@ func TestSyncHostedAppDiscardsCallbackInstallationWithoutRepositories(t *testing
 	integration := &contexts.IntegrationContext{
 		State: "pending",
 		Metadata: common.Metadata{
-			State:               "csrf",
-			HostedApp:           true,
-			StartedByUserID:     "user-1",
-			SetupInstallationID: "22",
+			State:                       "csrf",
+			HostedApp:                   true,
+			StartedByUserID:             "user-1",
+			SetupInstallationID:         "22",
+			SetupInstallationReceivedAt: time.Now().UTC().Add(-setupInstallationVisibilityGracePeriod - time.Second).Format(time.RFC3339Nano),
 			PendingInstallations: []common.PendingInstallation{{
 				ID:           "11",
 				AccountLogin: "existing",
@@ -375,8 +645,8 @@ func TestSyncHostedAppRecordsRequestBaselineBeforeOpeningGitHub(t *testing.T) {
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return nil, nil
+	listRecentAppInstallations = func(context.Context, *gh.Client, time.Time, int, int) ([]common.PendingInstallation, int, error) {
+		return nil, 0, nil
 	}
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return []common.InstallRequest{{ID: "existing-request"}}, nil
@@ -395,6 +665,16 @@ func TestSyncHostedAppRecordsRequestBaselineBeforeOpeningGitHub(t *testing.T) {
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Equal(t, []string{"existing-request"}, metadata.ObservedInstallRequestIDs)
 	assert.True(t, metadata.InstallRequestBaselineCaptured)
+	assert.Nil(t, integration.BrowserAction)
+
+	err = (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+	require.NoError(t, err)
 	require.NotNil(t, integration.BrowserAction)
 }
 
@@ -692,6 +972,7 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 		Metadata: common.Metadata{
 			State:                "csrf",
 			HostedApp:            true,
+			StartedByUserID:      "user-1",
 			StartedByGitHubLogin: "development",
 			InstallRequests: []common.InstallRequest{{
 				ID:             "1",
@@ -1465,7 +1746,6 @@ func resetBindClientHooks() {
 	getAppInstallation = getAppInstallationFromGitHub
 	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub
 	findAppUserInstallation = findAppUserInstallationFromGitHub
-	resolveInstallationIdentity = resolveInstallationIdentityFromGitHub
 	getRepositoryPermission = getRepositoryPermissionFromGitHub
 }
 
@@ -1479,8 +1759,11 @@ func stubEmptyHostedDiscovery(t *testing.T) {
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return nil, nil
+	findAppUserInstallation = func(context.Context, *gh.Client, string) (*gh.Installation, error) {
+		return nil, githubNotFoundError()
+	}
+	listRecentAppInstallations = func(context.Context, *gh.Client, time.Time, int, int) ([]common.PendingInstallation, int, error) {
+		return nil, 0, nil
 	}
 }
 
@@ -1488,4 +1771,7 @@ func enableUnverifiedDevelopmentRepositories(t *testing.T) {
 	t.Helper()
 	t.Setenv("APP_ENV", "development")
 	t.Setenv(allowUnverifiedDevelopmentRepositoriesEnv, "yes")
+	findAppUserInstallation = func(context.Context, *gh.Client, string) (*gh.Installation, error) {
+		return nil, githubNotFoundError()
+	}
 }

@@ -78,11 +78,14 @@ func Test__GitHub__Sync(t *testing.T) {
 		t.Cleanup(restore)
 
 		integrationCtx := &contexts.IntegrationContext{}
-		require.NoError(t, g.Sync(core.SyncContext{
+		syncCtx := core.SyncContext{
 			OrganizationID: "11111111-1111-1111-1111-111111111111",
 			ActorUserID:    "starter-user",
 			Integration:    integrationCtx,
-		}))
+		}
+		require.NoError(t, g.Sync(syncCtx))
+		assert.Nil(t, integrationCtx.BrowserAction)
+		require.NoError(t, g.Sync(syncCtx))
 
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Equal(t, "GET", integrationCtx.BrowserAction.Method)
