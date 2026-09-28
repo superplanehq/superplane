@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -271,8 +272,22 @@ func CompleteFactoryAgentResourceOAuth(
 	}
 	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretCodeVerifier)
 	_ = resource.ClearOAuthPending(db)
-	_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
+	finishFactoryAgentResourceOAuthConnect(db, resource)
 	return redirectPath, 302, ""
+}
+
+func finishFactoryAgentResourceOAuthConnect(db *gorm.DB, resource *models.FactoryAgentResource) {
+	err := resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
+	if err == nil {
+		return
+	}
+	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretAccessToken)
+	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+	message := mcp.UserFacingOAuthError(err)
+	if errors.Is(err, models.ErrFactoryAgentResourceURLTaken) {
+		message = "This MCP server is already connected."
+	}
+	_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, message, nil)
 }
 
 type oauthRevocation struct {

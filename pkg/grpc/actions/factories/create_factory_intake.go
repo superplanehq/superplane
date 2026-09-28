@@ -108,6 +108,8 @@ func CreateFactoryIntake(
 		settings = defaultSentryIntakeSettings()
 	case models.FactoryIntakeSourceProductiveTasks:
 		settings = defaultProductiveIntakeSettings()
+	case models.FactoryIntakeSourceDependabotAlerts:
+		settings = defaultDependabotIntakeSettings()
 	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {

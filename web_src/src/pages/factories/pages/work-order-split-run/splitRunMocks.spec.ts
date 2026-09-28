@@ -992,7 +992,7 @@ describe("line board work-order examples", () => {
       headline: "This task is closed as failed",
       text: "Reopen this task to start the line again.",
     });
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Send to backlog", "Reopen"]);
   });
 
   it("keeps the branch and pull request on implement for the verify enum card", () => {
@@ -2049,7 +2049,10 @@ describe("line board work-order examples", () => {
       headline: "This task did not succeed",
       text: "The work is done. The result did not meet the goal.",
     });
-    expect(fixture.footer.actions).toEqual([]);
+    expect(fixture.footer.actions).toEqual([
+      { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+      { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" },
+    ]);
   });
 
   it("keeps ingest analysis and a cancel note on the canceled done card", () => {

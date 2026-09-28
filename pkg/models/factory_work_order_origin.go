@@ -221,8 +221,19 @@ func githubOriginLabel(parsed *url.URL) string {
 		return ""
 	}
 
-	owner, repo, kind, number := parts[0], parts[1], parts[2], parts[3]
-	if owner == "" || repo == "" || number == "" {
+	owner, repo := parts[0], parts[1]
+	if owner == "" || repo == "" {
+		return ""
+	}
+	if len(parts) >= 5 && parts[2] == "security" && parts[3] == "dependabot" && parts[4] != "" {
+		return owner + "/" + repo + " dependabot #" + parts[4]
+	}
+	if len(parts) == 4 && parts[2] == "security" && parts[3] == "dependabot" {
+		return dependabotPackageOriginLabel(parsed)
+	}
+
+	kind, number := parts[2], parts[3]
+	if number == "" {
 		return ""
 	}
 	if kind != "issues" && kind != "pull" {
@@ -230,6 +241,18 @@ func githubOriginLabel(parsed *url.URL) string {
 	}
 
 	return owner + "/" + repo + "#" + number
+}
+
+// dependabotPackageOriginLabel names the package of an alerts page filtered
+// with a `package:` qualifier, such as
+// https://github.com/acme/payments/security/dependabot?q=is%3Aopen+package%3Alodash.
+func dependabotPackageOriginLabel(parsed *url.URL) string {
+	for _, qualifier := range strings.Fields(parsed.Query().Get("q")) {
+		if name, ok := strings.CutPrefix(qualifier, "package:"); ok && name != "" {
+			return "Dependabot: " + name
+		}
+	}
+	return ""
 }
 
 func lastPathSegment(parsed *url.URL) string {

@@ -56,6 +56,11 @@ describe("WORK_ORDER_BOARD_LANES", () => {
     expect(review?.title).toBe("Waiting");
     expect(review?.description).toBe("Tasks that wait for a human decision.");
   });
+
+  it("keeps completed and failed tasks in Done", () => {
+    const done = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "done");
+    expect(done?.statuses).toEqual(["completed", "failed"]);
+  });
 });
 
 describe("getWorkOrderDisplayStatus", () => {
@@ -213,7 +218,7 @@ describe("groupWorkOrdersByLane", () => {
       backlog: ["d"],
       running: ["r"],
       review: ["w"],
-      done: ["c", "f", "x"],
+      done: ["c", "f"],
     });
   });
 });

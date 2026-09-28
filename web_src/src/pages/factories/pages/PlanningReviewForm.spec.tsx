@@ -45,6 +45,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
     has: () => false,
     enabledExperimentalFeatures: [],
     isLoading: false,
+    organizationReady: true,
   })),
 }));
 
@@ -167,6 +168,7 @@ describe("PlanningReviewForm model options", () => {
       has: () => false,
       enabledExperimentalFeatures: [],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockReturnValue({
       data: [],
@@ -265,19 +267,23 @@ describe("PlanningReviewForm model options", () => {
       },
     } as ReturnType<typeof useComponent>);
     vi.mocked(useSelectableLLMModels).mockReturnValue({
-      data: [byokAnthropicModel("claude-opus-4-6"), byokAnthropicModel("claude-sonnet-4-6")],
+      data: [
+        byokAnthropicModel("claude-opus-4-6"),
+        byokAnthropicModel("claude-opus-5-5"),
+        byokAnthropicModel("claude-sonnet-4-6"),
+      ],
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof useSelectableLLMModels>);
 
     renderForm(claudeCodeDraft("sonnet"), { onChange });
 
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
         components: [
           expect.objectContaining({
-            configuration: expect.objectContaining({ model: "claude-sonnet-4-6" }),
+            configuration: expect.objectContaining({ model: "claude-opus-5-5" }),
           }),
         ],
       }),
@@ -307,7 +313,7 @@ describe("PlanningReviewForm model options", () => {
 
     renderForm(claudeCodeDraft("claude-opus-4-7"), { onChange });
 
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("claude-opus-4-7");
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 4-7");
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -347,6 +353,7 @@ describe("PlanningReviewForm model options", () => {
       has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
       enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockImplementation((_org, _factory, kind) => {
       if (kind === "KIND_SKILL") {

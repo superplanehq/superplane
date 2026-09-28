@@ -320,7 +320,7 @@ func Test__ProductiveSeedAsksForTenNewestTasks(t *testing.T) {
 
 func Test__ProductiveTaskEvents(t *testing.T) {
 	t.Run("the newest task ends up on top of the intake", func(t *testing.T) {
-		events := productiveTaskEvents(productiveTaskPage([]string{"Newest task", "Older task"}))
+		events := productiveTaskEvents(productiveTaskPage([]string{"Newest task", "Older task"}), "")
 		require.Len(t, events, 2)
 
 		// Events are emitted oldest first, so the newest task ends up on top
@@ -339,13 +339,14 @@ func Test__ProductiveTaskEvents(t *testing.T) {
 			},
 		}
 
-		events := productiveTaskEvents([]map[string]any{document})
+		events := productiveTaskEvents([]map[string]any{document}, "12345")
 		require.Len(t, events, 1)
 
 		// The graph reads root().data.data.attributes, and a created task is
 		// what the intake filters on.
 		assert.Equal(t, map[string]any{"event": "task.created"}, events[0]["meta"])
 		assert.Equal(t, document, events[0]["data"])
+		assert.Equal(t, "https://app.productive.io/12345/tasks/91", events[0]["url"])
 	})
 }
 

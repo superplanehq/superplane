@@ -302,7 +302,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		})
 
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
-		assert.Equal(t, "opus", runner.Configuration["model"])
+		assert.Equal(t, "claude-opus-5-5", runner.Configuration["model"])
 	})
 
 	t.Run("action nodes serialize per pull request", func(t *testing.T) {

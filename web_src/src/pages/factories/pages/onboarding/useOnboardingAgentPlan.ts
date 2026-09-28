@@ -1,4 +1,5 @@
 import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
+import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { hostedModelIds } from "@/lib/hostedLLMModels";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
@@ -21,7 +22,8 @@ export function useOnboardingAgentPlan(
   defaultHosted?: { provider?: string; model?: string; preferOwnKey?: boolean; usageLoading?: boolean },
 ) {
   const needHostedModels = isAgentProviderConnected(connected);
-  const anthropic = useHostedLLMModels(organizationId, "anthropic", needHostedModels);
+  // A Claude key picks from the models that key can use, not the hosted allowlist.
+  const anthropic = useBYOKLLMModels(organizationId, "anthropic", needHostedModels);
   const openai = useHostedLLMModels(organizationId, "openai", needHostedModels);
   const openrouter = useHostedLLMModels(organizationId, "openrouter", needHostedModels);
   return {
@@ -35,7 +37,7 @@ export function useOnboardingAgentPlan(
     plan: resolveOnboardingAgent({
       connected,
       hostedModels: {
-        anthropic: hostedModelIds(anthropic.data?.models),
+        anthropic: anthropicKeyModelIds(anthropic.data),
         openai: hostedModelIds(openai.data?.models),
         openrouter: hostedModelIds(openrouter.data?.models),
       },
@@ -44,6 +46,14 @@ export function useOnboardingAgentPlan(
       preferOwnKey: defaultHosted?.preferOwnKey,
     }),
   };
+}
+
+/** The organization's selected Claude models, or every model the key can use. */
+export function anthropicKeyModelIds(
+  data: { selected?: { id?: string | null }[]; candidates?: { id?: string | null }[] } | undefined,
+): string[] {
+  const selected = hostedModelIds(data?.selected);
+  return selected.length > 0 ? selected : hostedModelIds(data?.candidates);
 }
 
 export function agentRewriteFromPlan(

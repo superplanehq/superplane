@@ -61,6 +61,11 @@ func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.Up
 	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)
@@ -181,6 +186,11 @@ func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.S
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) SearchDependabotIntakeSetupItems(ctx context.Context, req *pb.SearchDependabotIntakeSetupItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchDependabotIntakeSetupItems(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
@@ -240,6 +250,11 @@ func (s *FactoryService) CloseWorkOrder(ctx context.Context, req *pb.CloseWorkOr
 func (s *FactoryService) UpdateWorkOrderStatus(ctx context.Context, req *pb.UpdateWorkOrderStatusRequest) (*pb.UpdateWorkOrderStatusResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateWorkOrderStatus(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SendWorkOrderToBacklog(ctx context.Context, req *pb.SendWorkOrderToBacklogRequest) (*pb.SendWorkOrderToBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendWorkOrderToBacklog(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) AddWorkOrderComment(ctx context.Context, req *pb.AddWorkOrderCommentRequest) (*pb.AddWorkOrderCommentResponse, error) {

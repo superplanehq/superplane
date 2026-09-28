@@ -231,6 +231,9 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
+      jiraAvailable={flow.jiraAvailable}
+      jiraFeatureLoading={flow.jiraFeatureLoading}
+      jiraChoiceBlock={flow.jiraChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -241,6 +244,7 @@ function TicketsScreenHost({
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
       jiraCompletion={model.jiraCompletion}
+      jiraCompletionNeedsManualColumn={model.jiraCompletionNeedsManualColumn}
       organizationId={organizationId}
       jiraIntegrationId={model.jiraIntegrationId}
       onSelectTicketSource={flow.selectTicketSource}

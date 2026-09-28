@@ -1,5 +1,17 @@
 /** User-facing copy for workspace MCP servers and skills. STE. */
 
+export type AgentResourceInstruction =
+  | string
+  | {
+      before: string;
+      href: string;
+      label: string;
+      after: string;
+    };
+
+export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+export const CIRCLECI_PERSONAL_API_TOKEN_URL = "https://app.circleci.com/settings/user/tokens";
+
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
   skillsTitle: "Skills",
@@ -9,6 +21,7 @@ export const AGENT_RESOURCES_COPY = {
   refinementNote:
     "These MCP servers can change systems outside SuperPlane during refinement. The repository stays read-only.",
   addConnection: "Add MCP server",
+  addServerTitle: (label: string) => `Add ${label}`,
   editConnection: "Edit MCP server",
   dialogDescription: "Agents on every run in this workspace can use this MCP server.",
   catalogDescription: "Choose a common server, or add a custom MCP URL.",
@@ -53,6 +66,7 @@ export const AGENT_RESOURCES_COPY = {
   enableToolLabel: (name: string) => `Enable ${name}`,
   close: "Close",
   connect: "Connect",
+  signIn: "Sign in",
   reconnect: "Reconnect",
   disconnect: "Disconnect",
   edit: "Edit",
@@ -70,6 +84,8 @@ export const AGENT_RESOURCES_COPY = {
   headersLabel: "Headers",
   headerNameLabel: "Header name",
   headerSecretLabel: "Secret",
+  tokenLabel: "Personal access token",
+  tokenRequired: "Personal access token is required.",
   addHeader: "Add header",
   removeHeader: "Remove header",
   loading: "Loading MCP servers...",
@@ -84,6 +100,22 @@ export const AGENT_RESOURCES_COPY = {
   urlInvalid: "Enter an https URL.",
   markdownRequired: "SKILL.md content is required.",
   headersHelper: "Add a header only when the server needs a credential.",
+  githubInstruction: {
+    before: "Create a ",
+    href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+    label: "GitHub personal access token",
+    after: " and paste it here.",
+  },
+  jiraInstruction: "Sign in with Atlassian to grant access to Jira.",
+  linearInstruction: "Sign in with Linear.",
+  circleciInstruction: {
+    before: "Create a ",
+    href: CIRCLECI_PERSONAL_API_TOKEN_URL,
+    label: "CircleCI personal API token",
+    after: " and paste it here.",
+  },
+  semaphoreInstruction: "Ask Semaphore support to enable MCP for your organization, then sign in.",
+  sentryInstruction: "Sign in with Sentry.",
   headerIncomplete: "Each header needs a name and a secret.",
   created: "MCP server added.",
   updated: "MCP server updated.",
@@ -92,6 +124,7 @@ export const AGENT_RESOURCES_COPY = {
   skillUpdated: "Skill updated.",
   skillDeleted: "Skill deleted.",
   disconnected: "MCP server disconnected.",
+  urlTaken: "This MCP server is already connected.",
   createFailed: "SuperPlane could not add the MCP server.",
   updateFailed: "SuperPlane could not update the MCP server.",
   deleteFailed: "SuperPlane could not delete the MCP server.",

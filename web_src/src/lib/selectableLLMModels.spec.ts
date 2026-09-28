@@ -71,8 +71,21 @@ describe("selectableLLMModelsForProvider", () => {
 describe("defaultByokRunnerModel", () => {
   const allowlist = ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
-  it("prefers Claude Opus 5.5 from the organization key over a Claude alias", () => {
-    expect(defaultByokRunnerModel("sonnet", "anthropic", [...allowlist, "claude-opus-5-5"])).toBe("claude-opus-5-5");
+  it("replaces a Claude alias with Opus 5.5 and keeps an allowlisted previous default", () => {
+    const withOpus55 = [...allowlist, "claude-opus-5-5"];
+    expect(defaultByokRunnerModel("sonnet", "anthropic", withOpus55)).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("opus", "anthropic", withOpus55)).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", withOpus55)).toBeUndefined();
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", withOpus55)).toBeUndefined();
+  });
+
+  it("replaces a previous Claude default that the key no longer offers", () => {
+    expect(defaultByokRunnerModel("claude-sonnet-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
+    expect(defaultByokRunnerModel("claude-opus-4-6", "anthropic", ["claude-opus-5-5"])).toBe("claude-opus-5-5");
+  });
+
+  it("prefers Claude Opus 5.5 when no model is selected", () => {
+    expect(defaultByokRunnerModel("", "anthropic", [...allowlist, "claude-opus-5-5"])).toBe("claude-opus-5-5");
   });
 
   it("prefers a Sonnet id when the organization key has no Opus 5.5 model", () => {
@@ -82,7 +95,7 @@ describe("defaultByokRunnerModel", () => {
 
   it("uses the first allowlisted id when the key has no Sonnet model", () => {
     expect(defaultByokRunnerModel("sonnet", "anthropic", ["claude-opus-4-6", "claude-haiku-4-5"])).toBe(
-      "claude-haiku-4-5",
+      "claude-sonnet-4-6",
     );
   });
 
@@ -91,8 +104,8 @@ describe("defaultByokRunnerModel", () => {
     expect(defaultByokRunnerModel("claude-custom", "anthropic", allowlist)).toBeUndefined();
   });
 
-  it("leaves the alias in place when the organization key has no models", () => {
-    expect(defaultByokRunnerModel("sonnet", "anthropic", [])).toBeUndefined();
+  it("uses Opus 5.5 when the organization key has no models", () => {
+    expect(defaultByokRunnerModel("sonnet", "anthropic", [])).toBe("claude-opus-5-5");
   });
 });
 
@@ -109,7 +122,7 @@ describe("byokRunnerModelOptions", () => {
       { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
     ]);
     expect(byokRunnerModelOptions(listed, "opus")).toEqual([
-      { value: "opus", label: "opus" },
+      { value: "claude-opus-5-5", label: "claude-opus-5-5" },
       { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
     ]);
   });

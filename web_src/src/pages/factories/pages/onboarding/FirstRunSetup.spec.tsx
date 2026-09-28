@@ -15,6 +15,10 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 let factory: FactoriesFactory;
 let factories: FactoriesFactory[];
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
+}));
+
 vi.mock("../../layout/factoriesLayoutContext", () => ({
   useFactoriesLayout: () => ({
     organizationId: "org-1",
@@ -39,7 +43,6 @@ vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: () => ({
     data: [
       { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
       { id: "done", name: "Done" },
     ],
     isLoading: false,
@@ -122,6 +125,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
     setJiraCompletion: vi.fn(),
+    jiraCompletionNeedsManualColumn: false,
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,

@@ -12,7 +12,11 @@ import {
   type WorkOrderOrdering,
   type WorkOrderScope,
 } from "./workOrderListModel";
-import { WORK_ORDER_DISPLAY_STATUSES, type WorkOrderDisplayStatus } from "./workOrderProgress";
+import {
+  WORK_ORDER_BOARD_FILTER_STATUSES,
+  isWorkOrderDialogStatus,
+  type WorkOrderDisplayStatus,
+} from "./workOrderProgress";
 
 /** One of the dimensions the Filter menu can narrow. */
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
@@ -67,7 +71,7 @@ const DEFAULT_SCOPE: WorkOrderScope = "all";
 const VALID_LAYOUTS = new Set(WORK_ORDER_LAYOUTS.map((item) => item.id));
 const VALID_ORDERINGS = new Set(WORK_ORDER_ORDERINGS.map((item) => item.id));
 const VALID_SCOPES = new Set(WORK_ORDER_SCOPES.map((item) => item.id));
-const VALID_DISPLAY_STATUSES = new Set<string>(WORK_ORDER_DISPLAY_STATUSES);
+const VALID_BOARD_FILTER_STATUSES = new Set<string>(WORK_ORDER_BOARD_FILTER_STATUSES);
 const VALID_FILTER_LABELS = new Set<string>(WORK_ORDER_FILTER_LABELS);
 
 /** Per-factory key, falling back to a bare key when `factoryId` is unavailable. */
@@ -107,7 +111,7 @@ function sanitizeStatuses(value: unknown): WorkOrderDisplayStatus[] {
     return [];
   }
   return value.filter(
-    (entry): entry is WorkOrderDisplayStatus => typeof entry === "string" && VALID_DISPLAY_STATUSES.has(entry),
+    (entry): entry is WorkOrderDisplayStatus => typeof entry === "string" && VALID_BOARD_FILTER_STATUSES.has(entry),
   );
 }
 
@@ -269,6 +273,9 @@ export function useWorkOrderListState(factoryId: string): WorkOrderListState {
 
   const toggleFilter = useCallback(
     (dimension: WorkOrderFilterDimension, value: string) => {
+      if (dimension === "statuses" && isWorkOrderDialogStatus(value)) {
+        return;
+      }
       setFilters((current) => {
         const values = current[dimension] as string[];
         const next = values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];

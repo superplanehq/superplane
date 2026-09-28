@@ -78,12 +78,21 @@ type intakeSettings struct {
 	SentryLevels []string
 	// Skip Productive.io key tasks (milestones). Productive task intakes only.
 	ExcludeKeyTasks bool
+	// Severities that still create a task. Empty means every severity.
+	// Dependabot alert intakes only.
+	DependabotSeverities []string
 	// Task list ids that still create a task. Empty means every task list.
 	// Productive task intakes only.
 	TaskListIDs []string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
+
+var intakeDependabotKnownSeverities = []string{"critical", "high", "medium", "low"}
+
+func dependabotIntakeActions() []any {
+	return []any{"created", "reopened", "reintroduced"}
+}
 
 func defaultIntakeSettings() intakeSettings {
 	return intakeSettings{
@@ -123,11 +132,18 @@ func defaultProductiveIntakeSettings() intakeSettings {
 	return settings
 }
 
+func defaultDependabotIntakeSettings() intakeSettings {
+	settings := defaultIntakeSettings()
+	settings.DependabotSeverities = []string{}
+	return settings
+}
+
 func intakeSourceHasFilterNode(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
-		source == models.FactoryIntakeSourceProductiveTasks
+		source == models.FactoryIntakeSourceProductiveTasks ||
+		source == models.FactoryIntakeSourceDependabotAlerts
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -150,6 +166,7 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.Labels = labels
 	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
+	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 
 	return s
@@ -182,6 +199,24 @@ func normalizeSentryLevels(levels []string) []string {
 	return normalized
 }
 
+func normalizeDependabotSeverities(severities []string) []string {
+	selected := make(map[string]bool, len(severities))
+	for _, severity := range severities {
+		selected[strings.ToLower(strings.TrimSpace(severity))] = true
+	}
+
+	normalized := make([]string, 0, len(intakeDependabotKnownSeverities))
+	for _, severity := range intakeDependabotKnownSeverities {
+		if selected[severity] {
+			normalized = append(normalized, severity)
+		}
+	}
+	if len(normalized) == len(intakeDependabotKnownSeverities) {
+		return []string{}
+	}
+	return normalized
+}
+
 // intakeFilterExpressionFor builds the gate in front of the work order from
 // the filters the source supports. An empty filter set is `true`, so every
 // matching event still creates a work order.
@@ -196,9 +231,24 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeSentryFilterExpression(settings)
 	case models.FactoryIntakeSourceProductiveTasks:
 		return intakeProductiveFilterExpression(settings)
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return intakeDependabotFilterExpression(settings)
 	default:
 		return "true"
 	}
+}
+
+func intakeDependabotFilterExpression(settings intakeSettings) string {
+	if len(settings.DependabotSeverities) == 0 {
+		return "true"
+	}
+
+	severities, err := json.Marshal(settings.DependabotSeverities)
+	if err != nil {
+		return "true"
+	}
+
+	return fmt.Sprintf(`(root().data.alert.security_advisory.severity ?? "") in %s`, severities)
 }
 
 func intakeGitHubFilterExpression(settings intakeSettings) string {
@@ -286,6 +336,9 @@ func intakeProductiveFilterExpression(settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+// intakeProductiveTaskListCondition keeps a task that is created on a
+// selected list, or an update that moves the task onto one. An edit that
+// leaves the task on the same list does not match.
 func intakeProductiveTaskListCondition(ids []string) string {
 	if len(ids) == 0 {
 		return ""
@@ -294,7 +347,14 @@ func intakeProductiveTaskListCondition(ids []string) string {
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+
+	onList := fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+	createdOnList := fmt.Sprintf(`(root().data.meta?.event ?? "") != "task.updated" && %s`, onList)
+	movedOntoList := fmt.Sprintf(
+		`(root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in %s && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? "")`,
+		encoded,
+	)
+	return fmt.Sprintf(`(%s || %s)`, createdOnList, movedOntoList)
 }
 
 func intakeTriggerActionsFor(settings intakeSettings) []any {
@@ -307,6 +367,18 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 	}
 	if settings.SuperplaneLabelAdded {
 		actions = append(actions, "labeled")
+	}
+	return actions
+}
+
+// intakeProductiveTriggerActions listens for new tasks, and also for updates
+// when a task list filter is set. The filter keeps an update only when the
+// task list changed, so an edit of a task already on the list does not
+// create a task.
+func intakeProductiveTriggerActions(settings intakeSettings) []any {
+	actions := []any{"created"}
+	if len(settings.TaskListIDs) > 0 {
+		actions = append(actions, "updated")
 	}
 	return actions
 }
@@ -346,6 +418,9 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
 			current.SentryAssignedIssues != updated.SentryAssignedIssues
 	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
+	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
 		current.SuperplaneLabelAdded != updated.SuperplaneLabelAdded
@@ -370,6 +445,9 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if !slices.Equal(current.SentryLevels, updated.SentryLevels) {
 		return true
 	}
+	if !slices.Equal(current.DependabotSeverities, updated.DependabotSeverities) {
+		return true
+	}
 	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
 		return true
 	}
@@ -391,6 +469,10 @@ var intakeSentryLevelsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.data\.issue\?\.level \?\? ""\) in (\[[^\]]*\])`,
 )
 
+var intakeDependabotSeveritiesPattern = regexp.MustCompile(
+	`\(root\(\)\.data\.alert\.security_advisory\.severity \?\? ""\) in (\[[^\]]*\])`,
+)
+
 var intakeProductiveTaskListsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.data\.relationships\.task_list\.data\.id \?\? ""\) in (\[[^\]]*\])`,
 )
@@ -407,6 +489,8 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultSentryIntakeSettings()
 	case models.FactoryIntakeSourceProductiveTasks:
 		settings = defaultProductiveIntakeSettings()
+	case models.FactoryIntakeSourceDependabotAlerts:
+		settings = defaultDependabotIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -424,6 +508,9 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
 		default:
+			if source == models.FactoryIntakeSourceDependabotAlerts {
+				break
+			}
 			actions := configurationStrings(trigger.Configuration["actions"])
 			settings.NewIssues = slices.Contains(actions, "opened")
 			settings.ReopenedIssues = slices.Contains(actions, "reopened")
@@ -439,6 +526,16 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 	expression, _ := filter.Configuration["expression"].(string)
 	if expression == "" {
 		return settings
+	}
+
+	if source == models.FactoryIntakeSourceDependabotAlerts {
+		if match := intakeDependabotSeveritiesPattern.FindStringSubmatch(expression); match != nil {
+			var severities []string
+			if err := json.Unmarshal([]byte(match[1]), &severities); err == nil {
+				settings.DependabotSeverities = severities
+			}
+		}
+		return settings.normalized()
 	}
 
 	if source == models.FactoryIntakeSourceSentryExceptions {
@@ -534,6 +631,9 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
 		serialized.TaskListIds = settings.TaskListIDs
 	}
+	if source == models.FactoryIntakeSourceDependabotAlerts {
+		serialized.DependabotSeverities = settings.DependabotSeverities
+	}
 	return serialized
 }
 
@@ -578,6 +678,7 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
 	}
 	updated.SentryLevels = requested.GetSentryLevels()
+	updated.DependabotSeverities = requested.GetDependabotSeverities()
 	if requested.ExcludeKeyTasks != nil {
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
 	}

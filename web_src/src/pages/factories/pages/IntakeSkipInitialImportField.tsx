@@ -7,10 +7,13 @@ import { INTAKE_SKIP_INITIAL_IMPORT_COPY } from "./intakeSkipInitialImportCopy";
 export function IntakeSkipInitialImportField({
   checked,
   onCheckedChange,
+  helper,
   testId,
 }: {
+  /** True when SuperPlane imports existing items. */
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  helper: string;
   testId: string;
 }) {
   const inputId = `${testId}-input`;
@@ -32,9 +35,7 @@ export function IntakeSkipInitialImportField({
         <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">
           {INTAKE_SKIP_INITIAL_IMPORT_COPY.label}
         </span>
-        <span className="mt-0.5 block text-[12px] font-normal text-muted-foreground">
-          {INTAKE_SKIP_INITIAL_IMPORT_COPY.helper}
-        </span>
+        <span className="mt-0.5 block text-[12px] font-normal text-muted-foreground">{helper}</span>
       </Label>
     </div>
   );

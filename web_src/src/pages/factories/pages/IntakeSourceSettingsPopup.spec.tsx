@@ -230,7 +230,7 @@ describe("IntakeSourceSettingsPopup", () => {
     ["jira-issues", "Jira issues", jiraIcon],
     ["sentry-exceptions", "Sentry exceptions", sentryIcon],
     ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
-    ["productive-tasks", "Productive.io tasks", productiveIcon],
+    ["productive-tasks", "Productive tasks", productiveIcon],
   ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
     renderPopup({ sourceId });
 
@@ -390,7 +390,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "hides connection, project, and pause controls for a %s intake",
     (sourceId) => {
       renderPopup({ sourceId });
@@ -401,7 +401,7 @@ describe("IntakeSourceSettingsPopup", () => {
     },
   );
 
-  it.each(["github-issues", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
+  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
     "deletes a %s intake after confirmation",
     async (sourceId) => {
       const onDelete = vi.fn();

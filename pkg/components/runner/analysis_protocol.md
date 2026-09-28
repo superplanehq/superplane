@@ -12,6 +12,8 @@ Use only the analysis tools in this protocol. Explore the repository only. Do no
 
 ## Tools
 
+Read `$SUPERPLANE_TASK_DIR/attachments/INDEX.md` before you score Clarity. For a video, read the extracted frames and the transcript. For audio, read the transcript. For an image, call inspect_attachment on the listed path. The original file stays there as well. Do not mention those paths in chat.
+
 Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.
 
 If you write or update a specification this turn, call propose_spec with the full markdown before you stop. Do not leave a written plan unpublished. Do not add an Open questions section. Unclear points stay in chat and survey.
@@ -21,6 +23,10 @@ Call survey only when the task prompt says to ask a question. A question can rai
 Call create_task only after the user confirms a split in chat or in a survey answer. The task prompt says when to propose a split. Never create a task the user did not confirm. Make one call per new task, with a short title and a self-contained markdown description that a reader who has not seen this chat can act on. Do not create a task this session already created; the continuation prompt lists them. This task stays as the first part: after the calls, narrow the specification to the part that stays, then call propose_spec, propose_clarity, and propose_confidence again. SuperPlane shows each new task in the chat as you create it, so do not list them again in chat. If create_task fails, say that SuperPlane could not create the task, then stop.
 
 Writing a file does not publish the specification or the score. SuperPlane shows the spec and the scores only after those calls. Persist task files as sp-file:// references. Never persist a signed URL. You may update the score without rewriting the specification.
+
+## Images
+
+When the user shares an image, SuperPlane saves it under $SUPERPLANE_TASK_DIR/attachments. Call inspect_attachment with that file path. Review the returned image. Do not curl a signed URL. Do not use OCR, the file command, or pixel counting.
 
 ## Chat wiring
 

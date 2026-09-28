@@ -1,5 +1,10 @@
+import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
+import type { OrganizationsIntegration } from "@/api-client";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { integrationKeys } from "@/hooks/useIntegrations";
 import { integrationDetailPath } from "@/lib/integrationSettingsPaths";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
@@ -19,6 +24,7 @@ interface ProductiveIntakeSetupDialogProps {
 
 export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogProps) {
   const setup = useProductiveIntakeSetup(props.organizationId, props.factoryId);
+  const queryClient = useQueryClient();
   const title =
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnect
@@ -26,9 +32,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
   const helper =
     setup.step === "connection"
       ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : setup.skipInitialImport
-        ? PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelperSkip
-        : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : PRODUCTIVE_INTAKE_SETUP_COPY.wizardStepProjectHelper;
   const onConnectionStep = setup.step === "connection" && !setup.connectedQuery.isLoading;
   const hasConnections = setup.productiveIntegrations.length > 0;
   // A broken account is only replaceable while Connect stays reachable, so the
@@ -40,7 +44,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
     <>
       <IntakeSetupWizard
         testId="productive-intake-setup"
-        integrationName="Productive.io"
+        integrationName="Productive"
         step={setup.step}
         title={title}
         helper={helper}
@@ -86,6 +90,7 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
         organizationId={props.organizationId}
         onCreateIntegration={async (payload) => {
           const response = await setup.createIntegration.mutateAsync(payload);
+          await rejectErroredProductiveConnection(queryClient, props.organizationId, response.data?.integration);
           return response.data;
         }}
         onReset={setup.createIntegration.reset}
@@ -96,6 +101,38 @@ export function ProductiveIntakeSetupDialog(props: ProductiveIntakeSetupDialogPr
       />
     </>
   );
+}
+
+async function rejectErroredProductiveConnection(
+  queryClient: QueryClient,
+  organizationId: string,
+  integration: OrganizationsIntegration | undefined,
+): Promise<void> {
+  if (integration?.status?.state !== "error") {
+    return;
+  }
+
+  const integrationId = integration.metadata?.id?.trim();
+  if (integrationId) {
+    await organizationsDeleteIntegration(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId, integrationId },
+      }),
+    );
+    await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+    queryClient.removeQueries({ queryKey: integrationKeys.integration(organizationId, integrationId) });
+  }
+
+  throw new Error(productiveConnectionError(integration.status?.stateDescription));
+}
+
+function productiveConnectionError(stateDescription: string | undefined): string {
+  const description = stateDescription?.trim();
+  if (description) {
+    return description;
+  }
+  return PRODUCTIVE_INTAKE_SETUP_COPY.connectionError;
 }
 
 function SetupStepBody({
@@ -147,8 +184,13 @@ function SetupFooter({ setup, onCreated }: { setup: ProductiveIntakeSetupModel; 
   return (
     <div className="space-y-3">
       <IntakeSkipInitialImportField
-        checked={setup.skipInitialImport}
-        onCheckedChange={setup.setSkipInitialImport}
+        checked={!setup.skipInitialImport}
+        onCheckedChange={(importExisting) => setup.setSkipInitialImport(!importExisting)}
+        helper={
+          setup.skipInitialImport
+            ? PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelperOff
+            : PRODUCTIVE_INTAKE_SETUP_COPY.importExistingHelper
+        }
         testId="productive-skip-initial-import"
       />
       <Button

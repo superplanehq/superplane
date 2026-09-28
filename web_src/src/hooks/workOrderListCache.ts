@@ -80,6 +80,13 @@ function pageIncludesState(states: readonly string[], state: FactoriesWorkOrderS
   return Boolean(state && states.includes(state));
 }
 
+function pageIncludesResults(results: readonly string[], result: FactoriesWorkOrder["result"]): boolean {
+  if (results.length === 0) {
+    return true;
+  }
+  return Boolean(result && results.includes(result));
+}
+
 export function workOrdersPageStatesFromKey(queryKey: readonly unknown[]): FactoriesWorkOrderState[] {
   const joined = queryKey[4];
   if (typeof joined !== "string" || joined.length === 0) {
@@ -93,13 +100,16 @@ export function patchCachedWorkOrderPages(
   orderId: string,
   described: FactoriesWorkOrder,
   states: readonly FactoriesWorkOrderState[],
-  query: WorkOrdersPageQuery = { unassigned: false },
+  query: WorkOrdersPageQuery = { unassigned: false, results: [] },
 ): InfiniteData<WorkOrdersPage> | undefined {
   if (!data) {
     return data;
   }
 
-  const belongs = pageIncludesState(states, described.state) && workOrderMatchesPageQuery(described, query);
+  const belongs =
+    pageIncludesState(states, described.state) &&
+    pageIncludesResults(query.results, described.result) &&
+    workOrderMatchesPageQuery(described, query);
   const exists = data.pages.some((page) => page.orders.some((order) => order.id === orderId));
 
   if (!belongs) {
@@ -168,6 +178,72 @@ export function applyWorkOrderToListCaches(
         workOrdersPageQueryFromKey(query.queryKey),
       ),
     );
+  }
+}
+
+function withoutWorkOrder<T extends { id?: string }>(orders: T[], orderId: string): T[] {
+  return orders.filter((order) => order.id !== orderId);
+}
+
+function pageContainsWorkOrder(page: WorkOrdersPage, orderId: string): boolean {
+  return page.orders.some((order) => order.id === orderId);
+}
+
+function pageHasNextCursor(page: WorkOrdersPage | undefined): boolean {
+  return Boolean(page?.hasNextPage && page.orders.at(-1)?.id);
+}
+
+function withoutWorkOrderPages(data: InfiniteData<WorkOrdersPage>, orderId: string): InfiniteData<WorkOrdersPage> {
+  const pages = data.pages.map((page) => ({
+    ...page,
+    orders: withoutWorkOrder(page.orders, orderId),
+  }));
+  const pageParams = data.pageParams.slice(0, pages.length);
+
+  while (pages.length > 1 && (pages[pages.length - 1]?.orders.length ?? 0) === 0) {
+    const dropped = pages.pop();
+    pageParams.pop();
+    const previous = pages[pages.length - 1];
+    if (!previous || !dropped) {
+      break;
+    }
+    pages[pages.length - 1] = { ...previous, hasNextPage: dropped.hasNextPage };
+  }
+
+  return { pages, pageParams };
+}
+
+function pagedListLostNextCursor(before: InfiniteData<WorkOrdersPage>, after: InfiniteData<WorkOrdersPage>): boolean {
+  const nextPageRemains = Boolean(after.pages.at(-1)?.hasNextPage);
+  return pageHasNextCursor(before.pages.at(-1)) && !pageHasNextCursor(after.pages.at(-1)) && nextPageRemains;
+}
+
+export function removeWorkOrderFromListCaches(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+): void {
+  queryClient.setQueryData<FactoriesWorkOrderSummary[]>(workOrdersListKey(organizationId, factoryId), (orders) => {
+    if (!orders) {
+      return orders;
+    }
+    return withoutWorkOrder(orders, orderId);
+  });
+
+  for (const query of queryClient.getQueryCache().findAll({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  })) {
+    const current = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey);
+    if (!current || !current.pages.some((page) => pageContainsWorkOrder(page, orderId))) {
+      continue;
+    }
+
+    const next = withoutWorkOrderPages(current, orderId);
+    queryClient.setQueryData(query.queryKey, next);
+    if (pagedListLostNextCursor(current, next)) {
+      void queryClient.invalidateQueries({ queryKey: query.queryKey });
+    }
   }
 }
 

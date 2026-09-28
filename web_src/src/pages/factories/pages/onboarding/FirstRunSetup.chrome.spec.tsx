@@ -37,6 +37,10 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
+}));
+
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
 vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
@@ -112,6 +116,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
     setJiraCompletion: vi.fn(),
+    jiraCompletionNeedsManualColumn: false,
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,

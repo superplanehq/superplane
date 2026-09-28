@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,10 @@ const (
 	CanvasNodeExecutionResultReasonOk            = "ok"
 	CanvasNodeExecutionResultReasonError         = "error"
 	CanvasNodeExecutionResultReasonErrorResolved = "error_resolved"
+
+	// CanvasNodeExecutionFrozenComponentKey stores the component an execution
+	// started with when a later model-source switch replaces the runtime node.
+	CanvasNodeExecutionFrozenComponentKey = "frozenComponent"
 )
 
 var CanvasNodeExecutionActiveStates = []string{
@@ -95,6 +100,14 @@ type CanvasNodeExecution struct {
 
 func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
+}
+
+func (e *CanvasNodeExecution) FrozenComponentName() string {
+	if e == nil {
+		return ""
+	}
+	name, _ := e.Metadata.Data()[CanvasNodeExecutionFrozenComponentKey].(string)
+	return strings.TrimSpace(name)
 }
 
 func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {

@@ -71,12 +71,102 @@ describe("useWorkOrderFileUpload", () => {
     expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
   });
 
-  it("rejects a file type that SuperPlane does not store", async () => {
+  it("uploads a video file and returns an sp-file ref", async () => {
+    const id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
     const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
 
     let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
     await act(async () => {
       uploaded = await result.current.uploadFiles([new File(["x"], "clip.mp4", { type: "video/mp4" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: true,
+      }),
+    ]);
+  });
+
+  it("uploads an audio file and returns an sp-file ref", async () => {
+    const id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "note.mp3", { type: "audio/mpeg" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: false,
+        isAudio: true,
+      }),
+    ]);
+  });
+
+  it("explains an opaque not-found create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "Not found" },
+      response: new Response("Not found", { status: 404 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains a forbidden create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "permission denied" },
+      response: new Response("permission denied", { status: 403 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains when the workspace or task no longer exists", async () => {
+    filesCreateWorkOrderFile.mockResolvedValue({
+      error: { message: "resource not found" },
+      response: new Response("resource not found", { status: 404 }),
+    });
+    const { result } = renderHook(() =>
+      useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1", orderId: "order-1" }),
+    );
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      "This workspace or task no longer exists. Refresh the page and try again.",
+    );
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file type that SuperPlane does not store", async () => {
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "payload.zip", { type: "application/zip" })]);
     });
 
     expect(uploaded).toEqual([]);

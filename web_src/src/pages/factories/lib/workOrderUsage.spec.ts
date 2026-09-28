@@ -241,7 +241,7 @@ describe("workOrderSpendBreakdownRows", () => {
         [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
       ),
     ).toEqual([
-      { label: "claude-sonnet-4-6", detail: "2.7k tokens", spend: "$0.45" },
+      { label: "sonnet 4-6", detail: "2.7k tokens", spend: "$0.45" },
       { label: "Machine time", detail: "1 min 30 s", spend: "$0.28" },
     ]);
   });
