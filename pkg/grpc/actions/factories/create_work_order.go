@@ -55,6 +55,25 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 			return err
 		}
 		order = created
+		rewritten, copiedKeys, copyErr := storedfiles.DuplicateTaskFiles(
+			ctx,
+			tx,
+			blob.Current(),
+			orgID,
+			factory.ID,
+			order.ID,
+			createdByID,
+			order.Description,
+		)
+		bound.CopiedKeys = append(bound.CopiedKeys, copiedKeys...)
+		if copyErr != nil {
+			return copyErr
+		}
+		if rewritten != order.Description {
+			if err := order.UpdateContent(tx, nil, &rewritten); err != nil {
+				return err
+			}
+		}
 		result, bindErr := storedfiles.BindDescriptionFiles(
 			ctx,
 			tx,
@@ -64,7 +83,8 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 			order.ID,
 			order.Description,
 		)
-		bound = result
+		bound.CopiedKeys = append(bound.CopiedKeys, result.CopiedKeys...)
+		bound.StaleKeys = append(bound.StaleKeys, result.StaleKeys...)
 		return bindErr
 	})
 	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {

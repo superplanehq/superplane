@@ -100,7 +100,7 @@ describe("WorkOrderSplitRunPopup duplicate", () => {
     await waitFor(() => {
       expect(createMutate).toHaveBeenCalledWith({
         title: SAVED_TITLE,
-        description: "Refunds fail.\n\nMore context.",
+        description: SAVED_DESCRIPTION,
       });
     });
     expect(createMutate.mock.calls[0]?.[0]).not.toHaveProperty("assigneeIds");

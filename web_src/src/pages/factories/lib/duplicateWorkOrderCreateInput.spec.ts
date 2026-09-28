@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { duplicateWorkOrderCreateInput } from "./duplicateWorkOrderCreateInput";
 
 describe("duplicateWorkOrderCreateInput", () => {
-  it("copies the saved title and description words, drops file links, and omits assignees", () => {
+  it("copies the saved title, description, and file links, and omits assignees", () => {
     const source = {
       title: "Retry refunds",
       description: [
@@ -20,8 +20,7 @@ describe("duplicateWorkOrderCreateInput", () => {
     const input = duplicateWorkOrderCreateInput(source);
 
     expect(input.title).toBe("Retry refunds");
-    expect(input.description).toBe("Refunds fail.\n\nSee and before [docs](https://example.com).");
-    expect(input.description).not.toContain("sp-file://");
+    expect(input.description).toBe(source.description);
     expect(input).not.toHaveProperty("assigneeIds");
   });
 });
