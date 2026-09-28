@@ -65,6 +65,12 @@ export function GitHubIntakeFilterFields({
             checked={settings.superplaneLabelAdded}
             onChange={() => update("superplaneLabelAdded", !settings.superplaneLabelAdded)}
           />
+          <IntakeSettingsCheckbox
+            title={INTAKE_SETTINGS_COPY.createIssueForManualTasks}
+            description={INTAKE_SETTINGS_COPY.createIssueForManualTasksHelp}
+            checked={settings.githubCreateIssueForManualTasks}
+            onChange={() => update("githubCreateIssueForManualTasks", !settings.githubCreateIssueForManualTasks)}
+          />
         </div>
       </fieldset>
       <fieldset className="min-w-0">
@@ -223,22 +229,27 @@ function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFie
 
 function IntakeSettingsCheckbox({
   title,
+  description,
   checked,
   onChange,
 }: {
   title: string;
+  description?: string;
   checked: boolean;
   onChange: () => void;
 }) {
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
         checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
       )}
     >
-      <Checkbox checked={checked} onChange={onChange} aria-label={title} />
-      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
+      <Checkbox checked={checked} onChange={onChange} aria-label={title} className="mt-0.5" />
+      <span className="min-w-0">
+        <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
+        {description ? <span className="mt-0.5 block text-[12px] text-muted-foreground">{description}</span> : null}
+      </span>
     </label>
   );
 }

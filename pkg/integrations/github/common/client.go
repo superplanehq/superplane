@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
@@ -464,9 +465,60 @@ func (c *Client) CreateIssue(ctx context.Context, repository string, issue *gith
 	return c.underlying.Issues.Create(ctx, owner, name, issue)
 }
 
+// AuthenticatedLogin returns the login of the token used by this client.
+func (c *Client) AuthenticatedLogin(ctx context.Context) (string, error) {
+	user, _, err := c.underlying.Users.Get(ctx, "")
+	if err != nil {
+		return "", err
+	}
+	login := strings.TrimSpace(user.GetLogin())
+	if login == "" {
+		return "", fmt.Errorf("github user login is empty")
+	}
+	return login, nil
+}
+
 func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber int) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
+}
+
+// ListRecentIssues returns the newest issues in a repository, including
+// issues that were just created. A timed-out create uses this to recover
+// the issue number when GitHub accepted the request but the response was late.
+func (c *Client) ListRecentIssues(ctx context.Context, repository string, limit int) ([]*github.Issue, *github.Response, error) {
+	return c.ListIssuesCreatedSince(ctx, repository, "", time.Time{}, limit)
+}
+
+// ListIssuesCreatedSince returns the newest issues in a repository. creator
+// limits the list to issues opened by that GitHub login. since limits the
+// list to issues updated at or after that time.
+func (c *Client) ListIssuesCreatedSince(
+	ctx context.Context,
+	repository, creator string,
+	since time.Time,
+	limit int,
+) ([]*github.Issue, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	options := &github.IssueListByRepoOptions{
+		State:     "all",
+		Sort:      "created",
+		Direction: "desc",
+		Creator:   strings.TrimSpace(creator),
+		ListOptions: github.ListOptions{
+			PerPage: limit,
+		},
+	}
+	if !since.IsZero() {
+		options.Since = since
+	}
+	return c.underlying.Issues.ListByRepo(ctx, owner, name, options)
 }
 
 // ListOpenDependabotAlerts reads open Dependabot alerts for a repository,
