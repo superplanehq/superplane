@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"strings"
 
 	"gorm.io/gorm"
@@ -27,6 +28,53 @@ func (f *Factory) ListWorkOrderOriginURLsContaining(tx *gorm.DB, fragment string
 	}
 
 	return urls, nil
+}
+
+// FindWorkOrderByPendingGitHubMarker returns the work order that is still
+// waiting for this manual-task marker. The stored label may also carry the
+// GitHub login that is allowed to claim the issue.
+func (f *Factory) FindWorkOrderByPendingGitHubMarker(tx *gorm.DB, marker string) (*FactoryWorkOrder, error) {
+	marker = strings.TrimSpace(marker)
+	if tx == nil || f == nil || marker == "" {
+		return nil, nil
+	}
+
+	var order FactoryWorkOrder
+	err := tx.
+		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
+		Where("origin_url IS NULL OR origin_url = ''").
+		Where(
+			"origin_label = ? OR origin_label LIKE ? OR origin_label LIKE ?",
+			marker,
+			marker+"\x1f%",
+			marker+createRequestKeySeparator+"%",
+		).
+		Order("created_at ASC").
+		First(&order).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+// FindWorkOrderByOriginLabel returns the work order whose origin label is
+// exactly label, in any state. A pending manual-task marker uses this until
+// the GitHub issue URL is known.
+func (f *Factory) FindWorkOrderByOriginLabel(tx *gorm.DB, label string) (*FactoryWorkOrder, error) {
+	label = strings.TrimSpace(label)
+	if tx == nil || f == nil || label == "" {
+		return nil, nil
+	}
+
+	order, err := f.findWorkOrder(tx, "origin_label = ?", label)
+	if errors.Is(err, ErrFactoryWorkOrderNotFound) {
+		return nil, nil
+	}
+	return order, err
 }
 
 // ListWorkOrdersByOriginURLFragment returns this factory's work orders whose

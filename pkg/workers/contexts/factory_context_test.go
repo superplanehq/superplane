@@ -21,6 +21,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
@@ -314,7 +316,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 
-	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+	t.Run("skips an opened GitHub issue that already has a task", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		origin := models.WorkOrderOrigin{
@@ -335,8 +337,9 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
 			"type": "github.issue",
 			"data": map[string]any{
+				"action": "opened",
 				"issue": map[string]any{
-					"html_url": origin.URL,
+					"html_url": "https://GitHub.com/acme/payments/issues/12/",
 					"title":    "Handle duplicate refunds",
 				},
 			},
@@ -347,9 +350,182 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 
 		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("skips a GitHub issue when the origin uses different path capitalization", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{
+				URL:   "https://github.com/Acme/Payments/issues/12",
+				Label: "Acme/Payments#12",
+			},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
+	t.Run("attaches a timed-out manual task instead of creating another", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		marker := ghintegration.NewManualTaskMarker()
+		existing, err := factoryModel.CreateWorkOrder(
+			database.Conn(),
+			"Ship the refunds line",
+			"Stop double charges.",
+			&r.User,
+			[]uuid.UUID{r.User},
+			nil,
+		)
+		require.NoError(t, err)
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), ghintegration.PendingManualTaskLabel(marker, "superplane-bot")))
+
+		issueURL := "https://github.com/acme/payments/issues/42"
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": issueURL,
+					"title":    "Ship the refunds line",
+					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "superplane-bot"},
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Ship the refunds line"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.OriginURL)
+		assert.Equal(t, issueURL, *reloaded.OriginURL)
+		require.NotNil(t, reloaded.CreatedByID)
+		assert.Equal(t, r.User, *reloaded.CreatedByID)
+	})
+
+	t.Run("does not attach a copied marker from another GitHub user", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		marker := ghintegration.NewManualTaskMarker()
+		existing, err := factoryModel.CreateWorkOrder(
+			database.Conn(),
+			"Ship the refunds line",
+			"Stop double charges.",
+			&r.User,
+			[]uuid.UUID{r.User},
+			nil,
+		)
+		require.NoError(t, err)
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), ghintegration.PendingManualTaskLabel(marker, "superplane-bot")))
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/99",
+					"title":    "Copied marker",
+					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "attacker"},
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Copied marker"})
+		require.NoError(t, err)
 		require.True(t, created)
 		require.NotNil(t, order)
 		assert.Equal(t, 2, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.OriginURL)
+		require.NotNil(t, reloaded.OriginLabel)
+		assert.Contains(t, *reloaded.OriginLabel, marker)
+	})
+
+	t.Run("attaches a timed-out issue when the stored actor is missing", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		marker := ghintegration.NewManualTaskMarker()
+		existing, err := factoryModel.CreateWorkOrder(
+			database.Conn(),
+			"Ship the refunds line",
+			"Stop double charges.",
+			&r.User,
+			[]uuid.UUID{r.User},
+			nil,
+		)
+		require.NoError(t, err)
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), marker))
+
+		issueURL := "https://github.com/acme/payments/issues/42"
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": issueURL,
+					"title":    "Ship the refunds line",
+					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "superplane[bot]"},
+				},
+			},
+		})
+		attachGitHubAppIssueTrigger(t, r, canvas, "superplane")
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Ship the refunds line"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.OriginURL)
+		assert.Equal(t, issueURL, *reloaded.OriginURL)
 	})
 
 	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {
@@ -629,7 +805,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 
-	t.Run("still creates a GitHub task with a repeated origin", func(t *testing.T) {
+	t.Run("skips an opened GitHub issue that already has a task", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		origin := models.WorkOrderOrigin{
@@ -650,8 +826,9 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
 			"type": "github.issue",
 			"data": map[string]any{
+				"action": "opened",
 				"issue": map[string]any{
-					"html_url": origin.URL,
+					"html_url": "https://GitHub.com/acme/payments/issues/12/",
 					"title":    "Handle duplicate refunds",
 				},
 			},
@@ -662,9 +839,9 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateJiraIssue(t *testing.T) {
 
 		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
 		require.NoError(t, err)
-		require.True(t, created)
-		require.NotNil(t, order)
-		assert.Equal(t, 2, countOrders(factoryModel))
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 
 	t.Run("serializes concurrent creates for the same Jira issue", func(t *testing.T) {
@@ -2093,6 +2270,38 @@ func setupFactoryAppExecution(
 	return setupFactoryAppExecutionWithPayload(t, r, factoryID, map[string]any{"key": "value"})
 }
 
+func attachGitHubAppIssueTrigger(t *testing.T, r *support.ResourceRegistry, canvas *models.Canvas, slug string) {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	setup := datatypes.NewJSONType(models.SetupState{})
+	integration.State = models.IntegrationStateReady
+	integration.SetupState = &setup
+	integration.Properties = datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+		{Name: ghcommon.PropertyAuthMethod, Value: ghcommon.AuthMethodApp},
+		{Name: ghcommon.PropertyAppSlug, Value: slug},
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
+	nodes := append([]models.Node(nil), liveVersion.Nodes...)
+	nodes = append(nodes, models.Node{
+		ID:            "github-issue",
+		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+		IntegrationID: &integrationID,
+	})
+	require.NoError(t, database.Conn().Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+}
+
 func setupFactoryAppExecutionWithPayload(
 	t *testing.T,
 	r *support.ResourceRegistry,
@@ -2124,4 +2333,86 @@ func setupFactoryAppExecutionWithPayload(
 	require.NoError(t, database.Conn().Save(nodeExecution).Error)
 
 	return canvas, nodeExecution, run
+}
+
+func TestFactoryContext_GitHubClientSkipsUnusableIntegration(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	broken := readyGitHubPATIntegration(t, r, false)
+	usable := readyGitHubPATIntegration(t, r, true)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			githubIssueCanvasNode("broken"),
+			githubIssueCanvasNode("usable"),
+		},
+		nil,
+	)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+	nodes := append([]models.Node(nil), liveVersion.Nodes...)
+	require.Len(t, nodes, 2)
+	brokenID := broken.ID.String()
+	usableID := usable.ID.String()
+	nodes[0].IntegrationID = &brokenID
+	nodes[1].IntegrationID = &usableID
+	require.NoError(t, database.Conn().Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nil).WithRemoteImageIngest(r.Encryptor, r.Registry)
+	require.Equal(t, broken.ID, ctx.githubIssueIntegration().ID)
+	assert.Nil(t, ctx.githubClient(ctx.githubIssueIntegration()))
+	assert.NotNil(t, ctx.githubClientForCanvas())
+}
+
+func githubIssueCanvasNode(nodeID string) models.CanvasNode {
+	return models.CanvasNode{
+		NodeID: nodeID,
+		Type:   models.NodeTypeTrigger,
+		Name:   "On Issue",
+		Ref: datatypes.NewJSONType(models.NodeRef{
+			Trigger: &models.TriggerRef{Name: "github.onIssue"},
+		}),
+	}
+}
+
+func readyGitHubPATIntegration(t *testing.T, r *support.ResourceRegistry, withPAT bool) *models.Integration {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	setup := datatypes.NewJSONType(models.SetupState{})
+	integration.State = models.IntegrationStateReady
+	integration.SetupState = &setup
+	integration.Properties = datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+		{Name: ghcommon.PropertyAuthMethod, Value: ghcommon.AuthMethodPAT},
+		{Name: ghcommon.PropertyOwner, Value: "acme"},
+		{Name: ghcommon.PropertyOwnerType, Value: ghcommon.OwnerTypeOrganization},
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+	if !withPAT {
+		return integration
+	}
+
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), []byte("ghp_test"), []byte(integration.ID.String()))
+	require.NoError(t, err)
+	now := time.Now()
+	require.NoError(t, database.Conn().Create(&models.IntegrationSecret{
+		OrganizationID: integration.OrganizationID,
+		InstallationID: integration.ID,
+		Name:           ghcommon.SecretPAT,
+		Value:          encrypted,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}).Error)
+	return integration
 }

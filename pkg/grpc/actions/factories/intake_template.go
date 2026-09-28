@@ -437,10 +437,14 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 }
 
 func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
-	if source != models.FactoryIntakeSourceJiraIssues {
+	switch source {
+	case models.FactoryIntakeSourceJiraIssues:
+		return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
+	case models.FactoryIntakeSourceGitHubIssues:
+		return githubManualTaskMetadata(intakeSettingsOrDefault(source, settings))
+	default:
 		return nil
 	}
-	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
 }
 
 func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {

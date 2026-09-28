@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -177,6 +178,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateGitHubIssueWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	skip, err = c.skipDuplicateProductiveWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -263,6 +272,73 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 	}
 	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	issueURL, ok := ghintegration.IssueURLFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghintegration.LockIssueWorkOrder(c.tx, factoryModel, issueURL); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := ghintegration.IssueHasWorkOrder(c.tx, factoryModel, issueURL)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping GitHub issue %s: work order already exists", issueURL)
+		return true, nil
+	}
+
+	marker, ok := ghintegration.ManualTaskMarkerFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	order, err := factoryModel.FindWorkOrderByPendingGitHubMarker(c.tx, marker)
+	if err != nil {
+		return false, err
+	}
+	if order == nil || order.OriginLabel == nil {
+		return false, nil
+	}
+
+	expected := ghintegration.ManualTaskActorFromLabel(*order.OriginLabel)
+	author, authorOK := ghintegration.IssueAuthorFromEventData(event.Data.Data())
+	if expected == "" {
+		expected = c.githubInstallationLogin()
+		if expected != "" {
+			if markErr := order.SetPendingGitHubMarker(c.tx, ghintegration.PendingManualTaskLabel(marker, expected)); markErr != nil {
+				return false, markErr
+			}
+		}
+	}
+	if expected == "" || !authorOK || !strings.EqualFold(expected, author) {
+		log.Warnf("GitHub issue %s carries a manual-task marker but its author does not match", issueURL)
+		return false, nil
+	}
+
+	if err := order.SetOrigin(c.tx, models.WorkOrderOrigin{
+		URL:   issueURL,
+		Label: models.OriginLabelFromURL(issueURL),
+	}); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("skipping GitHub issue %s: manual task %s already exists", issueURL, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {
@@ -471,7 +547,10 @@ func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) er
 	return err
 }
 
-func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+func (c *FactoryContext) githubIssueIntegrations() []*models.Integration {
+	if c == nil || c.canvas == nil || c.tx == nil {
+		return nil
+	}
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(c.tx, []uuid.UUID{c.canvas.ID})
 	if err != nil {
 		return nil
@@ -480,6 +559,7 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 	if !ok {
 		return nil
 	}
+	integrations := make([]*models.Integration, 0)
 	for i := range spec.Nodes {
 		node := spec.Nodes[i]
 		if node.ComponentName() != "github.onIssue" || node.IntegrationID == nil {
@@ -493,14 +573,57 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 		if err != nil || integration.State != models.IntegrationStateReady {
 			continue
 		}
-		client, err := githubcommon.NewClient(
-			NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
-			c.registry.HTTPContextInTransaction(c.tx),
-		)
-		if err != nil {
-			continue
+		integrations = append(integrations, integration)
+	}
+	return integrations
+}
+
+func (c *FactoryContext) githubIssueIntegration() *models.Integration {
+	integrations := c.githubIssueIntegrations()
+	if len(integrations) == 0 {
+		return nil
+	}
+	return integrations[0]
+}
+
+func (c *FactoryContext) githubClient(integration *models.Integration) *githubcommon.Client {
+	if integration == nil || c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client, err := githubcommon.NewClient(
+		NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
+		c.registry.HTTPContextInTransaction(c.tx),
+	)
+	if err != nil {
+		return nil
+	}
+	return client
+}
+
+func (c *FactoryContext) githubInstallationLogin() string {
+	integration := c.githubIssueIntegration()
+	if login := ghintegration.AppBotLogin(integration); login != "" {
+		return login
+	}
+	client := c.githubClient(integration)
+	if client == nil {
+		return ""
+	}
+	lookupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	login, err := client.AuthenticatedLogin(lookupCtx)
+	if err != nil {
+		log.WithError(err).Warn("failed to read the GitHub login for a manual task issue")
+		return ""
+	}
+	return strings.TrimSpace(login)
+}
+
+func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+	for _, integration := range c.githubIssueIntegrations() {
+		if client := c.githubClient(integration); client != nil {
+			return client
 		}
-		return client
 	}
 	return nil
 }

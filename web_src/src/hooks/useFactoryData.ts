@@ -499,11 +499,17 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[] }) => {
+    mutationFn: async (input: {
+      title: string;
+      description: string;
+      assigneeIds?: string[];
+      idempotencyKey?: string;
+    }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
+          headers: input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : undefined,
           body: {
             title: input.title,
             description: input.description,
