@@ -19,7 +19,7 @@ import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
-import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -110,7 +110,6 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
-  initialTab,
   analysis,
   popupData,
 }: WorkOrderSplitRunPopupProps & {
@@ -121,15 +120,15 @@ function AnalysisWorkOrderPopup({
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
-  const [tab, setTab] = useState(() => initialTab ?? defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel, draftThinking);
+  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => {}, draftModel, draftThinking);
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
+  const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
     organizationId,
@@ -166,15 +165,16 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: true }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
-  const descriptionReview = showsDescriptionReview(sourceOnly, showSidebarNote, tab) ? review : undefined;
+  const descriptionReview = !unified && !showSidebarNote ? review : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={analysisPopupClassName(fullPage, sourceOnly)}
+      className={analysisPopupClassName(fullPage, unified)}
       onDismiss={onClose}
     >
       <LiveHeaderSpendProvider>
@@ -188,15 +188,14 @@ function AnalysisWorkOrderPopup({
           orderId={orderId}
           orderNumber={orderNumber}
           lineId={lineId}
-          tab={tab}
-          onTabChange={setTab}
           canUpdate={canUpdate}
           footerActions={footerActions}
           resultFooter={descriptionReview}
-          sidebarNote={showSidebarNote ? review : undefined}
+          sidebarNote={!unified && showSidebarNote ? review : undefined}
           analysis={stripAnalysis}
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
+          panelReview={panelReview}
           header={analysisPopupHeader({
             edits,
             fixture,
@@ -210,10 +209,10 @@ function AnalysisWorkOrderPopup({
             mutations,
             footerBusy: footerActions.busy,
             reviewActions,
+            showOwnerRow: !unified,
             planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
           })}
         />
-        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
@@ -266,6 +265,8 @@ function analysisPopupHeader(args: {
   mutations: ReturnType<typeof footerMutationHandlers>;
   footerBusy: boolean;
   reviewActions: ReactNode;
+  /** The unified view moves owner and spend into the summary panel. */
+  showOwnerRow: boolean;
   planningSpend?: {
     view: ReturnType<typeof useAnalysisPlanningSession>["view"];
     savedTokens: number;
@@ -298,12 +299,14 @@ function analysisPopupHeader(args: {
           saved={{ tokens: args.planningSpend.savedTokens, cents: args.planningSpend.savedCostCents }}
         />
       ) : null}
-      <LiveOwnerTimeCostRow
-        fixture={{ ...args.fixture, owner: args.edits.owner }}
-        assigneeIds={args.edits.assigneeIds}
-        usageByModel={args.fixture.usageByModel}
-        usageByMachineType={args.fixture.usageByMachineType}
-      />
+      {args.showOwnerRow ? (
+        <LiveOwnerTimeCostRow
+          fixture={{ ...args.fixture, owner: args.edits.owner }}
+          assigneeIds={args.edits.assigneeIds}
+          usageByModel={args.fixture.usageByModel}
+          usageByMachineType={args.fixture.usageByMachineType}
+        />
+      ) : null}
     </PopupHeader>
   );
 }
@@ -439,20 +442,15 @@ function analysisReviewCompact(
   return showSidebarNote || (footerKind === "draft" && !sourceOnly);
 }
 
-function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
-  return !sourceOnly && !showSidebarNote && tab === "description";
-}
-
-function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
-  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
-    return review;
+/** The unified view is wide; the Planning draft keeps the refine widths. */
+function analysisPopupClassName(fullPage: boolean, unified: boolean) {
+  if (fullPage) {
+    return undefined;
   }
-  return null;
-}
-
-/** The split-run dialog width applies only to the Planning layout in a fixed popup. */
-function analysisPopupClassName(fullPage: boolean, sourceOnly: boolean) {
-  return fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
+  if (unified) {
+    return "h-[min(52rem,calc(100vh-5rem))] w-[min(80rem,calc(100vw-5rem))]";
+  }
+  return SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
 }
 
 /**
