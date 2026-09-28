@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -43,12 +44,78 @@ func TestHostedSetupCallbackDoesNotBindInstallationID(t *testing.T) {
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.InstallationID)
 	assert.Empty(t, metadata.Repositories)
+	assert.Equal(t, "999", metadata.SetupInstallationID)
 	assert.Empty(t, metadata.InstallationsRefreshedAt)
 	assert.Equal(
 		t,
 		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=complete&githubIntegrationId=11111111-1111-1111-1111-111111111111",
 		rec.Header().Get("Location"),
 	)
+}
+
+func TestSyncHostedAppVerifiesOnlyCallbackInstallation(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	getAppInstallation = func(_ context.Context, _ *gh.Client, id int64) (*gh.Installation, error) {
+		assert.Equal(t, int64(22), id)
+		return &gh.Installation{
+			ID:         gh.Ptr(id),
+			TargetType: gh.Ptr("Organization"),
+			Account:    &gh.User{Login: gh.Ptr("new-org"), Type: gh.Ptr("Organization")},
+		}, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		t.Fatal("callback verification must not list every App installation")
+		return nil, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 202, Name: "api"}}, nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:               "csrf",
+			HostedApp:           true,
+			SetupInstallationID: "22",
+			StartedByUserID:     "user-1",
+			PendingInstallations: []common.PendingInstallation{{
+				ID:           "11",
+				AccountLogin: "existing",
+				Repositories: []common.Repository{{ID: 101, Name: "existing/web"}},
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	err := (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	})
+
+	require.NoError(t, err)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.SetupInstallationID)
+	require.Len(t, metadata.PendingInstallations, 2)
+	assert.Equal(t, "new-org", metadata.PendingInstallations[0].AccountLogin)
+	assert.Equal(t, "new-org/api", metadata.PendingInstallations[0].Repositories[0].Name)
+	assert.Equal(t, "existing", metadata.PendingInstallations[1].AccountLogin)
 }
 
 func TestHostedSetupCallbackRejectsInvalidState(t *testing.T) {
@@ -100,8 +167,16 @@ func TestHostedBindUsesOptInLocalInstallationAccessWithoutIdentity(t *testing.T)
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
+	getAppInstallation = func(context.Context, *gh.Client, int64) (*gh.Installation, error) {
+		return &gh.Installation{
+			ID:         gh.Ptr(int64(11)),
+			TargetType: gh.Ptr("Organization"),
+			Account:    &gh.User{Login: gh.Ptr("acme"), Type: gh.Ptr("Organization")},
+		}, nil
+	}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+		t.Fatal("binding must not list every App installation")
+		return nil, nil
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -135,7 +210,7 @@ func TestHostedBindUsesOptInLocalInstallationAccessWithoutIdentity(t *testing.T)
 	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}}, metadata.Repositories)
 }
 
-func TestHostedBindIgnoresUnrelatedInstallationFailure(t *testing.T) {
+func TestHostedBindDoesNotCheckUnrelatedInstallation(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	t.Cleanup(resetBindClientHooks)
@@ -143,15 +218,20 @@ func TestHostedBindIgnoresUnrelatedInstallationFailure(t *testing.T) {
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{
-			{ID: "11", AccountLogin: "acme", AccountType: "Organization"},
-			{ID: "22", AccountLogin: "unavailable", AccountType: "Organization"},
+	getAppInstallation = func(context.Context, *gh.Client, int64) (*gh.Installation, error) {
+		return &gh.Installation{
+			ID:         gh.Ptr(int64(11)),
+			TargetType: gh.Ptr("Organization"),
+			Account:    &gh.User{Login: gh.Ptr("acme"), Type: gh.Ptr("Organization")},
 		}, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		t.Fatal("binding must not list every App installation")
+		return nil, nil
 	}
 	newInstallationClient = func(_ core.IntegrationContext, _ int64, installationID string) (*gh.Client, error) {
 		if installationID == "22" {
-			return nil, assert.AnError
+			t.Fatal("binding checked an unrelated installation")
 		}
 		return gh.NewClient(nil), nil
 	}
@@ -533,6 +613,22 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
 		return slices.Clone(installations), nil
 	}
+	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
+		for _, installation := range installations {
+			if installation.AccountLogin == account {
+				id, err := strconv.ParseInt(installation.ID, 10, 64)
+				require.NoError(t, err)
+				return &gh.Installation{
+					ID:      gh.Ptr(id),
+					Account: &gh.User{Login: gh.Ptr(account), Type: gh.Ptr("Organization")},
+				}, nil
+			}
+		}
+		return nil, githubNotFoundError()
+	}
+	findAppUserInstallation = func(context.Context, *gh.Client, string) (*gh.Installation, error) {
+		return nil, githubNotFoundError()
+	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
@@ -602,6 +698,12 @@ func TestSyncHostedAppDiscoversApprovedRequestOnBoundConnection(t *testing.T) {
 			{ID: "22", AccountLogin: "acme", AccountType: "Organization"},
 		}, nil
 	}
+	findAppOrganizationInstallation = func(context.Context, *gh.Client, string) (*gh.Installation, error) {
+		return &gh.Installation{
+			ID:      gh.Ptr(int64(22)),
+			Account: &gh.User{Login: gh.Ptr("acme"), Type: gh.Ptr("Organization")},
+		}, nil
+	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
@@ -658,11 +760,17 @@ func TestSyncHostedAppDiscoversApprovedRequestWithFreshInstallationCache(t *test
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{
-			{ID: "11", AccountLogin: "existing", AccountType: "Organization"},
-			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
+	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
+		assert.Equal(t, "approved", account)
+		return &gh.Installation{
+			ID:         gh.Ptr(int64(22)),
+			TargetType: gh.Ptr("Organization"),
+			Account:    &gh.User{Login: gh.Ptr("approved"), Type: gh.Ptr("Organization")},
 		}, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		t.Fatal("approval reconciliation must not list every App installation")
+		return nil, nil
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -768,6 +876,19 @@ func TestSyncHostedAppClearsUnknownInstallRequestAfterNewInstallationIsVerified(
 	installations := []common.PendingInstallation{{ID: "11", AccountLogin: "existing", AccountType: "User"}}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
 		return slices.Clone(installations), nil
+	}
+	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
+		for _, installation := range installations {
+			if installation.AccountLogin == account {
+				id, err := strconv.ParseInt(installation.ID, 10, 64)
+				require.NoError(t, err)
+				return &gh.Installation{
+					ID:      gh.Ptr(id),
+					Account: &gh.User{Login: gh.Ptr(account), Type: gh.Ptr("Organization")},
+				}, nil
+			}
+		}
+		return nil, githubNotFoundError()
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -1010,6 +1131,15 @@ func resetBindClientHooks() {
 	listInstallationRepos = listInstallationRepositories
 	listAppInstallations = listAppInstallationsFromGitHub
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
+	getAppInstallation = getAppInstallationFromGitHub
+	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub
+	findAppUserInstallation = findAppUserInstallationFromGitHub
+	resolveInstallationIdentity = resolveInstallationIdentityFromGitHub
+	getRepositoryPermission = getRepositoryPermissionFromGitHub
+}
+
+func githubNotFoundError() error {
+	return &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusNotFound}}
 }
 
 func stubEmptyHostedDiscovery(t *testing.T) {
