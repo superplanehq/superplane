@@ -244,14 +244,23 @@ func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload ma
 	}
 
 	var sendErr error
+	delivered := 0
 	for _, subscription := range subscriptions {
 		if err := subscription.SendMessage(payload); err != nil {
 			ctx.Logger.Errorf("failed to send datadog message to subscription: %v", err)
 			sendErr = errors.Join(sendErr, err)
+			continue
 		}
+		delivered++
 	}
 
-	return sendErr
+	// A retry repeats the whole webhook. Return an error only when no
+	// subscription accepted the alert, so a later retry cannot duplicate a
+	// delivery that already succeeded.
+	if delivered == 0 && sendErr != nil {
+		return sendErr
+	}
+	return nil
 }
 
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

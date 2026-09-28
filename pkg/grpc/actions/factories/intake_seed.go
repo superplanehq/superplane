@@ -695,14 +695,18 @@ func seedDatadogIssues(
 }
 
 func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
-	hydrated := make([]datadog.ErrorTrackingIssue, len(issues))
-	for i, issue := range issues {
-		hydrated[i] = issue
+	hydrated := make([]datadog.ErrorTrackingIssue, 0, len(issues))
+	for _, issue := range issues {
 		loaded, err := client.LoadErrorTrackingIssue(issue.ID, func(format string, args ...any) {
 			log.Warnf(format, args...)
 		})
 		if err != nil || loaded == nil {
 			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
+			hydrated = append(hydrated, issue)
+			continue
+		}
+		if !datadogDetailMatchesService(issue.Service, loaded.Service) {
+			log.Warnf("skipping Datadog issue %s: details report service %s", issue.ID, loaded.Service)
 			continue
 		}
 		if strings.TrimSpace(loaded.URL) == "" {
@@ -711,9 +715,17 @@ func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrac
 		if strings.TrimSpace(loaded.Service) == "" {
 			loaded.Service = issue.Service
 		}
-		hydrated[i] = *loaded
+		hydrated = append(hydrated, *loaded)
 	}
 	return hydrated
+}
+
+func datadogDetailMatchesService(expected, actual string) bool {
+	actual = strings.TrimSpace(actual)
+	if actual == "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(expected), actual)
 }
 
 func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.ErrorTrackingIssue, error) {
