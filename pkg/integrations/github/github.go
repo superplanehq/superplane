@@ -300,7 +300,8 @@ func (g *GitHub) refreshHostedSetup(
 	// A new connection has no trusted installation to refresh. Opening the
 	// GitHub setup flow gives the callback an exact installation candidate and
 	// avoids scanning every installation owned by the shared App.
-	if len(metadata.PendingInstallations) == 0 {
+	if len(metadata.PendingInstallations) == 0 &&
+		!installRequestFollowUpDiscoveryActive(*metadata, time.Now().UTC()) {
 		return nil
 	}
 	if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {

@@ -686,16 +686,11 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
 	integration := &contexts.IntegrationContext{
-		State: "ready",
+		State: "pending",
 		Metadata: common.Metadata{
-			State:                    "csrf",
-			HostedApp:                true,
-			InstallationID:           "11",
-			StartedByGitHubLogin:     "development",
-			InstallationsRefreshedAt: time.Now().UTC().Format(time.RFC3339Nano),
-			PendingInstallations: []common.PendingInstallation{
-				{ID: "11", AccountLogin: "existing", Repositories: []common.Repository{{ID: 101, Name: "existing/api"}}},
-			},
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByGitHubLogin: "development",
 			InstallRequests: []common.InstallRequest{{
 				ID:             "1",
 				AccountLogin:   "acme",
@@ -717,12 +712,12 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	require.NoError(t, (&GitHub{}).Sync(ctx))
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.InstallRequests)
+	assert.Empty(t, metadata.PendingInstallations)
 	assert.True(t, installRequestFollowUpDiscoveryActive(metadata, time.Now().UTC()))
 
 	installations = append(installations, common.PendingInstallation{
 		ID: "22", AccountLogin: "acme", AccountType: "Organization",
 	})
-	metadata.InstallationsRefreshedAt = time.Now().UTC().Add(-hostedInstallationDiscoveryInterval).Format(time.RFC3339Nano)
 	integration.Metadata = metadata
 
 	require.NoError(t, (&GitHub{}).Sync(ctx))
