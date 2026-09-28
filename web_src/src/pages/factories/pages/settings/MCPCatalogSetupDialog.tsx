@@ -14,9 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 
 import { AGENT_RESOURCES_COPY, type AgentResourceInstruction } from "./agentResourceCopy";
+import { DATADOG_MCP_DEFAULT_SITE_ID, DATADOG_MCP_SITES, datadogMCPSiteForURL, datadogMCPURL } from "./datadogMcpSites";
 import type { MCPCatalogEntry } from "./mcpCatalog";
 
 export function MCPCatalogSetupDialog({
@@ -38,6 +40,7 @@ export function MCPCatalogSetupDialog({
 }) {
   const [token, setToken] = useState("");
   const [tokenError, setTokenError] = useState("");
+  const [siteId, setSiteId] = useState(DATADOG_MCP_DEFAULT_SITE_ID);
 
   useEffect(() => {
     if (!open) {
@@ -45,17 +48,20 @@ export function MCPCatalogSetupDialog({
     }
     setToken("");
     setTokenError("");
-  }, [open, entry?.id]);
+    setSiteId(datadogMCPSiteForURL(resource?.url)?.id ?? DATADOG_MCP_DEFAULT_SITE_ID);
+  }, [open, entry?.id, resource?.url]);
 
   if (!entry) {
     return null;
   }
 
   const isHeaderAuth = entry.auth === "AUTH_HEADERS";
+  const isDatadog = entry.id === "datadog";
   const title = resource ? entry.label : AGENT_RESOURCES_COPY.addServerTitle(entry.label);
+  const signInEntry = isDatadog ? { ...entry, url: datadogMCPURL(siteId) } : entry;
 
   const handleSignIn = async () => {
-    await onSignIn(entry);
+    await onSignIn(signInEntry);
   };
 
   const handleSaveToken = async () => {
@@ -99,6 +105,24 @@ export function MCPCatalogSetupDialog({
               autoFocus
             />
             {tokenError ? <p className="text-[12px] text-destructive">{tokenError}</p> : null}
+          </div>
+        ) : null}
+        {isDatadog ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mcp-catalog-setup-site">{AGENT_RESOURCES_COPY.datadogSiteLabel}</Label>
+            <Select value={siteId} onValueChange={setSiteId}>
+              <SelectTrigger id="mcp-catalog-setup-site" data-testid="mcp-catalog-setup-site" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DATADOG_MCP_SITES.map((site) => (
+                  <SelectItem key={site.id} value={site.id}>
+                    {site.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.datadogSiteHelper}</p>
           </div>
         ) : null}
         <DialogFooter>

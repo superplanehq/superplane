@@ -5,6 +5,7 @@ import {
   factoryAppRunPath,
   factoryAppSplitRunPath,
   factoryAppViewPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryDetailPath,
   factoryHomePath,
@@ -196,6 +197,14 @@ describe("factorySentryIntakeSetupPath", () => {
   it("opens the Sentry intake setup page on the line board", () => {
     expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
+  });
+});
+
+describe("factoryDatadogIntakeSetupPath", () => {
+  it("opens the Datadog intake setup page on the line board", () => {
+    expect(factoryDatadogIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/datadog",
     );
   });
 });

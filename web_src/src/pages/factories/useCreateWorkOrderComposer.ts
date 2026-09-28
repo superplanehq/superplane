@@ -9,7 +9,7 @@ import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { derivedWorkOrderTitle } from "./lib/derivedWorkOrderTitle";
 
 const MAX_TITLE_LENGTH = 256;
-const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_DESCRIPTION_LENGTH = 20000;
 
 export interface CreateWorkOrderComposerDraft {
   title: string;
