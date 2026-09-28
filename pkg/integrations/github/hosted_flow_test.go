@@ -263,7 +263,7 @@ func TestHostedBindDoesNotCheckUnrelatedInstallation(t *testing.T) {
 	assert.Equal(t, []common.Repository{{ID: 101, Name: "acme/api"}}, metadata.Repositories)
 }
 
-func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
+func TestSyncHostedAppDoesNotDiscoverBeforeGitHubCallback(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
@@ -273,11 +273,16 @@ func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme"}}, nil
+		t.Fatal("initial setup must not list every App installation")
+		return nil, nil
 	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-		return nil, assert.AnError
+		t.Fatal("initial setup must not verify an installation before the callback")
+		return nil, nil
 	}
 	integration := &contexts.IntegrationContext{State: "pending"}
 	syncCtx := core.SyncContext{
@@ -289,28 +294,73 @@ func TestSyncHostedAppRetriesDiscoveryWithoutOpeningInstallPage(t *testing.T) {
 		Integration:    integration,
 	}
 
-	err := (&GitHub{}).Sync(syncCtx)
-	require.ErrorContains(t, err, "failed to discover GitHub App installations")
-	assert.Nil(t, integration.BrowserAction)
+	require.NoError(t, (&GitHub{}).Sync(syncCtx))
+	require.NotNil(t, integration.BrowserAction)
+	assert.Contains(t, integration.BrowserAction.URL, "github.com/apps/")
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Empty(t, metadata.PendingInstallations)
 	assert.Empty(t, metadata.InstallationsRefreshedAt)
+}
 
+func TestSyncHostedAppDiscardsCallbackInstallationWithoutRepositories(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	getAppInstallation = func(context.Context, *gh.Client, int64) (*gh.Installation, error) {
+		return &gh.Installation{
+			ID:      gh.Ptr(int64(22)),
+			Account: &gh.User{Login: gh.Ptr("no-access"), Type: gh.Ptr("Organization")},
+		}, nil
+	}
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-		return []common.Repository{{ID: 101, Name: "api"}}, nil
+		return nil, nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		t.Fatal("an unusable callback must not fall back to full discovery")
+		return nil, nil
 	}
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return nil, nil
 	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:               "csrf",
+			HostedApp:           true,
+			StartedByUserID:     "user-1",
+			SetupInstallationID: "22",
+			PendingInstallations: []common.PendingInstallation{{
+				ID:           "11",
+				AccountLogin: "existing",
+				Repositories: []common.Repository{{ID: 101, Name: "existing/api"}},
+			}},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
 
-	require.NoError(t, (&GitHub{}).Sync(syncCtx))
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "org-1",
+		ActorUserID:    "user-1",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+
 	assert.Nil(t, integration.BrowserAction)
-	metadata = integration.Metadata.(common.Metadata)
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.SetupInstallationID)
 	require.Len(t, metadata.PendingInstallations, 1)
-	assert.Equal(t, "acme/api", metadata.PendingInstallations[0].Repositories[0].Name)
+	assert.Equal(t, "existing", metadata.PendingInstallations[0].AccountLogin)
 	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
 }
 

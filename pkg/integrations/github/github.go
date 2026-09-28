@@ -273,6 +273,8 @@ func (g *GitHub) refreshHostedSetup(
 	app common.HostedApp,
 	metadata *common.Metadata,
 ) error {
+	refreshHostedStarterIdentity(ctx, metadata)
+
 	discoveryPerformed := false
 	if metadata.SetupInstallationID != "" {
 		discoveryPerformed = true
@@ -295,11 +297,28 @@ func (g *GitHub) refreshHostedSetup(
 	if discoveryPerformed || metadata.HasInstallRequests() {
 		return nil
 	}
+	// A new connection has no trusted installation to refresh. Opening the
+	// GitHub setup flow gives the callback an exact installation candidate and
+	// avoids scanning every installation owned by the shared App.
+	if len(metadata.PendingInstallations) == 0 {
+		return nil
+	}
 	if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
 		return err
 	}
 	g.refreshHostedInstallRequests(ctx, app, metadata)
 	return nil
+}
+
+func refreshHostedStarterIdentity(ctx core.SyncContext, metadata *common.Metadata) {
+	requestContext := ctx.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
+	if err == nil {
+		metadata.StartedByGitHubLogin = identity.Login
+	}
 }
 
 func (g *GitHub) refreshHostedInstallRequests(
@@ -368,6 +387,11 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	logHostedDiscovery(ctx, mode, candidateCount, len(installations), err, now)
 	if err != nil {
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
+		if targetID != "" && githubErrorIsNotFound(err) {
+			metadata.SetupInstallationID = ""
+			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+			return nil
+		}
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
 		}
@@ -380,8 +404,9 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	}
 	if targetID != "" {
 		if len(installations) == 0 {
-			metadata.InstallationsRefreshedAt = ""
-			return fmt.Errorf("GitHub App installation %s has no writable repositories", targetID)
+			metadata.SetupInstallationID = ""
+			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+			return nil
 		}
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
 		metadata.SetupInstallationID = ""
