@@ -136,8 +136,11 @@ function AddCategoryDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <span className="text-[13px] font-medium">{RISK_SCORE_SETUP_COPY.addScoreLabel}</span>
+            <Label htmlFor="risk-score-category-score" className="text-[13px]">
+              {RISK_SCORE_SETUP_COPY.addScoreLabel}
+            </Label>
             <RiskLevelSelect
+              id="risk-score-category-score"
               value={score}
               label={RISK_SCORE_SETUP_COPY.addScoreLabel}
               testId="risk-score-category-score"
@@ -174,11 +177,13 @@ function AddCategoryDialog({
 }
 
 function RiskLevelSelect({
+  id,
   value,
   label,
   testId,
   onScore,
 }: {
+  id?: string;
   value: RiskScoreLevel;
   label: string;
   testId: string;
@@ -189,6 +194,7 @@ function RiskLevelSelect({
   return (
     <Select value={String(value)} onValueChange={(next) => onScore(Number(next) as RiskScoreLevel)}>
       <SelectTrigger
+        id={id}
         className="h-8 w-[9.75rem] shrink-0 font-medium"
         style={riskToneStyle(tone)}
         data-testid={testId}
