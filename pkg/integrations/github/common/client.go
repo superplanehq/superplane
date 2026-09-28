@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	githubv75 "github.com/google/go-github/v75/github"
 	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -730,13 +729,6 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
 	}
-	tokenOptions, err := ScopedInstallationTokenOptions(metadata)
-	if err != nil {
-		return nil, err
-	}
-	if tokenOptions != nil {
-		itr.InstallationTokenOptions = tokenOptions
-	}
 
 	return &Client{
 		authMethod: AuthMethodApp,
@@ -744,25 +736,6 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		owner:      metadata.Owner,
 		underlying: github.NewClient(&http.Client{Transport: itr}),
 	}, nil
-}
-
-func ScopedInstallationTokenOptions(metadata Metadata) (*githubv75.InstallationTokenOptions, error) {
-	if !metadata.RepositoryScoped {
-		return nil, nil
-	}
-
-	repositoryIDs := make([]int64, 0, len(metadata.Repositories))
-	for _, repository := range metadata.Repositories {
-		if repository.ID <= 0 {
-			return nil, fmt.Errorf("repository-scoped GitHub connection has an invalid repository")
-		}
-		repositoryIDs = append(repositoryIDs, repository.ID)
-	}
-	if len(repositoryIDs) == 0 {
-		return nil, fmt.Errorf("repository-scoped GitHub connection has no repositories")
-	}
-
-	return &githubv75.InstallationTokenOptions{RepositoryIDs: repositoryIDs}, nil
 }
 
 func determineLegacyOwnerType(ctx core.IntegrationContext) string {

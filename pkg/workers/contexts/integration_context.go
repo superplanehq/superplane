@@ -33,7 +33,6 @@ type IntegrationContext struct {
 	// loadedMetadata is the metadata snapshot from when this context was
 	// created. PersistMetadata uses it to write only keys the handler changed.
 	loadedMetadata map[string]any
-	stateChanged   bool
 
 	//
 	// Lazily create a secret storage, when Secrets() used.
@@ -406,20 +405,14 @@ func (c *IntegrationContext) GetState() string {
 }
 
 func (c *IntegrationContext) Ready() {
-	c.stateChanged = true
 	c.integration.SetupState = nil
 	c.integration.State = models.IntegrationStateReady
 	c.integration.StateDescription = ""
 }
 
 func (c *IntegrationContext) Error(message string) {
-	c.stateChanged = true
 	c.integration.State = models.IntegrationStateError
 	c.integration.StateDescription = message
-}
-
-func (c *IntegrationContext) StateChanged() bool {
-	return c.stateChanged
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {

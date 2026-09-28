@@ -2,13 +2,6 @@ export type PendingGitHubInstallation = {
   id: string;
   accountLogin: string;
   accountType?: string;
-  repositories: PendingGitHubRepository[];
-};
-
-export type PendingGitHubRepository = {
-  id: string;
-  name: string;
-  url?: string;
 };
 
 export type PendingGitHubInstallRequest = {
@@ -64,7 +57,7 @@ export function pendingGitHubInstallations(metadata: unknown): PendingGitHubInst
       return [];
     }
 
-    const row = item as { id?: unknown; accountLogin?: unknown; accountType?: unknown; repositories?: unknown };
+    const row = item as { id?: unknown; accountLogin?: unknown; accountType?: unknown };
     const id = typeof row.id === "number" ? String(row.id) : row.id;
     if (typeof id !== "string" || id === "" || typeof row.accountLogin !== "string" || row.accountLogin === "") {
       return [];
@@ -75,21 +68,8 @@ export function pendingGitHubInstallations(metadata: unknown): PendingGitHubInst
         id,
         accountLogin: row.accountLogin,
         accountType: typeof row.accountType === "string" ? row.accountType : undefined,
-        repositories: pendingGitHubRepositories(row.repositories),
       },
     ];
-  });
-}
-
-function pendingGitHubRepositories(value: unknown): PendingGitHubRepository[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const row = item as { id?: unknown; name?: unknown; url?: unknown };
-    const id = typeof row.id === "number" ? String(row.id) : row.id;
-    if (typeof id !== "string" || id === "" || typeof row.name !== "string" || row.name === "") return [];
-    return [{ id, name: row.name, ...(typeof row.url === "string" && row.url !== "" ? { url: row.url } : {}) }];
   });
 }
 
@@ -127,6 +107,20 @@ export function hostedGitHubState(metadata: unknown): string {
 }
 
 /**
+ * The GitHub user OAuth authorize URL stored on the connection. The OAuth
+ * callback removes the browser action, so a repeat Connect click uses this
+ * URL to ask again which GitHub account to use.
+ */
+export function hostedGitHubAuthorizeURL(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const url = (metadata as { authorizeURL?: unknown }).authorizeURL;
+  return typeof url === "string" ? url : "";
+}
+
+/**
  * GitHub login of the member who authorized this connect. The account
  * picker uses it so the user can see which GitHub session the listed
  * installations belong to.
@@ -149,28 +143,29 @@ export function hostedGitHubAppSlug(metadata: unknown): string {
   return typeof app?.slug === "string" ? app.slug : "";
 }
 
-export function hostedGitHubBindPath(): string {
-  return "/api/v1/github/app/bind";
+export function hostedGitHubBindPath(state: string, installationId: string): string {
+  const params = new URLSearchParams({
+    state,
+    installation_id: installationId,
+  });
+  return `/api/v1/github/app/bind?${params.toString()}`;
 }
 
 /**
  * Binds a pending connection to an App installation without leaving the page.
- * The bind endpoint returns no content on success and an error status when
- * the bind did not happen.
+ * The bind endpoint answers with a redirect on success and with an error
+ * status when the bind did not happen. The redirect target comes from the
+ * server BASE_URL, which can differ from the page origin (a tunnel domain in
+ * local setups), so the fetch must not follow it: the redirect itself is the
+ * success signal.
  */
-export async function bindHostedGitHubInstallation(
-  state: string,
-  installationId: string,
-  repositoryId: string,
-): Promise<void> {
-  const body = new URLSearchParams({ state, installation_id: installationId, repository_id: repositoryId });
-  const response = await fetch(hostedGitHubBindPath(), {
-    method: "POST",
+export async function bindHostedGitHubInstallation(state: string, installationId: string): Promise<void> {
+  const response = await fetch(hostedGitHubBindPath(state, installationId), {
     credentials: "same-origin",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
+    redirect: "manual",
   });
-  if (!response.ok) {
+  const redirected = response.type === "opaqueredirect";
+  if (!redirected && !response.ok) {
     throw new Error("Failed to connect the GitHub account");
   }
 }

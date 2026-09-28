@@ -1,19 +1,12 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import type {
   IntegrationsIntegrationDefinition,
   OrganizationsCreateIntegrationResponse,
   OrganizationsIntegration,
 } from "@/api-client";
-import {
-  integrationKeys,
-  useAvailableIntegrations,
-  useConnectedIntegrations,
-  useCreateIntegration,
-} from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
-import { useSyncGitHubConnection } from "@/hooks/useSyncGitHubConnection";
 import { getApiErrorMessage } from "@/lib/errors";
 import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
 import {
@@ -56,44 +49,6 @@ export function selectReadyIntegrationInstance(
   );
   const selection = instance ? selectionFromInstance(instance) : null;
   return selection?.ready ? { ...selections, [integrationName]: selection } : null;
-}
-
-/** Prefer the query cache after an async mutation refreshes a connection. */
-export function selectLatestReadyIntegrationInstance(
-  refreshed: OrganizationsIntegration[] | undefined,
-  rendered: OrganizationsIntegration[],
-  selections: IntegrationSelections,
-  integrationName: string,
-  integrationId?: string,
-): IntegrationSelections | null {
-  return selectReadyIntegrationInstance(refreshed ?? rendered, selections, integrationName, integrationId);
-}
-
-function useLatestReadyIntegrationSelection(args: {
-  organizationId: string;
-  connected: OrganizationsIntegration[];
-  selections: IntegrationSelections;
-  onSelectionsChange: (selections: IntegrationSelections) => void;
-}) {
-  const queryClient = useQueryClient();
-  const selections = useRef(args.selections);
-  selections.current = args.selections;
-
-  return (integrationName: string, integrationId: string): boolean => {
-    const refreshed = queryClient.getQueryData<OrganizationsIntegration[]>(
-      integrationKeys.connected(args.organizationId),
-    );
-    const next = selectLatestReadyIntegrationInstance(
-      refreshed,
-      args.connected,
-      selections.current,
-      integrationName,
-      integrationId,
-    );
-    if (!next) return false;
-    args.onSelectionsChange(next);
-    return true;
-  };
 }
 
 /**
@@ -214,9 +169,7 @@ export function useIntegrationConnectDialog({
     const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
     if (existingSelection) {
       onSelectionsChange(existingSelection);
-      // Selecting an in-memory connection does not navigate away. Callers
-      // must be able to finish their current action and render the selection.
-      return false;
+      return true;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
       return hostedConnect.jira();
@@ -264,12 +217,10 @@ export function useIntegrationConnectDialog({
     openCreateIntegrationModal(integrationName);
   };
 
-  const selectInstance = useLatestReadyIntegrationSelection({
-    organizationId,
-    connected,
-    selections,
-    onSelectionsChange,
-  });
+  const selectInstance = (integrationName: string, integrationId: string) => {
+    const next = selectReadyIntegrationInstance(connected, selections, integrationName, integrationId);
+    if (next) onSelectionsChange(next);
+  };
 
   const dialogs = (
     <>
@@ -320,8 +271,6 @@ export function useIntegrationConnectDialog({
     connectionsLoading,
     /** Refetches the connected list, for screens that must not show a stale cache. */
     refetchConnections: refetch,
-    /** Synchronizes one hosted GitHub connection and updates the connected-list cache. */
-    syncGitHubConnection: hostedConnect.syncGitHubConnection,
     requestConnect,
     requestPrivateGitHubConnect,
     hostedGitHubAppInstall: githubConnect.hosted,
@@ -475,7 +424,6 @@ function useHostedProviderConnect({
   }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
 }) {
   return {
-    syncGitHubConnection: useSyncGitHubConnection(organizationId),
     github: useHostedGitHubConnect({
       organizationId,
       returnTo,

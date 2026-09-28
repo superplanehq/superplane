@@ -94,13 +94,6 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
 	}
-	tokenOptions, err := common.ScopedInstallationTokenOptions(metadata)
-	if err != nil {
-		return "", err
-	}
-	if tokenOptions != nil {
-		itr.InstallationTokenOptions = tokenOptions
-	}
 
 	token, err := itr.Token(context.Background())
 	if err != nil {

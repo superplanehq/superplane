@@ -8,16 +8,14 @@ describe("onboardingResumePath", () => {
     expect(onboardingResumePath("acme", "PAY", "")).toBe("/acme/workspaces/pay/setup");
   });
 
-  it("keeps the wizard step and GitHub setup-return params", () => {
+  it("keeps the wizard step and GitHub install-request params", () => {
     expect(
       onboardingResumePath(
         "acme",
         "PAY",
-        "?attempt=attempt-1&step=vcs&pick=newest&githubSetup=request&githubOrg=puppies&githubIntegrationId=int-1",
+        "?attempt=attempt-1&step=vcs&pick=newest&githubSetup=request&githubOrg=puppies",
       ),
-    ).toBe(
-      "/acme/workspaces/pay/setup?step=vcs&pick=newest&githubSetup=request&githubOrg=puppies&githubIntegrationId=int-1",
-    );
+    ).toBe("/acme/workspaces/pay/setup?step=vcs&pick=newest&githubSetup=request&githubOrg=puppies");
   });
 
   it("drops attempt and other first-run-only params", () => {

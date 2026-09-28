@@ -138,8 +138,8 @@ function useSectionSaves(args: {
       }),
     );
   };
-  const saveRepository = (repository: string, integrationIdOverride?: string) => {
-    const integrationId = integrationIdOverride ?? args.selections.github?.id;
+  const saveRepository = (repository: string) => {
+    const integrationId = args.selections.github?.id;
     if (!repository || !integrationId) return Promise.resolve(false);
     return runSave(args.setSaving, () => args.updateOnboarding(firstRunRepositoryPatch(integrationId, repository)));
   };
@@ -308,7 +308,7 @@ function useSelectOnboardingVcsConnection(args: {
   setup: OnboardingSetupApi;
   updateOnboarding: UpdateOnboarding;
   currentId: string;
-  selectInstance: (integrationName: string, integrationId: string) => boolean;
+  selectInstance: (integrationName: string, integrationId: string) => void;
 }) {
   const queryClient = useQueryClient();
   return async (integrationId: string): Promise<boolean> => {
@@ -326,7 +326,8 @@ function useSelectOnboardingVcsConnection(args: {
       });
       if (!saved) return false;
     }
-    return args.selectInstance("github", integrationId);
+    args.selectInstance("github", integrationId);
+    return true;
   };
 }
 
@@ -527,7 +528,6 @@ export function useOnboardingPageModel(args: {
     // The connect screen refetches on open, so the picker never shows a
     // stale connection list.
     refreshGithubConnections: connect.refetchConnections,
-    syncGithubConnection: connect.syncGitHubConnection,
     githubConnectionsLoading: connect.connectionsLoading,
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,

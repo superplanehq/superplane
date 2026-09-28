@@ -5,12 +5,11 @@ import {
   consumeIntegrationSetupReturn,
   consumeIntegrationSetupReturnIfArrived,
   hasGitHubSetupRequest,
-  hasGitHubSetupReturn,
   hasIntegrationSetupStay,
   peekIntegrationSetupReturnPreferredIntegration,
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
-  withGitHubSetupReturn,
+  withGitHubSetupRequest,
   configurationWithSetupReturnPath,
 } from "./integrationSetupReturn";
 
@@ -90,30 +89,21 @@ describe("integration setup return", () => {
     expect(hasGitHubSetupRequest("githubSetup=request")).toBe(true);
     expect(hasGitHubSetupRequest("?githubSetup=request")).toBe(true);
     expect(hasGitHubSetupRequest("")).toBe(false);
-    expect(withGitHubSetupReturn("/org-1/workspaces/APP/setup?step=vcs", "")).toBe(
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "")).toBe(
       "/org-1/workspaces/APP/setup?step=vcs",
     );
-    expect(withGitHubSetupReturn("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request")).toBe(
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request")).toBe(
       "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request",
     );
-    expect(withGitHubSetupReturn("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request&githubOrg=acme")).toBe(
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request&githubOrg=acme")).toBe(
       "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request&githubOrg=acme",
     );
     expect(
-      withGitHubSetupReturn(
+      withGitHubSetupRequest(
         "/org-1/workspaces/APP/setup?step=vcs",
         "githubSetup=request&githubOrg=acme&githubIntegrationId=int-1",
       ),
     ).toBe("/org-1/workspaces/APP/setup?step=vcs&githubSetup=request&githubOrg=acme&githubIntegrationId=int-1");
-  });
-
-  it("copies a completed GitHub setup onto the stored return path", () => {
-    const search = "githubSetup=complete&githubIntegrationId=int-1";
-
-    expect(hasGitHubSetupReturn(search)).toBe(true);
-    expect(withGitHubSetupReturn("/org-1/workspaces/APP/setup?step=vcs", search)).toBe(
-      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=complete&githubIntegrationId=int-1",
-    );
   });
 
   it("returns the path regardless of the integration the provider redirects to", () => {
