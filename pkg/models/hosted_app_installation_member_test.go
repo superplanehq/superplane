@@ -44,6 +44,7 @@ func Test__HostedAppInstallationMember(t *testing.T) {
 			InstallationID: "11",
 			MemberLogin:    "member-one",
 			Allowed:        false,
+			Errored:        true,
 			CheckedAt:      later,
 		}))
 
@@ -51,6 +52,7 @@ func Test__HostedAppInstallationMember(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, found)
 		assert.False(t, found.Allowed)
+		assert.True(t, found.Errored)
 		assert.True(t, found.CheckedAt.After(now.Add(-time.Second)))
 	})
 

@@ -20,6 +20,11 @@ const (
 	// before the next sync re-asks GitHub.
 	hostedMemberCheckTTL = 15 * time.Minute
 
+	// hostedMemberErrorRetryTTL is how long an errored membership check
+	// blocks a retry. A short window lets a fixed app permission take effect
+	// on the next syncs instead of after the full check TTL.
+	hostedMemberErrorRetryTTL = time.Minute
+
 	// hostedDiscoveryAPIBudget caps uncached membership lookups per discovery
 	// run. The cache fills across the 5-second onboarding polls, so a large
 	// installation table never turns one sync into an API storm.
@@ -75,7 +80,7 @@ func (g *GitHub) applyHostedIdentityDiscovery(ctx core.SyncContext, app common.H
 
 	g.reconcileHostedInstallations(ctx, app)
 
-	accessible, err := g.accessibleInstallations(ctx.Integration, app.ID, login)
+	accessible, err := g.accessibleInstallations(ctx, app.ID, login)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
@@ -142,7 +147,7 @@ func (g *GitHub) verifyInstallationAccess(
 	now := hostedIdentityNow().UTC()
 	if useCache {
 		cached, err := findCachedInstallationMember(snapshot.ID, login)
-		if err == nil && cached != nil && now.Sub(cached.CheckedAt) <= hostedMemberCheckTTL {
+		if err == nil && cached != nil && now.Sub(cached.CheckedAt) <= cachedMemberTTL(cached) {
 			return cached.Allowed, nil
 		}
 	}
@@ -150,23 +155,34 @@ func (g *GitHub) verifyInstallationAccess(
 	allowed, err := checkInstallationMembership(integration, appID, snapshot.ID, snapshot.AccountLogin, login)
 	if err != nil {
 		// A failed lookup is cached as not-allowed so repeated errors do not
-		// burn the discovery budget on the same rows every sync. The caller
-		// falls back to the no-identity rules either way.
-		_ = saveCachedInstallationMember(snapshot.ID, login, false, now)
+		// burn the discovery budget on the same rows every sync. The errored
+		// mark keeps the block short. The caller falls back to the
+		// no-identity rules either way.
+		_ = saveCachedInstallationMember(snapshot.ID, login, false, true, now)
 		return false, err
 	}
 
 	// The cache only avoids repeated lookups; a write failure must not turn
 	// a verified answer into an error.
-	_ = saveCachedInstallationMember(snapshot.ID, login, allowed, now)
+	_ = saveCachedInstallationMember(snapshot.ID, login, allowed, false, now)
 	return allowed, nil
 }
 
+// cachedMemberTTL returns how long a cached membership row stays valid. An
+// errored check retries much sooner than a clean answer, so a fixed app
+// permission shows in the picker without a long wait.
+func cachedMemberTTL(cached *models.HostedAppInstallationMember) time.Duration {
+	if cached.Errored {
+		return hostedMemberErrorRetryTTL
+	}
+	return hostedMemberCheckTTL
+}
+
 // accessibleInstallations returns the live installations the login can use,
-// as picker entries. Errors on single rows are skipped: discovery is
-// additive-only and must never break a sync.
+// as picker entries. Errors on single rows are logged and skipped: discovery
+// is additive-only and must never break a sync.
 func (g *GitHub) accessibleInstallations(
-	integration core.IntegrationContext,
+	ctx core.SyncContext,
 	appID int64,
 	login string,
 ) ([]common.PendingInstallation, error) {
@@ -194,7 +210,16 @@ func (g *GitHub) accessibleInstallations(
 			apiBudget--
 		}
 
-		allowed, err := g.userCanAccessInstallation(integration, appID, login, row)
+		allowed, err := g.userCanAccessInstallation(ctx.Integration, appID, login, row)
+		if err != nil && ctx.Logger != nil {
+			// A misconfigured app (for example a missing organization
+			// members read permission) must be visible in the logs, not a
+			// silently empty picker.
+			ctx.Logger.Errorf(
+				"membership check for GitHub App installation %s (%s) failed: %v",
+				row.ID, row.AccountLogin, err,
+			)
+		}
 		if err != nil || !allowed {
 			continue
 		}
@@ -215,7 +240,7 @@ func (g *GitHub) needsMembershipLookup(row hostedInstallationSnapshot, login str
 		return false
 	}
 	cached, err := findCachedInstallationMember(row.ID, login)
-	return err != nil || cached == nil || now.Sub(cached.CheckedAt) > hostedMemberCheckTTL
+	return err != nil || cached == nil || now.Sub(cached.CheckedAt) > cachedMemberTTL(cached)
 }
 
 // reconcileHostedInstallations upserts every installation GitHub lists for
@@ -263,12 +288,13 @@ func findCachedInstallationMemberFromDB(installationID, login string) (*models.H
 	return models.FindHostedAppInstallationMember(database.Conn(), models.HostedAppProviderGitHub, installationID, login)
 }
 
-func saveCachedInstallationMemberToDB(installationID, login string, allowed bool, checkedAt time.Time) error {
+func saveCachedInstallationMemberToDB(installationID, login string, allowed, errored bool, checkedAt time.Time) error {
 	return models.UpsertHostedAppInstallationMember(database.Conn(), models.HostedAppInstallationMember{
 		Provider:       models.HostedAppProviderGitHub,
 		InstallationID: installationID,
 		MemberLogin:    login,
 		Allowed:        allowed,
+		Errored:        errored,
 		CheckedAt:      checkedAt,
 	})
 }

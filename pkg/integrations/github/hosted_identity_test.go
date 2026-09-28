@@ -40,8 +40,12 @@ func stubHostedIdentity(t *testing.T, stub *hostedIdentityStub) {
 		}
 		return stub.cache[installationID+"/"+login], nil
 	}
-	saveCachedInstallationMember = func(installationID, login string, allowed bool, _ time.Time) error {
-		stub.savedChecks = append(stub.savedChecks, installationID+"/"+login)
+	saveCachedInstallationMember = func(installationID, login string, allowed, errored bool, _ time.Time) error {
+		saved := installationID + "/" + login
+		if errored {
+			saved += ":errored"
+		}
+		stub.savedChecks = append(stub.savedChecks, saved)
 		return nil
 	}
 	checkInstallationMembership = func(_ core.IntegrationContext, _ int64, _, accountLogin, _ string) (bool, error) {
@@ -548,7 +552,64 @@ func Test__userCanAccessInstallation(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.False(t, allowed)
-		assert.Equal(t, []string{"6/member"}, stub.savedChecks)
+		assert.Equal(t, []string{"6/member:errored"}, stub.savedChecks)
+	})
+
+	t.Run("fresh errored cache blocks a retry inside the short window", func(t *testing.T) {
+		stub := &hostedIdentityStub{
+			memberErr: errors.New("must not be called"),
+			cache: map[string]*models.HostedAppInstallationMember{
+				"7/member": {Allowed: false, Errored: true, CheckedAt: time.Now().UTC().Add(-30 * time.Second)},
+			},
+		}
+		stubHostedIdentity(t, stub)
+
+		allowed, err := g.userCanAccessInstallation(integration, 99, "member", hostedInstallationSnapshot{
+			ID:           "7",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		})
+		require.NoError(t, err)
+		assert.False(t, allowed)
+		assert.Empty(t, stub.savedChecks)
+	})
+
+	t.Run("errored cache retries before the full check TTL", func(t *testing.T) {
+		stub := &hostedIdentityStub{
+			memberOf: map[string]bool{"acme": true},
+			cache: map[string]*models.HostedAppInstallationMember{
+				"8/member": {Allowed: false, Errored: true, CheckedAt: time.Now().UTC().Add(-2 * time.Minute)},
+			},
+		}
+		stubHostedIdentity(t, stub)
+
+		allowed, err := g.userCanAccessInstallation(integration, 99, "member", hostedInstallationSnapshot{
+			ID:           "8",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		})
+		require.NoError(t, err)
+		assert.True(t, allowed, "a fixed app permission must show without waiting the full check TTL")
+		assert.Equal(t, []string{"8/member"}, stub.savedChecks)
+	})
+
+	t.Run("clean not-a-member answer holds for the full check TTL", func(t *testing.T) {
+		stub := &hostedIdentityStub{
+			memberErr: errors.New("must not be called"),
+			cache: map[string]*models.HostedAppInstallationMember{
+				"9/member": {Allowed: false, Errored: false, CheckedAt: time.Now().UTC().Add(-2 * time.Minute)},
+			},
+		}
+		stubHostedIdentity(t, stub)
+
+		allowed, err := g.userCanAccessInstallation(integration, 99, "member", hostedInstallationSnapshot{
+			ID:           "9",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		})
+		require.NoError(t, err)
+		assert.False(t, allowed)
+		assert.Empty(t, stub.savedChecks)
 	})
 
 	t.Run("deleted installation is never accessible", func(t *testing.T) {

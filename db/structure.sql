@@ -906,7 +906,8 @@ CREATE TABLE public.hosted_app_installation_members (
     allowed boolean DEFAULT false NOT NULL,
     checked_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    errored boolean DEFAULT false NOT NULL
 );
 
 
@@ -4574,7 +4575,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260928152313	f
+20260928201624	f
 \.
 
 

@@ -119,7 +119,12 @@ above if you still need to expose `localhost:8000`.
    - Repository hooks: Read and write
    - Commit statuses: Read and write
    - Deployments: Read and write
+
+   Grant these organization permissions:
+
    - Organization administration: Read-only
+   - Members: Read-only — identity discovery reads organization membership
+     to show installations the signed-in member can already use
 
 6. Create the app.
 7. Make the app **public**. GitHub creates it as private. Open the app

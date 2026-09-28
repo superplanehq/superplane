@@ -20,9 +20,13 @@ type HostedAppInstallationMember struct {
 	InstallationID string
 	MemberLogin    string
 	Allowed        bool
-	CheckedAt      time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// Errored marks a check that failed instead of answering, for example a
+	// missing app permission. Callers retry errored rows sooner than clean
+	// answers.
+	Errored   bool
+	CheckedAt time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (HostedAppInstallationMember) TableName() string {
@@ -46,6 +50,7 @@ func UpsertHostedAppInstallationMember(tx *gorm.DB, row HostedAppInstallationMem
 		Columns: []clause.Column{{Name: "provider"}, {Name: "installation_id"}, {Name: "member_login"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"allowed":    row.Allowed,
+			"errored":    row.Errored,
 			"checked_at": row.CheckedAt,
 			"updated_at": time.Now().UTC(),
 		}),
