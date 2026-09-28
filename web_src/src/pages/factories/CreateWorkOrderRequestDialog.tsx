@@ -6,6 +6,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
-import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
+import { CREATE_WORK_ORDER_REQUEST_COPY, createWorkOrderAutoStartHelper } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
 import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
 import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
@@ -27,6 +28,12 @@ import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 export interface CreateWorkOrderRequestDraft {
   title: string;
   description: string;
+  autoStartLineId?: string;
+}
+
+export interface CreateWorkOrderAutoStartLine {
+  id: string;
+  name: string;
 }
 
 export interface CreateWorkOrderRequestDialogProps {
@@ -43,6 +50,7 @@ export interface CreateWorkOrderRequestDialogProps {
   initialAttachedFiles?: UploadedWorkOrderFile[];
   organizationId?: string;
   factoryId?: string;
+  autoStartLine?: CreateWorkOrderAutoStartLine;
 }
 
 export function CreateWorkOrderRequestDialog({
@@ -59,8 +67,10 @@ export function CreateWorkOrderRequestDialog({
   initialAttachedFiles = [],
   organizationId,
   factoryId,
+  autoStartLine,
 }: CreateWorkOrderRequestDialogProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [autoStart, setAutoStart] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const stopDictationRef = useRef<() => void>(() => {});
   const form = useCreateWorkOrderRequestForm({
@@ -71,7 +81,7 @@ export function CreateWorkOrderRequestDialog({
     onDescriptionChange,
     onCreate: (draft) => {
       stopDictationRef.current();
-      onCreate(draft);
+      onCreate(autoStart && autoStartLine ? { ...draft, autoStartLineId: autoStartLine.id } : draft);
     },
     onUploadFiles,
     initialAttachedFiles,
@@ -137,6 +147,9 @@ export function CreateWorkOrderRequestDialog({
           showAttach={Boolean(onUploadFiles)}
           organizationId={organizationId}
           factoryId={factoryId}
+          autoStart={autoStart}
+          autoStartLine={autoStartLine}
+          onAutoStartChange={setAutoStart}
           onDescriptionChange={onDescriptionChange}
         />
       </DialogContent>
@@ -162,6 +175,9 @@ function RequestDialogForm({
   showAttach,
   organizationId,
   factoryId,
+  autoStart,
+  autoStartLine,
+  onAutoStartChange,
   onDescriptionChange,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
@@ -175,6 +191,9 @@ function RequestDialogForm({
   showAttach: boolean;
   organizationId?: string;
   factoryId?: string;
+  autoStart: boolean;
+  autoStartLine?: CreateWorkOrderAutoStartLine;
+  onAutoStartChange: (checked: boolean) => void;
   onDescriptionChange: (next: string) => void;
 }) {
   return (
@@ -219,6 +238,14 @@ function RequestDialogForm({
           />
         </div>
       </div>
+      {autoStartLine ? (
+        <AutoStartSwitch
+          lineName={autoStartLine.name}
+          checked={autoStart}
+          disabled={form.busy}
+          onCheckedChange={onAutoStartChange}
+        />
+      ) : null}
       <RequestDialogFooter
         attachedImages={attachedImages}
         canAttach={showAttach && form.canAttach}
@@ -298,6 +325,43 @@ function RequestDialogTitleField({
           "min-h-0 resize-none border-0 bg-transparent p-0 text-[16px] font-medium shadow-none focus-visible:ring-0",
           titleDirty ? "text-foreground" : "text-muted-foreground",
         )}
+      />
+    </div>
+  );
+}
+
+function AutoStartSwitch({
+  lineName,
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  lineName: string;
+  checked: boolean;
+  disabled: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 border-t border-border px-3 py-2"
+      data-testid="create-work-order-auto-start-row"
+    >
+      <div className="min-w-0">
+        <Label htmlFor="create-work-order-auto-start" className="text-[13px] font-medium text-foreground">
+          {CREATE_WORK_ORDER_REQUEST_COPY.autoStart}
+        </Label>
+        <p id="create-work-order-auto-start-help" className="text-[12px] leading-5 text-muted-foreground">
+          {createWorkOrderAutoStartHelper(lineName)}
+        </p>
+      </div>
+      <Switch
+        id="create-work-order-auto-start"
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+        aria-label={CREATE_WORK_ORDER_REQUEST_COPY.autoStart}
+        aria-describedby="create-work-order-auto-start-help"
+        data-testid="create-work-order-auto-start"
       />
     </div>
   );

@@ -45,7 +45,13 @@ export function useCreateWorkOrderDialogState(
     [factoryKey, firstLineId, isCreateWorkOrderRoute, location.pathname, navigate, organizationId],
   );
 
-  return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };
+  return {
+    createWorkOrderOpen,
+    createWorkOrderLineId: lineIdFromPathname(location.pathname),
+    openCreateWorkOrder,
+    closeCreateWorkOrder,
+    completeCreateWorkOrder,
+  };
 }
 
 function lineIdFromPathname(pathname: string): string | undefined {

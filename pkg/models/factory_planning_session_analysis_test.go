@@ -899,6 +899,109 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	assert.NotContains(t, session.Wait().Text, "propose_draft")
 }
 
+func TestWorkOrderReadyForAutoStart(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-ready")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	order.AutoStartLineID = nil
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	order.AutoStartLineID = &line.ID
+	order.State = FactoryWorkOrderStateOpen
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	order.State = FactoryWorkOrderStateDraft
+	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{{Prompt: "Which service?", Options: []string{"Payments"}}},
+	}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartRequiresSpec(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-spec")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-clarity")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeClarity(db, 4, "One decision is still open."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+}
+
+func mustAnalysisOrder(
+	t *testing.T,
+	db *gorm.DB,
+	factoryModel *Factory,
+	canvasID, userID uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, *FactoryPlanningSession) {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Retry refunds", "Stop double charges.", &userID, nil, nil, autoStartLineID)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvasID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvasID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	return order, session
+}
+
 func mustReadyTaskFile(
 	t *testing.T,
 	db *gorm.DB,

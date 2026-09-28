@@ -585,7 +585,18 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithAutoStart(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, autoStartLineID)
 }
 
 // SnapshotWorkOrderRepository records the current repository before a
@@ -611,7 +622,7 @@ func (f *Factory) CreateWorkOrderWithOrigin(
 	sourceRunID *uuid.UUID,
 	origin WorkOrderOrigin,
 ) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil)
 }
 
 func (f *Factory) createWorkOrder(
@@ -621,10 +632,16 @@ func (f *Factory) createWorkOrder(
 	assignees []uuid.UUID,
 	sourceRunID *uuid.UUID,
 	origin *WorkOrderOrigin,
+	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+	if autoStartLineID != nil {
+		if _, err := f.FindLine(tx, *autoStartLineID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
@@ -639,18 +656,19 @@ func (f *Factory) createWorkOrder(
 
 	now := time.Now()
 	order := &FactoryWorkOrder{
-		ID:             uuid.New(),
-		OrganizationID: f.OrganizationID,
-		FactoryID:      f.ID,
-		Number:         nextNumber,
-		Title:          title,
-		Description:    description,
-		State:          FactoryWorkOrderStateDraft,
-		Result:         "",
-		CreatedByID:    createdBy,
-		SourceRunID:    sourceRunID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:              uuid.New(),
+		OrganizationID:  f.OrganizationID,
+		FactoryID:       f.ID,
+		Number:          nextNumber,
+		Title:           title,
+		Description:     description,
+		State:           FactoryWorkOrderStateDraft,
+		Result:          "",
+		CreatedByID:     createdBy,
+		SourceRunID:     sourceRunID,
+		AutoStartLineID: autoStartLineID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	config := f.OnboardingConfigValue()
 	if config.AppRepository != "" && config.DefaultBranch != "" {

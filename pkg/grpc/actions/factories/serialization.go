@@ -455,7 +455,15 @@ func serializeWorkOrder(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
+		AutoStartLineId:      serializeAutoStartLineID(order),
 	}, nil
+}
+
+func serializeAutoStartLineID(order *models.FactoryWorkOrder) string {
+	if order == nil || order.AutoStartLineID == nil {
+		return ""
+	}
+	return order.AutoStartLineID.String()
 }
 
 func serializeWorkOrderSummary(
