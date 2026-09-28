@@ -21,6 +21,7 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
+  REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { workOrderDetailPath } from "../lib/factoryPagePaths";
@@ -31,6 +32,7 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useWorkOrder = vi.fn(() => ({ data: undefined, isLoading: false }));
 function boardPageResult(isLoading = false, workOrders: FactoriesWorkOrder[] = []) {
   return {
     workOrders,
@@ -51,7 +53,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryAutomations: () => ({ data: [] }),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useWorkOrder: () => ({ data: undefined }),
+  useWorkOrder: (...args: unknown[]) => useWorkOrder(...args),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -164,6 +166,7 @@ describe("LinesPage Done column", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
+    useWorkOrder.mockReturnValue({ data: undefined, isLoading: false });
     useFactoryBoardWorkOrders.mockImplementation((..._args: unknown[]) =>
       boardPageResult(false, useFactoryWorkOrders().data ?? []),
     );
@@ -379,6 +382,65 @@ describe("LinesPage Done column", () => {
       }),
     );
     expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
+  });
+
+  it("scopes Done to the displayed line when the task URL line was deleted", () => {
+    const order = {
+      id: "wo-done-hotfix",
+      number: "77",
+      title: "Ship the hotfix",
+      state: "STATE_CLOSED",
+      result: "RESULT_COMPLETED",
+      lineDispatches: [
+        {
+          id: "dispatch-hotfix",
+          createdAt: "2026-09-28T00:00:00.000Z",
+          line: { id: REFUND_LINE_HOTFIX_ID },
+        },
+      ],
+    } as FactoriesWorkOrder;
+    useWorkOrder.mockReturnValue({ data: order, isLoading: false });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/77?lineId=deleted-line`]}>
+              <FactoriesLayoutContext.Provider
+                value={{
+                  organizationId: "org-1",
+                  factoryId: PRIMARY_FACTORY_ID,
+                  factoryKey: PRIMARY_FACTORY_KEY,
+                  factory: REFUND_FACTORY,
+                  factories: [REFUND_FACTORY],
+                  openCreateWorkOrder: vi.fn(),
+                }}
+              >
+                <Routes>
+                  <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
+                </Routes>
+              </FactoriesLayoutContext.Provider>
+            </MemoryRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_HOTFIX_ID,
+          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+        },
+      }),
+    );
+    for (const call of useFactoryBoardWorkOrders.mock.calls) {
+      const options = call[2] as { done?: { lineId?: string } };
+      expect(options.done?.lineId).not.toBe("deleted-line");
+    }
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
   });
 });
