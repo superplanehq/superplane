@@ -64,13 +64,13 @@ There is no transcript in the toolbar. As the user speaks, the words appear in t
 const DESCRIPTION_ARTIFACT: FactoriesWorkOrderArtifact = {
   id: "art-503-description",
   type: "TYPE_MARKDOWN",
-  data: { name: "description.md", title: "description.md", body: DESCRIPTION_TEXT },
+  data: { name: "description.md", title: "description.md", size: "6 KB", body: DESCRIPTION_TEXT },
 };
 
 const SPEC_ARTIFACT: FactoriesWorkOrderArtifact = {
   id: "art-503-spec",
   type: "TYPE_MARKDOWN",
-  data: { name: "spec.md", title: "spec.md", body: PLAN_TEXT },
+  data: { name: "spec.md", title: "spec.md", size: "18 KB", body: PLAN_TEXT },
 };
 
 const BRANCH_ARTIFACT: FactoriesWorkOrderArtifact = {
@@ -86,13 +86,13 @@ const BRANCH_ARTIFACT: FactoriesWorkOrderArtifact = {
 const EVIDENCE_IMAGE: FactoriesWorkOrderArtifact = {
   id: "art-503-poster",
   type: "TYPE_FILE",
-  data: { title: "Live speech in the create-task field poster", filename: "dictation-in-field.png" },
+  data: { title: "Live speech in the create-task field poster", filename: "dictation-in-field.png", contentType: "image/png", size: "240 KB", url: "https://github.com/superplanehq/superplane/pull/7771" },
 };
 
 const EVIDENCE_VIDEO: FactoriesWorkOrderArtifact = {
   id: "art-503-video",
   type: "TYPE_FILE",
-  data: { title: "Live speech in the create-task field", filename: "dictation-in-field.webm" },
+  data: { title: "Live speech in the create-task field", filename: "dictation-in-field.webm", contentType: "video/webm", size: "1.2 MB", url: "https://github.com/superplanehq/superplane/pull/7771" },
 };
 
 const CONFIDENCE_CHECK: FactoriesWorkOrderCheck = {

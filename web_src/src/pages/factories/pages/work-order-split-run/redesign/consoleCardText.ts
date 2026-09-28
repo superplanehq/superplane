@@ -1,3 +1,4 @@
+import { formatCheckScore } from "../../../lib/workOrderChecks";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
 import { formatClock } from "./redesignFormat";
@@ -67,22 +68,36 @@ function runTitle(stage: AutomationStage): string | undefined {
   return stage.pullRequestActivity ? stage.name : undefined;
 }
 
-const HEADER_LINE_MAX_CHARS = 120;
-
-/**
- * The body shows the description when the header row did not: the row
- * showed the run title instead, or the description says more than one
- * line can hold (several paragraphs, or more text than the row fits).
- */
+/** The open card shows the description. The header row shows output counts. */
 export function showDescriptionInBody(stage: AutomationStage): boolean {
-  const description = stage.description?.trim() ?? "";
-  if (!description) {
-    return false;
-  }
-  if (runTitle(stage)) {
-    return true;
-  }
-  return /\n\s*\n/.test(description) || plainText(description).length > HEADER_LINE_MAX_CHARS;
+  return Boolean(stage.description?.trim());
+}
+
+export interface StepOutputSummary {
+  artifactCount: number;
+  artifactLabels: string[];
+  checkCount: number;
+  checkLines: string[];
+}
+
+/** Artifact and check counts for one step, plus the hover-card lines. */
+export function stepOutputSummary(stage: AutomationStage): StepOutputSummary {
+  const artifactLabels = stage.outputs.artifacts.map(artifactLabel).filter(Boolean);
+  const checkLines = stage.checks.map((check) => {
+    const score = formatCheckScore(check);
+    const value = `${score.value}${score.scale}`;
+    return value ? `${check.name} ${value}` : check.name;
+  });
+  return {
+    artifactCount: stage.outputs.artifacts.length,
+    artifactLabels,
+    checkCount: stage.checks.length,
+    checkLines,
+  };
+}
+
+export function outputCountLabel(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 /**

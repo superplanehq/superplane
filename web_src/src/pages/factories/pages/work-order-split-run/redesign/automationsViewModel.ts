@@ -157,14 +157,21 @@ export function stagesFromFixture(fixture: SplitRunFixture): AutomationStageGrou
   };
 }
 
+/**
+ * A column lists canvas runs, plus the task-creation stage. That stage
+ * has no canvas run when a person created or imported the task.
+ */
+export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">): boolean {
+  return Boolean(stage.appId) || stage.id === "backlog";
+}
+
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
   return [...groups.taskStages, ...groups.pullRequestGroups.flatMap((group) => group.stages)];
 }
 
 export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
   const nodes = groupSplitRunStream(phase.stream);
-  const agentNotes = phase.stream.filter((line) => line.note);
-  const agentSteps = groupClaudeSteps(agentNotes).map(agentStepFromGroup);
+  const agentSteps = agentStepsFromNotes(phase.stream);
   const plumbing = nodes.map(plumbingNodeFromGroup);
   const cost = parseWorkOrderMetric(phase.costCents);
   const tokens = parseWorkOrderMetric(phase.totalTokens);
@@ -230,6 +237,18 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
     events: [],
     iconSlug: line.iconSlug,
   };
+}
+
+export function agentStepsFromNotes(notes: SplitRunStreamLine[]): AgentStep[] {
+  return groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
+}
+
+/** A canceled or failed stage no longer has a step in progress. */
+export function settleStoppedSteps(steps: AgentStep[], status?: SplitRunPhaseStatus): AgentStep[] {
+  if (status !== "cancelled" && status !== "failed") {
+    return steps;
+  }
+  return steps.map((step) => (step.status === "running" ? { ...step, status } : step));
 }
 
 function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {

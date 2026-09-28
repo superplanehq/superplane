@@ -776,6 +776,47 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(slack?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
   });
 
+  it("keeps a GitHub issues intake in the Backlog column under its automation name", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_DRAFT",
+        createdBy: { automation: { appId: "app-github-issues", appName: "GitHub issues", nodeName: "On Issue" } },
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      }),
+      { demoArtifacts: false },
+    );
+    const backlog = fixture.phases[0];
+
+    expect(backlog).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "GitHub issues",
+      appId: "app-github-issues",
+      description: "Created this task from [acme/payments#12](https://github.com/acme/payments/issues/12).",
+    });
+  });
+
+  it("records a person importing a GitHub issue as the Backlog creation stage", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      },
+      { demoArtifacts: false },
+    );
+    const backlog = fixture.phases[0];
+
+    expect(backlog).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "Imported from GitHub",
+      description:
+        "Leonardo DiCaprio imported this task from [acme/payments#12](https://github.com/acme/payments/issues/12).",
+    });
+    expect(backlog?.appId).toBeUndefined();
+    expect(backlog?.stream[0]?.componentName).toBe("Leonardo DiCaprio imported this task from acme/payments#12.");
+  });
+
   it("still prompts a draft with no creator to start", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
@@ -1077,7 +1118,7 @@ describe("line board work-order examples", () => {
 
     expect(analysis?.name).toBe("Analysis");
     expect(analysis?.status).toBe("running");
-    expect(analysis?.componentName).toBe("Confidence score");
+    expect(analysis?.componentName).toBe("Backlog");
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
     expect(analysis?.durationRunning).toBe(true);

@@ -1,11 +1,13 @@
 import { Badge } from "@/components/ui/badge";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
+import { JumpToLatestPill } from "../JumpToLatestPill";
+import { useFollowLogScroll } from "../useFollowLogScroll";
 import { RawLogPre } from "./RawLogSheet";
 import { META_TEXT_CLASSNAME, MONO_LOG_CLASSNAME } from "./redesignFormat";
 import { NodeIcon, StageStatusGlyph, ToolKindIcon } from "./redesignShared";
@@ -31,6 +33,7 @@ export function AgentStepList({
   view: controlledView,
   onViewChange,
   showToggle = true,
+  defaultOpen = true,
   className,
 }: {
   stage: AutomationStage;
@@ -38,6 +41,8 @@ export function AgentStepList({
   view?: AgentStepView;
   onViewChange?: (view: AgentStepView) => void;
   showToggle?: boolean;
+  /** Detailed steps start open. The card body passes false. */
+  defaultOpen?: boolean;
   className?: string;
 }) {
   const [internalView, setInternalView] = useState<AgentStepView>("summary");
@@ -71,7 +76,7 @@ export function AgentStepList({
       ) : (
         <ol key={view} className="divide-y divide-border/70 rounded-md border border-border/80 bg-card">
           {steps.map((step) => (
-            <AgentStepRow key={step.id} step={step} detailed={view === "detailed"} />
+            <AgentStepRow key={step.id} step={step} detailed={view === "detailed"} defaultOpen={defaultOpen} />
           ))}
         </ol>
       )}
@@ -80,10 +85,10 @@ export function AgentStepList({
   );
 }
 
-/** In the detailed view every expandable step starts open. */
-function AgentStepRow({ step, detailed }: { step: AgentStep; detailed: boolean }) {
+/** In the detailed view a step can start open or collapsed. */
+function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detailed: boolean; defaultOpen: boolean }) {
   const expandable = detailed && (step.events.length > 0 || Boolean(step.output));
-  const [open, setOpen] = useState(expandable);
+  const [open, setOpen] = useState(expandable && defaultOpen);
   // An open step already shows its output, so do not repeat its first line.
   const reason = open && !step.summary ? "" : stepReason(step);
   const row = (
@@ -123,14 +128,143 @@ function AgentStepRow({ step, detailed }: { step: AgentStep; detailed: boolean }
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 px-3 py-2 pl-9">
-            {step.events.map((event) => (
-              <AgentEventBlock key={event.id} event={event} />
-            ))}
-            {step.output ? <pre className={cn(MONO_LOG_CLASSNAME, "max-h-48 overflow-auto")}>{step.output}</pre> : null}
+            <StepDetail step={step} />
           </div>
         </CollapsibleContent>
       </Collapsible>
     </li>
+  );
+}
+
+export function AgentStepMarkers({ stage }: { stage: AutomationStage }) {
+  if (stage.agentSteps.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col" data-testid={`redesign-agent-steps-${stage.id}`}>
+      {stage.agentSteps.map((step) => (
+        <AgentStepMarker key={step.id} step={step} />
+      ))}
+    </div>
+  );
+}
+
+function AgentStepMarker({ step }: { step: AgentStep }) {
+  const expandable = step.events.length > 0 || Boolean(step.output);
+  const running = step.status === "running";
+  const [open, setOpen] = useState(running);
+  const reason = open && !step.summary ? "" : stepReason(step);
+  const follow = useFollowLogScroll<HTMLDivElement>(running ? step.id : null, step.events.length);
+  const row = (
+    <Marker className={cn("items-start py-1", running && "bg-muted")}>
+      <MarkerIcon className="mt-0.5 text-muted-foreground">
+        {expandable ? (
+          <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
+        ) : step.type === "node" ? (
+          <NodeIcon iconSlug={step.iconSlug} />
+        ) : (
+          <ToolKindIcon type={step.type} />
+        )}
+      </MarkerIcon>
+      <MarkerContent className="flex min-w-0 flex-1 items-start gap-2 text-[13px] leading-5 text-foreground">
+        <span className="min-w-0 break-words">{step.title}</span>
+        {step.status !== "passed" ? <StepStatusBadge status={step.status} /> : null}
+        {reason ? <span className="min-w-0 break-words font-mono text-xs text-muted-foreground">{reason}</span> : null}
+        {running ? (
+          <Loader2 className="ml-auto size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+        ) : step.duration ? (
+          <span className="ml-auto w-12 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
+            {step.duration}
+          </span>
+        ) : null}
+      </MarkerContent>
+    </Marker>
+  );
+  if (!expandable) {
+    return row;
+  }
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button type="button" className="block w-full min-w-0 text-left" aria-expanded={open}>
+          {row}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="min-w-0">
+        {running ? (
+          <div className="relative min-w-0">
+            <div
+              ref={follow.scrollRef}
+              onScroll={follow.onScroll}
+              className="flex max-h-80 min-w-0 flex-col gap-2 overflow-y-auto py-1 pl-6"
+              data-testid={`redesign-step-log-${step.id}`}
+            >
+              <StepDetail step={step} />
+            </div>
+            {follow.showJumpToLatest ? (
+              <JumpToLatestPill
+                onJumpToLatest={() => follow.setFollowing(true)}
+                testId={`redesign-step-older-${step.id}`}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 py-1 pl-6">
+            <StepDetail step={step} />
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function StepDetail({ step }: { step: AgentStep }) {
+  return (
+    <>
+      {step.output ? <StepCommand text={step.output} /> : null}
+      {step.events.map((event) => (
+        <AgentEventBlock key={event.id} event={event} />
+      ))}
+    </>
+  );
+}
+
+function StepCommand({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const lineRef = useRef<HTMLElement>(null);
+  const [overflows, setOverflows] = useState(text.includes("\n"));
+  useEffect(() => {
+    const node = lineRef.current;
+    if (!node || overflows) {
+      return;
+    }
+    setOverflows(text.includes("\n") || node.scrollWidth > node.clientWidth + 1);
+  }, [overflows, text]);
+  if (!overflows) {
+    return (
+      <pre className={cn(MONO_LOG_CLASSNAME, "truncate")} ref={lineRef}>
+        {text}
+      </pre>
+    );
+  }
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+          aria-expanded={open}
+        >
+          <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
+          <span ref={lineRef} className="min-w-0 truncate">
+            {text.split("\n").find((line) => line.trim()) ?? text}
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <pre className={cn(MONO_LOG_CLASSNAME, "mt-1 whitespace-pre-wrap")}>{text}</pre>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -142,6 +276,9 @@ function StepIcon({ step }: { step: AgentStep }) {
 }
 
 function stepReason(step: AgentStep): string {
+  if (step.type === "bash") {
+    return "";
+  }
   if (step.summary) {
     return step.summary;
   }
@@ -159,7 +296,7 @@ function StepStatusBadge({ status }: { status: AgentStep["status"] }) {
   if (status === "failed" || status === "cancelled") {
     return (
       <Badge variant="outline" className="border-destructive/40 text-destructive">
-        {status === "cancelled" ? "Skipped" : "Failed"}
+        {status === "cancelled" ? "Canceled" : "Failed"}
       </Badge>
     );
   }
@@ -208,9 +345,7 @@ export function ToolGroup({
             <li key={tool.id} className="min-w-0">
               <div className="flex min-w-0 items-start gap-2">
                 <ToolKindIcon type={tool.type} className="mt-1" />
-                <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground/90" title={tool.name}>
-                  {tool.name}
-                </code>
+                <code className="min-w-0 flex-1 break-words font-mono text-[12px] text-foreground/90">{tool.name}</code>
                 <StageStatusGlyph status={tool.status} className="mt-0.5 size-3" />
               </div>
               {tool.output ? (

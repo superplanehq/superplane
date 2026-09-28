@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import type { FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 
-import { attachStreamArtifacts } from "./attachStreamArtifacts";
-import type { SplitRunStreamLine } from "./splitRunMocks";
+import { attachStreamArtifacts, phasesWithRunArtifacts, streamArtifactIndexFromEvents } from "./attachStreamArtifacts";
+import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
 
 const NOTE: FactoriesWorkOrderArtifact = {
   id: "art-md-1",
@@ -217,5 +217,53 @@ describe("attachStreamArtifacts", () => {
     );
 
     expect(stream?.[0]?.artifact).toEqual(NOTE);
+  });
+});
+
+function stage(runId: string | undefined): SplitRunPhase {
+  return {
+    id: "phase-1",
+    name: "Analysis",
+    status: "passed",
+    duration: "1s",
+    componentName: "Analysis",
+    artifacts: [],
+    stream: [],
+    canvasSteps: [],
+    runId,
+  };
+}
+
+describe("phasesWithRunArtifacts", () => {
+  it("keeps every artifact a run produced on that stage", () => {
+    const index = streamArtifactIndexFromEvents([
+      artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "write-spec" }, { id: "run-analysis" }),
+      artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "write-spec" }, { id: "run-analysis" }),
+      artifactAddedEvent(
+        "2026-08-24T16:40:18.000Z",
+        { id: "art-other", type: "TYPE_LINK", data: { url: "https://example.com" } },
+        { nodeId: "other" },
+        { id: "run-other" },
+      ),
+    ]);
+
+    const phases = phasesWithRunArtifacts([stage("run-analysis"), stage("run-other")], index);
+
+    expect(phases[0]?.artifacts.map((artifact) => artifact.id)).toEqual(["art-md-1", "art-branch-1"]);
+    expect(phases[1]?.artifacts.map((artifact) => artifact.id)).toEqual(["art-other"]);
+  });
+
+  it("attaches a plan spec by canvas run id when the event has no run", () => {
+    const spec: FactoriesWorkOrderArtifact = {
+      id: "art-spec",
+      type: "TYPE_MARKDOWN",
+      data: { name: "spec.md", title: "spec.md", body: "# Plan", canvasRunId: "run-analysis" },
+    };
+    const index = streamArtifactIndexFromEvents([], [spec]);
+
+    const phases = phasesWithRunArtifacts([stage("run-analysis"), stage("run-implement")], index);
+
+    expect(phases[0]?.artifacts).toEqual([spec]);
+    expect(phases[1]?.artifacts).toEqual([]);
   });
 });
