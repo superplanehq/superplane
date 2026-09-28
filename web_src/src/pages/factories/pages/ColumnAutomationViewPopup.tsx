@@ -268,8 +268,9 @@ export function ColumnAutomationViewHost({
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
+  const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
   const riskScoreGeneral =
-    allowRiskScore && agent.draft && riskScoreCategoriesFromDraft(agent.draft) ? (
+    allowRiskScore && isRiskScoreCanvas && agent.draft && riskScoreCategoriesFromDraft(agent.draft) ? (
       <RiskScoreSettingsForm draft={agent.draft} onSave={agent.save} />
     ) : undefined;
   return (

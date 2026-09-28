@@ -5,7 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { nextRiskScoreCategoryId, type RiskScoreCategory, type RiskScoreLevel } from "./riskScoreCategories";
+import {
+  isRiskScoreCategoryName,
+  nextRiskScoreCategoryId,
+  type RiskScoreCategory,
+  type RiskScoreLevel,
+} from "./riskScoreCategories";
 import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
 
 export function RiskScoreCategoryEditor({
@@ -18,7 +23,10 @@ export function RiskScoreCategoryEditor({
   const [adding, setAdding] = useState(false);
 
   const add = (name: string, score: RiskScoreLevel) => {
-    if (!name || categories.some((category) => category.name.toLowerCase() === name.toLowerCase())) {
+    if (
+      !isRiskScoreCategoryName(name) ||
+      categories.some((category) => category.name.toLowerCase() === name.toLowerCase())
+    ) {
       return;
     }
     onChange([...categories, { id: nextRiskScoreCategoryId(categories), name, score }]);
@@ -38,27 +46,31 @@ export function RiskScoreCategoryEditor({
                 onChange(categories.map((entry) => (entry.id === category.id ? { ...entry, score } : entry)))
               }
             />
-            <button
+            <Button
               type="button"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-muted-foreground"
               aria-label={`${RISK_SCORE_SETUP_COPY.remove} ${category.name}`}
               data-testid={`risk-score-category-remove-${category.id}`}
               onClick={() => onChange(categories.filter((entry) => entry.id !== category.id))}
             >
               <Trash2 className="size-3.5" aria-hidden />
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
-      <button
+      <Button
         type="button"
-        className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+        variant="ghost"
+        size="sm"
+        className="mt-3 text-muted-foreground"
         onClick={() => setAdding(true)}
         data-testid="risk-score-category-add-more"
       >
         <Plus className="size-3.5" aria-hidden />
         {RISK_SCORE_SETUP_COPY.addMore}
-      </button>
+      </Button>
       <AddCategoryDialog
         open={adding}
         existingNames={categories.map((category) => category.name)}
@@ -87,6 +99,7 @@ function AddCategoryDialog({
   const [score, setScore] = useState<RiskScoreLevel>(3);
   const trimmed = name.trim();
   const duplicate = existingNames.some((existing) => existing.toLowerCase() === trimmed.toLowerCase());
+  const invalid = trimmed.length > 0 && !isRiskScoreCategoryName(trimmed);
 
   useEffect(() => {
     if (!open) {
@@ -132,6 +145,11 @@ function AddCategoryDialog({
               {RISK_SCORE_SETUP_COPY.addDuplicate}
             </p>
           ) : null}
+          {invalid ? (
+            <p className="text-[13px] text-destructive" role="alert">
+              {RISK_SCORE_SETUP_COPY.addInvalid}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
@@ -139,7 +157,7 @@ function AddCategoryDialog({
           </Button>
           <Button
             type="button"
-            disabled={trimmed.length === 0 || duplicate}
+            disabled={trimmed.length === 0 || duplicate || invalid}
             onClick={() => onAdd(trimmed, score)}
             data-testid="risk-score-category-add"
           >

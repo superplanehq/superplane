@@ -36,4 +36,15 @@ describe("RiskScoreCategoryEditor", () => {
     expect(screen.getByText("Cache changes")).toBeInTheDocument();
     expect(screen.getByTestId("risk-score-category-custom-1")).toHaveTextContent("Moderate Risk");
   });
+
+  it("rejects a name that contains an equals sign", async () => {
+    const user = userEvent.setup();
+    render(<Editor />);
+
+    await user.click(screen.getByTestId("risk-score-category-add-more"));
+    await user.type(screen.getByTestId("risk-score-category-name"), "Connection = pool");
+
+    expect(screen.getByTestId("risk-score-category-add")).toBeDisabled();
+    expect(screen.queryByText("Connection = pool")).not.toBeInTheDocument();
+  });
 });

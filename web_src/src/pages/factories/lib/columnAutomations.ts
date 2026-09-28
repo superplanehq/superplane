@@ -299,7 +299,7 @@ function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
     return false;
   }
   const name = app.name?.trim() ?? "";
-  return name === RISK_SCORE_ENTRY.name || name.startsWith(`${RISK_SCORE_ENTRY.name} `);
+  return name === RISK_SCORE_ENTRY.name || /^Risk score \(\d+\)$/.test(name);
 }
 
 function riskScoreAutomation(

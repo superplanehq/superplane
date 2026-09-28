@@ -12,6 +12,7 @@ export const RISK_SCORE_SETUP_COPY = {
   addScoreLabel: "Risk",
   addButton: "Add",
   addDuplicate: "This category already exists.",
+  addInvalid: "Do not use an equals sign in the name.",
   cancel: "Cancel",
   remove: "Remove",
   save: "Save categories",

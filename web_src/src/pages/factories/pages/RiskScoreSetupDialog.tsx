@@ -56,15 +56,17 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
   return (
     <PRFeedbackSetupWizardShell testId="risk-score-setup" preview={<RiskScoreSetupPreview />}>
       <header className="text-left">
-        <button
+        <Button
           type="button"
-          className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+          variant="ghost"
+          size="sm"
+          className="mb-6 text-muted-foreground"
           onClick={props.onClose}
           data-testid="risk-score-setup-back"
         >
           <ArrowLeft className="size-4 shrink-0" aria-hidden />
-          <span>{RISK_SCORE_SETUP_COPY.back}</span>
-        </button>
+          {RISK_SCORE_SETUP_COPY.back}
+        </Button>
         <h1 className={factoryPageTitleClassName}>{RISK_SCORE_SETUP_COPY.title}</h1>
         <p className="workspace-body-text mt-2 text-muted-foreground">{RISK_SCORE_SETUP_COPY.helper}</p>
       </header>

@@ -5,6 +5,7 @@ import {
   defaultRiskScoreCategories,
   draftWithRiskScoreCategories,
   formatRiskScoreRules,
+  isRiskScoreCategoryName,
   parseRiskScoreRules,
   riskScoreCategoriesFromDraft,
 } from "./riskScoreCategories";
@@ -62,6 +63,11 @@ describe("formatRiskScoreRules", () => {
     expect(rules).not.toContain("Documentation only");
     expect(rules).toContain("Authorization changes = 5 (critical).");
     expect(rules).toContain("Cache changes = 2 (low).");
+  });
+
+  it("skips a name that contains an equals sign", () => {
+    expect(isRiskScoreCategoryName("Connection = pool")).toBe(false);
+    expect(formatRiskScoreRules([{ name: "Connection = pool", score: 3 }])).toBe("");
   });
 });
 

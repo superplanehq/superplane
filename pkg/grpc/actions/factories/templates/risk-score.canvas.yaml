@@ -95,7 +95,7 @@ spec:
             command: |-
               set -euo pipefail
               gh auth setup-git --hostname github.com --force
-              git clone --depth 1 "https://github.com/${REPO}.git" repo
+              git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
               cd repo
               git fetch --depth 1 origin "pull/${PR_NUMBER}/head"
               if [ -n "${PR_REVISION:-}" ]; then
@@ -103,11 +103,14 @@ spec:
               else
                 git checkout --detach FETCH_HEAD
               fi
+              gh pr diff "${PR_NUMBER}" --repo "${REPO}" > /tmp/pr.diff
           - name: Review Pull Request
             type: prompt
             workingDirectory: repo
             prompt: |-
-              Review this pull request. The repository is already checked out at the pull request head.
+              Review this pull request. The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
               Do not change files. Do not commit. Do not push.
 
               Repository: {{ root().data.repository.full_name }}
@@ -117,7 +120,6 @@ spec:
               Base branch: {{ root().data.pull_request.base.ref }}
               Head SHA: {{ root().data.pull_request.head.sha }}
 
-              Compare the head with the base branch and review the full diff.
               Write ONLY valid JSON to /tmp/risk.json. No markdown fences.
 
               JSON schema:

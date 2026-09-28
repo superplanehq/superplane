@@ -249,11 +249,12 @@ describe("buildColumnAutomations", () => {
         { id: "app-risk", name: "Risk score", columnKey: "verify" },
         { id: "app-risk-2", name: "Risk score (2)", columnKey: "verify" },
         { id: "app-create-env", name: "Create env", columnKey: "verify" },
+        { id: "app-risk-payments", name: "Risk score payments", columnKey: "verify" },
         { id: "app-risk-done", name: "Risk score", columnKey: "done" },
       ],
     });
 
-    expect(automations.map((automation) => automation.kind)).toEqual(["risk-score", "risk-score", "custom"]);
+    expect(automations.map((automation) => automation.kind)).toEqual(["risk-score", "risk-score", "custom", "custom"]);
     expect(automations[0]).toMatchObject({
       catalogId: "risk-score",
       name: "Risk score",
@@ -263,6 +264,7 @@ describe("buildColumnAutomations", () => {
     });
     expect(automations[1]).toMatchObject({ canvasId: "app-risk-2" });
     expect(automations[2]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
+    expect(automations[3]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
   });
 
   it("appends custom canvases attached to Verify or Done", () => {

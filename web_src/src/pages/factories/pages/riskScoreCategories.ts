@@ -36,11 +36,17 @@ export function defaultRiskScoreCategories(): RiskScoreCategory[] {
   return RISK_SCORE_CATEGORIES.map((category) => ({ ...category }));
 }
 
+/** A category name must stay one rules token. An equals sign breaks the saved line. */
+export function isRiskScoreCategoryName(name: string): boolean {
+  const trimmed = name.trim();
+  return trimmed.length > 0 && !trimmed.includes("=") && !trimmed.includes("\n");
+}
+
 export function formatRiskScoreRules(categories: Array<{ name: string; score: number }>): string {
   return categories
     .map((category) => {
       const name = category.name.trim();
-      if (!name) {
+      if (!isRiskScoreCategoryName(name)) {
         return "";
       }
       const score = clampRiskScoreLevel(category.score);

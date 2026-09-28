@@ -159,6 +159,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
 	assert.NotContains(t, prompt, "install_params.riskRules")
+	assert.Contains(t, result.canvasYAML, `gh pr diff "${PR_NUMBER}" --repo "${REPO}" > /tmp/pr.diff`)
 
 	format := findYAMLNode(t, canvas, "format-risk-review")
 	assert.Contains(t, format.Configuration["script"], "Math.min(5")
