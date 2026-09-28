@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -175,6 +176,22 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
+
+	// The connect intent proves a real identity on the provider, which a
+	// mock cannot do. With real OAuth credentials configured, development
+	// runs the real connect flow exactly like production. Sign-in stays
+	// mocked, so a login never needs a GitHub round trip.
+	if a.devRealOAuthConfigured(provider) {
+		if isConnectIntent(r) {
+			a.handleAuth(w, r)
+			return
+		}
+		if isConnectCallback(r) {
+			a.handleAuthCallback(w, r)
+			return
+		}
+	}
+
 	mockUser := goth.User{
 		UserID:      "dev-user-123",
 		Email:       "dev@superplane.local",
@@ -214,6 +231,32 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.completeProviderAuth(w, r, mockUser)
+}
+
+// devOAuthPlaceholderCredential is the throwaway value docker-compose.dev.yml
+// sets so the login page shows the provider buttons. It cannot complete a
+// real OAuth flow.
+const devOAuthPlaceholderCredential = "1234567890abcdefghijklmnopqrstuv"
+
+// devRealOAuthConfigured reports whether development has real GitHub OAuth
+// credentials, so the connect flow can prove a real identity instead of
+// returning the mock user.
+func (a *Handler) devRealOAuthConfigured(provider string) bool {
+	if provider != models.ProviderGitHub {
+		return false
+	}
+	key := strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID"))
+	secret := strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET"))
+	if key == "" || secret == "" {
+		return false
+	}
+	return key != devOAuthPlaceholderCredential && secret != devOAuthPlaceholderCredential
+}
+
+// isConnectCallback recognizes the provider callback of a connect flow by its
+// signed state, so the development routes can finish a real connect.
+func isConnectCallback(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Query().Get("state"), authConnectStatePrefix)
 }
 
 func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
