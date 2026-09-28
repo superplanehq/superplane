@@ -790,6 +790,132 @@ func Test__Sync_hostedAppKeepsWaitingWhenRequestNotApproved(t *testing.T) {
 	assert.Equal(t, "csrf", metadata.State)
 }
 
+// GitHub's request callback names no account, so the sync asks GitHub for the
+// requester's open install requests. The open list fills the account in and
+// its absence past the grace window clears a declined or cancelled request.
+func Test__Sync_hostedAppConfirmsInstallRequestsOnGitHub(t *testing.T) {
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	now := time.Now().UTC()
+
+	syncRequests := func(t *testing.T, tracked, open []common.InstallRequest, openErr error) common.Metadata {
+		t.Helper()
+		t.Cleanup(resetBindClientHooks)
+		newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
+		listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
+			return nil, nil
+		}
+		listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+			return open, openErr
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			State: "pending",
+			Metadata: common.Metadata{
+				State:                "csrf",
+				HostedApp:            true,
+				StartedByGitHubLogin: "member",
+				InstallRequested:     true,
+				InstallRequests:      tracked,
+				GitHubApp:            common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			},
+		}
+
+		require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+			Logger:         logrus.NewEntry(logrus.New()),
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			BaseURL:        "https://app.example",
+			Integration:    integrationCtx,
+		}))
+		return integrationCtx.Metadata.(common.Metadata)
+	}
+
+	t.Run("fills the account from the open list and adopts the approved installation", func(t *testing.T) {
+		stubHostedAdopt(t, "acme", "11", "Organization")
+		stubHostedIdentity(t, &hostedIdentityStub{login: "member", memberOf: map[string]bool{"acme": true}})
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{RequesterLogin: "member", CreatedAt: now.Format(time.RFC3339Nano)}},
+			[]common.InstallRequest{{ID: "7", AccountLogin: "acme", RequesterLogin: "member", CreatedAt: now.Format(time.RFC3339Nano)}},
+			nil,
+		)
+
+		assert.Empty(t, metadata.InstallRequests)
+		assert.False(t, metadata.InstallRequested)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+	})
+
+	t.Run("keeps an enriched request that still waits for approval", func(t *testing.T) {
+		stubHostedAdoptNone(t)
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{RequesterLogin: "member", CreatedAt: now.Format(time.RFC3339Nano)}},
+			[]common.InstallRequest{{ID: "7", AccountLogin: "acme", RequesterLogin: "member", CreatedAt: now.Format(time.RFC3339Nano)}},
+			nil,
+		)
+
+		require.Len(t, metadata.InstallRequests, 1)
+		assert.Equal(t, "acme", metadata.InstallRequests[0].AccountLogin)
+		assert.True(t, metadata.InstallRequested)
+		assert.Equal(t, "acme", metadata.InstallRequestedAccount)
+	})
+
+	t.Run("clears a request GitHub closed without an installation", func(t *testing.T) {
+		stubHostedAdoptNone(t)
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{AccountLogin: "acme", RequesterLogin: "member", CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano)}},
+			nil,
+			nil,
+		)
+
+		assert.Empty(t, metadata.InstallRequests)
+		assert.False(t, metadata.InstallRequested)
+	})
+
+	t.Run("clears an account-less request GitHub no longer lists", func(t *testing.T) {
+		stubHostedAdoptNone(t)
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{RequesterLogin: "member", CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano)}},
+			nil,
+			nil,
+		)
+
+		assert.Empty(t, metadata.InstallRequests)
+		assert.False(t, metadata.InstallRequested)
+	})
+
+	t.Run("keeps a request GitHub still lists as open", func(t *testing.T) {
+		stubHostedAdoptNone(t)
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{AccountLogin: "acme", RequesterLogin: "member", CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano)}},
+			[]common.InstallRequest{{ID: "7", AccountLogin: "acme", RequesterLogin: "member"}},
+			nil,
+		)
+
+		require.Len(t, metadata.InstallRequests, 1)
+		assert.True(t, metadata.InstallRequested)
+	})
+
+	t.Run("keeps waiting when the GitHub request lookup fails", func(t *testing.T) {
+		stubHostedAdoptNone(t)
+
+		metadata := syncRequests(t,
+			[]common.InstallRequest{{RequesterLogin: "member", CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano)}},
+			nil,
+			errors.New("GitHub unavailable"),
+		)
+
+		require.Len(t, metadata.InstallRequests, 1)
+		assert.True(t, metadata.InstallRequested)
+	})
+}
+
 func Test__Sync_hostedAppKeepsSinglePendingInstallation(t *testing.T) {
 	setHostedAppEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })

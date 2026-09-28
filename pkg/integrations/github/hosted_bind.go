@@ -26,6 +26,12 @@ var (
 // recorded request time.
 const hostedAdoptClockSkew = 2 * time.Minute
 
+// hostedInstallRequestGraceWindow keeps a recorded install request alive even
+// when GitHub does not list it as open yet. Past the window, a request that
+// GitHub closed without an installation was declined or cancelled, so the
+// connect stops waiting for it.
+const hostedInstallRequestGraceWindow = 10 * time.Minute
+
 func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
 	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
 }
@@ -104,18 +110,47 @@ func (g *GitHub) bindHostedInstallationWith(
 // installation must not adopt it — and the cross-organization rule applies
 // unchanged.
 func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
-	trackedRequests := metadata.CurrentInstallRequests()
 	githubInstallations := g.listAppInstallationsForAdopt(ctx, app)
 	login := g.adoptIdentityLogin(*metadata)
 
 	metadata.SetPendingInstallations(metadata.PendingInstallations)
-	unresolved := make([]common.InstallRequest, 0, len(trackedRequests))
-	for _, request := range trackedRequests {
+	unresolved, err := g.adoptMatchingInstallations(ctx, app, login, metadata.CurrentInstallRequests(), githubInstallations, metadata)
+	if err != nil {
+		return err
+	}
+
+	// The request callback from GitHub names no account, so a stored request
+	// can carry only the requester. GitHub's open request list fills the
+	// account in, and a second pass adopts an installation the enriched
+	// request now matches.
+	if confirmed, ok := g.confirmRequestsOnGitHub(ctx, app, login, unresolved); ok {
+		unresolved, err = g.adoptMatchingInstallations(ctx, app, login, confirmed, githubInstallations, metadata)
+		if err != nil {
+			return err
+		}
+	}
+
+	metadata.SetInstallRequests(unresolved)
+	return nil
+}
+
+// adoptMatchingInstallations moves every approved installation into the
+// account picker and returns the requests that stay unresolved.
+func (g *GitHub) adoptMatchingInstallations(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	login string,
+	requests []common.InstallRequest,
+	githubInstallations []hostedInstallationSnapshot,
+	metadata *common.Metadata,
+) ([]common.InstallRequest, error) {
+	unresolved := make([]common.InstallRequest, 0, len(requests))
+	for _, request := range requests {
 		installation, found := lookupRequestedInstallation(request.AccountLogin, githubInstallations)
 		if found {
 			adopted, err := g.adoptFoundInstallation(ctx, app, login, request, installation, metadata)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if adopted {
 				continue
@@ -123,8 +158,91 @@ func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.Hos
 		}
 		unresolved = append(unresolved, request)
 	}
-	metadata.SetInstallRequests(unresolved)
-	return nil
+	return unresolved, nil
+}
+
+// confirmRequestsOnGitHub reconciles unresolved requests with the open
+// install requests GitHub lists for the requester. The open list carries the
+// account name the request callback omitted, and its absence past the grace
+// window means the request was declined or cancelled. The second return is
+// false when no request needed GitHub or the lookup failed; the caller then
+// keeps the requests unchanged.
+func (g *GitHub) confirmRequestsOnGitHub(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	login string,
+	requests []common.InstallRequest,
+) ([]common.InstallRequest, bool) {
+	if !requestsNeedGitHubConfirmation(requests) || strings.TrimSpace(login) == "" {
+		return requests, false
+	}
+
+	client, err := newAppJWTClient(ctx.Integration, app.ID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to create app client for install requests: %v", err)
+		}
+		return requests, false
+	}
+	open, err := listAppInstallationRequests(context.Background(), client, login)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to list app install requests: %v", err)
+		}
+		return requests, false
+	}
+
+	confirmed := make([]common.InstallRequest, 0, len(requests)+len(open))
+	for _, request := range requests {
+		if strings.TrimSpace(request.AccountLogin) == "" {
+			// The open list is the complete set of this requester's open
+			// requests, so it replaces the account-less placeholder. Keep
+			// the placeholder only while GitHub can lag behind a very
+			// fresh callback.
+			if len(open) == 0 && withinInstallRequestGraceWindow(request) {
+				confirmed = append(confirmed, request)
+			}
+			continue
+		}
+		if withinInstallRequestGraceWindow(request) || containsRequestForAccount(open, request.AccountLogin) {
+			confirmed = append(confirmed, request)
+		}
+	}
+	for _, request := range open {
+		if !containsRequestForAccount(confirmed, request.AccountLogin) {
+			confirmed = append(confirmed, request)
+		}
+	}
+	return confirmed, true
+}
+
+// requestsNeedGitHubConfirmation reports whether any request misses its
+// account name or waited past the grace window, so only those cases spend a
+// GitHub lookup.
+func requestsNeedGitHubConfirmation(requests []common.InstallRequest) bool {
+	return slices.ContainsFunc(requests, func(request common.InstallRequest) bool {
+		return strings.TrimSpace(request.AccountLogin) == "" || !withinInstallRequestGraceWindow(request)
+	})
+}
+
+// withinInstallRequestGraceWindow reports whether the request is too young to
+// judge against GitHub's open request list. Requests without a recorded time
+// never leave the window, so legacy rows keep waiting until they resolve.
+func withinInstallRequestGraceWindow(request common.InstallRequest) bool {
+	createdAt, err := time.Parse(time.RFC3339Nano, request.CreatedAt)
+	if err != nil {
+		return true
+	}
+	return time.Since(createdAt) < hostedInstallRequestGraceWindow
+}
+
+func containsRequestForAccount(requests []common.InstallRequest, account string) bool {
+	if strings.TrimSpace(account) == "" {
+		return false
+	}
+	return slices.ContainsFunc(requests, func(request common.InstallRequest) bool {
+		return strings.EqualFold(request.AccountLogin, account)
+	})
 }
 
 func (g *GitHub) adoptFoundInstallation(
