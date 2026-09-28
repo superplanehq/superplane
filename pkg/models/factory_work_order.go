@@ -249,6 +249,67 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	return result, nil
 }
 
+func (o *FactoryWorkOrder) SetOrigin(tx *gorm.DB, origin WorkOrderOrigin) error {
+	applyWorkOrderOrigin(o, &origin)
+	if o.OriginURL == nil {
+		return nil
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_url":   o.OriginURL,
+		"origin_label": o.OriginLabel,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) SetPendingGitHubMarker(tx *gorm.DB, marker string) error {
+	marker = strings.TrimSpace(marker)
+	if marker == "" {
+		return nil
+	}
+
+	o.OriginLabel = &marker
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": marker,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) ClearPendingGitHubMarker(tx *gorm.DB, marker string) error {
+	if o.OriginURL != nil && strings.TrimSpace(*o.OriginURL) != "" {
+		return nil
+	}
+	if o.OriginLabel == nil || strings.TrimSpace(*o.OriginLabel) != marker {
+		return nil
+	}
+
+	o.OriginLabel = nil
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": gorm.Expr("NULL"),
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) AssignCreator(tx *gorm.DB, createdBy uuid.UUID) error {
+	if o.CreatedByID != nil {
+		return nil
+	}
+
+	o.CreatedByID = &createdBy
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"created_by_id": createdBy,
+		"updated_at":    now,
+	}).Error
+}
+
 func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description *string) error {
 	if title == nil && description == nil {
 		return nil

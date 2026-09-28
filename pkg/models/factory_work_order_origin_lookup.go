@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"strings"
 
 	"gorm.io/gorm"
@@ -27,6 +28,22 @@ func (f *Factory) ListWorkOrderOriginURLsContaining(tx *gorm.DB, fragment string
 	}
 
 	return urls, nil
+}
+
+// FindWorkOrderByOriginLabel returns the work order whose origin label is
+// exactly label, in any state. A pending manual-task marker uses this until
+// the GitHub issue URL is known.
+func (f *Factory) FindWorkOrderByOriginLabel(tx *gorm.DB, label string) (*FactoryWorkOrder, error) {
+	label = strings.TrimSpace(label)
+	if tx == nil || f == nil || label == "" {
+		return nil, nil
+	}
+
+	order, err := f.findWorkOrder(tx, "origin_label = ?", label)
+	if errors.Is(err, ErrFactoryWorkOrderNotFound) {
+		return nil, nil
+	}
+	return order, err
 }
 
 // ListWorkOrdersByOriginURLFragment returns this factory's work orders whose

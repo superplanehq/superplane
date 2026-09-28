@@ -208,7 +208,7 @@ func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrd
 
 func (s *FactoryService) CreateWorkOrder(ctx context.Context, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateWorkOrder(ctx, organizationID, req)
+	return actions.CreateWorkOrder(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) DescribeWorkOrder(ctx context.Context, req *pb.DescribeWorkOrderRequest) (*pb.DescribeWorkOrderResponse, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -177,6 +178,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateGitHubIssueWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	skip, err = c.skipDuplicateProductiveWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -263,6 +272,58 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
 	}
 	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	issueURL, ok := ghintegration.IssueURLFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghintegration.LockIssueWorkOrder(c.tx, factoryModel, issueURL); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := ghintegration.IssueHasWorkOrder(c.tx, factoryModel, issueURL)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping GitHub issue %s: work order already exists", issueURL)
+		return true, nil
+	}
+
+	marker, ok := ghintegration.ManualTaskMarkerFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	order, err := factoryModel.FindWorkOrderByOriginLabel(c.tx, marker)
+	if err != nil {
+		return false, err
+	}
+	if order == nil {
+		return false, nil
+	}
+
+	if err := order.SetOrigin(c.tx, models.WorkOrderOrigin{
+		URL:   issueURL,
+		Label: models.OriginLabelFromURL(issueURL),
+	}); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("skipping GitHub issue %s: manual task %s already exists", issueURL, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {

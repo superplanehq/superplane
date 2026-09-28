@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -19,7 +20,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
+func CreateWorkOrder(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	req *pb.CreateWorkOrderRequest,
+) (*pb.CreateWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
@@ -46,13 +52,29 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
+	target, err := oldestManualTaskIssueIntake(db, factory)
+	if err != nil {
+		log.WithError(err).Warnf("factory %s: failed to resolve a GitHub issue for a manual task", factory.ID)
+		target = nil
+	}
+
+	marker := ""
+	if target != nil {
+		marker = ghintegration.NewManualTaskMarker()
+	}
+
 	assigneeIDs := []uuid.UUID{createdByID}
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
-		if err != nil {
-			return err
+		created, createErr := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+		if createErr != nil {
+			return createErr
+		}
+		if marker != "" {
+			if markErr := created.SetPendingGitHubMarker(tx, marker); markErr != nil {
+				return markErr
+			}
 		}
 		order = created
 		result, bindErr := storedfiles.BindDescriptionFiles(
@@ -72,6 +94,15 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+
+	if target != nil {
+		attachManualTaskGitHubIssue(ctx, deps, db, factory, order, target, marker, title, req.GetDescription())
+		reloaded, reloadErr := factory.FindWorkOrder(db, order.ID)
+		if reloadErr != nil {
+			return nil, factoryErrorToStatus(reloadErr, "failed to create work order")
+		}
+		order = reloaded
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
