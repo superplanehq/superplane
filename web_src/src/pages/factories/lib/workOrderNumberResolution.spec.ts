@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 import {
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   findWorkOrderByRunId,
   latestDispatchForLine,
   peekOrderFromNavigationState,
@@ -134,6 +135,30 @@ describe("resolvePeekWorkOrder", () => {
 
   it("ignores a local hint once a permalink is in the URL", () => {
     expect(resolvePeekWorkOrder(notFound, "12", undefined, imported)).toBeUndefined();
+  });
+});
+
+describe("displayedBoardLineId", () => {
+  const lines = [{ id: "line-plan" }, { id: "line-hotfix" }];
+  const order: FactoriesWorkOrder = {
+    id: "order-1",
+    lineDispatches: [{ id: "dispatch-hotfix", createdAt: "2026-09-28T00:00:00.000Z", line: { id: "line-hotfix" } }],
+  };
+
+  it("ignores a deleted task URL line and uses the dispatch line", () => {
+    expect(displayedBoardLineId(undefined, "deleted-line", lines, order, "line-plan")).toBe("line-hotfix");
+  });
+
+  it("keeps a task URL line that still exists", () => {
+    expect(displayedBoardLineId(undefined, "line-plan", lines, order, "line-hotfix")).toBe("line-plan");
+  });
+
+  it("prefers the route line over the task URL line", () => {
+    expect(displayedBoardLineId("line-hotfix", "line-plan", lines, order, "line-plan")).toBe("line-hotfix");
+  });
+
+  it("uses the first line when the task has no dispatch", () => {
+    expect(displayedBoardLineId(undefined, "deleted-line", lines, { id: "order-2" }, "line-plan")).toBe("line-plan");
   });
 });
 

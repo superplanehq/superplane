@@ -150,4 +150,18 @@ describe("useFactoryBoardWorkOrders", () => {
     expect(open?.lineId).toBeUndefined();
     expect(open?.results).toBeUndefined();
   });
+
+  it("does not request Done while the line is unknown", async () => {
+    factoriesListWorkOrders.mockResolvedValue(ordersPage([]));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(() => useFactoryBoardWorkOrders("org-1", "factory-1", { done: { enabled: false } }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(factoriesListWorkOrders).toHaveBeenCalledTimes(2));
+    const queries = factoriesListWorkOrders.mock.calls.map((call) => call[0].query as { states?: string[] });
+    expect(queries.some((query) => query.states?.[0] === "STATE_CLOSED")).toBe(false);
+    expect(queries.some((query) => query.states?.[0] === "STATE_DRAFT")).toBe(true);
+    expect(queries.some((query) => query.states?.[0] === "STATE_OPEN")).toBe(true);
+  });
 });
