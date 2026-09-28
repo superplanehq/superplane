@@ -36,3 +36,6 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 
 /** Organization experimental feature: Risk score automation on the Verify column. */
 export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
+
+/** Organization experimental feature: unified task popup with one console timeline instead of tabs. */
+export const FEATURE_FACTORY_TASK_CONSOLE = "factory_task_console";
