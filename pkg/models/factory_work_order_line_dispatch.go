@@ -574,10 +574,6 @@ func dispatchHasEarlierStep(record FactoryWorkOrderLineDispatchRecord, stepIndex
 	return false
 }
 
-func (o *FactoryWorkOrder) lineDispatchQuery(tx *gorm.DB) *gorm.DB {
-	return tx.Model(&FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", o.ID)
-}
-
 // FindActiveLineDispatch is a single indexed lookup ("does an active
 // traversal exist for this work order") replacing a scan over child
 // executions by status.
@@ -605,27 +601,6 @@ func (o *FactoryWorkOrder) ensureNoActiveLineDispatch(tx *gorm.DB) error {
 		return nil
 	}
 	return err
-}
-
-// ensureNoLineDispatch rejects a restore when any line traversal exists,
-// including a finished one. Archived means the draft was rejected before
-// a line run.
-func (o *FactoryWorkOrder) ensureNoLineDispatch(tx *gorm.DB) error {
-	var count int64
-	if err := o.lineDispatchQuery(tx).Count(&count).Error; err != nil {
-		return err
-	}
-	if count > 0 {
-		return fmt.Errorf("%w: work order already ran on a line", ErrFactoryWorkOrderInvalidState)
-	}
-	return nil
-}
-
-func (o *FactoryWorkOrder) ensureArchivedRestore(tx *gorm.DB, fromResult string) error {
-	if fromResult != FactoryWorkOrderResultRejected {
-		return fmt.Errorf("%w: only an archived task can return to draft", ErrFactoryWorkOrderInvalidState)
-	}
-	return o.ensureNoLineDispatch(tx)
 }
 
 func FindWorkOrderLineDispatch(tx *gorm.DB, id uuid.UUID) (*FactoryWorkOrderLineDispatch, error) {
@@ -758,4 +733,29 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 	}
 
 	return result, nil
+}
+
+func (o *FactoryWorkOrder) lineDispatchQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&FactoryWorkOrderLineDispatch{}).Where("work_order_id = ?", o.ID)
+}
+
+// ensureNoLineDispatch rejects a restore when any line traversal exists,
+// including a finished one. Archived means the draft was rejected before
+// a line run.
+func (o *FactoryWorkOrder) ensureNoLineDispatch(tx *gorm.DB) error {
+	var count int64
+	if err := o.lineDispatchQuery(tx).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("%w: work order already ran on a line", ErrFactoryWorkOrderInvalidState)
+	}
+	return nil
+}
+
+func (o *FactoryWorkOrder) ensureArchivedRestore(tx *gorm.DB, fromResult string) error {
+	if fromResult != FactoryWorkOrderResultRejected {
+		return fmt.Errorf("%w: only an archived task can return to draft", ErrFactoryWorkOrderInvalidState)
+	}
+	return o.ensureNoLineDispatch(tx)
 }

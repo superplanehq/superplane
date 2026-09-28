@@ -70,6 +70,8 @@ type BoardColumnPaging = {
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => void;
+  /** Load the next page when the lane does not overflow. Archived pages use this because Done can be empty. */
+  loadWhenShort?: boolean;
 };
 
 type BoardPaging = {
@@ -117,8 +119,15 @@ import {
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import {
+  boardDoneResultsForStatuses,
+  backlogColumnPaging,
+  draftsVisibleForStatusFilter,
+  shouldLoadHiddenArchivedPage,
+  uniqueWorkOrdersById,
+} from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
+import { isArchivedWorkOrder } from "../lib/workOrderProgress";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
@@ -373,6 +382,72 @@ export function LinesPage() {
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
+  );
+  const includeArchived = listState.filters.statuses.includes("archived");
+  const visibleArchivedCount = useMemo(
+    () => visibleWorkOrders.filter((order) => isArchivedWorkOrder(order)).length,
+    [visibleWorkOrders],
+  );
+  const fetchNextBacklogPageRef = useRef(backlogPage.fetchNextPage);
+  const fetchNextClosedPageRef = useRef(donePage.fetchNextPage);
+  fetchNextBacklogPageRef.current = backlogPage.fetchNextPage;
+  fetchNextClosedPageRef.current = donePage.fetchNextPage;
+  const loadNextBacklogPage = useCallback(() => {
+    fetchNextBacklogPageRef.current();
+  }, []);
+  const loadNextClosedPage = useCallback(() => {
+    fetchNextClosedPageRef.current();
+  }, []);
+  useEffect(() => {
+    if (
+      !shouldLoadHiddenArchivedPage({
+        includeArchived,
+        visibleArchivedCount,
+        hasNextPage: !isPlaceholderData && donePage.hasNextPage,
+        isLoading: donePage.isFetchingNextPage || workOrdersLoading,
+        isError: donePage.isFetchNextPageError,
+      })
+    ) {
+      return;
+    }
+    loadNextClosedPage();
+  }, [
+    donePage.hasNextPage,
+    donePage.isFetchNextPageError,
+    donePage.isFetchingNextPage,
+    includeArchived,
+    isPlaceholderData,
+    loadNextClosedPage,
+    visibleArchivedCount,
+    workOrdersLoading,
+  ]);
+  const backlogPaging = useMemo(
+    () =>
+      backlogColumnPaging({
+        includeArchived,
+        showDrafts: draftsVisibleForStatusFilter(listState.filters.statuses),
+        drafts: {
+          hasMore: !isPlaceholderData && backlogPage.hasNextPage,
+          isLoading: backlogPage.isFetchingNextPage,
+          onLoadMore: loadNextBacklogPage,
+        },
+        closed: {
+          hasMore: !isPlaceholderData && donePage.hasNextPage,
+          isLoading: donePage.isFetchingNextPage,
+          onLoadMore: loadNextClosedPage,
+        },
+      }),
+    [
+      backlogPage.hasNextPage,
+      backlogPage.isFetchingNextPage,
+      donePage.hasNextPage,
+      donePage.isFetchingNextPage,
+      includeArchived,
+      isPlaceholderData,
+      listState.filters.statuses,
+      loadNextBacklogPage,
+      loadNextClosedPage,
+    ],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
@@ -732,7 +807,7 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             cardsPending={Boolean(isPlaceholderData)}
-            includeArchived={listState.filters.statuses.includes("archived")}
+            includeArchived={includeArchived}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -757,9 +832,8 @@ export function LinesPage() {
             colorView={columnColorView}
             columnPaging={{
               backlog: {
-                hasMore: !isPlaceholderData && backlogPage.hasNextPage,
-                isLoading: backlogPage.isFetchingNextPage,
-                onLoadMore: backlogPage.fetchNextPage,
+                ...backlogPaging,
+                loadWhenShort: includeArchived && !isPlaceholderData,
               },
               open: {
                 hasMore: !isPlaceholderData && openPage.hasNextPage,

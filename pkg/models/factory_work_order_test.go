@@ -338,16 +338,17 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("restore an archived reject to draft", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Archived", "", &userID, nil, nil)
+		db := database.DB(t.Context())
+		order, err := factoryModel.CreateWorkOrder(db, "Archived", "", &userID, nil, nil)
 		require.NoError(t, err)
-		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateClosed,
 			Result:  FactoryWorkOrderResultRejected,
 			Actor:   &userID,
 		})
 		require.NoError(t, err)
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateDraft,
 			Actor:   &userID,
 		})
@@ -358,17 +359,18 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("closed completed cannot return to draft", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Completed", "", &userID, nil, nil)
+		db := database.DB(t.Context())
+		order, err := factoryModel.CreateWorkOrder(db, "Completed", "", &userID, nil, nil)
 		require.NoError(t, err)
 		for _, step := range []FactoryWorkOrderStatusUpdate{
 			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
 			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultCompleted, Actor: &userID},
 		} {
-			_, err := order.UpdateStatus(database.Conn(), step)
+			_, err := order.UpdateStatus(db, step)
 			require.NoError(t, err)
 		}
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateDraft,
 			Actor:   &userID,
 		})
@@ -380,18 +382,19 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 
 	t.Run("rejected order that ran on a line cannot return to draft", func(t *testing.T) {
-		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Ran then rejected", "", &userID, nil, nil)
+		db := database.DB(t.Context())
+		order, err := factoryModel.CreateWorkOrder(db, "Ran then rejected", "", &userID, nil, nil)
 		require.NoError(t, err)
 		for _, step := range []FactoryWorkOrderStatusUpdate{
 			{ToState: FactoryWorkOrderStateOpen, Actor: &userID},
 			{ToState: FactoryWorkOrderStateClosed, Result: FactoryWorkOrderResultRejected, Actor: &userID},
 		} {
-			_, err := order.UpdateStatus(database.Conn(), step)
+			_, err := order.UpdateStatus(db, step)
 			require.NoError(t, err)
 		}
-		require.NoError(t, insertFinishedLineDispatch(t, factoryModel, order))
+		require.NoError(t, insertFinishedLineDispatch(t, db, factoryModel, order))
 
-		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+		changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 			ToState: FactoryWorkOrderStateDraft,
 			Actor:   &userID,
 		})
@@ -1316,14 +1319,14 @@ func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	})
 }
 
-func insertFinishedLineDispatch(t *testing.T, factoryModel *Factory, order *FactoryWorkOrder) error {
+func insertFinishedLineDispatch(t *testing.T, db *gorm.DB, factoryModel *Factory, order *FactoryWorkOrder) error {
 	t.Helper()
-	line, err := factoryModel.CreateLine(database.Conn(), "ship", nil)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
 	if err != nil {
 		return err
 	}
 	now := time.Now()
-	return database.Conn().Create(&FactoryWorkOrderLineDispatch{
+	return db.Create(&FactoryWorkOrderLineDispatch{
 		ID:             uuid.New(),
 		OrganizationID: order.OrganizationID,
 		FactoryID:      order.FactoryID,

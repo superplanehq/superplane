@@ -298,18 +298,6 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return o.RecordAssigneesUpdated(tx, updatedBy, assigned, unassigned)
 }
 
-// closedToDraftRule decides which closed orders may return to draft.
-type closedToDraftRule int
-
-const (
-	// closedToDraftArchivedOnly allows a rejected order that never ran on a
-	// line. Restore uses this path.
-	closedToDraftArchivedOnly closedToDraftRule = iota
-	// closedToDraftAny allows any closed order. Send to backlog uses this
-	// so a task that already ran can return to the Backlog.
-	closedToDraftAny
-)
-
 // UpdateStatus is the single writer for the work order lifecycle: it
 // validates the transition, updates the row, and records an
 // `order.status.updated` event enriched with the caller's attribution
@@ -342,6 +330,18 @@ func (o *FactoryWorkOrder) SendClosedToDraft(db *gorm.DB, actor *uuid.UUID) (boo
 		Actor:   actor,
 	}, closedToDraftAny)
 }
+
+// closedToDraftRule decides which closed orders may return to draft.
+type closedToDraftRule int
+
+const (
+	// closedToDraftArchivedOnly allows a rejected order that never ran on a
+	// line. Restore uses this path.
+	closedToDraftArchivedOnly closedToDraftRule = iota
+	// closedToDraftAny allows any closed order. Send to backlog uses this
+	// so a task that already ran can return to the Backlog.
+	closedToDraftAny
+)
 
 func (o *FactoryWorkOrder) writeStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate, closedToDraft closedToDraftRule) (bool, error) {
 	toState := update.ToState

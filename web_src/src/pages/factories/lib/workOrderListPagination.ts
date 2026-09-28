@@ -21,7 +21,7 @@ export const BOARD_DONE_RESULTS = [
   "RESULT_FAILED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
 
-/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. Archived asks for rejected tasks that never ran. */
+/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. Archived asks for rejected tasks. Backlog shows the ones that never ran and pages this query. */
 export function boardDoneResultsForStatuses(
   statuses: readonly WorkOrderDisplayStatus[],
 ): readonly FactoriesWorkOrderResult[] {
@@ -173,4 +173,60 @@ export function workOrderMatchesPageQuery(
     return workOrderMatchesUser(order, query.userId);
   }
   return true;
+}
+
+export type BoardColumnPageControls = {
+  hasMore: boolean;
+  isLoading: boolean;
+  onLoadMore: () => void;
+};
+
+export function draftsVisibleForStatusFilter(statuses: readonly string[]): boolean {
+  return statuses.length === 0 || statuses.includes("draft");
+}
+
+/** Backlog pages the closed-task query when archived tasks are shown there. Done can be empty, so its scroll cannot load those pages. */
+export function backlogColumnPaging(args: {
+  includeArchived: boolean;
+  showDrafts: boolean;
+  drafts: BoardColumnPageControls;
+  closed: BoardColumnPageControls;
+}): BoardColumnPageControls {
+  const pages: BoardColumnPageControls[] = [];
+  if (args.showDrafts) {
+    pages.push(args.drafts);
+  }
+  if (args.includeArchived) {
+    pages.push(args.closed);
+  }
+  if (pages.length === 0) {
+    return { hasMore: false, isLoading: false, onLoadMore: () => undefined };
+  }
+  if (pages.length === 1) {
+    return pages[0];
+  }
+  return {
+    hasMore: pages.some((page) => page.hasMore),
+    isLoading: pages.some((page) => page.isLoading),
+    onLoadMore: () => {
+      for (const page of pages) {
+        if (page.hasMore && !page.isLoading) {
+          page.onLoadMore();
+        }
+      }
+    },
+  };
+}
+
+/** Keep loading closed pages until an archived task is visible. A page of newer line rejects would otherwise hide every archived task. */
+export function shouldLoadHiddenArchivedPage(args: {
+  includeArchived: boolean;
+  visibleArchivedCount: number;
+  hasNextPage: boolean;
+  isLoading: boolean;
+  isError: boolean;
+}): boolean {
+  return (
+    args.includeArchived && args.visibleArchivedCount === 0 && args.hasNextPage && !args.isLoading && !args.isError
+  );
 }

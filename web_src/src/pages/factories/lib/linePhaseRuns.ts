@@ -145,6 +145,11 @@ export function isArchivedBacklogReject(order: FactoriesWorkOrder): boolean {
   return isArchivedWorkOrder(order);
 }
 
+/** Archived tasks appear in Backlog, but they do not fill the column size limit. */
+export function backlogCapacityOrderCount(orders: readonly FactoriesWorkOrder[]): number {
+  return orders.reduce((count, order) => (isArchivedWorkOrder(order) ? count : count + 1), 0);
+}
+
 /**
  * Completed and failed work that belongs on this line, plus open work still on
  * a Done or PR-closure step. Newest orders come first. Rejected and canceled

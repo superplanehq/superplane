@@ -8,6 +8,7 @@ import type {
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
+  backlogCapacityOrderCount,
   collectLineDoneOrders,
   lineBoardEndsWithDoneStep,
   lineStageColumns,
@@ -191,5 +192,18 @@ describe("collectLineDoneOrders", () => {
       collectLineBacklogOrders([archived, rejectedAfterRun, draft], { includeArchived: true }).map((entry) => entry.id),
     ).toEqual(["wo-archived", "wo-draft"]);
     expect(collectLineDoneOrders([archived, rejectedAfterRun], LINE)).toEqual([]);
+  });
+
+  it("excludes archived orders from the backlog size limit", () => {
+    const archived = closedOrder({ id: "wo-archived", result: "RESULT_REJECTED" });
+    const draft: FactoriesWorkOrder = {
+      id: "wo-draft",
+      title: "Draft",
+      state: "STATE_DRAFT",
+      lineDispatches: [],
+    };
+
+    expect(backlogCapacityOrderCount([archived, draft, archived])).toBe(1);
+    expect(backlogCapacityOrderCount([archived])).toBe(0);
   });
 });
