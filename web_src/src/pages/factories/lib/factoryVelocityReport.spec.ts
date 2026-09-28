@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   VELOCITY_PERIOD_OPTIONS,
+  formatPersonWaste,
   hasVelocityOutput,
   isVelocityPeriodDays,
   toVelocityReport,
@@ -198,6 +199,20 @@ describe("hasVelocityOutput", () => {
     const report = toVelocityReport({ totals: { waste: 2 } });
 
     expect(hasVelocityOutput(report)).toBe(true);
+  });
+});
+
+describe("formatPersonWaste", () => {
+  it("shows the waste count and the rounded share of SuperPlane closures", () => {
+    expect(formatPersonWaste({ factoryWaste: 3, factoryMerged: 9 })).toBe("3 (25%)");
+  });
+
+  it("shows zero when every SuperPlane closure merged", () => {
+    expect(formatPersonWaste({ factoryWaste: 0, factoryMerged: 5 })).toBe("0 (0%)");
+  });
+
+  it("shows an em dash when the person has no SuperPlane closures", () => {
+    expect(formatPersonWaste({ factoryWaste: 0, factoryMerged: 0 })).toBe("—");
   });
 });
 

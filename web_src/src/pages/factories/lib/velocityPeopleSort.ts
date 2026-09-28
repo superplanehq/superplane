@@ -8,7 +8,13 @@ import type {
  * fields (`"total"` stands in for `authoredMerged + factoryMerged`), and
  * mapped one-to-one onto the backend's `PeopleSort` enum below.
  */
-export type PeopleSortKey = "total" | "factoryMerged" | "authoredMerged" | "medianCycleHours" | "costUsd";
+export type PeopleSortKey =
+  | "total"
+  | "factoryMerged"
+  | "factoryWaste"
+  | "authoredMerged"
+  | "medianCycleHours"
+  | "costUsd";
 
 export type PeopleSortDirection = "asc" | "desc";
 
@@ -34,6 +40,7 @@ export function nextPeopleOffset(offset: number): number {
 const PEOPLE_SORT_PARAM: Record<PeopleSortKey, DescribeFactoryVelocityRequestPeopleSort> = {
   total: "PEOPLE_SORT_TOTAL",
   factoryMerged: "PEOPLE_SORT_FACTORY_MERGED",
+  factoryWaste: "PEOPLE_SORT_FACTORY_WASTE",
   authoredMerged: "PEOPLE_SORT_AUTHORED_MERGED",
   medianCycleHours: "PEOPLE_SORT_MEDIAN_CYCLE_HOURS",
   costUsd: "PEOPLE_SORT_COST_USD",

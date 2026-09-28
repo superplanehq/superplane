@@ -131,6 +131,19 @@ export interface VelocityPerson {
   costUsd: number;
 }
 
+/**
+ * Waste count and rate for one person.
+ * The rate is the rounded share of that person's SuperPlane closures.
+ * An empty closure count has no rate, so the cell shows an em dash.
+ */
+export function formatPersonWaste(person: Pick<VelocityPerson, "factoryWaste" | "factoryMerged">): string {
+  const closures = person.factoryMerged + person.factoryWaste;
+  if (closures === 0) return "—";
+
+  const rate = Math.round((person.factoryWaste * 100) / closures);
+  return `${person.factoryWaste} (${rate}%)`;
+}
+
 /** One automation of the workspace, summed over the reported window. */
 export interface VelocityAutomation {
   /** Canvas id of the automation, used to link to its detail page. */
