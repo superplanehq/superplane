@@ -90,6 +90,23 @@ export function findWorkOrderByRunId(
   return orders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === id));
 }
 
+/**
+ * Line the board shows. A task URL can keep `?lineId=` after that line
+ * is deleted. Ignore that id. Use the route line, a line that still
+ * exists, the task dispatch line, then the first line.
+ */
+export function displayedBoardLineId(
+  routeLineId: string | undefined,
+  requestedLineId: string | null | undefined,
+  lines: ReadonlyArray<{ id?: string }>,
+  order: FactoriesWorkOrder | null | undefined,
+  fallbackLineId: string | undefined,
+): string | undefined {
+  const searchLineId =
+    requestedLineId && lines.some((line) => line.id === requestedLineId) ? requestedLineId : undefined;
+  return routeLineId ?? searchLineId ?? latestDispatchForLine(order ?? undefined)?.line?.id ?? fallbackLineId;
+}
+
 /** Latest dispatch on this line, or the latest dispatch on the order. */
 export function latestDispatchForLine(
   order: FactoriesWorkOrder | undefined,

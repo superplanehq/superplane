@@ -101,6 +101,7 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   peekOrderFromNavigationState,
   resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
@@ -250,6 +251,16 @@ function boardWorkOrdersPageOptions(
   };
 }
 
+function boardWorkOrdersWhileTaskLineLoads(
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  return {
+    ...boardWorkOrdersPageOptions(state, undefined, currentUserId),
+    done: { enabled: false },
+  };
+}
+
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
   factory: FactoriesFactory | null | undefined,
@@ -299,6 +310,7 @@ export function LinesPage() {
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -315,6 +327,22 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
+  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
+    organizationId,
+    factoryId,
+    taskLineOrderId,
+  );
+  const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
+  const selectedLineId = displayedBoardLineId(
+    routeLineId,
+    boardLineId,
+    lines,
+    taskForBoardLine,
+    taskLinePending ? undefined : firstFactoryLineId(factory),
+  );
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -325,7 +353,9 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+    taskLinePending
+      ? boardWorkOrdersWhileTaskLineLoads(listState, currentUserId)
+      : boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -374,7 +404,6 @@ export function LinesPage() {
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
-  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
@@ -400,13 +429,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
-  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
-  const selectedLineId =
-    routeLineId ??
-    searchLineId ??
-    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
-    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
@@ -450,7 +472,7 @@ export function LinesPage() {
   }
 
   if (!selectedLine) {
-    if (routeOrderNumber && permalink.status === "loading") {
+    if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
         <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
