@@ -192,8 +192,8 @@ func (g *GitHub) reconcileInstallRequests(
 	discovery := hostedInstallRequestDiscovery{}
 	if installRequestFollowUpDiscoveryActive(*metadata, now) {
 		discovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
-		discovery.fallback = requiresHostedInstallRequestFallback(*metadata, now)
 	}
+	discovery.fallback = requiresHostedInstallRequestFallback(*metadata, now)
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
@@ -222,7 +222,8 @@ func (g *GitHub) reconcileInstallRequests(
 		metadata.InstallRequestDiscoveryUntil = now.Add(installRequestFollowUpDiscoveryPeriod).Format(time.RFC3339Nano)
 		metadata.InstallRequestDiscoveryAccounts = slices.Clone(discovery.accounts)
 	} else if len(unresolved) == 0 &&
-		(len(trackedRequests) > 0 || !installRequestFollowUpDiscoveryActive(*metadata, now)) {
+		(len(trackedRequests) > 0 || !installRequestFollowUpDiscoveryActive(*metadata, now)) &&
+		!hostedInstallRequestFallbackScanIncomplete(*metadata) {
 		clearHostedInstallRequestDiscovery(metadata)
 	}
 	return discovery, nil

@@ -293,9 +293,9 @@ func (g *GitHub) refreshHostedSetup(
 		if len(requestDiscovery.accounts) == 0 {
 			requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
 		}
-		requestDiscovery.fallback = requestDiscovery.fallback ||
-			requiresHostedInstallRequestFallback(*metadata, now)
 	}
+	requestDiscovery.fallback = requestDiscovery.fallback ||
+		requiresHostedInstallRequestFallback(*metadata, now)
 	if requestDiscovery.required() {
 		discoveryPerformed = true
 		if err := g.refreshHostedRequestedInstallations(ctx, app, metadata, requestDiscovery); err != nil {
@@ -469,24 +469,51 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 		if len(discovery.accounts) > 0 {
 			mode = "approval_and_fallback"
 		}
-		candidateCount += hostedInstallRequestFallbackPageSize
-		since, parseErr := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackSince)
-		if parseErr != nil {
-			fallbackErr = fmt.Errorf("parse GitHub App fallback time: %w", parseErr)
+		if metadata.InstallRequestFallbackPage > 0 {
+			candidateCount += hostedInstallRequestFallbackPageSize
+			since, parseErr := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackSince)
+			if parseErr != nil {
+				fallbackErr = fmt.Errorf("parse GitHub App fallback time: %w", parseErr)
+			} else {
+				var recent []common.PendingInstallation
+				var retries []common.PendingInstallation
+				var nextPage int
+				recent, retries, nextPage, fallbackErr = discoverAccessibleRecentInstallations(
+					requestContext,
+					ctx.Integration,
+					app,
+					*identity,
+					since,
+					metadata.InstallRequestFallbackPage,
+				)
+				installations = append(installations, recent...)
+				if nextPage >= 0 {
+					metadata.InstallRequestFallbackRetries = mergeFallbackRetries(
+						metadata.InstallRequestFallbackRetries,
+						retries,
+					)
+					advanceHostedInstallRequestFallback(metadata, nextPage, startedAt)
+				}
+			}
 		} else {
-			var recent []common.PendingInstallation
-			var nextPage int
-			recent, nextPage, fallbackErr = discoverAccessibleRecentInstallations(
+			retryCount := min(len(metadata.InstallRequestFallbackRetries), hostedInstallRequestFallbackPageSize)
+			candidateCount += retryCount
+			retryBatch := slices.Clone(metadata.InstallRequestFallbackRetries[:retryCount])
+			remaining := slices.Clone(metadata.InstallRequestFallbackRetries[retryCount:])
+			var retried []common.PendingInstallation
+			var retries []common.PendingInstallation
+			retried, retries, fallbackErr = verifyAccessibleInstallationsWithFailures(
 				requestContext,
 				ctx.Integration,
 				app,
 				*identity,
-				since,
-				metadata.InstallRequestFallbackPage,
+				retryBatch,
+				nil,
 			)
-			installations = append(installations, recent...)
-			if nextPage >= 0 {
-				advanceHostedInstallRequestFallback(metadata, nextPage, startedAt)
+			installations = append(installations, retried...)
+			metadata.InstallRequestFallbackRetries = mergeFallbackRetries(remaining, retries)
+			if len(metadata.InstallRequestFallbackRetries) == 0 {
+				completeHostedInstallRequestFallback(metadata, startedAt)
 			}
 		}
 	}
@@ -502,9 +529,14 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 	}
 	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
 		metadata.InstallRequestDiscoveryAccounts = nil
-		if metadata.InstallRequestFallbackPage == 0 {
+		if !hostedInstallRequestFallbackScanIncomplete(*metadata) {
 			metadata.InstallRequestDiscoveryUntil = ""
 		}
+	}
+	if !metadata.HasInstallRequests() &&
+		!installRequestFollowUpDiscoveryActive(*metadata, startedAt) &&
+		!hostedInstallRequestFallbackScanIncomplete(*metadata) {
+		clearHostedInstallRequestDiscovery(metadata)
 	}
 	return nil
 }
@@ -579,7 +611,11 @@ func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Ti
 }
 
 func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Time) bool {
-	if metadata.InstallRequestFallbackPage <= 0 {
+	if hostedInstallRequestFallbackScanIncomplete(metadata) {
+		return true
+	}
+	if metadata.InstallRequestFallbackPage <= 0 ||
+		!installRequestFollowUpDiscoveryActive(metadata, now) {
 		return false
 	}
 	if metadata.InstallRequestFallbackPage > 1 {
@@ -593,7 +629,7 @@ func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Tim
 }
 
 func ensureHostedInstallRequestFallback(metadata *common.Metadata, now time.Time) {
-	if metadata.InstallRequestFallbackPage > 0 {
+	if metadata.InstallRequestFallbackPage > 0 || len(metadata.InstallRequestFallbackRetries) > 0 {
 		return
 	}
 
@@ -613,8 +649,39 @@ func advanceHostedInstallRequestFallback(metadata *common.Metadata, nextPage int
 		return
 	}
 
+	if len(metadata.InstallRequestFallbackRetries) > 0 {
+		metadata.InstallRequestFallbackPage = 0
+		return
+	}
+	completeHostedInstallRequestFallback(metadata, now)
+}
+
+func completeHostedInstallRequestFallback(metadata *common.Metadata, now time.Time) {
 	metadata.InstallRequestFallbackPage = 1
 	metadata.InstallRequestFallbackRefreshedAt = now.Format(time.RFC3339Nano)
+}
+
+func hostedInstallRequestFallbackScanIncomplete(metadata common.Metadata) bool {
+	if len(metadata.InstallRequestFallbackRetries) > 0 || metadata.InstallRequestFallbackPage > 1 {
+		return true
+	}
+	return metadata.InstallRequestFallbackPage == 1 && metadata.InstallRequestFallbackRefreshedAt == ""
+}
+
+func mergeFallbackRetries(
+	existing []common.PendingInstallation,
+	additional []common.PendingInstallation,
+) []common.PendingInstallation {
+	merged := slices.Clone(existing)
+	for _, installation := range additional {
+		if slices.ContainsFunc(merged, func(candidate common.PendingInstallation) bool {
+			return candidate.ID == installation.ID
+		}) {
+			continue
+		}
+		merged = append(merged, installation)
+	}
+	return merged
 }
 
 func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
@@ -622,6 +689,7 @@ func clearHostedInstallRequestDiscovery(metadata *common.Metadata) {
 	metadata.InstallRequestDiscoveryAccounts = nil
 	metadata.InstallRequestFallbackSince = ""
 	metadata.InstallRequestFallbackPage = 0
+	metadata.InstallRequestFallbackRetries = nil
 	metadata.InstallRequestFallbackRefreshedAt = ""
 }
 

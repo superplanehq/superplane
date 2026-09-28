@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -117,10 +118,10 @@ func discoverAccessibleRecentInstallations(
 	identity hostedGitHubIdentity,
 	since time.Time,
 	page int,
-) ([]common.PendingInstallation, int, error) {
+) ([]common.PendingInstallation, []common.PendingInstallation, int, error) {
 	appClient, err := newAppJWTClient(integration, app.ID)
 	if err != nil {
-		return nil, -1, fmt.Errorf("create GitHub App client: %w", err)
+		return nil, nil, -1, fmt.Errorf("create GitHub App client: %w", err)
 	}
 
 	installations, nextPage, err := listRecentAppInstallations(
@@ -131,10 +132,17 @@ func discoverAccessibleRecentInstallations(
 		hostedInstallRequestFallbackPageSize,
 	)
 	if err != nil {
-		return nil, -1, fmt.Errorf("list recent GitHub App installations: %w", err)
+		return nil, nil, -1, fmt.Errorf("list recent GitHub App installations: %w", err)
 	}
-	accessible, err := verifyAccessibleInstallations(ctx, integration, app, identity, installations, nil)
-	return accessible, nextPage, err
+	accessible, retries, err := verifyAccessibleInstallationsWithFailures(
+		ctx,
+		integration,
+		app,
+		identity,
+		installations,
+		nil,
+	)
+	return accessible, retries, nextPage, err
 }
 
 func discoverAccessibleInstallationByID(
@@ -259,22 +267,42 @@ func verifyAccessibleInstallations(
 	installations []common.PendingInstallation,
 	repositoryIDs []int64,
 ) ([]common.PendingInstallation, error) {
+	accessible, _, err := verifyAccessibleInstallationsWithFailures(
+		ctx,
+		integration,
+		app,
+		identity,
+		installations,
+		repositoryIDs,
+	)
+	return accessible, err
+}
+
+func verifyAccessibleInstallationsWithFailures(
+	ctx context.Context,
+	integration core.IntegrationContext,
+	app common.HostedApp,
+	identity hostedGitHubIdentity,
+	installations []common.PendingInstallation,
+	repositoryIDs []int64,
+) ([]common.PendingInstallation, []common.PendingInstallation, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, slices.Clone(installations), err
 	}
 	if !identity.AllowUnverifiedRepositories {
 		resolved, ok, err := resolveHostedGitHubIdentity(ctx, integration, app, identity, installations)
 		if err != nil {
-			return nil, err
+			return nil, slices.Clone(installations), err
 		}
 		if !ok {
-			return nil, nil
+			return nil, nil, nil
 		}
 		identity = resolved
 	}
 
 	results := make([]*common.PendingInstallation, len(installations))
 	failures := make([]error, len(installations))
+	completed := make([]bool, len(installations))
 	var group errgroup.Group
 	group.SetLimit(hostedInstallationVerificationConcurrency)
 	for index, installation := range installations {
@@ -292,6 +320,7 @@ func verifyAccessibleInstallations(
 				installation,
 				repositoryIDs,
 			)
+			completed[index] = true
 			if err != nil {
 				failures[index] = err
 				return nil
@@ -303,11 +332,17 @@ func verifyAccessibleInstallations(
 		})
 	}
 	_ = group.Wait()
+	retries := make([]common.PendingInstallation, 0)
+	for index, failure := range failures {
+		if failure != nil || !completed[index] {
+			retries = append(retries, installations[index])
+		}
+	}
 	if err := ctx.Err(); err != nil {
-		return compactVerifiedInstallations(results), err
+		return compactVerifiedInstallations(results), retries, err
 	}
 
-	return compactVerifiedInstallations(results), summarizeHostedDiscoveryErrors(failures)
+	return compactVerifiedInstallations(results), retries, summarizeHostedDiscoveryErrors(failures)
 }
 
 func resolveHostedGitHubIdentity(
