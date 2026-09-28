@@ -263,9 +263,6 @@ func TestDiscoverAccessibleInstallationByIDRejectsReadOnlyRepository(t *testing.
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	resolveInstallationIdentity = func(context.Context, *gh.Client, int64) (*gh.User, error) {
-		return &gh.User{ID: gh.Ptr(int64(7)), Login: gh.Ptr("member")}, nil
-	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
@@ -286,7 +283,7 @@ func TestDiscoverAccessibleInstallationByIDRejectsReadOnlyRepository(t *testing.
 	assert.Empty(t, installations)
 }
 
-func TestDiscoverAccessibleInstallationsResolvesIdentityOnce(t *testing.T) {
+func TestDiscoverAccessibleInstallationsUsesLinkedLoginForPermissionChecks(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Cleanup(resetBindClientHooks)
 
@@ -302,16 +299,11 @@ func TestDiscoverAccessibleInstallationsResolvesIdentityOnce(t *testing.T) {
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	var identityCalls atomic.Int32
-	resolveInstallationIdentity = func(context.Context, *gh.Client, int64) (*gh.User, error) {
-		identityCalls.Add(1)
-		return &gh.User{ID: gh.Ptr(int64(7)), Login: gh.Ptr("renamed-member")}, nil
-	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
 	getRepositoryPermission = func(_ context.Context, _ *gh.Client, _, _, username string) (*gh.RepositoryPermissionLevel, error) {
-		assert.Equal(t, "renamed-member", username)
+		assert.Equal(t, "linked-member", username)
 		return &gh.RepositoryPermissionLevel{Permission: gh.Ptr("write")}, nil
 	}
 
@@ -319,12 +311,11 @@ func TestDiscoverAccessibleInstallationsResolvesIdentityOnce(t *testing.T) {
 		context.Background(),
 		&contexts.IntegrationContext{},
 		common.HostedApp{ID: 99},
-		hostedGitHubIdentity{ID: 7, Login: "old-member"},
+		hostedGitHubIdentity{ID: 7, Login: "linked-member"},
 	)
 
 	require.NoError(t, err)
 	assert.Len(t, installations, 2)
-	assert.Equal(t, int32(1), identityCalls.Load())
 }
 
 func TestDevelopmentGitHubDiscoveryRequiresExplicitLocalOptIn(t *testing.T) {

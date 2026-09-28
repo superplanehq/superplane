@@ -290,18 +290,8 @@ func verifyAccessibleInstallationsWithFailures(
 	if err := ctx.Err(); err != nil {
 		return nil, slices.Clone(installations), err
 	}
-	if !identity.AllowUnverifiedRepositories {
-		resolved, ok, err := resolveHostedGitHubIdentity(ctx, integration, app, identity, installations)
-		if err != nil {
-			if hostedDiscoveryErrorIsRetryable(err) {
-				return nil, slices.Clone(installations), err
-			}
-			return nil, nil, err
-		}
-		if !ok {
-			return nil, nil, nil
-		}
-		identity = resolved
+	if !identity.AllowUnverifiedRepositories && strings.TrimSpace(identity.Login) == "" {
+		return nil, nil, fmt.Errorf("linked GitHub login is empty")
 	}
 
 	results := make([]*common.PendingInstallation, len(installations))
@@ -387,45 +377,6 @@ func githubResponseErrorIsRetryable(err error) bool {
 		return false
 	}
 	return githubResponseErrorIsRetryable(errors.Unwrap(err))
-}
-
-func resolveHostedGitHubIdentity(
-	ctx context.Context,
-	integration core.IntegrationContext,
-	app common.HostedApp,
-	identity hostedGitHubIdentity,
-	installations []common.PendingInstallation,
-) (hostedGitHubIdentity, bool, error) {
-	failures := make([]error, 0)
-	for _, installation := range installations {
-		if err := ctx.Err(); err != nil {
-			return identity, false, err
-		}
-		client, err := newInstallationClient(integration, app.ID, installation.ID)
-		if err != nil {
-			failures = append(failures, fmt.Errorf("create client for installation %s: %w", installation.ID, err))
-			continue
-		}
-		user, err := resolveInstallationIdentity(ctx, client, identity.ID)
-		if err != nil {
-			if githubErrorIsNotFound(err) {
-				continue
-			}
-			failures = append(failures, fmt.Errorf("resolve GitHub identity for installation %s: %w", installation.ID, err))
-			continue
-		}
-		if user == nil || user.GetID() != identity.ID || strings.TrimSpace(user.GetLogin()) == "" {
-			continue
-		}
-
-		identity.Login = user.GetLogin()
-		return identity, true, nil
-	}
-
-	if err := summarizeHostedDiscoveryErrors(failures); err != nil {
-		return identity, false, err
-	}
-	return identity, false, nil
 }
 
 func verifyAccessibleInstallation(

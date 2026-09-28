@@ -55,9 +55,10 @@ To complete the GitHub app setup:
 	hostedInstallDescription = `
 	Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
 	`
-	hostedInstallationDiscoveryInterval   = time.Minute
-	installRequestResolutionGracePeriod   = 2 * time.Minute
-	installRequestFollowUpDiscoveryPeriod = 2 * hostedInstallationDiscoveryInterval
+	hostedInstallationDiscoveryInterval    = time.Minute
+	installRequestResolutionGracePeriod    = 2 * time.Minute
+	installRequestFollowUpDiscoveryPeriod  = 2 * hostedInstallationDiscoveryInterval
+	setupInstallationVisibilityGracePeriod = 2 * time.Minute
 )
 
 func init() {
@@ -309,17 +310,10 @@ func (g *GitHub) refreshHostedSetup(
 	if discoveryPerformed || metadata.HasInstallRequests() {
 		return nil
 	}
-	// A new connection has no trusted installation to refresh. Opening the
-	// GitHub setup flow gives the callback an exact installation candidate and
-	// avoids scanning every installation owned by the shared App.
-	if len(metadata.PendingInstallations) == 0 {
+	if metadata.InstallationID != "" {
 		return nil
 	}
-	if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
-		return err
-	}
-	g.refreshHostedInstallRequests(ctx, app, metadata)
-	return nil
+	return g.refreshHostedInitialInstallations(ctx, app, metadata)
 }
 
 func refreshHostedStarterIdentity(ctx core.SyncContext, metadata *common.Metadata) {
@@ -365,6 +359,9 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 ) error {
 	now := time.Now().UTC()
 	targetID := strings.TrimSpace(metadata.SetupInstallationID)
+	if targetID != "" {
+		ensureSetupInstallationReceivedAt(metadata, now)
+	}
 	if targetID == "" && !requiresHostedInstallationDiscovery(*metadata, now) {
 		return nil
 	}
@@ -400,7 +397,11 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	if err != nil {
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
 		if targetID != "" && githubErrorIsNotFound(err) {
-			metadata.SetupInstallationID = ""
+			if setupInstallationVisibilityPending(*metadata, now) {
+				metadata.InstallationsRefreshedAt = ""
+				return nil
+			}
+			clearSetupInstallation(metadata)
 			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 			return nil
 		}
@@ -416,17 +417,38 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	}
 	if targetID != "" {
 		if len(installations) == 0 {
-			metadata.SetupInstallationID = ""
+			if setupInstallationVisibilityPending(*metadata, now) {
+				metadata.InstallationsRefreshedAt = ""
+				return nil
+			}
+			clearSetupInstallation(metadata)
 			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 			return nil
 		}
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
-		metadata.SetupInstallationID = ""
+		clearSetupInstallation(metadata)
 	} else {
 		metadata.SetPendingInstallations(installations)
 	}
 	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 	return nil
+}
+
+func ensureSetupInstallationReceivedAt(metadata *common.Metadata, now time.Time) {
+	if _, err := time.Parse(time.RFC3339Nano, metadata.SetupInstallationReceivedAt); err == nil {
+		return
+	}
+	metadata.SetupInstallationReceivedAt = now.Format(time.RFC3339Nano)
+}
+
+func setupInstallationVisibilityPending(metadata common.Metadata, now time.Time) bool {
+	receivedAt, err := time.Parse(time.RFC3339Nano, metadata.SetupInstallationReceivedAt)
+	return err == nil && now.Before(receivedAt.Add(setupInstallationVisibilityGracePeriod))
+}
+
+func clearSetupInstallation(metadata *common.Metadata) {
+	metadata.SetupInstallationID = ""
+	metadata.SetupInstallationReceivedAt = ""
 }
 
 func (g *GitHub) refreshHostedRequestedInstallations(
@@ -696,6 +718,16 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 	}
 
 	if len(metadata.PendingInstallations) >= 1 {
+		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+	if hostedInitialDiscoveryActive(metadata) {
+		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.SetMetadata(metadata)
+		return
+	}
+	if metadata.SetupInstallationID != "" {
 		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		return
@@ -1391,7 +1423,9 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 			return
 		}
 		metadata.SetupInstallationID = installationID
+		metadata.SetupInstallationReceivedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		metadata.InstallationsRefreshedAt = ""
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		redirectToIntegrationSettingsCompleted(ctx)
 		return
