@@ -150,4 +150,60 @@ describe("useFactoryBoardWorkOrders", () => {
     expect(open?.lineId).toBeUndefined();
     expect(open?.results).toBeUndefined();
   });
+
+  it("sends backlog sort and filters on the next page only", async () => {
+    factoriesListWorkOrders.mockImplementation((request: { query?: { states?: string[]; beforeId?: string } }) => {
+      if (request.query?.states?.[0] === "STATE_DRAFT" && !request.query.beforeId) {
+        return Promise.resolve({ data: { orders: [{ id: "wo-1" }], hasNextPage: true } });
+      }
+      return Promise.resolve({ data: { orders: [{ id: "wo-2" }], hasNextPage: false } });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(
+      () =>
+        useFactoryBoardWorkOrders("org-1", "factory-1", {
+          backlog: {
+            sort: "confidence",
+            direction: "asc",
+            sourceGroups: ["github-issues"],
+            minConfidence: 3,
+            confidenceMissing: false,
+            age: "last_7_days",
+          },
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.backlog.hasNextPage).toBe(true));
+    result.current.backlog.fetchNextPage();
+    await waitFor(() =>
+      expect(factoriesListWorkOrders.mock.calls.filter((call) => call[0].query.beforeId).length).toBe(1),
+    );
+
+    const queries = factoriesListWorkOrders.mock.calls.map((call) => call[0].query as Record<string, unknown>);
+    const draftPages = queries.filter((query) => (query.states as string[] | undefined)?.[0] === "STATE_DRAFT");
+    expect(draftPages[0]).toEqual(
+      expect.objectContaining({
+        sort: "SORT_CONFIDENCE",
+        sortDirection: "SORT_DIRECTION_ASC",
+        sourceGroups: ["github-issues"],
+        minConfidence: 3,
+        age: "AGE_LAST_7_DAYS",
+      }),
+    );
+    expect(draftPages[0]?.beforeId).toBeUndefined();
+    expect(draftPages.at(-1)).toEqual(
+      expect.objectContaining({
+        beforeId: "wo-1",
+        sort: "SORT_CONFIDENCE",
+        sortDirection: "SORT_DIRECTION_ASC",
+        sourceGroups: ["github-issues"],
+        minConfidence: 3,
+        age: "AGE_LAST_7_DAYS",
+      }),
+    );
+    const open = queries.find((query) => (query.states as string[] | undefined)?.[0] === "STATE_OPEN");
+    expect(open?.sort).toBeUndefined();
+    expect(open?.sourceGroups).toBeUndefined();
+  });
 });

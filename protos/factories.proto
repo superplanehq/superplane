@@ -444,7 +444,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List factory work orders";
-      description: "Returns one page of work orders for a factory. The default page size is 100. Pass before_id to return orders older than that id.";
+      description: "Returns one page of work orders for a factory. The default page size is 100. Pass before_id to continue after that id in the active sort.";
       tags: "Factory";
     };
   }
@@ -1618,6 +1618,32 @@ message RefreshBacklogResponse {
 // Work orders
 
 message ListWorkOrdersRequest {
+  enum Sort {
+    // Same as SORT_UPDATED.
+    SORT_UNSPECIFIED = 0;
+    SORT_UPDATED = 1;
+    SORT_CONFIDENCE = 2;
+    SORT_SOURCE = 3;
+    SORT_CREATED = 4;
+  }
+
+  enum SortDirection {
+    // Same as SORT_DIRECTION_DESC.
+    SORT_DIRECTION_UNSPECIFIED = 0;
+    SORT_DIRECTION_ASC = 1;
+    SORT_DIRECTION_DESC = 2;
+  }
+
+  enum Age {
+    // Same as AGE_ANY.
+    AGE_UNSPECIFIED = 0;
+    AGE_ANY = 1;
+    AGE_LAST_7_DAYS = 2;
+    AGE_LAST_30_DAYS = 3;
+    AGE_LAST_90_DAYS = 4;
+    AGE_OLDER_THAN_90_DAYS = 5;
+  }
+
   string factory_id = 1;
   repeated WorkOrder.State states = 2;
   repeated WorkOrder.Result results = 3;
@@ -1626,10 +1652,23 @@ message ListWorkOrdersRequest {
   optional string user_id = 5;
   // Page size. Zero or omitted uses 100.
   uint32 limit = 6;
-  // Return orders older than this id in updated_at DESC, id DESC order.
+  // Cursor. Return orders after this id in the active sort, then id.
   string before_id = 7;
   // When set, return orders that ran on this line, plus orders with no line.
   string line_id = 8;
+  // Sort key. Omitted means updated time.
+  Sort sort = 9;
+  // Sort direction. Omitted means descending.
+  SortDirection sort_direction = 10;
+  // Source groups. Empty means every source. Values match the board filter
+  // groups recognized from origin and creator automation, plus manual.
+  repeated string source_groups = 11;
+  // Hide orders below this confidence score, including orders with no score.
+  optional double min_confidence = 12;
+  // When true, return only orders with no confidence score.
+  optional bool confidence_missing = 13;
+  // Issue age window. Age is created_at. Omitted means any age.
+  Age age = 14;
 }
 
 message ListWorkOrdersResponse {

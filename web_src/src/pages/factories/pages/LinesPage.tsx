@@ -38,6 +38,7 @@ import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import { DEFAULT_BACKLOG_COLUMN_QUERY, type BacklogColumnQuery } from "../lib/backlogColumnQuery";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -235,7 +236,8 @@ function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
 function boardWorkOrdersPageOptions(
   state: WorkOrderListState,
   lineId: string | undefined,
-  currentUserId?: string,
+  currentUserId: string | undefined,
+  backlog: BacklogColumnQuery,
 ): FactoryBoardWorkOrdersOptions {
   const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
   const scope = lineBoardWorkOrderScope(state.scope);
@@ -243,6 +245,7 @@ function boardWorkOrdersPageOptions(
     userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
     unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
     requireUser: scope === "my" && ownerIds.length !== 1,
+    backlog,
     done: {
       lineId,
       results: boardDoneResultsForStatuses(state.filters.statuses),
@@ -315,6 +318,7 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const [backlogColumnQuery, setBacklogColumnQuery] = useState(DEFAULT_BACKLOG_COLUMN_QUERY);
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -325,7 +329,7 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId, backlogColumnQuery),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -754,6 +758,8 @@ export function LinesPage() {
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             colorView={columnColorView}
+            backlogQuery={backlogColumnQuery}
+            onBacklogQueryChange={setBacklogColumnQuery}
             columnPaging={{
               backlog: {
                 hasMore: !isPlaceholderData && backlogPage.hasNextPage,
@@ -974,6 +980,8 @@ function LineDetail({
   showColumnAutomations,
   showAutomationRows,
   colorView,
+  backlogQuery,
+  onBacklogQueryChange,
   columnPaging,
   workOrderCardContext,
   peekOrder,
@@ -1005,6 +1013,8 @@ function LineDetail({
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
+  backlogQuery: BacklogColumnQuery;
+  onBacklogQueryChange: (query: BacklogColumnQuery) => void;
   columnPaging: BoardPaging;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
@@ -1117,6 +1127,8 @@ function LineDetail({
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
           colorView={colorView}
+          backlogQuery={backlogQuery}
+          onBacklogQueryChange={onBacklogQueryChange}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
@@ -1365,6 +1377,8 @@ function PhaseBoard({
   showColumnAutomations,
   showAutomationRows,
   colorView,
+  backlogQuery,
+  onBacklogQueryChange,
   automationsFor,
   onAutomationRowAction,
   onAddVerifyAutomation,
@@ -1393,6 +1407,8 @@ function PhaseBoard({
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
+  backlogQuery: BacklogColumnQuery;
+  onBacklogQueryChange: (query: BacklogColumnQuery) => void;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
@@ -1533,6 +1549,8 @@ function PhaseBoard({
           onAutomationRowAction={onAutomationRowAction}
           paging={columnPaging.backlog}
           cardsPending={cardsPending}
+          backlogQuery={backlogQuery}
+          onBacklogQueryChange={onBacklogQueryChange}
         />
       </div>
       {columns.map((column, index) => {

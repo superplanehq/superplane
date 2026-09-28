@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 
+import { backlogColumnQueryKey, type BacklogColumnQuery } from "./backlogColumnQuery";
 import { belongsToLineBoard } from "./linePhaseRuns";
 import type { WorkOrderDisplayStatus } from "./workOrderProgress";
 
@@ -92,15 +93,27 @@ export type WorkOrdersPageQuery = {
   unassigned: boolean;
   results: readonly FactoriesWorkOrderResult[];
   lineId?: string;
+  backlog?: BacklogColumnQuery;
 };
 
 export function normalizeWorkOrdersPageQuery(query?: Partial<WorkOrdersPageQuery>): WorkOrdersPageQuery {
-  return {
+  const normalized: WorkOrdersPageQuery = {
     userId: query?.userId,
     unassigned: Boolean(query?.unassigned),
     results: [...(query?.results ?? [])].sort(),
     lineId: query?.lineId,
   };
+  if (query?.backlog) {
+    normalized.backlog = {
+      sort: query.backlog.sort,
+      direction: query.backlog.direction,
+      sourceGroups: [...query.backlog.sourceGroups].sort(),
+      minConfidence: query.backlog.minConfidence,
+      confidenceMissing: query.backlog.confidenceMissing,
+      age: query.backlog.age,
+    };
+  }
+  return normalized;
 }
 
 export function factoryWorkOrdersPageKey(
@@ -117,6 +130,7 @@ export function factoryWorkOrdersPageKey(
     normalized.unassigned ? "unassigned" : "",
     normalized.results.join(","),
     normalized.lineId ?? "",
+    backlogColumnQueryKey(normalized.backlog),
   ] as const;
 }
 
@@ -132,7 +146,19 @@ export function workOrdersPageQueryFromKey(queryKey: readonly unknown[]): WorkOr
         ? (resultsJoined.split(",") as FactoriesWorkOrderResult[])
         : [],
     lineId: typeof lineId === "string" && lineId.length > 0 ? lineId : undefined,
+    backlog: backlogQueryFromKey(queryKey[9]),
   });
+}
+
+function backlogQueryFromKey(value: unknown): BacklogColumnQuery | undefined {
+  if (typeof value !== "string" || value.length === 0) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(value) as BacklogColumnQuery;
+  } catch {
+    return undefined;
+  }
 }
 
 export function workOrderMatchesUser(

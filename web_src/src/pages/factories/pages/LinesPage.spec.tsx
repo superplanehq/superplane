@@ -66,6 +66,7 @@ import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { ADD_INTAKE_COPY } from "./lineIntakeModel";
+import { DEFAULT_BACKLOG_COLUMN_QUERY } from "../lib/backlogColumnQuery";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
@@ -112,7 +113,7 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   isPlaceholderData: false,
@@ -178,7 +179,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (...args: unknown[]) => useFactoryBoardWorkOrders(...args),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -1738,6 +1739,93 @@ describe("LinesPage board editing", () => {
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
     expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+  });
+
+  it("sorts and filters the backlog column without saving the choice", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(
+      within(screen.getByTestId("lines-backlog-column")).getByTestId("lines-backlog-sort-filter"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-verify-column")).queryByTestId("lines-backlog-sort-filter"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-done-column")).queryByTestId("lines-backlog-sort-filter"),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-testid^="lines-phase-column-"] [data-testid="lines-backlog-sort-filter"]'),
+    ).toBeNull();
+    expect(document.querySelector('[data-testid^="lines-phase-column-"]')).not.toBeNull();
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({ backlog: DEFAULT_BACKLOG_COLUMN_QUERY }),
+    );
+
+    const storageBefore = JSON.stringify(window.localStorage);
+    await user.click(screen.getByTestId("lines-backlog-sort-filter"));
+    await user.hover(screen.getByTestId("lines-backlog-sort"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-sort-confidence"));
+    await user.hover(screen.getByTestId("lines-backlog-source"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-source-github-issues"));
+    await user.hover(screen.getByTestId("lines-backlog-confidence"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-confidence-3"));
+    await user.hover(screen.getByTestId("lines-backlog-age"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-age-last_7_days"));
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        backlog: expect.objectContaining({
+          sort: "confidence",
+          direction: "desc",
+          sourceGroups: ["github-issues"],
+          minConfidence: 3,
+          confidenceMissing: false,
+          age: "last_7_days",
+        }),
+      }),
+    );
+    expect(JSON.stringify(window.localStorage)).toBe(storageBefore);
+    expect(screen.getByTestId("lines-backlog-sort-filter")).toHaveAttribute("data-active", "true");
+  });
+
+  it("clears backlog column choices on the next visit and keeps the board filter", async () => {
+    const user = userEvent.setup();
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
+    });
+    const view = renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-sourceIds"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-sourceIds-github-issues"));
+    await user.click(screen.getByTestId("lines-backlog-sort-filter"));
+    await user.hover(screen.getByTestId("lines-backlog-sort"));
+    fireEvent.click(await screen.findByTestId("lines-backlog-sort-source"));
+
+    expect(screen.getByText("Source is GitHub issues")).toBeInTheDocument();
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        backlog: expect.objectContaining({ sort: "source", sourceGroups: [] }),
+      }),
+    );
+
+    view.unmount();
+    renderLinesBoard();
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({ backlog: DEFAULT_BACKLOG_COLUMN_QUERY }),
+    );
+    expect(screen.getByText("Source is GitHub issues")).toBeInTheDocument();
   });
 
   it("narrows the board when a Review label filter is selected", async () => {

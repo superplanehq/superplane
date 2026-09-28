@@ -13,7 +13,7 @@ import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
-import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { BacklogColumnControls, ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardColumnCardList, LineBoardOrderCard } from "./LineBoardOrderCard";
@@ -23,6 +23,7 @@ import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
+import type { BacklogColumnQuery } from "../lib/backlogColumnQuery";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -62,6 +63,8 @@ export type BacklogColumnProps = {
     onLoadMore: () => void;
   };
   cardsPending?: boolean;
+  backlogQuery: BacklogColumnQuery;
+  onBacklogQueryChange: (query: BacklogColumnQuery) => void;
 };
 
 export type BacklogIntakePanel = {
@@ -101,6 +104,8 @@ export function BacklogColumn({
   onAutomationRowAction,
   paging,
   cardsPending = false,
+  backlogQuery,
+  onBacklogQueryChange,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
   const atCapacity = size != null && orders.length >= size;
@@ -151,6 +156,8 @@ export function BacklogColumn({
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
+            backlogQuery={backlogQuery}
+            onBacklogQueryChange={onBacklogQueryChange}
           />
         }
         subheader={columnAutomationRowsSubheader({
@@ -198,6 +205,8 @@ function BacklogColumnHeaderActions({
   refreshBacklogPending,
   colorId,
   onColorChange,
+  backlogQuery,
+  onBacklogQueryChange,
 }: Pick<
   BacklogColumnProps,
   | "title"
@@ -208,6 +217,8 @@ function BacklogColumnHeaderActions({
   | "onAddIntake"
   | "colorId"
   | "onColorChange"
+  | "backlogQuery"
+  | "onBacklogQueryChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
   onRefreshBacklog?: () => void;
@@ -224,6 +235,7 @@ function BacklogColumnHeaderActions({
         />
       )}
       <BacklogCreatePopover {...createPopover} />
+      <BacklogColumnControls query={backlogQuery} onChange={onBacklogQueryChange} />
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"

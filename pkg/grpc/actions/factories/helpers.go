@@ -113,7 +113,51 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
+	filters.Sort = workOrderListSortFromProto(req.GetSort())
+	filters.SortDirection = workOrderListDirectionFromProto(req.GetSortDirection())
+	filters.SourceGroups = append([]string(nil), req.GetSourceGroups()...)
+	filters.MinConfidence = req.MinConfidence
+	if req.ConfidenceMissing != nil {
+		filters.ConfidenceMissing = *req.ConfidenceMissing
+	}
+	filters.Age = workOrderListAgeFromProto(req.GetAge())
+
 	return filters
+}
+
+func workOrderListSortFromProto(sort pb.ListWorkOrdersRequest_Sort) string {
+	switch sort {
+	case pb.ListWorkOrdersRequest_SORT_CONFIDENCE:
+		return models.WorkOrderListSortConfidence
+	case pb.ListWorkOrdersRequest_SORT_SOURCE:
+		return models.WorkOrderListSortSource
+	case pb.ListWorkOrdersRequest_SORT_CREATED:
+		return models.WorkOrderListSortCreated
+	default:
+		return models.WorkOrderListSortUpdated
+	}
+}
+
+func workOrderListDirectionFromProto(direction pb.ListWorkOrdersRequest_SortDirection) string {
+	if direction == pb.ListWorkOrdersRequest_SORT_DIRECTION_ASC {
+		return models.WorkOrderListDirectionAsc
+	}
+	return models.WorkOrderListDirectionDesc
+}
+
+func workOrderListAgeFromProto(age pb.ListWorkOrdersRequest_Age) string {
+	switch age {
+	case pb.ListWorkOrdersRequest_AGE_LAST_7_DAYS:
+		return models.WorkOrderListAgeLast7Days
+	case pb.ListWorkOrdersRequest_AGE_LAST_30_DAYS:
+		return models.WorkOrderListAgeLast30Days
+	case pb.ListWorkOrdersRequest_AGE_LAST_90_DAYS:
+		return models.WorkOrderListAgeLast90Days
+	case pb.ListWorkOrdersRequest_AGE_OLDER_THAN_90_DAYS:
+		return models.WorkOrderListAgeOlderThan90Days
+	default:
+		return ""
+	}
 }
 
 func closeWorkOrderResult(result pb.WorkOrder_Result) (string, error) {

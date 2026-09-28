@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
+import { Check, ListFilter, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -7,10 +7,25 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import {
+  backlogSortDirectionLabels,
+  backlogSourceFilterOptions,
+  isBacklogColumnQueryActive,
+  type BacklogColumnAge,
+  type BacklogColumnQuery,
+  type BacklogColumnSort,
+  type BacklogColumnSortDirection,
+} from "../lib/backlogColumnQuery";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
 import { BACKLOG_REFRESH_COPY } from "./backlogRefresh";
@@ -223,4 +238,190 @@ function ColumnLaneColorPicker({
       ) : null}
     </div>
   );
+}
+
+const BACKLOG_SORT_OPTIONS: Array<{ value: BacklogColumnSort; label: string }> = [
+  { value: "updated", label: "Updated" },
+  { value: "confidence", label: "Confidence" },
+  { value: "source", label: "Source" },
+  { value: "created", label: "Issue age" },
+];
+
+const BACKLOG_AGE_OPTIONS: Array<{ value: BacklogColumnAge; label: string }> = [
+  { value: "any", label: "Any age" },
+  { value: "last_7_days", label: "Last 7 days" },
+  { value: "last_30_days", label: "Last 30 days" },
+  { value: "last_90_days", label: "Last 90 days" },
+  { value: "older_than_90_days", label: "Older than 90 days" },
+];
+
+const CONFIDENCE_MINIMUMS = [1, 2, 3, 4, 5] as const;
+
+export function BacklogColumnControls({
+  query,
+  onChange,
+}: {
+  query: BacklogColumnQuery;
+  onChange: (query: BacklogColumnQuery) => void;
+}) {
+  const active = isBacklogColumnQueryActive(query);
+  const directionLabels = backlogSortDirectionLabels(query.sort);
+  const confidenceValue = query.confidenceMissing
+    ? "missing"
+    : query.minConfidence != null
+      ? String(query.minConfidence)
+      : "any";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Sort and filter backlog"
+          data-active={active ? "true" : "false"}
+          className={cn(
+            "relative flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            active && "text-foreground",
+          )}
+          data-testid="lines-backlog-sort-filter"
+        >
+          <ListFilter className="size-3.5" aria-hidden />
+          {active ? (
+            <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-foreground" aria-hidden />
+          ) : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40 w-max p-1" data-testid="lines-backlog-sort-filter-content">
+        <BacklogChoiceMenu
+          testId="lines-backlog-sort"
+          label="Sort"
+          value={query.sort}
+          options={BACKLOG_SORT_OPTIONS}
+          onChange={(sort) => onChange({ ...query, sort })}
+        />
+        <BacklogChoiceMenu
+          testId="lines-backlog-direction"
+          label="Direction"
+          value={query.direction}
+          options={[
+            { value: "desc" as BacklogColumnSortDirection, label: directionLabels.desc },
+            { value: "asc" as BacklogColumnSortDirection, label: directionLabels.asc },
+          ]}
+          onChange={(direction) => onChange({ ...query, direction })}
+        />
+        <BacklogSourceMenu query={query} onChange={onChange} />
+        <BacklogChoiceMenu
+          testId="lines-backlog-confidence"
+          label="Confidence"
+          value={confidenceValue}
+          options={[
+            { value: "any", label: "Any score" },
+            ...CONFIDENCE_MINIMUMS.map((score) => ({ value: String(score), label: `At least ${score}` })),
+            { value: "missing", label: "No score" },
+          ]}
+          onChange={(value) => onChange(confidenceQuery(query, value))}
+        />
+        <BacklogChoiceMenu
+          testId="lines-backlog-age"
+          label="Issue age"
+          value={query.age}
+          options={BACKLOG_AGE_OPTIONS}
+          onChange={(age) => onChange({ ...query, age })}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function BacklogChoiceMenu<T extends string>({
+  testId,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  testId: string;
+  label: string;
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger data-testid={testId}>{label}</DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent className="w-52">
+          <DropdownMenuRadioGroup value={value} onValueChange={(next) => onChange(next as T)}>
+            {options.map((option) => (
+              <DropdownMenuRadioItem
+                key={option.value}
+                value={option.value}
+                data-testid={`${testId}-${option.value}`}
+                onSelect={(event) => event.preventDefault()}
+              >
+                {option.label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
+  );
+}
+
+function BacklogSourceMenu({
+  query,
+  onChange,
+}: {
+  query: BacklogColumnQuery;
+  onChange: (query: BacklogColumnQuery) => void;
+}) {
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger data-testid="lines-backlog-source">Source</DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent className="w-52">
+          <DropdownMenuItem
+            data-testid="lines-backlog-source-any"
+            onSelect={(event) => {
+              event.preventDefault();
+              onChange({ ...query, sourceGroups: [] });
+            }}
+          >
+            Any source
+          </DropdownMenuItem>
+          {backlogSourceFilterOptions().map((option) => {
+            const selected = query.sourceGroups.includes(option.value);
+            return (
+              <DropdownMenuItem
+                key={option.value}
+                data-testid={`lines-backlog-source-${option.value}`}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onChange({ ...query, sourceGroups: toggleSourceGroup(query.sourceGroups, option.value) });
+                }}
+              >
+                <span className="flex-1">{option.label}</span>
+                {selected ? <Check className="size-3.5" aria-hidden /> : null}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
+  );
+}
+
+function toggleSourceGroup(groups: string[], value: string): string[] {
+  return groups.includes(value) ? groups.filter((group) => group !== value) : [...groups, value];
+}
+
+function confidenceQuery(query: BacklogColumnQuery, value: string): BacklogColumnQuery {
+  if (value === "missing") {
+    return { ...query, confidenceMissing: true, minConfidence: undefined };
+  }
+  if (value === "any") {
+    return { ...query, confidenceMissing: false, minConfidence: undefined };
+  }
+  return { ...query, confidenceMissing: false, minConfidence: Number(value) };
 }

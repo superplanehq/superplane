@@ -35,6 +35,7 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
+import { backlogListRequestQuery, type BacklogColumnQuery } from "@/pages/factories/lib/backlogColumnQuery";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
 import {
   getWorkOrderEventsNextPageParam,
@@ -213,6 +214,7 @@ export type FactoryBoardDoneQuery = {
 
 export type FactoryBoardWorkOrdersOptions = FactoryWorkOrdersPageOptions & {
   done?: FactoryBoardDoneQuery;
+  backlog?: BacklogColumnQuery;
 };
 
 function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions): WorkOrdersPageQuery {
@@ -221,6 +223,7 @@ function workOrdersPageQueryFromOptions(options?: FactoryWorkOrdersPageOptions):
     unassigned: options?.unassigned,
     results: options?.results,
     lineId: options?.lineId,
+    backlog: options?.backlog,
   });
 }
 
@@ -246,6 +249,7 @@ export function useFactoryWorkOrdersPage(
             ...(pageQuery.unassigned ? { unassigned: true } : {}),
             ...(pageQuery.results.length > 0 ? { results: [...pageQuery.results] } : {}),
             ...(pageQuery.lineId ? { lineId: pageQuery.lineId } : {}),
+            ...backlogListRequestQuery(pageQuery.backlog),
             ...(pageParam ? { beforeId: pageParam.beforeId } : {}),
           },
         }),
@@ -320,13 +324,10 @@ export function useFactoryBoardWorkOrders(
   options?: FactoryBoardWorkOrdersOptions,
 ): FactoryBoardWorkOrders {
   const shared = sharedBoardPageOptions(options);
-  const backlog = useFactoryWorkOrdersPage(
-    organizationId,
-    factoryId,
-    BOARD_BACKLOG_STATES,
-    BOARD_BACKLOG_PAGE_SIZE,
-    shared,
-  );
+  const backlog = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_BACKLOG_STATES, BOARD_BACKLOG_PAGE_SIZE, {
+    ...shared,
+    backlog: options?.backlog,
+  });
   const open = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_OPEN_STATES, BOARD_OPEN_PAGE_SIZE, shared);
   const doneResults = options?.done?.results;
   const closed = useFactoryWorkOrdersPage(organizationId, factoryId, BOARD_DONE_STATES, BOARD_DONE_PAGE_SIZE, {
