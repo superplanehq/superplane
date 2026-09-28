@@ -324,6 +324,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
+        onSwitchAccount={() => void flow.switchGitHubAccount()}
       />
     );
   }

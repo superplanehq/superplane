@@ -29,7 +29,11 @@ vi.mock("@/lib/startDirectJiraConnect", () => {
 
 vi.mock("react-router", () => {
   const actual = unmockedPackage<typeof ReactRouterModule>("react-router/dist/development/index.js");
-  return { ...actual, useNavigate: () => vi.fn() };
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+    useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "test" }),
+  };
 });
 
 describe("useHostedGitHubConnect", () => {
