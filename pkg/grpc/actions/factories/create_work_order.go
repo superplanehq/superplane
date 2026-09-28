@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -52,13 +53,26 @@ func CreateWorkOrder(
 	}
 
 	assigneeIDs := []uuid.UUID{createdByID}
-	origin, hasOrigin := manualTaskGitHubOrigin(ctx, deps, db, factory, title, req.GetDescription())
+	openedIssue, hasIssue := manualTaskGitHubOrigin(ctx, deps, db, factory, title, req.GetDescription())
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
+	var reused bool
 	err = db.Transaction(func(tx *gorm.DB) error {
 		var created *models.FactoryWorkOrder
 		var createErr error
-		if hasOrigin {
+		if hasIssue {
+			if lockErr := ghintegration.LockIssueWorkOrder(tx, factory, openedIssue.origin.URL); lockErr != nil {
+				return lockErr
+			}
+			existing, findErr := ghintegration.FindIssueWorkOrder(tx, factory, openedIssue.origin.URL)
+			if findErr != nil {
+				return findErr
+			}
+			if existing != nil {
+				order = existing
+				reused = true
+				return nil
+			}
 			created, createErr = factory.CreateWorkOrderWithOrigin(
 				tx,
 				title,
@@ -66,7 +80,7 @@ func CreateWorkOrder(
 				&createdByID,
 				assigneeIDs,
 				nil,
-				origin,
+				openedIssue.origin,
 			)
 		} else {
 			created, createErr = factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
@@ -91,7 +105,17 @@ func CreateWorkOrder(
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
+		if hasIssue {
+			closeManualTaskGitHubIssue(deps, db, openedIssue)
+		}
 		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+	if reused {
+		serialized, serializeErr := loadAndSerializeWorkOrder(ctx, factory, order)
+		if serializeErr != nil {
+			return nil, factoryErrorToStatus(serializeErr, "failed to create work order")
+		}
+		return &pb.CreateWorkOrderResponse{Order: serialized}, nil
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)

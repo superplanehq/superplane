@@ -353,6 +353,44 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 
+	t.Run("skips a GitHub issue when the origin uses different path capitalization", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"First github task",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{
+				URL:   "https://github.com/Acme/Payments/issues/12",
+				Label: "Acme/Payments#12",
+			},
+		)
+		require.NoError(t, err)
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+		assert.False(t, created)
+		assert.Nil(t, order)
+		assert.Equal(t, 1, countOrders(factoryModel))
+	})
+
 	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)

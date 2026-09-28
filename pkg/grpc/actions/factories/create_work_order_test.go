@@ -183,9 +183,139 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "/repos/acme/older/issues", httpCtx.Requests[0].URL.Path)
 	})
+
+	t.Run("returns the existing task when the issue already has one", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		existing, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(),
+			"Ship the refunds line",
+			"",
+			nil,
+			nil,
+			nil,
+			models.WorkOrderOrigin{URL: issueURL, Label: "acme/payments#42"},
+		)
+		require.NoError(t, err)
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, existing.ID.String(), resp.Order.GetId())
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+	})
+
+	t.Run("closes the GitHub issue when the task save fails", func(t *testing.T) {
+		httpCtx := githubIssueResponses(
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 42,
+				"html_url": "https://github.com/acme/payments/issues/42"
+			}`),
+			githubIssueResponse(http.StatusOK, `{
+				"number": 42,
+				"state": "closed",
+				"html_url": "https://github.com/acme/payments/issues/42"
+			}`),
+		)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		_, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "See ![bug](" + blob.FileRef(uuid.New()) + ")",
+		})
+		require.Error(t, err)
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		assert.Empty(t, orders)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPatch, httpCtx.Requests[1].Method)
+		assert.Equal(t, "/repos/acme/payments/issues/42", httpCtx.Requests[1].URL.Path)
+		body, err := io.ReadAll(httpCtx.Requests[1].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), `"state":"closed"`)
+		assert.Contains(t, string(body), `"state_reason":"not_planned"`)
+	})
+
+	t.Run("bounds the GitHub call", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		recorder := &deadlineHTTP{inner: httpCtx}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		_, err := CreateWorkOrder(ctx, githubIssueDeps(r, recorder), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		require.True(t, recorder.hasDeadline)
+		remaining := time.Until(recorder.deadline)
+		assert.LessOrEqual(t, remaining, manualTaskGitHubIssueTimeout)
+		assert.Greater(t, remaining, manualTaskGitHubIssueTimeout-2*time.Second)
+	})
 }
 
-func githubIssueDeps(r *support.ResourceRegistry, httpCtx *contexts.HTTPContext) IntakeDependencies {
+func Test__CreateWorkOrder__SkipsBrokenManualTaskIntakes(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	assertUsesNewerIntake := func(t *testing.T, factoryModel *models.Factory, httpCtx *contexts.HTTPContext) {
+		t.Helper()
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Use the healthy intake",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/acme/newer/issues/9", resp.Order.GetOrigin().GetUrl())
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/repos/acme/newer/issues", httpCtx.Requests[0].URL.Path)
+	}
+
+	t.Run("skips an older intake with no repository", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 9,
+			"html_url": "https://github.com/acme/newer/issues/9"
+		}`)
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		older := time.Now().Add(-time.Hour)
+		seedGitHubIssueIntake(t, r, factoryModel, true, false, "", &older)
+		seedGitHubIssueIntake(t, r, factoryModel, true, false, "acme/newer", nil)
+		assertUsesNewerIntake(t, factoryModel, httpCtx)
+	})
+
+	t.Run("skips an older intake whose integration is not ready", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 9,
+			"html_url": "https://github.com/acme/newer/issues/9"
+		}`)
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		older := time.Now().Add(-time.Hour)
+		_, integration := seedGitHubIssueIntake(t, r, factoryModel, true, false, "acme/older", &older)
+		integration.State = models.IntegrationStateError
+		require.NoError(t, database.Conn().Save(integration).Error)
+		seedGitHubIssueIntake(t, r, factoryModel, true, false, "acme/newer", nil)
+		assertUsesNewerIntake(t, factoryModel, httpCtx)
+	})
+}
+
+func githubIssueDeps(r *support.ResourceRegistry, httpCtx core.HTTPContext) IntakeDependencies {
 	return IntakeDependencies{
 		Registry:       r.Registry,
 		Encryptor:      r.Encryptor,
@@ -196,12 +326,31 @@ func githubIssueDeps(r *support.ResourceRegistry, httpCtx *contexts.HTTPContext)
 }
 
 func githubIssueHTTP(status int, body string) *contexts.HTTPContext {
-	return &contexts.HTTPContext{Responses: []*http.Response{{
+	return githubIssueResponses(githubIssueResponse(status, body))
+}
+
+func githubIssueResponses(responses ...*http.Response) *contexts.HTTPContext {
+	return &contexts.HTTPContext{Responses: responses}
+}
+
+func githubIssueResponse(status int, body string) *http.Response {
+	return &http.Response{
 		StatusCode: status,
 		Status:     http.StatusText(status),
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
-	}}}
+	}
+}
+
+type deadlineHTTP struct {
+	inner       *contexts.HTTPContext
+	deadline    time.Time
+	hasDeadline bool
+}
+
+func (d *deadlineHTTP) Do(request *http.Request) (*http.Response, error) {
+	d.deadline, d.hasDeadline = request.Context().Deadline()
+	return d.inner.Do(request)
 }
 
 func githubIssueFactory(
@@ -227,7 +376,7 @@ func seedGitHubIssueIntake(
 	paused bool,
 	repository string,
 	createdAt *time.Time,
-) {
+) (*models.FactoryIntake, *models.Integration) {
 	t.Helper()
 
 	db := database.Conn()
@@ -279,6 +428,7 @@ func seedGitHubIssueIntake(
 	if createdAt != nil {
 		require.NoError(t, db.Model(intake).Update("created_at", *createdAt).Error)
 	}
+	return intake, integration
 }
 
 func createReadyGitHubIssueIntegration(t *testing.T, r *support.ResourceRegistry) *models.Integration {

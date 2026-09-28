@@ -59,29 +59,44 @@ func githubIssueLockKey(factoryID uuid.UUID, issueURL string) int64 {
 // IssueHasWorkOrder reports whether this factory already has a work order
 // for the GitHub issue. Matching covers every work-order state.
 func IssueHasWorkOrder(tx *gorm.DB, factory *models.Factory, issueURL string) (bool, error) {
+	order, err := FindIssueWorkOrder(tx, factory, issueURL)
+	if err != nil {
+		return false, err
+	}
+	return order != nil, nil
+}
+
+// FindIssueWorkOrder returns the factory work order for this GitHub issue, if
+// one exists. Matching covers every work-order state.
+func FindIssueWorkOrder(tx *gorm.DB, factory *models.Factory, issueURL string) (*models.FactoryWorkOrder, error) {
 	normalized, ok := normalizeGitHubIssueURL(issueURL)
-	if factory == nil || !ok {
-		return false, nil
+	if tx == nil || factory == nil || !ok {
+		return nil, nil
 	}
 
 	parsed, err := url.Parse(normalized)
 	if err != nil || parsed.Path == "" {
-		return false, nil
+		return nil, nil
 	}
 
-	urls, err := factory.ListWorkOrderOriginURLsContaining(tx, parsed.Path)
+	orders, err := factory.ListWorkOrdersByOriginURLFragment(tx, parsed.Path)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	for _, rawURL := range urls {
-		found, foundOK := normalizeGitHubIssueURL(rawURL)
+	for i := range orders {
+		origin := orders[i].Origin()
+		if origin == nil {
+			continue
+		}
+		found, foundOK := normalizeGitHubIssueURL(origin.URL)
 		if foundOK && found == normalized {
-			return true, nil
+			match := orders[i]
+			return &match, nil
 		}
 	}
 
-	return false, nil
+	return nil, nil
 }
 
 func normalizeGitHubIssueURL(raw string) (string, bool) {
@@ -95,7 +110,7 @@ func normalizeGitHubIssueURL(raw string) (string, bool) {
 		return "", false
 	}
 
-	path := strings.TrimRight(parsed.EscapedPath(), "/")
+	path := strings.ToLower(strings.TrimRight(parsed.EscapedPath(), "/"))
 	if path == "" || path == "/" {
 		return "", false
 	}
