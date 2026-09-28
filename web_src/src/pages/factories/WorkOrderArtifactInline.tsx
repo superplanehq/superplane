@@ -1,6 +1,6 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileImage, FileText, FileVideo, GitBranch, Link as LinkIcon } from "lucide-react";
+import { ExternalLink, FileText, GitBranch, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +12,7 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  fileArtifactIcon,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
 
@@ -150,17 +151,6 @@ function firstLabel(...labels: Array<string | undefined>): string {
 
 function normalizeArtifactKind(type: string): string {
   return type.replace(/^TYPE_/i, "").toLowerCase();
-}
-
-/** Image, video, or document icon. Same choice the artifact row already uses. */
-export function fileArtifactIcon(contentType?: string): typeof FileText {
-  if (contentType?.startsWith("image/")) {
-    return FileImage;
-  }
-  if (contentType?.startsWith("video/")) {
-    return FileVideo;
-  }
-  return FileText;
 }
 
 function compactUrlLabel(value: string | undefined): string | undefined {

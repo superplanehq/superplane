@@ -12,3 +12,6 @@ export const MONO_LOG_CLASSNAME =
   "whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-foreground/90 [tab-size:2]";
 
 export const META_TEXT_CLASSNAME = "text-[12px] text-muted-foreground tabular-nums";
+
+export const HEADER_ICON_BUTTON =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground";

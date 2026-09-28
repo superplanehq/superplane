@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { JumpToLatestPill } from "../JumpToLatestPill";
 import { useFollowLogScroll } from "../useFollowLogScroll";
+import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
 import { META_TEXT_CLASSNAME, MONO_LOG_CLASSNAME } from "./redesignFormat";
 import { NodeIcon, StageStatusGlyph, ToolKindIcon } from "./redesignShared";
@@ -246,7 +247,7 @@ function StepDetail({ step }: { step: AgentStep }) {
 
 function StepCommand({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
-  const lineRef = useRef<HTMLElement>(null);
+  const lineRef = useRef<HTMLPreElement>(null);
   const [overflows, setOverflows] = useState(text.includes("\n"));
   useEffect(() => {
     const node = lineRef.current;

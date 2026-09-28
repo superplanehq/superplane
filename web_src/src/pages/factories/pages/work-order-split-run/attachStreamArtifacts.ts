@@ -66,51 +66,63 @@ export function streamArtifactIndexFromEvents(
   liveArtifacts: FactoriesWorkOrderArtifact[] | undefined,
   livePullRequests?: FactoriesFactoryPullRequest[],
 ): StreamArtifactIndex {
-  const byNodeId = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
-  const byNodeName = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
-  const pullRequestsByNodeId = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
-  const pullRequestsByNodeName = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
-  const byRunId = new Map<string, FactoriesWorkOrderArtifact[]>();
+  const index: StreamArtifactIndex = {
+    byNodeId: new Map(),
+    byNodeName: new Map(),
+    pullRequestsByNodeId: new Map(),
+    pullRequestsByNodeName: new Map(),
+    byRunId: new Map(),
+  };
   const liveById = liveArtifactsById(liveArtifacts);
   const latestDataById = buildLatestArtifactDataById(liveArtifacts ?? []);
   const livePullRequestsById = indexPullRequestsById(livePullRequests);
 
   for (const event of sortEventsChronologically(events)) {
-    const automation = eventAutomation(event);
-    const nodeId = automation?.nodeId?.trim();
-    const nodeName = automation?.nodeName?.trim();
-    const runId = eventRunId(event);
-
-    const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
-    if (artifact) {
-      if (nodeId) {
-        byNodeId.set(nodeId, { value: artifact, runId });
-      } else if (nodeName) {
-        byNodeName.set(nodeName, { value: artifact, runId });
-      }
-      if (runId) {
-        appendRunArtifact(byRunId, runId, artifact);
-      }
-    }
-
-    const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
-    if (pullRequest) {
-      if (nodeId) {
-        pullRequestsByNodeId.set(nodeId, { value: pullRequest, runId });
-      } else if (nodeName) {
-        pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
-      }
-    }
+    indexStreamEvent(index, event, liveById, latestDataById, livePullRequestsById);
   }
 
   for (const artifact of liveArtifacts ?? []) {
     const runId = canvasRunIdFromArtifact(artifact);
     if (runId) {
-      appendRunArtifact(byRunId, runId, artifact);
+      appendRunArtifact(index.byRunId, runId, artifact);
     }
   }
 
-  return { byNodeId, byNodeName, pullRequestsByNodeId, pullRequestsByNodeName, byRunId };
+  return index;
+}
+
+function indexStreamEvent(
+  index: StreamArtifactIndex,
+  event: FactoriesWorkOrderEvent,
+  liveById: Map<string, FactoriesWorkOrderArtifact>,
+  latestDataById: Map<string, Record<string, unknown>>,
+  livePullRequestsById: Map<string, FactoriesFactoryPullRequest>,
+): void {
+  const automation = eventAutomation(event);
+  const nodeId = automation?.nodeId?.trim();
+  const nodeName = automation?.nodeName?.trim();
+  const runId = eventRunId(event);
+
+  const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
+  if (artifact) {
+    if (nodeId) {
+      index.byNodeId.set(nodeId, { value: artifact, runId });
+    } else if (nodeName) {
+      index.byNodeName.set(nodeName, { value: artifact, runId });
+    }
+    if (runId) {
+      appendRunArtifact(index.byRunId, runId, artifact);
+    }
+  }
+
+  const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
+  if (pullRequest) {
+    if (nodeId) {
+      index.pullRequestsByNodeId.set(nodeId, { value: pullRequest, runId });
+    } else if (nodeName) {
+      index.pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
+    }
+  }
 }
 
 /**

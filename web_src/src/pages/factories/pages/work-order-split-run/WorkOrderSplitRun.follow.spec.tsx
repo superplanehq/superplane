@@ -11,8 +11,48 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
-import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
-import { SPLIT_RUN_SUPER503_RUNNING } from "./splitRunSuper503RunningFixture";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
+
+/** The running Implement phase with agent notes, so the console shows a live step log. */
+const RUNNING_WITH_AGENT_NOTES: SplitRunFixture = {
+  ...SPLIT_RUN_RUNNING,
+  phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+    phase.id === "implement"
+      ? {
+          ...phase,
+          stream: [
+            ...phase.stream,
+            {
+              id: "note-read-test",
+              at: "12:25:40",
+              componentName: "Read the failing test",
+              status: "passed" as const,
+              duration: "1m",
+              note: true,
+              componentType: "prompt",
+            },
+            {
+              id: "note-write-fix",
+              at: "12:26:40",
+              componentName: "Write the reconciliation fix",
+              status: "running" as const,
+              note: true,
+              componentType: "prompt",
+            },
+            {
+              id: "note-write-fix-detail",
+              at: "12:26:45",
+              componentName: "Edits reconciliation_worker_test.go",
+              status: "running" as const,
+              note: true,
+              noteParentId: "note-write-fix",
+              componentType: "note",
+            },
+          ],
+        }
+      : phase,
+  ),
+};
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -46,14 +86,14 @@ function runningStepLog() {
 
 describe("WorkOrderSplitRunPopup jump-to-latest", () => {
   it("does not show a Follow toggle on the console", () => {
-    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
+    renderPopup({ fixture: RUNNING_WITH_AGENT_NOTES });
 
     expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
   });
 
   it("hides the pill while the log follows the latest line", () => {
-    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
+    renderPopup({ fixture: RUNNING_WITH_AGENT_NOTES });
 
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
@@ -68,7 +108,7 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
 
   it("shows jump to latest after the user scrolls up, then hides it on click", async () => {
     const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
+    renderPopup({ fixture: RUNNING_WITH_AGENT_NOTES });
 
     const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
@@ -87,7 +127,7 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
   });
 
   it("turns following back on when the user scrolls to the latest line", async () => {
-    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
+    renderPopup({ fixture: RUNNING_WITH_AGENT_NOTES });
 
     const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });

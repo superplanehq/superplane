@@ -236,16 +236,19 @@ function stage(runId: string | undefined): SplitRunPhase {
 
 describe("phasesWithRunArtifacts", () => {
   it("keeps every artifact a run produced on that stage", () => {
-    const index = streamArtifactIndexFromEvents([
-      artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "write-spec" }, { id: "run-analysis" }),
-      artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "write-spec" }, { id: "run-analysis" }),
-      artifactAddedEvent(
-        "2026-08-24T16:40:18.000Z",
-        { id: "art-other", type: "TYPE_LINK", data: { url: "https://example.com" } },
-        { nodeId: "other" },
-        { id: "run-other" },
-      ),
-    ]);
+    const index = streamArtifactIndexFromEvents(
+      [
+        artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "write-spec" }, { id: "run-analysis" }),
+        artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "write-spec" }, { id: "run-analysis" }),
+        artifactAddedEvent(
+          "2026-08-24T16:40:18.000Z",
+          { id: "art-other", type: "TYPE_LINK", data: { url: "https://example.com" } },
+          { nodeId: "other" },
+          { id: "run-other" },
+        ),
+      ],
+      undefined,
+    );
 
     const phases = phasesWithRunArtifacts([stage("run-analysis"), stage("run-other")], index);
 
