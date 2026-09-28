@@ -10,6 +10,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubInstallationDiscoveryActive,
+  hostedGitHubInstallationDiscoveryInstallAvailable,
   hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -36,6 +37,7 @@ export type PendingGitHubAccountPicker = {
   /** Linked GitHub login used to verify repository access. */
   githubLogin: string;
   discoveringAccounts?: boolean;
+  installAvailable?: boolean;
 };
 
 export type PendingGitHubRequestConnection = {
@@ -58,6 +60,7 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
     ...(hostedGitHubInstallationDiscoveryActive(item.status?.metadata) ? { discoveringAccounts: true } : {}),
+    ...(hostedGitHubInstallationDiscoveryInstallAvailable(item.status?.metadata) ? { installAvailable: true } : {}),
   };
 }
 

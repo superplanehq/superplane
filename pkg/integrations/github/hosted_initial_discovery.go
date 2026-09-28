@@ -220,6 +220,7 @@ func completeHostedInitialDiscovery(metadata *common.Metadata) {
 	metadata.InstallationDiscovery.NextPage = 0
 	metadata.InstallationDiscovery.RetryCandidates = nil
 	metadata.InstallationDiscovery.TransientFailures = false
+	metadata.InstallationDiscovery.InstallAvailable = false
 }
 
 func finishHostedInitialDiscovery(metadata *common.Metadata) error {
@@ -234,6 +235,7 @@ func finishHostedInitialDiscovery(metadata *common.Metadata) error {
 	metadata.InstallationDiscovery.NextPage = 1
 	metadata.InstallationDiscovery.RetryCandidates = nil
 	metadata.InstallationDiscovery.TransientFailures = false
+	metadata.InstallationDiscovery.InstallAvailable = true
 	return errors.New("GitHub account discovery is temporarily unavailable")
 }
 

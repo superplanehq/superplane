@@ -640,6 +640,7 @@ func TestSyncHostedAppChecksLaterPagesAfterOneBoundedRetry(t *testing.T) {
 	assert.False(t, metadata.InstallationDiscovery.Complete)
 	assert.False(t, metadata.InstallationDiscovery.PersonalAccountChecked)
 	assert.Equal(t, 1, metadata.InstallationDiscovery.NextPage)
+	assert.True(t, metadata.InstallationDiscovery.InstallAvailable)
 	assert.Equal(t, 1, retryAttempts)
 	assert.Nil(t, integration.BrowserAction)
 }
@@ -685,6 +686,7 @@ func TestSyncHostedAppDoesNotCompleteAfterFinalTransientRetry(t *testing.T) {
 	assert.False(t, metadata.InstallationDiscovery.PersonalAccountChecked)
 	assert.Equal(t, 1, metadata.InstallationDiscovery.NextPage)
 	assert.Empty(t, metadata.InstallationDiscovery.RetryCandidates)
+	assert.True(t, metadata.InstallationDiscovery.InstallAvailable)
 	assert.Nil(t, integration.BrowserAction)
 }
 

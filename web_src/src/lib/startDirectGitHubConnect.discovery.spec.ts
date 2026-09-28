@@ -57,6 +57,25 @@ describe("active GitHub installation discovery", () => {
     });
   });
 
+  it("offers manual installation after a bounded scan cannot finish", () => {
+    const incompleteDiscovery: OrganizationsIntegration = {
+      ...activeDiscovery,
+      status: {
+        ...activeDiscovery.status,
+        metadata: {
+          ...activeDiscovery.status?.metadata,
+          installationDiscovery: { active: true, complete: false, installAvailable: true },
+        },
+      },
+    };
+
+    expect(pendingGitHubAccountPicker([incompleteDiscovery], "user-1")).toMatchObject({
+      id: "int-1",
+      discoveringAccounts: true,
+      installAvailable: true,
+    });
+  });
+
   it("stays inside onboarding instead of opening GitHub", async () => {
     const create = vi.fn();
     const started = await startDirectGitHubConnect({

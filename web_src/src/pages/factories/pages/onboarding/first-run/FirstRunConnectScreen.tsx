@@ -66,6 +66,7 @@ function FirstRunGitHubAccountPicker({
   bindingInstallationId,
   disabled,
   discoveringAccounts,
+  installAvailable,
   syncError,
   onUseInstallation,
   onInstallOther,
@@ -77,6 +78,7 @@ function FirstRunGitHubAccountPicker({
   bindingInstallationId?: string;
   disabled?: boolean;
   discoveringAccounts?: boolean;
+  installAvailable?: boolean;
   syncError?: string;
   onUseInstallation: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
@@ -118,7 +120,7 @@ function FirstRunGitHubAccountPicker({
           ) : null}
         </div>
       ) : null}
-      {!discoveringAccounts && githubAppSlug !== "" ? (
+      {(!discoveringAccounts || syncError || installAvailable) && githubAppSlug !== "" ? (
         <p className="text-[13px] text-muted-foreground">
           {copy.missingAccount}{" "}
           <a
@@ -150,13 +152,21 @@ function connectScreenState({
   githubOrganizations,
   pendingInstallations,
   githubState,
+  discoveringAccounts,
+  installAvailable,
+  syncError,
 }: {
   installRequested: boolean;
   githubOrganizations: string[];
   pendingInstallations: PendingGitHubInstallation[];
   githubState: string;
+  discoveringAccounts: boolean;
+  installAvailable: boolean;
+  syncError?: string;
 }) {
-  const showAccountPicker = pendingInstallations.length >= 1 && githubState !== "";
+  const showAccountPicker =
+    githubState !== "" &&
+    (pendingInstallations.length >= 1 || (discoveringAccounts && (Boolean(syncError) || installAvailable)));
   // A requested organization is ready only after the server verifies at
   // least one repository that the member can use. An installation row with
   // no repositories can be stale and must not clear the waiting state.
@@ -180,6 +190,7 @@ export function FirstRunConnectScreen({
   pickerExpected = false,
   installRequested = false,
   discoveringAccounts = false,
+  installAvailable = false,
   githubOrganization = "",
   githubOrganizations,
   pendingInstallations = [],
@@ -203,6 +214,7 @@ export function FirstRunConnectScreen({
   pickerExpected?: boolean;
   installRequested?: boolean;
   discoveringAccounts?: boolean;
+  installAvailable?: boolean;
   githubOrganization?: string;
   githubOrganizations?: string[];
   pendingInstallations?: PendingGitHubInstallation[];
@@ -227,6 +239,9 @@ export function FirstRunConnectScreen({
     githubOrganizations: requestedOrganizations,
     pendingInstallations,
     githubState,
+    discoveringAccounts,
+    installAvailable,
+    syncError,
   });
 
   return (
@@ -252,6 +267,7 @@ export function FirstRunConnectScreen({
             bindingInstallationId={bindingInstallationId}
             connecting={connecting}
             discoveringAccounts={discoveringAccounts}
+            installAvailable={installAvailable}
             syncError={syncError}
             showAccountPicker={showAccountPicker}
             waitingForApproval={waitingForApproval}
@@ -336,6 +352,7 @@ function ConnectScreenBody({
   bindingInstallationId,
   connecting,
   discoveringAccounts,
+  installAvailable,
   syncError,
   showAccountPicker,
   waitingForApproval,
@@ -351,6 +368,7 @@ function ConnectScreenBody({
   bindingInstallationId?: string;
   connecting: boolean;
   discoveringAccounts: boolean;
+  installAvailable: boolean;
   syncError?: string;
   showAccountPicker: boolean;
   waitingForApproval: boolean;
@@ -373,6 +391,7 @@ function ConnectScreenBody({
           bindingInstallationId={bindingInstallationId}
           disabled={connecting}
           discoveringAccounts={discoveringAccounts}
+          installAvailable={installAvailable}
           syncError={syncError}
           onUseInstallation={onUseInstallation}
           onInstallOther={onInstallOther}

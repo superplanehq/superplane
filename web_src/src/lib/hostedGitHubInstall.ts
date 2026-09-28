@@ -152,6 +152,15 @@ export function hostedGitHubInstallationDiscoveryActive(metadata: unknown): bool
   return (discovery as { active?: unknown }).active === true && (discovery as { complete?: unknown }).complete !== true;
 }
 
+export function hostedGitHubInstallationDiscoveryInstallAvailable(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") return false;
+
+  const discovery = (metadata as { installationDiscovery?: unknown }).installationDiscovery;
+  if (!discovery || typeof discovery !== "object") return false;
+
+  return (discovery as { installAvailable?: unknown }).installAvailable === true;
+}
+
 export function hostedGitHubAppSlug(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";

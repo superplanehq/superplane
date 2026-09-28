@@ -373,7 +373,7 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-install-other")).toBeInTheDocument();
   });
 
-  it("keeps progressive accounts usable and shows refresh failures", async () => {
+  it("keeps progressive accounts usable and offers installation after refresh failures", async () => {
     const user = userEvent.setup();
     const onUseInstallation = vi.fn();
     const onRetrySync = vi.fn();
@@ -394,13 +394,39 @@ describe("FirstRunConnectScreen", () => {
     const account = screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") });
     expect(account).toBeEnabled();
     expect(screen.getByText(FIRST_RUN_COPY.connect.checkingMoreAccounts)).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-github-install-other")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(FIRST_RUN_COPY.connect.refreshError);
 
     await user.click(account);
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.tryAgain }));
     expect(onUseInstallation).toHaveBeenCalledTimes(1);
     expect(onRetrySync).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers manual installation after an incomplete empty scan", async () => {
+    const user = userEvent.setup();
+    const onInstallOther = vi.fn();
+    const onRetrySync = vi.fn();
+    render(
+      <FirstRunConnectScreen
+        discoveringAccounts
+        installAvailable
+        pickerExpected
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onInstallOther={onInstallOther}
+        onRetrySync={onRetrySync}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-github-install-other"));
+    expect(onInstallOther).toHaveBeenCalledTimes(1);
+    expect(onRetrySync).not.toHaveBeenCalled();
   });
 
   it("keeps callback recovery in the organization step", async () => {

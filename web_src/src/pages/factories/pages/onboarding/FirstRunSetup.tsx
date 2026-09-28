@@ -202,6 +202,7 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
     githubState: flow.accountPicker?.state,
     githubAppSlug: flow.accountPicker?.appSlug,
     githubLogin: flow.accountPicker?.githubLogin,
+    installAvailable: flow.accountPicker?.installAvailable,
   };
 }
 

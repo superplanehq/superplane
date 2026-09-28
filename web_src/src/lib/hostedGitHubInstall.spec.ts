@@ -7,6 +7,7 @@ import {
   hostedGitHubInstallRequested,
   hostedGitHubInstallRequestedAccount,
   hostedGitHubInstallationDiscoveryActive,
+  hostedGitHubInstallationDiscoveryInstallAvailable,
   hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -132,6 +133,16 @@ describe("hosted GitHub URLs", () => {
     );
     expect(hostedGitHubInstallationDiscoveryActive({ installationDiscovery: { active: false } })).toBe(false);
     expect(hostedGitHubInstallationDiscoveryActive({})).toBe(false);
+  });
+
+  it("reads manual installation availability", () => {
+    expect(
+      hostedGitHubInstallationDiscoveryInstallAvailable({ installationDiscovery: { installAvailable: true } }),
+    ).toBe(true);
+    expect(
+      hostedGitHubInstallationDiscoveryInstallAvailable({ installationDiscovery: { installAvailable: false } }),
+    ).toBe(false);
+    expect(hostedGitHubInstallationDiscoveryInstallAvailable({})).toBe(false);
   });
 
   it("reads a pending GitHub install request", () => {
