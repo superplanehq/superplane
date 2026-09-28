@@ -58,6 +58,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.data.attributes.description }}",
     title: "Productive task intake",
   },
+  datadog: {
+    triggerComponent: "datadog.onErrorTrackingAlert",
+    triggerName: "On Error Tracking Alert",
+    createTitle: "{{ root().data.title }}",
+    createDescription: "{{ root().data.body }}\n\n{{ root().data.link }}",
+    title: "Datadog error intake",
+  },
 };
 
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {

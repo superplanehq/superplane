@@ -57,7 +57,12 @@ func (g intakeGraph) TriggerResourceID(spec models.LiveCanvasSpec) string {
 		}
 	}
 	if project, ok := trigger.Configuration["project"].(string); ok {
-		return strings.TrimSpace(project)
+		if value := strings.TrimSpace(project); value != "" {
+			return value
+		}
+	}
+	if service, ok := trigger.Configuration["service"].(string); ok {
+		return strings.TrimSpace(service)
 	}
 
 	return ""
@@ -105,7 +110,8 @@ func intakeHealth(
 func intakeSourceAllowsRebind(source string) bool {
 	return source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
-		source == models.FactoryIntakeSourceProductiveTasks
+		source == models.FactoryIntakeSourceProductiveTasks ||
+		source == models.FactoryIntakeSourceDatadog
 }
 
 // jiraIntakeWebhookHealth reports whether the intake trigger can receive Jira

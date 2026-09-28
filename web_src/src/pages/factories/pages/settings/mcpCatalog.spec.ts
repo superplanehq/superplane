@@ -8,6 +8,7 @@ import {
 import {
   catalogConnectionDefaults,
   catalogEntryForResource,
+  catalogEntryIsConnected,
   catalogOAuthResourceForEntry,
   filterMCPCatalog,
   groupMCPCatalog,
@@ -23,6 +24,7 @@ describe("MCP_CATALOG", () => {
       "circleci",
       "semaphore",
       "sentry",
+      "datadog",
     ]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
@@ -81,6 +83,11 @@ describe("MCP_CATALOG", () => {
 
   it("matches a saved server to a catalog entry by URL and auth", () => {
     expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_OAUTH" })?.id).toBe("sentry");
+    expect(catalogEntryForResource({ url: "https://mcp.datadoghq.com/v1/mcp", auth: "AUTH_OAUTH" })?.id).toBe(
+      "datadog",
+    );
+    expect(catalogEntryForResource({ url: "https://mcp.datadoghq.eu/v1/mcp", auth: "AUTH_OAUTH" })?.id).toBe("datadog");
+    expect(catalogEntryForResource({ url: "https://mcp.datadoghq.eu/v1/mcp", auth: "AUTH_HEADERS" })).toBeUndefined();
     expect(catalogEntryForResource({ url: "https://mcp.linear.app/mcp", auth: "AUTH_OAUTH" })?.id).toBe("linear");
     expect(catalogEntryForResource({ url: "https://api.githubcopilot.com/mcp/", auth: "AUTH_HEADERS" })?.id).toBe(
       "github",
@@ -119,6 +126,40 @@ describe("catalogOAuthResourceForEntry", () => {
     ).toBeUndefined();
   });
 
+  it("resumes a Datadog server saved on another site", () => {
+    const datadog = MCP_CATALOG.find((entry) => entry.id === "datadog");
+    expect(datadog).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry(
+        [{ name: "datadog", url: "https://mcp.us5.datadoghq.com/v1/mcp", auth: "AUTH_OAUTH" }],
+        datadog!,
+      ),
+    ).toEqual({ name: "datadog", url: "https://mcp.us5.datadoghq.com/v1/mcp", auth: "AUTH_OAUTH" });
+    expect(
+      catalogOAuthResourceForEntry(
+        [{ name: "custom", url: "https://mcp.us5.datadoghq.com/v1/mcp", auth: "AUTH_OAUTH" }],
+        datadog!,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("treats any connected Datadog site as the catalog server", () => {
+    const datadog = MCP_CATALOG.find((entry) => entry.id === "datadog");
+    expect(datadog).toBeDefined();
+    expect(
+      catalogEntryIsConnected(
+        [{ url: "https://mcp.datadoghq.eu/v1/mcp", auth: "AUTH_OAUTH", oauthStatus: "OAUTH_STATUS_CONNECTED" }],
+        datadog!,
+      ),
+    ).toBe(true);
+    expect(
+      catalogEntryIsConnected(
+        [{ url: "https://mcp.datadoghq.eu/v1/mcp", auth: "AUTH_OAUTH", oauthStatus: "OAUTH_STATUS_NOT_CONNECTED" }],
+        datadog!,
+      ),
+    ).toBe(false);
+  });
+
   it("does not resume header catalog entries", () => {
     expect(github).toBeDefined();
     expect(
@@ -145,7 +186,7 @@ describe("filterMCPCatalog", () => {
       filterMCPCatalog(MCP_CATALOG, "observability")
         .map((entry) => entry.id)
         .sort(),
-    ).toEqual(["sentry"]);
+    ).toEqual(["datadog", "sentry"]);
   });
 });
 
@@ -163,6 +204,7 @@ describe("groupMCPCatalog", () => {
       "Semaphore",
     ]);
     expect(groups.find((group) => group.id === "observability")?.entries.map((entry) => entry.label)).toEqual([
+      "Datadog",
       "Sentry",
     ]);
   });

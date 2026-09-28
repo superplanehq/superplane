@@ -14,6 +14,7 @@ import {
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
+import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
@@ -338,6 +339,14 @@ function IntakeGeneralTab({
             organizationId={organizationId}
             integrationId={integrationId}
             projectId={resourceId}
+          />
+          <DatadogIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            resourceId={resourceId}
           />
         </div>
       </div>

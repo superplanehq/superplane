@@ -2,6 +2,8 @@ package factories
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -10,8 +12,10 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
@@ -298,4 +302,73 @@ func TestSentryIntakeItemSource_StaysInsideItsProject(t *testing.T) {
 	assert.False(t, source.ownsIssue(&sentry.Issue{Project: &sentry.IssueProject{}}))
 	assert.False(t, source.ownsIssue(&sentry.Issue{}))
 	assert.False(t, source.ownsIssue(nil))
+}
+
+func TestDatadogIntakeItemSource_StaysInsideItsService(t *testing.T) {
+	source := &datadogIntakeItemSource{service: "checkout"}
+
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "checkout"}))
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "Checkout"}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "billing"}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: ""}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{}))
+}
+
+func TestDatadogServiceSearchQuery(t *testing.T) {
+	assert.Equal(t, "service:checkout", datadogServiceSearchQuery("checkout", ""))
+	assert.Equal(t, "service:checkout", datadogServiceSearchQuery(" checkout ", "  "))
+	assert.Equal(t, "service:checkout timeout", datadogServiceSearchQuery("checkout", "timeout"))
+}
+
+func TestDatadogIntakeItemSource_GetIncludesSampleAndRelatedLogs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/v2/error-tracking/issues/"):
+			_, _ = w.Write([]byte(`{"data":{"id":"issue-1","type":"issue","attributes":{"error_type":"TimeoutError","error_message":"checkout timed out","service":"checkout","file_path":"checkout/pay.go","function_name":"Charge","platform":"BACKEND"}}}`))
+		case r.URL.Path == "/api/v2/error-tracking/issues/search":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.URL.Path == "/api/v2/spans/events/search":
+			_, _ = w.Write([]byte(`{"data":[{"attributes":{"custom":{"otel":{"trace_id":"cf2c57cfc127be5a1f156480875acc0a"},"env":"development","resource_name":"POST /checkout","error":{"stack":"goroutine 1 [running]:\nmain.Charge(checkout/pay.go:22)"}},"start_timestamp":"2026-09-27T19:51:32.010Z"}}]}`))
+		case r.URL.Path == "/api/v2/logs/events/search":
+			_, _ = w.Write([]byte(`{"data":[{"attributes":{"timestamp":"2026-09-27T19:51:32.010Z","status":"error","service":"checkout","message":"POST /checkout -> 500 (0.2ms)"}}]}`))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	source := &datadogIntakeItemSource{datadog: client, service: "checkout"}
+	item, err := source.Get(t.Context(), "issue-1")
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	assert.Equal(t, "TimeoutError: checkout timed out", item.Title)
+	assert.Contains(t, item.Body, "## Error sample")
+	assert.Contains(t, item.Body, "POST /checkout")
+	assert.Contains(t, item.Body, "## Related logs")
+	assert.Contains(t, item.Body, "POST /checkout -> 500 (0.2ms)")
+}
+
+func TestDatadogIssueItem_UsesServiceAndAppURL(t *testing.T) {
+	client := &datadog.Client{Site: "datadoghq.eu"}
+	issue := datadog.ErrorTrackingIssue{
+		ID:           "issue-1",
+		ErrorType:    "TimeoutError",
+		ErrorMessage: "checkout timed out",
+		Service:      "checkout",
+	}
+
+	assert.Equal(t, IntakeItem{
+		ID:    "issue-1",
+		Key:   "checkout",
+		Title: "TimeoutError: checkout timed out",
+		Body:  "checkout timed out",
+		URL:   "https://app.datadoghq.eu/error-tracking/issue/issue-1",
+	}, datadogIssueItem(client, issue))
 }
