@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 const githubInstallApprovedPath = "/github/approved"
@@ -193,6 +195,12 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if err := recordHostedGitHubAppEvent(database.DB(r.Context()), event); err != nil {
+		log.WithError(err).Error("failed to record GitHub App installation")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	installationID, ok := githubInstallationID(event)
 	if !ok {
 		w.WriteHeader(http.StatusOK)
@@ -217,6 +225,43 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func recordHostedGitHubAppEvent(tx *gorm.DB, event any) error {
+	return recordHostedGitHubAppEventAt(tx, event, time.Now().UTC())
+}
+
+func recordHostedGitHubAppEventAt(tx *gorm.DB, event any, now time.Time) error {
+	switch event := event.(type) {
+	case *gh.InstallationEvent:
+		installation := event.GetInstallation()
+		if installation == nil {
+			return nil
+		}
+		installationID := strconv.FormatInt(installation.GetID(), 10)
+		if event.GetAction() == "deleted" {
+			return models.SoftDeleteHostedAppInstallation(tx, models.HostedAppProviderGitHub, installationID)
+		}
+
+		account := installation.GetAccount()
+		return models.UpsertHostedAppInstallation(tx, models.HostedAppInstallation{
+			Provider:       models.HostedAppProviderGitHub,
+			InstallationID: installationID,
+			AccountLogin:   account.GetLogin(),
+			AccountType:    account.GetType(),
+			AccountID:      account.GetID(),
+			SenderLogin:    event.GetSender().GetLogin(),
+			LastEventAt:    now,
+		})
+	case *gh.InstallationRepositoriesEvent:
+		installation := event.GetInstallation()
+		if installation == nil {
+			return nil
+		}
+		return models.TouchHostedAppInstallation(tx, models.HostedAppProviderGitHub, strconv.FormatInt(installation.GetID(), 10), now)
+	default:
+		return nil
+	}
 }
 
 func githubInstallationID(event any) (string, bool) {

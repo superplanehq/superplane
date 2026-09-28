@@ -100,3 +100,72 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.Empty(t, linked)
 	})
 }
+
+func TestFindGitHubLoginForUser(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+
+	org, err := CreateOrganization("Login Org", "")
+	require.NoError(t, err)
+
+	t.Run("prefers the linked account over the sign-in provider", func(t *testing.T) {
+		account, err := CreateAccount("Both", "both@example.com")
+		require.NoError(t, err)
+		user, err := CreateUser(org.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+
+		require.NoError(t, db.Create(&AccountProvider{
+			AccountID:  account.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "500",
+			Username:   "signin-login",
+		}).Error)
+		require.NoError(t, SaveAccountLinkedAccount(
+			db,
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "500", "linked-login", "", ""),
+		))
+
+		login, err := FindGitHubLoginForUser(db, user.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, "linked-login", login)
+	})
+
+	t.Run("falls back to the GitHub sign-in provider", func(t *testing.T) {
+		account, err := CreateAccount("Signin", "signin@example.com")
+		require.NoError(t, err)
+		user, err := CreateUser(org.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+
+		require.NoError(t, db.Create(&AccountProvider{
+			AccountID:  account.ID,
+			Provider:   ProviderGitHub,
+			ProviderID: "501",
+			Username:   "provider-login",
+		}).Error)
+
+		login, err := FindGitHubLoginForUser(db, user.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, "provider-login", login)
+	})
+
+	t.Run("returns empty when the user has no GitHub identity", func(t *testing.T) {
+		account, err := CreateAccount("None", "none@example.com")
+		require.NoError(t, err)
+		user, err := CreateUser(org.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+
+		login, err := FindGitHubLoginForUser(db, user.ID.String())
+		require.NoError(t, err)
+		assert.Empty(t, login)
+	})
+
+	t.Run("returns empty for a missing or malformed user id", func(t *testing.T) {
+		login, err := FindGitHubLoginForUser(db, "not-a-uuid")
+		require.NoError(t, err)
+		assert.Empty(t, login)
+
+		login, err = FindGitHubLoginForUser(db, "")
+		require.NoError(t, err)
+		assert.Empty(t, login)
+	})
+}
