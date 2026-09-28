@@ -307,11 +307,18 @@ func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.
 		return false, nil
 	}
 
-	order, err := factoryModel.FindWorkOrderByOriginLabel(c.tx, marker)
+	order, err := factoryModel.FindWorkOrderByPendingGitHubMarker(c.tx, marker)
 	if err != nil {
 		return false, err
 	}
-	if order == nil {
+	if order == nil || order.OriginLabel == nil {
+		return false, nil
+	}
+
+	expected := ghintegration.ManualTaskActorFromLabel(*order.OriginLabel)
+	author, authorOK := ghintegration.IssueAuthorFromEventData(event.Data.Data())
+	if expected == "" || !authorOK || !strings.EqualFold(expected, author) {
+		log.Warnf("GitHub issue %s carries a manual-task marker but its author does not match", issueURL)
 		return false, nil
 	}
 

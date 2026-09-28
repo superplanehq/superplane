@@ -405,7 +405,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 			nil,
 		)
 		require.NoError(t, err)
-		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), marker))
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), ghintegration.PendingManualTaskLabel(marker, "superplane-bot")))
 
 		issueURL := "https://github.com/acme/payments/issues/42"
 		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
@@ -416,6 +416,7 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 					"html_url": issueURL,
 					"title":    "Ship the refunds line",
 					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "superplane-bot"},
 				},
 			},
 		})
@@ -435,6 +436,50 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateSentryIssue(t *testing.T) 
 		assert.Equal(t, issueURL, *reloaded.OriginURL)
 		require.NotNil(t, reloaded.CreatedByID)
 		assert.Equal(t, r.User, *reloaded.CreatedByID)
+	})
+
+	t.Run("does not attach a copied marker from another GitHub user", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		marker := ghintegration.NewManualTaskMarker()
+		existing, err := factoryModel.CreateWorkOrder(
+			database.Conn(),
+			"Ship the refunds line",
+			"Stop double charges.",
+			&r.User,
+			[]uuid.UUID{r.User},
+			nil,
+		)
+		require.NoError(t, err)
+		require.NoError(t, existing.SetPendingGitHubMarker(database.Conn(), ghintegration.PendingManualTaskLabel(marker, "superplane-bot")))
+
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/99",
+					"title":    "Copied marker",
+					"body":     ghintegration.AppendManualTaskMarker("Stop double charges.", marker),
+					"user":     map[string]any{"login": "attacker"},
+				},
+			},
+		})
+		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Copied marker"})
+		require.NoError(t, err)
+		require.True(t, created)
+		require.NotNil(t, order)
+		assert.Equal(t, 2, countOrders(factoryModel))
+
+		reloaded, err := factoryModel.FindWorkOrder(database.Conn(), existing.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.OriginURL)
+		require.NotNil(t, reloaded.OriginLabel)
+		assert.Contains(t, *reloaded.OriginLabel, marker)
 	})
 
 	t.Run("merges a Dependabot alert into the open task for its package", func(t *testing.T) {

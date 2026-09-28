@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +27,12 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
 )
+
+const githubIssueTestActor = "superplane-bot"
+
+func init() {
+	runManualTaskIssueBackgroundReconcile = false
+}
 
 func Test__CreateWorkOrder__AssignsTheCreator(t *testing.T) {
 	r := support.Setup(t)
@@ -296,6 +303,8 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.Len(t, httpCtx.requests, 2)
 		assert.Equal(t, http.MethodPost, httpCtx.requests[0].Method)
 		assert.Equal(t, http.MethodGet, httpCtx.requests[1].Method)
+		assert.Equal(t, githubIssueTestActor, httpCtx.requests[1].URL.Query().Get("creator"))
+		assert.Equal(t, "100", httpCtx.requests[1].URL.Query().Get("per_page"))
 
 		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
 		require.NoError(t, err)
@@ -339,6 +348,93 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		remaining := time.Until(recorder.deadline)
 		assert.LessOrEqual(t, remaining, manualTaskGitHubIssueTimeout)
 		assert.Greater(t, remaining, manualTaskGitHubIssueTimeout-2*time.Second)
+	})
+
+	t.Run("links the issue when the first search misses", func(t *testing.T) {
+		httpCtx := &lateIssueHTTP{found: true, missesBeforeFound: 1}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
+		assert.GreaterOrEqual(t, httpCtx.listCalls, 2)
+	})
+
+	t.Run("links a late issue without the intake webhook", func(t *testing.T) {
+		previousAttempts := manualTaskGitHubIssueReconcileAttempts
+		previousDelay := manualTaskIssueBackgroundDelay
+		previousRuns := runManualTaskIssueBackgroundReconcile
+		manualTaskGitHubIssueReconcileAttempts = 1
+		manualTaskIssueBackgroundDelay = 10 * time.Millisecond
+		runManualTaskIssueBackgroundReconcile = true
+		t.Cleanup(func() {
+			manualTaskGitHubIssueReconcileAttempts = previousAttempts
+			manualTaskIssueBackgroundDelay = previousDelay
+			runManualTaskIssueBackgroundReconcile = previousRuns
+		})
+
+		httpCtx := &lateIssueHTTP{found: true, missesBeforeFound: 1}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		resp, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, resp.Order.GetOrigin())
+
+		require.Eventually(t, func() bool {
+			orders, listErr := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+			if listErr != nil || len(orders) != 1 || orders[0].OriginURL == nil {
+				return false
+			}
+			return *orders[0].OriginURL == issueURL
+		}, 2*time.Second, 20*time.Millisecond)
+	})
+
+	t.Run("returns the saved task when the client cancels during GitHub issue creation", func(t *testing.T) {
+		callCtx, cancel := context.WithCancel(ctx)
+		httpCtx := &lateIssueHTTP{found: true, cancel: cancel}
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+
+		resp, err := CreateWorkOrder(callCtx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, resp.Order.GetId())
+		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+	})
+
+	t.Run("returns the saved task when the same create is retried", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42"
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		request := &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "Stop double charges.",
+		}
+
+		first, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		second, err := CreateWorkOrder(ctx, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		assert.Equal(t, first.Order.GetId(), second.Order.GetId())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+		assert.Equal(t, 1, countGitHubIssueCreates(httpCtx.Requests))
 	})
 }
 
@@ -393,8 +489,33 @@ func githubIssueDeps(r *support.ResourceRegistry, httpCtx core.HTTPContext) Inta
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
 		WebhookBaseURL: "http://localhost:8000",
-		HTTP:           httpCtx,
+		HTTP: &githubActorRouter{
+			inner: httpCtx,
+			login: githubIssueTestActor,
+		},
 	}
+}
+
+type githubActorRouter struct {
+	inner core.HTTPContext
+	login string
+}
+
+func (r *githubActorRouter) Do(request *http.Request) (*http.Response, error) {
+	if request.URL.Path == "/user" {
+		return githubIssueResponse(http.StatusOK, `{"login":"`+r.login+`"}`), nil
+	}
+	return r.inner.Do(request)
+}
+
+func countGitHubIssueCreates(requests []*http.Request) int {
+	count := 0
+	for _, request := range requests {
+		if request.Method == http.MethodPost && strings.Contains(request.URL.Path, "/issues") {
+			count++
+		}
+	}
+	return count
 }
 
 func githubIssueHTTP(status int, body string) *contexts.HTTPContext {
@@ -426,9 +547,13 @@ func (d *deadlineHTTP) Do(request *http.Request) (*http.Response, error) {
 }
 
 type lateIssueHTTP struct {
-	found    bool
-	requests []*http.Request
-	marker   string
+	found             bool
+	missesBeforeFound int
+	listCalls         int
+	cancel            context.CancelFunc
+	requests          []*http.Request
+	marker            string
+	mu                sync.Mutex
 }
 
 func (h *lateIssueHTTP) Do(request *http.Request) (*http.Response, error) {
@@ -437,19 +562,37 @@ func (h *lateIssueHTTP) Do(request *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	request.Body = io.NopCloser(bytes.NewReader(body))
+	h.mu.Lock()
 	h.requests = append(h.requests, request)
+	h.mu.Unlock()
 	if request.Method == http.MethodPost {
+		h.mu.Lock()
 		h.marker = string(body)
+		h.mu.Unlock()
+		if h.cancel != nil {
+			h.cancel()
+		}
 		return nil, context.DeadlineExceeded
 	}
 
-	if !h.found {
+	h.mu.Lock()
+	h.listCalls++
+	listCalls := h.listCalls
+	marker := h.marker
+	h.mu.Unlock()
+	if !h.found || listCalls <= h.missesBeforeFound {
 		return githubIssueResponse(http.StatusOK, `[]`), nil
 	}
 	payload := `[{
+		"number": 99,
+		"html_url": "https://github.com/acme/payments/issues/99",
+		"body": ` + strconv.Quote(marker) + `,
+		"user": {"login": "attacker"}
+	},{
 		"number": 42,
 		"html_url": "https://github.com/acme/payments/issues/42",
-		"body": ` + strconv.Quote(h.marker) + `
+		"body": ` + strconv.Quote(marker) + `,
+		"user": {"login": "` + githubIssueTestActor + `"}
 	}]`
 	return githubIssueResponse(http.StatusOK, payload), nil
 }

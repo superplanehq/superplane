@@ -26,6 +26,38 @@ func TestManualTaskMarkerFromEventData(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestPendingManualTaskLabelKeepsTheActorOutOfTheBodyMarker(t *testing.T) {
+	marker := NewManualTaskMarker()
+	label := PendingManualTaskLabel(marker, "superplane-bot")
+
+	found, ok := ManualTaskMarkerFromLabel(label)
+	require.True(t, ok)
+	assert.Equal(t, marker, found)
+	assert.Equal(t, "superplane-bot", ManualTaskActorFromLabel(label))
+	assert.NotContains(t, AppendManualTaskMarker("Stop double charges.", marker), "superplane-bot")
+}
+
+func TestIssueAuthorFromEventData(t *testing.T) {
+	login, ok := IssueAuthorFromEventData(map[string]any{
+		"type": IssueEventPayloadType,
+		"data": map[string]any{
+			"issue": map[string]any{
+				"user": map[string]any{"login": "superplane-bot"},
+			},
+		},
+	})
+	require.True(t, ok)
+	assert.Equal(t, "superplane-bot", login)
+
+	_, ok = IssueAuthorFromEventData(map[string]any{
+		"type": IssueEventPayloadType,
+		"data": map[string]any{
+			"issue": map[string]any{"body": "copied marker"},
+		},
+	})
+	assert.False(t, ok)
+}
+
 func TestIssueURLFromEventData_NormalizesOwnerAndRepositoryCase(t *testing.T) {
 	issueURL, ok := IssueURLFromEventData(map[string]any{
 		"type": IssueEventPayloadType,

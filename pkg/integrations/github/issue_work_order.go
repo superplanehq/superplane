@@ -18,8 +18,38 @@ const ManualTaskMarkerPrefix = "superplane-manual-task:"
 
 const IssueEventPayloadType = "github.issue"
 
+// manualTaskActorSeparator keeps the GitHub login that opened the issue next
+// to the marker. The login is not taken from the issue body.
+const manualTaskActorSeparator = "\x1f"
+
 func NewManualTaskMarker() string {
 	return ManualTaskMarkerPrefix + uuid.NewString()
+}
+
+// PendingManualTaskLabel stores the marker and the integration's GitHub login.
+// A webhook may attach the issue only when that login matches the issue author.
+func PendingManualTaskLabel(marker, actor string) string {
+	marker = strings.TrimSpace(marker)
+	actor = strings.TrimSpace(actor)
+	if marker == "" || actor == "" {
+		return marker
+	}
+	return marker + manualTaskActorSeparator + actor
+}
+
+// ManualTaskActorFromLabel returns the GitHub login stored with a pending marker.
+func ManualTaskActorFromLabel(label string) string {
+	_, actor, ok := strings.Cut(label, manualTaskActorSeparator)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(actor)
+}
+
+// ManualTaskMarkerFromLabel returns the marker stored on a pending task.
+func ManualTaskMarkerFromLabel(label string) (string, bool) {
+	label, _, _ = strings.Cut(strings.TrimSpace(label), manualTaskActorSeparator)
+	return ManualTaskMarkerFromBody(label)
 }
 
 func ManualTaskMarkerComment(marker string) string {
@@ -61,20 +91,27 @@ func ManualTaskMarkerFromEventData(eventData any) (string, bool) {
 	return ManualTaskMarkerFromBody(body)
 }
 
-func issueBodyFromEventData(eventData any) (string, bool) {
-	envelope, ok := eventData.(map[string]any)
+// IssueAuthorFromEventData returns the GitHub login that opened the issue.
+// The login comes from the signed webhook payload, not from the issue body.
+func IssueAuthorFromEventData(eventData any) (string, bool) {
+	issue, ok := issueObjectFromEventData(eventData)
 	if !ok {
 		return "", false
 	}
-	if typeName, _ := envelope["type"].(string); typeName != IssueEventPayloadType {
+	user, ok := issue["user"].(map[string]any)
+	if !ok {
 		return "", false
 	}
+	login, _ := user["login"].(string)
+	login = strings.TrimSpace(login)
+	if login == "" {
+		return "", false
+	}
+	return login, true
+}
 
-	data, ok := envelope["data"].(map[string]any)
-	if !ok {
-		return "", false
-	}
-	issue, ok := data["issue"].(map[string]any)
+func issueBodyFromEventData(eventData any) (string, bool) {
+	issue, ok := issueObjectFromEventData(eventData)
 	if !ok {
 		return "", false
 	}
@@ -83,6 +120,26 @@ func issueBodyFromEventData(eventData any) (string, bool) {
 		return "", false
 	}
 	return body, true
+}
+
+func issueObjectFromEventData(eventData any) (map[string]any, bool) {
+	envelope, ok := eventData.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	if typeName, _ := envelope["type"].(string); typeName != IssueEventPayloadType {
+		return nil, false
+	}
+
+	data, ok := envelope["data"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return issue, true
 }
 
 func IssueURLFromEventData(eventData any) (string, bool) {
