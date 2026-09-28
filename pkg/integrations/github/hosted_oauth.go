@@ -43,6 +43,12 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	if err := g.ensureHostedBindAllowed(ctx, metadata, installationID); err != nil {
+		ctx.Logger.Errorf("%v", err)
+		http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
+		return
+	}
+
 	if err := g.bindHostedInstallation(ctx, metadata, installationID); err != nil {
 		ctx.Logger.Errorf("%v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)

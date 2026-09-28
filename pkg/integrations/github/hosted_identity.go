@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,10 +24,6 @@ const (
 	// run. The cache fills across the 5-second onboarding polls, so a large
 	// installation table never turns one sync into an API storm.
 	hostedDiscoveryAPIBudget = 25
-
-	// hostedCollaboratorRepoLimit caps repositories inspected by the
-	// collaborator fallback for one membership check.
-	hostedCollaboratorRepoLimit = 20
 
 	// hostedReconcileTTL is the in-process guard between reconciliations of
 	// the installations table against the GitHub list API.
@@ -100,13 +97,36 @@ func (g *GitHub) applyHostedIdentityDiscovery(ctx core.SyncContext, app common.H
 
 // userCanAccessInstallation reports whether the GitHub login may use the
 // installation: the installation account is the login itself, or the login is
-// a member/collaborator of the installation organization. Results of the
-// GitHub lookups are cached with a TTL; GitHub stays the source of truth.
+// an active member of the installation organization. Results of the GitHub
+// lookups are cached with a TTL; GitHub stays the source of truth. Discovery
+// uses this cached variant.
 func (g *GitHub) userCanAccessInstallation(
 	integration core.IntegrationContext,
 	appID int64,
 	login string,
 	snapshot hostedInstallationSnapshot,
+) (bool, error) {
+	return g.verifyInstallationAccess(integration, appID, login, snapshot, true)
+}
+
+// userCanAccessInstallationLive skips the cached answer. Privileged steps
+// (claim, adopt, bind) always ask GitHub, so a membership revoked after a
+// positive check cannot ride the cache into a bind.
+func (g *GitHub) userCanAccessInstallationLive(
+	integration core.IntegrationContext,
+	appID int64,
+	login string,
+	snapshot hostedInstallationSnapshot,
+) (bool, error) {
+	return g.verifyInstallationAccess(integration, appID, login, snapshot, false)
+}
+
+func (g *GitHub) verifyInstallationAccess(
+	integration core.IntegrationContext,
+	appID int64,
+	login string,
+	snapshot hostedInstallationSnapshot,
+	useCache bool,
 ) (bool, error) {
 	login = strings.TrimSpace(login)
 	if login == "" || snapshot.ID == "" || snapshot.Deleted {
@@ -120,13 +140,19 @@ func (g *GitHub) userCanAccessInstallation(
 	}
 
 	now := hostedIdentityNow().UTC()
-	cached, err := findCachedInstallationMember(snapshot.ID, login)
-	if err == nil && cached != nil && now.Sub(cached.CheckedAt) <= hostedMemberCheckTTL {
-		return cached.Allowed, nil
+	if useCache {
+		cached, err := findCachedInstallationMember(snapshot.ID, login)
+		if err == nil && cached != nil && now.Sub(cached.CheckedAt) <= hostedMemberCheckTTL {
+			return cached.Allowed, nil
+		}
 	}
 
 	allowed, err := checkInstallationMembership(integration, appID, snapshot.ID, snapshot.AccountLogin, login)
 	if err != nil {
+		// A failed lookup is cached as not-allowed so repeated errors do not
+		// burn the discovery budget on the same rows every sync. The caller
+		// falls back to the no-identity rules either way.
+		_ = saveCachedInstallationMember(snapshot.ID, login, false, now)
 		return false, err
 	}
 
@@ -267,11 +293,12 @@ func listHostedInstallationRowsFromDB() ([]hostedInstallationSnapshot, error) {
 	return result, nil
 }
 
-// checkInstallationMembershipOnGitHub asks GitHub whether the login belongs
-// to the installation organization. The membership endpoint needs the app's
-// organization members read permission; when it says no or is unavailable,
-// the collaborator fallback checks repository permission like Semaphore does,
-// which works with the default metadata read permission.
+// checkInstallationMembershipOnGitHub asks GitHub whether the login is an
+// active member of the installation organization. Only active membership
+// verifies identity access: a collaborator on a single repository must not
+// gain the whole installation. The membership endpoint needs the app's
+// organization members read permission; without it the lookup errors and the
+// caller falls back to the no-identity rules.
 func checkInstallationMembershipOnGitHub(
 	integration core.IntegrationContext,
 	appID int64,
@@ -284,33 +311,14 @@ func checkInstallationMembershipOnGitHub(
 		return false, err
 	}
 
-	membership, _, err := client.Organizations.GetOrgMembership(context.Background(), login, accountLogin)
-	if err == nil && membership.GetState() == "active" {
-		return true, nil
-	}
-
-	return installationHasCollaborator(client, accountLogin, login)
-}
-
-func installationHasCollaborator(client *github.Client, owner, login string) (bool, error) {
-	repos, err := listInstallationRepos(context.Background(), client)
+	membership, response, err := client.Organizations.GetOrgMembership(context.Background(), login, accountLogin)
 	if err != nil {
+		if response != nil && response.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
 		return false, err
 	}
-
-	for index, repo := range repos {
-		if index >= hostedCollaboratorRepoLimit {
-			break
-		}
-		level, _, err := client.Repositories.GetPermissionLevel(context.Background(), owner, repo.Name, login)
-		if err != nil {
-			continue
-		}
-		if permission := level.GetPermission(); permission != "" && permission != "none" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return membership.GetState() == "active", nil
 }
 
 func listAppInstallationsDetailedFromGitHub(integration core.IntegrationContext, appID int64) ([]hostedInstallationSnapshot, error) {

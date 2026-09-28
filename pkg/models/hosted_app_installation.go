@@ -80,7 +80,9 @@ func ReconcileHostedAppInstallation(tx *gorm.DB, row HostedAppInstallation) erro
 		row.LastEventAt = row.CreatedAt
 	}
 	if row.LastEventAt.IsZero() {
-		row.LastEventAt = time.Now().UTC()
+		// A missing provider timestamp must not look fresh: the epoch keeps
+		// the row outside the no-identity first-claim window.
+		row.LastEventAt = time.Unix(0, 0).UTC()
 	}
 
 	return tx.Unscoped().Clauses(clause.OnConflict{

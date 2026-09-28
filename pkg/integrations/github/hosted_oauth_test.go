@@ -108,7 +108,7 @@ func Test__afterHostedAppBind(t *testing.T) {
 		newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 			return gh.NewClient(nil), nil
 		}
-		listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
 			return nil, nil
 		}
 
@@ -515,8 +515,8 @@ func Test__Sync_hostedAppOffersApprovedInstallInPicker(t *testing.T) {
 	t.Cleanup(resetBindClientHooks)
 	stubHostedAdopt(t, "acme", "11", "Organization")
 
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
+		return []hostedInstallationSnapshot{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -563,8 +563,8 @@ func Test__Sync_hostedAppDoesNotDuplicatePickerEntry(t *testing.T) {
 	t.Cleanup(resetBindClientHooks)
 	stubHostedAdopt(t, "acme", "11", "Organization")
 
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
+		return []hostedInstallationSnapshot{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -608,8 +608,8 @@ func Test__Sync_hostedAppReconcilesMultipleRequestsWithoutDependingOnOrder(t *te
 			{ID: "2", AccountLogin: "octo", RequesterLogin: "member"},
 		}, nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
+		return []hostedInstallationSnapshot{{ID: "11", AccountLogin: "acme", AccountType: "Organization"}}, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
 
@@ -652,8 +652,8 @@ func Test__Sync_hostedReadyAppReconcilesApprovedRequest(t *testing.T) {
 	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
 		return nil, nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return []common.PendingInstallation{{ID: "22", AccountLogin: "octo", AccountType: "Organization"}}, nil
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
+		return []hostedInstallationSnapshot{{ID: "22", AccountLogin: "octo", AccountType: "Organization"}}, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
 
@@ -720,7 +720,7 @@ func Test__Sync_hostedAppPreservesRequestsWhenGitHubLookupFails(t *testing.T) {
 	t.Cleanup(resetBindClientHooks)
 
 	stubHostedAdoptNone(t)
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
 		return nil, errors.New("GitHub unavailable")
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
@@ -758,7 +758,7 @@ func Test__Sync_hostedAppKeepsWaitingWhenRequestNotApproved(t *testing.T) {
 	t.Cleanup(restore)
 	t.Cleanup(resetBindClientHooks)
 
-	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+	listAppInstallationsDetailed = func(core.IntegrationContext, int64) ([]hostedInstallationSnapshot, error) {
 		return nil, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
@@ -917,7 +917,7 @@ func resetBindClientHooks() {
 	newInstallationClient = newClientForAppInstallation
 	newAppJWTClient = newClientForApp
 	listInstallationRepos = listInstallationRepositories
-	listAppInstallations = listAppInstallationsFromGitHub
+	listAppInstallationsDetailed = listAppInstallationsDetailedFromGitHub
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 }
 

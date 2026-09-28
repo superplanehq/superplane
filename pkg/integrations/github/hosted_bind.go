@@ -18,9 +18,13 @@ var (
 	newInstallationClient       = newClientForAppInstallation
 	newAppJWTClient             = newClientForApp
 	listInstallationRepos       = listInstallationRepositories
-	listAppInstallations        = listAppInstallationsFromGitHub
 	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 )
+
+// hostedAdoptClockSkew tolerates small clock differences between GitHub and
+// this server when adopt compares an installation creation time against the
+// recorded request time.
+const hostedAdoptClockSkew = 2 * time.Minute
 
 func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
 	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
@@ -95,7 +99,9 @@ func (g *GitHub) bindHostedInstallationWith(
 //
 // Identity goes first: when GitHub vouches that the starter's login can use
 // the approved installation, another organization holding it does not block
-// adoption. On an identity miss the current cross-organization rule applies
+// adoption. On an identity miss the installation must postdate the recorded
+// request — a forged request callback that names an account with an old
+// installation must not adopt it — and the cross-organization rule applies
 // unchanged.
 func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
 	trackedRequests := metadata.CurrentInstallRequests()
@@ -107,21 +113,11 @@ func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.Hos
 	for _, request := range trackedRequests {
 		installation, found := lookupRequestedInstallation(request.AccountLogin, githubInstallations)
 		if found {
-			if g.adoptVerifiedByIdentity(ctx, app, login, installation) {
-				if !metadata.AllowsPendingInstallation(installation.ID) {
-					metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
-				}
-				continue
-			}
-
-			used, err := installationUsedByOtherOrg(ctx.OrganizationID, installation.ID)
+			adopted, err := g.adoptFoundInstallation(ctx, app, login, request, installation, metadata)
 			if err != nil {
 				return err
 			}
-			if !used {
-				if !metadata.AllowsPendingInstallation(installation.ID) {
-					metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
-				}
+			if adopted {
 				continue
 			}
 		}
@@ -129,6 +125,68 @@ func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.Hos
 	}
 	metadata.SetInstallRequests(unresolved)
 	return nil
+}
+
+func (g *GitHub) adoptFoundInstallation(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	login string,
+	request common.InstallRequest,
+	installation hostedInstallationSnapshot,
+	metadata *common.Metadata,
+) (bool, error) {
+	if g.adoptVerifiedByIdentity(ctx, app, login, installation) {
+		addAdoptedInstallation(metadata, installation)
+		return true, nil
+	}
+
+	if !installationPostdatesRequest(request, installation) {
+		return false, nil
+	}
+
+	used, err := installationUsedByOtherOrg(ctx.OrganizationID, installation.ID)
+	if err != nil {
+		return false, err
+	}
+	if used {
+		return false, nil
+	}
+
+	addAdoptedInstallation(metadata, installation)
+	return true, nil
+}
+
+func addAdoptedInstallation(metadata *common.Metadata, installation hostedInstallationSnapshot) {
+	if metadata.AllowsPendingInstallation(installation.ID) {
+		return
+	}
+	metadata.PendingInstallations = append(metadata.PendingInstallations, common.PendingInstallation{
+		ID:           installation.ID,
+		AccountLogin: installation.AccountLogin,
+		AccountType:  installation.AccountType,
+	})
+}
+
+// installationPostdatesRequest reports whether the installation appeared on
+// or after the recorded request time. Requests recorded before timestamps
+// existed keep the previous rule.
+func installationPostdatesRequest(request common.InstallRequest, installation hostedInstallationSnapshot) bool {
+	if request.CreatedAt == "" {
+		return true
+	}
+	requestedAt, err := time.Parse(time.RFC3339Nano, request.CreatedAt)
+	if err != nil {
+		return true
+	}
+
+	installedAt := installation.CreatedAt
+	if installedAt.IsZero() {
+		installedAt = installation.LastEventAt
+	}
+	if installedAt.IsZero() {
+		return false
+	}
+	return !installedAt.Before(requestedAt.Add(-hostedAdoptClockSkew))
 }
 
 func (g *GitHub) adoptIdentityLogin(metadata common.Metadata) string {
@@ -139,29 +197,19 @@ func (g *GitHub) adoptIdentityLogin(metadata common.Metadata) string {
 	return metadata.StartedByGitHubLogin
 }
 
-func (g *GitHub) adoptVerifiedByIdentity(ctx core.SyncContext, app common.HostedApp, login string, installation common.PendingInstallation) bool {
+func (g *GitHub) adoptVerifiedByIdentity(ctx core.SyncContext, app common.HostedApp, login string, installation hostedInstallationSnapshot) bool {
 	if strings.TrimSpace(login) == "" {
 		return false
 	}
 
-	allowed, err := g.userCanAccessInstallation(ctx.Integration, app.ID, login, hostedInstallationSnapshot{
-		ID:           installation.ID,
-		AccountLogin: installation.AccountLogin,
-		AccountType:  installation.AccountType,
-	})
+	// Adoption is privileged, so the check is live: a cached answer from
+	// discovery must not authorize an adopt after GitHub revoked the access.
+	allowed, err := g.userCanAccessInstallationLive(ctx.Integration, app.ID, login, installation)
 	return err == nil && allowed
 }
 
-func (g *GitHub) listAppInstallationsForAdopt(ctx core.SyncContext, app common.HostedApp) []common.PendingInstallation {
-	client, err := newAppJWTClient(ctx.Integration, app.ID)
-	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Errorf("failed to create app client: %v", err)
-		}
-		return nil
-	}
-
-	installations, err := listAppInstallations(context.Background(), client)
+func (g *GitHub) listAppInstallationsForAdopt(ctx core.SyncContext, app common.HostedApp) []hostedInstallationSnapshot {
+	installations, err := listAppInstallationsDetailed(ctx.Integration, app.ID)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to list app installations: %v", err)
@@ -171,27 +219,23 @@ func (g *GitHub) listAppInstallationsForAdopt(ctx core.SyncContext, app common.H
 	return installations
 }
 
-func lookupRequestedInstallation(accountLogin string, githubInstallations []common.PendingInstallation) (common.PendingInstallation, bool) {
+func lookupRequestedInstallation(accountLogin string, githubInstallations []hostedInstallationSnapshot) (hostedInstallationSnapshot, bool) {
 	if snapshot, err := findHostedInstallationByAccount(context.Background(), accountLogin); err == nil && snapshot != nil && !snapshot.Deleted {
-		return common.PendingInstallation{
-			ID:           snapshot.ID,
-			AccountLogin: snapshot.AccountLogin,
-			AccountType:  snapshot.AccountType,
-		}, true
+		return *snapshot, true
 	}
 	return installationForAccount(githubInstallations, accountLogin)
 }
 
-func installationForAccount(installations []common.PendingInstallation, account string) (common.PendingInstallation, bool) {
+func installationForAccount(installations []hostedInstallationSnapshot, account string) (hostedInstallationSnapshot, bool) {
 	if strings.TrimSpace(account) == "" {
-		return common.PendingInstallation{}, false
+		return hostedInstallationSnapshot{}, false
 	}
 	for _, installation := range installations {
 		if strings.EqualFold(installation.AccountLogin, account) {
 			return installation, true
 		}
 	}
-	return common.PendingInstallation{}, false
+	return hostedInstallationSnapshot{}, false
 }
 
 // listAppInstallationRequestsFromGitHub returns every open App install request
@@ -222,30 +266,6 @@ func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.C
 					CreatedAt:      createdAt,
 				})
 			}
-		}
-
-		if response == nil || response.NextPage == 0 {
-			return result, nil
-		}
-		opts.Page = response.NextPage
-	}
-}
-
-func listAppInstallationsFromGitHub(ctx context.Context, client *github.Client) ([]common.PendingInstallation, error) {
-	result := []common.PendingInstallation{}
-	opts := &github.ListOptions{PerPage: 100}
-	for {
-		installations, response, err := client.Apps.ListInstallations(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, installation := range installations {
-			result = append(result, common.PendingInstallation{
-				ID:           strconv.FormatInt(installation.GetID(), 10),
-				AccountLogin: installation.GetAccount().GetLogin(),
-				AccountType:  installation.GetAccount().GetType(),
-			})
 		}
 
 		if response == nil || response.NextPage == 0 {

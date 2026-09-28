@@ -1,11 +1,14 @@
 package github
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	gh "github.com/google/go-github/v84/github"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -337,6 +340,130 @@ func Test__Sync_hostedIdentityAdoptsCrossOrgApprovedRequest(t *testing.T) {
 	assert.Equal(t, "71", metadata.PendingInstallations[0].ID)
 }
 
+func Test__Sync_hostedAdoptRequiresInstallationAfterRequest(t *testing.T) {
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	now := time.Now().UTC()
+
+	syncWithRequest := func(t *testing.T, installedAt time.Time, requestedAt time.Time) common.Metadata {
+		t.Helper()
+		t.Cleanup(resetHostedClaimHooks)
+		stubHostedIdentity(t, &hostedIdentityStub{login: ""})
+		installationUsedByOtherOrg = func(string, string) (bool, error) { return false, nil }
+		findHostedInstallationByAccount = func(_ context.Context, login string) (*hostedInstallationSnapshot, error) {
+			if !strings.EqualFold(login, "victim-org") {
+				return nil, nil
+			}
+			return &hostedInstallationSnapshot{
+				ID:           "95",
+				AccountLogin: "victim-org",
+				AccountType:  "Organization",
+				CreatedAt:    installedAt,
+				LastEventAt:  installedAt,
+			}, nil
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			State: "pending",
+			Metadata: common.Metadata{
+				State:     "csrf",
+				HostedApp: true,
+				InstallRequests: []common.InstallRequest{
+					{AccountLogin: "victim-org", CreatedAt: requestedAt.Format(time.RFC3339Nano)},
+				},
+				InstallRequested: true,
+				GitHubApp:        common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			},
+		}
+
+		require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+			Logger:         logrus.NewEntry(logrus.New()),
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			BaseURL:        "https://app.example",
+			Integration:    integrationCtx,
+		}))
+		return integrationCtx.Metadata.(common.Metadata)
+	}
+
+	t.Run("a forged request cannot adopt an installation that already existed", func(t *testing.T) {
+		metadata := syncWithRequest(t, now.Add(-2*time.Hour), now)
+
+		assert.Empty(t, metadata.PendingInstallations)
+		require.Len(t, metadata.InstallRequests, 1)
+		assert.Equal(t, "victim-org", metadata.InstallRequests[0].AccountLogin)
+	})
+
+	t.Run("an installation created after the request is adopted", func(t *testing.T) {
+		metadata := syncWithRequest(t, now, now.Add(-time.Hour))
+
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.Equal(t, "95", metadata.PendingInstallations[0].ID)
+		assert.Empty(t, metadata.InstallRequests)
+	})
+}
+
+func Test__afterHostedAppBind_rechecksExclusivity(t *testing.T) {
+	setHostedAppEnv(t)
+	g := &GitHub{}
+
+	pickerMetadata := func(installationID string) common.Metadata {
+		return common.Metadata{
+			State:     "csrf",
+			HostedApp: true,
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: installationID, AccountLogin: "acme", AccountType: "Organization"},
+			},
+		}
+	}
+
+	t.Run("blocks an unverified bind when another organization uses the installation", func(t *testing.T) {
+		stubHostedClaim(t, hostedInstallationSnapshot{
+			ID:           "91",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		}, true)
+		stubHostedIdentity(t, &hostedIdentityStub{login: "member", memberOf: map[string]bool{}})
+
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = pickerMetadata("91")
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/bind?state=csrf&installation_id=91", nil)
+
+		g.afterHostedAppBind(ctx)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.NotEqual(t, "ready", integration.State)
+	})
+
+	t.Run("identity-verified bind proceeds when another organization uses the installation", func(t *testing.T) {
+		t.Cleanup(resetBindClientHooks)
+		stubHostedClaim(t, hostedInstallationSnapshot{
+			ID:           "92",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		}, true)
+		stubHostedIdentity(t, &hostedIdentityStub{login: "member", memberOf: map[string]bool{"acme": true}})
+		listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+			return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
+		}
+		newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+			return gh.NewClient(nil), nil
+		}
+
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = pickerMetadata("92")
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/bind?state=csrf&installation_id=92", nil)
+
+		g.afterHostedAppBind(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "ready", integration.State)
+		assert.Equal(t, "92", integration.Metadata.(common.Metadata).InstallationID)
+	})
+}
+
 func Test__userCanAccessInstallation(t *testing.T) {
 	g := &GitHub{}
 	integration := &contexts.IntegrationContext{}
@@ -389,6 +516,39 @@ func Test__userCanAccessInstallation(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, allowed)
 		assert.Equal(t, []string{"3/member"}, stub.savedChecks)
+	})
+
+	t.Run("live check ignores a fresh cached answer", func(t *testing.T) {
+		stub := &hostedIdentityStub{
+			memberOf: map[string]bool{},
+			cache: map[string]*models.HostedAppInstallationMember{
+				"5/member": {Allowed: true, CheckedAt: time.Now().UTC()},
+			},
+		}
+		stubHostedIdentity(t, stub)
+
+		allowed, err := g.userCanAccessInstallationLive(integration, 99, "member", hostedInstallationSnapshot{
+			ID:           "5",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		})
+		require.NoError(t, err)
+		assert.False(t, allowed, "a revoked membership must not ride the cache into a claim")
+		assert.Equal(t, []string{"5/member"}, stub.savedChecks)
+	})
+
+	t.Run("failed lookup is cached so retries do not burn the budget", func(t *testing.T) {
+		stub := &hostedIdentityStub{memberErr: errors.New("GitHub unavailable")}
+		stubHostedIdentity(t, stub)
+
+		allowed, err := g.userCanAccessInstallation(integration, 99, "member", hostedInstallationSnapshot{
+			ID:           "6",
+			AccountLogin: "acme",
+			AccountType:  "Organization",
+		})
+		require.Error(t, err)
+		assert.False(t, allowed)
+		assert.Equal(t, []string{"6/member"}, stub.savedChecks)
 	})
 
 	t.Run("deleted installation is never accessible", func(t *testing.T) {

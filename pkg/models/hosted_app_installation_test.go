@@ -144,6 +144,21 @@ func Test__HostedAppInstallation(t *testing.T) {
 		assert.True(t, found.LastEventAt.Before(now.Add(-29*time.Minute)))
 	})
 
+	t.Run("reconcile without timestamps stays outside the claim window", func(t *testing.T) {
+		require.NoError(t, models.ReconcileHostedAppInstallation(db, models.HostedAppInstallation{
+			Provider:       provider,
+			InstallationID: "23",
+			AccountLogin:   "timeless-org",
+			AccountType:    "Organization",
+		}))
+
+		found, err := models.FindHostedAppInstallation(db, provider, "23")
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.True(t, found.LastEventAt.Before(now.Add(-24*time.Hour)),
+			"a missing provider timestamp must not look fresh")
+	})
+
 	t.Run("list returns live rows only", func(t *testing.T) {
 		require.NoError(t, models.SoftDeleteHostedAppInstallation(db, provider, "22"))
 

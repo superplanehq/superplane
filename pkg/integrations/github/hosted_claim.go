@@ -119,8 +119,35 @@ func (g *GitHub) claimVerifiedByIdentity(ctx core.HTTPRequestContext, metadata c
 		return false
 	}
 
-	allowed, err := g.userCanAccessInstallation(ctx.Integration, metadata.GitHubApp.ID, login, snapshot)
+	// A claim is privileged, so the check is live: a cached answer from
+	// discovery must not authorize a claim after GitHub revoked the access.
+	allowed, err := g.userCanAccessInstallationLive(ctx.Integration, metadata.GitHubApp.ID, login, snapshot)
 	return err == nil && allowed
+}
+
+// ensureHostedBindAllowed re-checks exclusivity when the member binds a
+// picker entry. The entry was validated when it was offered, but another
+// organization can bind the same installation between offer and bind (or in
+// a racing claim), so an identity-unverified bind must not proceed when the
+// installation is already in use elsewhere.
+func (g *GitHub) ensureHostedBindAllowed(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
+	snapshot := hostedInstallationSnapshot{ID: installationID}
+	if record, err := findHostedInstallation(ctx, installationID); err == nil && record != nil {
+		snapshot = *record
+	} else {
+		for _, pending := range metadata.PendingInstallations {
+			if pending.ID == installationID {
+				snapshot.AccountLogin = pending.AccountLogin
+				snapshot.AccountType = pending.AccountType
+				break
+			}
+		}
+	}
+
+	if g.claimVerifiedByIdentity(ctx, metadata, snapshot) {
+		return nil
+	}
+	return rejectCrossOrganizationInstallation(ctx, installationID)
 }
 
 func rejectCrossOrganizationInstallation(ctx core.HTTPRequestContext, installationID string) error {
