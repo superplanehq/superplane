@@ -34,6 +34,49 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	return handler, r
 }
 
+func TestHandler_devRealOAuthConfigured(t *testing.T) {
+	handler := &Handler{isDev: true}
+
+	t.Run("real credentials enable the real connect flow", func(t *testing.T) {
+		t.Setenv("GITHUB_CLIENT_ID", "real-client-id")
+		t.Setenv("GITHUB_CLIENT_SECRET", "real-client-secret")
+
+		assert.True(t, handler.devRealOAuthConfigured(models.ProviderGitHub))
+	})
+
+	t.Run("the compose placeholder keeps the mock", func(t *testing.T) {
+		t.Setenv("GITHUB_CLIENT_ID", devOAuthPlaceholderCredential)
+		t.Setenv("GITHUB_CLIENT_SECRET", devOAuthPlaceholderCredential)
+
+		assert.False(t, handler.devRealOAuthConfigured(models.ProviderGitHub))
+	})
+
+	t.Run("missing credentials keep the mock", func(t *testing.T) {
+		t.Setenv("GITHUB_CLIENT_ID", "")
+		t.Setenv("GITHUB_CLIENT_SECRET", "")
+
+		assert.False(t, handler.devRealOAuthConfigured(models.ProviderGitHub))
+	})
+
+	t.Run("only GitHub supports the connect flow", func(t *testing.T) {
+		t.Setenv("GITHUB_CLIENT_ID", "real-client-id")
+		t.Setenv("GITHUB_CLIENT_SECRET", "real-client-secret")
+
+		assert.False(t, handler.devRealOAuthConfigured(models.ProviderGoogle))
+	})
+}
+
+func Test_isConnectCallback(t *testing.T) {
+	connect := httptest.NewRequest(http.MethodGet, "/auth/github/callback?code=abc&state=connect:token", nil)
+	assert.True(t, isConnectCallback(connect))
+
+	signIn := httptest.NewRequest(http.MethodGet, "/auth/github/callback?code=abc&state=%2Fhome", nil)
+	assert.False(t, isConnectCallback(signIn))
+
+	begin := httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect", nil)
+	assert.False(t, isConnectCallback(begin))
+}
+
 func TestHandler_handleAuthConfig(t *testing.T) {
 	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)

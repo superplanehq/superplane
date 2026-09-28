@@ -113,7 +113,6 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
-      authorizeUrl: "",
       githubLogin: "forestileao",
       installations: [{ id: "11", accountLogin: "acme" }],
     });
@@ -165,7 +164,6 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
-      authorizeUrl: "",
       githubLogin: "",
       installations: [
         { id: "11", accountLogin: "acme" },
@@ -249,8 +247,8 @@ describe("startDirectGitHubConnect", () => {
 
   // Onboarding asks again which GitHub account to use on every Connect
   // click. Many people stay signed in to two GitHub accounts, so the click
-  // must open GitHub authorization instead of reusing the stored picker.
-  it("opens GitHub authorization again on onboarding when a picker is pending", async () => {
+  // must open the GitHub App install page instead of reusing the stored picker.
+  it("opens the GitHub App install page again on onboarding when a picker is pending", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
@@ -265,7 +263,8 @@ describe("startDirectGitHubConnect", () => {
             state: "pending",
             metadata: {
               startedByUserID: "user-1",
-              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
+              state: "csrf",
+              githubApp: { slug: "superplane" },
               pendingInstallations: [
                 { id: "11", accountLogin: "acme" },
                 { id: "22", accountLogin: "octo" },
@@ -283,16 +282,15 @@ describe("startDirectGitHubConnect", () => {
     expect(create).not.toHaveBeenCalled();
     expect(follow).toHaveBeenCalledWith({
       method: "GET",
-      url: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
+      url: "https://github.com/apps/superplane/installations/new?state=csrf",
     });
     expect(goTo).not.toHaveBeenCalled();
     expect(remember).toHaveBeenCalledWith("org-1", "/onboarding?attempt=1&step=vcs");
   });
 
-  // A connection from before the authorize URL was stored cannot restart
-  // OAuth in place, so the click starts a fresh connect. The new connection
-  // also opens GitHub authorization.
-  it("starts a fresh connect on onboarding when the picker kept no authorize URL", async () => {
+  // A connection without a stored app slug and state cannot reopen the
+  // install page in place, so the click starts a fresh connect.
+  it("starts a fresh connect on onboarding when the picker kept no install URL", async () => {
     const action = { method: "GET", url: "https://github.com/login/oauth/authorize?client_id=new" };
     const create = vi.fn().mockResolvedValue({ integration: { status: { browserAction: action } } });
 
