@@ -12,13 +12,26 @@ import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.connect;
 
-function SignedInAsLine({ login }: { login: string }) {
+function SignedInAsLine({ login, onSwitchAccount }: { login: string; onSwitchAccount?: () => void }) {
   const [before, after] = copy.signedInAs(login).split(login);
   return (
     <p className="text-[15px] leading-6 text-muted-foreground" data-testid="first-run-github-signed-in-as">
       {before}
       <span className="font-medium text-foreground">{login}</span>
       {after}
+      {onSwitchAccount ? (
+        <>
+          {" "}
+          <button
+            type="button"
+            data-testid="first-run-github-switch-account"
+            onClick={onSwitchAccount}
+            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+          >
+            {copy.switchAccount}
+          </button>
+        </>
+      ) : null}
     </p>
   );
 }
@@ -164,6 +177,7 @@ export function FirstRunConnectScreen({
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
+  onSwitchAccount,
 }: {
   /** True while the picker data still loads after a GitHub round trip. */
   loading?: boolean;
@@ -183,6 +197,8 @@ export function FirstRunConnectScreen({
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
+  /** Links a different GitHub identity through the provider account picker. */
+  onSwitchAccount?: () => void;
 }) {
   const requestedOrganizations = requestedGitHubOrganizations(githubOrganizations, githubOrganization);
   const { showAccountPicker, waitingForApproval } = connectScreenState({
@@ -199,7 +215,11 @@ export function FirstRunConnectScreen({
       busy={loading || connecting || bindingInstallationId !== undefined}
       sphere={sphere}
     >
-      <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
+      <ConnectScreenHeading
+        showAccountPicker={showAccountPicker}
+        githubLogin={githubLogin}
+        onSwitchAccount={onSwitchAccount}
+      />
 
       <div className="mt-8 space-y-6">
         {loading ? (
@@ -230,14 +250,22 @@ function requestedGitHubOrganizations(organizations: string[] | undefined, legac
   return legacyOrganization ? [legacyOrganization] : [];
 }
 
-function ConnectScreenHeading({ showAccountPicker, githubLogin }: { showAccountPicker: boolean; githubLogin: string }) {
+function ConnectScreenHeading({
+  showAccountPicker,
+  githubLogin,
+  onSwitchAccount,
+}: {
+  showAccountPicker: boolean;
+  githubLogin: string;
+  onSwitchAccount?: () => void;
+}) {
   // On the stepper card the picker is the organization step, so the heading
   // asks the organization question instead of repeating the connect ask.
   if (showAccountPicker) {
     return (
       <FirstRunHeading headline={copy.selectAccount}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.selectAccountBody}</p>
-        {githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
+        {githubLogin ? <SignedInAsLine login={githubLogin} onSwitchAccount={onSwitchAccount} /> : null}
       </FirstRunHeading>
     );
   }

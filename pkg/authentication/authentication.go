@@ -165,7 +165,38 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 		r = r2
 	}
 
-	gothic.BeginAuthHandler(w, r)
+	authURL, err := gothic.GetAuthURL(w, r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+	if selectAccountRequested(r) {
+		authURL = withSelectAccountPrompt(authURL)
+	}
+	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+}
+
+// selectAccountRequested reports whether the caller asked the provider to
+// show its account chooser, so a member signed in to more than one provider
+// account can pick the one to link.
+func selectAccountRequested(r *http.Request) bool {
+	value := strings.TrimSpace(r.URL.Query().Get("select_account"))
+	return value == "1" || strings.EqualFold(value, "true")
+}
+
+// withSelectAccountPrompt adds prompt=select_account to the provider
+// authorize URL. GitHub then shows its account picker instead of reusing the
+// current browser session silently.
+func withSelectAccountPrompt(authURL string) string {
+	parsed, err := url.Parse(authURL)
+	if err != nil {
+		return authURL
+	}
+	query := parsed.Query()
+	query.Set("prompt", "select_account")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {

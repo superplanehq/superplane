@@ -66,6 +66,24 @@ func TestHandler_devRealOAuthConfigured(t *testing.T) {
 	})
 }
 
+func Test_selectAccountRequested(t *testing.T) {
+	requested := httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect&select_account=1", nil)
+	assert.True(t, selectAccountRequested(requested))
+
+	plain := httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect", nil)
+	assert.False(t, selectAccountRequested(plain))
+}
+
+func Test_withSelectAccountPrompt(t *testing.T) {
+	authURL := withSelectAccountPrompt("https://github.com/login/oauth/authorize?client_id=abc&state=xyz")
+
+	parsed, err := url.Parse(authURL)
+	require.NoError(t, err)
+	assert.Equal(t, "select_account", parsed.Query().Get("prompt"))
+	assert.Equal(t, "abc", parsed.Query().Get("client_id"))
+	assert.Equal(t, "xyz", parsed.Query().Get("state"))
+}
+
 func Test_isConnectCallback(t *testing.T) {
 	connect := httptest.NewRequest(http.MethodGet, "/auth/github/callback?code=abc&state=connect:token", nil)
 	assert.True(t, isConnectCallback(connect))

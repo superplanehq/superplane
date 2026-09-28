@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import {
   githubConnectResumeError,
   githubIdentityLinkPath,
+  githubSwitchAccountPath,
   hasGitHubIdentity,
   isGitHubConnectResumeReturn,
   redirectToGitHubIdentityLink,
@@ -37,6 +38,12 @@ describe("resume marker", () => {
   it("builds the link path with the encoded return path", () => {
     expect(githubIdentityLinkPath("/onboarding")).toBe(
       "/auth/github?intent=connect&redirect=%2Fonboarding%3FgithubConnect%3Dresume",
+    );
+  });
+
+  it("builds the switch path with the provider account picker forced", () => {
+    expect(githubSwitchAccountPath("/onboarding?step=vcs")).toBe(
+      "/auth/github?intent=connect&select_account=1&redirect=%2Fonboarding%3Fstep%3Dvcs%26githubConnect%3Dresume",
     );
   });
 

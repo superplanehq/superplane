@@ -16,7 +16,21 @@ export function hasGitHubIdentity(account: AccountIdentityResponse | undefined):
 }
 
 export function githubIdentityLinkPath(returnTo: string): string {
-  return `/auth/github?intent=connect&redirect=${encodeURIComponent(withGitHubConnectResumeMarker(returnTo))}`;
+  return githubConnectLinkPath(returnTo, false);
+}
+
+/**
+ * Link flow that forces GitHub's account picker, so a member signed in to
+ * more than one GitHub account can link a different one.
+ */
+export function githubSwitchAccountPath(returnTo: string): string {
+  return githubConnectLinkPath(returnTo, true);
+}
+
+function githubConnectLinkPath(returnTo: string, selectAccount: boolean): string {
+  const redirect = encodeURIComponent(withGitHubConnectResumeMarker(returnTo));
+  const picker = selectAccount ? "&select_account=1" : "";
+  return `/auth/github?intent=connect${picker}&redirect=${redirect}`;
 }
 
 /** Marks the return path so the page continues the connect after the link flow. */
