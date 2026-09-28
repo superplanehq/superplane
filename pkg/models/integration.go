@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"time"
@@ -519,6 +520,35 @@ func ClaimHostedJiraOAuthState(tx *gorm.DB, state string) (*Integration, error) 
 		return nil, err
 	}
 	return &integration, nil
+}
+
+// ListGitHubIntegrationsUsingInstallation finds GitHub connections that already
+// bound an installation or offer it in the account picker. First-claim
+// exclusivity uses this list to block a second organization.
+func ListGitHubIntegrationsUsingInstallation(tx *gorm.DB, installationID string) ([]Integration, error) {
+	if installationID == "" {
+		return nil, nil
+	}
+
+	pending, err := json.Marshal([]map[string]string{{"id": installationID}})
+	if err != nil {
+		return nil, err
+	}
+
+	var integrations []Integration
+	err = tx.
+		Where(
+			"app_name = ? AND (metadata->>'installationId' = ? OR metadata->'pendingInstallations' @> ?)",
+			"github",
+			installationID,
+			pending,
+		).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
 }
 
 // ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a

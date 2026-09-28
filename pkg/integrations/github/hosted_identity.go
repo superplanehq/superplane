@@ -1,0 +1,378 @@
+package github
+
+import (
+	"context"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/google/go-github/v84/github"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
+)
+
+const (
+	// hostedMemberCheckTTL is how long a cached membership check stays valid
+	// before the next sync re-asks GitHub.
+	hostedMemberCheckTTL = 15 * time.Minute
+
+	// hostedDiscoveryAPIBudget caps uncached membership lookups per discovery
+	// run. The cache fills across the 5-second onboarding polls, so a large
+	// installation table never turns one sync into an API storm.
+	hostedDiscoveryAPIBudget = 25
+
+	// hostedCollaboratorRepoLimit caps repositories inspected by the
+	// collaborator fallback for one membership check.
+	hostedCollaboratorRepoLimit = 20
+
+	// hostedReconcileTTL is the in-process guard between reconciliations of
+	// the installations table against the GitHub list API.
+	hostedReconcileTTL = 5 * time.Minute
+)
+
+var (
+	findGitHubLoginForUser       = findGitHubLoginForUserFromDB
+	findCachedInstallationMember = findCachedInstallationMemberFromDB
+	saveCachedInstallationMember = saveCachedInstallationMemberToDB
+	listHostedInstallationRows   = listHostedInstallationRowsFromDB
+	checkInstallationMembership  = checkInstallationMembershipOnGitHub
+	listAppInstallationsDetailed = listAppInstallationsDetailedFromGitHub
+	saveReconciledInstallation   = saveReconciledInstallationToDB
+	hostedIdentityNow            = time.Now
+
+	hostedReconcileMu   sync.Mutex
+	hostedReconcileLast time.Time
+)
+
+// applyHostedIdentityDiscovery resolves the starter's GitHub identity and
+// merges the installations that identity can use into the account picker.
+// It is additive-only: it never removes picker entries, and any failure
+// leaves the metadata as it was, so Sync proceeds exactly as without
+// discovery.
+func (g *GitHub) applyHostedIdentityDiscovery(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) {
+	userID := metadata.StartedByUserID
+	if userID == "" {
+		userID = ctx.ActorUserID
+	}
+
+	login, err := findGitHubLoginForUser(userID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to resolve GitHub login for user %s: %v", userID, err)
+		}
+		return
+	}
+	if login == "" {
+		return
+	}
+	metadata.StartedByGitHubLogin = login
+
+	// A bound connection keeps its picker as-is; discovery only serves the
+	// account picker before bind.
+	if metadata.InstallationID != "" {
+		return
+	}
+
+	g.reconcileHostedInstallations(ctx, app)
+
+	accessible, err := g.accessibleInstallations(ctx.Integration, app.ID, login)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
+		}
+		return
+	}
+	if len(accessible) == 0 {
+		return
+	}
+
+	metadata.SetPendingInstallations(append(metadata.PendingInstallations, accessible...))
+
+	requests := metadata.CurrentInstallRequests()
+	for _, installation := range accessible {
+		requests = filterResolvedInstallRequests(requests, installation.AccountLogin)
+	}
+	metadata.SetInstallRequests(requests)
+}
+
+// userCanAccessInstallation reports whether the GitHub login may use the
+// installation: the installation account is the login itself, or the login is
+// a member/collaborator of the installation organization. Results of the
+// GitHub lookups are cached with a TTL; GitHub stays the source of truth.
+func (g *GitHub) userCanAccessInstallation(
+	integration core.IntegrationContext,
+	appID int64,
+	login string,
+	snapshot hostedInstallationSnapshot,
+) (bool, error) {
+	login = strings.TrimSpace(login)
+	if login == "" || snapshot.ID == "" || snapshot.Deleted {
+		return false, nil
+	}
+	if strings.EqualFold(snapshot.AccountLogin, login) {
+		return true, nil
+	}
+	if !strings.EqualFold(snapshot.AccountType, "Organization") {
+		return false, nil
+	}
+
+	now := hostedIdentityNow().UTC()
+	cached, err := findCachedInstallationMember(snapshot.ID, login)
+	if err == nil && cached != nil && now.Sub(cached.CheckedAt) <= hostedMemberCheckTTL {
+		return cached.Allowed, nil
+	}
+
+	allowed, err := checkInstallationMembership(integration, appID, snapshot.ID, snapshot.AccountLogin, login)
+	if err != nil {
+		return false, err
+	}
+
+	// The cache only avoids repeated lookups; a write failure must not turn
+	// a verified answer into an error.
+	_ = saveCachedInstallationMember(snapshot.ID, login, allowed, now)
+	return allowed, nil
+}
+
+// accessibleInstallations returns the live installations the login can use,
+// as picker entries. Errors on single rows are skipped: discovery is
+// additive-only and must never break a sync.
+func (g *GitHub) accessibleInstallations(
+	integration core.IntegrationContext,
+	appID int64,
+	login string,
+) ([]common.PendingInstallation, error) {
+	login = strings.TrimSpace(login)
+	if login == "" {
+		return nil, nil
+	}
+
+	rows, err := listHostedInstallationRows()
+	if err != nil {
+		return nil, err
+	}
+
+	now := hostedIdentityNow().UTC()
+	apiBudget := hostedDiscoveryAPIBudget
+	result := []common.PendingInstallation{}
+	for _, row := range rows {
+		if row.Deleted {
+			continue
+		}
+		if g.needsMembershipLookup(row, login, now) {
+			if apiBudget <= 0 {
+				continue
+			}
+			apiBudget--
+		}
+
+		allowed, err := g.userCanAccessInstallation(integration, appID, login, row)
+		if err != nil || !allowed {
+			continue
+		}
+		result = append(result, common.PendingInstallation{
+			ID:           row.ID,
+			AccountLogin: row.AccountLogin,
+			AccountType:  row.AccountType,
+		})
+	}
+	return result, nil
+}
+
+func (g *GitHub) needsMembershipLookup(row hostedInstallationSnapshot, login string, now time.Time) bool {
+	if strings.EqualFold(row.AccountLogin, login) {
+		return false
+	}
+	if !strings.EqualFold(row.AccountType, "Organization") {
+		return false
+	}
+	cached, err := findCachedInstallationMember(row.ID, login)
+	return err != nil || cached == nil || now.Sub(cached.CheckedAt) > hostedMemberCheckTTL
+}
+
+// reconcileHostedInstallations upserts every installation GitHub lists for
+// the app, so identity discovery also sees installations that predate the
+// webhook table. It never freshens last_event_at on existing rows: only
+// signed webhooks may move an installation into the no-identity first-claim
+// window.
+func (g *GitHub) reconcileHostedInstallations(ctx core.SyncContext, app common.HostedApp) {
+	if !takeHostedReconcileSlot() {
+		return
+	}
+
+	installations, err := listAppInstallationsDetailed(ctx.Integration, app.ID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to list GitHub App installations for reconcile: %v", err)
+		}
+		return
+	}
+
+	for _, installation := range installations {
+		if err := saveReconciledInstallation(installation); err != nil && ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to reconcile GitHub App installation %s: %v", installation.ID, err)
+		}
+	}
+}
+
+func takeHostedReconcileSlot() bool {
+	hostedReconcileMu.Lock()
+	defer hostedReconcileMu.Unlock()
+
+	now := hostedIdentityNow().UTC()
+	if !hostedReconcileLast.IsZero() && now.Sub(hostedReconcileLast) < hostedReconcileTTL {
+		return false
+	}
+	hostedReconcileLast = now
+	return true
+}
+
+func findGitHubLoginForUserFromDB(userID string) (string, error) {
+	return models.FindGitHubLoginForUser(database.Conn(), userID)
+}
+
+func findCachedInstallationMemberFromDB(installationID, login string) (*models.HostedAppInstallationMember, error) {
+	return models.FindHostedAppInstallationMember(database.Conn(), models.HostedAppProviderGitHub, installationID, login)
+}
+
+func saveCachedInstallationMemberToDB(installationID, login string, allowed bool, checkedAt time.Time) error {
+	return models.UpsertHostedAppInstallationMember(database.Conn(), models.HostedAppInstallationMember{
+		Provider:       models.HostedAppProviderGitHub,
+		InstallationID: installationID,
+		MemberLogin:    login,
+		Allowed:        allowed,
+		CheckedAt:      checkedAt,
+	})
+}
+
+func listHostedInstallationRowsFromDB() ([]hostedInstallationSnapshot, error) {
+	rows, err := models.ListHostedAppInstallations(database.Conn(), models.HostedAppProviderGitHub)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]hostedInstallationSnapshot, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, hostedInstallationSnapshot{
+			ID:           row.InstallationID,
+			AccountLogin: row.AccountLogin,
+			AccountType:  row.AccountType,
+			LastEventAt:  row.LastEventAt,
+			CreatedAt:    row.CreatedAt,
+			Deleted:      row.DeletedAt.Valid,
+		})
+	}
+	return result, nil
+}
+
+// checkInstallationMembershipOnGitHub asks GitHub whether the login belongs
+// to the installation organization. The membership endpoint needs the app's
+// organization members read permission; when it says no or is unavailable,
+// the collaborator fallback checks repository permission like Semaphore does,
+// which works with the default metadata read permission.
+func checkInstallationMembershipOnGitHub(
+	integration core.IntegrationContext,
+	appID int64,
+	installationID string,
+	accountLogin string,
+	login string,
+) (bool, error) {
+	client, err := newInstallationClient(integration, appID, installationID)
+	if err != nil {
+		return false, err
+	}
+
+	membership, _, err := client.Organizations.GetOrgMembership(context.Background(), login, accountLogin)
+	if err == nil && membership.GetState() == "active" {
+		return true, nil
+	}
+
+	return installationHasCollaborator(client, accountLogin, login)
+}
+
+func installationHasCollaborator(client *github.Client, owner, login string) (bool, error) {
+	repos, err := listInstallationRepos(context.Background(), client)
+	if err != nil {
+		return false, err
+	}
+
+	for index, repo := range repos {
+		if index >= hostedCollaboratorRepoLimit {
+			break
+		}
+		level, _, err := client.Repositories.GetPermissionLevel(context.Background(), owner, repo.Name, login)
+		if err != nil {
+			continue
+		}
+		if permission := level.GetPermission(); permission != "" && permission != "none" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func listAppInstallationsDetailedFromGitHub(integration core.IntegrationContext, appID int64) ([]hostedInstallationSnapshot, error) {
+	client, err := newAppJWTClient(integration, appID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := []hostedInstallationSnapshot{}
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		installations, response, err := client.Apps.ListInstallations(context.Background(), opts)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, installation := range installations {
+			if installation == nil || installation.GetAccount() == nil {
+				continue
+			}
+			createdAt := time.Time{}
+			if installation.CreatedAt != nil {
+				createdAt = installation.CreatedAt.Time
+			}
+			result = append(result, hostedInstallationSnapshot{
+				ID:           strconv.FormatInt(installation.GetID(), 10),
+				AccountLogin: installation.GetAccount().GetLogin(),
+				AccountType:  installation.GetAccount().GetType(),
+				CreatedAt:    createdAt,
+				LastEventAt:  createdAt,
+			})
+		}
+
+		if response == nil || response.NextPage == 0 {
+			return result, nil
+		}
+		opts.Page = response.NextPage
+	}
+}
+
+func saveReconciledInstallationToDB(snapshot hostedInstallationSnapshot) error {
+	return models.ReconcileHostedAppInstallation(database.Conn(), models.HostedAppInstallation{
+		Provider:       models.HostedAppProviderGitHub,
+		InstallationID: snapshot.ID,
+		AccountLogin:   snapshot.AccountLogin,
+		AccountType:    snapshot.AccountType,
+		LastEventAt:    snapshot.CreatedAt,
+		CreatedAt:      snapshot.CreatedAt,
+	})
+}
+
+func resetHostedIdentityHooks() {
+	findGitHubLoginForUser = findGitHubLoginForUserFromDB
+	findCachedInstallationMember = findCachedInstallationMemberFromDB
+	saveCachedInstallationMember = saveCachedInstallationMemberToDB
+	listHostedInstallationRows = listHostedInstallationRowsFromDB
+	checkInstallationMembership = checkInstallationMembershipOnGitHub
+	listAppInstallationsDetailed = listAppInstallationsDetailedFromGitHub
+	saveReconciledInstallation = saveReconciledInstallationToDB
+	hostedIdentityNow = time.Now
+
+	hostedReconcileMu.Lock()
+	hostedReconcileLast = time.Time{}
+	hostedReconcileMu.Unlock()
+}
