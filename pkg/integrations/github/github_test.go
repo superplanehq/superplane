@@ -71,18 +71,21 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.NotEmpty(t, metadata.State)
 	})
 
-	t.Run("hosted public app", func(t *testing.T) {
+	t.Run("hosted public app from settings", func(t *testing.T) {
 		setHostedAppEnv(t)
 		stubEmptyHostedDiscovery(t)
 		restore := withFactoriesEnabledForTest(func(string) bool { return true })
 		t.Cleanup(restore)
 
 		integrationCtx := &contexts.IntegrationContext{}
-		require.NoError(t, g.Sync(core.SyncContext{
+		const starterUserID = "22222222-2222-2222-2222-222222222222"
+		syncCtx := core.SyncContext{
 			OrganizationID: "11111111-1111-1111-1111-111111111111",
-			ActorUserID:    "starter-user",
+			ActorUserID:    starterUserID,
+			Configuration:  Configuration{SetupReturnPath: "/acme/settings/integrations"},
 			Integration:    integrationCtx,
-		}))
+		}
+		require.NoError(t, g.Sync(syncCtx))
 
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Equal(t, "GET", integrationCtx.BrowserAction.Method)
@@ -95,10 +98,11 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.True(t, metadata.HostedApp)
 		assert.Equal(t, int64(99), metadata.GitHubApp.ID)
 		assert.Equal(t, "superplane", metadata.GitHubApp.Slug)
-		assert.Equal(t, "starter-user", metadata.StartedByUserID)
+		assert.Equal(t, starterUserID, metadata.StartedByUserID)
 		assert.NotEmpty(t, metadata.State)
 		assert.Empty(t, metadata.InstallationID)
-		assert.Empty(t, metadata.SetupReturnPath)
+		assert.Equal(t, "/acme/settings/integrations", metadata.SetupReturnPath)
+		assert.Nil(t, metadata.InstallationDiscovery)
 	})
 
 	t.Run("hosted public app stores a safe setup return path", func(t *testing.T) {
@@ -110,7 +114,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{}
 		require.NoError(t, g.Sync(core.SyncContext{
 			OrganizationID: "11111111-1111-1111-1111-111111111111",
-			ActorUserID:    "starter-user",
+			ActorUserID:    "22222222-2222-2222-2222-222222222222",
 			Configuration:  Configuration{SetupReturnPath: "/onboarding?attempt=1&step=vcs"},
 			Integration:    integrationCtx,
 		}))

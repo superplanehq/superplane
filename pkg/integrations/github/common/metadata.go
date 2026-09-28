@@ -27,10 +27,17 @@ type Metadata struct {
 	// PendingInstallations is the server-verified list of installations and
 	// writable repositories available to the linked GitHub identity.
 	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
+	// InstallationDiscovery resumes the bounded scan for installations that
+	// the linked GitHub identity can use. Results join PendingInstallations as
+	// each step completes.
+	InstallationDiscovery *InstallationDiscovery `mapstructure:"installationDiscovery" json:"installationDiscovery,omitempty"`
 	// SetupInstallationID is an untrusted installation ID from GitHub's setup
 	// callback. Sync verifies it with App credentials before it can become a
 	// pending or bound installation.
 	SetupInstallationID string `mapstructure:"setupInstallationId" json:"setupInstallationId,omitempty"`
+	// SetupInstallationReceivedAt keeps callback verification pending while a
+	// new GitHub installation propagates to the App installation API.
+	SetupInstallationReceivedAt string `mapstructure:"setupInstallationReceivedAt" json:"setupInstallationReceivedAt,omitempty"`
 	// InstallationsRefreshedAt limits full App installation discovery while the
 	// picker polls, without making the verified list permanent.
 	InstallationsRefreshedAt string `mapstructure:"installationsRefreshedAt" json:"installationsRefreshedAt,omitempty"`
@@ -74,6 +81,16 @@ type Metadata struct {
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
+}
+
+type InstallationDiscovery struct {
+	Active                 bool                  `mapstructure:"active" json:"active"`
+	PersonalAccountChecked bool                  `mapstructure:"personalAccountChecked" json:"personalAccountChecked"`
+	NextPage               int                   `mapstructure:"nextPage" json:"nextPage"`
+	RetryCandidates        []PendingInstallation `mapstructure:"retryCandidates" json:"retryCandidates,omitempty"`
+	TransientFailures      bool                  `mapstructure:"transientFailures" json:"transientFailures,omitempty"`
+	InstallAvailable       bool                  `mapstructure:"installAvailable" json:"installAvailable,omitempty"`
+	Complete               bool                  `mapstructure:"complete" json:"complete"`
 }
 
 type PendingInstallation struct {

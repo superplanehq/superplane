@@ -9,6 +9,8 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
+  hostedGitHubInstallationDiscoveryActive,
+  hostedGitHubInstallationDiscoveryInstallAvailable,
   hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
@@ -34,6 +36,8 @@ export type PendingGitHubAccountPicker = {
   appSlug: string;
   /** Linked GitHub login used to verify repository access. */
   githubLogin: string;
+  discoveringAccounts?: boolean;
+  installAvailable?: boolean;
 };
 
 export type PendingGitHubRequestConnection = {
@@ -55,6 +59,8 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
+    ...(hostedGitHubInstallationDiscoveryActive(item.status?.metadata) ? { discoveringAccounts: true } : {}),
+    ...(hostedGitHubInstallationDiscoveryInstallAvailable(item.status?.metadata) ? { installAvailable: true } : {}),
   };
 }
 
@@ -101,6 +107,18 @@ export function pendingGitHubBrowserAction(
   currentUserId?: string,
 ): OrganizationsBrowserAction | undefined {
   return pendingOwnGitHubWithAction(connected, currentUserId)?.status?.browserAction;
+}
+
+export function pendingGitHubBrowserActionConnection(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): { id: string; action: OrganizationsBrowserAction } | undefined {
+  const connection = pendingOwnGitHubWithAction(connected, currentUserId, preferredIntegrationId);
+  const id = connection?.metadata?.id;
+  const action = connection?.status?.browserAction;
+  if (!id || !action?.url) return undefined;
+  return { id, action };
 }
 
 function pendingOwnGitHubWithAction(
@@ -175,7 +193,10 @@ export function pendingGitHubAccountPicker(
     ) {
       return false;
     }
-    return pendingGitHubInstallations(item.status?.metadata).length >= 1;
+    return (
+      pendingGitHubInstallations(item.status?.metadata).length >= 1 ||
+      hostedGitHubInstallationDiscoveryActive(item.status?.metadata)
+    );
   });
   const owned = candidates.find((item) => startedByUserID(item) === currentUserId);
   const legacyCandidates = candidates.filter((item) => startedByUserID(item) === "");
@@ -200,7 +221,7 @@ export function githubAccountPickerFromConnection(
   }
 
   const picker = accountPickerFromItem(connection);
-  if (!picker || picker.installations.length === 0 || picker.state === "") {
+  if (!picker || (picker.installations.length === 0 && !picker.discoveringAccounts) || picker.state === "") {
     return undefined;
   }
 
