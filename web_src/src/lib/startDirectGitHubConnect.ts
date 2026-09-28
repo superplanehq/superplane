@@ -11,7 +11,6 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubInstallRequested,
-  hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallRequests,
@@ -258,12 +257,15 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
-      // Onboarding asks again which GitHub account to use on every Connect
-      // click, so the click opens the GitHub App install page instead of
-      // the stored picker. Without a slug and state the flow falls through
-      // and starts a fresh connect.
-      if (picker.appSlug && picker.state) {
-        return followBrowserAction({ method: "GET", url: hostedGitHubInstallURL(picker.appSlug, picker.state) });
+      // Identity discovery prefills the stored options, so onboarding shows
+      // its own account picker instead of the GitHub install page. A full
+      // load of the setup step re-reads the connection list and opens the
+      // picker; "Install on another account" still opens GitHub. Without a
+      // bind state the options cannot bind, so the flow falls through and
+      // starts a fresh connect.
+      if (picker.state && args.returnTo) {
+        window.location.assign(args.returnTo);
+        return true;
       }
       return false;
     }
@@ -346,7 +348,10 @@ function openPrefilledPickerAfterCreate(
   if (!createdId || pendingGitHubInstallations(created?.status?.metadata).length < 1) {
     return false;
   }
-  if (isOnboardingSetupReturnPath(args.returnTo)) {
+  if (args.returnTo && isOnboardingSetupReturnPath(args.returnTo)) {
+    // Reload the setup step, so onboarding opens its picker with the
+    // prefilled options instead of waiting for a GitHub redirect.
+    window.location.assign(args.returnTo);
     return true;
   }
 

@@ -187,6 +187,34 @@ describe("FirstRunSetup reliability", () => {
     expect(screen.getByTestId("first-run-back")).toBeEnabled();
   });
 
+  // Identity discovery prefills the account picker before any GitHub round
+  // trip. The Connect click then shows the stored accounts in place and
+  // must not open the GitHub install page.
+  it("opens the prefilled account picker on Connect without a GitHub round trip", async () => {
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    const model = pageModel({
+      openSection: "vcs",
+      requestConnect,
+      githubConnections: githubConnections([
+        githubConnection("github-9", {
+          startedByUserID: "user-1",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [{ id: "11", accountLogin: "forestileao", accountType: "User" }],
+        }),
+      ]),
+    });
+    renderSetup(model, "/org-1/workspaces/PAY/setup");
+
+    await user.click(screen.getByTestId("first-run-get-started"));
+    await user.click(screen.getByTestId("first-run-connect-github"));
+
+    expect(await screen.findByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /forestileao/ })).toBeInTheDocument();
+    expect(requestConnect).not.toHaveBeenCalled();
+  });
+
   it("keeps repository and ticket screens locked until their saves finish", async () => {
     const user = userEvent.setup();
     const repositorySaved = deferred<boolean>();
