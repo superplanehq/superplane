@@ -344,7 +344,7 @@ describe("FirstRunSetup reliability", () => {
     );
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
-    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true);
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "int-1", true, 5_000);
   });
 
   it("opens the waiting screen from a GitHub request return", async () => {
@@ -402,7 +402,12 @@ describe("FirstRunSetup reliability", () => {
     expect(
       screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("connected-user") }),
     ).not.toBeInTheDocument();
-    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith("org-1", "request-integration", true);
+    expect(vi.mocked(useRecheckGitHubInstallRequest)).toHaveBeenLastCalledWith(
+      "org-1",
+      "request-integration",
+      true,
+      5_000,
+    );
   });
 
   it("uses server metadata for every requested organization", () => {
