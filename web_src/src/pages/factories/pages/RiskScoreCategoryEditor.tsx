@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
@@ -122,15 +123,18 @@ function AddCategoryDialog({
           <DialogTitle>{RISK_SCORE_SETUP_COPY.addTitle}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <label className="block space-y-1.5">
-            <span className="text-[13px] font-medium">{RISK_SCORE_SETUP_COPY.addNameLabel}</span>
+          <div className="space-y-1.5">
+            <Label htmlFor="risk-score-category-name" className="text-[13px]">
+              {RISK_SCORE_SETUP_COPY.addNameLabel}
+            </Label>
             <Input
+              id="risk-score-category-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               autoFocus
               data-testid="risk-score-category-name"
             />
-          </label>
+          </div>
           <div className="space-y-1.5">
             <span className="text-[13px] font-medium">{RISK_SCORE_SETUP_COPY.addScoreLabel}</span>
             <RiskLevelSelect

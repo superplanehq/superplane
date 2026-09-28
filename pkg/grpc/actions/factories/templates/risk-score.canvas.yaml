@@ -103,7 +103,9 @@ spec:
               else
                 git checkout --detach FETCH_HEAD
               fi
-              gh pr diff "${PR_NUMBER}" --repo "${REPO}" > /tmp/pr.diff
+              revision="$(git rev-parse HEAD)"
+              base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
+              gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
           - name: Review Pull Request
             type: prompt
             workingDirectory: repo
