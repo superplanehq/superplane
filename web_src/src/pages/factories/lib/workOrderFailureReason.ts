@@ -9,7 +9,7 @@ export type WorkOrderCreditFailureReason =
 export interface WorkOrderCreditFailureCopy {
   /** Short text for the task card chip. */
   label: string;
-  /** Sentence that tells the user why the step did not run. */
+  /** Sentence that tells the user why the agent run is blocked. */
   message: string;
   /** Text for the billing link. */
   actionLabel: string;
@@ -18,17 +18,17 @@ export interface WorkOrderCreditFailureCopy {
 const CREDIT_FAILURE_COPY: Record<WorkOrderCreditFailureReason, WorkOrderCreditFailureCopy> = {
   no_hosted_credit: {
     label: "No credit",
-    message: "This step did not start. The organization has no SuperPlane hosted credit.",
+    message: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
     actionLabel: "Add credits",
   },
   hosted_subscription_required: {
     label: "No plan",
-    message: "This step did not start. SuperPlane hosted runs need a Business plan.",
+    message: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
     actionLabel: "Subscribe",
   },
   workspace_budget_empty: {
     label: "No workspace budget",
-    message: "This step did not start. This workspace has no hosted credit budget left.",
+    message: "This agent run is blocked. This workspace has no hosted credit budget left.",
     actionLabel: "Open billing",
   },
 };
