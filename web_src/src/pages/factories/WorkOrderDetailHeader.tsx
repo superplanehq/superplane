@@ -2,7 +2,13 @@ import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-cl
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Ellipsis } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import {
@@ -33,6 +39,9 @@ interface WorkOrderDetailHeaderProps {
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onSendToBacklog?: () => void;
+  canCreate?: boolean;
+  isDuplicating?: boolean;
+  onDuplicate?: () => void;
   className?: string;
 }
 
@@ -69,7 +78,8 @@ const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
 
 function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
   const actions = buildWorkOrderStatusActions(props);
-  if (actions.length === 0) {
+  const showDuplicate = Boolean(props.canCreate && props.onDuplicate);
+  if (actions.length === 0 && !showDuplicate) {
     return null;
   }
 
@@ -78,7 +88,7 @@ function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
   return (
     <DropdownMenu>
       <PermissionTooltip
-        allowed={props.canClose || props.canManage}
+        allowed={props.canClose || props.canManage || showDuplicate}
         message="You don't have permission to manage this task."
       >
         <DropdownMenuTrigger asChild>
@@ -97,6 +107,16 @@ function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
       </PermissionTooltip>
 
       <DropdownMenuContent align="end" className="w-48">
+        {showDuplicate ? (
+          <DropdownMenuItem
+            disabled={props.isDuplicating}
+            onSelect={() => props.onDuplicate?.()}
+            data-testid="work-order-duplicate-button"
+          >
+            Duplicate
+          </DropdownMenuItem>
+        ) : null}
+        {showDuplicate && actions.length > 0 ? <DropdownMenuSeparator /> : null}
         {actions.map((action) => (
           <DropdownMenuItem
             key={action.kind}
