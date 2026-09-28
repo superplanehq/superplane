@@ -21,7 +21,9 @@ then you implement only after they confirm the spec.
    only. The settings page shows at least one filter that belongs to this
    integration. Manual token or application input is always available. A
    public app or OAuth install is added when the service offers one, and it
-   runs only when the deployment variables are set.
+   runs only when the deployment variables are set. The setup wizard includes
+   **Import existing items**, on by default, and that import is the 10 newest
+   items.
 4. Repeat the spec and wait for confirmation.
 5. Implement from the skill's file map. Reuse the closest finished intake.
    Do not add write-back, attachment copy, or merge-into-one-task unless the

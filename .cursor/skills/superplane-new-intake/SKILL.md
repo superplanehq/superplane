@@ -80,7 +80,7 @@ Required before any code:
 - Title fields, body fields, and the browse URL field
 - Resource the trigger listens on, and the configuration key name
 - Filters and their defaults
-- First import: on or off, item cap, and whether the user can skip it
+- Import existing items on the setup wizard. It is on by default and imports the 10 newest items. The user can turn it off.
 - Feature flag: on or off for the Add intake entry
 - Write-back when the task completes: yes or no
 
@@ -281,19 +281,27 @@ app asks for a personal token.
 - Can the user reconnect a missing integration from settings? Jira, Sentry,
   and Productive can. GitHub uses the workspace repository from onboarding.
 
-### 4. First import
+### 4. Import existing items
 
-- Import existing items when the intake is created, or wait for the next
-  event?
-- Cap. Current caps: GitHub issues 30, Jira 10, Sentry 10, Productive 10.
-  Dependabot does not auto-import. The user picks packages, and create sets
-  `skipInitialImport`.
-- Offer **Skip import** in the wizard? Jira, Sentry, and Productive do.
-- Search and import one item by id, so the wizard and **Import** can read the
-  source. The list API and the trigger payload must be the same shape.
-- A setup list that runs before the intake exists needs its own RPC, as
-  Dependabot does in `search_dependabot_intake_setup_items.go`. Prefer
-  `SearchFactoryIntakeItems` after the intake exists.
+The setup wizard includes **Import existing items**. Reuse
+`IntakeSkipInitialImportField`. Do not add a second control. GitHub, Jira,
+Sentry, and Productive use this field. Do not copy Dependabot, which skips
+the import and asks the user to pick packages.
+
+- The checkbox is on by default. Create then imports items.
+- The user can turn it off. Create then sends `skipInitialImport: true` and
+  waits for the next event.
+- The import is the 10 newest items that match the intake filters. Use a
+  source cap of 10 in `pkg/grpc/actions/factories/intake_seed.go`. GitHub
+  issues still use 30. Do not change that cap.
+- The helper states the number. Productive says "SuperPlane adds the 10
+  newest open tasks from this project." Name this source's open state the
+  same way.
+- The label stays **Import existing items**. That string is shared.
+
+Search and import of one item by id stays available after create, through
+`SearchFactoryIntakeItems`. A list that runs before the intake exists needs
+its own RPC, as Dependabot does. Prefer search after the intake exists.
 
 ### 5. Trigger payload
 
@@ -331,15 +339,16 @@ either unless the human says yes.
   flag. Default for a new source: flag on, entry shows **Coming soon** until
   the flag is enabled.
 - Picker name, description, and icon.
-- Setup page title, helper text, skip-import label, and create-error text.
+- Setup page title, the helper under **Import existing items**, and the create-error text.
 
 ## Confirm, then implement
 
 Repeat the answers as a short spec. Include the integration, icon file,
 task-card name and host, settings filters and their defaults, manual connect
 fields and steps, hosted env vars when that path exists, trigger component,
-source id, events, title, body, origin URL, resource key, seed cap, feature
-flag, and write-back. Say that delete removes the intake and keeps the
+source id, events, title, body, origin URL, resource key, feature flag, and
+write-back. Say that the setup wizard imports the 10 newest items unless the
+user turns **Import existing items** off. Say that delete removes the intake and keeps the
 integration. Say that an empty hosted configuration shows the manual dialog.
 Ask the human to confirm. Start code only after they confirm.
 
@@ -381,8 +390,9 @@ analysis node. Scoring happens on the Backlog canvas.
 
 ### Read live items
 
-- `pkg/grpc/actions/factories/intake_seed.go`: list existing items, emit the
-  trigger payload type, skip items that already have a task, honor the cap.
+- `pkg/grpc/actions/factories/intake_seed.go`: list the 10 newest matching
+  items, emit the trigger payload type, and skip items that already have a
+  task. Honor `skipInitialImport`.
   Record skipped, failed, and completed on the intake.
 - `pkg/grpc/actions/factories/intake_items.go`: register the trigger
   component for Search, Get, and origin-id matching.
@@ -484,4 +494,6 @@ and keep the manual client id and client secret fields.
 
 Still ask: which actions create a task, title format, and at least one
 settings filter (labels, state, or priority). The settings page must show
-that filter. Also ask seed cap, skip import, feature flag, and write-back.
+that filter. Also ask feature flag and write-back. Do not ask about the
+import cap. It is the 10 newest items, and the setup wizard offers **Import
+existing items**.
