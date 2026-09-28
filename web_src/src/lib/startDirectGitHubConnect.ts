@@ -6,6 +6,7 @@ import type {
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
 
 import { followBrowserAction } from "@/lib/browserAction";
+import { redirectToGitHubIdentityLink } from "@/lib/githubIdentityLinkGate";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
@@ -248,6 +249,8 @@ type StartDirectGitHubConnectArgs = {
   }) => Promise<OrganizationsCreateIntegrationResponse>;
   update?: (payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>;
   goTo?: (path: string) => void;
+  /** Set on the automatic retry after the identity link flow returns. */
+  skipIdentityGate?: boolean;
 };
 
 async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
@@ -288,6 +291,14 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
 export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
   if (!args.forceNew && !args.currentUserId) {
     return false;
+  }
+
+  // Link the GitHub identity first, so installation discovery can
+  // prepopulate the account picker. The retry after the link flow returns
+  // skips the gate, so a failed link still falls through to the plain
+  // connect below.
+  if (!args.skipIdentityGate && (await redirectToGitHubIdentityLink(connectReturnPath(args.returnTo)))) {
+    return true;
   }
 
   if (!args.forceNew && (await resumePendingGitHubConnect(args))) {
@@ -359,6 +370,13 @@ async function persistSetupReturnPath(
   }
 
   await update({ id: integrationId, configuration });
+}
+
+function connectReturnPath(returnTo?: string): string {
+  if (returnTo) {
+    return returnTo;
+  }
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 function githubInstallPickerPath(organizationId: string, integrationId: string, integrationsBasePath?: string) {
