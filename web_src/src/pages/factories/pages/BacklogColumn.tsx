@@ -290,7 +290,7 @@ function BacklogColumnOrderList({
       return;
     }
     loadMoreIfNeeded(scrollRef.current);
-  }, [loadMoreIfNeeded, orders.length, paging?.loadWhenShort]);
+  }, [loadMoreIfNeeded, orders.length, paging?.loadWhenShort, scrollRef]);
 
   return (
     <LineBoardColumnCardList
