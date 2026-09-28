@@ -3,8 +3,8 @@ name: superplane-new-intake
 description: >-
   Use when adding a new factory intake source, such as Linear, Notion, or
   Datadog. Ask which source, then collect branding, the existing integration,
-  delete-intake behavior, the task-card source, settings filters, and the
-  other facts required before implementation.
+  manual and hosted connect, delete-intake behavior, the task-card source,
+  settings filters, and the other facts required before implementation.
 ---
 
 # New factory intake
@@ -73,6 +73,8 @@ Required before any code:
 - Task-card source: display name, icon, site host, and ticket label
 - Delete intake is included. It removes the intake only. It does not remove the integration.
 - Settings filters: at least one filter that belongs to this integration, plus its default
+- Manual connect: each value the user pastes, and the current steps to create it
+- Hosted connect, when the service offers a public app or OAuth install: env var names and the operator steps to create that app. Manual connect stays available.
 - Events that create a task
 - One task per what (one issue, one package, one alert)
 - Title fields, body fields, and the browse URL field
@@ -90,7 +92,7 @@ You may propose, and the human confirms:
 
 ## Checklist
 
-These five are required for every intake. Do not treat them as optional.
+These items are required for every intake. Do not treat them as optional.
 
 ### Branding
 
@@ -182,6 +184,71 @@ Add `intakeSourceHasFilterNode` for the new source in
 source id. Cover the round trip in `intake_settings_test.go` and a
 `*FilterFields.spec.tsx`.
 
+### Connection
+
+Do this even when the integration already exists. Read `Instructions()` and
+the configuration fields. A trigger is not a finished connection.
+
+**Manual connect is always required.** The user must be able to create the
+credential on the service and paste it into SuperPlane. That credential is
+whatever the service requires: an API token, a personal token, an application
+token, or the client id and client secret of an application the user creates.
+
+The connect dialog shows those steps above the fields. The text is
+`Instructions()` on the integration, rendered by `IntegrationInstructions`.
+The steps must match the service's current UI:
+
+- Name every value the user copies.
+- Name the page and the control that creates it. Link a stable URL when one
+  exists. Sentry links the personal-token page.
+- Name each permission the token or application needs, and why.
+- Name the SuperPlane field that receives each value.
+- Follow [ui-copy](../../.agents/skills/ui-copy/SKILL.md). Number the steps.
+
+If the human does not know the current clicks, look them up in the vendor
+docs and show the draft steps. Wait for the human to confirm before you
+write them. A test must assert that the instructions contain the permission
+names and the page path. Sentry does this in `pkg/integrations/sentry/sentry_test.go`.
+
+**Hosted connect is required when the service offers it.** GitHub, Sentry,
+and Jira do this. SuperPlane owns one public application. The user installs
+that application, or the browser redirects through OAuth. The user does not
+paste SuperPlane's client secret.
+
+The hosted path runs only when the deployment has a complete set of
+variables. `HostedAppFromEnv` or `UseHostedInstall` returns false when any
+required variable is empty. Empty variables keep the manual dialog. They must
+not show a broken install button.
+
+When the variables are set, Connect opens the install or OAuth page
+(`HostedAppInstall` on the integration definition). The manual dialog stays
+available so a user can still paste their own token or application. Sentry
+uses `privateApp` for that opt-out. Jira uses a pasted client id and client
+secret even when the hosted app is configured.
+
+Ask the human whether this service has a public application or an OAuth
+install that one vendor can hold for every customer. If you are not sure,
+say what the vendor docs show and ask them to confirm. Skip the hosted path
+only after they confirm the service has no such install.
+
+When the hosted path is in scope, collect:
+
+- Variable names, one per secret the process holds. Do not invent a second
+  prefix. GitHub uses `SUPERPLANE_GITHUB_APP_*`. Sentry uses
+  `SUPERPLANE_SENTRY_APP_*`. Jira uses `SUPERPLANE_JIRA_OAUTH_*`.
+- Callback URL, webhook URL, and events, written with `{BASE_URL}` and
+  `{WEBHOOKS_BASE_URL}`.
+- Permissions the public app requests.
+- The operator steps to create that app on the service.
+
+Document the operator steps in
+`docs/contributing/connecting-to-3rdparty-services-from-development.md`.
+Add commented variables to `.env.example` and pass them through
+`docker-compose.dev.yml`. Do not commit real secrets. State what the user
+sees when the variables are set, and what they see when the variables are
+empty. Sentry's doc says a complete app opens the install page, and an empty
+app asks for a personal token.
+
 ### 1. What becomes a task
 
 - Which events create a task? Examples: created, reopened, assigned, a
@@ -228,15 +295,13 @@ source id. Cover the round trip in `intake_settings_test.go` and a
   Dependabot does in `search_dependabot_intake_setup_items.go`. Prefer
   `SearchFactoryIntakeItems` after the intake exists.
 
-### 5. Connection
+### 5. Trigger payload
 
-Skip this group when the integration and a suitable trigger already exist.
-Say which trigger you will reuse. Do not add a second trigger for the same
-event.
+Connection is required. Collect it in **Connection**. Do not skip it because
+the integration already exists.
 
-Ask this group only when the integration or the trigger is missing:
+Ask this group only when the trigger is missing:
 
-- Auth: OAuth app, API token, or an existing app installation.
 - Delivery: webhook or poll. Current live intakes use webhooks.
 - Who can connect. Linear webhooks need a workspace admin token.
 - List API for search and seed, and get-by-id API for import.
@@ -244,10 +309,6 @@ Ask this group only when the integration or the trigger is missing:
   emits. Seed events must use that same type.
 - Token scopes. Read is enough for intake. Write is required only when the
   human asked for write-back.
-- Public app env vars, when the product installs a SuperPlane-owned app
-  (Sentry, Jira). Name the variables. Document them in
-  `docs/contributing/connecting-to-3rdparty-services-from-development.md`
-  and `.env.example`.
 
 ### 6. After the task exists
 
@@ -275,11 +336,12 @@ either unless the human says yes.
 ## Confirm, then implement
 
 Repeat the answers as a short spec. Include the integration, icon file,
-task-card name and host, settings filters and their defaults, trigger
-component, source id, events, title, body, origin URL, resource key, seed
-cap, feature flag, and write-back. Say that delete removes the intake and
-keeps the integration. Ask the human to confirm. Start code only after they
-confirm.
+task-card name and host, settings filters and their defaults, manual connect
+fields and steps, hosted env vars when that path exists, trigger component,
+source id, events, title, body, origin URL, resource key, seed cap, feature
+flag, and write-back. Say that delete removes the intake and keeps the
+integration. Say that an empty hosted configuration shows the manual dialog.
+Ask the human to confirm. Start code only after they confirm.
 
 Generated files stay gitignored. Edit `protos/factories.proto`, then run
 `make pb.gen`. Do not hand-edit `pkg/protos/`, `web_src/src/api-client/`, or
@@ -337,6 +399,19 @@ Reuse the existing trigger when one matches the events. When it does not,
 add the component under `pkg/integrations/<name>/`, register it, add an
 example payload, and update `docs/components/<Name>.mdx`. Follow
 `docs/contributing/component-implementations.md`.
+
+### Connect
+
+- Rewrite `Instructions()` when the steps omit a value, a page, or a
+  permission. Show that text in the connect dialog.
+- Add configuration fields for each pasted value. Mark secrets sensitive.
+- When the hosted path is in scope, add a config loader that is enabled only
+  when every variable is set. Wire `UseHostedInstall` and
+  `HostedAppInstall` in `pkg/grpc/actions/integrations/list_integrations.go`.
+  Add the public callback and webhook routes. Keep the manual fields working
+  when the user opts out, and when the variables are empty.
+- Document the public app in `.env.example`, `docker-compose.dev.yml`, and
+  `docs/contributing/connecting-to-3rdparty-services-from-development.md`.
 
 ### Feature flag and UI
 
@@ -400,6 +475,12 @@ Facts you can state, then still confirm the product choices:
 - Body: `{{ root().data.data.description }}`
 - Browse URL: `{{ root().data.url }}`
 - Webhooks require a workspace admin token
+
+Linear connect today asks for a Client ID and a Client Secret. The
+instructions do not say how to create that OAuth application. Rewrite them
+with the current Linear steps. Check whether Linear offers a public OAuth
+application that SuperPlane can hold. If it does, add the env-gated install
+and keep the manual client id and client secret fields.
 
 Still ask: which actions create a task, title format, and at least one
 settings filter (labels, state, or priority). The settings page must show
