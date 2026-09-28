@@ -298,6 +298,7 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceGitHubIssues:
 				configuration["actions"] = intakeTriggerActionsFor(updated)
 				nodes[i].Configuration = configuration
+				nodes[i].Metadata = mergeGitHubManualTaskMetadata(nodes[i].Metadata, updated)
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
 				nodes[i].Configuration = configuration

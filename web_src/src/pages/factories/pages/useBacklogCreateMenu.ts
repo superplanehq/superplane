@@ -7,7 +7,7 @@ import {
 } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useBacklogIntakeItemCatalog } from "./useBacklogIntakeItemCatalog";
 import {
@@ -33,6 +33,7 @@ export function useBacklogCreateMenu(
   const [focusedIntakeId, setFocusedIntakeId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(BACKLOG_SEARCH_PAGE_SIZE);
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
+  const createRequestKeys = useRef(new Map<string, string>());
   const importIntakeItem = useImportFactoryIntakeItem(organizationId, factoryId);
   const intakes = useMemo(() => intakesQuery.data ?? [], [intakesQuery.data]);
   const hasCatalog = catalog.items.length > 0;
@@ -98,7 +99,14 @@ export function useBacklogCreateMenu(
   const importItem = async (item: BacklogIntakeItem) => {
     try {
       if (hasCatalog) {
-        await createWorkOrder.mutateAsync({ title: item.title, description: item.body });
+        const requestKey = createRequestKeys.current.get(item.id) ?? crypto.randomUUID();
+        createRequestKeys.current.set(item.id, requestKey);
+        await createWorkOrder.mutateAsync({
+          title: item.title,
+          description: item.body,
+          idempotencyKey: requestKey,
+        });
+        createRequestKeys.current.delete(item.id);
         return;
       }
 

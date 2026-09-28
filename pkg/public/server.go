@@ -447,6 +447,8 @@ func headersMatcher(key string) (string, bool) {
 		return key, true
 	case "X-Token-Scopes":
 		return key, true
+	case "Idempotency-Key":
+		return "idempotency-key", true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
 	}

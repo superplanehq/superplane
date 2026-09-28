@@ -488,7 +488,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		factoryModel := newFactory(t)
 		create(t, factoryModel, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
-		_, err := CreateWorkOrder(ctx, orgID, &pb.CreateWorkOrderRequest{
+		_, err := CreateWorkOrder(ctx, deps, orgID, &pb.CreateWorkOrderRequest{
 			FactoryId: factoryModel.ID.String(),
 			Title:     "Show a clearer empty state",
 		})
@@ -513,7 +513,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		}))
 		create(t, factoryModel, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
-		_, err := CreateWorkOrder(ctx, orgID, &pb.CreateWorkOrderRequest{
+		_, err := CreateWorkOrder(ctx, deps, orgID, &pb.CreateWorkOrderRequest{
 			FactoryId: factoryModel.ID.String(),
 			Title:     "Keep this as a plain draft",
 		})

@@ -38,6 +38,8 @@ export function useCreateWorkOrderComposer({
   const [titleError, setTitleError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const hasSeededOwner = useRef(false);
+  const createRequestKey = useRef("");
+  const createRequestDraft = useRef("");
 
   const canCreate = Boolean(title.trim()) && !isCreating;
 
@@ -73,12 +75,24 @@ export function useCreateWorkOrderComposer({
     }
 
     setIsCreating(true);
+    const draftToken = JSON.stringify({
+      title: trimmedTitle,
+      description: trimmedDescription,
+      assigneeIds,
+    });
+    if (createRequestDraft.current !== draftToken || createRequestKey.current === "") {
+      createRequestDraft.current = draftToken;
+      createRequestKey.current = crypto.randomUUID();
+    }
     try {
       const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
         description: trimmedDescription,
         assigneeIds,
+        idempotencyKey: createRequestKey.current,
       });
+      createRequestKey.current = "";
+      createRequestDraft.current = "";
       goToOrder(order);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create task"));

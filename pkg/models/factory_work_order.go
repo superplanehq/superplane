@@ -122,7 +122,7 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 
 	label := ""
 	if o.OriginLabel != nil {
-		label = strings.TrimSpace(*o.OriginLabel)
+		label = StripCreateRequestKey(strings.TrimSpace(*o.OriginLabel))
 	}
 	if label == "" {
 		label = OriginLabelFromURL(url)
@@ -247,6 +247,122 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	}
 
 	return result, nil
+}
+
+func (o *FactoryWorkOrder) SetOrigin(tx *gorm.DB, origin WorkOrderOrigin) error {
+	key := ""
+	if o.OriginLabel != nil {
+		key = CreateRequestKeyFromLabel(*o.OriginLabel)
+	}
+	applyWorkOrderOrigin(o, &origin)
+	if o.OriginURL == nil {
+		return nil
+	}
+	if key != "" && o.OriginLabel != nil {
+		labeled := AppendCreateRequestKey(*o.OriginLabel, key)
+		o.OriginLabel = &labeled
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_url":   o.OriginURL,
+		"origin_label": o.OriginLabel,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) SetPendingGitHubMarker(tx *gorm.DB, marker string) error {
+	marker = strings.TrimSpace(marker)
+	if marker == "" {
+		return nil
+	}
+	key := CreateRequestKeyFromLabel(marker)
+	if key == "" && o.OriginLabel != nil {
+		key = CreateRequestKeyFromLabel(*o.OriginLabel)
+	}
+	if key != "" {
+		marker = AppendCreateRequestKey(marker, key)
+	}
+
+	o.OriginLabel = &marker
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": marker,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) ClearCreateRequestKey(tx *gorm.DB) error {
+	if o == nil || o.OriginLabel == nil {
+		return nil
+	}
+	stripped := StripCreateRequestKey(*o.OriginLabel)
+	if stripped == *o.OriginLabel {
+		return nil
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	if stripped == "" {
+		o.OriginLabel = nil
+		return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+			"origin_label": gorm.Expr("NULL"),
+			"updated_at":   now,
+		}).Error
+	}
+
+	o.OriginLabel = &stripped
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": stripped,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) ClearPendingGitHubMarker(tx *gorm.DB, marker string) error {
+	if o.OriginURL != nil && strings.TrimSpace(*o.OriginURL) != "" {
+		return nil
+	}
+	if o.OriginLabel == nil {
+		return nil
+	}
+	stored := strings.TrimSpace(*o.OriginLabel)
+	if StripCreateRequestKey(stored) != StripCreateRequestKey(strings.TrimSpace(marker)) {
+		return nil
+	}
+
+	key := CreateRequestKeyFromLabel(stored)
+	now := time.Now()
+	o.UpdatedAt = now
+	if key == "" {
+		o.OriginLabel = nil
+		return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+			"origin_label": gorm.Expr("NULL"),
+			"updated_at":   now,
+		}).Error
+	}
+
+	kept := AppendCreateRequestKey("", key)
+	o.OriginLabel = &kept
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": kept,
+		"updated_at":   now,
+	}).Error
+}
+
+func (o *FactoryWorkOrder) AssignCreator(tx *gorm.DB, createdBy uuid.UUID) error {
+	if o.CreatedByID != nil {
+		return nil
+	}
+
+	o.CreatedByID = &createdBy
+	now := time.Now()
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"created_by_id": createdBy,
+		"updated_at":    now,
+	}).Error
 }
 
 func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description *string) error {
