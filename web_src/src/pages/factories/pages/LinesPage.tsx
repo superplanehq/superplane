@@ -113,6 +113,7 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  clientFilterSkipsArchivedAutoPage,
   countWorkOrderFilters,
   UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
@@ -384,10 +385,11 @@ export function LinesPage() {
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
   const includeArchived = listState.filters.statuses.includes("archived");
-  const visibleArchivedCount = useMemo(
-    () => visibleWorkOrders.filter((order) => isArchivedWorkOrder(order)).length,
-    [visibleWorkOrders],
+  const loadedArchivedCount = useMemo(
+    () => workOrders.filter((order) => isArchivedWorkOrder(order)).length,
+    [workOrders],
   );
+  const clientFilterHidesArchivedTasks = clientFilterSkipsArchivedAutoPage(listState.filters, listState.search);
   const fetchNextBacklogPageRef = useRef(backlogPage.fetchNextPage);
   const fetchNextClosedPageRef = useRef(donePage.fetchNextPage);
   fetchNextBacklogPageRef.current = backlogPage.fetchNextPage;
@@ -402,10 +404,11 @@ export function LinesPage() {
     if (
       !shouldLoadHiddenArchivedPage({
         includeArchived,
-        visibleArchivedCount,
+        loadedArchivedCount,
         hasNextPage: !isPlaceholderData && donePage.hasNextPage,
         isLoading: donePage.isFetchingNextPage || workOrdersLoading,
         isError: donePage.isFetchNextPageError,
+        clientFilterHidesTasks: clientFilterHidesArchivedTasks,
       })
     ) {
       return;
@@ -415,10 +418,11 @@ export function LinesPage() {
     donePage.hasNextPage,
     donePage.isFetchNextPageError,
     donePage.isFetchingNextPage,
+    clientFilterHidesArchivedTasks,
     includeArchived,
     isPlaceholderData,
     loadNextClosedPage,
-    visibleArchivedCount,
+    loadedArchivedCount,
     workOrdersLoading,
   ]);
   const backlogPaging = useMemo(
@@ -833,7 +837,7 @@ export function LinesPage() {
             columnPaging={{
               backlog: {
                 ...backlogPaging,
-                loadWhenShort: includeArchived && !isPlaceholderData,
+                loadWhenShort: includeArchived && !isPlaceholderData && !clientFilterHidesArchivedTasks,
               },
               open: {
                 hasMore: !isPlaceholderData && openPage.hasNextPage,

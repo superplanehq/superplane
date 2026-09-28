@@ -222,44 +222,58 @@ describe("backlogColumnPaging", () => {
 });
 
 describe("shouldLoadHiddenArchivedPage", () => {
-  it("loads the next closed page while no archived task is visible", () => {
+  it("loads the next closed page while no archived task is loaded", () => {
     expect(
       shouldLoadHiddenArchivedPage({
         includeArchived: true,
-        visibleArchivedCount: 0,
+        loadedArchivedCount: 0,
         hasNextPage: true,
         isLoading: false,
         isError: false,
+        clientFilterHidesTasks: false,
       }),
     ).toBe(true);
   });
 
-  it("stops when an archived task is visible, a page is in flight, or the query failed", () => {
+  it("stops when an archived task is loaded, a filter hides tasks, a page is in flight, or the query failed", () => {
     expect(
       shouldLoadHiddenArchivedPage({
         includeArchived: true,
-        visibleArchivedCount: 1,
+        loadedArchivedCount: 1,
         hasNextPage: true,
         isLoading: false,
         isError: false,
+        clientFilterHidesTasks: false,
       }),
     ).toBe(false);
     expect(
       shouldLoadHiddenArchivedPage({
         includeArchived: true,
-        visibleArchivedCount: 0,
+        loadedArchivedCount: 0,
+        hasNextPage: true,
+        isLoading: false,
+        isError: false,
+        clientFilterHidesTasks: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldLoadHiddenArchivedPage({
+        includeArchived: true,
+        loadedArchivedCount: 0,
         hasNextPage: true,
         isLoading: true,
         isError: false,
+        clientFilterHidesTasks: false,
       }),
     ).toBe(false);
     expect(
       shouldLoadHiddenArchivedPage({
         includeArchived: true,
-        visibleArchivedCount: 0,
+        loadedArchivedCount: 0,
         hasNextPage: true,
         isLoading: false,
         isError: true,
+        clientFilterHidesTasks: false,
       }),
     ).toBe(false);
     expect(draftsVisibleForStatusFilter([])).toBe(true);

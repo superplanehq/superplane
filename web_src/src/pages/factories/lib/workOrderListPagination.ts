@@ -218,15 +218,22 @@ export function backlogColumnPaging(args: {
   };
 }
 
-/** Keep loading closed pages until an archived task is visible. A page of newer line rejects would otherwise hide every archived task. */
+/**
+ * Keep loading closed pages until an archived task is loaded. A page of newer
+ * line rejects would otherwise hide every archived task. Stop when a filter
+ * the closed-task query does not apply can hide those tasks. A no-match search
+ * would otherwise read every closed page.
+ */
 export function shouldLoadHiddenArchivedPage(args: {
   includeArchived: boolean;
-  visibleArchivedCount: number;
+  loadedArchivedCount: number;
   hasNextPage: boolean;
   isLoading: boolean;
   isError: boolean;
+  clientFilterHidesTasks: boolean;
 }): boolean {
-  return (
-    args.includeArchived && args.visibleArchivedCount === 0 && args.hasNextPage && !args.isLoading && !args.isError
-  );
+  if (args.clientFilterHidesTasks) {
+    return false;
+  }
+  return args.includeArchived && args.loadedArchivedCount === 0 && args.hasNextPage && !args.isLoading && !args.isError;
 }
