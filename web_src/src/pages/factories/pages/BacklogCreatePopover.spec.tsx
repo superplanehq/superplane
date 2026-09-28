@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
+import type { ComponentProps } from "react";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import {
@@ -11,8 +12,8 @@ import {
 } from "./backlogIntakeItems";
 
 const sources: BacklogIntakeSource[] = [
-  { intakeId: "intake-github", name: "GitHub issues", iconSrc: "/github.svg", iconAlt: "GitHub" },
-  { intakeId: "intake-sentry", name: "Sentry exceptions", iconAlt: "Sentry" },
+  { intakeId: "intake-github", name: "GitHub issues", iconSrc: "/github.svg", iconAlt: "GitHub", tabLabel: "GitHub" },
+  { intakeId: "intake-sentry", name: "Sentry exceptions", iconAlt: "Sentry", tabLabel: "Sentry" },
 ];
 
 const githubItems: BacklogIntakeItem[] = [
@@ -25,6 +26,23 @@ const githubItems: BacklogIntakeItem[] = [
   },
 ];
 
+function popover(overrides: Partial<ComponentProps<typeof BacklogCreatePopover>> = {}) {
+  return (
+    <BacklogCreatePopover
+      canAdd
+      sources={sources}
+      items={[]}
+      query=""
+      focusedIntakeId={null}
+      onQueryChange={vi.fn()}
+      onFocusedIntakeChange={vi.fn()}
+      onCreateManually={vi.fn()}
+      onImportItem={vi.fn()}
+      {...overrides}
+    />
+  );
+}
+
 describe("BacklogCreatePopover", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
@@ -32,24 +50,10 @@ describe("BacklogCreatePopover", () => {
 
   it("opens from the plus control and focuses the first intake", async () => {
     const onCreateManually = vi.fn();
-    const onImportItem = vi.fn();
-    const onQueryChange = vi.fn();
     const onFocusedIntakeChange = vi.fn();
     const user = userEvent.setup();
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={onQueryChange}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={onCreateManually}
-        onImportItem={onImportItem}
-      />,
-    );
+    render(popover({ onCreateManually, onFocusedIntakeChange }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
@@ -64,29 +68,34 @@ describe("BacklogCreatePopover", () => {
     expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toHaveAttribute("src", "/github.svg");
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-github");
     expect(screen.queryByTestId("lines-backlog-create-item-gh-1")).not.toBeInTheDocument();
-
     expect(screen.queryByTestId("lines-backlog-create-with-agent")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));
     expect(onCreateManually).toHaveBeenCalledTimes(1);
   });
 
+  it("labels GitHub issues and Dependabot alerts as separate tabs", async () => {
+    const user = userEvent.setup();
+    const dependabot: BacklogIntakeSource = {
+      intakeId: "intake-dependabot",
+      name: "Dependabot alerts",
+      iconSrc: "/github.svg",
+      iconAlt: "GitHub",
+      tabLabel: "Dependabot",
+    };
+
+    render(popover({ sources: [sources[0], dependabot], focusedIntakeId: "intake-dependabot" }));
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    expect(screen.getByTestId("lines-backlog-create-tab-intake-github")).toHaveTextContent("GitHub");
+    expect(screen.getByTestId("lines-backlog-create-tab-intake-dependabot")).toHaveTextContent("Dependabot");
+    expect(screen.getByPlaceholderText("Import from Dependabot alert")).toBeInTheDocument();
+  });
+
   it("does not open the create menu on hover", async () => {
     const user = userEvent.setup();
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover());
 
     await user.hover(screen.getByTestId("lines-backlog-create"));
     expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
@@ -95,19 +104,7 @@ describe("BacklogCreatePopover", () => {
   it("keeps the plus control in its hover style while the menu is open", async () => {
     const user = userEvent.setup();
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover());
 
     const trigger = screen.getByTestId("lines-backlog-create");
     expect(trigger).not.toHaveClass("bg-accent");
@@ -121,20 +118,7 @@ describe("BacklogCreatePopover", () => {
   it("keeps the ghost card in its hover style while the menu is open", async () => {
     const user = userEvent.setup();
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        variant="ghost"
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ variant: "ghost" }));
 
     const trigger = screen.getByTestId("lines-backlog-create-ghost");
     expect(trigger).not.toHaveClass("bg-muted/70");
@@ -150,35 +134,18 @@ describe("BacklogCreatePopover", () => {
     const onImportItem = vi.fn();
     const user = userEvent.setup();
 
-    const { rerender } = render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={onImportItem}
-      />,
-    );
+    const { rerender } = render(popover({ onFocusedIntakeChange, onImportItem }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-github");
 
     rerender(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={githubItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={onImportItem}
-      />,
+      popover({
+        onFocusedIntakeChange,
+        onImportItem,
+        items: githubItems,
+        focusedIntakeId: "intake-github",
+      }),
     );
 
     expect(screen.getByTestId("lines-backlog-create-item-gh-1")).toHaveTextContent("Handle duplicate refunds");
@@ -203,17 +170,7 @@ describe("BacklogCreatePopover", () => {
     const user = userEvent.setup();
 
     const { rerender } = render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={githubItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={onImportItem}
-      />,
+      popover({ onFocusedIntakeChange, onImportItem, items: githubItems, focusedIntakeId: "intake-github" }),
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
@@ -221,17 +178,12 @@ describe("BacklogCreatePopover", () => {
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-sentry");
 
     rerender(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={sentryItems}
-        query=""
-        focusedIntakeId="intake-sentry"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={onImportItem}
-      />,
+      popover({
+        onFocusedIntakeChange,
+        onImportItem,
+        items: sentryItems,
+        focusedIntakeId: "intake-sentry",
+      }),
     );
 
     expect(screen.getByPlaceholderText(searchPlaceholderForIntake("Sentry exceptions"))).toBeInTheDocument();
@@ -264,17 +216,7 @@ describe("BacklogCreatePopover", () => {
     ];
 
     const { rerender } = render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={manyGithubItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
+      popover({ onFocusedIntakeChange, items: manyGithubItems, focusedIntakeId: "intake-github" }),
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
@@ -288,19 +230,7 @@ describe("BacklogCreatePopover", () => {
     await user.click(screen.getByTestId("lines-backlog-create-tab-intake-sentry"));
     expect(onFocusedIntakeChange).toHaveBeenCalledWith("intake-sentry");
 
-    rerender(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={sentryItems}
-        query=""
-        focusedIntakeId="intake-sentry"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={onFocusedIntakeChange}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    rerender(popover({ onFocusedIntakeChange, items: sentryItems, focusedIntakeId: "intake-sentry" }));
 
     const sentryList = screen.getByTestId("lines-backlog-create-items-intake-sentry");
     expect(sentryList.scrollTop).toBe(0);
@@ -309,19 +239,7 @@ describe("BacklogCreatePopover", () => {
   it("keeps a single intake as a search row without tabs", async () => {
     const user = userEvent.setup();
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={[sources[0]]}
-        items={[]}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ sources: [sources[0]], focusedIntakeId: "intake-github" }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.queryByTestId("lines-backlog-create-tabs")).not.toBeInTheDocument();
@@ -341,21 +259,7 @@ describe("BacklogCreatePopover", () => {
       body: "",
     }));
 
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={manyItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-        hasMore
-        onLoadMore={onLoadMore}
-      />,
-    );
+    render(popover({ items: manyItems, focusedIntakeId: "intake-github", hasMore: true, onLoadMore }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     const list = screen.getByTestId("lines-backlog-create-items-intake-github");
@@ -369,20 +273,7 @@ describe("BacklogCreatePopover", () => {
 
   it("shows a spinner while the first search page loads", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-        isLoading
-      />,
-    );
+    render(popover({ focusedIntakeId: "intake-github", isLoading: true }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     const status = screen.getByTestId("lines-backlog-create-loading");
@@ -392,21 +283,7 @@ describe("BacklogCreatePopover", () => {
 
   it("shows a spinner while the next search page loads", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={githubItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-        isLoadingMore
-        hasMore
-      />,
-    );
+    render(popover({ items: githubItems, focusedIntakeId: "intake-github", isLoadingMore: true, hasMore: true }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     const status = screen.getByTestId("lines-backlog-create-loading-more");
@@ -417,18 +294,11 @@ describe("BacklogCreatePopover", () => {
   it("keeps search results when a later page fails", async () => {
     const user = userEvent.setup();
     render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={githubItems}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-        errorMessage={BACKLOG_CREATE_COPY.unconnected}
-      />,
+      popover({
+        items: githubItems,
+        focusedIntakeId: "intake-github",
+        errorMessage: BACKLOG_CREATE_COPY.unconnected,
+      }),
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
@@ -438,20 +308,7 @@ describe("BacklogCreatePopover", () => {
 
   it("shows the search error when the intake is not connected", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId="intake-github"
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-        errorMessage={BACKLOG_CREATE_COPY.unconnected}
-      />,
-    );
+    render(popover({ focusedIntakeId: "intake-github", errorMessage: BACKLOG_CREATE_COPY.unconnected }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-items-intake-github")).toHaveTextContent(
@@ -462,19 +319,7 @@ describe("BacklogCreatePopover", () => {
   it("opens the create menu when no intakes are configured", async () => {
     const onCreateManually = vi.fn();
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd
-        sources={[]}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={onCreateManually}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ sources: [], onCreateManually }));
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
@@ -484,20 +329,7 @@ describe("BacklogCreatePopover", () => {
 
   it("opens the create menu from the ghost card", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd
-        variant="ghost"
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ variant: "ghost" }));
 
     await user.click(screen.getByTestId("lines-backlog-create-ghost"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
@@ -506,20 +338,7 @@ describe("BacklogCreatePopover", () => {
 
   it("does not open the ghost card when the backlog cannot accept work", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd={false}
-        variant="ghost"
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ canAdd: false, variant: "ghost" }));
 
     expect(screen.getByTestId("lines-backlog-create-ghost")).toBeDisabled();
     await user.click(screen.getByTestId("lines-backlog-create-ghost"));
@@ -528,19 +347,7 @@ describe("BacklogCreatePopover", () => {
 
   it("does not open when the backlog cannot accept work", async () => {
     const user = userEvent.setup();
-    render(
-      <BacklogCreatePopover
-        canAdd={false}
-        sources={sources}
-        items={[]}
-        query=""
-        focusedIntakeId={null}
-        onQueryChange={vi.fn()}
-        onFocusedIntakeChange={vi.fn()}
-        onCreateManually={vi.fn()}
-        onImportItem={vi.fn()}
-      />,
-    );
+    render(popover({ canAdd: false }));
 
     expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
     await user.click(screen.getByTestId("lines-backlog-create"));
