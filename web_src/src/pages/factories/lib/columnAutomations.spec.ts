@@ -242,6 +242,31 @@ describe("buildColumnAutomations", () => {
     ]);
   });
 
+  it("shows an installed risk score as its own Verify row", () => {
+    const automations = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-risk-2", name: "Risk score (2)", columnKey: "verify" },
+        { id: "app-create-env", name: "Create env", columnKey: "verify" },
+        { id: "app-risk-payments", name: "Risk score payments", columnKey: "verify" },
+        { id: "app-risk-done", name: "Risk score", columnKey: "done" },
+      ],
+    });
+
+    expect(automations.map((automation) => automation.kind)).toEqual(["risk-score", "risk-score", "custom", "custom"]);
+    expect(automations[0]).toMatchObject({
+      catalogId: "risk-score",
+      name: "Risk score",
+      trigger: "On pull request opened or updated",
+      action: "Score the change",
+      canvasId: "app-risk",
+    });
+    expect(automations[1]).toMatchObject({ canvasId: "app-risk-2" });
+    expect(automations[2]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
+    expect(automations[3]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
+  });
+
   it("appends custom canvases attached to Verify or Done", () => {
     const verify = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -300,10 +325,19 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
   });
 
-  it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
+  it("offers risk score in the verify catalog when the feature is on", () => {
+    expect(catalogForColumn("verify", { allowRiskScore: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
+      "risk-score",
+    ]);
+  });
+
+  it("offers a custom canvas in the verify catalog when the feature is on", () => {
+    expect(catalogForColumn("verify", { allowCustom: true, allowRiskScore: true }).map((entry) => entry.id)).toEqual([
+      "discussion",
+      "checks",
+      "risk-score",
       "custom",
     ]);
   });
@@ -337,8 +371,13 @@ describe("catalogForColumn", () => {
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(true);
+    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
+  });
+
+  it("is false when risk score is still available", () => {
+    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 
   it("is false when custom automations are off", () => {

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -92,6 +93,52 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 		_, _, err = materialized.Parse(r.Registry, orgID)
 		require.NoError(t, err)
+
+		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.ColumnKey)
+	})
+
+	t.Run("risk score install attaches the canvas to Verify", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+		factoryModel := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "risk-score",
+			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
+		})
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		_, _, err = materialized.Parse(r.Registry, orgID)
+		require.NoError(t, err)
+
+		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.ColumnKey)
+		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+	})
+
+	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+		factoryModel := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+
+		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "risk-score",
+			AppId:      canvas.ID.String(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
 	})
 
 	t.Run("an app from another factory reports not found", func(t *testing.T) {
