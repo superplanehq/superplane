@@ -767,13 +767,21 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 		return []common.PendingInstallation{
 			{ID: "11", AccountLogin: "unavailable", AccountType: "Organization"},
 			{ID: "22", AccountLogin: "approved", AccountType: "Organization"},
+			{ID: "33", AccountLogin: "revoked", AccountType: "Organization"},
 		}, 2, nil
 	}
 	unavailableAttempts := 0
+	revokedAttempts := 0
 	newInstallationClient = func(_ core.IntegrationContext, _ int64, installationID string) (*gh.Client, error) {
 		if installationID == "11" {
 			unavailableAttempts++
-			return nil, errors.New("unavailable")
+			if unavailableAttempts < 3 {
+				return nil, context.DeadlineExceeded
+			}
+		}
+		if installationID == "33" {
+			revokedAttempts++
+			return nil, errors.New("revoked")
 		}
 		return gh.NewClient(nil), nil
 	}
@@ -803,6 +811,7 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	metadata := integration.Metadata.(common.Metadata)
 	assert.Equal(t, []int{1}, discoveryPages)
 	assert.Equal(t, 1, unavailableAttempts)
+	assert.Equal(t, 1, revokedAttempts)
 	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
 	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
 		return installation.AccountLogin == "approved" && len(installation.Repositories) > 0
@@ -819,6 +828,7 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	}))
 	assert.Equal(t, []int{1, 2}, discoveryPages)
 	assert.Equal(t, 1, unavailableAttempts)
+	assert.Equal(t, 1, revokedAttempts)
 
 	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
 		Context:        context.Background(),
@@ -829,6 +839,7 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 	}))
 	assert.Equal(t, []int{1, 2}, discoveryPages)
 	assert.Equal(t, 2, unavailableAttempts)
+	assert.Equal(t, 1, revokedAttempts)
 
 	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
 		Context:        context.Background(),
@@ -845,7 +856,8 @@ func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.
 		Integration:    integration,
 	}))
 	assert.Equal(t, []int{1, 2}, discoveryPages)
-	assert.Equal(t, hostedInstallRequestFallbackMaxAttempts, unavailableAttempts)
+	assert.Equal(t, 3, unavailableAttempts)
+	assert.Equal(t, 1, revokedAttempts)
 }
 
 func TestSyncHostedAppPreservesLegacyFallbackWithOverlappingRequest(t *testing.T) {

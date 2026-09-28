@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,7 +34,6 @@ const (
 	allowUnverifiedDevelopmentRepositoriesEnv = "SUPERPLANE_GITHUB_APP_ALLOW_UNVERIFIED_REPOSITORIES"
 	hostedInstallationVerificationConcurrency = 8
 	hostedInstallRequestFallbackPageSize      = 8
-	hostedInstallRequestFallbackMaxAttempts   = 3
 	maxHostedDiscoveryErrors                  = 3
 )
 
@@ -293,7 +293,10 @@ func verifyAccessibleInstallationsWithFailures(
 	if !identity.AllowUnverifiedRepositories {
 		resolved, ok, err := resolveHostedGitHubIdentity(ctx, integration, app, identity, installations)
 		if err != nil {
-			return nil, slices.Clone(installations), err
+			if hostedDiscoveryErrorIsRetryable(err) {
+				return nil, slices.Clone(installations), err
+			}
+			return nil, nil, err
 		}
 		if !ok {
 			return nil, nil, nil
@@ -335,7 +338,7 @@ func verifyAccessibleInstallationsWithFailures(
 	_ = group.Wait()
 	retries := make([]common.PendingInstallation, 0)
 	for index, failure := range failures {
-		if failure != nil || !completed[index] {
+		if !completed[index] || hostedDiscoveryErrorIsRetryable(failure) {
 			retries = append(retries, installations[index])
 		}
 	}
@@ -344,6 +347,29 @@ func verifyAccessibleInstallationsWithFailures(
 	}
 
 	return compactVerifiedInstallations(results), retries, summarizeHostedDiscoveryErrors(failures)
+}
+
+func hostedDiscoveryErrorIsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	if errors.As(err, new(*gh.RateLimitError)) || errors.As(err, new(*gh.AbuseRateLimitError)) {
+		return true
+	}
+
+	var responseError *gh.ErrorResponse
+	if errors.As(err, &responseError) && responseError.Response != nil {
+		status := responseError.Response.StatusCode
+		return status == http.StatusRequestTimeout ||
+			status == http.StatusTooManyRequests ||
+			status >= http.StatusInternalServerError
+	}
+
+	var networkError net.Error
+	return errors.As(err, &networkError)
 }
 
 func resolveHostedGitHubIdentity(

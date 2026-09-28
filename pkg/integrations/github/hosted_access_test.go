@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -59,6 +60,47 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Empty(t, writable)
+}
+
+func TestHostedDiscoveryErrorIsRetryable(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		retryable bool
+	}{
+		{name: "no error", retryable: false},
+		{name: "canceled", err: context.Canceled, retryable: true},
+		{name: "deadline", err: context.DeadlineExceeded, retryable: true},
+		{name: "network", err: &net.DNSError{IsTimeout: true}, retryable: true},
+		{name: "primary rate limit", err: &gh.RateLimitError{}, retryable: true},
+		{name: "secondary rate limit", err: &gh.AbuseRateLimitError{}, retryable: true},
+		{
+			name:      "request timeout",
+			err:       &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusRequestTimeout}},
+			retryable: true,
+		},
+		{
+			name:      "too many requests",
+			err:       &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusTooManyRequests}},
+			retryable: true,
+		},
+		{
+			name:      "server error",
+			err:       &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}},
+			retryable: true,
+		},
+		{
+			name: "revoked installation",
+			err:  &gh.ErrorResponse{Response: &http.Response{StatusCode: http.StatusUnauthorized}},
+		},
+		{name: "permanent error", err: errors.New("revoked")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.retryable, hostedDiscoveryErrorIsRetryable(test.err))
+		})
+	}
 }
 
 func TestDiscoverAccessibleInstallationsUsesExplicitUnverifiedAccess(t *testing.T) {
