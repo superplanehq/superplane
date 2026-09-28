@@ -19,6 +19,7 @@ import {
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
+  clientFilterSkipsArchivedAutoPage,
   groupWorkOrderEntriesByLane,
   countWorkOrderFilters,
   visibleWorkOrderFilterLabels,
@@ -531,5 +532,23 @@ describe("groupWorkOrderEntriesByLane", () => {
     expect(grouped.get("running")).toEqual([]);
     expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
     expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed"]);
+  });
+});
+
+describe("clientFilterSkipsArchivedAutoPage", () => {
+  it("skips auto-page when search, source, labels, or several people hide loaded tasks", () => {
+    expect(clientFilterSkipsArchivedAutoPage(EMPTY_WORK_ORDER_FILTERS, "")).toBe(false);
+    expect(clientFilterSkipsArchivedAutoPage(EMPTY_WORK_ORDER_FILTERS, "  refund  ")).toBe(true);
+    expect(clientFilterSkipsArchivedAutoPage({ ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["github-issues"] }, "")).toBe(
+      true,
+    );
+    expect(clientFilterSkipsArchivedAutoPage({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["review"] }, "")).toBe(true);
+    expect(clientFilterSkipsArchivedAutoPage({ ...EMPTY_WORK_ORDER_FILTERS, assigneeIds: ["alex", "zoe"] }, "")).toBe(
+      true,
+    );
+    expect(
+      clientFilterSkipsArchivedAutoPage({ ...EMPTY_WORK_ORDER_FILTERS, assigneeIds: [UNASSIGNED_FILTER_VALUE] }, ""),
+    ).toBe(false);
+    expect(clientFilterSkipsArchivedAutoPage({ ...EMPTY_WORK_ORDER_FILTERS, statuses: ["archived"] }, "")).toBe(false);
   });
 });

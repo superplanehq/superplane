@@ -42,6 +42,9 @@ export function footerMutationHandlers(
         onDismiss?.();
       }
     },
+    onRestore: async () => {
+      await footerActions.handleRestore();
+    },
     onReject: () => void footerActions.handleReject(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
       void footerActions.handleStop(choice, {

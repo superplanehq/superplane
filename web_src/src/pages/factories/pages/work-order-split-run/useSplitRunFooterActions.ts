@@ -31,6 +31,11 @@ const ARCHIVE_COPY: RejectedCloseCopy = {
   error: "Failed to archive task",
 };
 
+const RESTORE_COPY: RejectedCloseCopy = {
+  success: "Task restored.",
+  error: "Failed to restore task",
+};
+
 function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
     return "Task closed as completed.";
@@ -113,6 +118,20 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
   const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
 
+  const handleRestore = useCallback(async () => {
+    if (!live || !orderId || busy) {
+      return false;
+    }
+    try {
+      await updateStatus.mutateAsync({ orderId, state: "STATE_DRAFT" });
+      showSuccessToast(RESTORE_COPY.success);
+      return true;
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, RESTORE_COPY.error));
+      return false;
+    }
+  }, [busy, live, orderId, updateStatus]);
+
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
       if (!live || !orderId || busy) {
@@ -173,6 +192,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStopAutomation,
     handleReject,
     handleArchive,
+    handleRestore,
     busy,
   };
 }

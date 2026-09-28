@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -28,13 +28,16 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
-  workOrders: useFactoryWorkOrders().data ?? [],
-  isLoading: false,
-  backlog: idleBoardPage(),
-  open: idleBoardPage(),
-  done: idleBoardPage(),
-}));
+function idleBoardResult() {
+  return {
+    workOrders: useFactoryWorkOrders().data ?? [],
+    isLoading: false,
+    backlog: idleBoardPage(),
+    open: idleBoardPage(),
+    done: idleBoardPage(),
+  };
+}
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => idleBoardResult());
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
@@ -146,6 +149,7 @@ describe("LinesPage Done column", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
+    useFactoryBoardWorkOrders.mockImplementation(() => idleBoardResult());
   });
 
   it("always shows a Done column after the line stages", () => {
@@ -306,5 +310,48 @@ describe("LinesPage Done column", () => {
 
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
+  });
+
+  it("offers Load more on a short Backlog lane when a filter can hide archived tasks", () => {
+    const fetchNextPage = vi.fn();
+    useFactoryBoardWorkOrders.mockImplementation(() => ({
+      ...idleBoardResult(),
+      done: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage },
+    }));
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({
+        statuses: ["archived"],
+        labels: [],
+        lineIds: [],
+        sourceIds: ["github-issues"],
+        assigneeIds: [],
+      }),
+    );
+    renderBoard();
+
+    fireEvent.click(within(screen.getByTestId("lines-backlog-column")).getByRole("button", { name: "Load more" }));
+
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer Load more when Archived is on and the closed query applies the filter", () => {
+    useFactoryBoardWorkOrders.mockImplementation(() => ({
+      ...idleBoardResult(),
+      done: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: vi.fn() },
+    }));
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({
+        statuses: ["archived"],
+        labels: [],
+        lineIds: [],
+        sourceIds: [],
+        assigneeIds: [],
+      }),
+    );
+    renderBoard();
+
+    expect(within(screen.getByTestId("lines-backlog-column")).queryByRole("button", { name: "Load more" })).toBeNull();
   });
 });

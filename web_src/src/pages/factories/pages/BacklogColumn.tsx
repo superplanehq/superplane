@@ -1,12 +1,18 @@
+import { useLayoutEffect } from "react";
+
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
+import { backlogCapacityOrderCount } from "../lib/linePhaseRuns";
+import { isArchivedWorkOrder } from "../lib/workOrderProgress";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
+import { WorkOrderStatusBadge } from "../workOrders/WorkOrderStatusIcon";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
@@ -60,6 +66,8 @@ export type BacklogColumnProps = {
     hasMore: boolean;
     isLoading: boolean;
     onLoadMore: () => void;
+    loadWhenShort?: boolean;
+    manualLoadMore?: boolean;
   };
   cardsPending?: boolean;
 };
@@ -103,7 +111,7 @@ export function BacklogColumn({
   cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
-  const atCapacity = size != null && orders.length >= size;
+  const atCapacity = size != null && backlogCapacityOrderCount(orders) >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const { canAct } = usePermissions();
@@ -277,6 +285,12 @@ function BacklogColumnOrderList({
     isLoading: paging?.isLoading,
     onLoadMore: paging?.onLoadMore,
   });
+  useLayoutEffect(() => {
+    if (!paging?.loadWhenShort) {
+      return;
+    }
+    loadMoreIfNeeded(scrollRef.current);
+  }, [loadMoreIfNeeded, orders.length, paging?.loadWhenShort, scrollRef]);
 
   return (
     <LineBoardColumnCardList
@@ -291,6 +305,11 @@ function BacklogColumnOrderList({
     >
       {orders.map((order) => (
         <li key={order.id}>
+          {isArchivedWorkOrder(order) ? (
+            <div className="mb-1">
+              <WorkOrderStatusBadge status="archived" />
+            </div>
+          ) : null}
           <LineBoardOrderCard
             order={order}
             workOrderCardContext={workOrderCardContext}
@@ -304,6 +323,21 @@ function BacklogColumnOrderList({
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
       )}
+      {paging?.manualLoadMore && paging.hasMore ? (
+        <li>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={paging.isLoading}
+            data-testid="lines-backlog-load-more"
+            onClick={paging.onLoadMore}
+          >
+            {paging.isLoading ? "Loading…" : "Load more"}
+          </Button>
+        </li>
+      ) : null}
     </LineBoardColumnCardList>
   );
 }
