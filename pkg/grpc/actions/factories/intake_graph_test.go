@@ -141,6 +141,24 @@ func Test__IntakeTriggerBinding(t *testing.T) {
 	assert.Equal(t, "payments", graph.TriggerResourceID(spec))
 }
 
+func Test__IntakeTriggerBinding_DatadogService(t *testing.T) {
+	integrationID := "int-ready"
+	node := triggerNode(intakeTriggerNodeID, "datadog.onErrorTrackingAlert")
+	node.IntegrationID = &integrationID
+	node.Configuration = map[string]any{"service": "checkout"}
+	spec := models.LiveCanvasSpec{
+		Nodes: []models.Node{
+			node,
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		},
+		Edges: []models.Edge{{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID}},
+	}
+
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceDatadog, spec)
+	assert.Equal(t, integrationID, graph.TriggerIntegrationID(spec))
+	assert.Equal(t, "checkout", graph.TriggerResourceID(spec))
+}
+
 func Test__IntakeHealth(t *testing.T) {
 	intake := &models.FactoryIntake{Source: models.FactoryIntakeSourceSentryExceptions}
 	integrationID := "int-ready"

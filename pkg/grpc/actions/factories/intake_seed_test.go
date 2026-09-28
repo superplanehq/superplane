@@ -2,9 +2,11 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -650,4 +653,280 @@ func Test__JiraSeedSkipsKnownIssues(t *testing.T) {
 	finalEvents, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
 	require.NoError(t, err)
 	assert.Len(t, finalEvents, 3)
+}
+
+func Test__DatadogSeedAsksForTenNewestErrors(t *testing.T) {
+	var query string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		data, _ := payload["data"].(map[string]any)
+		attributes, _ := data["attributes"].(map[string]any)
+		query, _ = attributes["query"].(string)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(datadogSeedSearchPage()))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues, err := newestDatadogSeedIssues(client, "checkout")
+	require.NoError(t, err)
+	assert.Equal(t, "service:checkout", query)
+	require.Len(t, issues, 12)
+	assert.Equal(t, datadogSeedIssueID(12), issues[0].ID)
+	assert.Equal(t, datadogSeedIssueID(1), issues[len(issues)-1].ID)
+	assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/"+datadogSeedIssueID(12), issues[0].URL)
+}
+
+func Test__DatadogSeedLoadsIssueDetails(t *testing.T) {
+	const issueID = "11111111-1111-4111-8111-111111111111"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/error-tracking/issues/"):
+			_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_type":"TimeoutError","error_message":"inventory timeout","service":"checkout","platform":"BACKEND"}}}`))
+		case r.URL.Path == "/api/v2/error-tracking/issues/search":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.URL.Path == "/api/v2/spans/events/search":
+			_, _ = w.Write([]byte(`{"data":[{"attributes":{"custom":{"env":"prod","resource_name":"POST /checkout","error":{"stack":"goroutine 1 [running]:\nmain.Charge(checkout/pay.go:22)"}},"start_timestamp":"2026-09-27T19:51:32.010Z"}}]}`))
+		case r.URL.Path == "/api/v2/logs/events/search" || r.URL.Path == "/api/v2/rum/events/search":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:      issueID,
+		Service: "checkout",
+		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	require.Len(t, issues, 1)
+	assert.Equal(t, "inventory timeout", issues[0].ErrorMessage)
+	assert.Contains(t, issues[0].Stack, "main.Charge")
+	require.NotNil(t, issues[0].Sample)
+	assert.Equal(t, "prod", issues[0].Sample.Env)
+
+	payload := datadog.ErrorTrackingIssuePayload(issues[0])
+	assert.Equal(t, "prod", payload.Environment)
+	assert.Contains(t, payload.Description, "inventory timeout")
+	assert.Contains(t, payload.Description, "main.Charge")
+}
+
+func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherService(t *testing.T) {
+	const issueID = "22222222-2222-4222-8222-222222222222"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/error-tracking/issues/") {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_message":"billing failed","service":"billing"}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:      issueID,
+		Service: "checkout",
+		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	assert.Empty(t, issues)
+}
+
+func Test__DatadogSeedFillsFromTheNextIssueWhenDetailsDisagree(t *testing.T) {
+	const droppedID = "22222222-2222-4222-8222-222222222222"
+	const keptID = "33333333-3333-4333-8333-333333333333"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, droppedID) {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + droppedID + `","type":"issue","attributes":{"error_message":"billing failed","service":"billing"}}}`))
+			return
+		}
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, keptID) {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + keptID + `","type":"issue","attributes":{"error_message":"checkout failed","service":"checkout"}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{
+		{ID: droppedID, Service: "checkout"},
+		{ID: keptID, Service: "checkout"},
+	})
+	require.Len(t, issues, 1)
+	assert.Equal(t, keptID, issues[0].ID)
+	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
+}
+
+func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {
+	const issueID = "33333333-3333-4333-8333-333333333333"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_message":"loaded too late","service":"checkout"}}}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+	client.SetRequestDeadline(time.Now().Add(-time.Second))
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:           issueID,
+		Service:      "checkout",
+		ErrorMessage: "search summary",
+		URL:          "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	require.Len(t, issues, 1)
+	assert.Equal(t, "search summary", issues[0].ErrorMessage)
+	assert.Equal(t, "checkout", issues[0].Service)
+}
+
+func Test__DatadogIssueEvents(t *testing.T) {
+	now := time.Now().UTC()
+	issues := []datadog.ErrorTrackingIssue{
+		{
+			ID:           datadogSeedIssueID(2),
+			ErrorType:    "TimeoutError",
+			ErrorMessage: "Newest timeout",
+			Service:      "checkout",
+			URL:          "https://app.datadoghq.eu/error-tracking/issue/" + datadogSeedIssueID(2),
+			LastSeen:     now,
+		},
+		{
+			ID:           datadogSeedIssueID(1),
+			ErrorType:    "TypeError",
+			ErrorMessage: "Older null pointer",
+			Service:      "checkout",
+			URL:          "https://app.datadoghq.eu/error-tracking/issue/" + datadogSeedIssueID(1),
+			LastSeen:     now.Add(-time.Hour),
+		},
+	}
+
+	events, err := datadogIssueEvents(issues)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, "TypeError: Older null pointer", events[0]["title"])
+	assert.Contains(t, events[0]["description"], "Older null pointer")
+	assert.Equal(t, "TimeoutError: Newest timeout", events[1]["title"])
+	assert.Equal(t, issues[0].URL, events[1]["link"])
+}
+
+func Test__DatadogSeedSkipsKnownIssues(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factoryModel.ID.String(),
+		Source:    pb.FactoryIntake_SOURCE_DATADOG,
+	})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(response.GetIntake().GetCanvasId())
+	tx := database.DB(t.Context())
+
+	onTrigger := datadogSeedIssue(1, "Queued timeout")
+	hasOrder := datadogSeedIssue(2, "Draft timeout")
+	fresh := datadogSeedIssue(3, "Fresh timeout")
+
+	origin := models.WorkOrderOrigin{URL: hasOrder.URL, Label: hasOrder.IssueTitle()}
+	_, err = factoryModel.CreateWorkOrderWithOrigin(tx, hasOrder.IssueTitle(), "", nil, nil, nil, origin)
+	require.NoError(t, err)
+
+	first, err := seedKnownDatadogIssues(tx, canvasID, []datadog.ErrorTrackingIssue{onTrigger})
+	require.NoError(t, err)
+	assert.Equal(t, 1, first.itemCount)
+
+	result, err := seedKnownDatadogIssues(tx, canvasID, []datadog.ErrorTrackingIssue{onTrigger, hasOrder, fresh})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.itemCount)
+
+	after, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, 20, nil)
+	require.NoError(t, err)
+	require.Len(t, after, 2)
+
+	freshIDs := map[string]bool{}
+	for i := range after {
+		issueID, ok := datadog.IssueIDFromEventData(after[i].Data.Data())
+		require.True(t, ok)
+		freshIDs[issueID] = true
+	}
+	assert.Equal(t, map[string]bool{onTrigger.ID: true, fresh.ID: true}, freshIDs)
+}
+
+func datadogSeedIssue(number int, message string) datadog.ErrorTrackingIssue {
+	id := datadogSeedIssueID(number)
+	return datadog.ErrorTrackingIssue{
+		ID:           id,
+		ErrorType:    "TimeoutError",
+		ErrorMessage: message,
+		Service:      "checkout",
+		URL:          "https://app.datadoghq.eu/error-tracking/issue/" + id,
+	}
+}
+
+func datadogSeedIssueID(number int) string {
+	return fmt.Sprintf("11111111-1111-4111-8111-%012d", number)
+}
+
+func datadogSeedSearchPage() string {
+	results := make([]string, 0, 13)
+	included := make([]string, 0, 13)
+	appendIssue := func(number int, service string, lastSeen int64) {
+		id := datadogSeedIssueID(number)
+		results = append(results, fmt.Sprintf(
+			`{"id":"%s","type":"error_tracking_search_result","relationships":{"issue":{"data":{"id":"%s","type":"issue"}}}}`,
+			id, id,
+		))
+		included = append(included, fmt.Sprintf(
+			`{"id":"%s","type":"issue","attributes":{"error_type":"TimeoutError","error_message":"error %d","service":"%s","last_seen":%d}}`,
+			id, number, service, lastSeen,
+		))
+	}
+	for number := 1; number <= 12; number++ {
+		appendIssue(number, "checkout", int64(number)*1000)
+	}
+	appendIssue(13, "billing", 99_000)
+
+	return `{"data":[` + strings.Join(results, ",") + `],"included":[` + strings.Join(included, ",") + `]}`
 }
