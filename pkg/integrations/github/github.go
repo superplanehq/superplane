@@ -283,9 +283,14 @@ func (g *GitHub) refreshHostedSetup(
 		}
 	}
 
+	now := time.Now().UTC()
 	requestDiscovery := g.refreshHostedInstallRequests(ctx, app, metadata)
-	if !requestDiscovery.required() && installRequestFollowUpDiscoveryActive(*metadata, time.Now().UTC()) {
+	if !requestDiscovery.required() && installRequestFollowUpDiscoveryActive(*metadata, now) {
 		requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+		// Connections that entered follow-up discovery before account tracking
+		// was added need the legacy fallback until their short window expires.
+		requestDiscovery.full = len(requestDiscovery.accounts) == 0 &&
+			requiresHostedInstallRequestFallback(*metadata, now)
 	}
 	if requestDiscovery.required() {
 		discoveryPerformed = true
@@ -458,9 +463,14 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 	if err != nil {
 		return fmt.Errorf("failed to discover requested GitHub App installations: %w", err)
 	}
+	if discovery.full {
+		metadata.InstallationsRefreshedAt = startedAt.Format(time.RFC3339Nano)
+		metadata.InstallRequestFallbackRefreshedAt = startedAt.Format(time.RFC3339Nano)
+	}
 	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
 		metadata.InstallRequestDiscoveryUntil = ""
 		metadata.InstallRequestDiscoveryAccounts = nil
+		metadata.InstallRequestFallbackRefreshedAt = ""
 	}
 	return nil
 }
@@ -532,6 +542,14 @@ func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time
 func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Time) bool {
 	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
 	return err == nil && now.Before(discoverUntil)
+}
+
+func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Time) bool {
+	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackRefreshedAt)
+	if err != nil {
+		return true
+	}
+	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {

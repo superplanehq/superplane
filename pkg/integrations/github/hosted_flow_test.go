@@ -731,6 +731,102 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	assert.Empty(t, metadata.InstallRequestDiscoveryUntil)
 }
 
+func TestSyncHostedAppDiscoversLegacyLateApprovalWithoutSavedAccount(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	fullDiscoveryCalls := 0
+	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
+		fullDiscoveryCalls++
+		return []common.PendingInstallation{{ID: "22", AccountLogin: "approved", AccountType: "Organization"}}, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+		return []common.Repository{{ID: 101, Name: "api"}}, nil
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                        "csrf",
+			HostedApp:                    true,
+			StartedByGitHubLogin:         "development",
+			InstallRequestDiscoveryUntil: time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano),
+			InstallationsRefreshedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+			GitHubApp:                    common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+
+	metadata := integration.Metadata.(common.Metadata)
+	assert.Equal(t, 1, fullDiscoveryCalls)
+	assert.NotEmpty(t, metadata.InstallationsRefreshedAt)
+	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
+		return installation.AccountLogin == "approved" && len(installation.Repositories) > 0
+	}))
+
+	integration.Metadata = metadata
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Context:        context.Background(),
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integration,
+	}))
+	assert.Equal(t, 1, fullDiscoveryCalls)
+}
+
+func TestReconcileInstallRequestsPreservesOverlappingFollowUpAccounts(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	metadata := common.Metadata{
+		StartedByGitHubLogin:            "member",
+		InstallRequestDiscoveryUntil:    time.Now().UTC().Add(time.Minute).Format(time.RFC3339Nano),
+		InstallRequestDiscoveryAccounts: []string{"earlier"},
+		InstallRequests: []common.InstallRequest{{
+			ID:             "2",
+			AccountLogin:   "later",
+			RequesterLogin: "member",
+			CreatedAt: time.Now().UTC().
+				Add(-installRequestResolutionGracePeriod - time.Second).
+				Format(time.RFC3339Nano),
+		}},
+	}
+
+	discovery, err := (&GitHub{}).reconcileInstallRequests(core.SyncContext{
+		Context:     context.Background(),
+		Integration: &contexts.IntegrationContext{},
+	}, common.HostedApp{ID: 99}, &metadata)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"earlier", "later"}, discovery.accounts)
+	assert.Equal(t, discovery.accounts, metadata.InstallRequestDiscoveryAccounts)
+}
+
 func TestSyncHostedAppDiscoversApprovedRequestOnBoundConnection(t *testing.T) {
 	enableUnverifiedDevelopmentRepositories(t)
 	setHostedAppEnv(t)
