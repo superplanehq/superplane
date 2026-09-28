@@ -54,7 +54,12 @@ export const PhaseCatalog: Story = {
 
 export const VerifyCatalog: Story = {
   name: "Verify catalog",
-  render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true })} takenIds={["discussion"]} />,
+  render: () => (
+    <OpenPicker
+      catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
+      takenIds={["discussion"]}
+    />
+  ),
 };
 
 export const DoneCatalog: Story = {
