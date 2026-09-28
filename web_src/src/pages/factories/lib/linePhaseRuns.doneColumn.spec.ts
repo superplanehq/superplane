@@ -7,6 +7,7 @@ import type {
 } from "@/api-client";
 import {
   buildLinePhaseBoard,
+  collectLineBacklogOrders,
   collectLineDoneOrders,
   lineBoardEndsWithDoneStep,
   lineStageColumns,
@@ -167,5 +168,28 @@ describe("collectLineDoneOrders", () => {
     const done = collectLineDoneOrders([rejectedDraft, rejectedAfterRun], LINE);
 
     expect(done).toEqual([]);
+  });
+
+  it("shows archived orders in Backlog only when the Archived filter is on", () => {
+    const archived = closedOrder({
+      id: "wo-archived",
+      result: "RESULT_REJECTED",
+      updatedAt: "2026-08-11T16:00:00.000Z",
+    });
+    const rejectedAfterRun = closedOrder({ id: "wo-rejected-ran", result: "RESULT_REJECTED", lineId: "line-1" });
+    const draft: FactoriesWorkOrder = {
+      id: "wo-draft",
+      title: "Draft",
+      state: "STATE_DRAFT",
+      lineDispatches: [],
+    };
+
+    expect(collectLineBacklogOrders([archived, rejectedAfterRun, draft]).map((entry) => entry.id)).toEqual([
+      "wo-draft",
+    ]);
+    expect(
+      collectLineBacklogOrders([archived, rejectedAfterRun, draft], { includeArchived: true }).map((entry) => entry.id),
+    ).toEqual(["wo-archived", "wo-draft"]);
+    expect(collectLineDoneOrders([archived, rejectedAfterRun], LINE)).toEqual([]);
   });
 });

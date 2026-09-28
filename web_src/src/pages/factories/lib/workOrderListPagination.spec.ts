@@ -26,6 +26,19 @@ describe("boardDoneResultsForStatuses", () => {
   it("asks only for completed tasks when Completed is the status filter", () => {
     expect(boardDoneResultsForStatuses(["completed"])).toEqual(["RESULT_COMPLETED"]);
   });
+
+  it("asks only for rejected tasks when Archived is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["archived"])).toEqual(["RESULT_REJECTED"]);
+  });
+
+  it("keeps the selected done result when Archived is also selected", () => {
+    expect(boardDoneResultsForStatuses(["failed", "archived"])).toEqual(["RESULT_FAILED", "RESULT_REJECTED"]);
+    expect(boardDoneResultsForStatuses(["completed", "failed", "archived"])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+    ]);
+  });
 });
 
 describe("workOrderListPagination", () => {

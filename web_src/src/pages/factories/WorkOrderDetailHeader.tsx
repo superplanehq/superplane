@@ -64,6 +64,7 @@ const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
   reject: "work-order-reject-button",
   "reject-draft": "work-order-reject-draft-button",
   reopen: "work-order-reopen-open-button",
+  restore: "work-order-restore-button",
   "send-to-backlog": "work-order-send-to-backlog-button",
 };
 

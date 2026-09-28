@@ -21,16 +21,26 @@ export const BOARD_DONE_RESULTS = [
   "RESULT_FAILED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
 
-/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. */
+/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. Archived asks for rejected tasks that never ran. */
 export function boardDoneResultsForStatuses(
   statuses: readonly WorkOrderDisplayStatus[],
 ): readonly FactoriesWorkOrderResult[] {
   const wantsCompleted = statuses.includes("completed");
   const wantsFailed = statuses.includes("failed");
-  if (wantsCompleted === wantsFailed) {
-    return BOARD_DONE_RESULTS;
+  const wantsArchived = statuses.includes("archived");
+  if (wantsArchived && !wantsCompleted && !wantsFailed) {
+    return ["RESULT_REJECTED"];
   }
-  return wantsFailed ? ["RESULT_FAILED"] : ["RESULT_COMPLETED"];
+  const narrowedToOneDone = wantsCompleted !== wantsFailed;
+  const results: FactoriesWorkOrderResult[] = narrowedToOneDone
+    ? wantsFailed
+      ? ["RESULT_FAILED"]
+      : ["RESULT_COMPLETED"]
+    : [...BOARD_DONE_RESULTS];
+  if (wantsArchived) {
+    return [...results, "RESULT_REJECTED"];
+  }
+  return results;
 }
 
 export type WorkOrdersPageCursor = {

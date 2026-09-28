@@ -6,7 +6,9 @@ import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from 
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
+import { isArchivedWorkOrder } from "../lib/workOrderProgress";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
+import { WorkOrderStatusBadge } from "../workOrders/WorkOrderStatusIcon";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
@@ -291,6 +293,11 @@ function BacklogColumnOrderList({
     >
       {orders.map((order) => (
         <li key={order.id}>
+          {isArchivedWorkOrder(order) ? (
+            <div className="mb-1">
+              <WorkOrderStatusBadge status="archived" />
+            </div>
+          ) : null}
           <LineBoardOrderCard
             order={order}
             workOrderCardContext={workOrderCardContext}

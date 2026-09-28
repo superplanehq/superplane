@@ -1,6 +1,10 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
-import { buildWorkOrderStatusActions, type WorkOrderStatusActionInput } from "./workOrderStatusActions";
+import {
+  applyWorkOrderStatusAction,
+  buildWorkOrderStatusActions,
+  type WorkOrderStatusActionInput,
+} from "./workOrderStatusActions";
 
 function labelsOf(overrides: Partial<WorkOrderStatusActionInput> = {}) {
   return buildWorkOrderStatusActions({
@@ -57,6 +61,26 @@ describe("buildWorkOrderStatusActions", () => {
         isClosed: true,
       }),
     ).toEqual(["Send to backlog", "Reopen"]);
+  });
+
+  it("offers Restore, not Reopen, for an archived order", () => {
+    expect(
+      labelsOf({
+        displayStatus: "archived",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Restore"]);
+  });
+
+  it("restores an archived order to draft", () => {
+    const onStatusChange = vi.fn();
+    applyWorkOrderStatusAction("restore", {
+      onClose: vi.fn(),
+      onStatusChange,
+    });
+    expect(onStatusChange).toHaveBeenCalledWith("STATE_DRAFT");
   });
 
   it("offers Reopen for a completed order", () => {

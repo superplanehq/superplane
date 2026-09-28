@@ -185,6 +185,27 @@ describe("useSplitRunFooterActions", () => {
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
   });
 
+  it("restores an archived task to draft", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const restored = await result.current.handleRestore();
+
+    expect(restored).toBe(true);
+    expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_DRAFT" });
+    expect(showSuccessToast).toHaveBeenCalledWith("Task restored.");
+  });
+
+  it("keeps an archived task closed when restore fails", async () => {
+    updateMutateAsync.mockRejectedValue(new Error("Failed to fetch"));
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const restored = await result.current.handleRestore();
+
+    expect(restored).toBe(false);
+    expect(showSuccessToast).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to restore task");
+  });
+
   it("archives a draft as rejected", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
@@ -212,6 +233,7 @@ describe("useSplitRunFooterActions", () => {
     await result.current.handleStop("canceled", { kind: "running" });
     await result.current.handleReject();
     await result.current.handleArchive();
+    await result.current.handleRestore();
 
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(updateMutateAsync).not.toHaveBeenCalled();
