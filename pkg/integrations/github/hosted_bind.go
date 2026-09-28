@@ -213,8 +213,11 @@ func (g *GitHub) reconcileInstallRequests(
 	metadata.SetInstallRequests(unresolved)
 	if followUpDiscovery {
 		metadata.InstallRequestDiscoveryUntil = now.Add(installRequestFollowUpDiscoveryPeriod).Format(time.RFC3339Nano)
-	} else if len(unresolved) == 0 && len(trackedRequests) > 0 {
+		metadata.InstallRequestDiscoveryAccounts = slices.Clone(discovery.accounts)
+	} else if len(unresolved) == 0 &&
+		(len(trackedRequests) > 0 || !installRequestFollowUpDiscoveryActive(*metadata, now)) {
 		metadata.InstallRequestDiscoveryUntil = ""
+		metadata.InstallRequestDiscoveryAccounts = nil
 	}
 	return discovery, nil
 }

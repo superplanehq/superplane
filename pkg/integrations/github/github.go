@@ -284,6 +284,9 @@ func (g *GitHub) refreshHostedSetup(
 	}
 
 	requestDiscovery := g.refreshHostedInstallRequests(ctx, app, metadata)
+	if !requestDiscovery.required() && installRequestFollowUpDiscoveryActive(*metadata, time.Now().UTC()) {
+		requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+	}
 	if requestDiscovery.required() {
 		discoveryPerformed = true
 		if err := g.refreshHostedRequestedInstallations(ctx, app, metadata, requestDiscovery); err != nil {
@@ -300,8 +303,7 @@ func (g *GitHub) refreshHostedSetup(
 	// A new connection has no trusted installation to refresh. Opening the
 	// GitHub setup flow gives the callback an exact installation candidate and
 	// avoids scanning every installation owned by the shared App.
-	if len(metadata.PendingInstallations) == 0 &&
-		!installRequestFollowUpDiscoveryActive(*metadata, time.Now().UTC()) {
+	if len(metadata.PendingInstallations) == 0 {
 		return nil
 	}
 	if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
@@ -456,7 +458,25 @@ func (g *GitHub) refreshHostedRequestedInstallations(
 	if err != nil {
 		return fmt.Errorf("failed to discover requested GitHub App installations: %w", err)
 	}
+	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
+		metadata.InstallRequestDiscoveryUntil = ""
+		metadata.InstallRequestDiscoveryAccounts = nil
+	}
 	return nil
+}
+
+func requestedAccountsAreVerified(installations []common.PendingInstallation, accounts []string) bool {
+	if len(accounts) == 0 {
+		return false
+	}
+	for _, account := range accounts {
+		if !slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
+			return strings.EqualFold(account, installation.AccountLogin) && len(installation.Repositories) > 0
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func logHostedDiscovery(

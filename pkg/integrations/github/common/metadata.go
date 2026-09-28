@@ -52,6 +52,10 @@ type Metadata struct {
 	// after a closed request leaves the waiting UI. This covers an approval
 	// that becomes visible after GitHub removes it from the open request list.
 	InstallRequestDiscoveryUntil string `mapstructure:"installRequestDiscoveryUntil" json:"installRequestDiscoveryUntil,omitempty"`
+	// InstallRequestDiscoveryAccounts preserves closed request accounts during
+	// the follow-up window so Sync can verify them directly without showing a
+	// waiting row or scanning every App installation.
+	InstallRequestDiscoveryAccounts []string `mapstructure:"installRequestDiscoveryAccounts" json:"installRequestDiscoveryAccounts,omitempty"`
 	// ObservedInstallRequestIDs records App requests visible before the local
 	// development flow opens GitHub. The request callback uses this baseline to
 	// exclude requests that belong to another developer.

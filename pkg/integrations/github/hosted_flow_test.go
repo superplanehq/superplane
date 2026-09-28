@@ -661,7 +661,8 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	}
 	installations := []common.PendingInstallation{{ID: "11", AccountLogin: "existing", AccountType: "Organization"}}
 	listAppInstallations = func(context.Context, *gh.Client) ([]common.PendingInstallation, error) {
-		return slices.Clone(installations), nil
+		t.Fatal("late approval must not list every App installation")
+		return nil, nil
 	}
 	findAppOrganizationInstallation = func(_ context.Context, _ *gh.Client, account string) (*gh.Installation, error) {
 		for _, installation := range installations {
@@ -714,6 +715,7 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	assert.Empty(t, metadata.InstallRequests)
 	assert.Empty(t, metadata.PendingInstallations)
 	assert.True(t, installRequestFollowUpDiscoveryActive(metadata, time.Now().UTC()))
+	assert.Equal(t, []string{"acme"}, metadata.InstallRequestDiscoveryAccounts)
 
 	installations = append(installations, common.PendingInstallation{
 		ID: "22", AccountLogin: "acme", AccountType: "Organization",
@@ -725,6 +727,8 @@ func TestSyncHostedAppDiscoversLateApprovalAfterWaitingClears(t *testing.T) {
 	assert.True(t, slices.ContainsFunc(metadata.PendingInstallations, func(installation common.PendingInstallation) bool {
 		return installation.AccountLogin == "acme" && len(installation.Repositories) > 0
 	}))
+	assert.Empty(t, metadata.InstallRequestDiscoveryAccounts)
+	assert.Empty(t, metadata.InstallRequestDiscoveryUntil)
 }
 
 func TestSyncHostedAppDiscoversApprovedRequestOnBoundConnection(t *testing.T) {
