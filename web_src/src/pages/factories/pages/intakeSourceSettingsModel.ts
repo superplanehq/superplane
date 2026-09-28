@@ -359,7 +359,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     excludeKeyTasks: settings.excludeKeyTasks,
     taskListIds: normalizeTaskListIds(settings.taskListIds),
     datadogTriggeredAlerts: settings.datadogTriggeredAlerts,
-    datadogRetriggeredAlerts: false,
+    datadogRetriggeredAlerts: settings.datadogRetriggeredAlerts,
     datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),
   };
 }

@@ -56,6 +56,17 @@ func TestDescribeErrorTrackingIssue_IncludesSampleAndRelatedLogs(t *testing.T) {
 	assert.Contains(t, text, "myt-home dogfood error 783228ea")
 }
 
+func TestDescribeErrorTrackingIssue_KeepsBackticksInsideTheLogFence(t *testing.T) {
+	text := DescribeErrorTrackingIssue(ErrorTrackingIssue{
+		ErrorMessage: "checkout failed",
+		RelatedLogs: []LogLine{
+			{Message: "closed the fence ``` then more text"},
+		},
+	}, AlertDetails{})
+
+	assert.Contains(t, text, "````\nclosed the fence ``` then more text\n````")
+}
+
 func TestDescribeErrorTrackingIssue_IncludesFrontendContext(t *testing.T) {
 	text := DescribeErrorTrackingIssue(ErrorTrackingIssue{
 		ErrorType:    "Error",

@@ -65,7 +65,7 @@ func writeErrorSection(b *strings.Builder, issue ErrorTrackingIssue) {
 	message := strings.TrimSpace(issue.ErrorMessage)
 	if message != "" {
 		if strings.Contains(message, "\n") {
-			lines = append(lines, "", "```", message, "```")
+			lines = append(lines, "", fencedBlock(message))
 		} else {
 			lines = append(lines, "- **Message:** "+markdownInline(message))
 		}
@@ -172,7 +172,7 @@ func writeRelatedLogsSection(b *strings.Builder, issue ErrorTrackingIssue) {
 		return
 	}
 
-	body := "```\n" + strings.Join(lines, "\n") + "\n```"
+	body := fencedBlock(strings.Join(lines, "\n"))
 	if link := relatedLogsLink(issue); link != "" {
 		body += "\n\n[View logs in Datadog](" + link + ")"
 	}
@@ -208,7 +208,7 @@ func writeStackSection(b *strings.Builder, stack string) {
 	if stack == "" {
 		return
 	}
-	writeSection(b, "Stack trace", "```\n"+strings.ReplaceAll(stack, "```", "'''")+"\n```")
+	writeSection(b, "Stack trace", fencedBlock(stack))
 }
 
 func writeImpactSection(b *strings.Builder, issue ErrorTrackingIssue) {
@@ -315,6 +315,15 @@ func alertMessage(alert AlertDetails, errorMessage string) string {
 		return ""
 	}
 	return limitRunes(message, maxAlertMessageRunes)
+}
+
+func fencedBlock(text string) string {
+	text = strings.TrimRight(text, "\n")
+	fence := "```"
+	for strings.Contains(text, fence) {
+		fence += "`"
+	}
+	return fence + "\n" + text + "\n" + fence
 }
 
 func writeSection(b *strings.Builder, title, body string) {

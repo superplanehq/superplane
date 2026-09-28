@@ -686,6 +686,49 @@ func Test__DatadogSeedAsksForTenNewestErrors(t *testing.T) {
 	assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/"+datadogSeedIssueID(12), issues[0].URL)
 }
 
+func Test__DatadogSeedLoadsIssueDetails(t *testing.T) {
+	const issueID = "11111111-1111-4111-8111-111111111111"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/error-tracking/issues/"):
+			_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_type":"TimeoutError","error_message":"inventory timeout","service":"checkout","platform":"BACKEND"}}}`))
+		case r.URL.Path == "/api/v2/error-tracking/issues/search":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case r.URL.Path == "/api/v2/spans/events/search":
+			_, _ = w.Write([]byte(`{"data":[{"attributes":{"custom":{"env":"prod","resource_name":"POST /checkout","error":{"stack":"goroutine 1 [running]:\nmain.Charge(checkout/pay.go:22)"}},"start_timestamp":"2026-09-27T19:51:32.010Z"}}]}`))
+		case r.URL.Path == "/api/v2/logs/events/search" || r.URL.Path == "/api/v2/rum/events/search":
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:      issueID,
+		Service: "checkout",
+		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	require.Len(t, issues, 1)
+	assert.Equal(t, "inventory timeout", issues[0].ErrorMessage)
+	assert.Contains(t, issues[0].Stack, "main.Charge")
+	require.NotNil(t, issues[0].Sample)
+	assert.Equal(t, "prod", issues[0].Sample.Env)
+
+	payload := datadog.ErrorTrackingIssuePayload(issues[0])
+	assert.Equal(t, "prod", payload.Environment)
+	assert.Contains(t, payload.Description, "inventory timeout")
+	assert.Contains(t, payload.Description, "main.Charge")
+}
+
 func Test__DatadogIssueEvents(t *testing.T) {
 	now := time.Now().UTC()
 	issues := []datadog.ErrorTrackingIssue{

@@ -691,7 +691,29 @@ func seedDatadogIssues(
 		return intakeSeedResult{}, err
 	}
 
-	return seedKnownDatadogIssues(tx, canvasID, issues)
+	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, issues))
+}
+
+func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
+	hydrated := make([]datadog.ErrorTrackingIssue, len(issues))
+	for i, issue := range issues {
+		hydrated[i] = issue
+		loaded, err := client.LoadErrorTrackingIssue(issue.ID, func(format string, args ...any) {
+			log.Warnf(format, args...)
+		})
+		if err != nil || loaded == nil {
+			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
+			continue
+		}
+		if strings.TrimSpace(loaded.URL) == "" {
+			loaded.URL = issue.URL
+		}
+		if strings.TrimSpace(loaded.Service) == "" {
+			loaded.Service = issue.Service
+		}
+		hydrated[i] = *loaded
+	}
+	return hydrated
 }
 
 func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.ErrorTrackingIssue, error) {

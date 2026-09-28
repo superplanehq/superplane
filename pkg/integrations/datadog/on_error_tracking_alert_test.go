@@ -396,6 +396,66 @@ func Test__OnErrorTrackingAlert__OnIntegrationMessage(t *testing.T) {
 		assert.Equal(t, "development", payload.Environment)
 	})
 
+	t.Run("drops an alert when the loaded issue belongs to another service", func(t *testing.T) {
+		const issueID = "da226b38-baac-11f1-bad1-da7ad0900005"
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{issueDetailsResponse(issueID)},
+		}
+		events := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"site":   "datadoghq.eu",
+					"apiKey": "test-api-key",
+					"appKey": "test-app-key",
+				},
+			},
+			Configuration: map[string]any{"service": "checkout"},
+			Message: map[string]any{
+				"event_type":       ErrorTrackingAlertEventType,
+				"alert_transition": AlertTransitionTriggered,
+				"tags":             "service:checkout,monitor",
+				"body":             issueID,
+				"link":             "https://app.datadoghq.eu/monitors/98765",
+			},
+			Events: events,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, events.Payloads)
+	})
+
+	t.Run("uses the issue page when the loaded issue matches the service", func(t *testing.T) {
+		const issueID = "da226b38-baac-11f1-bad1-da7ad0900005"
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{issueDetailsResponseFor(issueID, "checkout")},
+		}
+		events := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"site":   "datadoghq.eu",
+					"apiKey": "test-api-key",
+					"appKey": "test-app-key",
+				},
+			},
+			Configuration: map[string]any{"service": "checkout"},
+			Message: map[string]any{
+				"event_type":       ErrorTrackingAlertEventType,
+				"alert_transition": AlertTransitionTriggered,
+				"tags":             "service:checkout,monitor",
+				"body":             issueID,
+				"link":             "https://app.datadoghq.eu/monitors/98765",
+			},
+			Events: events,
+		})
+		require.NoError(t, err)
+		require.Len(t, events.Payloads, 1)
+		payload := events.Payloads[0].Data.(ErrorTrackingAlertPayload)
+		assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/"+issueID, payload.Link)
+	})
+
 	t.Run("ignores non error tracking events", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
@@ -425,6 +485,10 @@ func Test__OnErrorTrackingAlert__ExampleDataMatchesTrigger(t *testing.T) {
 }
 
 func issueDetailsResponse(issueID string) *http.Response {
+	return issueDetailsResponseFor(issueID, "myt-home")
+}
+
+func issueDetailsResponseFor(issueID, service string) *http.Response {
 	body := `{
 		"data": {
 			"id": "` + issueID + `",
@@ -432,7 +496,7 @@ func issueDetailsResponse(issueID string) *http.Response {
 			"attributes": {
 				"error_type": "TimeoutError",
 				"error_message": "checkout timed out",
-				"service": "myt-home",
+				"service": "` + service + `",
 				"file_path": "checkout/pay.go",
 				"function_name": "Charge",
 				"platform": "BACKEND",

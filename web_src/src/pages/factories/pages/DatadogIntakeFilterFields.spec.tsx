@@ -87,6 +87,7 @@ describe("DatadogIntakeFilterFields", () => {
     expect(screen.queryByTestId("datadog-service-name")).not.toBeInTheDocument();
     expect(screen.queryByText("Set the Error Tracking monitor query to service:<name>.")).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: DATADOG_INTAKE_SETTINGS_COPY.triggered })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: DATADOG_INTAKE_SETTINGS_COPY.retriggered })).not.toBeChecked();
     expect(screen.queryByText("An issue alerts again after it recovered")).not.toBeInTheDocument();
     expect(screen.queryByTestId("datadog-environment-new")).not.toBeInTheDocument();
     expect(screen.getByTestId("datadog-environment-prod")).toBeInTheDocument();
@@ -120,6 +121,26 @@ describe("DatadogIntakeFilterFields", () => {
       datadogTriggeredAlerts: true,
       datadogRetriggeredAlerts: false,
       datadogEnvironments: ["prod"],
+    });
+  });
+
+  it("saves a Re-Triggered alert selection", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <FilterHarness
+        sourceId="datadog"
+        initial={{ ...DEFAULT_DATADOG_INTAKE_SETTINGS, datadogService: "checkout" }}
+        onSave={onSave}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: DATADOG_INTAKE_SETTINGS_COPY.retriggered }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({
+      datadogTriggeredAlerts: true,
+      datadogRetriggeredAlerts: true,
     });
   });
 

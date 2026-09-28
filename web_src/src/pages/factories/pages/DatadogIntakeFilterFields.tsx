@@ -72,6 +72,12 @@ export function DatadogIntakeFilterFields({
             checked={settings.datadogTriggeredAlerts}
             onChange={() => update("datadogTriggeredAlerts", !settings.datadogTriggeredAlerts)}
           />
+          <IntakeSettingsCheckbox
+            id={`${idPrefix}-retriggered`}
+            title={DATADOG_INTAKE_SETTINGS_COPY.retriggered}
+            checked={settings.datadogRetriggeredAlerts}
+            onChange={() => update("datadogRetriggeredAlerts", !settings.datadogRetriggeredAlerts)}
+          />
         </div>
       </fieldset>
       <fieldset className="min-w-0">

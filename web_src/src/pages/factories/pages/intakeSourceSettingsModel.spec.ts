@@ -186,7 +186,7 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.datadogEnvironments).toEqual(["prod", "staging"]);
     expect(intakeSettingsToApi(settings)).toMatchObject({
       datadogTriggeredAlerts: false,
-      datadogRetriggeredAlerts: false,
+      datadogRetriggeredAlerts: true,
       datadogEnvironments: ["prod", "staging"],
     });
   });

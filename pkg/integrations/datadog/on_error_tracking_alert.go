@@ -182,7 +182,12 @@ func (t *OnErrorTrackingAlert) OnIntegrationMessage(ctx core.IntegrationMessageC
 		return nil
 	}
 
-	return ctx.Events.Emit(ErrorTrackingAlertPayloadType, enrichErrorTrackingAlert(ctx, payload))
+	enriched, issue := enrichErrorTrackingAlert(ctx, payload)
+	if !issueServiceMatches(issue, config.Service) {
+		return nil
+	}
+
+	return ctx.Events.Emit(ErrorTrackingAlertPayloadType, enriched)
 }
 
 func (t *OnErrorTrackingAlert) Cleanup(ctx core.TriggerContext) error {
@@ -197,6 +202,20 @@ func decodeErrorTrackingAlertPayload(message any) (ErrorTrackingAlertPayload, er
 		return ErrorTrackingAlertPayload{}, fmt.Errorf("failed to decode datadog alert payload: %w", err)
 	}
 	return payload, nil
+}
+
+func issueServiceMatches(issue *ErrorTrackingIssue, service string) bool {
+	service = strings.TrimSpace(service)
+	if service == "" || issue == nil {
+		return true
+	}
+
+	actual := strings.TrimSpace(issue.Service)
+	if actual == "" {
+		return true
+	}
+
+	return strings.EqualFold(actual, service)
 }
 
 func payloadMatchesService(payload ErrorTrackingAlertPayload, service string) bool {

@@ -39,7 +39,37 @@ func IssueIDFromEventData(eventData any) (string, bool) {
 		return "", false
 	}
 	link, _ := payload["link"].(string)
-	return IssueIDFromURL(link)
+	if issueID, ok := IssueIDFromURL(link); ok {
+		return issueID, true
+	}
+	return issueIDInValue(payload)
+}
+
+func issueIDInValue(value any) (string, bool) {
+	switch current := value.(type) {
+	case string:
+		if issueID, ok := IssueIDFromURL(current); ok {
+			return issueID, true
+		}
+		match := issuePathMarker.FindStringSubmatch(current)
+		if len(match) < 2 {
+			return "", false
+		}
+		return strings.ToLower(match[1]), true
+	case map[string]any:
+		for _, child := range current {
+			if issueID, ok := issueIDInValue(child); ok {
+				return issueID, true
+			}
+		}
+	case []any:
+		for _, child := range current {
+			if issueID, ok := issueIDInValue(child); ok {
+				return issueID, true
+			}
+		}
+	}
+	return "", false
 }
 
 // IssueHasWorkOrder reports whether this factory already has a work order

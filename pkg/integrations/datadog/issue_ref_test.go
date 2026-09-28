@@ -39,6 +39,16 @@ func TestIssueIDFromEventData(t *testing.T) {
 	})
 	assert.False(t, ok)
 
+	found, ok = IssueIDFromEventData(map[string]any{
+		"type": ErrorTrackingAlertPayloadType,
+		"data": map[string]any{
+			"link":        "https://app.datadoghq.com/monitors/98765",
+			"description": "See [the issue](https://app.datadoghq.eu/error-tracking/issue/" + issueID + ").",
+		},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, issueID, found)
+
 	_, ok = IssueIDFromEventData(map[string]any{
 		"type": "sentry.issue",
 		"data": map[string]any{

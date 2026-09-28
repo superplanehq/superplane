@@ -21,7 +21,7 @@ var (
 	uuidMarker      = regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 )
 
-func enrichErrorTrackingAlert(ctx core.IntegrationMessageContext, payload ErrorTrackingAlertPayload) ErrorTrackingAlertPayload {
+func enrichErrorTrackingAlert(ctx core.IntegrationMessageContext, payload ErrorTrackingAlertPayload) (ErrorTrackingAlertPayload, *ErrorTrackingIssue) {
 	alert := alertDetailsFromPayload(payload)
 	issue := loadAlertIssue(ctx, alert)
 	if issue != nil {
@@ -37,11 +37,16 @@ func enrichErrorTrackingAlert(ctx core.IntegrationMessageContext, payload ErrorT
 	text := DescribeErrorTrackingIssue(described, alert)
 	payload.Description = text
 	payload.Body = text
+	if issue != nil {
+		if issueURL := strings.TrimSpace(issue.URL); issueURL != "" {
+			payload.Link = issueURL
+		}
+	}
 	payload.Environment = strings.ToLower(strings.TrimSpace(environmentFromAlert(payload)))
 	if payload.Environment == "" && issue != nil && issue.Sample != nil {
 		payload.Environment = strings.ToLower(strings.TrimSpace(issue.Sample.Env))
 	}
-	return payload
+	return payload, issue
 }
 
 func alertDetailsFromPayload(payload ErrorTrackingAlertPayload) AlertDetails {

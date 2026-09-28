@@ -2,6 +2,7 @@ package datadog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -242,13 +243,15 @@ func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload ma
 		return fmt.Errorf("failed to list datadog subscriptions: %w", err)
 	}
 
+	var sendErr error
 	for _, subscription := range subscriptions {
 		if err := subscription.SendMessage(payload); err != nil {
 			ctx.Logger.Errorf("failed to send datadog message to subscription: %v", err)
+			sendErr = errors.Join(sendErr, err)
 		}
 	}
 
-	return nil
+	return sendErr
 }
 
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

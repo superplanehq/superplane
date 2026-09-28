@@ -2,6 +2,7 @@ package datadog
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -276,6 +277,32 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("returns an error when a subscription does not accept the alert", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			IntegrationID: integrationID.String(),
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				WebhookSecretName: {Name: WebhookSecretName, Value: []byte("secret-token")},
+			},
+			Subscriptions: []contexts.Subscription{
+				{ID: uuid.New(), Configuration: SubscriptionConfiguration{}, SendErr: errors.New("queue is full")},
+			},
+		}
+
+		body := `{"event_type":"error_tracking_alert","alert_transition":"Triggered"}`
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/"+integrationID.String()+"/events", strings.NewReader(body))
+		request.Header.Set(WebhookHeaderName, "secret-token")
+		recorder := httptest.NewRecorder()
+
+		d.HandleRequest(core.HTTPRequestContext{
+			Integration: appCtx,
+			Request:     request,
+			Response:    recorder,
+			Logger:      logrus.NewEntry(logrus.New()),
+		})
+
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 	})
 
 	t.Run("ignores recovered alerts", func(t *testing.T) {
