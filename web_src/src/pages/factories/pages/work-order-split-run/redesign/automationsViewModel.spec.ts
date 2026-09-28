@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { DRAFT_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
+import { CLOSED_WORK_ORDER, DRAFT_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
   LINE_BOARD_VERIFY_ENUM_ORDER,
@@ -146,6 +146,12 @@ describe("console column placement", () => {
 
     expect(ids.done).toContain("done-2");
     expect(ids.verify).toContain("verify-1");
+  });
+
+  it("puts the close decision in Done when no closer automation ran", () => {
+    const ids = columnStageIds(splitRunFixtureForWorkOrder(CLOSED_WORK_ORDER, { demoArtifacts: false }));
+
+    expect(ids.done).toEqual(["done-closure"]);
   });
 
   it("keeps a custom-named line step on the timeline", () => {

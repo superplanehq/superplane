@@ -167,11 +167,12 @@ export function stagesFromFixture(fixture: SplitRunFixture): AutomationStageGrou
 }
 
 /**
- * A column lists canvas runs, plus the task-creation stage. That stage
- * has no canvas run when a person created or imported the task.
+ * A column lists canvas runs, plus the task-creation and close-decision
+ * stages. Those stages have no canvas run when a person created or
+ * closed the task.
  */
 export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">): boolean {
-  return Boolean(stage.appId) || stage.id === "backlog";
+  return Boolean(stage.appId) || stage.id === "backlog" || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID;
 }
 
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
