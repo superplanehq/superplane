@@ -9,8 +9,8 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
-  hostedGitHubAuthorizeURL,
   hostedGitHubInstallRequested,
+  hostedGitHubInstallURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallRequests,
@@ -29,9 +29,7 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
-  /** GitHub OAuth authorize URL, to ask again which account to use. */
-  authorizeUrl: string;
-  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  /** GitHub login that started this connect. Empty when the field is absent. */
   githubLogin: string;
 };
 
@@ -53,23 +51,8 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     installations: pendingGitHubInstallations(item.status?.metadata),
     state,
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
-    authorizeUrl: authorizeURLWithState(hostedGitHubAuthorizeURL(item.status?.metadata), state),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
   };
-}
-
-function authorizeURLWithState(authorizeURL: string, state: string): string {
-  if (!authorizeURL || !state) return authorizeURL;
-
-  try {
-    const url = new URL(authorizeURL);
-    if (url.searchParams.get("state") === state) return authorizeURL;
-
-    url.searchParams.set("state", state);
-    return url.toString();
-  } catch {
-    return authorizeURL;
-  }
 }
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -273,11 +256,11 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
       // Onboarding asks again which GitHub account to use on every Connect
-      // click, so the click goes to GitHub authorization instead of the
-      // stored picker. Without a stored authorize URL the flow falls
-      // through and starts a fresh connect, which also opens authorization.
-      if (picker.authorizeUrl) {
-        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
+      // click, so the click opens the GitHub App install page instead of
+      // the stored picker. Without a slug and state the flow falls through
+      // and starts a fresh connect.
+      if (picker.appSlug && picker.state) {
+        return followBrowserAction({ method: "GET", url: hostedGitHubInstallURL(picker.appSlug, picker.state) });
       }
       return false;
     }
@@ -325,11 +308,44 @@ export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArg
   });
 
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  const action = result.integration?.status?.browserAction;
+
+  const created = result.integration;
+  if (openPrefilledPickerAfterCreate(args, created)) {
+    return true;
+  }
+
+  const action = created?.status?.browserAction;
   if (!action?.url) {
     throw new Error("The GitHub App install page did not open.");
   }
   return followBrowserAction(action);
+}
+
+/**
+ * Identity discovery can prefill the account picker on create. Such a
+ * connection carries no browser action, so the flow stays in the app and
+ * shows the picker instead of opening GitHub. A fresh connect with an empty
+ * picker follows the install browser action exactly as before.
+ */
+function openPrefilledPickerAfterCreate(
+  args: StartDirectGitHubConnectArgs,
+  created: OrganizationsIntegration | undefined,
+): boolean {
+  const createdId = created?.metadata?.id;
+  if (!createdId || pendingGitHubInstallations(created?.status?.metadata).length < 1) {
+    return false;
+  }
+  if (isOnboardingSetupReturnPath(args.returnTo)) {
+    return true;
+  }
+
+  const path = githubInstallPickerPath(args.organizationId, createdId, args.integrationsBasePath);
+  if (args.goTo) {
+    args.goTo(path);
+    return true;
+  }
+  window.location.assign(path);
+  return true;
 }
 
 async function persistSetupReturnPath(

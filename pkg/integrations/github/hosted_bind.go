@@ -88,60 +88,98 @@ func (g *GitHub) bindHostedInstallationWith(
 }
 
 // adoptRequestedInstallation resolves a pending install request once an owner
-// approved it on GitHub. The approve callback carries no CSRF state and the
-// installation webhook cannot find a connection without an installation id,
-// so Sync asks GitHub whether the requested account has the App installed.
-// An approved installation joins the account picker; the member still picks
-// the account, a silent bind must not happen.
+// approved it on GitHub. The approve callback carries no CSRF state, so Sync
+// looks up the requested account in the webhook-fed installations table. An
+// approved installation joins the account picker; the member still picks the
+// account, a silent bind must not happen.
 //
-// The request callback from GitHub also does not name the requested account,
-// so when it is unknown Sync finds the member's open install request on
-// GitHub and records the account on the metadata for the next sync and the
-// waiting screen.
+// Identity goes first: when GitHub vouches that the starter's login can use
+// the approved installation, another organization holding it does not block
+// adoption. On an identity miss the current cross-organization rule applies
+// unchanged.
 func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) error {
-	client, err := newAppJWTClient(ctx.Integration, app.ID)
-	if err != nil {
-		return fmt.Errorf("failed to create app client: %w", err)
+	trackedRequests := metadata.CurrentInstallRequests()
+	githubInstallations := g.listAppInstallationsForAdopt(ctx, app)
+	login := g.adoptIdentityLogin(*metadata)
+
+	metadata.SetPendingInstallations(metadata.PendingInstallations)
+	unresolved := make([]common.InstallRequest, 0, len(trackedRequests))
+	for _, request := range trackedRequests {
+		installation, found := lookupRequestedInstallation(request.AccountLogin, githubInstallations)
+		if found {
+			if g.adoptVerifiedByIdentity(ctx, app, login, installation) {
+				if !metadata.AllowsPendingInstallation(installation.ID) {
+					metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
+				}
+				continue
+			}
+
+			used, err := installationUsedByOtherOrg(ctx.OrganizationID, installation.ID)
+			if err != nil {
+				return err
+			}
+			if !used {
+				if !metadata.AllowsPendingInstallation(installation.ID) {
+					metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
+				}
+				continue
+			}
+		}
+		unresolved = append(unresolved, request)
+	}
+	metadata.SetInstallRequests(unresolved)
+	return nil
+}
+
+func (g *GitHub) adoptIdentityLogin(metadata common.Metadata) string {
+	login, err := findGitHubLoginForUser(metadata.StartedByUserID)
+	if err == nil && login != "" {
+		return login
+	}
+	return metadata.StartedByGitHubLogin
+}
+
+func (g *GitHub) adoptVerifiedByIdentity(ctx core.SyncContext, app common.HostedApp, login string, installation common.PendingInstallation) bool {
+	if strings.TrimSpace(login) == "" {
+		return false
 	}
 
-	trackedRequests := metadata.CurrentInstallRequests()
-	if requester := strings.TrimSpace(metadata.StartedByGitHubLogin); requester != "" {
-		trackedRequests = slices.DeleteFunc(trackedRequests, func(request common.InstallRequest) bool {
-			return request.RequesterLogin != "" && !strings.EqualFold(request.RequesterLogin, requester)
-		})
-	}
-	openRequests := trackedRequests
-	if strings.TrimSpace(metadata.StartedByGitHubLogin) != "" {
-		openRequests, err = listAppInstallationRequests(context.Background(), client, metadata.StartedByGitHubLogin)
-		if err != nil {
-			return fmt.Errorf("failed to list app installation requests: %w", err)
+	allowed, err := g.userCanAccessInstallation(ctx.Integration, app.ID, login, hostedInstallationSnapshot{
+		ID:           installation.ID,
+		AccountLogin: installation.AccountLogin,
+		AccountType:  installation.AccountType,
+	})
+	return err == nil && allowed
+}
+
+func (g *GitHub) listAppInstallationsForAdopt(ctx core.SyncContext, app common.HostedApp) []common.PendingInstallation {
+	client, err := newAppJWTClient(ctx.Integration, app.ID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to create app client: %v", err)
 		}
+		return nil
 	}
 
 	installations, err := listAppInstallations(context.Background(), client)
 	if err != nil {
-		return fmt.Errorf("failed to list app installations: %w", err)
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to list app installations: %v", err)
+		}
+		return nil
 	}
+	return installations
+}
 
-	// Put GitHub's current records first so their request IDs and timestamps
-	// replace callback placeholders for the same account during deduplication.
-	candidates := append(slices.Clone(openRequests), trackedRequests...)
-	metadata.SetPendingInstallations(metadata.PendingInstallations)
-	unresolved := make([]common.InstallRequest, 0, len(openRequests))
-	for _, request := range candidates {
-		installation, installed := installationForAccount(installations, request.AccountLogin)
-		if installed {
-			if !metadata.AllowsPendingInstallation(installation.ID) {
-				metadata.PendingInstallations = append(metadata.PendingInstallations, installation)
-			}
-			continue
-		}
-		if installRequestIsOpen(request, openRequests) {
-			unresolved = append(unresolved, request)
-		}
+func lookupRequestedInstallation(accountLogin string, githubInstallations []common.PendingInstallation) (common.PendingInstallation, bool) {
+	if snapshot, err := findHostedInstallationByAccount(context.Background(), accountLogin); err == nil && snapshot != nil && !snapshot.Deleted {
+		return common.PendingInstallation{
+			ID:           snapshot.ID,
+			AccountLogin: snapshot.AccountLogin,
+			AccountType:  snapshot.AccountType,
+		}, true
 	}
-	metadata.SetInstallRequests(unresolved)
-	return nil
+	return installationForAccount(githubInstallations, accountLogin)
 }
 
 func installationForAccount(installations []common.PendingInstallation, account string) (common.PendingInstallation, bool) {
@@ -154,15 +192,6 @@ func installationForAccount(installations []common.PendingInstallation, account 
 		}
 	}
 	return common.PendingInstallation{}, false
-}
-
-func installRequestIsOpen(request common.InstallRequest, open []common.InstallRequest) bool {
-	return slices.ContainsFunc(open, func(candidate common.InstallRequest) bool {
-		if request.ID != "" && candidate.ID != "" {
-			return request.ID == candidate.ID
-		}
-		return request.AccountLogin != "" && strings.EqualFold(request.AccountLogin, candidate.AccountLogin)
-	})
 }
 
 // listAppInstallationRequestsFromGitHub returns every open App install request
