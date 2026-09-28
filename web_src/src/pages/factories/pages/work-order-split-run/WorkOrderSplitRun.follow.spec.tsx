@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -11,7 +11,16 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
-import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { SPLIT_RUN_SUPER503_RUNNING } from "./splitRunSuper503RunningFixture";
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
 
 function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   return render(
@@ -27,42 +36,41 @@ function renderPopup(props: ComponentProps<typeof WorkOrderSplitRunPopup>) {
   );
 }
 
-describe("WorkOrderSplitRunPopup jump-to-latest", () => {
-  it("does not show a Follow toggle in the Automations tab", async () => {
-    const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_RUNNING });
+function runningStepLog() {
+  const node = document.querySelector("[data-testid^='redesign-step-log-']");
+  if (!(node instanceof HTMLElement)) {
+    throw new Error("running step log not found");
+  }
+  return node;
+}
 
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
+describe("WorkOrderSplitRunPopup jump-to-latest", () => {
+  it("does not show a Follow toggle on the console", () => {
+    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
 
     expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
   });
 
-  it("hides the pill while the log follows the latest line", async () => {
-    const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_RUNNING });
-
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
+  it("hides the pill while the log follows the latest line", () => {
+    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
 
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
-  it("keeps the pill hidden for a finished run, since auto-scroll starts on", async () => {
-    const user = userEvent.setup();
+  it("keeps the pill hidden for a finished run, since auto-scroll starts on", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
   it("shows jump to latest after the user scrolls up, then hides it on click", async () => {
     const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_RUNNING });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
+    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
 
-    const scroller = screen.getByTestId("split-run-log-scroll");
+    const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
     Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 100 });
     await new Promise<void>((resolve) => {
@@ -72,18 +80,16 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-older")).toBeInTheDocument();
+    expect(document.querySelector("[data-testid^='redesign-step-older-']")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest }));
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
   it("turns following back on when the user scrolls to the latest line", async () => {
-    const user = userEvent.setup();
-    renderPopup({ fixture: SPLIT_RUN_RUNNING });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
+    renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
 
-    const scroller = screen.getByTestId("split-run-log-scroll");
+    const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
     Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 100 });
     await new Promise<void>((resolve) => {

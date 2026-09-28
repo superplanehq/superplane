@@ -64,6 +64,10 @@ const FeatureWorkspaceSkills = "workspace_skills"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
+// FeatureFactoryTaskConsole gates the unified task popup: one console
+// timeline with a summary panel instead of the Task and Automations tabs.
+const FeatureFactoryTaskConsole = "factory_task_console"
+
 func released() *bool {
 	v := true
 	return &v
@@ -83,6 +87,7 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
+	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 }
 
 func All() []Feature {

@@ -34,6 +34,14 @@ vi.mock("@/hooks/useFactoryData", () => {
   };
 });
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("./useAnalysisPlanningSession", () => ({
   useAnalysisPlanningSession: () => ({
     organizationId: "organization-1",
@@ -126,8 +134,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
-  it("keeps a started task on the analysis popup while artifacts load", async () => {
-    const user = userEvent.setup();
+  it("keeps a started task on the analysis popup while artifacts load", () => {
     lookupState.artifactsLoading = true;
     const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
     expect(fixture.footer.kind).not.toBe("draft");
@@ -136,12 +143,9 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
 
     expect(screen.queryByTestId("work-order-split-run-loading")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("tab", { name: "Task" }));
-
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: INTENT_DOCUMENT_TITLE })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Loading the spec" })).toBeInTheDocument();
   });
 
   it("keeps a started task on the analysis popup when Planning is off", () => {

@@ -118,13 +118,7 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
       return presentation(LinkIcon, firstLabel(name, title, compactUrlLabel(url), "Link"));
     case "file": {
       const label = firstLabel(title, filename, compactUrlLabel(url), "File");
-      if (contentType?.startsWith("image/")) {
-        return presentation(FileImage, label);
-      }
-      if (contentType?.startsWith("video/")) {
-        return presentation(FileVideo, label);
-      }
-      return presentation(FileText, label);
+      return presentation(fileArtifactIcon(contentType), label);
     }
     default:
       return presentation(url ? LinkIcon : FileText, firstLabel(title, name, compactUrlLabel(url), "Artifact"));
@@ -156,6 +150,17 @@ function firstLabel(...labels: Array<string | undefined>): string {
 
 function normalizeArtifactKind(type: string): string {
   return type.replace(/^TYPE_/i, "").toLowerCase();
+}
+
+/** Image, video, or document icon. Same choice the artifact row already uses. */
+export function fileArtifactIcon(contentType?: string): typeof FileText {
+  if (contentType?.startsWith("image/")) {
+    return FileImage;
+  }
+  if (contentType?.startsWith("video/")) {
+    return FileVideo;
+  }
+  return FileText;
 }
 
 function compactUrlLabel(value: string | undefined): string | undefined {
