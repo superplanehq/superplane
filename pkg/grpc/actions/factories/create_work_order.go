@@ -85,7 +85,9 @@ func CreateWorkOrder(
 				return nil
 			}
 			if existing != nil {
-				storeKey = ""
+				if clearErr := existing.ClearCreateRequestKey(tx); clearErr != nil {
+					return clearErr
+				}
 			}
 		}
 

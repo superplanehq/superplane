@@ -294,6 +294,32 @@ func (o *FactoryWorkOrder) SetPendingGitHubMarker(tx *gorm.DB, marker string) er
 	}).Error
 }
 
+func (o *FactoryWorkOrder) ClearCreateRequestKey(tx *gorm.DB) error {
+	if o == nil || o.OriginLabel == nil {
+		return nil
+	}
+	stripped := StripCreateRequestKey(*o.OriginLabel)
+	if stripped == *o.OriginLabel {
+		return nil
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	if stripped == "" {
+		o.OriginLabel = nil
+		return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+			"origin_label": gorm.Expr("NULL"),
+			"updated_at":   now,
+		}).Error
+	}
+
+	o.OriginLabel = &stripped
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"origin_label": stripped,
+		"updated_at":   now,
+	}).Error
+}
+
 func (o *FactoryWorkOrder) ClearPendingGitHubMarker(tx *gorm.DB, marker string) error {
 	if o.OriginURL != nil && strings.TrimSpace(*o.OriginURL) != "" {
 		return nil

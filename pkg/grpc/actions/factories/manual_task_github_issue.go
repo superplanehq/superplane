@@ -221,6 +221,17 @@ func createManualTaskGitHubIssue(
 	return manualTaskIssueFromGitHub(issue)
 }
 
+type manualTaskIssueCreateJob struct {
+	deps        IntakeDependencies
+	factory     *models.Factory
+	orderID     uuid.UUID
+	marker      string
+	title       string
+	description string
+	since       time.Time
+	openedWith  *manualTaskIssueTarget
+}
+
 func scheduleManualTaskIssueCreate(
 	deps IntakeDependencies,
 	factory *models.Factory,
@@ -232,57 +243,105 @@ func scheduleManualTaskIssueCreate(
 	if !runManualTaskIssueBackgroundReconcile || factory == nil || order == nil || target == nil {
 		return
 	}
-	targetCopy := *target
-	factoryID := factory.ID
-	orderID := order.ID
+	job := &manualTaskIssueCreateJob{
+		deps:        deps,
+		factory:     factory,
+		orderID:     order.ID,
+		marker:      marker,
+		title:       title,
+		description: description,
+		since:       since,
+	}
 	go func() {
 		for attempt := 0; attempt < manualTaskIssueBackgroundAttempts; attempt++ {
 			time.Sleep(manualTaskIssueBackgroundDelay)
-			db := database.DB(context.Background())
-			current, err := factory.FindWorkOrder(db, orderID)
-			if err != nil || current == nil || current.Origin() != nil {
+			if job.run() {
 				return
 			}
-			if current.OriginLabel == nil || !strings.Contains(*current.OriginLabel, marker) {
-				return
-			}
-			client, clientErr := newIntakeGitHubClient(deps, db, targetCopy.integration)
-			if clientErr != nil {
-				log.WithError(clientErr).Warnf("factory %s: failed to open the GitHub issue for task %s", factoryID, orderID)
-				return
-			}
-			login := resolveManualTaskGitHubActor(context.Background(), client, db, factory, current, &targetCopy, marker, "")
-			if login == "" {
-				continue
-			}
-			found, findErr := listCreatedManualTaskIssue(client, targetCopy.repository, marker, login, since)
-			if findErr == nil && found != nil {
-				if storeCreatedManualTaskIssue(db, factory, current, factoryID, orderID, found) {
-					return
-				}
-				continue
-			}
-			opened, createErr := createManualTaskGitHubIssue(context.Background(), client, &targetCopy, title, description, marker, login, since)
-			if createErr == nil {
-				if storeErr := storeManualTaskGitHubOrigin(db, factory, current, opened); storeErr != nil {
-					log.WithError(storeErr).Warnf("factory %s: failed to store GitHub issue %s on task %s", factoryID, opened.URL, orderID)
-				}
-				publishManualTaskGitHubOrigin(factoryID, orderID)
-				return
-			}
-			if errors.Is(createErr, errManualTaskGitHubIssueUnconfirmed) {
-				continue
-			}
-			log.WithError(createErr).Warnf(
-				"factory %s: intake %s: failed to create a GitHub issue in %s for a manual task",
-				factoryID,
-				targetCopy.intake.ID,
-				targetCopy.repository,
-			)
-			clearPendingManualTaskMarker(db, factory, current, marker)
-			return
 		}
 	}()
+}
+
+func (job *manualTaskIssueCreateJob) run() bool {
+	if job == nil || job.factory == nil {
+		return true
+	}
+	db := database.DB(context.Background())
+	current, err := job.factory.FindWorkOrder(db, job.orderID)
+	if err != nil || current == nil || current.Origin() != nil {
+		return true
+	}
+	if current.OriginLabel == nil || !strings.Contains(*current.OriginLabel, job.marker) {
+		return true
+	}
+
+	live, liveErr := oldestManualTaskIssueIntake(db, job.factory)
+	if liveErr != nil {
+		log.WithError(liveErr).Warnf("factory %s: failed to check the GitHub intake for task %s", job.factory.ID, job.orderID)
+		return false
+	}
+	if live == nil && job.openedWith == nil {
+		log.Warnf("factory %s: GitHub issue creation is stopped for task %s", job.factory.ID, job.orderID)
+		clearPendingManualTaskMarker(db, job.factory, current, job.marker)
+		return true
+	}
+
+	searchTarget := live
+	if job.openedWith != nil {
+		searchTarget = job.openedWith
+	}
+	if searchTarget == nil {
+		return false
+	}
+
+	client, clientErr := newIntakeGitHubClient(job.deps, db, searchTarget.integration)
+	if clientErr != nil {
+		log.WithError(clientErr).Warnf("factory %s: failed to open the GitHub issue for task %s", job.factory.ID, job.orderID)
+		return true
+	}
+	login := resolveManualTaskGitHubActor(context.Background(), client, db, job.factory, current, searchTarget, job.marker, "")
+	if login == "" {
+		return false
+	}
+
+	found, findErr := listCreatedManualTaskIssue(client, searchTarget.repository, job.marker, login, job.since)
+	if findErr == nil && found != nil {
+		return storeCreatedManualTaskIssue(db, job.factory, current, job.factory.ID, job.orderID, found)
+	}
+	if job.openedWith != nil || live == nil {
+		return false
+	}
+
+	createTarget := *live
+	opened, createErr := createManualTaskGitHubIssue(
+		context.Background(),
+		client,
+		&createTarget,
+		job.title,
+		job.description,
+		job.marker,
+		login,
+		job.since,
+	)
+	if createErr == nil {
+		if storeErr := storeManualTaskGitHubOrigin(db, job.factory, current, opened); storeErr != nil {
+			log.WithError(storeErr).Warnf("factory %s: failed to store GitHub issue %s on task %s", job.factory.ID, opened.URL, job.orderID)
+		}
+		publishManualTaskGitHubOrigin(job.factory.ID, job.orderID)
+		return true
+	}
+	if errors.Is(createErr, errManualTaskGitHubIssueUnconfirmed) {
+		job.openedWith = &createTarget
+		return false
+	}
+	log.WithError(createErr).Warnf(
+		"factory %s: intake %s: failed to create a GitHub issue in %s for a manual task",
+		job.factory.ID,
+		createTarget.intake.ID,
+		createTarget.repository,
+	)
+	clearPendingManualTaskMarker(db, job.factory, current, job.marker)
+	return true
 }
 
 func storeCreatedManualTaskIssue(

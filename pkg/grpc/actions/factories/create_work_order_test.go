@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	ghintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -566,6 +567,186 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		assert.Equal(t, issueURL, resp.Order.GetOrigin().GetUrl())
 		require.Len(t, httpCtx.Requests, 1)
 	})
+
+	t.Run("keeps the request key when a changed retry creates another task", func(t *testing.T) {
+		httpCtx := githubIssueResponses(
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 42,
+				"html_url": "https://github.com/acme/payments/issues/42"
+			}`),
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 43,
+				"html_url": "https://github.com/acme/payments/issues/43"
+			}`),
+		)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		key := uuid.NewString()
+		keyed := withCreateRequestKey(ctx, r.User.String(), key)
+		firstRequest := &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "Stop double charges.",
+		}
+		changedRequest := &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line again",
+			Description: "Stop double charges.",
+		}
+
+		first, err := CreateWorkOrder(keyed, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), firstRequest)
+		require.NoError(t, err)
+		second, err := CreateWorkOrder(keyed, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), changedRequest)
+		require.NoError(t, err)
+		assert.NotEqual(t, first.Order.GetId(), second.Order.GetId())
+
+		third, err := CreateWorkOrder(keyed, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), changedRequest)
+		require.NoError(t, err)
+		assert.Equal(t, second.Order.GetId(), third.Order.GetId())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 2)
+		assert.Equal(t, 2, countGitHubIssueCreates(httpCtx.Requests))
+
+		savedFirst, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(first.Order.GetId()))
+		require.NoError(t, err)
+		savedSecond, err := factoryModel.FindWorkOrder(database.Conn(), uuid.MustParse(second.Order.GetId()))
+		require.NoError(t, err)
+		require.NotNil(t, savedFirst.OriginLabel)
+		require.NotNil(t, savedSecond.OriginLabel)
+		assert.Empty(t, models.CreateRequestKeyFromLabel(*savedFirst.OriginLabel))
+		assert.Equal(t, key, models.CreateRequestKeyFromLabel(*savedSecond.OriginLabel))
+	})
+}
+
+func Test__CreateWorkOrder__BackgroundIssueCreateRespectsIntakeState(t *testing.T) {
+	r := support.Setup(t)
+
+	for _, how := range []string{"paused", "deleted", "switched off"} {
+		t.Run(how, func(t *testing.T) {
+			httpCtx := githubIssueHTTP(http.StatusCreated, `{}`)
+			job, _, intake := pendingManualTaskIssueJob(t, r, httpCtx)
+			stopManualTaskIssueIntake(t, intake, how)
+
+			assert.True(t, job.run())
+			assert.Empty(t, httpCtx.Requests)
+
+			saved, err := job.factory.FindWorkOrder(database.Conn(), job.orderID)
+			require.NoError(t, err)
+			assert.Nil(t, saved.OriginURL)
+			if saved.OriginLabel != nil {
+				assert.NotContains(t, *saved.OriginLabel, "superplane-manual-task:")
+			}
+		})
+	}
+}
+
+func Test__CreateWorkOrder__BackgroundIssueCreateDoesNotDuplicateAnUnconfirmedIssue(t *testing.T) {
+	r := support.Setup(t)
+	previousAttempts := manualTaskGitHubIssueReconcileAttempts
+	previousDelay := manualTaskGitHubIssueReconcileDelay
+	manualTaskGitHubIssueReconcileAttempts = 1
+	manualTaskGitHubIssueReconcileDelay = time.Millisecond
+	t.Cleanup(func() {
+		manualTaskGitHubIssueReconcileAttempts = previousAttempts
+		manualTaskGitHubIssueReconcileDelay = previousDelay
+	})
+
+	httpCtx := &unconfirmedCreateHTTP{}
+	job, _, _ := pendingManualTaskIssueJob(t, r, httpCtx)
+
+	assert.False(t, job.run())
+	assert.False(t, job.run())
+	assert.Equal(t, 1, httpCtx.createCount())
+
+	saved, err := job.factory.FindWorkOrder(database.Conn(), job.orderID)
+	require.NoError(t, err)
+	assert.Nil(t, saved.OriginURL)
+	require.NotNil(t, saved.OriginLabel)
+	assert.Contains(t, *saved.OriginLabel, job.marker)
+}
+
+func pendingManualTaskIssueJob(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	httpCtx core.HTTPContext,
+) (*manualTaskIssueCreateJob, *models.Factory, *models.FactoryIntake) {
+	t.Helper()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	intake, _ := seedGitHubIssueIntake(t, r, factoryModel, true, false, "acme/payments", nil)
+	deps := githubIssueDeps(r, httpCtx)
+	deps.HTTP = &flakyActorRouter{inner: httpCtx, login: githubIssueTestActor, failures: manualTaskGitHubActorAttempts}
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	resp, err := CreateWorkOrder(ctx, deps, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+		FactoryId:   factoryModel.ID.String(),
+		Title:       "Ship the refunds line",
+		Description: "Stop double charges.",
+	})
+	require.NoError(t, err)
+	require.Nil(t, resp.Order.GetOrigin())
+
+	orderID := uuid.MustParse(resp.Order.GetId())
+	saved, err := factoryModel.FindWorkOrder(database.Conn(), orderID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.OriginLabel)
+	marker, ok := ghintegration.ManualTaskMarkerFromLabel(*saved.OriginLabel)
+	require.True(t, ok)
+
+	return &manualTaskIssueCreateJob{
+		deps:        deps,
+		factory:     factoryModel,
+		orderID:     orderID,
+		marker:      marker,
+		title:       "Ship the refunds line",
+		description: "Stop double charges.",
+		since:       saved.CreatedAt,
+	}, factoryModel, intake
+}
+
+func stopManualTaskIssueIntake(t *testing.T, intake *models.FactoryIntake, how string) {
+	t.Helper()
+
+	db := database.Conn()
+	switch how {
+	case "paused":
+		require.NoError(t, intake.SetPaused(db, true))
+	case "deleted":
+		require.NoError(t, intake.Delete(db))
+	case "switched off":
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, intake.CanvasID)
+		require.NoError(t, err)
+		nodes := append([]models.Node(nil), liveVersion.Nodes...)
+		for i := range nodes {
+			if nodes[i].Metadata == nil {
+				nodes[i].Metadata = map[string]any{}
+			}
+			nodes[i].Metadata[intakeMetadataGitHubCreateIssueForManualTasks] = false
+		}
+		require.NoError(t, db.Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+	default:
+		t.Fatalf("unknown intake stop %s", how)
+	}
+}
+
+type unconfirmedCreateHTTP struct {
+	mu       sync.Mutex
+	requests []*http.Request
+}
+
+func (h *unconfirmedCreateHTTP) Do(request *http.Request) (*http.Response, error) {
+	h.mu.Lock()
+	h.requests = append(h.requests, request)
+	h.mu.Unlock()
+	return nil, context.DeadlineExceeded
+}
+
+func (h *unconfirmedCreateHTTP) createCount() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return countGitHubIssueCreates(h.requests)
 }
 
 func Test__CreateWorkOrder__SkipsBrokenManualTaskIntakes(t *testing.T) {
