@@ -30,11 +30,15 @@ func TestFilterWritableRepositories(t *testing.T) {
 		context.Background(),
 		"acme",
 		"member",
+		7,
 		repositories,
 		func(_ context.Context, owner, repository, username string) (*gh.RepositoryPermissionLevel, error) {
 			assert.Equal(t, "acme", owner)
 			assert.Equal(t, "member", username)
-			return &gh.RepositoryPermissionLevel{Permission: gh.Ptr(permissions[repository])}, nil
+			return &gh.RepositoryPermissionLevel{
+				Permission: gh.Ptr(permissions[repository]),
+				User:       &gh.User{ID: gh.Ptr(int64(7))},
+			}, nil
 		},
 	)
 
@@ -52,6 +56,7 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 		context.Background(),
 		"acme",
 		"member",
+		7,
 		repositories,
 		func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error) {
 			return nil, errors.New("GitHub unavailable")
@@ -59,6 +64,27 @@ func TestFilterWritableRepositoriesFailsClosed(t *testing.T) {
 	)
 
 	assert.Error(t, err)
+	assert.Empty(t, writable)
+}
+
+func TestFilterWritableRepositoriesRejectsReusedLogin(t *testing.T) {
+	repositories := []common.Repository{{ID: 1, Name: "api"}}
+
+	writable, err := filterWritableRepositories(
+		context.Background(),
+		"acme",
+		"former-login",
+		7,
+		repositories,
+		func(context.Context, string, string, string) (*gh.RepositoryPermissionLevel, error) {
+			return &gh.RepositoryPermissionLevel{
+				Permission: gh.Ptr("admin"),
+				User:       &gh.User{ID: gh.Ptr(int64(8))},
+			}, nil
+		},
+	)
+
+	require.NoError(t, err)
 	assert.Empty(t, writable)
 }
 
@@ -263,9 +289,6 @@ func TestDiscoverAccessibleInstallationByIDRejectsReadOnlyRepository(t *testing.
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	resolveInstallationIdentity = func(context.Context, *gh.Client, int64) (*gh.User, error) {
-		return &gh.User{ID: gh.Ptr(int64(7)), Login: gh.Ptr("member")}, nil
-	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
@@ -286,7 +309,7 @@ func TestDiscoverAccessibleInstallationByIDRejectsReadOnlyRepository(t *testing.
 	assert.Empty(t, installations)
 }
 
-func TestDiscoverAccessibleInstallationsResolvesIdentityOnce(t *testing.T) {
+func TestDiscoverAccessibleInstallationsUsesLinkedLoginForPermissionChecks(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Cleanup(resetBindClientHooks)
 
@@ -302,29 +325,26 @@ func TestDiscoverAccessibleInstallationsResolvesIdentityOnce(t *testing.T) {
 	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
 	}
-	var identityCalls atomic.Int32
-	resolveInstallationIdentity = func(context.Context, *gh.Client, int64) (*gh.User, error) {
-		identityCalls.Add(1)
-		return &gh.User{ID: gh.Ptr(int64(7)), Login: gh.Ptr("renamed-member")}, nil
-	}
 	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
 		return []common.Repository{{ID: 101, Name: "api"}}, nil
 	}
 	getRepositoryPermission = func(_ context.Context, _ *gh.Client, _, _, username string) (*gh.RepositoryPermissionLevel, error) {
-		assert.Equal(t, "renamed-member", username)
-		return &gh.RepositoryPermissionLevel{Permission: gh.Ptr("write")}, nil
+		assert.Equal(t, "linked-member", username)
+		return &gh.RepositoryPermissionLevel{
+			Permission: gh.Ptr("write"),
+			User:       &gh.User{ID: gh.Ptr(int64(7))},
+		}, nil
 	}
 
 	installations, err := discoverAccessibleInstallations(
 		context.Background(),
 		&contexts.IntegrationContext{},
 		common.HostedApp{ID: 99},
-		hostedGitHubIdentity{ID: 7, Login: "old-member"},
+		hostedGitHubIdentity{ID: 7, Login: "linked-member"},
 	)
 
 	require.NoError(t, err)
 	assert.Len(t, installations, 2)
-	assert.Equal(t, int32(1), identityCalls.Load())
 }
 
 func TestDevelopmentGitHubDiscoveryRequiresExplicitLocalOptIn(t *testing.T) {
