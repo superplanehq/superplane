@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  archivedShortLanePaging,
   boardDoneResultsForStatuses,
   backlogColumnPaging,
   draftsVisibleForStatusFilter,
@@ -218,6 +219,45 @@ describe("backlogColumnPaging", () => {
     expect(closedLoads).toBe(0);
     expect(paging.hasMore).toBe(true);
     expect(paging.isLoading).toBe(true);
+  });
+});
+
+describe("archivedShortLanePaging", () => {
+  it("auto-loads a short lane when Archived is on and the closed query applies the filter", () => {
+    expect(
+      archivedShortLanePaging({
+        includeArchived: true,
+        isPlaceholderData: false,
+        clientFilterHidesTasks: false,
+      }),
+    ).toEqual({ loadWhenShort: true, manualLoadMore: false });
+  });
+
+  it("offers Load more instead of reading every closed page when a browser filter can hide tasks", () => {
+    expect(
+      archivedShortLanePaging({
+        includeArchived: true,
+        isPlaceholderData: false,
+        clientFilterHidesTasks: true,
+      }),
+    ).toEqual({ loadWhenShort: false, manualLoadMore: true });
+  });
+
+  it("does not page a short lane while Archived is off or the board is still a placeholder", () => {
+    expect(
+      archivedShortLanePaging({
+        includeArchived: false,
+        isPlaceholderData: false,
+        clientFilterHidesTasks: true,
+      }),
+    ).toEqual({ loadWhenShort: false, manualLoadMore: false });
+    expect(
+      archivedShortLanePaging({
+        includeArchived: true,
+        isPlaceholderData: true,
+        clientFilterHidesTasks: true,
+      }),
+    ).toEqual({ loadWhenShort: false, manualLoadMore: false });
   });
 });
 

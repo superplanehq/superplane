@@ -219,10 +219,31 @@ export function backlogColumnPaging(args: {
 }
 
 /**
+ * A short Backlog lane cannot scroll, so it cannot load the next closed page.
+ * Auto-load until an archived task appears when the closed query applies the
+ * filter. Search, source, labels, and a multi-person filter run in the browser.
+ * Auto-load would read every closed page when nothing matches. Offer Load more
+ * so older matches stay reachable one page at a time.
+ */
+export function archivedShortLanePaging(args: {
+  includeArchived: boolean;
+  isPlaceholderData: boolean;
+  clientFilterHidesTasks: boolean;
+}): { loadWhenShort: boolean; manualLoadMore: boolean } {
+  if (!args.includeArchived || args.isPlaceholderData) {
+    return { loadWhenShort: false, manualLoadMore: false };
+  }
+  if (args.clientFilterHidesTasks) {
+    return { loadWhenShort: false, manualLoadMore: true };
+  }
+  return { loadWhenShort: true, manualLoadMore: false };
+}
+
+/**
  * Keep loading closed pages until an archived task is loaded. A page of newer
  * line rejects would otherwise hide every archived task. Stop when a filter
  * the closed-task query does not apply can hide those tasks. A no-match search
- * would otherwise read every closed page.
+ * would otherwise read every closed page. The short lane then offers Load more.
  */
 export function shouldLoadHiddenArchivedPage(args: {
   includeArchived: boolean;

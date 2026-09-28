@@ -439,7 +439,8 @@ export function applyWorkOrderFilters(
 /**
  * Search, source, labels, and a multi-person assignee filter run in the
  * browser. The closed-task page query does not apply them. Auto-paging while
- * they hide every archived task would read the full closed history.
+ * they hide every archived task would read the full closed history. The short
+ * Backlog lane offers Load more instead.
  */
 export function clientFilterSkipsArchivedAutoPage(filters: WorkOrderFilters, search: string): boolean {
   if (search.trim() !== "") {

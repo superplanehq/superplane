@@ -72,6 +72,8 @@ type BoardColumnPaging = {
   onLoadMore: () => void;
   /** Load the next page when the lane does not overflow. Archived pages use this because Done can be empty. */
   loadWhenShort?: boolean;
+  /** Show Load more when the lane is short and auto-load would read every closed page. */
+  manualLoadMore?: boolean;
 };
 
 type BoardPaging = {
@@ -121,6 +123,7 @@ import {
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import {
+  archivedShortLanePaging,
   boardDoneResultsForStatuses,
   backlogColumnPaging,
   draftsVisibleForStatusFilter,
@@ -390,6 +393,11 @@ export function LinesPage() {
     [workOrders],
   );
   const clientFilterHidesArchivedTasks = clientFilterSkipsArchivedAutoPage(listState.filters, listState.search);
+  const archivedShortLane = archivedShortLanePaging({
+    includeArchived,
+    isPlaceholderData: Boolean(isPlaceholderData),
+    clientFilterHidesTasks: clientFilterHidesArchivedTasks,
+  });
   const fetchNextBacklogPageRef = useRef(backlogPage.fetchNextPage);
   const fetchNextClosedPageRef = useRef(donePage.fetchNextPage);
   fetchNextBacklogPageRef.current = backlogPage.fetchNextPage;
@@ -837,7 +845,8 @@ export function LinesPage() {
             columnPaging={{
               backlog: {
                 ...backlogPaging,
-                loadWhenShort: includeArchived && !isPlaceholderData && !clientFilterHidesArchivedTasks,
+                loadWhenShort: archivedShortLane.loadWhenShort,
+                manualLoadMore: archivedShortLane.manualLoadMore,
               },
               open: {
                 hasMore: !isPlaceholderData && openPage.hasNextPage,

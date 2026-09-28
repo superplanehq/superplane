@@ -2,6 +2,7 @@ import { useLayoutEffect } from "react";
 
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
@@ -66,6 +67,7 @@ export type BacklogColumnProps = {
     isLoading: boolean;
     onLoadMore: () => void;
     loadWhenShort?: boolean;
+    manualLoadMore?: boolean;
   };
   cardsPending?: boolean;
 };
@@ -321,6 +323,21 @@ function BacklogColumnOrderList({
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
       )}
+      {paging?.manualLoadMore && paging.hasMore ? (
+        <li>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            disabled={paging.isLoading}
+            data-testid="lines-backlog-load-more"
+            onClick={paging.onLoadMore}
+          >
+            {paging.isLoading ? "Loading…" : "Load more"}
+          </Button>
+        </li>
+      ) : null}
     </LineBoardColumnCardList>
   );
 }
