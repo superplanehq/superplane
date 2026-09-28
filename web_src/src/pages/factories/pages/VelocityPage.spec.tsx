@@ -264,7 +264,7 @@ describe("VelocityPage shell", () => {
     expect(people).toHaveTextContent("1 person with activity in this period");
     expect(within(people).getByRole("button", { name: "Task waste" })).toHaveAttribute(
       "title",
-      "SuperPlane tasks this person opened that closed without a merge",
+      "SuperPlane tasks credited to this person that closed without a merge",
     );
     expect(people).toHaveTextContent("1 (25%)");
   });

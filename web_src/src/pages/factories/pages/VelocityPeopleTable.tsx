@@ -47,7 +47,7 @@ const COLUMNS: Column[] = [
   {
     key: "factoryWaste",
     label: "Task waste",
-    hint: "SuperPlane tasks this person opened that closed without a merge",
+    hint: "SuperPlane tasks credited to this person that closed without a merge",
     format: formatPersonWaste,
   },
   {

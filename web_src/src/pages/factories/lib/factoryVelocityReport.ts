@@ -125,7 +125,7 @@ export interface VelocityPerson {
   authoredMerged: number;
   /** Merged pull requests from SuperPlane tasks this person opened. */
   factoryMerged: number;
-  /** Tasks this person opened that closed without a merge. */
+  /** SuperPlane tasks credited to this person that closed without a merge. */
   factoryWaste: number;
   medianCycleHours: number;
   costUsd: number;
