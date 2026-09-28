@@ -50,8 +50,10 @@ var (
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
-	// open` is reopen; `closed → draft` is send to backlog; `draft → closed`
-	// is "abandon before dispatch" (rejected only). See TransitionOnDispatch
+	// open` is reopen; `closed → draft` is restore or send to backlog;
+	// `draft → closed` is "abandon before dispatch" (rejected only).
+	// UpdateStatus allows closed → draft only for an archived reject.
+	// SendClosedToDraft allows any closed order. See TransitionOnDispatch
 	// for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
@@ -309,7 +311,39 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // (target state equals current state). Callers that fan out an
 // `order.status.updated` event downstream must check this so a re-run
 // doesn't emit a phantom transition — see FactoryContext.
+//
+// closed → draft is allowed only for an archived reject (rejected, and no
+// line dispatch). SendClosedToDraft is the send-to-backlog path.
 func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate) (bool, error) {
+	return o.writeStatus(db, update, closedToDraftArchivedOnly)
+}
+
+// SendClosedToDraft moves a closed order back to draft without the
+// archive-restore rule. Send to backlog uses this so a task that already
+// ran can return. Restore must call UpdateStatus instead.
+func (o *FactoryWorkOrder) SendClosedToDraft(db *gorm.DB, actor *uuid.UUID) (bool, error) {
+	if o.State != FactoryWorkOrderStateClosed {
+		return false, fmt.Errorf("%w: work order is not closed", ErrFactoryWorkOrderInvalidState)
+	}
+	return o.writeStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateDraft,
+		Actor:   actor,
+	}, closedToDraftAny)
+}
+
+// closedToDraftRule decides which closed orders may return to draft.
+type closedToDraftRule int
+
+const (
+	// closedToDraftArchivedOnly allows a rejected order that never ran on a
+	// line. Restore uses this path.
+	closedToDraftArchivedOnly closedToDraftRule = iota
+	// closedToDraftAny allows any closed order. Send to backlog uses this
+	// so a task that already ran can return to the Backlog.
+	closedToDraftAny
+)
+
+func (o *FactoryWorkOrder) writeStatus(db *gorm.DB, update FactoryWorkOrderStatusUpdate, closedToDraft closedToDraftRule) (bool, error) {
 	toState := update.ToState
 	if !slices.Contains(factoryWorkOrderStates, toState) {
 		return false, fmt.Errorf("%w: unknown state %q", ErrFactoryWorkOrderInvalidState, toState)
@@ -348,6 +382,14 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// desync the FSM from the executor. Mirror the dispatch guard here.
 		if fromState == FactoryWorkOrderStateOpen && toState == FactoryWorkOrderStateDraft {
 			if err := o.ensureNoActiveLineDispatch(tx); err != nil {
+				return err
+			}
+		}
+		// Restore returns an archived reject to draft. A closed order that
+		// already ran, or that closed as completed or failed, stays closed
+		// on this path. Send to backlog uses closedToDraftAny.
+		if fromState == FactoryWorkOrderStateClosed && toState == FactoryWorkOrderStateDraft && closedToDraft == closedToDraftArchivedOnly {
+			if err := o.ensureArchivedRestore(tx, fromResult); err != nil {
 				return err
 			}
 		}

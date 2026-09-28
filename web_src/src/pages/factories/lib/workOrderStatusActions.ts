@@ -3,7 +3,13 @@ import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-cl
 import { SEND_WORK_ORDER_TO_BACKLOG_COPY } from "./sendWorkOrderToBacklog";
 import { isWorkOrderRecoveryStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
-export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen" | "send-to-backlog";
+export type WorkOrderStatusActionKind =
+  | "complete"
+  | "reject"
+  | "reject-draft"
+  | "reopen"
+  | "restore"
+  | "send-to-backlog";
 
 export interface WorkOrderStatusAction {
   kind: WorkOrderStatusActionKind;
@@ -41,6 +47,10 @@ export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): 
   }
 
   if (input.isClosed) {
+    if (input.displayStatus === "archived") {
+      actions.push({ kind: "restore", label: "Restore", disabled: manageDisabled });
+      return actions;
+    }
     if (isWorkOrderRecoveryStatus(input.displayStatus)) {
       actions.push({
         kind: "send-to-backlog",
@@ -72,6 +82,9 @@ export function applyWorkOrderStatusAction(
       return;
     case "reopen":
       void handlers.onStatusChange("STATE_OPEN");
+      return;
+    case "restore":
+      void handlers.onStatusChange("STATE_DRAFT");
       return;
     case "send-to-backlog":
       handlers.onSendToBacklog?.();
