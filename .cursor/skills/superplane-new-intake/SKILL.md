@@ -3,8 +3,8 @@ name: superplane-new-intake
 description: >-
   Use when adding a new factory intake source, such as Linear, Notion, or
   Datadog. Ask which source, then collect branding, the existing integration,
-  delete-intake behavior, the task-card source, and the other facts required
-  before implementation.
+  delete-intake behavior, the task-card source, settings filters, and the
+  other facts required before implementation.
 ---
 
 # New factory intake
@@ -72,6 +72,7 @@ Required before any code:
 - Branding: product name, icon file, and whether the logo is one color
 - Task-card source: display name, icon, site host, and ticket label
 - Delete intake is included. It removes the intake only. It does not remove the integration.
+- Settings filters: at least one filter that belongs to this integration, plus its default
 - Events that create a task
 - One task per what (one issue, one package, one alert)
 - Title fields, body fields, and the browse URL field
@@ -89,7 +90,7 @@ You may propose, and the human confirms:
 
 ## Checklist
 
-These four are required for every intake. Do not treat them as optional.
+These five are required for every intake. Do not treat them as optional.
 
 ### Branding
 
@@ -152,6 +153,35 @@ does not exist, the next work is the integration, not the intake. Follow
 `docs/contributing/component-implementations.md`. Come back to this skill
 after the trigger can emit an event.
 
+### Settings filters
+
+Every intake opens the shared intake settings page
+(`IntakeSourceSettingsPopup`) and shows filters that belong to this
+integration. A settings page with no source-specific filter is not done.
+Do not reuse the GitHub label and assignment fields for another source.
+
+Ask which filters to ship. At least one. Propose filters from the source's
+own objects, then let the human cut the list:
+
+- GitHub issues: labels, assignment, author access, which events
+- Jira issues: new or updated, labels, assignment
+- Sentry exceptions: which events, issue level
+- Productive tasks: task list, skip key tasks
+- Dependabot alerts: severity
+
+Empty selection means every value, unless the human says otherwise. The same
+filters appear in the setup wizard and on the settings page. Saving writes
+them into the canvas graph (the filter node, the trigger configuration, or
+both). The workers run the graph, so do not store the filter a second time
+on the intake row.
+
+Add `intakeSourceHasFilterNode` for the new source in
+`pkg/grpc/actions/factories/intake_settings.go`. Render a
+`<Name>IntakeFilterFields` component from the General tab of
+`IntakeSourceSettingsPopup.tsx`. The component returns null for every other
+source id. Cover the round trip in `intake_settings_test.go` and a
+`*FilterFields.spec.tsx`.
+
 ### 1. What becomes a task
 
 - Which events create a task? Examples: created, reopened, assigned, a
@@ -180,10 +210,7 @@ after the trigger can emit an event.
   `pkg/grpc/actions/factories/intake_graph.go` reads `repository` and
   `project` only. A new key must be added there or settings lose the
   resource.
-- Which filters appear in the setup wizard and in intake settings? Examples:
-  labels, assignment, severity, level, task list. Empty selection means every
-  value, unless the human says otherwise.
-- Default for each filter.
+- Filters for this source are required. Collect them in **Settings filters**.
 - Can the user reconnect a missing integration from settings? Jira, Sentry,
   and Productive can. GitHub uses the workspace repository from onboarding.
 
@@ -248,10 +275,11 @@ either unless the human says yes.
 ## Confirm, then implement
 
 Repeat the answers as a short spec. Include the integration, icon file,
-task-card name and host, trigger component, source id, events, title, body,
-origin URL, resource key, filters, seed cap, feature flag, and write-back.
-Say that delete removes the intake and keeps the integration. Ask the human
-to confirm. Start code only after they confirm.
+task-card name and host, settings filters and their defaults, trigger
+component, source id, events, title, body, origin URL, resource key, seed
+cap, feature flag, and write-back. Say that delete removes the intake and
+keeps the integration. Ask the human to confirm. Start code only after they
+confirm.
 
 Generated files stay gitignored. Edit `protos/factories.proto`, then run
 `make pb.gen`. Do not hand-edit `pkg/protos/`, `web_src/src/api-client/`, or
@@ -321,8 +349,9 @@ example payload, and update `docs/components/<Name>.mdx`. Follow
 - `web_src/src/pages/factories/pages/lineIntakeCanvas.ts`.
 - `web_src/src/pages/factories/pages/intakeSourceSettingsModel.ts`: settings,
   pause, and `intakeSupportsDelete` (must return true).
-- `web_src/src/pages/factories/pages/IntakeSourceSettingsPopup.tsx` and a
-  filter-fields component for this source.
+- `web_src/src/pages/factories/pages/IntakeSourceSettingsPopup.tsx`: mount
+  `<Name>IntakeFilterFields` on the General tab. It renders only for this
+  source id and shows the filters from the confirmed spec.
 - Setup wizard, page, copy, and route. Wire the picker in `LinesPage.tsx`.
   Add the path in `web_src/src/pages/factories/lib/factoryPagePaths.ts` and
   the route in `web_src/src/App.tsx`. Export the page from
@@ -372,5 +401,6 @@ Facts you can state, then still confirm the product choices:
 - Browse URL: `{{ root().data.url }}`
 - Webhooks require a workspace admin token
 
-Still ask: which actions create a task, title format, filters (labels, state,
-priority), seed cap, skip import, feature flag, and write-back.
+Still ask: which actions create a task, title format, and at least one
+settings filter (labels, state, or priority). The settings page must show
+that filter. Also ask seed cap, skip import, feature flag, and write-back.
