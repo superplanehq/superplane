@@ -211,14 +211,12 @@ function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
 }
 
 function TicketsScreenHost({
-  organizationId,
   flow,
   model,
   saving,
   chrome,
   sphere,
 }: {
-  organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   saving: boolean;
@@ -243,14 +241,9 @@ function TicketsScreenHost({
       jiraProjectsLoading={model.jiraProjectsLoading}
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
-      jiraCompletion={model.jiraCompletion}
-      jiraCompletionNeedsManualColumn={model.jiraCompletionNeedsManualColumn}
-      organizationId={organizationId}
-      jiraIntegrationId={model.jiraIntegrationId}
       onSelectTicketSource={flow.selectTicketSource}
       onConnectJira={() => void flow.connectJira()}
       onSelectJiraProject={model.setJiraProjectId}
-      onJiraCompletionChange={model.setJiraCompletion}
       onRetryJiraProjects={model.retryJiraProjects}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
@@ -355,7 +348,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
-        organizationId={organizationId}
         flow={flow}
         model={model}
         saving={model.saving}
