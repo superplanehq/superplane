@@ -19,6 +19,7 @@ export { GitHubIntakeSetupPage } from "./GitHubIntakeSetupPage";
 export { JiraIntakeSetupPage } from "./JiraIntakeSetupPage";
 export { ProductiveIntakeSetupPage } from "./ProductiveIntakeSetupPage";
 export { PlanningSetupPage } from "./PlanningSetupPage";
+export { RiskScoreSetupPage } from "./RiskScoreSetupPage";
 export { SentryIntakeSetupPage } from "./SentryIntakeSetupPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";

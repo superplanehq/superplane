@@ -1,8 +1,5 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
-import { JiraCompletionColumnFields } from "../../JiraCompletionColumnFields";
-import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
-import type { JiraCompletionColumnValue } from "../../jiraCompletionColumn";
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -39,15 +36,10 @@ type FirstRunTicketsScreenProps = {
   jiraProjectsLoading?: boolean;
   jiraProjectsError?: boolean;
   jiraProjectId?: string;
-  jiraCompletion?: JiraCompletionColumnValue;
-  jiraCompletionNeedsManualColumn?: boolean;
-  organizationId?: string;
-  jiraIntegrationId?: string;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
-  onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
   onRetryJiraProjects?: () => void;
 };
 
@@ -81,15 +73,10 @@ export function FirstRunTicketsScreen({
   jiraProjectsLoading = false,
   jiraProjectsError = false,
   jiraProjectId = "",
-  jiraCompletion = DEFAULT_JIRA_COMPLETION_SETTINGS,
-  jiraCompletionNeedsManualColumn = false,
-  organizationId = "",
-  jiraIntegrationId = "",
   onSelectTicketSource,
   onAnalyzeTickets,
   onConnectJira,
   onSelectJiraProject,
-  onJiraCompletionChange,
   onRetryJiraProjects,
 }: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
@@ -142,12 +129,7 @@ export function FirstRunTicketsScreen({
             jiraProjectsLoading={jiraProjectsLoading}
             jiraProjectsError={jiraProjectsError}
             jiraProjectId={jiraProjectId}
-            jiraCompletion={jiraCompletion}
-            jiraCompletionNeedsManualColumn={jiraCompletionNeedsManualColumn}
-            organizationId={organizationId}
-            jiraIntegrationId={jiraIntegrationId}
             onSelectJiraProject={onSelectJiraProject}
-            onJiraCompletionChange={onJiraCompletionChange}
             onRetryJiraProjects={onRetryJiraProjects}
           />
         </FirstRunPanel>
@@ -253,12 +235,7 @@ function FirstRunJiraProjectFields({
   jiraProjectsLoading,
   jiraProjectsError,
   jiraProjectId,
-  jiraCompletion,
-  jiraCompletionNeedsManualColumn,
-  organizationId,
-  jiraIntegrationId,
   onSelectJiraProject,
-  onJiraCompletionChange,
   onRetryJiraProjects,
 }: {
   jiraAvailable: boolean;
@@ -269,12 +246,7 @@ function FirstRunJiraProjectFields({
   jiraProjectsLoading: boolean;
   jiraProjectsError: boolean;
   jiraProjectId: string;
-  jiraCompletion: JiraCompletionColumnValue;
-  jiraCompletionNeedsManualColumn: boolean;
-  organizationId: string;
-  jiraIntegrationId: string;
   onSelectJiraProject?: (id: string) => void;
-  onJiraCompletionChange?: (next: JiraCompletionColumnValue) => void;
   onRetryJiraProjects?: () => void;
 }) {
   if (!jiraAvailable || !visible) {
@@ -293,17 +265,6 @@ function FirstRunJiraProjectFields({
           onSelect={(id) => onSelectJiraProject?.(id)}
           onRetry={() => onRetryJiraProjects?.()}
         />
-        {jiraCompletionNeedsManualColumn && jiraProjectId && organizationId && jiraIntegrationId ? (
-          <div className="mt-4">
-            <JiraCompletionColumnFields
-              organizationId={organizationId}
-              integrationId={jiraIntegrationId}
-              projectId={jiraProjectId}
-              value={jiraCompletion}
-              onChange={(next) => onJiraCompletionChange?.(next)}
-            />
-          </div>
-        ) : null}
       </fieldset>
     </div>
   );

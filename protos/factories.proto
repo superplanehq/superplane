@@ -2184,6 +2184,8 @@ message DescribeFactoryVelocityRequest {
     PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
     // Sorts on cost_cents.
     PEOPLE_SORT_COST_USD = 5;
+    // SuperPlane tasks this person opened that closed without a merge.
+    PEOPLE_SORT_FACTORY_WASTE = 6;
   }
 
   enum SortDirection {

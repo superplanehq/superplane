@@ -61,6 +61,7 @@ export interface LineIntakeSource {
   description: string;
   iconSrc: string;
   iconAlt: string;
+  tabLabel: string;
   /** How SuperPlane receives events from this source. */
   listen: {
     kind: LineIntakeListenKind;
@@ -89,6 +90,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
+    tabLabel: "GitHub",
     listen: {
       kind: "webhook",
       label: "On GitHub issue",
@@ -108,6 +110,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Dependabot alerts.",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
+    tabLabel: "Dependabot",
     listen: {
       kind: "webhook",
       label: "On Dependabot alert",
@@ -127,6 +130,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
     iconAlt: "Jira",
+    tabLabel: "Jira",
     listen: {
       kind: "webhook",
       label: "On Jira issue",
@@ -146,6 +150,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
+    tabLabel: "Sentry",
     listen: {
       kind: "webhook",
       label: "On Sentry exception",
@@ -165,6 +170,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
     iconAlt: "PagerDuty",
+    tabLabel: "PagerDuty",
     listen: {
       kind: "webhook",
       label: "On PagerDuty incident",
@@ -184,6 +190,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Create tasks from Productive tasks.",
     iconSrc: productiveIcon,
     iconAlt: "Productive",
+    tabLabel: "Productive",
     listen: {
       kind: "webhook",
       label: "On Productive task",

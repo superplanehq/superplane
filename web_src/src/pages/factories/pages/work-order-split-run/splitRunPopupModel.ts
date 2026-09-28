@@ -16,10 +16,20 @@ import {
   toArtifactDataRecord,
 } from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import type { SplitRunFixture, SplitRunPhase } from "./splitRunMocks";
+import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunFixture, type SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
+
+/**
+ * The classic tabbed popup predates the console. Drop the console-only
+ * phases (runs from earlier dispatches and the closure card) so orgs
+ * without the Task Console feature see the original timeline.
+ */
+export function classicSplitRunFixture(fixture: SplitRunFixture): SplitRunFixture {
+  const phases = fixture.phases.filter((phase) => !phase.historyRun && phase.id !== SPLIT_RUN_CLOSURE_PHASE_ID);
+  return phases.length === fixture.phases.length ? fixture : { ...fixture, phases };
+}
 
 export function refinePopupShowsAutomations(args: {
   footerKind: SplitRunFixture["footer"]["kind"];

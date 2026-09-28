@@ -50,5 +50,6 @@ export {
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
+  RiskScoreSetupPage,
   SentryIntakeSetupPage,
 } from "./pages";

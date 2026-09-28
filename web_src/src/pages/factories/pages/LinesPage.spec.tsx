@@ -17,6 +17,7 @@ import {
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_RISK_SCORE,
   FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -40,6 +41,7 @@ import {
   factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factoryRiskScoreSetupPath,
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
@@ -454,7 +456,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -1009,35 +1011,59 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
-  it("hides Add automation when custom automations are off", async () => {
+  it("shows Add automation on Verify when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Verify plus when custom automations are off", async () => {
+  it("opens the Verify catalog when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
+  });
+
+  it("opens the risk score setup page from the Verify catalog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-risk-score"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
       isPending: false,
+    });
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
     });
     const user = userEvent.setup();
     renderLinesBoard();

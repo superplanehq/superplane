@@ -32,7 +32,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -101,6 +101,7 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   peekOrderFromNavigationState,
   resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
@@ -251,6 +252,16 @@ function boardWorkOrdersPageOptions(
   };
 }
 
+function boardWorkOrdersWhileTaskLineLoads(
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  return {
+    ...boardWorkOrdersPageOptions(state, undefined, currentUserId),
+    done: { enabled: false },
+  };
+}
+
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
   factory: FactoriesFactory | null | undefined,
@@ -300,6 +311,7 @@ export function LinesPage() {
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -316,6 +328,22 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
+  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
+    organizationId,
+    factoryId,
+    taskLineOrderId,
+  );
+  const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
+  const selectedLineId = displayedBoardLineId(
+    routeLineId,
+    boardLineId,
+    lines,
+    taskForBoardLine,
+    taskLinePending ? undefined : firstFactoryLineId(factory),
+  );
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -326,7 +354,9 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+    taskLinePending
+      ? boardWorkOrdersWhileTaskLineLoads(listState, currentUserId)
+      : boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -338,7 +368,6 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
@@ -375,7 +404,6 @@ export function LinesPage() {
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
-  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
@@ -401,13 +429,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
-  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
-  const selectedLineId =
-    routeLineId ??
-    searchLineId ??
-    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
-    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
@@ -451,9 +472,9 @@ export function LinesPage() {
   }
 
   if (!selectedLine) {
-    if (routeOrderNumber && permalink.status === "loading") {
+    if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
-        <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        <div className="flex h-full min-h-0 min-w-0 w-full">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
@@ -746,11 +767,7 @@ export function LinesPage() {
             onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations && customAutomationsEnabled
-                ? undefined
-                : canAddPRFeedback
-                  ? () => setAddPRFeedbackOpen(true)
-                  : undefined
+              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
@@ -1065,6 +1082,7 @@ function LineDetail({
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
+  const canAddVerifyAutomation = showColumnAutomations && canUpdate;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -1126,7 +1144,7 @@ function LineDetail({
           colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
-          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}

@@ -399,10 +399,36 @@ function totalMergedOf(person: VelocityPerson): number {
 
 const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => number>> = {
   PEOPLE_SORT_FACTORY_MERGED: (person) => person.factoryMerged ?? 0,
+  PEOPLE_SORT_FACTORY_WASTE: (person) => person.factoryWaste ?? 0,
   PEOPLE_SORT_AUTHORED_MERGED: (person) => person.authoredMerged ?? 0,
   PEOPLE_SORT_MEDIAN_CYCLE_HOURS: (person) => person.medianCycleHours ?? 0,
   PEOPLE_SORT_COST_USD: (person) => Number(person.costCents ?? 0),
 };
+
+/**
+ * Matches the server tie-break: total merges, then SuperPlane merges, then
+ * name, then id. Direction applies only to the primary key.
+ */
+function compareVelocityPeople(
+  left: VelocityPerson,
+  right: VelocityPerson,
+  valueOf: (person: VelocityPerson) => number,
+  ascending: boolean,
+): number {
+  const diff = valueOf(left) - valueOf(right);
+  if (diff !== 0) return ascending ? diff : -diff;
+
+  const totalDiff = totalMergedOf(right) - totalMergedOf(left);
+  if (totalDiff !== 0) return totalDiff;
+
+  const factoryDiff = (right.factoryMerged ?? 0) - (left.factoryMerged ?? 0);
+  if (factoryDiff !== 0) return factoryDiff;
+
+  const nameDiff = (left.name ?? "").localeCompare(right.name ?? "");
+  if (nameDiff !== 0) return nameDiff;
+
+  return (left.id ?? "").localeCompare(right.id ?? "");
+}
 
 /**
  * Stands in for the backend's sort-then-page step: orders `report.people` by
@@ -415,11 +441,7 @@ export function paginateVelocityPeople(report: VelocityResponse, url: URL): Velo
   const valueOf = PEOPLE_SORT_VALUE[url.searchParams.get("peopleSort") ?? ""] ?? totalMergedOf;
   const ascending = url.searchParams.get("peopleSortDirection") === "SORT_DIRECTION_ASC";
 
-  people.sort((a, b) => {
-    const diff = valueOf(a) - valueOf(b);
-    if (diff !== 0) return ascending ? diff : -diff;
-    return (a.name ?? "").localeCompare(b.name ?? "");
-  });
+  people.sort((a, b) => compareVelocityPeople(a, b, valueOf, ascending));
 
   const offset = Number(url.searchParams.get("peopleOffset") ?? 0);
   const pageSize = Number(url.searchParams.get("peoplePageSize") ?? peoplePageSizeForOffset(offset));

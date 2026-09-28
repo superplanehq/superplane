@@ -6,7 +6,7 @@ import { getUserInitials } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
-import type { VelocityPerson } from "../lib/factoryVelocityReport";
+import { formatPersonWaste, type VelocityPerson } from "../lib/factoryVelocityReport";
 import type { PeopleSortDirection, PeopleSortKey } from "../lib/velocityPeopleSort";
 import { VelocitySortableHeader } from "./VelocitySortableHeader";
 
@@ -43,6 +43,12 @@ const COLUMNS: Column[] = [
     label: "Via SuperPlane",
     hint: "Merged pull requests from SuperPlane tasks this person opened",
     format: (person) => String(person.factoryMerged),
+  },
+  {
+    key: "factoryWaste",
+    label: "Task waste",
+    hint: "SuperPlane tasks credited to this person that closed without a merge",
+    format: formatPersonWaste,
   },
   {
     key: "authoredMerged",
@@ -117,7 +123,7 @@ export function VelocityPeopleTable({
       </div>
 
       <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[860px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border">
               <th scope="col" className="w-8 pb-2 text-left text-[12px] font-normal text-muted-foreground">
