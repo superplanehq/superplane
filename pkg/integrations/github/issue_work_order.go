@@ -64,6 +64,7 @@ func integrationProperty(integration *models.Integration, name string) string {
 
 // ManualTaskActorFromLabel returns the GitHub login stored with a pending marker.
 func ManualTaskActorFromLabel(label string) string {
+	label = models.StripCreateRequestKey(label)
 	_, actor, ok := strings.Cut(label, manualTaskActorSeparator)
 	if !ok {
 		return ""
@@ -73,7 +74,8 @@ func ManualTaskActorFromLabel(label string) string {
 
 // ManualTaskMarkerFromLabel returns the marker stored on a pending task.
 func ManualTaskMarkerFromLabel(label string) (string, bool) {
-	label, _, _ = strings.Cut(strings.TrimSpace(label), manualTaskActorSeparator)
+	label = models.StripCreateRequestKey(strings.TrimSpace(label))
+	label, _, _ = strings.Cut(label, manualTaskActorSeparator)
 	return ManualTaskMarkerFromBody(label)
 }
 

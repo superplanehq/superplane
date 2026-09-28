@@ -43,7 +43,12 @@ func (f *Factory) FindWorkOrderByPendingGitHubMarker(tx *gorm.DB, marker string)
 	err := tx.
 		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
 		Where("origin_url IS NULL OR origin_url = ''").
-		Where("origin_label = ? OR origin_label LIKE ?", marker, marker+"\x1f%").
+		Where(
+			"origin_label = ? OR origin_label LIKE ? OR origin_label LIKE ?",
+			marker,
+			marker+"\x1f%",
+			marker+createRequestKeySeparator+"%",
+		).
 		Order("created_at ASC").
 		First(&order).
 		Error

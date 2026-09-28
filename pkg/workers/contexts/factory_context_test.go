@@ -2334,3 +2334,85 @@ func setupFactoryAppExecutionWithPayload(
 
 	return canvas, nodeExecution, run
 }
+
+func TestFactoryContext_GitHubClientSkipsUnusableIntegration(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	broken := readyGitHubPATIntegration(t, r, false)
+	usable := readyGitHubPATIntegration(t, r, true)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			githubIssueCanvasNode("broken"),
+			githubIssueCanvasNode("usable"),
+		},
+		nil,
+	)
+
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+	nodes := append([]models.Node(nil), liveVersion.Nodes...)
+	require.Len(t, nodes, 2)
+	brokenID := broken.ID.String()
+	usableID := usable.ID.String()
+	nodes[0].IntegrationID = &brokenID
+	nodes[1].IntegrationID = &usableID
+	require.NoError(t, database.Conn().Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nil).WithRemoteImageIngest(r.Encryptor, r.Registry)
+	require.Equal(t, broken.ID, ctx.githubIssueIntegration().ID)
+	assert.Nil(t, ctx.githubClient(ctx.githubIssueIntegration()))
+	assert.NotNil(t, ctx.githubClientForCanvas())
+}
+
+func githubIssueCanvasNode(nodeID string) models.CanvasNode {
+	return models.CanvasNode{
+		NodeID: nodeID,
+		Type:   models.NodeTypeTrigger,
+		Name:   "On Issue",
+		Ref: datatypes.NewJSONType(models.NodeRef{
+			Trigger: &models.TriggerRef{Name: "github.onIssue"},
+		}),
+	}
+}
+
+func readyGitHubPATIntegration(t *testing.T, r *support.ResourceRegistry, withPAT bool) *models.Integration {
+	t.Helper()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	setup := datatypes.NewJSONType(models.SetupState{})
+	integration.State = models.IntegrationStateReady
+	integration.SetupState = &setup
+	integration.Properties = datatypes.NewJSONSlice([]core.IntegrationPropertyDefinition{
+		{Name: ghcommon.PropertyAuthMethod, Value: ghcommon.AuthMethodPAT},
+		{Name: ghcommon.PropertyOwner, Value: "acme"},
+		{Name: ghcommon.PropertyOwnerType, Value: ghcommon.OwnerTypeOrganization},
+	})
+	require.NoError(t, database.Conn().Save(integration).Error)
+	if !withPAT {
+		return integration
+	}
+
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), []byte("ghp_test"), []byte(integration.ID.String()))
+	require.NoError(t, err)
+	now := time.Now()
+	require.NoError(t, database.Conn().Create(&models.IntegrationSecret{
+		OrganizationID: integration.OrganizationID,
+		InstallationID: integration.ID,
+		Name:           ghcommon.SecretPAT,
+		Value:          encrypted,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}).Error)
+	return integration
+}

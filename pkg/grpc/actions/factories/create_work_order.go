@@ -17,6 +17,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/metadata"
 	"gorm.io/gorm"
 )
 
@@ -52,6 +53,7 @@ func CreateWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
+	requestKey := createRequestKeyFromContext(ctx)
 	target, err := oldestManualTaskIssueIntake(db, factory)
 	if err != nil {
 		log.WithError(err).Warnf("factory %s: failed to resolve a GitHub issue for a manual task", factory.ID)
@@ -66,13 +68,37 @@ func CreateWorkOrder(
 	assigneeIDs := []uuid.UUID{createdByID}
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
+	replayed := false
 	err = db.Transaction(func(tx *gorm.DB) error {
+		storeKey := requestKey
+		if requestKey != "" {
+			if lockErr := models.LockWorkOrderCreateRequest(tx, factory.ID, createdByID, requestKey); lockErr != nil {
+				return lockErr
+			}
+			existing, findErr := factory.FindWorkOrderByCreateRequestKey(tx, createdByID, requestKey)
+			if findErr != nil {
+				return findErr
+			}
+			if existing != nil && existing.Title == title && existing.Description == req.GetDescription() {
+				order = existing
+				replayed = true
+				return nil
+			}
+			if existing != nil {
+				storeKey = ""
+			}
+		}
+
 		created, createErr := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 		if createErr != nil {
 			return createErr
 		}
-		if marker != "" {
-			if markErr := created.SetPendingGitHubMarker(tx, marker); markErr != nil {
+		label := marker
+		if storeKey != "" {
+			label = models.AppendCreateRequestKey(label, storeKey)
+		}
+		if label != "" {
+			if markErr := created.SetPendingGitHubMarker(tx, label); markErr != nil {
 				return markErr
 			}
 		}
@@ -94,6 +120,13 @@ func CreateWorkOrder(
 	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+	if replayed {
+		serialized, serializeErr := loadAndSerializeWorkOrder(context.WithoutCancel(ctx), factory, order)
+		if serializeErr != nil {
+			return nil, factoryErrorToStatus(serializeErr, "failed to create work order")
+		}
+		return &pb.CreateWorkOrderResponse{Order: serialized}, nil
 	}
 
 	workCtx := context.WithoutCancel(ctx)
@@ -126,4 +159,20 @@ func CreateWorkOrder(
 	return &pb.CreateWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func createRequestKeyFromContext(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	values := md.Get("idempotency-key")
+	if len(values) == 0 {
+		return ""
+	}
+	parsed, err := uuid.Parse(strings.TrimSpace(values[0]))
+	if err != nil {
+		return ""
+	}
+	return parsed.String()
 }

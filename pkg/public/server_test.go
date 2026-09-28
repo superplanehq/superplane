@@ -914,3 +914,9 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 	assert.Equal(t, int32(0), data.CurrentOrganizations)
 	assert.Empty(t, data.Message)
 }
+
+func TestHeadersMatcherForwardsIdempotencyKey(t *testing.T) {
+	key, ok := headersMatcher("Idempotency-Key")
+	require.True(t, ok)
+	assert.Equal(t, "idempotency-key", key)
+}

@@ -154,12 +154,12 @@ func workOrderCreatedPayloadWithRefinement(
 		workOrder["repository_url"] = repositoryURL
 		workOrder["default_branch"] = defaultBranch
 	}
-	if order.OriginURL != nil && *order.OriginURL != "" {
-		origin := map[string]any{"url": *order.OriginURL}
-		if order.OriginLabel != nil && *order.OriginLabel != "" {
-			origin["label"] = *order.OriginLabel
+	if origin := order.Origin(); origin != nil {
+		item := map[string]any{"url": origin.URL}
+		if origin.Label != "" {
+			item["label"] = origin.Label
 		}
-		workOrder["origin"] = origin
+		workOrder["origin"] = item
 	}
 
 	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride

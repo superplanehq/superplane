@@ -197,6 +197,7 @@ describe("useCreateWorkOrderComposer", () => {
       title: "Refunds fail on retry.",
       description: "Refunds fail on retry.",
       assigneeIds: [],
+      idempotencyKey: expect.any(String),
     });
     expect(onCreated).toHaveBeenCalledWith("101", { id: "order-1", number: "101" });
   });
@@ -224,6 +225,7 @@ describe("useCreateWorkOrderComposer", () => {
       title: "New task",
       description: "![receipt.png](sp-file://file-2)",
       assigneeIds: [],
+      idempotencyKey: expect.any(String),
     });
   });
 
@@ -242,5 +244,34 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     expect(result.current.description).toHaveLength(5000);
+  });
+
+  it("reuses the request key when create fails", async () => {
+    createMutate.mockRejectedValueOnce(new Error("network")).mockResolvedValueOnce({ id: "order-1", number: "101" });
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.updateTitle("Ship the refunds line");
+    });
+
+    await act(async () => {
+      await result.current.handleCreate();
+    });
+    await act(async () => {
+      await result.current.handleCreate();
+    });
+
+    const firstKey = createMutate.mock.calls[0][0].idempotencyKey;
+    const secondKey = createMutate.mock.calls[1][0].idempotencyKey;
+    expect(firstKey).toEqual(secondKey);
+    expect(firstKey).toEqual(expect.any(String));
   });
 });

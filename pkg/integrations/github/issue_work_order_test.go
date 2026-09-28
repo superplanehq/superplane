@@ -39,6 +39,12 @@ func TestPendingManualTaskLabelKeepsTheActorOutOfTheBodyMarker(t *testing.T) {
 	assert.Equal(t, marker, found)
 	assert.Equal(t, "superplane-bot", ManualTaskActorFromLabel(label))
 	assert.NotContains(t, AppendManualTaskMarker("Stop double charges.", marker), "superplane-bot")
+
+	stored := models.AppendCreateRequestKey(label, "6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+	found, ok = ManualTaskMarkerFromLabel(stored)
+	require.True(t, ok)
+	assert.Equal(t, marker, found)
+	assert.Equal(t, "superplane-bot", ManualTaskActorFromLabel(stored))
 }
 
 func TestIssueAuthorFromEventData(t *testing.T) {

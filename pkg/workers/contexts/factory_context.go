@@ -547,7 +547,7 @@ func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) er
 	return err
 }
 
-func (c *FactoryContext) githubIssueIntegration() *models.Integration {
+func (c *FactoryContext) githubIssueIntegrations() []*models.Integration {
 	if c == nil || c.canvas == nil || c.tx == nil {
 		return nil
 	}
@@ -559,6 +559,7 @@ func (c *FactoryContext) githubIssueIntegration() *models.Integration {
 	if !ok {
 		return nil
 	}
+	integrations := make([]*models.Integration, 0)
 	for i := range spec.Nodes {
 		node := spec.Nodes[i]
 		if node.ComponentName() != "github.onIssue" || node.IntegrationID == nil {
@@ -572,9 +573,17 @@ func (c *FactoryContext) githubIssueIntegration() *models.Integration {
 		if err != nil || integration.State != models.IntegrationStateReady {
 			continue
 		}
-		return integration
+		integrations = append(integrations, integration)
 	}
-	return nil
+	return integrations
+}
+
+func (c *FactoryContext) githubIssueIntegration() *models.Integration {
+	integrations := c.githubIssueIntegrations()
+	if len(integrations) == 0 {
+		return nil
+	}
+	return integrations[0]
 }
 
 func (c *FactoryContext) githubClient(integration *models.Integration) *githubcommon.Client {
@@ -611,7 +620,12 @@ func (c *FactoryContext) githubInstallationLogin() string {
 }
 
 func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
-	return c.githubClient(c.githubIssueIntegration())
+	for _, integration := range c.githubIssueIntegrations() {
+		if client := c.githubClient(integration); client != nil {
+			return client
+		}
+	}
+	return nil
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {

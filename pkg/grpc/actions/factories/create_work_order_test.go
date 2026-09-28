@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"google.golang.org/grpc/metadata"
 	"gorm.io/datatypes"
 )
 
@@ -450,7 +451,7 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		assert.Equal(t, 2, countGitHubIssueCreates(httpCtx.Requests))
 	})
 
-	t.Run("does not open an issue when the GitHub login cannot be read", func(t *testing.T) {
+	t.Run("keeps the marker when the GitHub login cannot be read", func(t *testing.T) {
 		httpCtx := githubIssueHTTP(http.StatusCreated, `{
 			"number": 42,
 			"html_url": "https://github.com/acme/payments/issues/42"
@@ -471,7 +472,81 @@ func Test__CreateWorkOrder__MirrorsManualTasksAsGitHubIssues(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, orders, 1)
 		assert.Nil(t, orders[0].OriginURL)
-		assert.Nil(t, orders[0].OriginLabel)
+		require.NotNil(t, orders[0].OriginLabel)
+		assert.Contains(t, *orders[0].OriginLabel, "superplane-manual-task:")
+	})
+
+	t.Run("opens an issue after a later login lookup", func(t *testing.T) {
+		previousDelay := manualTaskIssueBackgroundDelay
+		previousAttempts := manualTaskIssueBackgroundAttempts
+		previousRuns := runManualTaskIssueBackgroundReconcile
+		manualTaskIssueBackgroundDelay = 10 * time.Millisecond
+		manualTaskIssueBackgroundAttempts = 4
+		runManualTaskIssueBackgroundReconcile = true
+		t.Cleanup(func() {
+			manualTaskIssueBackgroundDelay = previousDelay
+			manualTaskIssueBackgroundAttempts = previousAttempts
+			runManualTaskIssueBackgroundReconcile = previousRuns
+		})
+
+		httpCtx := githubIssueResponses(
+			githubIssueResponse(http.StatusOK, `[]`),
+			githubIssueResponse(http.StatusCreated, `{
+				"number": 42,
+				"html_url": "https://github.com/acme/payments/issues/42"
+			}`),
+		)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		deps := githubIssueDeps(r, httpCtx)
+		deps.HTTP = &flakyActorRouter{inner: httpCtx, login: githubIssueTestActor, failures: manualTaskGitHubActorAttempts}
+
+		resp, err := CreateWorkOrder(ctx, deps, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Ship the refunds line",
+		})
+		require.NoError(t, err)
+		assert.Nil(t, resp.Order.GetOrigin())
+
+		require.Eventually(t, func() bool {
+			orders, listErr := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+			if listErr != nil || len(orders) != 1 || orders[0].OriginURL == nil {
+				return false
+			}
+			return *orders[0].OriginURL == issueURL
+		}, 2*time.Second, 20*time.Millisecond)
+		assert.Equal(t, 1, countGitHubIssueCreates(httpCtx.Requests))
+	})
+
+	t.Run("returns the saved task when the same request key is sent again", func(t *testing.T) {
+		httpCtx := githubIssueHTTP(http.StatusCreated, `{
+			"number": 42,
+			"html_url": "https://github.com/acme/payments/issues/42",
+			"user": {"login": "superplane-bot"}
+		}`)
+		factoryModel := githubIssueFactory(t, r, true, false, "acme/payments")
+		request := &pb.CreateWorkOrderRequest{
+			FactoryId:   factoryModel.ID.String(),
+			Title:       "Ship the refunds line",
+			Description: "Stop double charges.",
+		}
+		keyed := withCreateRequestKey(ctx, r.User.String(), uuid.NewString())
+
+		first, err := CreateWorkOrder(keyed, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		assert.Equal(t, issueURL, first.Order.GetOrigin().GetUrl())
+		assert.Equal(t, "acme/payments#42", first.Order.GetOrigin().GetLabel())
+
+		second, err := CreateWorkOrder(keyed, githubIssueDeps(r, httpCtx), r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		assert.Equal(t, first.Order.GetId(), second.Order.GetId())
+		assert.Equal(t, issueURL, second.Order.GetOrigin().GetUrl())
+		assert.Equal(t, "acme/payments#42", second.Order.GetOrigin().GetLabel())
+
+		orders, err := factoryModel.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
+		require.NoError(t, err)
+		require.Len(t, orders, 1)
+		assert.Equal(t, 1, countGitHubIssueCreates(httpCtx.Requests))
+		assert.Contains(t, *orders[0].OriginLabel, "\x1ecreate:")
 	})
 
 	t.Run("opens an issue when a later login lookup succeeds", func(t *testing.T) {
@@ -579,6 +654,13 @@ func (r *githubActorRouter) Do(request *http.Request) (*http.Response, error) {
 		return githubIssueResponse(http.StatusOK, `{"login":"`+r.login+`"}`), nil
 	}
 	return r.inner.Do(request)
+}
+
+func withCreateRequestKey(ctx context.Context, userID, key string) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs(
+		"x-user-id", userID,
+		"idempotency-key", key,
+	))
 }
 
 func countGitHubIssueCreates(requests []*http.Request) int {

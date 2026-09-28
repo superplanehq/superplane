@@ -122,7 +122,7 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 
 	label := ""
 	if o.OriginLabel != nil {
-		label = strings.TrimSpace(*o.OriginLabel)
+		label = StripCreateRequestKey(strings.TrimSpace(*o.OriginLabel))
 	}
 	if label == "" {
 		label = OriginLabelFromURL(url)
@@ -250,9 +250,17 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 }
 
 func (o *FactoryWorkOrder) SetOrigin(tx *gorm.DB, origin WorkOrderOrigin) error {
+	key := ""
+	if o.OriginLabel != nil {
+		key = CreateRequestKeyFromLabel(*o.OriginLabel)
+	}
 	applyWorkOrderOrigin(o, &origin)
 	if o.OriginURL == nil {
 		return nil
+	}
+	if key != "" && o.OriginLabel != nil {
+		labeled := AppendCreateRequestKey(*o.OriginLabel, key)
+		o.OriginLabel = &labeled
 	}
 
 	now := time.Now()
@@ -269,6 +277,13 @@ func (o *FactoryWorkOrder) SetPendingGitHubMarker(tx *gorm.DB, marker string) er
 	if marker == "" {
 		return nil
 	}
+	key := CreateRequestKeyFromLabel(marker)
+	if key == "" && o.OriginLabel != nil {
+		key = CreateRequestKeyFromLabel(*o.OriginLabel)
+	}
+	if key != "" {
+		marker = AppendCreateRequestKey(marker, key)
+	}
 
 	o.OriginLabel = &marker
 	now := time.Now()
@@ -283,15 +298,29 @@ func (o *FactoryWorkOrder) ClearPendingGitHubMarker(tx *gorm.DB, marker string) 
 	if o.OriginURL != nil && strings.TrimSpace(*o.OriginURL) != "" {
 		return nil
 	}
-	if o.OriginLabel == nil || strings.TrimSpace(*o.OriginLabel) != marker {
+	if o.OriginLabel == nil {
+		return nil
+	}
+	stored := strings.TrimSpace(*o.OriginLabel)
+	if StripCreateRequestKey(stored) != StripCreateRequestKey(strings.TrimSpace(marker)) {
 		return nil
 	}
 
-	o.OriginLabel = nil
+	key := CreateRequestKeyFromLabel(stored)
 	now := time.Now()
 	o.UpdatedAt = now
+	if key == "" {
+		o.OriginLabel = nil
+		return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+			"origin_label": gorm.Expr("NULL"),
+			"updated_at":   now,
+		}).Error
+	}
+
+	kept := AppendCreateRequestKey("", key)
+	o.OriginLabel = &kept
 	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
-		"origin_label": gorm.Expr("NULL"),
+		"origin_label": kept,
 		"updated_at":   now,
 	}).Error
 }

@@ -63,7 +63,7 @@ func attachManualTaskGitHubIssue(
 
 	actor, persisted := persistManualTaskGitHubActor(ctx, client, db, factory, order, target, marker)
 	if !persisted {
-		clearPendingManualTaskMarker(db, factory, order, marker)
+		scheduleManualTaskIssueCreate(deps, factory, order, target, marker, title, description, order.CreatedAt)
 		return
 	}
 	opened, err := createManualTaskGitHubIssue(ctx, client, target, title, description, marker, actor, order.CreatedAt)
@@ -219,6 +219,99 @@ func createManualTaskGitHubIssue(
 		issue = found
 	}
 	return manualTaskIssueFromGitHub(issue)
+}
+
+func scheduleManualTaskIssueCreate(
+	deps IntakeDependencies,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	target *manualTaskIssueTarget,
+	marker, title, description string,
+	since time.Time,
+) {
+	if !runManualTaskIssueBackgroundReconcile || factory == nil || order == nil || target == nil {
+		return
+	}
+	targetCopy := *target
+	factoryID := factory.ID
+	orderID := order.ID
+	go func() {
+		for attempt := 0; attempt < manualTaskIssueBackgroundAttempts; attempt++ {
+			time.Sleep(manualTaskIssueBackgroundDelay)
+			db := database.DB(context.Background())
+			current, err := factory.FindWorkOrder(db, orderID)
+			if err != nil || current == nil || current.Origin() != nil {
+				return
+			}
+			if current.OriginLabel == nil || !strings.Contains(*current.OriginLabel, marker) {
+				return
+			}
+			client, clientErr := newIntakeGitHubClient(deps, db, targetCopy.integration)
+			if clientErr != nil {
+				log.WithError(clientErr).Warnf("factory %s: failed to open the GitHub issue for task %s", factoryID, orderID)
+				return
+			}
+			login := resolveManualTaskGitHubActor(context.Background(), client, db, factory, current, &targetCopy, marker, "")
+			if login == "" {
+				continue
+			}
+			found, findErr := listCreatedManualTaskIssue(client, targetCopy.repository, marker, login, since)
+			if findErr == nil && found != nil {
+				if storeCreatedManualTaskIssue(db, factory, current, factoryID, orderID, found) {
+					return
+				}
+				continue
+			}
+			opened, createErr := createManualTaskGitHubIssue(context.Background(), client, &targetCopy, title, description, marker, login, since)
+			if createErr == nil {
+				if storeErr := storeManualTaskGitHubOrigin(db, factory, current, opened); storeErr != nil {
+					log.WithError(storeErr).Warnf("factory %s: failed to store GitHub issue %s on task %s", factoryID, opened.URL, orderID)
+				}
+				publishManualTaskGitHubOrigin(factoryID, orderID)
+				return
+			}
+			if errors.Is(createErr, errManualTaskGitHubIssueUnconfirmed) {
+				continue
+			}
+			log.WithError(createErr).Warnf(
+				"factory %s: intake %s: failed to create a GitHub issue in %s for a manual task",
+				factoryID,
+				targetCopy.intake.ID,
+				targetCopy.repository,
+			)
+			clearPendingManualTaskMarker(db, factory, current, marker)
+			return
+		}
+	}()
+}
+
+func storeCreatedManualTaskIssue(
+	db *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	factoryID, orderID uuid.UUID,
+	issue *github.Issue,
+) bool {
+	opened, originErr := manualTaskIssueFromGitHub(issue)
+	if originErr != nil {
+		return false
+	}
+	if storeErr := storeManualTaskGitHubOrigin(db, factory, order, opened); storeErr != nil {
+		log.WithError(storeErr).Warnf("factory %s: failed to store GitHub issue %s on task %s", factoryID, opened.URL, orderID)
+		return false
+	}
+	publishManualTaskGitHubOrigin(factoryID, orderID)
+	return true
+}
+
+func publishManualTaskGitHubOrigin(factoryID, orderID uuid.UUID) {
+	if publishErr := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		orderID.String(),
+		factoryevents.EventTypeOrderUpdated,
+	); publishErr != nil {
+		log.WithError(publishErr).Warnf("factory %s: failed to publish the GitHub origin for task %s", factoryID, orderID)
+	}
 }
 
 func scheduleManualTaskIssueReconcile(
