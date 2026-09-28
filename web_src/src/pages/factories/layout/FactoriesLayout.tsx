@@ -114,13 +114,18 @@ function FactoriesLayoutContent({
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
-  const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
-    useCreateWorkOrderDialogState(
-      organizationId,
-      factoryKey,
-      canAct("work_orders", "create"),
-      firstFactoryLineId(factory),
-    );
+  const {
+    createWorkOrderOpen,
+    createWorkOrderLineId,
+    openCreateWorkOrder,
+    closeCreateWorkOrder,
+    completeCreateWorkOrder,
+  } = useCreateWorkOrderDialogState(
+    organizationId,
+    factoryKey,
+    canAct("work_orders", "create"),
+    firstFactoryLineId(factory),
+  );
   useFactoryWebsocket(organizationId, factoryId);
 
   const storybookOnboarding = useOnboardingStorybook();
@@ -202,6 +207,7 @@ function FactoriesLayoutContent({
       {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
+          lineId={createWorkOrderLineId}
           onClose={closeCreateWorkOrder}
           onCreated={completeCreateWorkOrder}
         />

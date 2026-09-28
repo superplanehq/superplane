@@ -1642,6 +1642,8 @@ message CreateWorkOrderRequest {
   string title = 2;
   string description = 3;
   repeated string assignee_ids = 4;
+  // Line to start on when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message CreateWorkOrderResponse {
@@ -1723,6 +1725,8 @@ message WorkOrder {
   PlanningSessionSummary planning_session = 23;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 24;
+  // Line this draft starts on when the plan scores 5. Empty means auto-start is off.
+  string auto_start_line_id = 25;
 }
 
 // WorkOrderSummary is the list row for a work order.

@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test";
 import {
   createWorkOrderPath,
   factoryLineDetailPath,
+  factoryOverviewPath,
   linesPath,
   workOrderDetailPath,
   workOrdersPath,
@@ -109,5 +110,37 @@ describe("useCreateWorkOrderDialogState", () => {
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);
+  });
+
+  it("exposes the board line id from a line path", () => {
+    const { result } = renderHook(() => useDialogState(true), {
+      wrapper: wrapper(factoryLineDetailPath(ORGANIZATION_ID, FACTORY_KEY, "line-hotfix")),
+    });
+
+    expect(result.current.createWorkOrderLineId).toBe("line-hotfix");
+  });
+
+  it("leaves the board line id empty off a line board", () => {
+    const { result } = renderHook(() => useDialogState(true, "line-plan-and-implement"), {
+      wrapper: wrapper(workOrdersPath(ORGANIZATION_ID, FACTORY_KEY)),
+    });
+
+    expect(result.current.createWorkOrderLineId).toBeUndefined();
+  });
+
+  it("leaves the board line id empty on the new task route", () => {
+    const { result } = renderHook(() => useDialogState(true), {
+      wrapper: wrapper(createWorkOrderPath(ORGANIZATION_ID, FACTORY_KEY)),
+    });
+
+    expect(result.current.createWorkOrderLineId).toBeUndefined();
+  });
+
+  it("leaves the board line id empty on the overview", () => {
+    const { result } = renderHook(() => useDialogState(true), {
+      wrapper: wrapper(factoryOverviewPath(ORGANIZATION_ID, FACTORY_KEY)),
+    });
+
+    expect(result.current.createWorkOrderLineId).toBeUndefined();
   });
 });
