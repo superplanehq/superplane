@@ -142,6 +142,7 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
@@ -551,6 +552,12 @@ export function LinesPage() {
     if (template.id === "jira-issues") {
       if (selectedLine.id) {
         navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "datadog") {
+      if (selectedLine.id) {
+        navigate(factoryDatadogIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       }
       return;
     }

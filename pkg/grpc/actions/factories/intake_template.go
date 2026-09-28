@@ -147,12 +147,15 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: dependabotAlertCreateDescription,
 	},
 	models.FactoryIntakeSourceDatadog: {
-		name:              "Datadog errors",
-		description:       "Create a work order when Datadog reports a new Error Tracking issue.",
-		triggerComponent:  "datadog.onErrorTrackingAlert",
-		triggerName:       "On Error Tracking Alert",
+		name:             "Datadog errors",
+		description:      "Create a work order when Datadog reports a new Error Tracking issue.",
+		triggerComponent: "datadog.onErrorTrackingAlert",
+		triggerName:      "On Error Tracking Alert",
+		triggerConfiguration: map[string]any{
+			"alertTransitions": intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()),
+		},
 		createTitle:       "{{ root().data.title }}",
-		createDescription: "{{ root().data.body }}\n\n{{ root().data.link }}",
+		createDescription: "{{ root().data.description }}",
 	},
 }
 
@@ -466,6 +469,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		return defaultDependabotIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return defaultDatadogIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

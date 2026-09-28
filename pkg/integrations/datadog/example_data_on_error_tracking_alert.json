@@ -5,6 +5,8 @@
   "body": "InventoryTimeout: checkout failed: inventory timeout",
   "alert_id": "98765",
   "alert_transition": "Triggered",
-  "tags": "service:checkout,monitor",
+  "tags": "service:checkout,env:prod,monitor",
+  "alert_query": "error-tracking(\"service:checkout\").source(\"backend\").new().rollup(\"count\").by(\"@issue.id\").last(\"1d\") > 0",
+  "alert_scope": "service:checkout,env:prod",
   "link": "https://app.datadoghq.com/monitors/98765"
 }

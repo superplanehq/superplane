@@ -5,6 +5,7 @@ import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
@@ -74,6 +75,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Datadog errors",
     description: "Creates tasks from Datadog Error Tracking alerts.",
     iconSrc: datadogIcon,
+    featureId: FEATURE_FACTORY_DATADOG_INTAKE,
   },
   {
     id: "notion",

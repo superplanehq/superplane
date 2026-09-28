@@ -298,7 +298,10 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         appId: intake.canvasId?.trim() ?? "",
         healthy: intake.healthy !== false,
         paused: intake.paused === true,
-        settings: intakeSettingsFromApi(name, intake.settings),
+        settings: {
+          ...intakeSettingsFromApi(name, intake.settings),
+          datadogService: intake.resourceId?.trim() ?? "",
+        },
         source: { ...source, name },
         health: intake.health,
         integrationId: intake.integrationId?.trim() || undefined,

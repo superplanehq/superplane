@@ -1206,6 +1206,15 @@ message FactoryIntake {
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
     repeated string dependabot_severities = 17;
+    // Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
+    // On by default. An empty selection still listens for Triggered.
+    optional bool datadog_triggered_alerts = 18;
+    // Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes
+    // only. Off by default.
+    optional bool datadog_retriggered_alerts = 19;
+    // Environments that still create a task. Empty means every environment.
+    // Datadog intakes only.
+    repeated string datadog_environments = 20;
   }
 
   string id = 1;

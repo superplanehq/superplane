@@ -10,6 +10,7 @@ import { unmockedSrc } from "@/test/unmockedModule";
 
 import {
   connectedJiraIntake,
+  DATADOG_INTAKE,
   GITHUB_INTAKE_CANVAS,
   PRODUCTIVE_INTAKE,
   renderHost,
@@ -102,6 +103,17 @@ describe("IntakeSettingsHost", () => {
               { id: "todo", name: "To Do" },
               { id: "qa", name: "QA" },
               { id: "done", name: "Done" },
+            ],
+            isLoading: false,
+            isError: false,
+            refetch: vi.fn(),
+          };
+        }
+        if (resourceType === "service") {
+          return {
+            data: [
+              { id: "checkout", name: "checkout" },
+              { id: "billing", name: "billing" },
             ],
             isLoading: false,
             isError: false,
@@ -253,6 +265,28 @@ describe("IntakeSettingsHost", () => {
     });
   });
 
+  it("sends the Datadog service with the settings when the service changes", async () => {
+    const user = userEvent.setup();
+    renderHost({
+      intake: DATADOG_INTAKE,
+    });
+
+    expect(screen.getByTestId("datadog-service-checkout")).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("datadog-service-name")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("datadog-service-billing"));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-datadog",
+      settings: expect.objectContaining({
+        datadogTriggeredAlerts: true,
+        datadogRetriggeredAlerts: false,
+      }),
+      integrationId: "datadog-1",
+      resourceId: "billing",
+    });
+  });
+
   it("saves the Jira completion column from General settings", async () => {
     const user = userEvent.setup();
     renderHost({
@@ -339,6 +373,23 @@ describe("IntakeSettingsHost", () => {
     expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-productive");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes a Datadog intake from settings", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({
+      intake: DATADOG_INTAKE,
+      onClose,
+    });
+
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(deleteIntake).toHaveBeenCalledWith("intake-datadog");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

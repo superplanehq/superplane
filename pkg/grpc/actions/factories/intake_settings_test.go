@@ -182,13 +182,13 @@ func Test__intakeSettingsChangeTrigger(t *testing.T) {
 		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceGitHubIssues, current, current))
 	})
 
-	t.Run("sees a Productive task list filter turn on", func(t *testing.T) {
-		current := defaultProductiveIntakeSettings()
+	t.Run("sees a Datadog re-triggered toggle change", func(t *testing.T) {
+		current := defaultDatadogIntakeSettings()
 		updated := current
-		updated.TaskListIDs = []string{"list-bugs"}
+		updated.DatadogRetriggeredAlerts = true
 
-		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, current, updated))
-		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceProductiveTasks, updated, updated))
+		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceDatadog, current, updated))
+		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceDatadog, current, current))
 	})
 }
 
@@ -836,5 +836,200 @@ func Test__applyIntakeSettingsToGraph_Productive(t *testing.T) {
 
 		trigger := findModelNode(t, updated, intakeTriggerNodeID)
 		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+}
+
+func Test__intakeDatadogAlertTransitions(t *testing.T) {
+	t.Run("listens for Triggered by default", func(t *testing.T) {
+		assert.Equal(t, []any{"Triggered"}, intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()))
+	})
+
+	t.Run("maps each checkbox to an alert transition", func(t *testing.T) {
+		settings := defaultDatadogIntakeSettings()
+		settings.DatadogTriggeredAlerts = false
+		settings.DatadogRetriggeredAlerts = true
+
+		assert.Equal(t, []any{"Re-Triggered"}, intakeDatadogAlertTransitions(settings))
+	})
+
+	t.Run("an empty selection lists no transitions", func(t *testing.T) {
+		settings := defaultDatadogIntakeSettings()
+		settings.DatadogTriggeredAlerts = false
+
+		assert.Empty(t, intakeDatadogAlertTransitions(settings))
+	})
+}
+
+func Test__intakeFilterExpressionFor_DatadogEnvironments(t *testing.T) {
+	t.Run("accepts every environment when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDatadog, defaultDatadogIntakeSettings())
+		assert.Equal(t, "true", expression)
+	})
+
+	t.Run("builds an environment membership check in a stable order", func(t *testing.T) {
+		settings := defaultDatadogIntakeSettings()
+		settings.DatadogEnvironments = []string{" Staging ", "prod", "PROD"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDatadog, settings)
+
+		assert.Equal(t, `(root().data.environment ?? "") in ["staging","prod"]`, expression)
+	})
+}
+
+func Test__intakeSettingsFromGraph_Datadog(t *testing.T) {
+	newSpec := func(transitions []any, expression string) models.LiveCanvasSpec {
+		return models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				{
+					ID:            intakeTriggerNodeID,
+					Configuration: map[string]any{"alertTransitions": transitions},
+				},
+				{
+					ID:            intakeFilterNodeID,
+					Configuration: map[string]any{"expression": expression},
+				},
+			},
+		}
+	}
+	graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID}
+
+	t.Run("reads the trigger transitions and environment list", func(t *testing.T) {
+		settings := defaultDatadogIntakeSettings()
+		settings.DatadogRetriggeredAlerts = true
+		settings.DatadogEnvironments = []string{"prod", "staging"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDatadog, settings)
+
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceDatadog,
+			graph,
+			newSpec(intakeDatadogAlertTransitions(settings), expression),
+		)
+
+		assert.True(t, parsed.DatadogTriggeredAlerts)
+		assert.True(t, parsed.DatadogRetriggeredAlerts)
+		assert.Equal(t, []string{"prod", "staging"}, parsed.DatadogEnvironments)
+	})
+
+	t.Run("an empty transition list keeps Triggered", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceDatadog,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{
+				Nodes: []models.Node{
+					{ID: intakeTriggerNodeID, Configuration: map[string]any{}},
+				},
+			},
+		)
+
+		assert.True(t, parsed.DatadogTriggeredAlerts)
+		assert.False(t, parsed.DatadogRetriggeredAlerts)
+		assert.Empty(t, parsed.DatadogEnvironments)
+	})
+
+	t.Run("a hand-edited expression falls back to the defaults", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceDatadog,
+			graph,
+			newSpec([]any{"Re-Triggered"}, `root().data.environment == "prod"`),
+		)
+
+		assert.False(t, parsed.DatadogTriggeredAlerts)
+		assert.True(t, parsed.DatadogRetriggeredAlerts)
+		assert.Empty(t, parsed.DatadogEnvironments)
+	})
+}
+
+func Test__intakeFilterExpressionFor_EvaluatesAgainstDatadogPayloads(t *testing.T) {
+	prod := map[string]any{"environment": "prod"}
+	staging := map[string]any{"environment": "staging"}
+	missing := map[string]any{}
+
+	t.Run("accepts every environment when none are selected", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDatadog, defaultDatadogIntakeSettings())
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, prod))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, staging))
+		assert.Equal(t, true, evalRootDataExpression(t, expression, missing))
+	})
+
+	t.Run("keeps only the selected environments and treats a missing env as no match", func(t *testing.T) {
+		settings := defaultDatadogIntakeSettings()
+		settings.DatadogEnvironments = []string{"prod"}
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceDatadog, settings)
+
+		assert.Equal(t, true, evalRootDataExpression(t, expression, prod))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, staging))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, missing))
+	})
+}
+
+func Test__applyIntakeSettingsToGraph_Datadog(t *testing.T) {
+	legacyNodes := func() []models.Node {
+		return []models.Node{
+			{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"service": "checkout"},
+			},
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+	}
+	legacyEdges := []models.Edge{
+		{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+	}
+	legacyGraph := intakeGraph{TriggerNodeID: intakeTriggerNodeID, CreateNodeID: intakeCreateNodeID}
+
+	t.Run("inserts a filter when a legacy intake selects an environment", func(t *testing.T) {
+		nodes, edges, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceDatadog,
+			legacyGraph,
+			models.LiveCanvasSpec{Nodes: legacyNodes(), Edges: legacyEdges},
+			&pb.FactoryIntake_Settings{DatadogEnvironments: []string{"prod"}},
+			legacyNodes(),
+			append([]models.Edge{}, legacyEdges...),
+		)
+		require.NoError(t, err)
+
+		filter := findModelNode(t, nodes, intakeFilterNodeID)
+		assert.Equal(t, `(root().data.environment ?? "") in ["prod"]`, filter.Configuration["expression"])
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"Triggered"}, trigger.Configuration["alertTransitions"])
+		assert.ElementsMatch(t, []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, edges)
+	})
+
+	t.Run("writes re-triggered alerts onto the trigger", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"alertTransitions": []any{"Triggered"}},
+			},
+			{
+				ID:            intakeFilterNodeID,
+				Configuration: map[string]any{"expression": "true"},
+			},
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		graph := intakeGraph{
+			TriggerNodeID: intakeTriggerNodeID,
+			FilterNodeID:  intakeFilterNodeID,
+			CreateNodeID:  intakeCreateNodeID,
+		}
+
+		updated, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceDatadog,
+			graph,
+			models.LiveCanvasSpec{Nodes: nodes},
+			&pb.FactoryIntake_Settings{
+				DatadogTriggeredAlerts:   proto.Bool(true),
+				DatadogRetriggeredAlerts: proto.Bool(true),
+			},
+			nodes,
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, updated, intakeTriggerNodeID)
+		assert.Equal(t, []any{"Triggered", "Re-Triggered"}, trigger.Configuration["alertTransitions"])
 	})
 }

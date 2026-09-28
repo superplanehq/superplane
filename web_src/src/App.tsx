@@ -56,6 +56,7 @@ import {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,
@@ -170,6 +171,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
               <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />

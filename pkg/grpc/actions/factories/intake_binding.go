@@ -71,7 +71,7 @@ func resolveIntakeBinding(
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source == models.FactoryIntakeSourceDatadog {
-		return resolveDatadogIntakeBinding(tx, factory)
+		return resolveDatadogIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
@@ -188,38 +188,42 @@ func resolveProductiveIntakeBinding(
 func resolveDatadogIntakeBinding(
 	tx *gorm.DB,
 	factory *models.Factory,
+	integrationID string,
+	serviceName string,
 ) (*intakeBinding, error) {
-	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
+	integrationID = strings.TrimSpace(integrationID)
+	serviceName = strings.TrimSpace(serviceName)
+	if integrationID == "" && serviceName == "" {
+		return nil, nil
+	}
+	if integrationID == "" || serviceName == "" {
+		return nil, invalidArgument("Datadog integration and service are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, err
+		return nil, invalidArgument("Datadog integration is invalid")
 	}
 
-	var ready []models.Integration
-	for _, integration := range integrations {
-		if integration.AppName != intakeDatadogAppName {
-			continue
-		}
-		if integration.State != models.IntegrationStateReady {
-			continue
-		}
-		ready = append(ready, integration)
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Datadog integration was not found")
+	}
+	if integration.AppName != intakeDatadogAppName {
+		return nil, invalidArgument("selected integration is not Datadog")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Datadog integration is not ready")
 	}
 
-	switch len(ready) {
-	case 0:
-		return nil, invalidArgument("connect one Datadog integration before adding this intake")
-	case 1:
-		integration := ready[0]
-		return &intakeBinding{
-			Integration: &yaml.IntegrationRef{
-				ID:   integration.ID.String(),
-				Name: integration.InstallationName,
-			},
-			Installation: &integration,
-		}, nil
-	default:
-		return nil, invalidArgument("connect only one Datadog integration for this intake")
-	}
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"service": serviceName},
+		Installation:  integration,
+	}, nil
 }
 
 func resolveSentryIntakeBinding(

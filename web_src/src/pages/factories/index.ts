@@ -43,6 +43,7 @@ export {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,

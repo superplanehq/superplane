@@ -126,6 +126,8 @@ func Test__Datadog__Sync(t *testing.T) {
 		assert.Equal(t, IntegrationWebhookName, webhookConfig.Name)
 		assert.Contains(t, webhookConfig.URL, integrationID.String())
 		assert.Contains(t, webhookConfig.CustomHeaders, token)
+		assert.Contains(t, webhookConfig.Payload, "$ALERT_QUERY")
+		assert.Contains(t, webhookConfig.Payload, "$ALERT_SCOPE")
 	})
 
 	t.Run("EU site -> uses correct base URL", func(t *testing.T) {
@@ -248,6 +250,32 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusForbidden, recorder.Code)
+	})
+
+	t.Run("dispatches re-triggered error tracking alerts", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			IntegrationID: integrationID.String(),
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				WebhookSecretName: {Name: WebhookSecretName, Value: []byte("secret-token")},
+			},
+			Subscriptions: []contexts.Subscription{
+				{ID: uuid.New(), Configuration: SubscriptionConfiguration{}},
+			},
+		}
+
+		body := `{"event_type":"error_tracking_alert","alert_transition":"Re-Triggered"}`
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/"+integrationID.String()+"/events", strings.NewReader(body))
+		request.Header.Set(WebhookHeaderName, "secret-token")
+		recorder := httptest.NewRecorder()
+
+		d.HandleRequest(core.HTTPRequestContext{
+			Integration: appCtx,
+			Request:     request,
+			Response:    recorder,
+			Logger:      logrus.NewEntry(logrus.New()),
+		})
+
+		assert.Equal(t, http.StatusOK, recorder.Code)
 	})
 
 	t.Run("ignores recovered alerts", func(t *testing.T) {

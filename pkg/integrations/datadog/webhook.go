@@ -18,6 +18,7 @@ const (
 
 	ErrorTrackingAlertEventType = "error_tracking_alert"
 	AlertTransitionTriggered    = "Triggered"
+	AlertTransitionRetriggered  = "Re-Triggered"
 )
 
 type WebhookConfiguration struct {
@@ -78,9 +79,13 @@ func buildWebhookConfiguration(webhookURL, token string) WebhookConfiguration {
 		"event_type":       "$EVENT_TYPE",
 		"title":            "$ALERT_TITLE",
 		"body":             "$TEXT_ONLY_MSG",
+		"event_message":    "$EVENT_MSG",
 		"alert_id":         "$ALERT_ID",
 		"alert_transition": "$ALERT_TRANSITION",
 		"tags":             "$TAGS",
+		"alert_query":      "$ALERT_QUERY",
+		"alert_scope":      "$ALERT_SCOPE",
+		"aggreg_key":       "$AGGREG_KEY",
 		"link":             "$LINK",
 	})
 	customHeaders, _ := json.Marshal(map[string]string{
