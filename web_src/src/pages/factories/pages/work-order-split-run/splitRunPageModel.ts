@@ -51,6 +51,8 @@ export type FixtureForSplitRunPageOptions = {
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
   credit?: HostedCreditRunContext;
+  /** False when the line uses only BYOK runners. Undefined while that is still loading. */
+  usesHostedRunner?: boolean;
 };
 
 export function fixtureForSplitRunPage(
@@ -72,6 +74,7 @@ export function fixtureForSplitRunPage(
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
     credit: options?.credit,
+    usesHostedRunner: options?.usesHostedRunner,
   });
 }
 

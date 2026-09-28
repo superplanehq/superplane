@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   failedStepCreditNote,
   hostedCreditBlockNote,
+  hostedCreditBlocksDispatch,
   isOutOfHostedCredit,
   isWorkOrderCreditFailureReason,
   workOrderCreditFailureCopy,
@@ -19,6 +20,21 @@ describe("isOutOfHostedCredit", () => {
     expect(isOutOfHostedCredit({ remainingCreditCents: 1 })).toBe(false);
     expect(isOutOfHostedCredit({})).toBe(false);
     expect(isOutOfHostedCredit(undefined)).toBe(false);
+  });
+});
+
+describe("hostedCreditBlocksDispatch", () => {
+  const empty = { remainingCreditCents: 0 };
+
+  it("blocks a hosted line and an unknown line when credit is empty", () => {
+    expect(hostedCreditBlocksDispatch(empty, true)).toBe(true);
+    expect(hostedCreditBlocksDispatch(empty, undefined)).toBe(true);
+  });
+
+  it("does not block a BYOK line or a selected BYOK model", () => {
+    expect(hostedCreditBlocksDispatch(empty, false)).toBe(false);
+    expect(hostedCreditBlocksDispatch(empty, true, "byok::anthropic::claude-sonnet-4-6")).toBe(false);
+    expect(hostedCreditBlocksDispatch(empty, undefined, "auto")).toBe(true);
   });
 });
 
@@ -84,11 +100,9 @@ describe("failedStepCreditNote", () => {
     });
   });
 
-  it("warns when the failure reason is missing on an empty trial", () => {
-    expect(failedStepCreditNote(undefined, openTrial, now)?.warning).toBe(true);
-  });
-
-  it("keeps a real error on an empty trial", () => {
+  it("does not label a missing or unrelated failure as a credit failure", () => {
+    expect(failedStepCreditNote(undefined, openTrial, now)).toBeNull();
+    expect(failedStepCreditNote("", openTrial, now)).toBeNull();
     expect(failedStepCreditNote("provider_error", openTrial, now)).toBeNull();
   });
 

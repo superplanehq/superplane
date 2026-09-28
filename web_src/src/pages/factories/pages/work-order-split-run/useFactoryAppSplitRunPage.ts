@@ -8,6 +8,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { lineAppIds } from "../../lib/lineHostedCredit";
+import { useLineUsesHostedCredit } from "../../lib/useLineHostedCredit";
 import { useHostedCreditRunContext } from "../../lib/useHostedCreditEmptyBanner";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
@@ -82,6 +84,9 @@ export function useFactoryAppSplitRunPage() {
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
   const credit = useHostedCreditRunContext(organizationId, factoryKey);
+  const line = factory?.lines?.find((entry) => entry.id === query.lineId);
+  const detectedHostedRunner = useLineUsesHostedCredit(organizationId, lineAppIds(line));
+  const usesHostedRunner = line ? detectedHostedRunner : undefined;
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
@@ -91,8 +96,20 @@ export function useFactoryAppSplitRunPage() {
         isAnalyzing,
         resolveUser,
         credit,
+        usesHostedRunner,
       }),
-    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser, credit],
+    [
+      order,
+      orderChecks,
+      artifacts,
+      prFeedbackRuns,
+      analysisRuns,
+      isAnalyzing,
+      query.lineId,
+      resolveUser,
+      credit,
+      usesHostedRunner,
+    ],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(

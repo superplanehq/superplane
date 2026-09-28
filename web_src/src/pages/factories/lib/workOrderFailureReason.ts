@@ -69,9 +69,34 @@ export const OUT_OF_CREDIT_ACTION_TOOLTIP = "This organization is out of credit.
 /**
  * True when remaining hosted credit is known and at or below zero.
  * Undefined remaining credit means the balance is still loading — do not block.
+ * This does not mean the next run needs hosted credit. A BYOK line does not.
  */
 export function isOutOfHostedCredit(credit?: HostedCreditRunContext): boolean {
   return credit?.remainingCreditCents != null && credit.remainingCreditCents <= 0;
+}
+
+/**
+ * True when Start or Rerun would spend hosted credit and none remains.
+ * A BYOK line, or a selected `byok::` model, does not spend hosted credit.
+ * Unknown runner funding keeps the credit block so a hosted line does not start early.
+ */
+export function hostedCreditBlocksDispatch(
+  credit: HostedCreditRunContext | undefined,
+  usesHostedRunner: boolean | undefined,
+  selectedModel?: string,
+): boolean {
+  if (isByokSelectableModel(selectedModel) || usesHostedRunner === false) {
+    return false;
+  }
+  return isOutOfHostedCredit(credit);
+}
+
+/** True when the draft model key is a bring-your-own-key model. */
+export function isByokSelectableModel(model: string | undefined): boolean {
+  if (!model) {
+    return false;
+  }
+  return model.trim().startsWith("byok::");
 }
 
 /** Warning or failure copy for a draft or a failed step that cannot run. */
@@ -122,7 +147,7 @@ const NO_CREDIT_NOTE: FailedStepCreditNote = {
  * Note for a failed step when hosted credit or the plan blocked the run.
  * An open trial with $0 warns that the organization is out of credit and
  * links to billing. Other credit failures stay on the failure strip.
- * Other errors return null.
+ * A missing reason is not a credit failure. Other errors return null.
  */
 export function failedStepCreditNote(
   failureReason: string | undefined,
@@ -156,12 +181,7 @@ export function failedStepCreditNote(
 }
 
 function isTrialCreditBlock(failureReason: string | undefined): boolean {
-  return (
-    failureReason == null ||
-    failureReason === "" ||
-    failureReason === "no_hosted_credit" ||
-    failureReason === "hosted_subscription_required"
-  );
+  return failureReason === "no_hosted_credit" || failureReason === "hosted_subscription_required";
 }
 
 function isActiveTrialWithoutCredit(credit: HostedCreditRunContext | undefined, now: Date): boolean {

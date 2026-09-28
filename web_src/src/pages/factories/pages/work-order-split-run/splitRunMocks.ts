@@ -45,7 +45,7 @@ import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } fro
 import {
   failedStepCreditNote,
   hostedCreditBlockNote,
-  isOutOfHostedCredit,
+  hostedCreditBlocksDispatch,
   type HostedCreditRunContext,
 } from "../../lib/workOrderFailureReason";
 import {
@@ -393,6 +393,11 @@ export type SplitRunFixtureOptions = {
   resolveUser?: OrgUserDisplayLookup;
   /** Organization credit used to explain a step that credit blocked. */
   credit?: HostedCreditRunContext;
+  /**
+   * False when every agent on the line uses a customer key.
+   * Undefined while the line canvases are still loading. A hosted line stays blocked.
+   */
+  usesHostedRunner?: boolean;
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -447,6 +452,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       analysisRuns: options?.analysisRuns,
       isAnalyzing: options?.isAnalyzing,
       credit: options?.credit,
+      usesHostedRunner: options?.usesHostedRunner,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -470,16 +476,18 @@ function reviewSurfaces(
     analysisRuns?: BacklogAnalysisRun[];
     isAnalyzing?: boolean;
     credit?: HostedCreditRunContext;
+    usesHostedRunner?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
+  const outOfCredit = hostedCreditBlocksDispatch(input.credit, input.usesHostedRunner);
   const executions = latestDispatchExecutions(order, input.lineId);
   const current = pickCurrentExecution(executions);
   const column = boardColumnFor(current, executions.length);
   const checks = overviewChecks(input.phases, input.apiChecks, demoArtifacts);
 
   if (displayStatus === "draft") {
-    const creditNotice = hostedCreditBlockNote(input.credit) ?? undefined;
+    const creditNotice = outOfCredit ? (hostedCreditBlockNote(input.credit) ?? undefined) : undefined;
     return surfaces(
       buildSplitRunFooter({
         kind: "draft",
@@ -488,7 +496,7 @@ function reviewSurfaces(
         isAnalyzing: draftIsAnalyzing(input),
         clarityScore: clarityScoreFromChecks(checks),
         confidenceScore: confidenceScoreFromChecks(checks),
-        outOfCredit: isOutOfHostedCredit(input.credit),
+        outOfCredit,
         creditNotice,
       }),
       [],
@@ -499,10 +507,10 @@ function reviewSurfaces(
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
-    return failedReviewSurface(current, displayStatus, checks, input.credit);
+    return failedReviewSurface(current, displayStatus, checks, input.credit, input.usesHostedRunner);
   }
   if (current?.result === "RESULT_CANCELLED") {
-    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy, input.credit);
+    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy, input.credit, input.usesHostedRunner);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
     return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
@@ -537,6 +545,7 @@ function stoppedReviewSurface(
   checks: WorkOrderCheckPresentation[],
   stoppedBy?: OrgUserDisplay,
   credit?: HostedCreditRunContext,
+  usesHostedRunner?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   return surfaces(
     buildSplitRunFooter({
@@ -544,7 +553,7 @@ function stoppedReviewSurface(
       actor: stoppedBy,
       run: footerRun(current),
       status: displayStatus,
-      outOfCredit: isOutOfHostedCredit(credit),
+      outOfCredit: hostedCreditBlocksDispatch(credit, usesHostedRunner),
     }),
     [],
     checks,
@@ -556,6 +565,7 @@ function failedReviewSurface(
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
   credit?: HostedCreditRunContext,
+  usesHostedRunner?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const failed = failedFooterNote(current, credit);
   return surfaces(
@@ -565,7 +575,7 @@ function failedReviewSurface(
       run: footerRun(current),
       status: displayStatus,
       attentionTone: failed.warning ? "warning" : undefined,
-      outOfCredit: isOutOfHostedCredit(credit),
+      outOfCredit: hostedCreditBlocksDispatch(credit, usesHostedRunner),
     }),
     [failed.note],
     checks,

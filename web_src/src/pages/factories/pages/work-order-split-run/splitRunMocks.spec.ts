@@ -736,6 +736,34 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footer.actions.find((action) => action.kind === "reject")?.disabled).toBeUndefined();
   });
 
+  it("keeps Rerun enabled on a BYOK line when hosted credit is empty", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "provider_error",
+            },
+          ]),
+        ],
+      }),
+      {
+        credit: { plan: "trial", remainingCreditCents: 0, billingHref: "/demo/organization/billing" },
+        usesHostedRunner: false,
+      },
+    );
+
+    expect(fixture.footer.note?.headline).toBe("Implement did not pass");
+    expect(fixture.footer.note?.cta?.label).toBe("Debug");
+    expect(fixture.footer.actions.find((action) => action.kind === "rerun")?.disabled).toBeUndefined();
+  });
+
   it("keeps Rerun enabled when the organization still has credit", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
@@ -789,6 +817,21 @@ describe("splitRunFixtureForWorkOrder", () => {
       tooltip: "This organization is out of credit.",
     });
     expect(fixture.footer.actions.find((action) => action.kind === "archive")?.disabled).toBeUndefined();
+  });
+
+  it("keeps Start enabled on a BYOK line when hosted credit is empty", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      credit: { plan: "trial", remainingCreditCents: 0, billingHref: "/demo/organization/billing" },
+      usesHostedRunner: false,
+    });
+
+    expect(fixture.footer.creditNotice).toBeUndefined();
+    expect(fixture.footer.actions.find((action) => action.kind === "start")).toEqual({
+      id: "start",
+      kind: "start",
+      label: "Start",
+      emphasis: "primary",
+    });
   });
 
   it("keeps Start enabled on a draft when credit remains", () => {

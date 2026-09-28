@@ -7,6 +7,7 @@ import {
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
   defaultSplitRunStopChoice,
   doneFooterForStatus,
+  footerWithoutHostedCreditLock,
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
   splitRunDecisionTone,
@@ -363,6 +364,27 @@ describe("buildSplitRunFooter", () => {
       REJECT,
       RERUN,
     ]);
+  });
+
+  it("releases the credit lock when the selected model is BYOK", () => {
+    const locked = buildSplitRunFooter({
+      kind: "draft",
+      note: DRAFT_NOTE,
+      outOfCredit: true,
+      creditNotice: {
+        headline: "No credit",
+        text: "This organization is out of credit.",
+        actionLabel: "Open billing",
+        href: "/billing",
+        warning: true,
+      },
+    });
+
+    const released = footerWithoutHostedCreditLock(locked);
+
+    expect(released.creditNotice).toBeUndefined();
+    expect(released.actions.find((action) => action.kind === "start")?.disabled).toBeUndefined();
+    expect(classicSplitRunFooter(released).note?.headline).toBe("This task is ready to start");
   });
 });
 

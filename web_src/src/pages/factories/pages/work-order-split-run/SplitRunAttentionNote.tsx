@@ -348,7 +348,6 @@ function NoteActionRow({
       {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} icon={note.cta.icon} /> : null}
       {actions.map((action) => {
         const groupedStart = action.kind === "start" && Boolean(modelSelect);
-        const startLocked = startDisabled || startBusy || Boolean(action.disabled);
         const noteAction = (
           <NoteAction
             action={action}
@@ -363,7 +362,9 @@ function NoteActionRow({
           return <Fragment key={action.id}>{noteAction}</Fragment>;
         }
         const select = isValidElement(modelSelect)
-          ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, { disabled: startLocked })
+          ? cloneElement(modelSelect as ReactElement<{ disabled?: boolean }>, {
+              disabled: startDisabled || startBusy,
+            })
           : modelSelect;
         return (
           <ButtonGroup key={action.id} aria-label="Start">

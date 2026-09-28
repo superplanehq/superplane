@@ -196,6 +196,27 @@ function rerunAction(outOfCredit?: boolean): SplitRunFooterAction {
   return { ...RERUN, disabled: true, tooltip: OUT_OF_CREDIT_ACTION_TOOLTIP };
 }
 
+/** Drop the hosted-credit lock so a BYOK model can start. Other disabled actions stay disabled. */
+export function footerWithoutHostedCreditLock(footer: SplitRunFooter): SplitRunFooter {
+  const locked = footer.actions.some((action) => action.tooltip === OUT_OF_CREDIT_ACTION_TOOLTIP);
+  if (!locked && !footer.creditNotice) {
+    return footer;
+  }
+  return {
+    ...footer,
+    creditNotice: undefined,
+    attentionTone: footer.creditNotice ? undefined : footer.attentionTone,
+    note: footer.creditNotice && footer.kind === "draft" ? { ...SPLIT_RUN_DRAFT_NOTE } : footer.note,
+    actions: footer.actions.map((action) => {
+      if (action.tooltip !== OUT_OF_CREDIT_ACTION_TOOLTIP) {
+        return action;
+      }
+      const { disabled: _disabled, tooltip: _tooltip, ...rest } = action;
+      return rest;
+    }),
+  };
+}
+
 export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
 export const SPLIT_RUN_STOPPED_NOTE_TEXT = "This automation did not finish. This task still needs a decision.";

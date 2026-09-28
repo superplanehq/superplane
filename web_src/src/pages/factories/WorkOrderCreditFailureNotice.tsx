@@ -1,6 +1,6 @@
 import type { FactoriesWorkOrderExecution } from "@/api-client";
+import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router";
 
 import { factorySettingsSectionPath } from "./lib/factoryPagePaths";
 import { workOrderExecutionCreditFailure } from "./lib/workOrderFailureReason";
@@ -35,7 +35,7 @@ export function WorkOrderCreditFailureNotice({
       className={cn("text-[12px] leading-relaxed text-[color:var(--status-danger)]", className)}
     >
       {failure.message}{" "}
-      <Link to={billingHref} className="font-medium underline underline-offset-2 hover:no-underline">
+      <Link href={billingHref} className="font-medium underline underline-offset-2 hover:no-underline">
         {failure.actionLabel}
       </Link>
     </p>
