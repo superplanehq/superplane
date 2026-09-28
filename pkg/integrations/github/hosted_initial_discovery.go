@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -53,15 +54,13 @@ func (g *GitHub) refreshHostedInitialInstallations(
 		return g.refreshHostedPersonalInstallation(requestContext, ctx, app, *identity, metadata, startedAt)
 	}
 	if len(metadata.InstallationDiscovery.RetryCandidates) > 0 {
-		g.retryHostedInitialInstallations(requestContext, ctx, app, *identity, metadata, startedAt)
-		return nil
+		return g.retryHostedInitialInstallations(requestContext, ctx, app, *identity, metadata, startedAt)
 	}
 	if metadata.InstallationDiscovery.NextPage > 0 {
 		return g.refreshHostedInitialInstallationPage(requestContext, ctx, app, *identity, metadata, startedAt)
 	}
 
-	completeHostedInitialDiscovery(metadata)
-	return nil
+	return finishHostedInitialDiscovery(metadata)
 }
 
 func (g *GitHub) refreshHostedPersonalInstallation(
@@ -86,6 +85,8 @@ func (g *GitHub) refreshHostedPersonalInstallation(
 		}
 		logHostedDiscovery(ctx, "initial_personal", 1, 0, err, startedAt)
 		if hostedDiscoveryErrorIsRetryable(err) {
+			metadata.InstallationDiscovery.PersonalAccountChecked = true
+			metadata.InstallationDiscovery.TransientFailures = true
 			return nil
 		}
 		return fmt.Errorf("find personal GitHub App installation: %w", err)
@@ -152,7 +153,9 @@ func (g *GitHub) refreshHostedInitialInstallationPage(
 	metadata.InstallationDiscovery.NextPage = nextPage
 	metadata.InstallationDiscovery.RetryCandidates = uniqueDiscoveryCandidates(retries)
 	if nextPage == 0 && len(metadata.InstallationDiscovery.RetryCandidates) == 0 {
-		completeHostedInitialDiscovery(metadata)
+		completionErr := finishHostedInitialDiscovery(metadata)
+		logHostedDiscovery(ctx, "initial_page", len(candidates), len(verified), errors.Join(verificationErr, completionErr), startedAt)
+		return completionErr
 	}
 	logHostedDiscovery(ctx, "initial_page", len(candidates), len(verified), verificationErr, startedAt)
 	return nil
@@ -165,9 +168,9 @@ func (g *GitHub) retryHostedInitialInstallations(
 	identity hostedGitHubIdentity,
 	metadata *common.Metadata,
 	startedAt time.Time,
-) {
+) error {
 	candidates := slices.Clone(metadata.InstallationDiscovery.RetryCandidates)
-	verified, _, err := verifyAccessibleInstallationsWithFailures(
+	verified, retries, err := verifyAccessibleInstallationsWithFailures(
 		requestContext,
 		ctx.Integration,
 		app,
@@ -176,13 +179,20 @@ func (g *GitHub) retryHostedInitialInstallations(
 		nil,
 	)
 	metadata.SetPendingInstallations(mergeVerifiedInstallations(verified, metadata.PendingInstallations))
-	// Discard failures after this one retry. A persistent GitHub error must not
-	// block the next installation page or keep discovery active forever.
+	// Discard candidates after this one retry so a persistent GitHub error does
+	// not block the next page. The cycle failure prevents empty completion.
 	metadata.InstallationDiscovery.RetryCandidates = nil
-	if metadata.InstallationDiscovery.NextPage == 0 {
-		completeHostedInitialDiscovery(metadata)
+	if len(retries) > 0 {
+		metadata.InstallationDiscovery.TransientFailures = true
 	}
-	logHostedDiscovery(ctx, "initial_retry", len(candidates), len(verified), err, startedAt)
+	if metadata.InstallationDiscovery.NextPage > 0 {
+		logHostedDiscovery(ctx, "initial_retry", len(candidates), len(verified), err, startedAt)
+		return nil
+	}
+
+	completionErr := finishHostedInitialDiscovery(metadata)
+	logHostedDiscovery(ctx, "initial_retry", len(candidates), len(verified), errors.Join(err, completionErr), startedAt)
+	return completionErr
 }
 
 func supportsHostedInitialDiscovery(returnPath string) bool {
@@ -209,6 +219,22 @@ func completeHostedInitialDiscovery(metadata *common.Metadata) {
 	metadata.InstallationDiscovery.Complete = true
 	metadata.InstallationDiscovery.NextPage = 0
 	metadata.InstallationDiscovery.RetryCandidates = nil
+	metadata.InstallationDiscovery.TransientFailures = false
+}
+
+func finishHostedInitialDiscovery(metadata *common.Metadata) error {
+	if metadata.InstallationDiscovery == nil || !metadata.InstallationDiscovery.TransientFailures {
+		completeHostedInitialDiscovery(metadata)
+		return nil
+	}
+
+	metadata.InstallationDiscovery.PersonalAccountChecked = false
+	metadata.InstallationDiscovery.Active = true
+	metadata.InstallationDiscovery.Complete = false
+	metadata.InstallationDiscovery.NextPage = 1
+	metadata.InstallationDiscovery.RetryCandidates = nil
+	metadata.InstallationDiscovery.TransientFailures = false
+	return errors.New("GitHub account discovery is temporarily unavailable")
 }
 
 func hostedInitialDiscoveryActive(metadata common.Metadata) bool {

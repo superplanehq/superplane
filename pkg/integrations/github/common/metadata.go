@@ -88,6 +88,7 @@ type InstallationDiscovery struct {
 	PersonalAccountChecked bool                  `mapstructure:"personalAccountChecked" json:"personalAccountChecked"`
 	NextPage               int                   `mapstructure:"nextPage" json:"nextPage"`
 	RetryCandidates        []PendingInstallation `mapstructure:"retryCandidates" json:"retryCandidates,omitempty"`
+	TransientFailures      bool                  `mapstructure:"transientFailures" json:"transientFailures,omitempty"`
 	Complete               bool                  `mapstructure:"complete" json:"complete"`
 }
 

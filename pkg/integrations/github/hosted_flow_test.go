@@ -631,12 +631,60 @@ func TestSyncHostedAppChecksLaterPagesAfterOneBoundedRetry(t *testing.T) {
 	assert.Equal(t, 1, retryAttempts)
 
 	integration.Metadata = metadata
-	require.NoError(t, (&GitHub{}).Sync(ctx))
+	err := (&GitHub{}).Sync(ctx)
+	require.EqualError(t, err, "GitHub account discovery is temporarily unavailable")
 	metadata = integration.Metadata.(common.Metadata)
 	require.Len(t, metadata.PendingInstallations, 1)
 	assert.Equal(t, "later-account", metadata.PendingInstallations[0].AccountLogin)
-	assert.True(t, metadata.InstallationDiscovery.Complete)
+	assert.True(t, metadata.InstallationDiscovery.Active)
+	assert.False(t, metadata.InstallationDiscovery.Complete)
+	assert.False(t, metadata.InstallationDiscovery.PersonalAccountChecked)
+	assert.Equal(t, 1, metadata.InstallationDiscovery.NextPage)
 	assert.Equal(t, 1, retryAttempts)
+	assert.Nil(t, integration.BrowserAction)
+}
+
+func TestSyncHostedAppDoesNotCompleteAfterFinalTransientRetry(t *testing.T) {
+	enableUnverifiedDevelopmentRepositories(t)
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) { return gh.NewClient(nil), nil }
+	listAppInstallationRequests = func(context.Context, *gh.Client, string) ([]common.InstallRequest, error) {
+		return nil, nil
+	}
+	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+		return nil, context.DeadlineExceeded
+	}
+	integration := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			StartedByUserID:      "user-1",
+			StartedByGitHubLogin: "development",
+			SetupReturnPath:      "/onboarding?step=vcs",
+			InstallationDiscovery: &common.InstallationDiscovery{
+				Active:                 true,
+				PersonalAccountChecked: true,
+				RetryCandidates: []common.PendingInstallation{{
+					ID: "11", AccountLogin: "temporarily-unavailable",
+				}},
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	err := (&GitHub{}).Sync(core.SyncContext{Context: context.Background(), Integration: integration})
+	require.EqualError(t, err, "GitHub account discovery is temporarily unavailable")
+	metadata := integration.Metadata.(common.Metadata)
+	assert.True(t, metadata.InstallationDiscovery.Active)
+	assert.False(t, metadata.InstallationDiscovery.Complete)
+	assert.False(t, metadata.InstallationDiscovery.PersonalAccountChecked)
+	assert.Equal(t, 1, metadata.InstallationDiscovery.NextPage)
+	assert.Empty(t, metadata.InstallationDiscovery.RetryCandidates)
 	assert.Nil(t, integration.BrowserAction)
 }
 
