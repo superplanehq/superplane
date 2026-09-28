@@ -12,7 +12,7 @@ import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStrea
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "./splitRunActivityGroups";
 import { autoExpandedPhaseId, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
-import { splitRunPhaseRunHref, type SplitRunPopupTab } from "./splitRunPopupModel";
+import { splitRunPhaseRunHref } from "./splitRunPopupModel";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import type { useFollowLogScroll } from "./useFollowLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
@@ -38,8 +38,6 @@ export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "foot
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
-  /** Tab to open first. Defaults to the tab the fixture state calls for. */
-  initialTab?: SplitRunPopupTab;
 };
 
 type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;

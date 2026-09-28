@@ -136,23 +136,29 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
   );
 }
 
-export function AgentStepMarkers({ stage }: { stage: AutomationStage }) {
+export function AgentStepMarkers({ stage, expandSteps = false }: { stage: AutomationStage; expandSteps?: boolean }) {
   if (stage.agentSteps.length === 0) {
     return null;
   }
   return (
     <div className="flex flex-col" data-testid={`redesign-agent-steps-${stage.id}`}>
       {stage.agentSteps.map((step) => (
-        <AgentStepMarker key={step.id} step={step} />
+        <AgentStepMarker key={step.id} step={step} defaultOpen={expandSteps} />
       ))}
     </div>
   );
 }
 
-function AgentStepMarker({ step }: { step: AgentStep }) {
+function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defaultOpen?: boolean }) {
   const expandable = step.events.length > 0 || Boolean(step.output);
   const running = step.status === "running";
-  const [open, setOpen] = useState(running);
+  const [open, setOpen] = useState(running || defaultOpen);
+  const userToggled = useRef(false);
+  useEffect(() => {
+    if (!running && !userToggled.current && !defaultOpen) {
+      setOpen(false);
+    }
+  }, [defaultOpen, running]);
   const reason = open && !step.summary ? "" : stepReason(step);
   const follow = useFollowLogScroll<HTMLDivElement>(running ? step.id : null, step.events.length);
   const row = (
@@ -184,7 +190,13 @@ function AgentStepMarker({ step }: { step: AgentStep }) {
     return row;
   }
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible
+      open={open}
+      onOpenChange={(next) => {
+        userToggled.current = true;
+        setOpen(next);
+      }}
+    >
       <CollapsibleTrigger asChild>
         <button type="button" className="block w-full min-w-0 text-left" aria-expanded={open}>
           {row}
@@ -196,7 +208,10 @@ function AgentStepMarker({ step }: { step: AgentStep }) {
             <div
               ref={follow.scrollRef}
               onScroll={follow.onScroll}
-              className="flex max-h-80 min-w-0 flex-col gap-2 overflow-y-auto py-1 pl-6"
+              className={cn(
+                "flex min-w-0 flex-col gap-2 overflow-y-auto py-1 pl-6",
+                defaultOpen ? "max-h-[60vh]" : "max-h-80",
+              )}
               data-testid={`redesign-step-log-${step.id}`}
             >
               <StepDetail step={step} />

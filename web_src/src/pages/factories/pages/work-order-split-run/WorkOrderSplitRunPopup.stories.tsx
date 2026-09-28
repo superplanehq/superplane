@@ -11,9 +11,9 @@ const STORY_CLIENT = new QueryClient({
 });
 
 /**
- * The task popup as it ships today, on the Automations tab. Rendered from
- * SUPER-503. No organization id, so live canvas and runner log hooks stay
- * off and the fixture stream is what you see.
+ * The unified task popup rendered from SUPER-503. No organization id, so
+ * live canvas and runner log hooks stay off and the fixture stream is what
+ * you see.
  */
 const meta = {
   title: "Factories/Pages/Task Split Run/Current design",
@@ -37,8 +37,8 @@ export default meta;
 
 type Story = StoryObj;
 
-/** SUPER-503, Automations tab. Analysis, Implement, PR #7771, then closure. */
-export const AutomationsTab: Story = {
-  name: "Automations tab",
-  render: () => <WorkOrderSplitRunPopup fixture={SPLIT_RUN_SUPER503} initialTab="log" />,
+/** SUPER-503 unified view. Analysis, Implement, PR #7771, then closure. */
+export const UnifiedConsole: Story = {
+  name: "Unified console",
+  render: () => <WorkOrderSplitRunPopup fixture={SPLIT_RUN_SUPER503} />,
 };

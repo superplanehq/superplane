@@ -11,10 +11,13 @@ export function LiveAgentSteps({
   stage,
   phase,
   organizationId,
+  expandSteps = false,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
+  /** Open every step's detail, for the full-log view. */
+  expandSteps?: boolean;
 }) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
@@ -42,7 +45,7 @@ export function LiveAgentSteps({
 
   if (!organizationId || !phase || runners.length === 0) {
     const settled = { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
-    return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} /> : null;
+    return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : null;
   }
 
   return (
@@ -56,7 +59,7 @@ export function LiveAgentSteps({
           onNotes={reportNotes}
         />
       ))}
-      {shown.agentSteps.length > 0 ? <AgentStepMarkers stage={shown} /> : null}
+      {shown.agentSteps.length > 0 ? <AgentStepMarkers stage={shown} expandSteps={expandSteps} /> : null}
     </>
   );
 }

@@ -37,31 +37,23 @@ function runningStepLog() {
 }
 
 describe("WorkOrderSplitRunPopup jump-to-latest", () => {
-  it("does not show a Follow toggle in the Automations tab", async () => {
-    const user = userEvent.setup();
+  it("does not show a Follow toggle on the console", () => {
     renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
-
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
   });
 
-  it("hides the pill while the log follows the latest line", async () => {
-    const user = userEvent.setup();
+  it("hides the pill while the log follows the latest line", () => {
     renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
-
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
-  it("keeps the pill hidden for a finished run, since auto-scroll starts on", async () => {
-    const user = userEvent.setup();
+  it("keeps the pill hidden for a finished run, since auto-scroll starts on", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
@@ -69,7 +61,6 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
   it("shows jump to latest after the user scrolls up, then hides it on click", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
@@ -88,9 +79,7 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
   });
 
   it("turns following back on when the user scrolls to the latest line", async () => {
-    const user = userEvent.setup();
     renderPopup({ fixture: SPLIT_RUN_SUPER503_RUNNING });
-    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     const scroller = runningStepLog();
     Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });

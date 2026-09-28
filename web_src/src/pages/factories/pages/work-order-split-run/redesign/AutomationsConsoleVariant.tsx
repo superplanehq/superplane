@@ -1,4 +1,3 @@
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
 import {
   Timeline,
@@ -21,10 +20,9 @@ import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import {
+  ArrowLeft,
   ChevronRight,
-  CircleX,
   Download,
-  ExternalLink,
   FileText,
   GitBranch,
   CircleStop,
@@ -54,7 +52,6 @@ import { fileArtifactIcon } from "../../../WorkOrderArtifactInline";
 import { SplitRunCheckPills } from "../SplitRunReview";
 import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
 import { splitRunLinkedArtifacts, splitRunPhaseRunHref } from "../splitRunPopupModel";
-import { AgentStepList } from "./AgentStepList";
 import { LiveAgentSteps } from "./LiveAgentSteps";
 import {
   outputCountLabel,
@@ -89,30 +86,54 @@ export function AutomationsConsoleVariant({
   factoryKey,
   orderNumber,
   lineId,
+  taskDescription,
+  panelReview,
   canStopRun = false,
   actionBusy = false,
   onStopRun,
+  onRerunStep,
 }: {
   fixture: SplitRunFixture;
   organizationId?: string;
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
+  /** Task description markdown for the creation card body. */
+  taskDescription?: string;
+  /** Decision note and actions for the summary panel. */
+  panelReview?: ReactNode;
   /** True when this person can cancel a live canvas run. */
   canStopRun?: boolean;
   actionBusy?: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
+  /** Reruns a failed line step. The card footer Retry uses this. */
+  onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);
   const stages = allStages(groups);
   const columns = consoleColumns(groups, fixture.footer.run?.appId);
+  const currentColumn = reachedColumns(columns);
   const [openAutomation, setOpenAutomation] = useState<ConsoleAutomation | null>(null);
+  const [fullLogAutomation, setFullLogAutomation] = useState<ConsoleAutomation | null>(null);
+
+  if (fullLogAutomation) {
+    const phase = fixture.phases.find((entry) => entry.id === fullLogAutomation.latest.id);
+    return (
+      <ConsoleFullLog
+        automation={fullLogAutomation}
+        phase={phase}
+        organizationId={organizationId}
+        runHref={phase ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase }) : undefined}
+        onBack={() => setFullLogAutomation(null)}
+      />
+    );
+  }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]" data-testid="redesign-console-variant">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="redesign-console-variant">
       <section className="flex min-w-0 flex-col gap-4">
-        <Timeline value={reachedColumns(columns)} className="pl-1">
+        <Timeline value={currentColumn} className="pl-1">
           {columns.map((column, index) => (
             <TimelineItem key={column.id} step={index + 1} data-testid={`redesign-console-column-${column.id}`}>
               <TimelineSeparator />
@@ -138,10 +159,14 @@ export function AutomationsConsoleVariant({
                       factoryKey={factoryKey}
                       orderNumber={orderNumber}
                       lineId={lineId}
+                      taskDescription={taskDescription}
+                      defaultOpen={index + 1 === currentColumn}
                       canStopRun={canStopRun}
                       actionBusy={actionBusy}
                       onStopRun={onStopRun}
+                      onRerunStep={onRerunStep}
                       onOpen={() => setOpenAutomation(automation)}
+                      onFullLog={() => setFullLogAutomation(automation)}
                     />
                   ))
                 )}
@@ -150,11 +175,16 @@ export function AutomationsConsoleVariant({
           ))}
         </Timeline>
       </section>
-      <ConsoleSummaryPanel fixture={fixture} outcome={outcome} stages={stages} />
+      <ConsoleSummaryPanel fixture={fixture} outcome={outcome} stages={stages} panelReview={panelReview} />
       <ConsoleRunsDrawer
         automation={openAutomation}
         open={openAutomation !== null}
         onOpenChange={(open) => !open && setOpenAutomation(null)}
+        fixture={fixture}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        lineId={lineId}
       />
     </div>
   );
@@ -243,10 +273,14 @@ function ConsoleAutomationCard({
   factoryKey,
   orderNumber,
   lineId,
+  taskDescription,
+  defaultOpen,
   canStopRun,
   actionBusy,
   onStopRun,
+  onRerunStep,
   onOpen,
+  onFullLog,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
@@ -254,16 +288,20 @@ function ConsoleAutomationCard({
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
+  taskDescription?: string;
+  /** True for cards in the column the task is currently in. */
+  defaultOpen: boolean;
   canStopRun: boolean;
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
+  onRerunStep?: (phase: SplitRunPhase) => void;
   onOpen: () => void;
+  onFullLog: () => void;
 }) {
   const { latest } = automation;
   const stopping = useStopRequested(latest.status, actionBusy);
   const shownStatus: SplitRunPhaseStatus = stopping.active && latest.status === "running" ? "cancelled" : latest.status;
   const shownPhase = phase && shownStatus !== phase.status ? { ...phase, status: shownStatus } : phase;
-  const finished = shownStatus === "passed" || shownStatus === "cancelled";
   const runHref = shownPhase
     ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: shownPhase })
     : undefined;
@@ -274,6 +312,10 @@ function ConsoleAutomationCard({
           onStopRun({ appId: shownPhase.appId ?? "", runId: shownPhase.runId ?? "" });
         }
       : undefined;
+  const rerunStep =
+    canStopRun && onRerunStep && shownStatus === "failed" && shownPhase?.stepIndex != null
+      ? () => onRerunStep(shownPhase)
+      : undefined;
   return (
     <Frame
       variant="default"
@@ -283,7 +325,7 @@ function ConsoleAutomationCard({
       className="[--frame-radius:var(--radius-lg)]"
       data-testid={`redesign-console-automation-${automation.id}`}
     >
-      <Collapsible defaultOpen={!finished} className="group/collapsible">
+      <Collapsible defaultOpen={defaultOpen || shownStatus === "running"} className="group/collapsible">
         <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
           <CollapsibleTrigger
             className="flex min-w-0 shrink-0 items-center gap-2"
@@ -294,8 +336,7 @@ function ConsoleAutomationCard({
           </CollapsibleTrigger>
           <StepOutputCounts stage={latest} />
           <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
-          {stopRun ? <StageStopButton onStop={stopRun} /> : null}
-          {runHref ? <ViewRunLink href={runHref} /> : null}
+          {latest.appId ? <FullLogButton onFullLog={onFullLog} /> : null}
           <CollapsibleTrigger
             className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             tabIndex={-1}
@@ -313,6 +354,11 @@ function ConsoleAutomationCard({
               automation={automation}
               phase={shownPhase}
               organizationId={organizationId}
+              taskDescription={taskDescription}
+              runHref={runHref}
+              onStop={stopRun}
+              onRetry={rerunStep}
+              actionBusy={actionBusy}
               onOpen={onOpen}
             />
           </FramePanel>
@@ -346,29 +392,66 @@ function useStopRequested(status: SplitRunPhaseStatus, actionBusy: boolean) {
   return { active: stopping, request: () => setStopping(true) };
 }
 
-function StageStopButton({ onStop }: { onStop: () => void }) {
+function FullLogButton({ onFullLog }: { onFullLog: () => void }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button type="button" aria-label="Stop" onClick={onStop} className={HEADER_ICON_BUTTON}>
-          <CircleStop className="size-3.5" aria-hidden />
+        <button type="button" aria-label="Full log" onClick={onFullLog} className={HEADER_ICON_BUTTON}>
+          <Maximize2 className="size-3.5" aria-hidden />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="top">Stop</TooltipContent>
+      <TooltipContent side="top">Full log</TooltipContent>
     </Tooltip>
   );
 }
 
-function ViewRunLink({ href }: { href: string }) {
+/**
+ * The stage stream on the whole popup: a sticky bar with the way back and
+ * the run page link, then every step open for reading.
+ */
+function ConsoleFullLog({
+  automation,
+  phase,
+  organizationId,
+  runHref,
+  onBack,
+}: {
+  automation: ConsoleAutomation;
+  phase?: SplitRunPhase;
+  organizationId?: string;
+  runHref?: string;
+  onBack: () => void;
+}) {
+  const { latest } = automation;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link href={href} aria-label="View run" className={HEADER_ICON_BUTTON}>
-          <Maximize2 className="size-3.5" aria-hidden />
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="top">View run</TooltipContent>
-    </Tooltip>
+    <div className="flex min-w-0 flex-col gap-3" data-testid="redesign-console-full-log">
+      <div className="sticky -top-4 z-10 -mx-1 flex items-center gap-2 border-b bg-background px-1 py-2">
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onBack}>
+          <ArrowLeft className="size-3.5" aria-hidden />
+          Back
+        </Button>
+        <StageStatusGlyph status={latest.status} />
+        <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{automation.name}</span>
+        <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{runMetaLine(latest)}</span>
+        {runHref ? (
+          <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-[12px]" asChild>
+            <Link href={runHref}>
+              <Maximize2 className="size-3.5" aria-hidden />
+              View run
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+      {latest.description ? (
+        <div className="text-[12.5px] leading-5 text-muted-foreground">
+          <MarkdownContent content={latest.description} variant="workspace" />
+        </div>
+      ) : null}
+      <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} expandSteps />
+      <div className="border-t pt-3">
+        <span className={META_TEXT_CLASSNAME}>{runFooterLine(latest)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -655,18 +738,28 @@ function AutomationCardBody({
   automation,
   phase,
   organizationId,
+  taskDescription,
+  runHref,
+  onStop,
+  onRetry,
+  actionBusy,
   onOpen,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   organizationId?: string;
+  taskDescription?: string;
+  runHref?: string;
+  onStop?: () => void;
+  onRetry?: () => void;
+  actionBusy: boolean;
   onOpen: () => void;
 }) {
   const { latest, runs } = automation;
-  const failed = latest.status === "failed" || latest.status === "cancelled";
   const pullRequest = latest.outputs.pullRequests[0];
   const hasOutputs = Boolean(pullRequest) || latest.outputs.artifacts.length > 0;
   const showDescription = showDescriptionInBody(latest);
+  const creationDescription = latest.id === "backlog" ? taskDescription?.trim() : undefined;
   return (
     <div className="space-y-3">
       {showDescription ? (
@@ -674,6 +767,7 @@ function AutomationCardBody({
           <MarkdownContent content={latest.description ?? ""} variant="workspace" />
         </div>
       ) : null}
+      {creationDescription ? <ClampedMarkdown content={creationDescription} /> : null}
       <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} />
       {hasOutputs || latest.checks.length > 0 ? (
         <div className="flex flex-col gap-2" data-testid={`redesign-console-outputs-${automation.id}`}>
@@ -696,34 +790,79 @@ function AutomationCardBody({
           ) : null}
         </div>
       ) : null}
-      {failed ? (
-        <Alert variant="destructive">
-          <CircleX />
-          <AlertTitle>{automation.name} did not finish</AlertTitle>
-          <AlertDescription>Fix the error, then run this automation again.</AlertDescription>
-          <AlertAction>
-            <Button size="sm" variant="outline">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
+        <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(latest)}</span>
+        <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          {runs.length > 1 ? (
+            <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" onClick={onOpen}>
+              <History className="size-3.5" aria-hidden />
+              View {runs.length} runs
+            </Button>
+          ) : runHref ? (
+            <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" asChild>
+              <Link href={runHref}>
+                <Maximize2 className="size-3.5" aria-hidden />
+                View run
+              </Link>
+            </Button>
+          ) : latest.appId ? (
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onOpen}>
+              Open run
+            </Button>
+          ) : null}
+          {onRetry ? (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
               <RotateCw className="size-3.5" aria-hidden />
               Retry
             </Button>
-          </AlertAction>
-        </Alert>
-      ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-        <span className={META_TEXT_CLASSNAME}>{runFooterLine(latest)}</span>
-        {latest.appId ? (
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onOpen}>
-            {runs.length === 1 ? (
-              "Open run"
-            ) : (
-              <>
-                <History className="size-3.5" aria-hidden />
-                View {runs.length} runs
-              </>
-            )}
-          </Button>
+          ) : null}
+          {onStop ? (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
+              <CircleStop className="size-3.5" aria-hidden />
+              Stop
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const DESCRIPTION_CLAMP_PX = 320;
+
+/** The task description on the creation card. Long text clamps with Show more. */
+function ClampedMarkdown({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setClamped((bodyRef.current?.scrollHeight ?? 0) > DESCRIPTION_CLAMP_PX + 40);
+  }, [content]);
+  return (
+    <div data-testid="redesign-console-task-description">
+      <div
+        ref={bodyRef}
+        className={cn("relative overflow-hidden text-[13px] leading-6", !expanded && clamped && "max-h-80")}
+      >
+        <MarkdownContent content={content} variant="workspace" />
+        {!expanded && clamped ? (
+          <div
+            className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent"
+            aria-hidden
+          />
         ) : null}
       </div>
+      {clamped ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="mt-1 h-7 px-2 text-[12px] text-muted-foreground"
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -732,10 +871,20 @@ function ConsoleRunsDrawer({
   automation,
   open,
   onOpenChange,
+  fixture,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  lineId,
 }: {
   automation: ConsoleAutomation | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fixture: SplitRunFixture;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
 }) {
   const runs = automation?.runs ?? [];
   const totalCost = runs.reduce((sum, run) => sum + parseUsd(run.cost), 0);
@@ -758,9 +907,22 @@ function ConsoleRunsDrawer({
           <SheetDescription>{automation ? summary : "Select an automation to read its runs."}</SheetDescription>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
-          {runs.map((run, index) => (
-            <DrawerRun key={run.id} run={run} defaultOpen={index === 0} />
-          ))}
+          {runs.map((run, index) => {
+            const phase = fixture.phases.find((entry) => entry.id === run.id);
+            const runHref = phase
+              ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase })
+              : undefined;
+            return (
+              <DrawerRun
+                key={run.id}
+                run={run}
+                phase={phase}
+                organizationId={organizationId}
+                runHref={runHref}
+                defaultOpen={index === 0}
+              />
+            );
+          })}
         </div>
       </SheetContent>
     </Sheet>
@@ -773,31 +935,53 @@ function parseUsd(value?: string): number {
 }
 
 /**
- * One historical run inside the drawer. The newest run starts open. A run
- * shows its agent transcript with tool calls expanded. Canvas nodes are
- * not listed; "Open on canvas" leads to the run page for those.
+ * One historical run inside the drawer. The newest run starts open. The
+ * row leads with the outcome glyph, then the trigger that caused the run
+ * (rendered, so mentions and comment links work), then the revision sha.
+ * The body reuses the card's live step list.
  */
-function DrawerRun({ run, defaultOpen }: { run: AutomationStage; defaultOpen: boolean }) {
+function DrawerRun({
+  run,
+  phase,
+  organizationId,
+  runHref,
+  defaultOpen,
+}: {
+  run: AutomationStage;
+  phase?: SplitRunPhase;
+  organizationId?: string;
+  runHref?: string;
+  defaultOpen: boolean;
+}) {
   const revision = run.pullRequestActivity?.revision;
+  const plainName = plainRunTitle(run.name);
   return (
     <Frame variant="default" spacing="sm" stacked dense className="[--frame-radius:var(--radius-lg)]">
       <Collapsible defaultOpen={defaultOpen} className="group/run">
-        <CollapsibleTrigger className="flex w-full min-w-0" aria-label={`Toggle ${run.name}`}>
-          <FrameHeader className="flex min-w-0 grow flex-row items-center gap-2 py-2">
+        <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
+          <CollapsibleTrigger className="shrink-0" aria-label={`Toggle ${plainName}`}>
             <StageStatusGlyph status={run.status} />
-            <span className="min-w-0 truncate text-left text-[13px] font-medium text-foreground">{run.name}</span>
-            {revision ? (
-              <span className="shrink-0 font-mono text-[12px] text-muted-foreground">{revision.sha?.slice(0, 7)}</span>
-            ) : null}
-            <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>
-              {[formatClock(run.startedAt), run.duration, run.cost].filter(Boolean).join(" · ")}
-            </span>
+          </CollapsibleTrigger>
+          <MarkdownContent
+            content={run.name}
+            variant="workspace"
+            openLinksInNewTab
+            linkClassName="font-medium text-current !underline !decoration-current underline-offset-2"
+            className="min-w-0 truncate text-left text-[13px] font-medium text-foreground [&_p]:m-0 [&_p]:inline"
+          />
+          {revision ? (
+            <span className="shrink-0 font-mono text-[12px] text-muted-foreground">{revision.sha?.slice(0, 7)}</span>
+          ) : null}
+          <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>
+            {[formatClock(run.startedAt), run.duration, run.cost].filter(Boolean).join(" · ")}
+          </span>
+          <CollapsibleTrigger className={HEADER_ICON_BUTTON} tabIndex={-1} aria-hidden>
             <ChevronRight
-              className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/run:rotate-90"
+              className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/run:rotate-90"
               aria-hidden
             />
-          </FrameHeader>
-        </CollapsibleTrigger>
+          </CollapsibleTrigger>
+        </FrameHeader>
         <CollapsibleContent>
           <FramePanel className="space-y-3">
             {run.description ? (
@@ -805,13 +989,17 @@ function DrawerRun({ run, defaultOpen }: { run: AutomationStage; defaultOpen: bo
                 <MarkdownContent content={run.description} variant="workspace" />
               </div>
             ) : null}
-            <AgentStepList stage={run} view="detailed" showToggle={false} />
+            <LiveAgentSteps stage={run} phase={phase} organizationId={organizationId} />
             <div className="flex items-center justify-between gap-2 border-t pt-3">
               <span className={META_TEXT_CLASSNAME}>{runFooterLine(run)}</span>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]">
-                <ExternalLink className="size-3.5" aria-hidden />
-                Open on canvas
-              </Button>
+              {runHref ? (
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" asChild>
+                  <Link href={runHref}>
+                    <Maximize2 className="size-3.5" aria-hidden />
+                    View run
+                  </Link>
+                </Button>
+              ) : null}
             </div>
           </FramePanel>
         </CollapsibleContent>
@@ -820,19 +1008,27 @@ function DrawerRun({ run, defaultOpen }: { run: AutomationStage; defaultOpen: bo
   );
 }
 
+/** Markdown links reduced to their text, for aria labels. */
+function plainRunTitle(name: string): string {
+  return name.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+}
+
 function ConsoleSummaryPanel({
   fixture,
   outcome,
   stages,
+  panelReview,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
   stages: AutomationStage[];
+  panelReview?: ReactNode;
 }) {
   const artifacts = splitRunLinkedArtifacts([
     ...new Map(stages.flatMap((stage) => stage.outputs.artifacts).map((artifact) => [artifact.id, artifact])).values(),
   ]);
   const checks = stages.flatMap((stage) => stage.checks);
+  const hasOutputs = outcome.pullRequests.length > 0 || artifacts.length > 0 || checks.length > 0;
   const spendRows = (fixture.usageByModel ?? []).map((row) => ({
     label: row.model?.split("/").at(-1) ?? row.provider ?? "",
     value: `$${(Number(row.costCents ?? 0) / 100).toFixed(2)}`,
@@ -845,8 +1041,9 @@ function ConsoleSummaryPanel({
             <StageStatusGlyph status={outcome.status} />
             {outcome.statusLabel}
           </FrameTitle>
-          <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>
+          {panelReview ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
+        {panelReview ? <FramePanel className="py-3">{panelReview}</FramePanel> : null}
         <FramePanel className="flex flex-col gap-2 py-3">
           <SummaryRow label="Owner">
             <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
@@ -862,35 +1059,26 @@ function ConsoleSummaryPanel({
             </SummaryRow>
           ))}
         </FramePanel>
-        <FramePanel className="flex flex-col gap-2 py-3">
-          <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
-          {outcome.pullRequests.map((pullRequest) => (
-            <WorkOrderPullRequestInline key={pullRequest.id} pullRequest={pullRequest} showTitle />
-          ))}
-          {artifacts.map((artifact) => (
-            <WorkOrderArtifactInline
-              key={artifact.id}
-              artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
-            />
-          ))}
-          {checks.length > 0 ? (
-            <>
-              <span className="mt-1 text-[12px] font-medium text-muted-foreground">Checks</span>
-              <SplitRunCheckPills checks={checks} testId="redesign-console-checks" />
-            </>
-          ) : null}
-        </FramePanel>
-        <FramePanel className="flex flex-wrap gap-2 py-3">
-          <Button size="sm" variant="outline">
-            <ExternalLink className="size-3.5" aria-hidden />
-            View run
-          </Button>
-          {fixture.footer.actions.map((action) => (
-            <Button key={action.id} size="sm" variant={action.emphasis === "primary" ? "default" : "outline"}>
-              {action.label}
-            </Button>
-          ))}
-        </FramePanel>
+        {hasOutputs ? (
+          <FramePanel className="flex flex-col gap-2 py-3">
+            <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
+            {outcome.pullRequests.map((pullRequest) => (
+              <WorkOrderPullRequestInline key={pullRequest.id} pullRequest={pullRequest} showTitle />
+            ))}
+            {artifacts.map((artifact) => (
+              <WorkOrderArtifactInline
+                key={artifact.id}
+                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+              />
+            ))}
+            {checks.length > 0 ? (
+              <>
+                <span className="mt-1 text-[12px] font-medium text-muted-foreground">Checks</span>
+                <SplitRunCheckPills checks={checks} testId="redesign-console-checks" />
+              </>
+            ) : null}
+          </FramePanel>
+        ) : null}
       </Frame>
     </aside>
   );
