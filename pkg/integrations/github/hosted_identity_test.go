@@ -26,6 +26,7 @@ type hostedIdentityStub struct {
 	cache       map[string]*models.HostedAppInstallationMember
 	savedChecks []string
 	reconciled  []hostedInstallationSnapshot
+	pruned      [][]string
 }
 
 func stubHostedIdentity(t *testing.T, stub *hostedIdentityStub) {
@@ -59,6 +60,10 @@ func stubHostedIdentity(t *testing.T, stub *hostedIdentityStub) {
 	}
 	saveReconciledInstallation = func(snapshot hostedInstallationSnapshot) error {
 		stub.reconciled = append(stub.reconciled, snapshot)
+		return nil
+	}
+	pruneReconciledInstallations = func(liveInstallationIDs []string) error {
+		stub.pruned = append(stub.pruned, liveInstallationIDs)
 		return nil
 	}
 }
@@ -648,7 +653,13 @@ func Test__reconcileHostedInstallations(t *testing.T) {
 	require.Len(t, stub.reconciled, 1)
 	assert.Equal(t, "81", stub.reconciled[0].ID)
 
+	// Rows GitHub no longer lists are pruned, so a dead installation stops
+	// wasting discovery lookups.
+	require.Len(t, stub.pruned, 1)
+	assert.Equal(t, []string{"81"}, stub.pruned[0])
+
 	// A second run inside the TTL window does not ask GitHub again.
 	g.reconcileHostedInstallations(ctx, app)
 	assert.Len(t, stub.reconciled, 1)
+	assert.Len(t, stub.pruned, 1)
 }

@@ -181,6 +181,23 @@ func FindHostedAppInstallationByAccountLogin(tx *gorm.DB, provider, accountLogin
 	return &row, nil
 }
 
+// SoftDeleteHostedAppInstallationsNotIn marks every live installation the
+// provider no longer lists as uninstalled. Reconcile calls it with the full
+// list from the provider, so a dead row (for example after a lost uninstall
+// webhook) stops wasting discovery lookups.
+func SoftDeleteHostedAppInstallationsNotIn(tx *gorm.DB, provider string, keepInstallationIDs []string) error {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return nil
+	}
+
+	query := tx.Where("provider = ?", provider)
+	if len(keepInstallationIDs) > 0 {
+		query = query.Where("installation_id NOT IN ?", keepInstallationIDs)
+	}
+	return query.Delete(&HostedAppInstallation{}).Error
+}
+
 // SoftDeleteHostedAppInstallation marks an installation as uninstalled.
 func SoftDeleteHostedAppInstallation(tx *gorm.DB, provider, installationID string) error {
 	provider = strings.TrimSpace(provider)

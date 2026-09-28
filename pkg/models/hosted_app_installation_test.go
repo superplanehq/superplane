@@ -171,4 +171,25 @@ func Test__HostedAppInstallation(t *testing.T) {
 		assert.Contains(t, logins, "old-org-renamed")
 		assert.NotContains(t, logins, "fresh-org")
 	})
+
+	t.Run("prune soft-deletes rows the provider no longer lists", func(t *testing.T) {
+		require.NoError(t, models.SoftDeleteHostedAppInstallationsNotIn(db, provider, []string{"23"}))
+
+		rows, err := models.ListHostedAppInstallations(db, provider)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, "23", rows[0].InstallationID)
+
+		// A reinstall reported by the provider clears the soft-delete.
+		require.NoError(t, models.ReconcileHostedAppInstallation(db, models.HostedAppInstallation{
+			Provider:       provider,
+			InstallationID: "11",
+			AccountLogin:   "old-org-renamed",
+			AccountType:    "Organization",
+		}))
+		found, err := models.FindHostedAppInstallation(db, provider, "11")
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.False(t, found.DeletedAt.Valid)
+	})
 }

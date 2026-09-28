@@ -43,6 +43,7 @@ var (
 	checkInstallationMembership  = checkInstallationMembershipOnGitHub
 	listAppInstallationsDetailed = listAppInstallationsDetailedFromGitHub
 	saveReconciledInstallation   = saveReconciledInstallationToDB
+	pruneReconciledInstallations = pruneReconciledInstallationsFromDB
 	hostedIdentityNow            = time.Now
 
 	hostedReconcileMu   sync.Mutex
@@ -247,7 +248,9 @@ func (g *GitHub) needsMembershipLookup(row hostedInstallationSnapshot, login str
 // the app, so identity discovery also sees installations that predate the
 // webhook table. It never freshens last_event_at on existing rows: only
 // signed webhooks may move an installation into the no-identity first-claim
-// window.
+// window. Rows GitHub no longer lists are soft-deleted: a dead installation
+// (for example after a lost uninstall webhook) must not waste discovery
+// lookups on every sync.
 func (g *GitHub) reconcileHostedInstallations(ctx core.SyncContext, app common.HostedApp) {
 	if !takeHostedReconcileSlot() {
 		return
@@ -261,10 +264,16 @@ func (g *GitHub) reconcileHostedInstallations(ctx core.SyncContext, app common.H
 		return
 	}
 
+	liveIDs := make([]string, 0, len(installations))
 	for _, installation := range installations {
+		liveIDs = append(liveIDs, installation.ID)
 		if err := saveReconciledInstallation(installation); err != nil && ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to reconcile GitHub App installation %s: %v", installation.ID, err)
 		}
+	}
+
+	if err := pruneReconciledInstallations(liveIDs); err != nil && ctx.Logger != nil {
+		ctx.Logger.Errorf("failed to prune uninstalled GitHub App installations: %v", err)
 	}
 }
 
@@ -385,6 +394,10 @@ func listAppInstallationsDetailedFromGitHub(integration core.IntegrationContext,
 	}
 }
 
+func pruneReconciledInstallationsFromDB(liveInstallationIDs []string) error {
+	return models.SoftDeleteHostedAppInstallationsNotIn(database.Conn(), models.HostedAppProviderGitHub, liveInstallationIDs)
+}
+
 func saveReconciledInstallationToDB(snapshot hostedInstallationSnapshot) error {
 	return models.ReconcileHostedAppInstallation(database.Conn(), models.HostedAppInstallation{
 		Provider:       models.HostedAppProviderGitHub,
@@ -404,6 +417,7 @@ func resetHostedIdentityHooks() {
 	checkInstallationMembership = checkInstallationMembershipOnGitHub
 	listAppInstallationsDetailed = listAppInstallationsDetailedFromGitHub
 	saveReconciledInstallation = saveReconciledInstallationToDB
+	pruneReconciledInstallations = pruneReconciledInstallationsFromDB
 	hostedIdentityNow = time.Now
 
 	hostedReconcileMu.Lock()
