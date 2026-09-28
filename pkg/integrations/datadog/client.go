@@ -2,6 +2,7 @@ package datadog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,11 +44,18 @@ func (e *APIError) Error() string {
 }
 
 type Client struct {
-	APIKey  string
-	AppKey  string
-	Site    string
-	BaseURL string
-	http    core.HTTPContext
+	APIKey          string
+	AppKey          string
+	Site            string
+	BaseURL         string
+	http            core.HTTPContext
+	requestDeadline time.Time
+}
+
+// SetRequestDeadline stops later Datadog calls at deadline. The zero time
+// clears the limit.
+func (c *Client) SetRequestDeadline(deadline time.Time) {
+	c.requestDeadline = deadline
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -77,7 +85,14 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 }
 
 func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, requestURL, body)
+	ctx := context.Background()
+	if !c.requestDeadline.IsZero() {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, c.requestDeadline)
+		defer cancel()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, requestURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
 	}

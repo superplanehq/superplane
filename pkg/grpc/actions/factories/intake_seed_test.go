@@ -755,6 +755,32 @@ func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherService(t *testing.T) {
 	assert.Empty(t, issues)
 }
 
+func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {
+	const issueID = "33333333-3333-4333-8333-333333333333"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_message":"loaded too late","service":"checkout"}}}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+	client.SetRequestDeadline(time.Now().Add(-time.Second))
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:           issueID,
+		Service:      "checkout",
+		ErrorMessage: "search summary",
+		URL:          "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	require.Len(t, issues, 1)
+	assert.Equal(t, "search summary", issues[0].ErrorMessage)
+	assert.Equal(t, "checkout", issues[0].Service)
+}
+
 func Test__DatadogIssueEvents(t *testing.T) {
 	now := time.Now().UTC()
 	issues := []datadog.ErrorTrackingIssue{

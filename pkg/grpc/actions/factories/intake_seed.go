@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -56,6 +57,11 @@ const (
 	// intakeDatadogSearchPageSize is the Error Tracking search page. The
 	// seed sorts that page by last seen and keeps intakeDatadogSeedSize.
 	intakeDatadogSearchPageSize = 100
+
+	// intakeDatadogSeedBudget is how long setup waits while it loads issue
+	// details. Each call can otherwise wait 30 seconds, and one issue can
+	// make several calls. After the budget, the import keeps the search result.
+	intakeDatadogSeedBudget = 15 * time.Second
 
 	// intakeDatadogSeedEventWindow is how many recent trigger events a
 	// reseed reads so it can drop errors that already sit on the intake.
@@ -691,6 +697,7 @@ func seedDatadogIssues(
 		return intakeSeedResult{}, err
 	}
 
+	client.SetRequestDeadline(time.Now().Add(intakeDatadogSeedBudget))
 	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, issues))
 }
 
