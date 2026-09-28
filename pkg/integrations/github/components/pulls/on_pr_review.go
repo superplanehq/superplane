@@ -150,7 +150,7 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	commentMaps, err := reviewCommentsAsMaps(comments)
+	commentMaps, err := reviewCommentsAsMaps(ctx, config.Repository, data, comments)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to encode review comments: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to encode review comments: %w", err)
@@ -229,7 +229,12 @@ func reviewFilterBodies(data map[string]any, comments []*github.PullRequestComme
 	return bodies
 }
 
-func reviewCommentsAsMaps(comments []*github.PullRequestComment) ([]any, error) {
+func reviewCommentsAsMaps(
+	ctx core.WebhookRequestContext,
+	configuredRepository string,
+	data map[string]any,
+	comments []*github.PullRequestComment,
+) ([]any, error) {
 	encoded, err := json.Marshal(comments)
 	if err != nil {
 		return nil, err
@@ -241,6 +246,47 @@ func reviewCommentsAsMaps(comments []*github.PullRequestComment) ([]any, error) 
 	}
 	if maps == nil {
 		return []any{}, nil
+	}
+
+	pullRequest, ok := data["pull_request"].(map[string]any)
+	if !ok {
+		return maps, nil
+	}
+
+	pullNumber, ok := int64FromJSON(pullRequest["number"])
+	if !ok {
+		return maps, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return maps, nil
+	}
+
+	repository := webhookRepositoryFullName(data, configuredRepository)
+	commentToThread, err := client.GetPullRequestReviewThreads(
+		context.Background(),
+		repository,
+		int(pullNumber),
+	)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to fetch review threads: %v", err)
+		return maps, nil
+	}
+
+	for i, m := range maps {
+		commentMap, ok := m.(map[string]any)
+		if !ok {
+			continue
+		}
+		commentID, ok := int64FromJSON(commentMap["id"])
+		if !ok {
+			continue
+		}
+		if threadID, found := commentToThread[commentID]; found {
+			commentMap["pull_request_review_thread"] = map[string]any{"id": threadID}
+			maps[i] = commentMap
+		}
 	}
 
 	return maps, nil

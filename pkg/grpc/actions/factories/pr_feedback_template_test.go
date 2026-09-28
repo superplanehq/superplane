@@ -177,6 +177,121 @@ func TestPrFeedbackPRNumberExpression_IssueCommentPayload(t *testing.T) {
 	assert.Equal(t, 42, got)
 }
 
+func TestPrFeedbackResolveThreadIDExpression(t *testing.T) {
+	t.Run("a review has no single thread ID", func(t *testing.T) {
+		assert.Empty(t, prFeedbackResolveThreadIDExpression("github.onPRReview"))
+	})
+
+	t.Run("a plain pull request comment has no thread ID", func(t *testing.T) {
+		assert.Empty(t, prFeedbackResolveThreadIDExpression("github.onPRComment"))
+	})
+
+	expression := prFeedbackResolveThreadIDExpression("github.onPRReviewComment")
+	requireValidTemplateExpressions(t, expression)
+	source := templateExpressionSource(t, expression)
+
+	t.Run("yields the thread of the reply", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"comment": map[string]any{
+				"id":                         222,
+				"pull_request_review_thread": map[string]any{"id": "PRRT_b"},
+			},
+		})
+		assert.Equal(t, "PRRT_b", got)
+	})
+
+	t.Run("yields an empty string when the comment has no thread", func(t *testing.T) {
+		got := evalRootDataExpression(t, source, map[string]any{
+			"comment": map[string]any{"id": 222},
+		})
+		assert.Equal(t, "", got)
+	})
+}
+
+func TestPrFeedbackResolveThreadIDsExpression(t *testing.T) {
+	t.Run("a review comment has no thread ID list", func(t *testing.T) {
+		assert.Empty(t, prFeedbackResolveThreadIDsExpression("github.onPRReviewComment"))
+	})
+
+	expression := prFeedbackResolveThreadIDsExpression("github.onPRReview")
+
+	t.Run("is a bare expression the component evaluates at run time", func(t *testing.T) {
+		assert.NotContains(t, expression, "{{")
+		assert.NotContains(t, expression, "}}")
+	})
+
+	t.Run("yields the thread of every inline comment", func(t *testing.T) {
+		got := evalRootDataExpression(t, expression, map[string]any{
+			"review_comments": []any{
+				map[string]any{"id": 111, "pull_request_review_thread": map[string]any{"id": "PRRT_a"}},
+				map[string]any{"id": 222, "pull_request_review_thread": map[string]any{"id": "PRRT_b"}},
+				map[string]any{"id": 333},
+			},
+		})
+		assert.Equal(t, []any{"PRRT_a", "PRRT_b", ""}, got)
+	})
+
+	t.Run("yields each thread once", func(t *testing.T) {
+		got := evalRootDataExpression(t, expression, map[string]any{
+			"review_comments": []any{
+				map[string]any{"id": 111, "pull_request_review_thread": map[string]any{"id": "PRRT_a"}},
+				map[string]any{"id": 222, "pull_request_review_thread": map[string]any{"id": "PRRT_a"}},
+			},
+		})
+		assert.Equal(t, []any{"PRRT_a"}, got)
+	})
+
+	t.Run("yields an empty list when the review has no inline comments", func(t *testing.T) {
+		got := evalRootDataExpression(t, expression, map[string]any{
+			"review": map[string]any{"body": "LGTM"},
+		})
+		assert.Equal(t, []any{}, got)
+	})
+}
+
+func TestPRFeedbackResolveNodes(t *testing.T) {
+	canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository: "acme/app",
+		Mention:    prFeedbackDefaultMention,
+		IgnoreBots: true,
+	})
+
+	t.Run("the review node resolves every thread after the runner", func(t *testing.T) {
+		node := findSpecNode(t, canvas, prFeedbackResolveReviewNodeID)
+
+		assert.Equal(t, "github.resolveReviewThread", node.Component)
+		assert.Equal(t,
+			`uniq(map(root().data.review_comments ?? [], .pull_request_review_thread?.id ?? ""))`,
+			node.Configuration["threadIdsExpression"],
+		)
+		assert.NotContains(t, node.Configuration, "threadId")
+	})
+
+	t.Run("the reply node resolves one thread after the runner", func(t *testing.T) {
+		node := findSpecNode(t, canvas, prFeedbackResolveReplyNodeID)
+
+		assert.Equal(t, "github.resolveReviewThread", node.Component)
+		assert.Equal(t,
+			`{{ root().data.comment.pull_request_review_thread?.id ?? "" }}`,
+			node.Configuration["threadId"],
+		)
+		assert.NotContains(t, node.Configuration, "threadIdsExpression")
+	})
+
+	t.Run("only the review and reply flows resolve threads", func(t *testing.T) {
+		var resolveIDs []string
+		for _, node := range canvas.Spec.Nodes {
+			if node.Component == "github.resolveReviewThread" {
+				resolveIDs = append(resolveIDs, node.ID)
+			}
+		}
+		assert.Equal(t, []string{
+			prFeedbackResolveReviewNodeID,
+			prFeedbackResolveReplyNodeID,
+		}, resolveIDs)
+	})
+}
+
 func templateExpressionSource(t *testing.T, wrapped string) string {
 	t.Helper()
 

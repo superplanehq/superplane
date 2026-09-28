@@ -1,6 +1,7 @@
 package pulls
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -181,6 +182,12 @@ func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 		return http.StatusOK, nil, nil
 	}
 
+	if eventType == "pull_request_review_comment" {
+		if err := enrichReviewCommentWithThread(ctx, config.Repository, data); err != nil {
+			ctx.Logger.Warnf("Failed to enrich review comment with thread: %v", err)
+		}
+	}
+
 	if err := ctx.Events.Emit("github.prReviewComment", data); err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
@@ -190,5 +197,52 @@ func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 }
 
 func (p *OnPRReviewComment) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}
+
+func enrichReviewCommentWithThread(
+	ctx core.WebhookRequestContext,
+	configuredRepository string,
+	data map[string]any,
+) error {
+	comment, ok := data["comment"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	commentID, ok := int64FromJSON(comment["id"])
+	if !ok {
+		return nil
+	}
+
+	pullRequest, ok := data["pull_request"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	pullNumber, ok := int64FromJSON(pullRequest["number"])
+	if !ok {
+		return nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil
+	}
+
+	repository := webhookRepositoryFullName(data, configuredRepository)
+	commentToThread, err := client.GetPullRequestReviewThreads(
+		context.Background(),
+		repository,
+		int(pullNumber),
+	)
+	if err != nil {
+		return err
+	}
+
+	if threadID, found := commentToThread[commentID]; found {
+		comment["pull_request_review_thread"] = map[string]any{"id": threadID}
+	}
+
 	return nil
 }
