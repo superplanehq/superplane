@@ -618,6 +618,51 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	return state, nil
 }
 
+func WorkOrderReadyForAutoStart(
+	tx *gorm.DB,
+	factoryModel *Factory,
+	order *FactoryWorkOrder,
+	session *FactoryPlanningSession,
+) (bool, error) {
+	if factoryModel == nil || order == nil || session == nil {
+		return false, nil
+	}
+	if order.State != FactoryWorkOrderStateDraft || order.AutoStartLineID == nil {
+		return false, nil
+	}
+	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {
+		return false, nil
+	}
+	if len(session.CurrentSurvey().Questions) > 0 {
+		return false, nil
+	}
+	checks, err := order.ListChecks(tx)
+	if err != nil {
+		return false, err
+	}
+	if !planningCheckScoreIs(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	if factoryModel.PlanningClarity && !planningCheckScoreIs(checks, PlanningClarityCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	spec, err := planningSpecBody(tx, order)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(spec) != "", nil
+}
+
+func planningCheckScoreIs(checks []FactoryWorkOrderCheck, key string, score float64) bool {
+	for i := range checks {
+		if checks[i].Key != key {
+			continue
+		}
+		return checks[i].Score == score
+	}
+	return false
+}
+
 func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
 	artifacts, err := order.ListArtifacts(tx)
 	if err != nil {

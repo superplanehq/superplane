@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -46,11 +47,19 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
+	autoStartLineID, err := optionalAutoStartLineID(req.GetAutoStartLineId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+	if err := rejectAutoStartWhenUnavailable(db, factory, autoStartLineID); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create work order")
+	}
+
 	assigneeIDs := []uuid.UUID{createdByID}
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
+		created, err := factory.CreateWorkOrderWithAutoStart(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil, autoStartLineID)
 		if err != nil {
 			return err
 		}
@@ -92,4 +101,32 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	return &pb.CreateWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func optionalAutoStartLineID(raw string) (*uuid.UUID, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, invalidArgument("auto_start_line_id must be a UUID")
+	}
+	return &parsed, nil
+}
+
+func rejectAutoStartWhenUnavailable(db *gorm.DB, factory *models.Factory, lineID *uuid.UUID) error {
+	if lineID == nil {
+		return nil
+	}
+	if !factory.PlanningEnabled || !factory.PlanningConfidence {
+		return invalidArgument("auto-start requires planning and confidence")
+	}
+	if _, err := factory.FindLine(db, *lineID); err != nil {
+		if errors.Is(err, models.ErrFactoryLineNotFound) {
+			return invalidArgument("auto_start_line_id is not a line in this workspace")
+		}
+		return err
+	}
+	return nil
 }
