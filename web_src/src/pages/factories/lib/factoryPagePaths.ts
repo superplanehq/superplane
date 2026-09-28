@@ -383,6 +383,11 @@ export function factorySentryIntakeSetupPath(organizationId: string, factoryKey:
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
 }
 
+/** Dedicated setup page for Datadog Error Tracking intake. */
+export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
+}
+
 /** Dedicated setup page for Dependabot alert intake. */
 export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;

@@ -6,6 +6,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import superplaneIcon from "@/assets/superplane.svg";
@@ -104,6 +105,31 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("href", "https://acme.sentry.io/issues/1");
     expect(icon.querySelector("img")).toHaveAttribute("src", sentryIcon);
     expect(icon).toHaveAttribute("aria-label", "Sentry exceptions ISSUE-1");
+  });
+
+  it("shows the Datadog icon for a Datadog Error Tracking origin", () => {
+    const href = "https://app.datadoghq.eu/error-tracking/issue/da226b38-baac-11f1-bad1-da7ad0900005";
+    renderCard({
+      ...baseOrder,
+      origin: { url: href, label: "da226b38-baac-11f1-bad1-da7ad0900005" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon).toHaveAttribute("href", href);
+    expect(icon.querySelector("img")).toHaveAttribute("src", datadogIcon);
+    expect(icon).toHaveAttribute("aria-label", "Datadog errors da226b38-baac-11f1-bad1-da7ad0900005");
+  });
+
+  it("shows the Datadog icon when only the Datadog automation is present", () => {
+    renderCard({
+      ...baseOrder,
+      createdBy: { automation: { appId: "datadog-intake", appName: "Datadog" } },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon.querySelector("img")).toHaveAttribute("src", datadogIcon);
+    expect(icon).toHaveAttribute("aria-label", "Datadog errors");
   });
 
   it("renders a SuperPlane source mark for a manual task", () => {
