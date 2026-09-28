@@ -29,6 +29,8 @@ export interface IntakeSourceSettings {
   /** Also create a task when somebody adds the "superplane" label to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
+  /** Open a GitHub issue when someone adds a task by hand. */
+  githubCreateIssueForManualTasks: boolean;
   /** Move the originating Jira issue when SuperPlane completes the task. */
   jiraMoveOnComplete: boolean;
   /** Jira status name to move the issue to. Empty means the Done column. */
@@ -60,6 +62,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   reopenedIssues: true,
   superplaneLabelAdded: true,
   authorsWithAccess: false,
+  githubCreateIssueForManualTasks: false,
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
   sentryNewIssues: true,
@@ -128,6 +131,8 @@ export const INTAKE_SETTINGS_COPY = {
   labelsEmpty: "No labels found in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
   authorsWithAccess: "Author is a repository collaborator",
+  createIssueForManualTasks: "Create a GitHub issue for each manual task",
+  createIssueForManualTasksHelp: "SuperPlane opens an issue in this repository when someone adds a task by hand.",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
@@ -225,6 +230,7 @@ type IntakeToggles = Pick<
   | "reopenedIssues"
   | "superplaneLabelAdded"
   | "authorsWithAccess"
+  | "githubCreateIssueForManualTasks"
   | "sentryNewIssues"
   | "sentryRegressedIssues"
   | "sentryAssignedIssues"
@@ -237,6 +243,8 @@ function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefin
     reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
     superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
     authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    githubCreateIssueForManualTasks:
+      settings?.githubCreateIssueForManualTasks ?? DEFAULT_GITHUB_INTAKE_SETTINGS.githubCreateIssueForManualTasks,
     sentryNewIssues: settings?.sentryNewIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues,
     sentryRegressedIssues: settings?.sentryRegressedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues,
     sentryAssignedIssues: settings?.sentryAssignedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues,
@@ -289,6 +297,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     newIssues: settings.newIssues,
     reopenedIssues: settings.reopenedIssues,
     superplaneLabelAdded: settings.superplaneLabelAdded,
+    githubCreateIssueForManualTasks: settings.githubCreateIssueForManualTasks,
     jiraMoveOnComplete: settings.jiraMoveOnComplete,
     jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
     sentryNewIssues: settings.sentryNewIssues,
