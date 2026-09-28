@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -124,6 +125,50 @@ func Test__UpdateIntegration(t *testing.T) {
 		//
 		assert.Equal(t, models.IntegrationStateError, updateResponse.Integration.Status.State)
 		assert.Contains(t, updateResponse.Integration.Status.StateDescription, "sync failed on update")
+	})
+
+	t.Run("large sync failure is bounded before persistence", func(t *testing.T) {
+		syncCount := 0
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(core.SyncContext) error {
+				syncCount++
+				if syncCount == 1 {
+					return nil
+				}
+				return errors.New(strings.Repeat("x", models.IntegrationStateDescriptionMaxLength*2))
+			},
+		})
+
+		integrationName := support.RandomName("integration")
+		createResponse, err := CreateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			"dummy",
+			integrationName,
+			nil,
+		)
+		require.NoError(t, err)
+
+		updateResponse, err := UpdateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			createResponse.Integration.Metadata.Id,
+			nil,
+			"",
+		)
+
+		require.NoError(t, err)
+		description := updateResponse.Integration.Status.StateDescription
+		assert.Len(t, []rune(description), models.IntegrationStateDescriptionMaxLength)
+		assert.True(t, strings.HasSuffix(description, "..."))
 	})
 
 	t.Run("successful retry restores a failed integration to pending", func(t *testing.T) {
