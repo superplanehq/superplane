@@ -18,6 +18,14 @@ const (
 	FactoryWorkOrderExecutionStatusFinished = "finished"
 )
 
+// Failure reasons stored on a factory step. The UI maps each code to copy
+// and a billing action.
+const (
+	WorkOrderExecutionFailureReasonNoHostedCredit             = "no_hosted_credit"
+	WorkOrderExecutionFailureReasonHostedSubscriptionRequired = "hosted_subscription_required"
+	WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty       = "workspace_budget_empty"
+)
+
 var (
 	ErrFactoryWorkOrderExecutionNotFound = errors.New("factory work order execution not found")
 	ErrFactoryWorkOrderNotDispatchable   = errors.New("work order cannot be dispatched in its current state")
@@ -52,14 +60,6 @@ type FactoryWorkOrderExecution struct {
 	UpdatedAt     time.Time
 	FinishedAt    *time.Time
 }
-
-// Failure reasons stored on a factory step. The UI maps each code to copy
-// and a billing action.
-const (
-	WorkOrderExecutionFailureReasonNoHostedCredit             = "no_hosted_credit"
-	WorkOrderExecutionFailureReasonHostedSubscriptionRequired = "hosted_subscription_required"
-	WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty       = "workspace_budget_empty"
-)
 
 // WorkOrderExecutionFailureReasonFor maps a SuperPlane hosted credit error
 // to a stored failure reason. Other errors return an empty string.
