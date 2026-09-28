@@ -15,11 +15,16 @@ import (
 )
 
 var (
-	newInstallationClient       = newClientForAppInstallation
-	newAppJWTClient             = newClientForApp
-	listInstallationRepos       = listInstallationRepositories
-	listAppInstallations        = listAppInstallationsFromGitHub
-	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
+	newInstallationClient           = newClientForAppInstallation
+	newAppJWTClient                 = newClientForApp
+	listInstallationRepos           = listInstallationRepositories
+	listAppInstallations            = listAppInstallationsFromGitHub
+	listAppInstallationRequests     = listAppInstallationRequestsFromGitHub
+	getAppInstallation              = getAppInstallationFromGitHub
+	findAppOrganizationInstallation = findAppOrganizationInstallationFromGitHub
+	findAppUserInstallation         = findAppUserInstallationFromGitHub
+	resolveInstallationIdentity     = resolveInstallationIdentityFromGitHub
+	getRepositoryPermission         = getRepositoryPermissionFromGitHub
 )
 
 const installRequestAssociationWindow = 2 * time.Minute
@@ -136,7 +141,7 @@ func (g *GitHub) reconcileInstallRequests(
 	ctx core.SyncContext,
 	app common.HostedApp,
 	metadata *common.Metadata,
-) (bool, error) {
+) (hostedInstallRequestDiscovery, error) {
 	trackedRequests := metadata.CurrentInstallRequests()
 	requester := strings.TrimSpace(metadata.StartedByGitHubLogin)
 	localUnverifiedDiscovery := useDevelopmentGitHubDiscovery() && requester == "development"
@@ -153,7 +158,7 @@ func (g *GitHub) reconcileInstallRequests(
 		}
 		client, err := newAppJWTClient(ctx.Integration, app.ID)
 		if err != nil {
-			return false, fmt.Errorf("failed to create app client: %w", err)
+			return hostedInstallRequestDiscovery{}, fmt.Errorf("failed to create app client: %w", err)
 		}
 		lookupRequester := requester
 		if localUnverifiedDiscovery {
@@ -165,7 +170,7 @@ func (g *GitHub) reconcileInstallRequests(
 		}
 		openRequests, err = listAppInstallationRequests(requestContext, client, lookupRequester)
 		if err != nil {
-			return false, fmt.Errorf("failed to list app installation requests: %w", err)
+			return hostedInstallRequestDiscovery{}, fmt.Errorf("failed to list app installation requests: %w", err)
 		}
 		if localUnverifiedDiscovery {
 			if len(trackedRequests) == 0 {
@@ -182,7 +187,10 @@ func (g *GitHub) reconcileInstallRequests(
 	unresolved := make([]common.InstallRequest, 0, len(openRequests))
 	now := time.Now().UTC()
 	followUpDiscovery := false
-	needsInstallationDiscovery := false
+	discovery := hostedInstallRequestDiscovery{}
+	if installRequestFollowUpDiscoveryActive(*metadata, now) {
+		discovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+	}
 	for _, request := range candidates {
 		if installRequestIsOpen(request, openRequests) {
 			unresolved = append(unresolved, request)
@@ -192,7 +200,13 @@ func (g *GitHub) reconcileInstallRequests(
 		if found && len(installation.Repositories) > 0 {
 			continue
 		}
-		needsInstallationDiscovery = true
+		if request.AccountLogin == "" {
+			discovery.full = true
+		} else if !slices.ContainsFunc(discovery.accounts, func(account string) bool {
+			return strings.EqualFold(account, request.AccountLogin)
+		}) {
+			discovery.accounts = append(discovery.accounts, request.AccountLogin)
+		}
 		if installRequestMayStillResolve(request, now) {
 			unresolved = append(unresolved, request)
 			continue
@@ -202,10 +216,17 @@ func (g *GitHub) reconcileInstallRequests(
 	metadata.SetInstallRequests(unresolved)
 	if followUpDiscovery {
 		metadata.InstallRequestDiscoveryUntil = now.Add(installRequestFollowUpDiscoveryPeriod).Format(time.RFC3339Nano)
-	} else if len(unresolved) == 0 {
+		metadata.InstallRequestDiscoveryAccounts = slices.Clone(discovery.accounts)
+		if len(discovery.accounts) > 0 {
+			metadata.InstallRequestFallbackRefreshedAt = ""
+		}
+	} else if len(unresolved) == 0 &&
+		(len(trackedRequests) > 0 || !installRequestFollowUpDiscoveryActive(*metadata, now)) {
 		metadata.InstallRequestDiscoveryUntil = ""
+		metadata.InstallRequestDiscoveryAccounts = nil
+		metadata.InstallRequestFallbackRefreshedAt = ""
 	}
-	return needsInstallationDiscovery, nil
+	return discovery, nil
 }
 
 func installRequestMayStillResolve(request common.InstallRequest, now time.Time) bool {
@@ -339,4 +360,47 @@ func listAppInstallationsFromGitHub(ctx context.Context, client *github.Client) 
 		}
 		opts.Page = response.NextPage
 	}
+}
+
+func getAppInstallationFromGitHub(ctx context.Context, client *github.Client, id int64) (*github.Installation, error) {
+	installation, _, err := client.Apps.GetInstallation(ctx, id)
+	return installation, err
+}
+
+func findAppOrganizationInstallationFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	account string,
+) (*github.Installation, error) {
+	installation, _, err := client.Apps.FindOrganizationInstallation(ctx, account)
+	return installation, err
+}
+
+func findAppUserInstallationFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	account string,
+) (*github.Installation, error) {
+	installation, _, err := client.Apps.FindUserInstallation(ctx, account)
+	return installation, err
+}
+
+func resolveInstallationIdentityFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	id int64,
+) (*github.User, error) {
+	user, _, err := client.Users.GetByID(ctx, id)
+	return user, err
+}
+
+func getRepositoryPermissionFromGitHub(
+	ctx context.Context,
+	client *github.Client,
+	owner string,
+	repository string,
+	username string,
+) (*github.RepositoryPermissionLevel, error) {
+	permission, _, err := client.Repositories.GetPermissionLevel(ctx, owner, repository, username)
+	return permission, err
 }

@@ -223,18 +223,9 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
-		discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &existing)
-		needsInstallationDiscovery := g.refreshHostedInstallRequests(ctx, app, &existing)
-		if needsInstallationDiscovery {
-			existing.InstallationsRefreshedAt = ""
-			discoveryErr = g.refreshHostedAccessibleInstallations(ctx, app, &existing)
-			if existing.HasInstallRequests() {
-				g.refreshHostedInstallRequests(ctx, app, &existing)
-			}
-		}
-		if discoveryErr != nil {
+		if err := g.refreshHostedSetup(ctx, app, &existing); err != nil {
 			g.clearHostedPendingAction(ctx, existing)
-			return discoveryErr
+			return err
 		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
@@ -260,46 +251,107 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			Slug: app.Slug,
 		},
 	}
-	discoveryErr := g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
-	needsInstallationDiscovery := g.refreshHostedInstallRequests(ctx, app, &metadata)
-	if needsInstallationDiscovery {
-		metadata.InstallationsRefreshedAt = ""
-		discoveryErr = g.refreshHostedAccessibleInstallations(ctx, app, &metadata)
-		if metadata.HasInstallRequests() {
-			g.refreshHostedInstallRequests(ctx, app, &metadata)
-		}
-	}
-	if discoveryErr != nil {
+	if err := g.refreshHostedSetup(ctx, app, &metadata); err != nil {
 		g.clearHostedPendingAction(ctx, metadata)
-		return discoveryErr
+		return err
 	}
 	g.refreshHostedPendingAction(ctx, app, metadata)
 	return nil
+}
+
+type hostedInstallRequestDiscovery struct {
+	accounts []string
+	full     bool
+}
+
+func (d hostedInstallRequestDiscovery) required() bool {
+	return d.full || len(d.accounts) > 0
+}
+
+func (g *GitHub) refreshHostedSetup(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+) error {
+	refreshHostedStarterIdentity(ctx, metadata)
+
+	discoveryPerformed := false
+	if metadata.SetupInstallationID != "" {
+		discoveryPerformed = true
+		if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
+			return err
+		}
+	}
+
+	now := time.Now().UTC()
+	requestDiscovery := g.refreshHostedInstallRequests(ctx, app, metadata)
+	if !requestDiscovery.required() && installRequestFollowUpDiscoveryActive(*metadata, now) {
+		requestDiscovery.accounts = slices.Clone(metadata.InstallRequestDiscoveryAccounts)
+		// Connections that entered follow-up discovery before account tracking
+		// was added need the legacy fallback until their short window expires.
+		requestDiscovery.full = len(requestDiscovery.accounts) == 0 &&
+			requiresHostedInstallRequestFallback(*metadata, now)
+	}
+	if requestDiscovery.required() {
+		discoveryPerformed = true
+		if err := g.refreshHostedRequestedInstallations(ctx, app, metadata, requestDiscovery); err != nil {
+			return err
+		}
+		if metadata.HasInstallRequests() {
+			g.refreshHostedInstallRequests(ctx, app, metadata)
+		}
+	}
+
+	if discoveryPerformed || metadata.HasInstallRequests() {
+		return nil
+	}
+	// A new connection has no trusted installation to refresh. Opening the
+	// GitHub setup flow gives the callback an exact installation candidate and
+	// avoids scanning every installation owned by the shared App.
+	if len(metadata.PendingInstallations) == 0 {
+		return nil
+	}
+	if err := g.refreshHostedAccessibleInstallations(ctx, app, metadata); err != nil {
+		return err
+	}
+	g.refreshHostedInstallRequests(ctx, app, metadata)
+	return nil
+}
+
+func refreshHostedStarterIdentity(ctx core.SyncContext, metadata *common.Metadata) {
+	requestContext := ctx.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
+	if err == nil {
+		metadata.StartedByGitHubLogin = identity.Login
+	}
 }
 
 func (g *GitHub) refreshHostedInstallRequests(
 	ctx core.SyncContext,
 	app common.HostedApp,
 	metadata *common.Metadata,
-) bool {
+) hostedInstallRequestDiscovery {
 	// A member can request an installation without the request callback
 	// reaching this server, so a known GitHub login is enough to ask GitHub for
 	// that member's open install requests. The first call also records the local
 	// development baseline before the browser opens GitHub.
 	if !metadata.HasInstallRequests() && strings.TrimSpace(metadata.StartedByGitHubLogin) == "" {
-		return false
+		return hostedInstallRequestDiscovery{}
 	}
 
-	needsInstallationDiscovery, err := g.reconcileInstallRequests(ctx, app, metadata)
+	discovery, err := g.reconcileInstallRequests(ctx, app, metadata)
 	if err != nil {
 		// The connection stays pending; the next sync retries.
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to reconcile GitHub App install requests: %v", err)
 		}
-		return false
+		return hostedInstallRequestDiscovery{}
 	}
 
-	return needsInstallationDiscovery
+	return discovery
 }
 
 func (g *GitHub) refreshHostedAccessibleInstallations(
@@ -308,7 +360,8 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	metadata *common.Metadata,
 ) error {
 	now := time.Now().UTC()
-	if !requiresHostedInstallationDiscovery(*metadata, now) {
+	targetID := strings.TrimSpace(metadata.SetupInstallationID)
+	if targetID == "" && !requiresHostedInstallationDiscovery(*metadata, now) {
 		return nil
 	}
 
@@ -322,22 +375,143 @@ func (g *GitHub) refreshHostedAccessibleInstallations(
 	}
 	metadata.StartedByGitHubLogin = identity.Login
 
-	installations, err := discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
+	mode := "full"
+	candidateCount := -1
+	var installations []common.PendingInstallation
+	if targetID != "" {
+		mode = "callback"
+		candidateCount = 1
+		installations, err = discoverAccessibleInstallationByID(
+			requestContext,
+			ctx.Integration,
+			app,
+			*identity,
+			targetID,
+			nil,
+		)
+	} else {
+		installations, err = discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
+	}
+	logHostedDiscovery(ctx, mode, candidateCount, len(installations), err, now)
 	if err != nil {
 		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
+		if targetID != "" && githubErrorIsNotFound(err) {
+			metadata.SetupInstallationID = ""
+			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+			return nil
+		}
 		if ctx.Logger != nil {
 			ctx.Logger.Errorf("failed to discover accessible GitHub App installations: %v", err)
 		}
-		if len(metadata.PendingInstallations) == 0 {
+		if targetID != "" || len(metadata.PendingInstallations) == 0 {
 			metadata.InstallationsRefreshedAt = ""
 			return fmt.Errorf("failed to discover GitHub App installations: %w", err)
 		}
 		metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 		return nil
 	}
-	metadata.SetPendingInstallations(installations)
+	if targetID != "" {
+		if len(installations) == 0 {
+			metadata.SetupInstallationID = ""
+			metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
+			return nil
+		}
+		metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
+		metadata.SetupInstallationID = ""
+	} else {
+		metadata.SetPendingInstallations(installations)
+	}
 	metadata.InstallationsRefreshedAt = now.Format(time.RFC3339Nano)
 	return nil
+}
+
+func (g *GitHub) refreshHostedRequestedInstallations(
+	ctx core.SyncContext,
+	app common.HostedApp,
+	metadata *common.Metadata,
+	discovery hostedInstallRequestDiscovery,
+) error {
+	requestContext := ctx.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	identity, err := hostedGitHubDiscoveryIdentity(requestContext, ctx.OrganizationID, metadata.StartedByUserID)
+	if err != nil {
+		return nil
+	}
+	metadata.StartedByGitHubLogin = identity.Login
+
+	startedAt := time.Now().UTC()
+	mode := "approval"
+	candidateCount := len(discovery.accounts)
+	var installations []common.PendingInstallation
+	if discovery.full {
+		mode = "approval_fallback"
+		candidateCount = -1
+		installations, err = discoverAccessibleInstallations(requestContext, ctx.Integration, app, *identity)
+	} else {
+		installations, err = discoverAccessibleInstallationsByAccount(
+			requestContext,
+			ctx.Integration,
+			app,
+			*identity,
+			discovery.accounts,
+		)
+	}
+	logHostedDiscovery(ctx, mode, candidateCount, len(installations), err, startedAt)
+	metadata.SetPendingInstallations(mergeVerifiedInstallations(installations, metadata.PendingInstallations))
+	if err != nil {
+		return fmt.Errorf("failed to discover requested GitHub App installations: %w", err)
+	}
+	if discovery.full {
+		metadata.InstallationsRefreshedAt = startedAt.Format(time.RFC3339Nano)
+		metadata.InstallRequestFallbackRefreshedAt = startedAt.Format(time.RFC3339Nano)
+	}
+	if !metadata.HasInstallRequests() && requestedAccountsAreVerified(metadata.PendingInstallations, discovery.accounts) {
+		metadata.InstallRequestDiscoveryUntil = ""
+		metadata.InstallRequestDiscoveryAccounts = nil
+		metadata.InstallRequestFallbackRefreshedAt = ""
+	}
+	return nil
+}
+
+func requestedAccountsAreVerified(installations []common.PendingInstallation, accounts []string) bool {
+	if len(accounts) == 0 {
+		return false
+	}
+	for _, account := range accounts {
+		if !slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
+			return strings.EqualFold(account, installation.AccountLogin) && len(installation.Repositories) > 0
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
+func logHostedDiscovery(
+	ctx core.SyncContext,
+	mode string,
+	candidateCount int,
+	verifiedCount int,
+	err error,
+	startedAt time.Time,
+) {
+	if ctx.Logger == nil {
+		return
+	}
+	entry := ctx.Logger.
+		WithField("discovery_mode", mode).
+		WithField("verified_count", verifiedCount).
+		WithField("duration", time.Since(startedAt))
+	if candidateCount >= 0 {
+		entry = entry.WithField("candidate_count", candidateCount)
+	}
+	if err != nil {
+		entry.WithError(err).Warn("GitHub App installation discovery completed with failures")
+		return
+	}
+	entry.Info("GitHub App installation discovery completed")
 }
 
 func mergeVerifiedInstallations(refreshed, existing []common.PendingInstallation) []common.PendingInstallation {
@@ -368,6 +542,14 @@ func requiresHostedInstallationDiscovery(metadata common.Metadata, now time.Time
 func installRequestFollowUpDiscoveryActive(metadata common.Metadata, now time.Time) bool {
 	discoverUntil, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestDiscoveryUntil)
 	return err == nil && now.Before(discoverUntil)
+}
+
+func requiresHostedInstallRequestFallback(metadata common.Metadata, now time.Time) bool {
+	refreshedAt, err := time.Parse(time.RFC3339Nano, metadata.InstallRequestFallbackRefreshedAt)
+	if err != nil {
+		return true
+	}
+	return !now.Before(refreshedAt.Add(hostedInstallationDiscoveryInterval))
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
@@ -1062,6 +1244,16 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 			redirectToIntegrationSettingsRequested(ctx)
 			return
 		}
+		if !isPendingInstallationSetupAction(setupAction) {
+			http.Error(ctx.Response, "invalid setup action", http.StatusBadRequest)
+			return
+		}
+		parsedInstallationID, err := strconv.ParseInt(installationID, 10, 64)
+		if err != nil || parsedInstallationID <= 0 {
+			http.Error(ctx.Response, "invalid installation ID", http.StatusBadRequest)
+			return
+		}
+		metadata.SetupInstallationID = installationID
 		metadata.InstallationsRefreshedAt = ""
 		ctx.Integration.SetMetadata(metadata)
 		redirectToIntegrationSettingsCompleted(ctx)
