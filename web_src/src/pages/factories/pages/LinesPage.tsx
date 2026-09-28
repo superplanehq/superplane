@@ -299,6 +299,7 @@ export function LinesPage() {
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -325,7 +326,7 @@ export function LinesPage() {
   } = useFactoryBoardWorkOrders(
     organizationId,
     factoryId,
-    boardWorkOrdersPageOptions(listState, routeLineId, currentUserId),
+    boardWorkOrdersPageOptions(listState, routeLineId ?? boardLineId ?? undefined, currentUserId),
   );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
@@ -400,7 +401,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
   const selectedLineId =
     routeLineId ??

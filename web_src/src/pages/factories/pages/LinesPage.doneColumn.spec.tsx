@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { WORKSPACE_LOADING_TEST_ID } from "@/lib/workspaceLoadingCopy";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -21,6 +23,7 @@ import {
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { BOARD_DONE_REJECTED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -28,13 +31,19 @@ import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) => ({
-  workOrders: useFactoryWorkOrders().data ?? [],
-  isLoading: false,
-  backlog: idleBoardPage(),
-  open: idleBoardPage(),
-  done: idleBoardPage(),
-}));
+function boardPageResult(isLoading = false, workOrders: FactoriesWorkOrder[] = []) {
+  return {
+    workOrders,
+    isLoading,
+    isPlaceholderData: false,
+    backlog: idleBoardPage(),
+    open: idleBoardPage(),
+    done: idleBoardPage(),
+  };
+}
+const useFactoryBoardWorkOrders = vi.fn((..._args: unknown[]) =>
+  boardPageResult(false, useFactoryWorkOrders().data ?? []),
+);
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
@@ -115,6 +124,15 @@ vi.mock("@/hooks/useCanvasData", () => {
   };
 });
 
+function OpenTaskRouteButton({ href }: { href: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" data-testid="open-task-route" onClick={() => navigate(href)}>
+      Open task
+    </button>
+  );
+}
+
 function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
@@ -146,6 +164,9 @@ describe("LinesPage Done column", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
+    useFactoryBoardWorkOrders.mockImplementation((..._args: unknown[]) =>
+      boardPageResult(false, useFactoryWorkOrders().data ?? []),
+    );
   });
 
   it("always shows a Done column after the line stages", () => {
@@ -306,5 +327,58 @@ describe("LinesPage Done column", () => {
 
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Done line and the board when a card opens for the first time", async () => {
+    const user = userEvent.setup();
+    const taskHref = workOrderDetailPath("org-1", PRIMARY_FACTORY_KEY, "101", REFUND_LINE_PLAN_ID);
+    useFactoryBoardWorkOrders.mockImplementation((...args: unknown[]) => {
+      const options = args[2] as { done?: { lineId?: string } } | undefined;
+      return boardPageResult(!options?.done?.lineId, useFactoryWorkOrders().data ?? []);
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
+              <FactoriesLayoutContext.Provider
+                value={{
+                  organizationId: "org-1",
+                  factoryId: PRIMARY_FACTORY_ID,
+                  factoryKey: PRIMARY_FACTORY_KEY,
+                  factory: REFUND_FACTORY,
+                  factories: [REFUND_FACTORY],
+                  openCreateWorkOrder: vi.fn(),
+                }}
+              >
+                <Routes>
+                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
+                </Routes>
+                <OpenTaskRouteButton href={taskHref} />
+              </FactoriesLayoutContext.Provider>
+            </MemoryRouter>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("open-task-route"));
+
+    expect(useFactoryBoardWorkOrders).toHaveBeenLastCalledWith(
+      "org-1",
+      PRIMARY_FACTORY_ID,
+      expect.objectContaining({
+        done: {
+          lineId: REFUND_LINE_PLAN_ID,
+          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+        },
+      }),
+    );
+    expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
   });
 });
