@@ -127,11 +127,19 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft tasks. A draft that already ran on a line still belongs
- * here. Newest updated drafts come first.
+ * Draft tasks. A draft that already ran on a line still belongs here.
+ * The default order is newest update first. Pass preserveOrder when the
+ * server already ordered the column.
  */
-export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+export function collectLineBacklogOrders(
+  workOrders: FactoriesWorkOrder[],
+  options?: { preserveOrder?: boolean },
+): FactoriesWorkOrder[] {
+  const drafts = workOrders.filter(isLineBacklogOrder);
+  if (options?.preserveOrder) {
+    return drafts;
+  }
+  return drafts.sort(compareOrdersNewestFirst);
 }
 
 /**

@@ -464,6 +464,28 @@ describe("collectLineBacklogOrders", () => {
     expect(backlog.map((entry) => entry.id)).toEqual(["wo-returned", "wo-draft"]);
   });
 
+  it("keeps the server order when the column sort is not newest update", () => {
+    const older: FactoriesWorkOrder = {
+      id: "wo-older",
+      title: "Older",
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T10:00:00.000Z",
+      lineDispatches: [],
+    };
+    const newer: FactoriesWorkOrder = {
+      id: "wo-newer",
+      title: "Newer",
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T16:00:00.000Z",
+      lineDispatches: [],
+    };
+
+    expect(collectLineBacklogOrders([older, newer], { preserveOrder: true }).map((entry) => entry.id)).toEqual([
+      "wo-older",
+      "wo-newer",
+    ]);
+  });
+
   it("keeps a returned draft off the Plan column", () => {
     const returned: FactoriesWorkOrder = {
       ...order("wo-returned", "Returned", [

@@ -1031,7 +1031,13 @@ function LineDetail({
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
-  const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
+  const backlogOrders = useMemo(
+    () =>
+      collectLineBacklogOrders(workOrders ?? [], {
+        preserveOrder: backlogColumnQuery.sort !== "updated" || backlogColumnQuery.sortDirection !== "desc",
+      }),
+    [backlogColumnQuery.sort, backlogColumnQuery.sortDirection, workOrders],
+  );
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
     [workOrders, line, fullBoard],
