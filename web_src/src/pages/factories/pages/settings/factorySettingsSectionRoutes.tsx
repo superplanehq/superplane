@@ -2,7 +2,12 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -95,7 +100,7 @@ export const factorySettingsSectionRoutes = [
     path="workspace/mcp"
     element={
       <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
+        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_SUPERPLANE_MCP_SERVER]}>
           <FactorySettingsMCPPage />
         </RequireExperimentalFeature>
       </RequirePermission>

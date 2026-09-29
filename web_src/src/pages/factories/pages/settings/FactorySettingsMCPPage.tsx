@@ -12,6 +12,8 @@ import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettings
 import { MCPAddPicker } from "./MCPAddPicker";
 import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
+import { SuperPlaneMCPServerSection } from "./SuperPlaneMCPServerSection";
+import { SUPERPLANE_MCP_SERVER_COPY } from "./superplaneMCPServerCopy";
 import { useMCPPage } from "./useMCPPage";
 
 export function FactorySettingsMCPPage() {
@@ -22,63 +24,43 @@ export function FactorySettingsMCPPage() {
     <FactorySettingsPageFrame
       title={AGENT_RESOURCES_COPY.mcpTitle}
       subtitle={
-        <span className="flex flex-col gap-1">
-          <span>{AGENT_RESOURCES_COPY.mcpHelper}</span>
-          <span>{AGENT_RESOURCES_COPY.refinementNote}</span>
-        </span>
+        page.showAgentMCP ? (
+          <span className="flex flex-col gap-1">
+            <span>{AGENT_RESOURCES_COPY.mcpHelper}</span>
+            <span>{AGENT_RESOURCES_COPY.refinementNote}</span>
+          </span>
+        ) : (
+          SUPERPLANE_MCP_SERVER_COPY.helper
+        )
       }
       wide
       actions={
-        <PermissionTooltip allowed={page.canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
-          <Button
-            type="button"
-            onClick={() => page.setAddPickerOpen(true)}
-            disabled={!page.canUpdate}
-            data-testid="agent-resources-add-connection"
-          >
-            {AGENT_RESOURCES_COPY.addConnection}
-          </Button>
-        </PermissionTooltip>
+        page.showAgentMCP ? (
+          <PermissionTooltip allowed={page.canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
+            <Button
+              type="button"
+              onClick={() => page.setAddPickerOpen(true)}
+              disabled={!page.canUpdate}
+              data-testid="agent-resources-add-connection"
+            >
+              {AGENT_RESOURCES_COPY.addConnection}
+            </Button>
+          </PermissionTooltip>
+        ) : undefined
       }
     >
-      <div data-testid="factory-settings-mcp">
-        {page.connections.isLoading ? (
-          <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.loading}</p>
-        ) : page.connections.isError ? (
-          <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.loadError}</p>
-        ) : (page.connections.data ?? []).length === 0 ? (
-          <FactorySettingsCard data-testid="agent-resources-connections-empty">
-            <Empty className="border-0 p-6 md:p-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Plug />
-                </EmptyMedia>
-                <EmptyTitle>{AGENT_RESOURCES_COPY.emptyConnectionsTitle}</EmptyTitle>
-                <EmptyDescription>{AGENT_RESOURCES_COPY.emptyConnectionsBody}</EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <PermissionTooltip allowed={page.canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
-                  <Button type="button" onClick={() => page.setAddPickerOpen(true)} disabled={!page.canUpdate}>
-                    {AGENT_RESOURCES_COPY.addConnection}
-                  </Button>
-                </PermissionTooltip>
-              </EmptyContent>
-            </Empty>
-          </FactorySettingsCard>
-        ) : (
-          <MCPServerList
+      <div className="flex flex-col gap-5" data-testid="factory-settings-mcp">
+        {page.showAgentMCP ? <WorkspaceMCPServers page={page} /> : null}
+        {page.showSuperPlaneMCP ? (
+          <SuperPlaneMCPServerSection
             organizationId={page.organizationId}
             factoryId={page.factoryId}
-            resources={page.connections.data ?? []}
+            clients={page.mcpClients.data ?? []}
+            isLoading={page.mcpClients.isLoading}
+            isError={page.mcpClients.isError}
             canUpdate={page.canUpdate}
-            onEdit={page.setEditResource}
-            onDelete={page.setPendingDelete}
-            onDisconnect={page.disconnectResource}
-            onToggleEnabled={page.toggleEnabled}
-            onToggleTools={page.toggleTools}
-            onConnect={(resource) => void page.startOAuthRedirect(resource)}
           />
-        )}
+        ) : null}
       </div>
       <MCPAddPicker
         open={page.addPickerOpen}
@@ -113,5 +95,53 @@ export function FactorySettingsMCPPage() {
         onConfirm={page.confirmDelete}
       />
     </FactorySettingsPageFrame>
+  );
+}
+
+function WorkspaceMCPServers({ page }: { page: ReturnType<typeof useMCPPage> }) {
+  if (page.connections.isLoading) {
+    return <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.loading}</p>;
+  }
+  if (page.connections.isError) {
+    return <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.loadError}</p>;
+  }
+  if ((page.connections.data ?? []).length === 0) {
+    return (
+      <FactorySettingsCard data-testid="agent-resources-connections-empty">
+        <Empty className="border-0 p-6 md:p-10">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Plug />
+            </EmptyMedia>
+            <EmptyTitle>{AGENT_RESOURCES_COPY.emptyConnectionsTitle}</EmptyTitle>
+            <EmptyDescription>{AGENT_RESOURCES_COPY.emptyConnectionsBody}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <PermissionTooltip allowed={page.canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
+              <Button type="button" onClick={() => page.setAddPickerOpen(true)} disabled={!page.canUpdate}>
+                {AGENT_RESOURCES_COPY.addConnection}
+              </Button>
+            </PermissionTooltip>
+          </EmptyContent>
+        </Empty>
+      </FactorySettingsCard>
+    );
+  }
+
+  return (
+    <FactorySettingsCard>
+      <MCPServerList
+        organizationId={page.organizationId}
+        factoryId={page.factoryId}
+        resources={page.connections.data ?? []}
+        canUpdate={page.canUpdate}
+        onEdit={page.setEditResource}
+        onDelete={page.setPendingDelete}
+        onDisconnect={page.disconnectResource}
+        onToggleEnabled={page.toggleEnabled}
+        onToggleTools={page.toggleTools}
+        onConnect={(resource) => void page.startOAuthRedirect(resource)}
+      />
+    </FactorySettingsCard>
   );
 }

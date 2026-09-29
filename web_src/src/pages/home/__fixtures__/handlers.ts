@@ -176,6 +176,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Workspace Skills",
               description: "Add skills for workspace agents",
             },
+            {
+              id: "superplane_mcp_server",
+              label: "SuperPlane MCP Server",
+              description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
+            },
           ],
         },
       }),

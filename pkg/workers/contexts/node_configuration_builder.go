@@ -1269,6 +1269,9 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 	if err != nil {
 		return fmt.Errorf("order() could not mint a file URL: %w", err)
 	}
+	// Local runner containers cannot fetch localhost file URLs. A remote
+	// broker skips this rewrite; public hosts stay unchanged.
+	_, files = runner.RewriteLoopbackTaskFileURLs("", files)
 
 	filePayloads := make([]any, 0, len(files))
 	for _, file := range files {
