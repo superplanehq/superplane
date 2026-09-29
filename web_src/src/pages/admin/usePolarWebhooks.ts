@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   groupPolarWebhookEvents,
   knownDeliveryIdsForEvent,
+  mismatchedPolarWebhookEndpoints,
   POLAR_WEBHOOK_ALL_VALUE,
   POLAR_WEBHOOK_POLL_INTERVAL_MS,
   polarWebhookListQuery,
@@ -13,6 +14,7 @@ import {
   visiblePolarWebhookEvents,
   type PendingPolarRedeliver,
   type PolarWebhookDelivery,
+  type PolarWebhookEndpointsResponse,
   type PolarWebhooksResponse,
   type PolarWebhookStatusFilter,
 } from "./polarWebhookDeliveries";
@@ -93,6 +95,33 @@ async function fetchPolarWebhooksPage(
     throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook deliveries."));
   }
   return response.json();
+}
+
+async function fetchPolarWebhookEndpoints(signal: AbortSignal): Promise<PolarWebhookEndpointsResponse> {
+  const response = await fetch("/admin/api/polar/webhooks/endpoints", { credentials: "include", signal });
+  if (!response.ok) {
+    throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook endpoints."));
+  }
+  return response.json();
+}
+
+function usePolarWebhookEndpoints(configured: boolean | null) {
+  const [endpoints, setEndpoints] = useState<PolarWebhookEndpointsResponse | null>(null);
+
+  useEffect(() => {
+    if (configured !== true) {
+      return;
+    }
+    const controller = new AbortController();
+    fetchPolarWebhookEndpoints(controller.signal)
+      .then(setEndpoints)
+      .catch(() => {
+        // The drift check is advisory. The deliveries list already reports Polar errors.
+      });
+    return () => controller.abort();
+  }, [configured]);
+
+  return endpoints;
 }
 
 function usePolarWebhookList() {
@@ -186,6 +215,8 @@ function usePolarWebhookList() {
 
 export function usePolarWebhooks() {
   const list = usePolarWebhookList();
+  const endpoints = usePolarWebhookEndpoints(list.configured);
+  const mismatchedEndpoints = useMemo(() => mismatchedPolarWebhookEndpoints(endpoints), [endpoints]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const eventGroups = useMemo(
     () => visiblePolarWebhookEvents(groupPolarWebhookEvents(list.items), list.statusFilter),
@@ -254,5 +285,7 @@ export function usePolarWebhooks() {
     failedEventIds,
     handleRedeliver,
     handleRedeliverFailed,
+    pinnedApiVersion: endpoints?.api_version ?? "",
+    mismatchedEndpoints,
   };
 }

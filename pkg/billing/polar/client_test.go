@@ -264,7 +264,7 @@ func Test__CreateCustomerPostsTeamOwnerWithoutEmail(t *testing.T) {
 
 func Test__EnsureCustomerUsesExistingAfterConflict(t *testing.T) {
 	created := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
 			if !created {
@@ -297,7 +297,7 @@ func Test__EnsureCustomerUsesExistingAfterConflict(t *testing.T) {
 
 func Test__EnsureCustomerReusesCustomerAfterUniqueness422(t *testing.T) {
 	created := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
 			if !created {
@@ -327,7 +327,7 @@ func Test__EnsureCustomerReusesCustomerAfterUniqueness422(t *testing.T) {
 }
 
 func Test__EnsureCustomerDoesNotTreatValidationAsConflict(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
 			http.Error(w, "missing", http.StatusNotFound)
@@ -582,4 +582,110 @@ func Test__APIBaseURLUsesSandboxByDefault(t *testing.T) {
 	assert.Equal(t, productionAPIBaseURL, APIBaseURL())
 	t.Setenv("POLAR_API_BASE_URL", "http://polar.example/v1/")
 	assert.Equal(t, "http://polar.example/v1", APIBaseURL())
+}
+
+func Test__APIVersionUsesPinnedVersionUnlessOverridden(t *testing.T) {
+	t.Setenv("POLAR_API_VERSION", "")
+	assert.Equal(t, defaultAPIVersion, APIVersion())
+	t.Setenv("POLAR_API_VERSION", " 2027-01 ")
+	assert.Equal(t, "2027-01", APIVersion())
+}
+
+func Test__RequestsSendPinnedAPIVersion(t *testing.T) {
+	t.Setenv("POLAR_API_VERSION", "")
+	var received []string
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
+		received = append(received, r.Header.Get("Polar-Version"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":          "cust_1",
+			"external_id": "org-1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCustomerByExternalID(context.Background(), "org-1")
+	require.NoError(t, err)
+	_, err = client.CreateCustomer(context.Background(), CreateCustomerInput{ExternalID: "org-1"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{defaultAPIVersion, defaultAPIVersion}, received)
+}
+
+func Test__RequestsSendOverriddenAPIVersion(t *testing.T) {
+	t.Setenv("POLAR_API_VERSION", "2027-01")
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "2027-01", r.Header.Get("Polar-Version"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "cust_1"}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCustomerByExternalID(context.Background(), "org-1")
+	require.NoError(t, err)
+}
+
+func Test__NotFoundWithoutVersionHeaderReportsUnsupportedAPIVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"detail":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCustomerByExternalID(context.Background(), "org-1")
+	require.Error(t, err)
+	assert.True(t, IsUnsupportedAPIVersion(err))
+	assert.False(t, IsNotFound(err))
+	assert.Contains(t, err.Error(), APIVersion())
+}
+
+func Test__NotFoundWithVersionHeaderReportsNotFound(t *testing.T) {
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"detail":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCustomerByExternalID(context.Background(), "org-1")
+	require.Error(t, err)
+	assert.True(t, IsNotFound(err))
+	assert.False(t, IsUnsupportedAPIVersion(err))
+}
+
+func Test__EnsureCustomerDoesNotCreateWhenAPIVersionIsUnsupported(t *testing.T) {
+	created := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			created = true
+		}
+		http.Error(w, `{"detail":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.EnsureCustomer(context.Background(), CreateCustomerInput{ExternalID: "org-1"})
+	require.Error(t, err)
+	assert.True(t, IsUnsupportedAPIVersion(err))
+	assert.False(t, created)
+}
+
+func Test__GetCreditPackReportsUnsupportedAPIVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"detail":"Not Found"}`, http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.GetCreditPack(context.Background(), "prod_1")
+	require.Error(t, err)
+	assert.True(t, IsUnsupportedAPIVersion(err))
+	assert.False(t, IsNotFound(err))
+}
+
+// echoPolarVersion mirrors real Polar, which echoes Polar-Version on every
+// response for a supported version.
+func echoPolarVersion(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Polar-Version", r.Header.Get("Polar-Version"))
+		handler(w, r)
+	}
 }
