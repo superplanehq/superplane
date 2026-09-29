@@ -35,7 +35,7 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
 }));
 
-function renderPage() {
+function renderPage(factory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
@@ -43,8 +43,8 @@ function renderPage() {
           <FactorySettingsLayoutContext.Provider
             value={{
               organizationId: "org-1",
-              factoryId: REFUND_FACTORY.id ?? "factory-1",
-              factory: REFUND_FACTORY,
+              factoryId: factory.id ?? "factory-1",
+              factory,
             }}
           >
             <FactorySettingsGeneralPage />
@@ -54,6 +54,13 @@ function renderPage() {
     </QueryClientProvider>,
   );
 }
+
+const badgeOnFactory = {
+  ...REFUND_FACTORY,
+  publicBadgeEnabled: true,
+  publicBadgeShowCost: false,
+  publicBadgeToken: "badge-token",
+};
 
 describe("FactorySettingsGeneralPage", () => {
   beforeEach(() => {
@@ -89,5 +96,57 @@ describe("FactorySettingsGeneralPage", () => {
     await user.click(save);
     expect(mutateAsync).toHaveBeenCalledWith({ name: "Refunds" });
     expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty("description");
+  });
+
+  it("shows the public badge toggle and saves it", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole("switch", { name: "Public badge" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Show cost per merged PR" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Public badge" }));
+    expect(mutateAsync).toHaveBeenCalledWith({ publicBadgeEnabled: true });
+  });
+
+  it("shows the cost switch only when the badge is on and keeps the snippet stable", async () => {
+    const user = userEvent.setup();
+    mutateAsync.mockResolvedValue({ publicBadgeToken: "badge-token" });
+    renderPage(badgeOnFactory);
+
+    const cost = screen.getByRole("switch", { name: "Show cost per merged PR" });
+    expect(cost).not.toBeChecked();
+
+    const snippet = screen.getByTestId("factory-settings-public-badge-markdown");
+    expect(snippet).toHaveValue(
+      `[![PRs via SuperPlane](${window.location.origin}/api/v1/public/badges/badge-token.svg?period=30&size=small)](${window.location.origin})`,
+    );
+
+    await user.click(screen.getByTestId("factory-settings-public-badge-period"));
+    await user.click(screen.getByRole("option", { name: "14 days" }));
+    expect(snippet).toHaveValue(
+      `[![PRs via SuperPlane](${window.location.origin}/api/v1/public/badges/badge-token.svg?period=14&size=small)](${window.location.origin})`,
+    );
+
+    await user.click(screen.getByTestId("factory-settings-public-badge-size"));
+    await user.click(screen.getByRole("option", { name: "Full width" }));
+    const afterSize = (snippet as HTMLInputElement).value;
+    expect(afterSize).toContain("period=14&size=wide");
+
+    await user.click(cost);
+    expect(mutateAsync).toHaveBeenCalledWith({ publicBadgeShowCost: true });
+    expect(snippet).toHaveValue(afterSize);
+  });
+
+  it("disables badge controls without update permission", () => {
+    canUpdate = false;
+    renderPage(badgeOnFactory);
+
+    expect(screen.getByRole("switch", { name: "Public badge" })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "Show cost per merged PR" })).toBeDisabled();
+    expect(screen.getByTestId("factory-settings-public-badge-period")).toBeDisabled();
+    expect(screen.getByTestId("factory-settings-public-badge-size")).toBeDisabled();
+    expect(screen.getByTestId("factory-settings-public-badge-copy")).toBeDisabled();
+    expect(screen.getByTestId("factory-settings-public-badge-markdown")).toBeDisabled();
   });
 });

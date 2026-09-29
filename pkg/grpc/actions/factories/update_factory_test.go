@@ -146,4 +146,55 @@ func Test__UpdateFactory(t *testing.T) {
 			SetupCompleted: true,
 		}, reloaded.Planning())
 	})
+
+	t.Run("public badge defaults cost off and keeps the token", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		assert.False(t, factory.PublicBadgeEnabled)
+		assert.False(t, factory.PublicBadgeShowCost)
+		assert.Nil(t, factory.PublicBadgeToken)
+
+		enabled := true
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                 factory.ID.String(),
+			PublicBadgeEnabled: &enabled,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, response.Factory.PublicBadgeToken)
+		assert.True(t, response.Factory.PublicBadgeEnabled)
+		assert.False(t, response.Factory.PublicBadgeShowCost)
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		token := *reloaded.PublicBadgeToken
+		assert.GreaterOrEqual(t, len(token), 22)
+
+		disabled := false
+		response, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                 factory.ID.String(),
+			PublicBadgeEnabled: &disabled,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.Factory.PublicBadgeEnabled)
+		assert.Equal(t, token, response.Factory.PublicBadgeToken)
+		assert.False(t, response.Factory.PublicBadgeShowCost)
+
+		showCost := true
+		response, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                  factory.ID.String(),
+			PublicBadgeShowCost: &showCost,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.Factory.PublicBadgeEnabled)
+		assert.True(t, response.Factory.PublicBadgeShowCost)
+		assert.Equal(t, token, response.Factory.PublicBadgeToken)
+
+		reloaded, err = models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.False(t, reloaded.PublicBadgeEnabled)
+		assert.True(t, reloaded.PublicBadgeShowCost)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		assert.Equal(t, token, *reloaded.PublicBadgeToken)
+	})
 }

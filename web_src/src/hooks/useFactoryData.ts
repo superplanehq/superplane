@@ -441,6 +441,8 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       key?: string;
       hostedSpendBudgetCents?: number | null;
       planning?: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean };
+      publicBadgeEnabled?: boolean;
+      publicBadgeShowCost?: boolean;
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -456,6 +458,8 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
                 : String(input.hostedSpendBudgetCents),
             clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
             planning: input.planning,
+            ...(input.publicBadgeEnabled !== undefined ? { publicBadgeEnabled: input.publicBadgeEnabled } : {}),
+            ...(input.publicBadgeShowCost !== undefined ? { publicBadgeShowCost: input.publicBadgeShowCost } : {}),
           },
         }),
       );

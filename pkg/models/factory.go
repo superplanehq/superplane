@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
@@ -50,6 +52,9 @@ type Factory struct {
 	PlanningClarity        bool
 	PlanningConfidence     bool
 	PlanningSetupCompleted bool
+	PublicBadgeEnabled     bool
+	PublicBadgeShowCost    bool
+	PublicBadgeToken       *string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
@@ -252,6 +257,25 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	return &factory, nil
 }
 
+// FindFactoryByPublicBadgeToken loads the workspace that owns a public badge
+// link. An empty token is not a match. Soft-deleted workspaces are excluded.
+func FindFactoryByPublicBadgeToken(tx *gorm.DB, token string) (*Factory, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, ErrFactoryNotFound
+	}
+
+	var factory Factory
+	err := tx.Where("public_badge_token = ?", token).First(&factory).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+	return &factory, nil
+}
+
 func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
 	normalized := NormalizeFactoryKey(key)
 	if err := ValidateFactoryKey(normalized); err != nil {
@@ -432,6 +456,65 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningSetupCompleted = planning.SetupCompleted
 	f.UpdatedAt = now
 	return nil
+}
+
+// UpdatePublicBadgeEnabled turns the public badge on or off. The first time
+// it is turned on, a random URL-safe token is stored. Later toggles keep that
+// token so an existing README link works again.
+func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
+	now := time.Now()
+	updates := map[string]any{
+		"public_badge_enabled": enabled,
+		"updated_at":           now,
+	}
+	columns := []string{"public_badge_enabled", "updated_at"}
+	if enabled && (f.PublicBadgeToken == nil || *f.PublicBadgeToken == "") {
+		token, err := newPublicBadgeToken()
+		if err != nil {
+			return err
+		}
+		updates["public_badge_token"] = token
+		columns = append(columns, "public_badge_token")
+		f.PublicBadgeToken = &token
+	}
+
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select(columns).
+		Updates(updates).Error
+	if err != nil {
+		return err
+	}
+	f.PublicBadgeEnabled = enabled
+	f.UpdatedAt = now
+	return nil
+}
+
+// UpdatePublicBadgeShowCost stores the cost switch on its own. Turning the
+// badge off does not clear this value.
+func (f *Factory) UpdatePublicBadgeShowCost(tx *gorm.DB, showCost bool) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public_badge_show_cost", "updated_at").
+		Updates(map[string]any{
+			"public_badge_show_cost": showCost,
+			"updated_at":             now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PublicBadgeShowCost = showCost
+	f.UpdatedAt = now
+	return nil
+}
+
+func newPublicBadgeToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
