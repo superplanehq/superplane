@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -60,13 +61,87 @@ func Test__NormalizePullRequestChecks(t *testing.T) {
 	assert.Equal(t, "check-run:dco:DCO", checks[0].Key)
 	assert.Equal(t, "failure", checks[0].Conclusion)
 	assert.Equal(t, "DCO required", checks[0].Description)
-	assert.Equal(t, "The DCO check failed.", checks[0].Summary)
+	assert.Equal(t, "\n\nThe DCO check failed.\nSee the log.", checks[0].Summary)
 	assert.Equal(t, "check-run:github-actions:lint", checks[1].Key)
 	assert.Equal(t, checkStatusPending, checks[1].Status)
 	assert.Equal(t, "status:ci/semaphore", checks[2].Key)
 	assert.Equal(t, "success", checks[2].Conclusion)
 	assert.Equal(t, "CI", checks[2].Summary)
 	assert.Equal(t, "https://example.com/ci-later", checks[2].DetailsURL)
+}
+
+func Test__NormalizePullRequestChecks_KeepsCheckRunHTMLBody(t *testing.T) {
+	t.Parallel()
+
+	previewTable := strings.Join([]string{
+		"<table>",
+		"<tr><td><strong>Preview URL:</strong></td>",
+		`<td><a href="https://preview.pages.dev">Visit Preview</a></td></tr>`,
+		"</table>",
+	}, "\n")
+	details := "Last deploy finished in 12s."
+
+	checks := normalizePullRequestChecks(&github.ListCheckRunsResults{
+		CheckRuns: []*github.CheckRun{
+			{
+				Name:       github.Ptr("Cloudflare Pages"),
+				Status:     github.Ptr("completed"),
+				Conclusion: github.Ptr("success"),
+				DetailsURL: github.Ptr("https://example.com/pages"),
+				App:        &github.App{Slug: github.Ptr("cloudflare-pages")},
+				Output: &github.CheckRunOutput{
+					Title:   github.Ptr("Deploy successful"),
+					Summary: github.Ptr(previewTable),
+					Text:    github.Ptr(details),
+				},
+			},
+		},
+	}, nil)
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "success", checks[0].Conclusion)
+	assert.Equal(t, "Deploy successful", checks[0].Description)
+	assert.Equal(t, "\n\n"+previewTable+"\n\n"+details, checks[0].Summary)
+	assert.Contains(t, checks[0].Summary, "https://preview.pages.dev")
+}
+
+func Test__NormalizePullRequestChecks_SkipsDuplicateCheckRunText(t *testing.T) {
+	t.Parallel()
+
+	body := "<p>Deploy successful.</p>"
+	checks := normalizePullRequestChecks(&github.ListCheckRunsResults{
+		CheckRuns: []*github.CheckRun{
+			{
+				Name:   github.Ptr("Cloudflare Pages"),
+				Status: github.Ptr("completed"),
+				App:    &github.App{Slug: github.Ptr("cloudflare-pages")},
+				Output: &github.CheckRunOutput{
+					Summary: github.Ptr(body),
+					Text:    github.Ptr(body),
+				},
+			},
+		},
+	}, nil)
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "\n\n"+body, checks[0].Summary)
+}
+
+func Test__NormalizePullRequestChecks_LeavesCommitStatusDescription(t *testing.T) {
+	t.Parallel()
+
+	checks := normalizePullRequestChecks(nil, &github.CombinedStatus{
+		Statuses: []*github.RepoStatus{
+			{
+				Context:     github.Ptr("ci/semaphore"),
+				State:       github.Ptr("success"),
+				Description: github.Ptr("CI passed"),
+			},
+		},
+	})
+
+	require.Len(t, checks, 1)
+	assert.Equal(t, "CI passed", checks[0].Summary)
 }
 
 func Test__EvaluatePullRequestChecks(t *testing.T) {

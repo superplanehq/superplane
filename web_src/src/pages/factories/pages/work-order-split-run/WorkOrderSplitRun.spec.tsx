@@ -451,6 +451,51 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(verify).getByRole("button", { name: "View 2 runs" })).toBeInTheDocument();
   });
 
+  it("renders HTML preview links from a finished check activity", async () => {
+    const user = userEvent.setup();
+    const previewHref = "https://preview.pages.dev";
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-checks",
+            handlerName: "Fix pull request checks",
+            title: "Checks passed on [abc1234](https://github.com/acme/app/commit/abc1234)",
+            description: [
+              "· [Cloudflare Pages](https://github.com/acme/app/runs/1)",
+              "",
+              "<table><tbody><tr><td><strong>Preview URL:</strong></td>",
+              `<td><a href="${previewHref}">Visit Preview</a></td></tr></tbody></table>`,
+            ].join("\n"),
+            pullRequest: {
+              id: "pr-12",
+              number: "12",
+              title: "feat: add endpoint to re-shuffle an existing deck",
+              url: "https://github.com/example/repo/pull/12",
+              state: "STATE_OPEN",
+            },
+            run: {
+              id: "run-checks-passed",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    const verify = screen.getByTestId("redesign-console-column-verify");
+    if (!within(verify).queryByRole("link", { name: "Visit Preview" })) {
+      await user.click(within(verify).getByRole("button", { name: "Toggle Fix pull request checks details" }));
+    }
+
+    const preview = within(verify).getByRole("link", { name: "Visit Preview" });
+    expect(preview).toHaveAttribute("href", previewHref);
+    expect(within(verify).getByRole("table")).toBeInTheDocument();
+  });
+
   it("shows the run console on the Automations tab", () => {
     renderSplitRun();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();

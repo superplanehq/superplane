@@ -85,9 +85,9 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 			}
 			description := ""
 			summary := ""
-			if run.GetOutput() != nil {
-				description = strings.TrimSpace(run.GetOutput().GetTitle())
-				summary = firstLine(run.GetOutput().GetSummary())
+			if output := run.GetOutput(); output != nil {
+				description = strings.TrimSpace(output.GetTitle())
+				summary = checkRunOutputBody(output)
 			}
 			latest[key] = PullRequestCheck{
 				Key:         key,
@@ -257,15 +257,24 @@ func checkFingerprint(checks []PullRequestCheck) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func firstLine(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
+func checkRunOutputBody(output *github.CheckRunOutput) string {
+	summary := strings.TrimSpace(output.GetSummary())
+	text := strings.TrimSpace(output.GetText())
+	body := joinDistinctCheckOutput(summary, text)
+	if body == "" {
 		return ""
 	}
-	if index := strings.IndexAny(trimmed, "\n\r"); index >= 0 {
-		return strings.TrimSpace(trimmed[:index])
+	return "\n\n" + body
+}
+
+func joinDistinctCheckOutput(summary, text string) string {
+	if text == "" || strings.Contains(summary, text) {
+		return summary
 	}
-	return trimmed
+	if summary == "" {
+		return text
+	}
+	return summary + "\n\n" + text
 }
 
 func firstNonEmpty(values ...string) string {
