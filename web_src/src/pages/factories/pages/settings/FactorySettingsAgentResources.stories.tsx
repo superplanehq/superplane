@@ -71,7 +71,7 @@ export const OAuthNotConnected: Story = {
 };
 
 export const ConnectedGreenDot: Story = {
-  render: () => withResources([OAUTH_CONNECTED_RESOURCE]),
+  render: () => withResources([HEADER_MCP_RESOURCE, OAUTH_CONNECTED_RESOURCE]),
 };
 
 export const OAuthNeedsReconnect: Story = {

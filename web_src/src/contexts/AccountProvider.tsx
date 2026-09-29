@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { posthog } from "@/posthog";
-import { consumePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { consumePendingSignupAnalyticsPreference, hasConfirmedSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { trackGoogleSignup } from "@/lib/googleTagManager";
 
 import { AccountContext, type AccountContextType } from "./accountContextState";
 
@@ -41,6 +42,12 @@ export function AccountProvider({ children }: AccountProviderProps) {
     }
 
     const signupResult = getSignupAnalyticsResult(window.location.search);
+    if (
+      signupResult === "created" ||
+      (signupResult !== "existing" && hasConfirmedSignupAnalyticsPreference(accountData.email))
+    ) {
+      trackGoogleSignup(accountData.id);
+    }
     const signupPreference = consumePendingSignupAnalyticsPreference({
       accountEmail: accountData.email,
       currentPath: window.location.pathname,

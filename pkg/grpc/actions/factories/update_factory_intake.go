@@ -308,6 +308,9 @@ func applyIntakeSettingsToGraph(
 				configuration["events"] = intakeTriggerEventsFor(updated)
 				nodes[i].Configuration = configuration
 				nodes[i].Metadata = mergeJiraCompletionMetadata(nodes[i].Metadata, updated)
+			case models.FactoryIntakeSourceDatadog:
+				configuration["alertTransitions"] = intakeDatadogAlertTransitions(updated)
+				nodes[i].Configuration = configuration
 			default:
 				continue
 			}

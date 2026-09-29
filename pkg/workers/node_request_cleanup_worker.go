@@ -18,11 +18,11 @@ const (
 	nodeRequestCleanupDeleteBatchSize     = 500
 	nodeRequestCleanupMaxDeletesPerTick   = 5000
 	nodeRequestCleanupPauseBetweenBatches = 50 * time.Millisecond
+	sentryWebhookReceiptCleanupBatch      = 500
 )
 
-// NodeRequestCleanupWorker deletes completed workflow_node_requests after a
-// retention window. Processing only marks requests completed, so this table
-// otherwise grows without bound.
+// NodeRequestCleanupWorker deletes old rows that otherwise grow without bound.
+// It removes completed workflow node requests and expired Sentry webhook receipts.
 type NodeRequestCleanupWorker struct {
 	logger              *log.Entry
 	retentionDays       int
@@ -60,6 +60,8 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 		return
 	}
 
+	w.deleteExpiredSentryWebhookReceipts()
+
 	startedAt := time.Now()
 	olderThan := startedAt.AddDate(0, 0, -w.retentionDays)
 	deleted, err := w.cleanCompletedRequests(olderThan, w.maxDeletesPerTick)
@@ -84,6 +86,23 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	}
 
 	logger.Info("Deleted completed node requests")
+}
+
+func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {
+	cutoff := time.Now().UTC().Add(-models.SentryWebhookReceiptRetention)
+	deleted, err := models.DeleteExpiredSentryWebhookReceipts(database.Conn(), cutoff, sentryWebhookReceiptCleanupBatch)
+	if err != nil {
+		w.logger.Errorf("Error cleaning Sentry webhook receipts: %v", err)
+		return
+	}
+	if deleted == 0 {
+		return
+	}
+
+	w.logger.WithFields(log.Fields{
+		"deleted":    deleted,
+		"older_than": cutoff.Format(time.RFC3339),
+	}).Info("Deleted expired Sentry webhook receipts")
 }
 
 func (w *NodeRequestCleanupWorker) cleanCompletedRequests(olderThan time.Time, limit int) (int64, error) {

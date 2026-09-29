@@ -8,7 +8,7 @@ import { workOrderFileContentTypeMap, workOrderFileDownloadMap } from "@/lib/wor
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { WorkOrderDescriptionEditor } from "../../WorkOrderDescriptionEditor";
 
-const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_DESCRIPTION_LENGTH = 20000;
 
 /**
  * Description on the split-run Description tab. Drafts can switch the

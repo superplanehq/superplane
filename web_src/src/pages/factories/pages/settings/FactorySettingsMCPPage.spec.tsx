@@ -148,17 +148,70 @@ describe("FactorySettingsMCPPage", () => {
     );
 
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`).className).toContain("rounded-lg");
     expect(screen.getByText("docs")).toBeInTheDocument();
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.queryByText("Header")).not.toBeInTheDocument();
     expect(screen.queryByText("Connected")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connected" })).toHaveAttribute("type", "button");
     expect(screen.getByTestId("mcp-status-connected")).toHaveAttribute("aria-label", "Connected");
+    expect(screen.getByTestId("mcp-status-connected").className).toContain("size-3");
+    expect(screen.getByTestId("mcp-status-connected").className).toContain("absolute");
     expect(screen.getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("Tools");
 
     const user = userEvent.setup();
     await user.hover(screen.getByTestId("mcp-status-connected"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Connected");
+  }, 10000);
+
+  it("renders each server as its own compact card", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE],
+          },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    const list = await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 });
+    const docsCard = screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`);
+    const mobbinCard = screen.getByTestId(`agent-resource-row-${OAUTH_NOT_CONNECTED_RESOURCE.id}`);
+    expect(list.className).toContain("gap-2");
+    expect(docsCard).not.toBe(mobbinCard);
+    expect(docsCard.className).toContain("rounded-lg");
+    expect(mobbinCard.className).toContain("rounded-lg");
+    expect(within(docsCard).getByText("docs")).toBeInTheDocument();
+    expect(within(docsCard).getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
+    expect(within(docsCard).getByTestId("mcp-status-connected")).toBeInTheDocument();
+    expect(within(mobbinCard).getByTestId("mcp-status-disconnected")).toBeInTheDocument();
+    expect(within(docsCard).getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toBeInTheDocument();
+    expect(within(docsCard).getByTestId(`agent-resource-actions-${HEADER_MCP_RESOURCE.id}`).className).toContain(
+      "flex-wrap",
+    );
+  }, 10000);
+
+  it("shows the full server name and address on hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.hover(await screen.findByTestId(`agent-resource-edit-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("docs");
+    expect(tooltip).toHaveTextContent("https://mcp.example.com/mcp");
   }, 10000);
 
   it("expands tools without showing descriptions", async () => {
@@ -174,10 +227,14 @@ describe("FactorySettingsMCPPage", () => {
       />,
     );
 
-    await user.click(
-      await screen.findByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }),
+    const toolsButton = await screen.findByTestId(
+      `agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`,
+      {},
+      { timeout: 8000 },
     );
-    expect(await screen.findByTestId("mcp-tools-list")).toHaveTextContent("search");
+    await user.click(toolsButton);
+    const card = screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`);
+    expect(await within(card).findByTestId("mcp-tools-list")).toHaveTextContent("search");
     expect(screen.queryByText("Search the catalog.")).not.toBeInTheDocument();
   }, 10000);
 

@@ -707,10 +707,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
-	githubAppUserRoute := r.NewRoute().Subrouter()
-	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
-	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/oauth/callback", s.HandleGitHubAppOAuthCallback).Methods("GET")
-	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
@@ -728,7 +724,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account", s.updateAccount).Methods("PATCH")
 	accountRoute.HandleFunc("/account", s.deleteAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
-	accountRoute.HandleFunc("/account/linked-accounts/{provider}", s.disconnectLinkedAccount).Methods("DELETE")
+	accountRoute.HandleFunc("/account/linked-accounts/{provider}/{providerID}", s.disconnectLinkedAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/onboarding", s.createInitialWorkspace).Methods("POST")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
@@ -762,6 +758,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
+	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
@@ -840,10 +837,6 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if status := hostedGitHubAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
-		writeHostedGitHubAppAuthError(w, status)
-		return
-	}
 	if status := hostedSentryAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
 		writeHostedGitHubAppAuthError(w, status)
 		return
@@ -1393,10 +1386,12 @@ type AccountProviderResponse struct {
 // AccountLinkedAccountResponse describes an identity the member owns on another
 // service. It is not a sign-in method, so it carries no email or token.
 type AccountLinkedAccountResponse struct {
-	Provider  string `json:"provider"`
-	Username  string `json:"username"`
-	Name      string `json:"name,omitempty"`
-	AvatarURL string `json:"avatar_url,omitempty"`
+	Provider   string `json:"provider"`
+	ProviderID string `json:"provider_id"`
+	Username   string `json:"username"`
+	Name       string `json:"name,omitempty"`
+	AvatarURL  string `json:"avatar_url,omitempty"`
+	Active     bool   `json:"active"`
 }
 
 type AccountOrganizationPendingDeletion struct {

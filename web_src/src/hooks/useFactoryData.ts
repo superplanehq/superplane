@@ -16,6 +16,7 @@ import {
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesSendWorkOrderToBacklog,
+  factoriesSelectFactoryVcsProviderRepository,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -440,7 +441,13 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       description?: string;
       key?: string;
       hostedSpendBudgetCents?: number | null;
-      planning?: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean };
+      planning?: {
+        enabled: boolean;
+        clarity: boolean;
+        confidence: boolean;
+        setupCompleted?: boolean;
+        autoStartLineId?: string;
+      };
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -468,6 +475,28 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useSelectFactoryVcsProviderRepository(organizationId: string, factoryId: string, provider: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (repositoryId: string) => {
+      const response = await factoriesSelectFactoryVcsProviderRepository(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+          body: { provider, repositoryId },
+        }),
+      );
+      if (!response.data?.factory) throw new Error("Failed to select the repository");
+      return response.data.factory;
+    },
+    onSuccess: (factory) => {
+      queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
     },
   });
 }

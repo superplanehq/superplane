@@ -5,10 +5,10 @@ import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
@@ -60,7 +60,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Sentry exceptions",
     description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
-    featureId: FEATURE_FACTORY_SENTRY_INTAKE,
   },
   {
     id: "productive-tasks",
@@ -71,10 +70,10 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   },
   {
     id: "datadog",
-    name: "DataDog",
-    description: "Creates tasks from DataDog monitors.",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
     iconSrc: datadogIcon,
-    soon: true,
+    featureId: FEATURE_FACTORY_DATADOG_INTAKE,
   },
   {
     id: "notion",

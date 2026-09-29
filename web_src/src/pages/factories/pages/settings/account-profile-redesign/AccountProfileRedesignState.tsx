@@ -113,9 +113,13 @@ export function AccountProfileRedesignRoutePage() {
       onSave={saveName}
       associatedAccounts={
         <AccountProfileAssociatedAccountsCard
-          githubUsername={profile.linkedGithubUsername}
+          githubAccounts={
+            profile.linkedGithubUsername
+              ? [{ providerId: "storybook-github-account", username: profile.linkedGithubUsername }]
+              : []
+          }
           onLinkGithub={linkGithub}
-          onRemoveGithub={removeGithub}
+          onRemoveGithub={() => removeGithub()}
         />
       }
       security={

@@ -80,10 +80,14 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        organizationName="acme"
+        githubLogin="octocat"
+        githubUserId="1"
+        githubIdentities={[{ userId: "1", login: "octocat" }]}
         chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
-        onEditConnection={() => setScreen("connect")}
+        onSelectGitHubIdentity={() => undefined}
+        onConnectAnotherGitHubAccount={() => undefined}
+        onGrantAccess={() => undefined}
         onContinue={() => {
           if (selectedRepository) setScreen("tickets");
         }}

@@ -25,7 +25,6 @@ import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -404,11 +403,11 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
 
 /**
  * Path for an existing column automation. Opens the popup on the first tab.
- * Task analysis opens the Planning setup wizard until the factory confirms it.
+ * Task analysis opens Planning settings.
  */
 export function columnAutomationOpenPath(
   automation: ColumnAutomation,
-  args: { organizationId: string; factoryKey: string; lineId?: string; planningSetupCompleted?: boolean },
+  args: { organizationId: string; factoryKey: string; lineId?: string },
 ): string | undefined {
   if (automation.kind === "intake") {
     return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
@@ -417,9 +416,6 @@ export function columnAutomationOpenPath(
     return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
   }
   if (automation.kind === "analysis") {
-    if (args.planningSetupCompleted === false && args.lineId) {
-      return factoryPlanningSetupPath(args.organizationId, args.factoryKey, args.lineId);
-    }
     return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
   }
   if (!automation.canvasId) {

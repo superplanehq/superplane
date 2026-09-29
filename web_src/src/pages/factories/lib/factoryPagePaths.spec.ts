@@ -5,6 +5,7 @@ import {
   factoryAppRunPath,
   factoryAppSplitRunPath,
   factoryAppViewPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryDetailPath,
   factoryHomePath,
@@ -14,7 +15,6 @@ import {
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -176,14 +176,6 @@ describe("factoryPRFeedbackSetupPath", () => {
   });
 });
 
-describe("factoryPlanningSetupPath", () => {
-  it("opens the Planning setup page on the line board", () => {
-    expect(factoryPlanningSetupPath("org-1", "SP", "line-plan")).toBe(
-      "/org-1/workspaces/sp/lines/line-plan/setup/planning",
-    );
-  });
-});
-
 describe("factoryGitHubIntakeSetupPath", () => {
   it("opens the GitHub intake setup page on the line board", () => {
     expect(factoryGitHubIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
@@ -196,6 +188,14 @@ describe("factorySentryIntakeSetupPath", () => {
   it("opens the Sentry intake setup page on the line board", () => {
     expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
+    );
+  });
+});
+
+describe("factoryDatadogIntakeSetupPath", () => {
+  it("opens the Datadog intake setup page on the line board", () => {
+    expect(factoryDatadogIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/datadog",
     );
   });
 });

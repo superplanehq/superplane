@@ -194,6 +194,8 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			vcs_provider_reconcile_jobs,
+			vcs_provider_installations,
 			secrets,
 			account_magic_codes,
 			account_password_auth,

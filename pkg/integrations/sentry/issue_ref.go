@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // IssuePayloadType is the canvas event type emitted by sentry.onIssue and
@@ -48,6 +50,25 @@ func IssueIDFromEventData(eventData any) (string, bool) {
 		return "", false
 	}
 	return issueID, true
+}
+
+// ReceiptIDFromEventData reads the SuperPlane webhook receipt ID stored on a
+// sentry.issue canvas event. Sentry does not send this field.
+func ReceiptIDFromEventData(eventData any) (uuid.UUID, bool) {
+	envelope, ok := eventData.(map[string]any)
+	if !ok {
+		return uuid.Nil, false
+	}
+	webhook, ok := envelope["data"].(map[string]any)
+	if !ok {
+		return uuid.Nil, false
+	}
+	raw, _ := webhook[SuperplaneReceiptField].(string)
+	receiptID, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return receiptID, true
 }
 
 // IssueURLFragment is the origin-URL substring that identifies a Sentry

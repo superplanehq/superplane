@@ -47,6 +47,7 @@ describe("WorkOrderSplitRunPopup without the Task Console feature", () => {
     expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
     expect(screen.queryByTestId("redesign-console-variant")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
   it("hides the console-only closure phase from the classic log", async () => {

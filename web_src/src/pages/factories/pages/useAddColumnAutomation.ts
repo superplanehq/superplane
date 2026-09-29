@@ -1,7 +1,9 @@
+import { organizationsDescribeIntegration } from "@/api-client";
 import { useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -135,6 +137,20 @@ function openPRFeedbackSetup(
   }
 }
 
+async function installationName(organizationId: string, integrationId: string): Promise<string> {
+  try {
+    const response = await organizationsDescribeIntegration(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId, integrationId },
+      }),
+    );
+    return response.data?.integration?.metadata?.name?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
 async function installBundledCanvas(
   args: {
     organizationId: string;
@@ -155,11 +171,16 @@ async function installBundledCanvas(
     showErrorToast(options.missingGitHubMessage);
     return;
   }
+  const githubInstallationName = await installationName(args.organizationId, args.githubIntegrationId);
+  if (!githubInstallationName) {
+    showErrorToast(options.missingGitHubMessage);
+    return;
+  }
   try {
     const installed = await installFactory({
       factoryId: options.factoryId,
       workspaceFactoryId: args.factoryId,
-      integrations: { github: { id: args.githubIntegrationId, name: "GitHub", ready: true } },
+      integrations: { github: { id: args.githubIntegrationId, name: githubInstallationName, ready: true } },
       installParams: {
         appRepository: args.appRepository,
         backlogRepository: args.backlogRepository,
