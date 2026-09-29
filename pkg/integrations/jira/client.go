@@ -159,7 +159,10 @@ func (c *Client) recoverFromUnauthorized() error {
 				return nil
 			}
 		}
-		return fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+		return errors.Join(
+			&APIError{StatusCode: http.StatusUnauthorized},
+			fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr),
+		)
 	}
 	return nil
 }

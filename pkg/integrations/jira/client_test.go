@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -208,6 +209,9 @@ func Test__Client__GetCurrentUser(t *testing.T) {
 
 		_, err = client.GetCurrentUser()
 		require.ErrorContains(t, err, "token refresh failed")
+		var apiErr *APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
 	})
 }
 

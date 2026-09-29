@@ -2,12 +2,22 @@ package factories
 
 import (
 	"errors"
+	"net/http"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+)
+
+const (
+	intakeConnectFirstMessage      = "Connect this intake first."
+	intakeCouldNotLoadItemsMessage = "SuperPlane could not load items from this intake."
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
@@ -180,9 +190,9 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
 		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
-		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
+		return grpcerrors.FailedPrecondition(err, intakeConnectFirstMessage)
 	case errors.Is(err, errIntakeConnectionBroken):
-		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "Connect this intake first."))
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, intakeConnectFirstMessage))
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
 	case errors.Is(err, errIntakeRefreshUnsupported):
@@ -230,6 +240,44 @@ var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")
 var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")
+
+func intakeErrorToStatus(err error, internalMessage string) error {
+	if message, ok := liveIntakeClientRefusalMessage(err); ok {
+		return grpcerrors.FailedPrecondition(err, message)
+	}
+	return factoryErrorToStatus(err, internalMessage)
+}
+
+func liveIntakeClientRefusalMessage(err error) (string, bool) {
+	status, ok := liveIntakeSourceStatus(err)
+	if !ok {
+		return "", false
+	}
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return intakeConnectFirstMessage, true
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return "", false
+	}
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		return intakeCouldNotLoadItemsMessage, true
+	}
+	return "", false
+}
+
+func liveIntakeSourceStatus(err error) (int, bool) {
+	if status := ghcommon.StatusCode(err); status != 0 {
+		return status, true
+	}
+	var jiraErr *jira.APIError
+	if errors.As(err, &jiraErr) {
+		return jiraErr.StatusCode, true
+	}
+	if status, ok := sentry.StatusCode(err); ok {
+		return status, true
+	}
+	return productive.StatusCode(err)
+}
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))
