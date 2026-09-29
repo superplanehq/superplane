@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -187,6 +188,62 @@ func TestMemberFactorySocketStaysUnauthorizedWithoutSession(t *testing.T) {
 		path:   "/ws/factories/" + factory.ID.String(),
 	})
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
+}
+
+func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
+	appID := uuid.New()
+	verifyKey := models.CanvasColumnKeyVerify
+	factory := &models.Factory{Name: "Instabot", Key: "NEWWO", PlanningEnabled: true}
+	line := &models.FactoryLine{
+		Name:  "implement",
+		Steps: []models.FactoryLineStep{{AppID: appID}},
+	}
+	canvases := []models.Canvas{
+		{Name: "Backlog"},
+		{ID: appID, Name: "Implement"},
+		{Name: "PR Closure"},
+		{Name: "Risk score", ColumnKey: &verifyKey},
+	}
+	board := assemblePublicBoard(
+		factory,
+		line,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		canvases,
+		[]models.FactoryIntake{{Source: models.FactoryIntakeSourceGitHubIssues}},
+		[]models.FactoryPRFeedbackHandler{{Source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion}},
+	)
+
+	assert.Equal(t, []publicAutomation{
+		{ID: "intake-0", Kind: "intake", Name: "GitHub issues", CatalogID: "github-issues", Icon: "github", Health: "healthy"},
+		{ID: "analysis", Kind: "analysis", Name: "Task analysis", CatalogID: "analysis", Health: "healthy"},
+	}, automationsNamed(board, "backlog"))
+	assert.Equal(t, []publicAutomation{
+		{ID: "step-0", Kind: "agent-step", Name: "Implement", CatalogID: "agent-step", Health: "healthy"},
+	}, automationsNamed(board, "phase-0"))
+	assert.Equal(t, []publicAutomation{
+		{ID: "feedback-0", Kind: "pr-discussion", Name: "Pull request comments", CatalogID: "pr-discussion", Icon: "github", Health: "healthy"},
+		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Icon: "github", Health: "healthy"},
+	}, automationsNamed(board, "verify"))
+	assert.Equal(t, []publicAutomation{
+		{ID: "closure", Kind: "pr-closure", Name: "PR Closure", CatalogID: "pr-closure", Icon: "github", Health: "healthy"},
+	}, automationsNamed(board, "done"))
+
+	body, err := json.Marshal(board)
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), appID.String())
+}
+
+func automationsNamed(board *publicBoard, key string) []publicAutomation {
+	for _, column := range board.Columns {
+		if column.Key == key {
+			return column.Automations
+		}
+	}
+	return nil
 }
 
 func openPublicLine(t *testing.T, r *support.ResourceRegistry, public bool) (*models.Factory, *models.FactoryLine) {

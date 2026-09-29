@@ -23,6 +23,11 @@ export function FactoryLineAccessGate() {
   return <MemberLineGate />;
 }
 
+function SignedInPublicBoard() {
+  const { account } = useAccount();
+  return <PublicFactoryBoardPage signedIn accountName={account?.name} accountAvatarUrl={account?.avatar_url} />;
+}
+
 function MemberLineGate() {
   const { canAct, isLoading } = usePermissions();
 
@@ -31,7 +36,7 @@ function MemberLineGate() {
   }
 
   if (!canAct("factories", "read") || !canAct("work_orders", "read")) {
-    return <PublicFactoryBoardPage signedIn />;
+    return <SignedInPublicBoard />;
   }
 
   return (

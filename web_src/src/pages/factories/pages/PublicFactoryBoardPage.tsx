@@ -1,35 +1,49 @@
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
-import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
-import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "../workOrders/WorkOrderBoardChrome";
-import { PublicBoardCard, type PublicBoardCardModel } from "../workOrders/WorkOrderCard";
+import { PublicFactoriesSidebar } from "../layout/FactoriesSidebar";
+import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
+import type { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
+import { humanizeLineName } from "../lib/humanizeLineName";
+import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
+import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
+import { useWorkOrderListState } from "../lib/useWorkOrderListState";
+import { FilterChips } from "../workOrders/header/FilterChips";
+import { FilterMenu } from "../workOrders/header/FilterMenu";
+import { WorkOrderKanbanBoard, workOrderKanbanLaneSizeClassName } from "../workOrders/WorkOrderBoardChrome";
+import { SearchField } from "../workOrders/header/SearchField";
+import {
+  factoryKanbanPageClassName,
+  factorySectionHeaderClassName,
+  factoryWorkOrdersBodyClassName,
+} from "./factoryPageLayoutStyles";
+import { PublicBoardColumnLane } from "./PublicFactoryBoardLane";
+import {
+  boardFilterOptions,
+  columnAutomations,
+  loadStateForErrorStatus,
+  parseBoardEvent,
+  publicBoardSocketPath,
+  publicBoardUrl,
+  visibleBoardColumns,
+  type BoardLoad,
+  type PublicBoard,
+  type PublicBoardColumn,
+} from "./publicBoardModel";
 
-interface PublicBoardColumn {
-  key: string;
-  title: string;
-  color?: string;
-  labels: string[];
-  cards: PublicBoardCardModel[];
-}
-
-interface PublicBoard {
-  workspaceName: string;
-  lineName: string;
-  showClarity: boolean;
-  showConfidence: boolean;
-  columns: PublicBoardColumn[];
-}
-
-type BoardLoad =
-  | { status: "loading" }
-  | { status: "ready"; board: PublicBoard }
-  | { status: "denied" }
-  | { status: "missing" };
-
-export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
+export function PublicFactoryBoardPage({
+  signedIn,
+  accountName,
+  accountAvatarUrl,
+}: {
+  signedIn: boolean;
+  accountName?: string;
+  accountAvatarUrl?: string | null;
+}) {
+  useFactoriesThemeClass();
   const {
     organizationId = "",
     factoryKey = "",
@@ -40,7 +54,7 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
     lineId: string;
   }>();
   const [load, setLoad] = useState<BoardLoad>({ status: "loading" });
-  const [query, setQuery] = useState("");
+  const listState = useWorkOrderListState(`${organizationId}:${factoryKey}:${lineId}`);
   const signedInRef = useRef(signedIn);
   signedInRef.current = signedIn;
   const reloadRef = useRef<() => Promise<void>>(async () => undefined);
@@ -52,16 +66,9 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
     } catch {
       return;
     }
-    if (response.status === 404) {
-      if (signedInRef.current) {
-        setLoad({ status: "denied" });
-        return;
-      }
-      redirectToLogin();
-      return;
-    }
-    if (!response.ok) {
-      setLoad({ status: "missing" });
+    const failed = loadStateForErrorStatus(response.status, signedInRef.current);
+    if (failed) {
+      setLoad(failed);
       return;
     }
     const board = (await response.json()) as PublicBoard;
@@ -76,16 +83,9 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
       if (cancelled) {
         return;
       }
-      if (response.status === 404) {
-        if (signedInRef.current) {
-          setLoad({ status: "denied" });
-          return;
-        }
-        redirectToLogin();
-        return;
-      }
-      if (!response.ok) {
-        setLoad({ status: "missing" });
+      const failed = loadStateForErrorStatus(response.status, signedInRef.current);
+      if (failed) {
+        setLoad(failed);
         return;
       }
       const board = (await response.json()) as PublicBoard;
@@ -102,7 +102,15 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
-  const columns = useMemo(() => filterBoardColumns(board?.columns ?? [], query), [board, query]);
+  const columns = useMemo(
+    () => visibleBoardColumns(board?.columns ?? [], listState.filters, listState.search),
+    [board, listState.filters, listState.search],
+  );
+  const filterOptions = useMemo(() => boardFilterOptions(board?.columns ?? [], board?.workspaceKey), [board]);
+  const automationRowCount = useMemo(
+    () => columnAutomationHeaderRowCount((board?.columns ?? []).map((column) => columnAutomations(column))),
+    [board],
+  );
 
   if (load.status === "loading") {
     return <PublicBoardStatus title="Loading board" />;
@@ -114,7 +122,21 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
     return <PublicBoardStatus title="This board is not available." />;
   }
 
-  return <PublicBoardView board={board} columns={columns} query={query} onQueryChange={setQuery} />;
+  return (
+    <PublicBoardView
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+      lineId={lineId}
+      account={signedIn ? { name: accountName, avatarUrl: accountAvatarUrl } : null}
+      board={board}
+      columns={columns}
+      automationRowCount={automationRowCount}
+      listState={listState}
+      sourceOptions={filterOptions.sources}
+      assigneeOptions={filterOptions.assignees}
+      narrowed={listState.search.trim().length > 0 || listState.filterCount > 0}
+    />
+  );
 }
 
 function usePublicBoardSocket(
@@ -168,79 +190,102 @@ function usePublicBoardSocket(
 }
 
 function PublicBoardView({
+  organizationId,
+  factoryKey,
+  lineId,
+  account,
   board,
   columns,
-  query,
-  onQueryChange,
+  automationRowCount,
+  listState,
+  sourceOptions,
+  assigneeOptions,
+  narrowed,
 }: {
+  organizationId: string;
+  factoryKey: string;
+  lineId: string;
+  account: { name?: string; avatarUrl?: string | null } | null;
   board: PublicBoard;
   columns: PublicBoardColumn[];
-  query: string;
-  onQueryChange: (next: string) => void;
+  automationRowCount: number;
+  listState: ReturnType<typeof useWorkOrderListState>;
+  sourceOptions: ReturnType<typeof buildSourceFilterOptions>;
+  assigneeOptions: ReturnType<typeof buildAssigneeFilterOptions>;
+  narrowed: boolean;
 }) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  const { view: colorView } = useLineBoardColumnColorViewPreference();
+
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-background text-foreground" data-testid="public-factory-board">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-        <h1 className="min-w-0 truncate text-[15px] font-medium">{board.workspaceName}</h1>
-        <Input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search tasks"
-          aria-label="Search tasks"
-          className="ml-auto max-w-xs"
-          data-testid="public-board-search"
-        />
-      </header>
-      <div className="flex min-h-0 flex-1 p-4">
-        <WorkOrderKanbanBoard testId="public-board-columns">
-          {columns.map((column) => (
-            <PublicBoardColumnLane key={column.key} column={column} query={query} board={board} />
-          ))}
-        </WorkOrderKanbanBoard>
-      </div>
+    <div className="flex h-screen w-full bg-background text-foreground" data-testid="public-factory-board">
+      <PublicFactoriesSidebar
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        lineId={lineId}
+        workspaceName={board.workspaceName}
+        account={account}
+      />
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className={factoryKanbanPageClassName}>
+          <WorkspacePageHeader
+            className={factorySectionHeaderClassName}
+            data-testid="public-board-header"
+            title={humanizeLineName(board.lineName)}
+            leading={<PublicViewBadge />}
+            actions={
+              <>
+                <FilterMenu state={listState} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+                <SearchField
+                  inputRef={searchRef}
+                  open={listState.searchOpen}
+                  value={listState.search}
+                  onOpen={listState.openSearch}
+                  onChange={listState.setSearch}
+                  onClose={listState.closeSearch}
+                />
+              </>
+            }
+            belowRow={<FilterChips state={listState} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />}
+          />
+          <div className={factoryWorkOrdersBodyClassName}>
+            <WorkOrderKanbanBoard testId="public-board-columns">
+              {columns.map((column, index) => (
+                <div
+                  key={column.key}
+                  className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
+                >
+                  {index > 0 ? (
+                    <span
+                      className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border"
+                      aria-hidden
+                    />
+                  ) : null}
+                  <PublicBoardColumnLane
+                    column={column}
+                    narrowed={narrowed}
+                    board={board}
+                    automationRowCount={automationRowCount}
+                    colorView={colorView}
+                  />
+                </div>
+              ))}
+            </WorkOrderKanbanBoard>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
 
-function PublicBoardColumnLane({
-  column,
-  query,
-  board,
-}: {
-  column: PublicBoardColumn;
-  query: string;
-  board: PublicBoard;
-}) {
+function PublicViewBadge() {
   return (
-    <WorkOrderBoardLane
-      title={column.title}
-      count={column.cards.length}
-      emptyDescription={query.trim() ? "No matching tasks." : "Nothing here."}
-      subheader={
-        column.labels.length > 0 ? (
-          <div className="space-y-1 px-3 py-2">
-            {column.labels.map((label) => (
-              <p key={label} className="truncate text-[12px] text-muted-foreground">
-                {label}
-              </p>
-            ))}
-          </div>
-        ) : null
-      }
-      testId={`public-board-column-${column.key}`}
-      {...lineBoardColumnLaneProps(column.color)}
+    <span
+      data-testid="public-board-badge"
+      className="inline-flex h-8 shrink-0 items-center rounded-full bg-emerald-100 px-2.5 text-[12px] font-medium whitespace-nowrap text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
-        {column.cards.map((card) => (
-          <PublicBoardCard
-            key={`${column.key}-${card.title}-${card.createdAt}`}
-            card={card}
-            showClarity={board.showClarity}
-            showConfidence={board.showConfidence}
-          />
-        ))}
-      </div>
-    </WorkOrderBoardLane>
+      Public view
+    </span>
   );
 }
 
@@ -253,40 +298,4 @@ function PublicBoardStatus({ title }: { title: string }) {
       {title}
     </div>
   );
-}
-
-function filterBoardColumns(columns: PublicBoardColumn[], query: string): PublicBoardColumn[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) {
-    return columns;
-  }
-  return columns.map((column) => ({
-    ...column,
-    cards: column.cards.filter((card) => card.title.toLowerCase().includes(needle)),
-  }));
-}
-
-function publicBoardUrl(organizationId: string, factoryKey: string, lineId: string): string {
-  return `/api/v1/public/organizations/${encodeURIComponent(organizationId)}/workspaces/${encodeURIComponent(factoryKey)}/lines/${encodeURIComponent(lineId)}/board`;
-}
-
-function publicBoardSocketPath(organizationId: string, factoryKey: string, lineId: string): string {
-  return `/ws/public/organizations/${encodeURIComponent(organizationId)}/workspaces/${encodeURIComponent(factoryKey)}/lines/${encodeURIComponent(lineId)}`;
-}
-
-function parseBoardEvent(data: unknown): string {
-  if (typeof data !== "string") {
-    return "";
-  }
-  try {
-    const message = JSON.parse(data) as { event?: string };
-    return message.event ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function redirectToLogin(): void {
-  const redirectTarget = `${window.location.pathname}${window.location.search}`;
-  window.location.href = `/login?redirect=${encodeURIComponent(redirectTarget)}`;
 }

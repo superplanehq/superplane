@@ -110,6 +110,20 @@ describe("api-interceptor", () => {
     expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
   });
 
+  it("does not redirect a public line board when an api request is unauthorized", async () => {
+    pathname = "/demo/workspaces/newwo/lines/fb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7";
+    search = "";
+    locationHref = "http://localhost" + pathname;
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+
+    setupApiInterceptor();
+
+    const response = await globalThis.fetch("/api/v1/me");
+    expect(response.status).toBe(401);
+    expect(locationHref).toBe("http://localhost/demo/workspaces/newwo/lines/fb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7");
+  });
+
   it("does not redirect auth routes", async () => {
     pathname = "/login";
     search = "";

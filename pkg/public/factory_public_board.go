@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ import (
 const publicBoardPageSize = 100
 const publicBoardMaxPages = 10
 
+var riskScoreCanvasName = regexp.MustCompile(`^Risk score \(\d+\)$`)
+
 var errPublicBoardNotFound = errors.New("public board not found")
 
 type publicBoard struct {
@@ -38,22 +41,48 @@ type publicBoard struct {
 }
 
 type publicColumn struct {
-	Key    string       `json:"key"`
-	Title  string       `json:"title"`
-	Color  string       `json:"color,omitempty"`
-	Labels []string     `json:"labels"`
-	Cards  []publicCard `json:"cards"`
+	Key         string             `json:"key"`
+	Title       string             `json:"title"`
+	Color       string             `json:"color,omitempty"`
+	Automations []publicAutomation `json:"automations"`
+	Cards       []publicCard       `json:"cards"`
+}
+
+type publicAutomation struct {
+	ID        string `json:"id"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	CatalogID string `json:"catalogId,omitempty"`
+	Icon      string `json:"icon,omitempty"`
+	Health    string `json:"health,omitempty"`
 }
 
 type publicCard struct {
+	ID            string             `json:"id"`
 	Title         string             `json:"title"`
 	CreatedAt     time.Time          `json:"createdAt"`
-	AssigneeName  string             `json:"assigneeName,omitempty"`
+	State         string             `json:"state"`
+	Result        string             `json:"result,omitempty"`
+	Running       bool               `json:"running,omitempty"`
+	Stopped       bool               `json:"stopped,omitempty"`
+	Failed        bool               `json:"failed,omitempty"`
+	Approval      bool               `json:"approval,omitempty"`
+	Origin        *publicOrigin      `json:"origin,omitempty"`
+	Assignee      *publicAssignee    `json:"assignee,omitempty"`
 	Confidence    *int               `json:"confidence,omitempty"`
 	Clarity       *int               `json:"clarity,omitempty"`
 	PullRequest   *publicPullRequest `json:"pullRequest,omitempty"`
-	Status        string             `json:"status,omitempty"`
 	AgentQuestion bool               `json:"agentQuestion,omitempty"`
+}
+
+type publicOrigin struct {
+	URL   string `json:"url"`
+	Label string `json:"label,omitempty"`
+}
+
+type publicAssignee struct {
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatarUrl,omitempty"`
 }
 
 type publicPullRequest struct {
@@ -233,8 +262,12 @@ func buildPublicBoard(db *gorm.DB, factory *models.Factory, line *models.Factory
 	if err != nil {
 		return nil, err
 	}
+	handlers, err := factory.ListPRFeedbackHandlers(db)
+	if err != nil {
+		return nil, err
+	}
 
-	return assemblePublicBoard(factory, line, orders, dispatches, checks, pullRequests, sessions, canvases, intakes), nil
+	return assemblePublicBoard(factory, line, orders, dispatches, checks, pullRequests, sessions, canvases, intakes, handlers), nil
 }
 
 func listPublicBoardOrders(db *gorm.DB, factory *models.Factory, lineID uuid.UUID) ([]models.FactoryWorkOrder, error) {
@@ -270,6 +303,7 @@ func assemblePublicBoard(
 	sessions map[uuid.UUID]*models.FactoryPlanningSession,
 	canvases []models.Canvas,
 	intakes []models.FactoryIntake,
+	handlers []models.FactoryPRFeedbackHandler,
 ) *publicBoard {
 	planning := factory.Planning()
 	names := map[uuid.UUID]string{}
@@ -281,13 +315,14 @@ func assemblePublicBoard(
 		}
 	}
 
+	avatars := assigneeAvatarURLs(orders)
 	steps := []models.FactoryLineStep(line.Steps)
 	columns := []publicColumn{{
-		Key:    "backlog",
-		Title:  "Backlog",
-		Color:  line.ColumnColorsValue()["backlog"],
-		Labels: intakeLabels(intakes),
-		Cards:  []publicCard{},
+		Key:         "backlog",
+		Title:       "Backlog",
+		Color:       line.ColumnColorsValue()["backlog"],
+		Automations: backlogAutomations(intakes, canvases, planning.Enabled),
+		Cards:       []publicCard{},
 	}}
 	for index, step := range steps {
 		if isDoneStep(names[step.AppID], columnKey[step.AppID]) {
@@ -299,27 +334,27 @@ func assemblePublicBoard(
 			title = "Step"
 		}
 		columns = append(columns, publicColumn{
-			Key:    key,
-			Title:  title,
-			Color:  line.ColumnColorsValue()[key],
-			Labels: []string{"Runs the " + title + " agent"},
-			Cards:  []publicCard{},
+			Key:         key,
+			Title:       title,
+			Color:       line.ColumnColorsValue()[key],
+			Automations: []publicAutomation{agentStepAutomation(index, title)},
+			Cards:       []publicCard{},
 		})
 	}
 	columns = append(columns,
 		publicColumn{
-			Key:    "verify",
-			Title:  "Verify",
-			Color:  line.ColumnColorsValue()["verify"],
-			Labels: labelsForColumn(canvases, models.CanvasColumnKeyVerify),
-			Cards:  []publicCard{},
+			Key:         "verify",
+			Title:       "Verify",
+			Color:       line.ColumnColorsValue()["verify"],
+			Automations: verifyAutomations(canvases, handlers),
+			Cards:       []publicCard{},
 		},
 		publicColumn{
-			Key:    "done",
-			Title:  "Done",
-			Color:  line.ColumnColorsValue()["done"],
-			Labels: labelsForColumn(canvases, models.CanvasColumnKeyDone),
-			Cards:  []publicCard{},
+			Key:         "done",
+			Title:       "Done",
+			Color:       line.ColumnColorsValue()["done"],
+			Automations: doneAutomations(canvases),
+			Cards:       []publicCard{},
 		},
 	)
 
@@ -338,7 +373,9 @@ func assemblePublicBoard(
 		if column == nil {
 			continue
 		}
-		column.Cards = append(column.Cards, publicCardFromOrder(order, planning, checks[order.ID], pullRequests[order.ID], sessions[order.ID], dispatchesForLine(dispatches[order.ID], line.ID)))
+		card := publicCardFromOrder(order, planning, checks[order.ID], pullRequests[order.ID], sessions[order.ID], dispatchesForLine(dispatches[order.ID], line.ID), avatars)
+		card.ID = column.Key + "-" + strconv.Itoa(len(column.Cards))
+		column.Cards = append(column.Cards, card)
 	}
 
 	return &publicBoard{
@@ -489,13 +526,24 @@ func publicCardFromOrder(
 	pullRequests []models.FactoryPullRequest,
 	session *models.FactoryPlanningSession,
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	avatars map[uuid.UUID]string,
 ) publicCard {
 	card := publicCard{
-		Title:        order.Title,
-		CreatedAt:    order.CreatedAt,
-		AssigneeName: assigneeName(order),
-		PullRequest:  pickPublicPullRequest(pullRequests),
-		Status:       publicStatus(order, dispatches),
+		Title:       order.Title,
+		CreatedAt:   order.CreatedAt,
+		State:       uiWorkOrderState(order.State),
+		Result:      uiWorkOrderResult(order.Result),
+		Running:     hasActiveDispatch(dispatches),
+		Origin:      publicOriginFromOrder(order),
+		Assignee:    publicAssigneeFromOrder(order, avatars),
+		PullRequest: pickPublicPullRequest(pullRequests),
+	}
+	if !card.Running {
+		execution := latestExecution(dispatches)
+		card.Stopped = execution != nil && executionResult(execution) == models.CanvasRunResultCancelled
+		card.Failed = execution != nil && executionResult(execution) == models.CanvasRunResultFailed
+		notes, err := order.StatusNotes()
+		card.Approval = err == nil && len(notes) > 0
 	}
 	if order.State == models.FactoryWorkOrderStateDraft {
 		if planning.Confidence {
@@ -509,11 +557,81 @@ func publicCardFromOrder(
 	return card
 }
 
-func assigneeName(order *models.FactoryWorkOrder) string {
-	if len(order.Assignees) == 0 || order.Assignees[0].User == nil {
+func uiWorkOrderState(state string) string {
+	switch state {
+	case models.FactoryWorkOrderStateDraft:
+		return "STATE_DRAFT"
+	case models.FactoryWorkOrderStateClosed:
+		return "STATE_CLOSED"
+	default:
+		return "STATE_OPEN"
+	}
+}
+
+func uiWorkOrderResult(result string) string {
+	switch result {
+	case models.FactoryWorkOrderResultCompleted:
+		return "RESULT_COMPLETED"
+	case models.FactoryWorkOrderResultRejected:
+		return "RESULT_REJECTED"
+	case models.FactoryWorkOrderResultFailed:
+		return "RESULT_FAILED"
+	default:
 		return ""
 	}
-	return strings.TrimSpace(order.Assignees[0].User.Name)
+}
+
+func publicOriginFromOrder(order *models.FactoryWorkOrder) *publicOrigin {
+	origin := order.Origin()
+	if origin == nil || strings.TrimSpace(origin.URL) == "" {
+		return nil
+	}
+	return &publicOrigin{URL: origin.URL, Label: origin.Label}
+}
+
+func publicAssigneeFromOrder(order *models.FactoryWorkOrder, avatars map[uuid.UUID]string) *publicAssignee {
+	if len(order.Assignees) == 0 || order.Assignees[0].User == nil {
+		return nil
+	}
+	name := strings.TrimSpace(order.Assignees[0].User.Name)
+	if name == "" {
+		return nil
+	}
+	return &publicAssignee{Name: name, AvatarURL: strings.TrimSpace(avatars[order.Assignees[0].User.ID])}
+}
+
+func assigneeAvatarURLs(orders []models.FactoryWorkOrder) map[uuid.UUID]string {
+	avatars := map[uuid.UUID]string{}
+	seen := map[uuid.UUID]struct{}{}
+	users := make([]models.User, 0)
+	for i := range orders {
+		if len(orders[i].Assignees) == 0 || orders[i].Assignees[0].User == nil {
+			continue
+		}
+		user := orders[i].Assignees[0].User
+		if _, ok := seen[user.ID]; ok {
+			continue
+		}
+		seen[user.ID] = struct{}{}
+		users = append(users, *user)
+	}
+	if len(users) == 0 {
+		return avatars
+	}
+	providers, err := models.FindUserAccountProviders(users)
+	if err != nil {
+		return avatars
+	}
+	for _, provider := range providers {
+		id, err := uuid.Parse(provider.UserID)
+		if err != nil || strings.TrimSpace(provider.AvatarURL) == "" {
+			continue
+		}
+		if _, exists := avatars[id]; !exists {
+			avatars[id] = provider.AvatarURL
+		}
+	}
+	return avatars
 }
 
 func scoreForCheck(checks []models.FactoryWorkOrderCheck, name string) *int {
@@ -570,30 +688,6 @@ func pullRequestRank(pullRequest models.FactoryPullRequest) int {
 	}
 }
 
-func publicStatus(order *models.FactoryWorkOrder, dispatches []models.FactoryWorkOrderLineDispatchRecord) string {
-	if order.State == models.FactoryWorkOrderStateClosed && order.Result == models.FactoryWorkOrderResultFailed {
-		return "failed"
-	}
-	if order.State != models.FactoryWorkOrderStateOpen && order.State != models.FactoryWorkOrderStateDraft {
-		return ""
-	}
-	if hasActiveDispatch(dispatches) {
-		return ""
-	}
-	execution := latestExecution(dispatches)
-	if execution != nil && executionResult(execution) == models.CanvasRunResultFailed {
-		return "failed"
-	}
-	if execution != nil && executionResult(execution) == models.CanvasRunResultCancelled {
-		return "stopped"
-	}
-	notes, err := order.StatusNotes()
-	if err == nil && len(notes) > 0 {
-		return "approval"
-	}
-	return ""
-}
-
 func hasActiveDispatch(dispatches []models.FactoryWorkOrderLineDispatchRecord) bool {
 	for i := range dispatches {
 		if dispatches[i].State == models.FactoryWorkOrderLineDispatchStateActive {
@@ -628,16 +722,168 @@ func sessionHasAgentQuestion(session *models.FactoryPlanningSession) bool {
 	return false
 }
 
-func intakeLabels(intakes []models.FactoryIntake) []string {
-	labels := make([]string, 0, len(intakes))
-	for _, intake := range intakes {
+func backlogAutomations(intakes []models.FactoryIntake, canvases []models.Canvas, planningEnabled bool) []publicAutomation {
+	rows := intakeAutomations(intakes)
+	canvas := backlogAnalysisCanvas(canvases)
+	if canvas == nil {
+		return rows
+	}
+	name := strings.TrimSpace(canvas.Name)
+	if name == "" || name == "Ingest" || name == "Backlog" {
+		name = "Task analysis"
+	}
+	health := "healthy"
+	if !planningEnabled {
+		health = "disabled"
+	}
+	return append(rows, publicAutomation{
+		ID:        "analysis",
+		Kind:      "analysis",
+		Name:      name,
+		CatalogID: "analysis",
+		Health:    health,
+	})
+}
+
+func intakeAutomations(intakes []models.FactoryIntake) []publicAutomation {
+	rows := make([]publicAutomation, 0, len(intakes))
+	for index, intake := range intakes {
 		name := intakeSourceName(intake.Source)
 		if name == "" {
 			continue
 		}
-		labels = append(labels, "Listens to "+name)
+		rows = append(rows, publicAutomation{
+			ID:        "intake-" + strconv.Itoa(index),
+			Kind:      "intake",
+			Name:      name,
+			CatalogID: intake.Source,
+			Icon:      intakeIcon(intake.Source),
+			Health:    "healthy",
+		})
 	}
-	return labels
+	return rows
+}
+
+func agentStepAutomation(index int, title string) publicAutomation {
+	return publicAutomation{
+		ID:        "step-" + strconv.Itoa(index),
+		Kind:      "agent-step",
+		Name:      title,
+		CatalogID: "agent-step",
+		Health:    "healthy",
+	}
+}
+
+func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
+	rows := prFeedbackAutomations(handlers)
+	skip := map[uuid.UUID]struct{}{}
+	for _, canvas := range canvases {
+		if !isRiskScoreCanvas(canvas) {
+			continue
+		}
+		skip[canvas.ID] = struct{}{}
+		rows = append(rows, publicAutomation{
+			ID:        "risk-score-" + strconv.Itoa(len(rows)),
+			Kind:      "risk-score",
+			Name:      strings.TrimSpace(canvas.Name),
+			CatalogID: "risk-score",
+			Icon:      publicIconGitHub,
+			Health:    "healthy",
+		})
+	}
+	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyVerify, skip)...)
+}
+
+func doneAutomations(canvases []models.Canvas) []publicAutomation {
+	rows := []publicAutomation{}
+	skip := map[uuid.UUID]struct{}{}
+	if canvas := closureCanvas(canvases); canvas != nil {
+		skip[canvas.ID] = struct{}{}
+		rows = append(rows, publicAutomation{
+			ID:        "closure",
+			Kind:      "pr-closure",
+			Name:      "PR Closure",
+			CatalogID: "pr-closure",
+			Icon:      publicIconGitHub,
+			Health:    "healthy",
+		})
+	}
+	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyDone, skip)...)
+}
+
+func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
+	rows := make([]publicAutomation, 0, len(handlers))
+	for index, handler := range handlers {
+		kind := "pr-discussion"
+		name := "Pull request comments"
+		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+			kind = "pr-checks"
+			name = "Pull request checks"
+		}
+		if canvasName := strings.TrimSpace(handler.Name()); canvasName != "" {
+			name = canvasName
+		}
+		rows = append(rows, publicAutomation{
+			ID:        "feedback-" + strconv.Itoa(index),
+			Kind:      kind,
+			Name:      name,
+			CatalogID: kind,
+			Icon:      publicIconGitHub,
+			Health:    "healthy",
+		})
+	}
+	return rows
+}
+
+func customColumnAutomations(canvases []models.Canvas, column string, skip map[uuid.UUID]struct{}) []publicAutomation {
+	rows := []publicAutomation{}
+	for _, canvas := range canvases {
+		if _, omitted := skip[canvas.ID]; omitted || canvas.ColumnKey == nil || *canvas.ColumnKey != column {
+			continue
+		}
+		name := strings.TrimSpace(canvas.Name)
+		if name == "" {
+			continue
+		}
+		rows = append(rows, publicAutomation{
+			ID:        column + "-" + strconv.Itoa(len(rows)),
+			Kind:      "custom",
+			Name:      name,
+			CatalogID: "custom",
+			Health:    "healthy",
+		})
+	}
+	return rows
+}
+
+func backlogAnalysisCanvas(canvases []models.Canvas) *models.Canvas {
+	for i := range canvases {
+		name := strings.TrimSpace(canvases[i].Name)
+		if name == "Backlog" || name == "Ingest" {
+			return &canvases[i]
+		}
+	}
+	return nil
+}
+
+func closureCanvas(canvases []models.Canvas) *models.Canvas {
+	for i := range canvases {
+		if canvases[i].ColumnKey != nil && strings.TrimSpace(*canvases[i].ColumnKey) != "" {
+			continue
+		}
+		if strings.TrimSpace(canvases[i].Name) == "PR Closure" {
+			return &canvases[i]
+		}
+	}
+	return nil
+}
+
+func isRiskScoreCanvas(canvas models.Canvas) bool {
+	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyVerify {
+		return false
+	}
+	name := strings.TrimSpace(canvas.Name)
+	return name == "Risk score" || riskScoreCanvasName.MatchString(name)
 }
 
 func intakeSourceName(source string) string {
@@ -661,16 +907,30 @@ func intakeSourceName(source string) string {
 	}
 }
 
-func labelsForColumn(canvases []models.Canvas, column string) []string {
-	labels := []string{}
-	for _, canvas := range canvases {
-		if canvas.ColumnKey == nil || *canvas.ColumnKey != column {
-			continue
-		}
-		name := strings.TrimSpace(canvas.Name)
-		if name != "" {
-			labels = append(labels, name)
-		}
+const (
+	publicIconGitHub     = "github"
+	publicIconSentry     = "sentry"
+	publicIconJira       = "jira"
+	publicIconPagerDuty  = "pagerduty"
+	publicIconProductive = "productive"
+	publicIconDatadog    = "datadog"
+)
+
+func intakeIcon(source string) string {
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceDependabotAlerts:
+		return publicIconGitHub
+	case models.FactoryIntakeSourceSentryExceptions:
+		return publicIconSentry
+	case models.FactoryIntakeSourceJiraIssues:
+		return publicIconJira
+	case models.FactoryIntakeSourcePagerDutyIncidents:
+		return publicIconPagerDuty
+	case models.FactoryIntakeSourceProductiveTasks:
+		return publicIconProductive
+	case models.FactoryIntakeSourceDatadog:
+		return publicIconDatadog
+	default:
+		return ""
 	}
-	return labels
 }
