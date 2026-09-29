@@ -137,7 +137,9 @@ describe("OrganizationSettingsOverviewPage", () => {
     expect(screen.getByTestId("organization-settings-danger-zone")).toHaveTextContent("Danger zone");
     expect(screen.getByTestId("organization-settings-delete-button")).toHaveTextContent("Delete organization");
     expect(
-      screen.getByText("SuperPlane permanently removes all workspaces, members, and settings in this organization."),
+      screen.getByText(
+        "You lose access now. SuperPlane keeps this organization for at least 30 days, then removes it.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -156,6 +158,7 @@ describe("OrganizationSettingsOverviewPage", () => {
     await user.click(screen.getByTestId("organization-settings-delete-button"));
     const confirm = screen.getByTestId("organization-delete-confirm-button");
     expect(confirm).toBeDisabled();
+    expect(screen.getByText("Removal can take longer when workspaces or integrations remain.")).toBeInTheDocument();
     expect(screen.getByText("If this organization has a Business plan, SuperPlane cancels it.")).toBeInTheDocument();
 
     const confirmation = screen.getByLabelText('Type "Acme" to confirm');
@@ -196,7 +199,7 @@ describe("OrganizationSettingsOverviewPage", () => {
 
     await user.click(screen.getByTestId("organization-settings-delete-button"));
     await user.type(screen.getByLabelText('Type "Acme" to confirm'), "Ac");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Keep organization" }));
     await user.click(screen.getByTestId("organization-settings-delete-button"));
 
     expect(screen.getByLabelText('Type "Acme" to confirm')).toHaveValue("");

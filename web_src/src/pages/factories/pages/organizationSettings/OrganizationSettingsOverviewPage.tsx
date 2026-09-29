@@ -201,7 +201,7 @@ function OrganizationDangerZone({ canDelete, permissionsLoading, onOpenDelete }:
         <div className="min-w-0 space-y-0.5">
           <p className="text-[13px] font-medium text-foreground">Delete organization</p>
           <p className="text-[12px] text-muted-foreground">
-            SuperPlane permanently removes all workspaces, members, and settings in this organization.
+            You lose access now. SuperPlane keeps this organization for at least 30 days, then removes it.
           </p>
         </div>
         <PermissionTooltip
