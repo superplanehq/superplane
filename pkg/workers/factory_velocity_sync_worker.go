@@ -378,6 +378,7 @@ func repositoryMergeRows(
 		)
 		row.AuthorLogin = merge.authorLogin
 		row.AuthorName = merge.authorName
+		row.AuthorEmail = merge.authorEmail
 		row.AuthorAvatarURL = merge.authorAvatarURL
 		rows = append(rows, row)
 	}
@@ -468,6 +469,7 @@ type repositoryMerge struct {
 	source          string
 	authorLogin     string
 	authorName      string
+	authorEmail     string
 	authorAvatarURL string
 	mergedAt        time.Time
 }
@@ -609,6 +611,7 @@ func toRepositoryMerge(
 		source:          models.FactoryVelocityMergeSourcePeople,
 		authorLogin:     pullRequest.GetUser().GetLogin(),
 		authorName:      pullRequest.GetUser().GetName(),
+		authorEmail:     pullRequest.GetUser().GetEmail(),
 		authorAvatarURL: pullRequest.GetUser().GetAvatarURL(),
 		mergedAt:        mergedAt,
 	}

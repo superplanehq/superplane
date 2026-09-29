@@ -29,6 +29,11 @@ const factoryVelocityRepositoryMergeBatchSize = 200
 //
 // MergedAt keeps the exact merge instant, so the velocity chart buckets a merge
 // into the correct day whatever timezone it is rendered in.
+//
+// AuthorEmail is the author's public GitHub email, when they chose to show one
+// on their profile. The velocity report matches it against a member's
+// SuperPlane email, so a member who never linked a GitHub account still gets
+// one row instead of a second one keyed by their login.
 type FactoryVelocityRepositoryMerge struct {
 	ID              uuid.UUID
 	OrganizationID  uuid.UUID
@@ -38,6 +43,7 @@ type FactoryVelocityRepositoryMerge struct {
 	Source          string
 	AuthorLogin     string
 	AuthorName      string
+	AuthorEmail     string
 	AuthorAvatarURL string
 	MergedAt        time.Time
 	CreatedAt       time.Time
@@ -111,6 +117,7 @@ func ReplaceFactoryVelocityRepositoryMerges(
 			"source",
 			"author_login",
 			"author_name",
+			"author_email",
 			"author_avatar_url",
 			"merged_at",
 			"updated_at",

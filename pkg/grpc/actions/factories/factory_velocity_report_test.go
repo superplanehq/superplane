@@ -218,6 +218,65 @@ func TestVelocityPeopleBuilder_KeepsAuthorsOutsideTheOrganization(t *testing.T) 
 	assert.Equal(t, "outside-contributor", rows[0].name, "the login stands in for a missing name")
 }
 
+// TestVelocityPeopleBuilder_JoinsAuthorByEmailWhenLoginDoesNotMatch covers a
+// member who never linked or signed in with GitHub: their GitHubLogin is
+// empty, so only their public GitHub email can join the author to the member.
+func TestVelocityPeopleBuilder_JoinsAuthorByEmailWhenLoginDoesNotMatch(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Luca Mancini", Email: "LMancini@Example.com"},
+	})
+
+	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{
+		AuthorLogin:     "mancinux",
+		AuthorEmail:     "lmancini@example.com",
+		AuthorAvatarURL: "https://avatars/mancinux",
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1, "the author's public email joins them to the member, instead of a second row keyed by their login")
+	assert.Equal(t, userID.String(), rows[0].id)
+	assert.Equal(t, "Luca Mancini", rows[0].name)
+	assert.Equal(t, 1, rows[0].authoredMerged)
+}
+
+// TestVelocityPeopleBuilder_GitHubLoginMatchWinsOverEmail covers two members
+// where one linked the GitHub login the merge names, and another merely shares
+// an email with it. The linked login is a stronger, explicit signal, so it
+// must win over a coincidental email match.
+func TestVelocityPeopleBuilder_GitHubLoginMatchWinsOverEmail(t *testing.T) {
+	linkedID, otherID := uuid.New(), uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: linkedID, Name: "Linked Member", GitHubLogin: "octocat"},
+		{UserID: otherID, Name: "Other Member", Email: "octocat@example.com"},
+	})
+
+	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{
+		AuthorLogin: "octocat",
+		AuthorEmail: "octocat@example.com",
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, linkedID.String(), rows[0].id, "a linked GitHub login is a stronger signal than a shared email")
+}
+
+// TestVelocityPeopleBuilder_IgnoresAuthorEmailWithNoMember covers an author
+// whose public email matches nobody in the organization: they still get a row
+// keyed by their login, same as any other outside contributor.
+func TestVelocityPeopleBuilder_IgnoresAuthorEmailWithNoMember(t *testing.T) {
+	builder := newVelocityPeopleBuilder(nil)
+
+	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{
+		AuthorLogin: "outside-contributor",
+		AuthorEmail: "outside@example.com",
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "github:outside-contributor", rows[0].id)
+}
+
 func TestVelocityPeopleBuilder_SkipsAutomationOrders(t *testing.T) {
 	builder := newVelocityPeopleBuilder(nil)
 
