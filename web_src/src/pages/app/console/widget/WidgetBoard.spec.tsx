@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "bun:test";
@@ -272,5 +272,77 @@ describe("WidgetBoard row actions", () => {
       [PR_NODE],
     );
     expect(screen.queryByTestId("widget-row-action-on-pr")).toBeNull();
+  });
+});
+
+describe("WidgetBoard costs action", () => {
+  const COST_ROWS = [
+    { id: "run-1", title: "Expensive task", status: "Done", costCents: 1500, totalTokens: 500000 },
+    { id: "run-2", title: "Cheap task", status: "Done", costCents: 50, totalTokens: 10000 },
+    { id: "run-3", title: "Free task", status: "Done", costCents: 0, totalTokens: 0 },
+    { id: "run-4", title: "Mid task", status: "Done", costCents: 750, totalTokens: 200000 },
+  ];
+
+  it("shows a Costs button on the Done lane header", () => {
+    renderBoard({ rows: COST_ROWS });
+    const doneLane = screen.getAllByTestId("widget-board-lane")[2];
+    expect(within(doneLane).getByTestId("widget-board-lane-costs")).toBeTruthy();
+  });
+
+  it("does not show the Costs button on other lanes", () => {
+    renderBoard({ rows: COST_ROWS });
+    const todoLane = screen.getAllByTestId("widget-board-lane")[0];
+    expect(within(todoLane).queryByTestId("widget-board-lane-costs")).toBeNull();
+  });
+
+  it("opens the costs dialog when the Costs button is clicked", async () => {
+    renderBoard({ rows: COST_ROWS });
+    const costsButton = screen.getByTestId("widget-board-lane-costs");
+    await act(async () => {
+      fireEvent.click(costsButton);
+    });
+    expect(screen.getByRole("dialog", { name: /Costs/ })).toBeInTheDocument();
+  });
+
+  it("sorts tasks by costCents descending", async () => {
+    renderBoard({ rows: COST_ROWS });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("widget-board-lane-costs"));
+    });
+    const costCells = screen.getAllByTestId("costs-row").map(
+      (row) => within(row).getAllByRole("link")[2].textContent,
+    );
+    expect(costCells).toEqual(["$15.00", "$7.50", "$0.50", "\u2014"]);
+  });
+
+  it("shows an em dash for tasks with zero cost", async () => {
+    renderBoard({ rows: COST_ROWS });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("widget-board-lane-costs"));
+    });
+    const costCells = screen.getAllByTestId("costs-row");
+    const lastRowCost = within(costCells[3]).getAllByRole("link")[2].textContent;
+    expect(lastRowCost).toBe("\u2014");
+  });
+
+  it("shows token count for each task", async () => {
+    renderBoard({ rows: COST_ROWS });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("widget-board-lane-costs"));
+    });
+    const costRows = screen.getAllByTestId("costs-row");
+    const tokenCells = costRows.map((row) => within(row).getAllByRole("link")[3].textContent);
+    expect(tokenCells).toEqual(["500k tokens", "200k tokens", "10k tokens", "\u2014"]);
+  });
+
+  it("each row links to the run detail page", async () => {
+    renderBoard({ rows: COST_ROWS });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("widget-board-lane-costs"));
+    });
+    const links = within(screen.getByRole("dialog")).getAllByRole("link");
+    expect(links).toHaveLength(16); // 4 rows × 4 columns
+    const firstRowLinks = within(screen.getAllByTestId("costs-row")[0]).getAllByRole("link");
+    expect(firstRowLinks[0].getAttribute("href")).toContain("run=run-1");
   });
 });

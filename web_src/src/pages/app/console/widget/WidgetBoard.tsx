@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { Kanban, Loader2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Coins, Kanban, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 import { normalizeBoardLaneValue } from "../boardPanelContent";
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
@@ -13,6 +14,7 @@ import { resolveCellValue } from "./resolveCellValue";
 import { evaluateRowShow } from "./rowVisibility";
 import { applySort } from "./widgetData";
 import { WidgetBoardCardField } from "./WidgetBoardCardField";
+import { WidgetBoardCostsDialog } from "./WidgetBoardCostsDialog";
 import { WidgetRowActionButton } from "./WidgetRowActionButton";
 import { rowKeyForRow } from "./rowKey";
 import { WidgetLoadMoreFooter } from "./WidgetTable";
@@ -53,6 +55,24 @@ export function WidgetBoard({
   displayCount,
 }: WidgetBoardProps) {
   const ctx = useConsoleContext();
+
+  const [showCosts, setShowCosts] = useState(false);
+  const costsLaneValue = useMemo(
+    () => {
+      const lane = render.lanes.find((l) => normalizeBoardLaneValue(l.value) === "done");
+      return lane ? lane.value : undefined;
+    },
+    [render.lanes],
+  );
+
+  const handleShowCosts = useCallback(() => {
+    if (hasMore && onLoadMore) {
+      for (let i = 0; i < 10; i += 1) {
+        onLoadMore();
+      }
+    }
+    setShowCosts(true);
+  }, [hasMore, onLoadMore]);
 
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
@@ -126,14 +146,29 @@ export function WidgetBoard({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
-        <BoardLanes lanes={lanes} rowActions={rowActions} render={render} />
-      </WidgetTableActionLockProvider>
-      {hasMore && onLoadMore ? (
-        <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
-      ) : null}
-    </div>
+    <>
+      <div className="flex h-full min-h-0 flex-col">
+        <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
+          <BoardLanes
+            lanes={lanes}
+            rowActions={rowActions}
+            render={render}
+            costsLaneValue={costsLaneValue}
+            onShowCosts={handleShowCosts}
+          />
+        </WidgetTableActionLockProvider>
+        {hasMore && onLoadMore ? (
+          <WidgetLoadMoreFooter isFetchingMore={Boolean(isFetchingMore)} onLoadMore={onLoadMore} />
+        ) : null}
+      </div>
+      <WidgetBoardCostsDialog
+        open={showCosts}
+        onOpenChange={setShowCosts}
+        render={render}
+        rows={recordRows}
+        isLoading={isLoading}
+      />
+    </>
   );
 }
 
@@ -141,10 +176,14 @@ function BoardLanes({
   lanes,
   rowActions,
   render,
+  costsLaneValue,
+  onShowCosts,
 }: {
   lanes: LaneBucket[];
   rowActions: WidgetRowAction[];
   render: WidgetBoardRender;
+  costsLaneValue?: string;
+  onShowCosts: () => void;
 }) {
   return (
     <div
@@ -153,7 +192,14 @@ function BoardLanes({
       data-groupby={render.groupBy}
     >
       {lanes.map((bucket) => (
-        <BoardLane key={bucket.key} bucket={bucket} rowActions={rowActions} render={render} />
+        <BoardLane
+          key={bucket.key}
+          bucket={bucket}
+          rowActions={rowActions}
+          render={render}
+          showCostsAction={costsLaneValue != null && normalizeBoardLaneValue(bucket.lane.value) === normalizeBoardLaneValue(costsLaneValue)}
+          onShowCosts={onShowCosts}
+        />
       ))}
     </div>
   );
@@ -163,10 +209,14 @@ function BoardLane({
   bucket,
   rowActions,
   render,
+  showCostsAction,
+  onShowCosts,
 }: {
   bucket: LaneBucket;
   rowActions: WidgetRowAction[];
   render: WidgetBoardRender;
+  showCostsAction: boolean;
+  onShowCosts: () => void;
 }) {
   const laneStyle = laneStyleFor(bucket.lane.color);
   const laneLabel = bucket.lane.label?.trim() ? bucket.lane.label : bucket.lane.value;
@@ -182,16 +232,35 @@ function BoardLane({
           laneStyle.header,
         )}
       >
-        <span className="truncate text-xs font-medium">{laneLabel}</span>
-        <span
-          className={cn(
-            "ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-            laneStyle.badge,
-          )}
-          data-testid="widget-board-lane-count"
-        >
-          {bucket.rows.length}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-xs font-medium">{laneLabel}</span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+              laneStyle.badge,
+            )}
+            data-testid="widget-board-lane-count"
+          >
+            {bucket.rows.length}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {showCostsAction ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShowCosts();
+              }}
+              aria-label="Costs"
+              data-testid="widget-board-lane-costs"
+            >
+              <Coins className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
       </div>
       <div
         className={cn("flex-1 space-y-2 overflow-y-auto border-l-2 p-2", laneStyle.strip)}
