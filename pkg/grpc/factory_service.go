@@ -56,6 +56,11 @@ func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactor
 	return actions.UpdateFactory(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SetFactoryVisibility(ctx context.Context, req *pb.SetFactoryVisibilityRequest) (*pb.SetFactoryVisibilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SetFactoryVisibility(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.UpdateFactoryOnboardingRequest) (*pb.UpdateFactoryOnboardingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
