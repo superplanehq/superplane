@@ -134,10 +134,15 @@ const useFactoryPRFeedbackHandlers = vi.fn(
     data?: { id?: string; source?: string; healthy?: boolean }[];
     isPending?: boolean;
     isError?: boolean;
+    refetch?: () => Promise<{
+      data?: { id?: string; source?: string; healthy?: boolean }[];
+      error?: Error | null;
+    }>;
   } => ({
     data: [],
     isPending: false,
     isError: false,
+    refetch: vi.fn().mockResolvedValue({ data: [], error: null }),
   }),
 );
 const createFactoryPRFeedbackHandler = vi.fn();
@@ -321,7 +326,11 @@ async function resetLinesBoardMocks() {
   createFactoryAutomationMutateAsync.mockReset();
   deleteFactoryAutomationMutateAsync.mockReset();
   createFactoryPRFeedbackHandler.mockReset();
-  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [], isPending: false });
+  useFactoryPRFeedbackHandlers.mockReturnValue({
+    data: [],
+    isPending: false,
+    refetch: vi.fn().mockResolvedValue({ data: [], error: null }),
+  });
   searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
   importFactoryIntakeItem.mockReset();
   refreshBacklogMutateAsync.mockReset();
@@ -853,6 +862,25 @@ describe("LinesPage board", () => {
 describe("LinesPage next steps", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
+  });
+
+  it("does not create a second handler when a fresh list already has one", async () => {
+    const refetch = vi.fn().mockResolvedValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" }],
+      error: null,
+    });
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [],
+      isPending: false,
+      refetch,
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalled();
+    });
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(screen.queryByText("How should pull request comments be handled?")).not.toBeInTheDocument();
   });
 
   it("creates comment handling and hides the comments question", async () => {

@@ -188,6 +188,32 @@ describe("provisionWorkspace", () => {
     expect(createPRFeedbackHandler).toHaveBeenCalledTimes(1);
   });
 
+  it("completes setup when the discussion handler cannot be created", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createPRFeedbackHandler = vi.fn().mockRejectedValue(new Error("failed"));
+
+    const result = await provisionWorkspace(provisionArgs({ updateOnboarding, createPRFeedbackHandler }));
+
+    expect(result).toEqual({ lineId: "line-1" });
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete === true)).toBe(true);
+  });
+
+  it("completes setup when discussion handlers cannot be listed", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createPRFeedbackHandler = vi.fn();
+
+    await provisionWorkspace(
+      provisionArgs({
+        updateOnboarding,
+        createPRFeedbackHandler,
+        listPRFeedbackHandlers: vi.fn().mockRejectedValue(new Error("failed")),
+      }),
+    );
+
+    expect(createPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete === true)).toBe(true);
+  });
+
   it("does not create a GitHub intake when the ticket source is Jira without a project", async () => {
     const createIntake = vi.fn();
 

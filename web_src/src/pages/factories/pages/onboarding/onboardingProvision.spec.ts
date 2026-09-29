@@ -7,6 +7,7 @@ import {
   GITHUB_INTAKE_SOURCE,
   JIRA_INTAKE_SOURCE,
   provisionDiscussionHandler,
+  provisionDiscussionHandlerWithoutBlocking,
   provisionEventApps,
   provisionGithubIntake,
   provisionJiraIntake,
@@ -459,5 +460,23 @@ describe("provisionDiscussionHandler", () => {
 
     expect(createHandler).toHaveBeenCalledTimes(1);
     expect(createHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
+  });
+
+  it("continues when listing or creating the handler fails", async () => {
+    await expect(
+      provisionDiscussionHandlerWithoutBlocking({
+        listHandlers: vi.fn().mockRejectedValue(new Error("list failed")),
+        createHandler: vi.fn(),
+      }),
+    ).resolves.toBeUndefined();
+
+    const createHandler = vi.fn().mockRejectedValue(new Error("create failed"));
+    await expect(
+      provisionDiscussionHandlerWithoutBlocking({
+        listHandlers: vi.fn().mockResolvedValue([]),
+        createHandler,
+      }),
+    ).resolves.toBeUndefined();
+    expect(createHandler).toHaveBeenCalledTimes(1);
   });
 });

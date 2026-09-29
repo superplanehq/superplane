@@ -21,7 +21,7 @@ import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
-  provisionDiscussionHandler,
+  provisionDiscussionHandlerWithoutBlocking,
   provisionEventApps,
   provisionOnboardingIntake,
   provisionLine,
@@ -198,7 +198,7 @@ export async function provisionWorkspace(args: {
     issuesChoice: args.issuesChoice,
     jira: args.jira,
   });
-  await provisionDiscussionHandler({
+  await provisionDiscussionHandlerWithoutBlocking({
     listHandlers: args.listPRFeedbackHandlers,
     createHandler: args.createPRFeedbackHandler,
   });

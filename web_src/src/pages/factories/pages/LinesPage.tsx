@@ -455,7 +455,13 @@ export function LinesPage() {
   const discussionProvision = useAutoProvisionDiscussionHandler({
     factoryId,
     enabled: shouldProvisionDiscussion,
-    listHandlers: async () => prFeedbackHandlers,
+    listHandlers: async () => {
+      const listed = await prFeedbackHandlersQuery.refetch();
+      if (listed.error) {
+        throw listed.error;
+      }
+      return listed.data ?? [];
+    },
     createHandler: createPRFeedbackHandler.mutateAsync,
   });
   const hideCommentsNextStep = shouldProvisionDiscussion && !discussionProvision.failed;

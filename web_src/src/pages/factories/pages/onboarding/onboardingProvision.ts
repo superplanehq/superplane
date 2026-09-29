@@ -306,6 +306,17 @@ export async function provisionDiscussionHandler(args: {
   await args.createHandler(discussionHandlerCreateInput());
 }
 
+export async function provisionDiscussionHandlerWithoutBlocking(args: {
+  listHandlers: ListFactoryPRFeedbackHandlers;
+  createHandler: CreateDiscussionHandler;
+}): Promise<void> {
+  try {
+    await provisionDiscussionHandler(args);
+  } catch {
+    return;
+  }
+}
+
 export async function provisionLine(args: {
   factory: FactoriesFactory | null;
   savedLineId?: string;

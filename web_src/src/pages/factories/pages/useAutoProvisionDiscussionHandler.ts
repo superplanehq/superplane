@@ -18,7 +18,8 @@ export function useAutoProvisionDiscussionHandler(args: {
   listHandlers: ListFactoryPRFeedbackHandlers;
   createHandler: CreateDiscussionHandler;
 }): { failed: boolean } {
-  const [failed, setFailed] = useState(false);
+  const [failedFactoryId, setFailedFactoryId] = useState<string | null>(null);
+  const failed = Boolean(args.factoryId) && failedFactoryId === args.factoryId;
   const listHandlersRef = useRef(args.listHandlers);
   const createHandlerRef = useRef(args.createHandler);
   listHandlersRef.current = args.listHandlers;
@@ -29,8 +30,9 @@ export function useAutoProvisionDiscussionHandler(args: {
       return;
     }
 
+    const factoryId = args.factoryId;
     let active = true;
-    const existing = discussionProvisionInFlight.get(args.factoryId);
+    const existing = discussionProvisionInFlight.get(factoryId);
     const attempt =
       existing ??
       provisionDiscussionHandler({
@@ -38,21 +40,21 @@ export function useAutoProvisionDiscussionHandler(args: {
         createHandler: (input) => Promise.resolve(createHandlerRef.current(input)),
       });
     if (!existing) {
-      discussionProvisionInFlight.set(args.factoryId, attempt);
+      discussionProvisionInFlight.set(factoryId, attempt);
     }
 
     void attempt.then(
       () => {
-        if (discussionProvisionInFlight.get(args.factoryId) === attempt) {
-          discussionProvisionInFlight.delete(args.factoryId);
+        if (discussionProvisionInFlight.get(factoryId) === attempt) {
+          discussionProvisionInFlight.delete(factoryId);
         }
       },
       () => {
-        if (discussionProvisionInFlight.get(args.factoryId) === attempt) {
-          discussionProvisionInFlight.delete(args.factoryId);
+        if (discussionProvisionInFlight.get(factoryId) === attempt) {
+          discussionProvisionInFlight.delete(factoryId);
         }
         if (active) {
-          setFailed(true);
+          setFailedFactoryId(factoryId);
         }
       },
     );
