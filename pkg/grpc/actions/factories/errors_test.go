@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -94,6 +95,15 @@ func Test__factoryErrorToStatus(t *testing.T) {
 
 func Test__intakeErrorToStatus(t *testing.T) {
 	for _, source := range liveIntakeClientErrors() {
+		t.Run(source.name+" 401 becomes a failed precondition", func(t *testing.T) {
+			err := intakeErrorToStatus(source.statusError(http.StatusUnauthorized), "failed to search factory intake items")
+
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.FailedPrecondition, code)
+			assert.Equal(t, intakeConnectFirstMessage, message)
+		})
+
 		t.Run(source.name+" 403 becomes a failed precondition", func(t *testing.T) {
 			err := intakeErrorToStatus(source.statusError(http.StatusForbidden), "failed to search factory intake items")
 
@@ -152,6 +162,29 @@ func Test__intakeErrorToStatus(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Equal(t, intakeConnectFirstMessage, message)
+	})
+
+	t.Run("a Jira 401 whose token refresh hit 429 stays Internal", func(t *testing.T) {
+		sourceErr := fmt.Errorf(
+			"request got 401 and token refresh failed: %w",
+			&jira.APIError{StatusCode: http.StatusTooManyRequests},
+		)
+
+		err := intakeErrorToStatus(sourceErr, "failed to search factory intake items")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("Dependabot unavailable stays a failed precondition", func(t *testing.T) {
+		err := intakeErrorToStatus(ghdependabot.ErrAlertsDisabled, "failed to search dependabot setup items")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, ghdependabot.AlertsDisabledMessage, message)
 	})
 }
 

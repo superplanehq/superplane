@@ -159,12 +159,17 @@ func (c *Client) recoverFromUnauthorized() error {
 				return nil
 			}
 		}
-		return errors.Join(
-			&APIError{StatusCode: http.StatusUnauthorized},
-			fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr),
-		)
+		return unauthorizedRefreshError(refreshErr)
 	}
 	return nil
+}
+
+func unauthorizedRefreshError(refreshErr error) error {
+	wrapped := fmt.Errorf("request got 401 and token refresh failed: %w", refreshErr)
+	if IsRetryableAPIError(refreshErr) {
+		return wrapped
+	}
+	return errors.Join(&APIError{StatusCode: http.StatusUnauthorized}, wrapped)
 }
 
 func (c *Client) doRequest(method, requestURL string, body []byte) ([]byte, int, error) {
@@ -326,7 +331,7 @@ func (a *Auth) requestToken(body map[string]string) (*TokenResponse, error) {
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("token request got %d: %s", res.StatusCode, string(responseBody))
+		return nil, &APIError{StatusCode: res.StatusCode, Body: string(responseBody)}
 	}
 
 	var token TokenResponse
