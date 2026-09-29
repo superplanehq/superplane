@@ -6,7 +6,9 @@ import { SegmentedNav } from "@/ui/SegmentedNav";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { JumpToLatestPill } from "../JumpToLatestPill";
+import type { AgentActivity } from "../agentActivity";
+import { activityFollowTick, activityFromAgentStep } from "./activityFromAgentStep";
+import { StepMarkerDetail } from "./AgentStepMarkerBody";
 import { useFollowLogScroll } from "../useFollowLogScroll";
 import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
@@ -137,22 +139,55 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
   );
 }
 
-export function AgentStepMarkers({ stage, expandSteps = false }: { stage: AutomationStage; expandSteps?: boolean }) {
+export function AgentStepMarkers({
+  stage,
+  expandSteps = false,
+  liveActivity,
+  liveActive = false,
+}: {
+  stage: AutomationStage;
+  expandSteps?: boolean;
+  /** Live turn for the open running step. Finished steps keep the collapsible body. */
+  liveActivity?: AgentActivity;
+  liveActive?: boolean;
+}) {
   if (stage.agentSteps.length === 0) {
     return null;
   }
+  const liveStepId = liveActive
+    ? [...stage.agentSteps].reverse().find((step) => step.status === "running")?.id
+    : undefined;
   return (
     <div className="flex flex-col" data-testid={`redesign-agent-steps-${stage.id}`}>
       {stage.agentSteps.map((step) => (
-        <AgentStepMarker key={step.id} step={step} defaultOpen={expandSteps} />
+        <AgentStepMarker
+          key={step.id}
+          step={step}
+          defaultOpen={expandSteps}
+          liveActivity={step.id === liveStepId ? liveActivity : undefined}
+          liveActive={step.id === liveStepId}
+          liveTestId={`redesign-live-activity-${stage.id}`}
+        />
       ))}
     </div>
   );
 }
 
-function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defaultOpen?: boolean }) {
-  const expandable = step.events.length > 0 || Boolean(step.output);
+function AgentStepMarker({
+  step,
+  defaultOpen = false,
+  liveActivity,
+  liveActive = false,
+  liveTestId,
+}: {
+  step: AgentStep;
+  defaultOpen?: boolean;
+  liveActivity?: AgentActivity;
+  liveActive?: boolean;
+  liveTestId?: string;
+}) {
   const running = step.status === "running";
+  const expandable = step.events.length > 0 || Boolean(step.output) || liveActive;
   const [open, setOpen] = useState(running || defaultOpen);
   const userToggled = useRef(false);
   useEffect(() => {
@@ -161,7 +196,11 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
     }
   }, [defaultOpen, running]);
   const reason = open && !step.summary ? "" : stepReason(step);
-  const follow = useFollowLogScroll<HTMLDivElement>(running ? step.id : null, step.events.length);
+  const activity = liveActivity && liveActivity.items.length > 0 ? liveActivity : activityFromAgentStep(step);
+  const follow = useFollowLogScroll<HTMLDivElement>(
+    running ? step.id : null,
+    liveActive ? activityFollowTick(activity) : step.events.length,
+  );
   const row = (
     <Marker className={cn("min-w-0 py-1", running && "bg-muted")}>
       <MarkerIcon className="text-muted-foreground">
@@ -175,6 +214,7 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
       </MarkerIcon>
       <MarkerContent className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[13px] leading-5 text-foreground">
         <span className="max-w-[50%] shrink-0 truncate">{step.title}</span>
+        {step.type === "node" ? <NodeIcon iconSlug={step.iconSlug} /> : <ToolKindIcon type={step.type} />}
         <StepStatusBadge status={step.status} />
         {reason ? (
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
@@ -204,31 +244,16 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="min-w-0">
-        {running ? (
-          <div className="relative min-w-0">
-            <div
-              ref={follow.scrollRef}
-              onScroll={follow.onScroll}
-              className={cn(
-                "flex min-w-0 flex-col gap-2 overflow-y-auto py-1 pl-6",
-                defaultOpen ? "max-h-[60vh]" : "max-h-80",
-              )}
-              data-testid={`redesign-step-log-${step.id}`}
-            >
-              <StepDetail step={step} />
-            </div>
-            {follow.showJumpToLatest ? (
-              <JumpToLatestPill
-                onJumpToLatest={() => follow.setFollowing(true)}
-                testId={`redesign-step-older-${step.id}`}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 py-1 pl-6">
-            <StepDetail step={step} />
-          </div>
-        )}
+        <StepMarkerDetail
+          step={step}
+          activity={activity}
+          running={running}
+          liveActive={liveActive}
+          liveActivity={liveActivity}
+          liveTestId={liveTestId}
+          defaultOpen={defaultOpen}
+          follow={follow}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
