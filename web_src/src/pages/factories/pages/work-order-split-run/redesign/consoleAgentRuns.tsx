@@ -102,25 +102,25 @@ function AgentRunRow({
     <Collapsible defaultOpen={defaultOpen} className="group py-1.5 first:pt-0 last:pb-0">
       <div className="relative flex items-center gap-1.5 py-1">
         <CollapsibleTrigger className="absolute inset-0 z-0 cursor-pointer" aria-label={`Toggle ${title}`} />
-        <ChevronRight
-          className="relative z-10 size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-          aria-hidden
-        />
-        {clock ? (
-          <span className={cn(META_TEXT_CLASSNAME, "relative z-10 shrink-0 tabular-nums")}>{clock}</span>
-        ) : null}
-        <span className="relative z-10">
+        <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 items-center gap-1.5">
+          <ChevronRight
+            className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden
+          />
+          {clock ? <span className={cn(META_TEXT_CLASSNAME, "shrink-0 tabular-nums")}>{clock}</span> : null}
           <StaticStatusGlyph status={run.status} />
-        </span>
-        <MarkdownContent
-          content={run.name}
-          variant="workspace"
-          openLinksInNewTab
-          linkClassName={cn(RUN_LINK, "relative z-10")}
-          className={cn(RUN_TITLE_MARKDOWN, "pointer-events-none relative z-10 flex-1 [&_a]:pointer-events-auto")}
-        />
+          <MarkdownContent
+            content={run.name}
+            variant="workspace"
+            openLinksInNewTab
+            linkClassName={RUN_LINK}
+            className={cn(RUN_TITLE_MARKDOWN, "flex-1 [&_a]:pointer-events-auto")}
+          />
+        </div>
         {run.duration ? (
-          <span className={cn(META_TEXT_CLASSNAME, "relative z-10 shrink-0 tabular-nums")}>{run.duration}</span>
+          <span className={cn(META_TEXT_CLASSNAME, "pointer-events-none relative z-10 shrink-0 tabular-nums")}>
+            {run.duration}
+          </span>
         ) : null}
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
