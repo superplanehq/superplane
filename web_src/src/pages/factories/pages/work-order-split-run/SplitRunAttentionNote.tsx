@@ -105,6 +105,7 @@ export function SplitRunAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   startEmphasis = "filled",
   organizationId,
@@ -123,6 +124,8 @@ export function SplitRunAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  /** Compact note in a narrow column: full-width text, actions below. */
+  stacked?: boolean;
   /** Refine strip: actions only, no note. The strip shows its own verdict. */
   actionsOnly?: boolean;
   /** Weight of Start on the refine strip. The verdict decides it. */
@@ -163,6 +166,7 @@ export function SplitRunAttentionNote({
       startDisabled={startDisabled}
       modelSelect={modelSelect}
       compact={compact}
+      stacked={stacked}
       actionsOnly={actionsOnly}
       startEmphasis={startEmphasis}
       onAction={onAction}
@@ -180,6 +184,7 @@ function StandardAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   startEmphasis = "filled",
   onAction,
@@ -193,6 +198,7 @@ function StandardAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  stacked?: boolean;
   actionsOnly?: boolean;
   startEmphasis?: StartEmphasis;
   onAction?: (action: SplitRunFooterAction) => void;
@@ -220,6 +226,7 @@ function StandardAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        stacked={stacked}
         onAction={onAction}
       />
     );
@@ -267,6 +274,7 @@ function StandardAttentionNote({
   );
 }
 
+/** In a narrow column `stacked` gives the text the full width and moves the actions below it. */
 function CompactAttentionNote({
   note,
   actions,
@@ -275,6 +283,7 @@ function CompactAttentionNote({
   startBusy,
   startDisabled,
   modelSelect,
+  stacked = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -284,10 +293,14 @@ function CompactAttentionNote({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
+  stacked?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+    <div
+      className={cn("flex min-w-0 flex-1 gap-3", stacked ? "flex-col" : "items-center")}
+      data-testid="split-run-attention-note"
+    >
       <div
         key={`${note.headline}-${note.text ?? ""}`}
         className="sp-stream-text min-w-0 flex-1"
