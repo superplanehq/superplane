@@ -416,6 +416,7 @@ func layoutLarge(in Input) largeModel {
 type wideModel struct {
 	Font    string
 	Height  int
+	InnerH  int
 	Title   string
 	Texts   []placedText
 	Days    []dayBar
@@ -425,17 +426,13 @@ type wideModel struct {
 
 func layoutWide(in Input) wideModel {
 	m := derive(in)
-	const (
-		width  = 800
-		height = 240
-		maxX   = 780
-	)
+	const maxX = 780
 	items := []headerItem{
 		{text: "SuperPlane", size: 14, weight: "700", fill: colorText},
 	}
 	if m.showShare {
 		items = append(items, headerItem{
-			text: fmt.Sprintf("%d%%", m.share), size: 18, weight: "700", fill: colorSuperplane, dropRank: dropShare,
+			text: fmt.Sprintf("%d%%", m.share), size: 18, weight: "700", fill: colorSuperplane,
 		})
 		if m.showTrend {
 			items = append(items, headerItem{
@@ -462,20 +459,22 @@ func layoutWide(in Input) wideModel {
 	})
 	if m.showMerge {
 		items = append(items, headerItem{
-			text:     fmt.Sprintf("%d%% merge rate", m.mergeRate),
-			size:     12,
-			weight:   "400",
-			fill:     colorManual,
-			dropRank: dropRate,
+			text:   fmt.Sprintf("%d%% merge rate", m.mergeRate),
+			size:   12,
+			weight: "400",
+			fill:   colorManual,
 		})
 	}
 	if m.showCost {
-		items = append(items, headerItem{text: m.cost, size: 12, weight: "600", fill: colorText})
+		items = append(items, headerItem{
+			text: m.cost, size: 12, weight: "600", fill: colorText, wrap: true,
+		})
 	}
-	texts := placeHeader(items, 20, 30, maxX)
+	texts, headerExtra := placeHeader(items, 20, 30, maxX)
+	height := 240 + headerExtra
 
-	chart := layoutChart(in.Days, 24, 56, 752, 118)
-	legend, squares := layoutLegend(m, in.Updated, 24, 214, 776)
+	chart := layoutChart(in.Days, 24, 56+headerExtra, 752, 118)
+	legend, squares := layoutLegend(m, in.Updated, 24, 214+headerExtra, 776)
 	title := fmt.Sprintf("SuperPlane · %d PRs merged · last %d days", in.SuperplaneMerged, in.PeriodDays)
 	if m.showShare {
 		title = fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
@@ -483,6 +482,7 @@ func layoutWide(in Input) wideModel {
 	return wideModel{
 		Font:    fontFamily,
 		Height:  height,
+		InnerH:  height - 1,
 		Title:   escapeXML(title),
 		Texts:   texts,
 		Days:    chart,
@@ -492,10 +492,9 @@ func layoutWide(in Input) wideModel {
 }
 
 const (
-	dropShare  = 1
-	dropCount  = 2
-	dropRate   = 3
-	dropPhrase = 4
+	dropCount      = 1
+	dropPhrase     = 2
+	headerLineStep = 22
 )
 
 type headerItem struct {
@@ -504,16 +503,48 @@ type headerItem struct {
 	weight   string
 	fill     string
 	dropRank int
+	wrap     bool
 }
 
-func placeHeader(items []headerItem, startX, y, maxX int) []placedText {
+func placeHeader(items []headerItem, startX, y, maxX int) ([]placedText, int) {
+	primary := make([]headerItem, 0, len(items))
+	wrapped := make([]headerItem, 0)
+	for _, item := range items {
+		if item.wrap {
+			wrapped = append(wrapped, item)
+			continue
+		}
+		primary = append(primary, item)
+	}
+	if len(wrapped) == 0 {
+		return fitHeaderLine(primary, startX, y, maxX), 0
+	}
+	oneLine := append(append([]headerItem{}, primary...), wrapped...)
+	placed := fitHeaderLineAbove(oneLine, startX, y, maxX, dropPhrase)
+	if !headerOverflows(placed, maxX) {
+		return placed, 0
+	}
+	placed = fitHeaderLineAbove(primary, startX, y, maxX, dropPhrase)
+	if headerOverflows(placed, maxX) {
+		placed = fitHeaderLine(primary, startX, y, maxX)
+	}
+	secondY := y + headerLineStep
+	placed = append(placed, fitHeaderLine(wrapped, startX, secondY, maxX)...)
+	return placed, headerLineStep
+}
+
+func fitHeaderLine(items []headerItem, startX, y, maxX int) []placedText {
+	return fitHeaderLineAbove(items, startX, y, maxX, dropCount)
+}
+
+func fitHeaderLineAbove(items []headerItem, startX, y, maxX, minRank int) []placedText {
 	kept := append([]headerItem(nil), items...)
 	for {
 		placed := placeHeaderPass(kept, startX, y)
 		if !headerOverflows(placed, maxX) {
 			return placed
 		}
-		index := highestDropRank(kept)
+		index := highestDropRank(kept, minRank)
 		if index < 0 {
 			return placed
 		}
@@ -521,9 +552,9 @@ func placeHeader(items []headerItem, startX, y, maxX int) []placedText {
 	}
 }
 
-func highestDropRank(items []headerItem) int {
+func highestDropRank(items []headerItem, minRank int) int {
 	best := -1
-	bestRank := 0
+	bestRank := minRank - 1
 	for i, item := range items {
 		if item.dropRank > bestRank {
 			best = i
@@ -732,7 +763,7 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
 const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
   <title>{{.Title}}</title>
-  <rect x="0.5" y="0.5" width="799" height="239" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
   {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}"{{if .Anchor}} text-anchor="{{.Anchor}}"{{end}}>{{.Text}}</text>
   {{end}}{{range .Days}}<g class="day">
     {{range .Rects}}<rect x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}"{{if gt .Radius 0}} rx="{{.Radius}}"{{end}} fill="{{.Fill}}"/>{{end}}

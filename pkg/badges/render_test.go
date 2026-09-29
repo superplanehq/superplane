@@ -70,7 +70,7 @@ func TestRender_ZeroMergesHasNoBarsTrendMergeRateOrCost(t *testing.T) {
 		ShareKnown:               true,
 		PreviousSuperplaneMerged: 10,
 		PreviousPeopleMerged:     10,
-		Updated:                  time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC),
+		Updated:                  time.Now(),
 		Days:                     daysFor(14, 0, 0),
 	}
 	for _, size := range []Size{SizeLarge, SizeWide} {
@@ -186,30 +186,100 @@ func TestRender_WideKeepsLongCostInsideViewBox(t *testing.T) {
 	label := formatCostPerMerged(cost, in.SuperplaneMerged)
 	svg := mustRender(t, in)
 	parseSVG(t, svg)
-	assert.Contains(t, svg, label)
+	assertWideKeepsCostAndMetrics(t, svg, label)
+}
+
+func TestRender_WideKeepsMetricsWhenCostIsShown(t *testing.T) {
+	in := exampleInput()
+	in.Size = SizeWide
+	svg := mustRender(t, in)
+	assertWideKeepsCostAndMetrics(t, svg, "$4.20 per merged PR")
+}
+
+func TestRender_WideKeepsFittingCostOnTheHeaderLine(t *testing.T) {
+	cost := int64(100)
+	in := Input{
+		PeriodDays:       7,
+		SuperplaneMerged: 1,
+		ShareKnown:       true,
+		CostCents:        &cost,
+		Updated:          time.Now(),
+		Days:             daysFor(7, 0, 0),
+		Size:             SizeWide,
+	}
+	svg := mustRender(t, in)
+	_, costY := textPosition(t, svg, "$1.00 per merged PR")
+	_, rateY := textPosition(t, svg, "100% merge rate")
+	assert.Equal(t, rateY, costY)
+	assert.Equal(t, 240, viewBoxHeight(t, svg))
+}
+
+func assertWideKeepsCostAndMetrics(t *testing.T, svg, costLabel string) {
+	t.Helper()
+	parseSVG(t, svg)
+	assert.Contains(t, svg, costLabel)
 	assert.Contains(t, svg, "▲ 8 pts vs previous 14 days")
-	assert.NotContains(t, svg, "of merged PRs via SuperPlane")
-	assert.LessOrEqual(t, textRightEdge(t, svg, label), 780)
+	assert.Contains(t, svg, "92% merge rate")
+	assert.Contains(t, svg, "35 PRs merged · last 14 days")
+	_, costY := textPosition(t, svg, costLabel)
+	_, rateY := textPosition(t, svg, "92% merge rate")
+	_, countY := textPosition(t, svg, "35 PRs merged · last 14 days")
+	assert.Equal(t, rateY, countY)
+	assert.Greater(t, costY, rateY)
+	assert.LessOrEqual(t, textRightEdge(t, svg, costLabel), 780)
+	assert.LessOrEqual(t, textRightEdge(t, svg, "92% merge rate"), 780)
+	assert.LessOrEqual(t, textRightEdge(t, svg, "35 PRs merged · last 14 days"), 780)
+	height := viewBoxHeight(t, svg)
+	assert.Greater(t, height, costY)
+	assert.Contains(t, svg, fmt.Sprintf(`width="799" height="%d"`, height-1))
 }
 
 func textRightEdge(t *testing.T, svg, label string) int {
+	t.Helper()
+	origin, _ := textPosition(t, svg, label)
+	tag := textTag(t, svg, label)
+	size := regexp.MustCompile(`font-size="(\d+)"`).FindStringSubmatch(tag)
+	require.Len(t, size, 2)
+	var fontSize int
+	_, err := fmt.Sscanf(size[1], "%d", &fontSize)
+	require.NoError(t, err)
+	bold := strings.Contains(tag, `font-weight="700"`) || strings.Contains(tag, `font-weight="600"`)
+	return origin + textWidth(label, float64(fontSize), bold)
+}
+
+func textPosition(t *testing.T, svg, label string) (int, int) {
+	t.Helper()
+	tag := textTag(t, svg, label)
+	x := regexp.MustCompile(`x="(\d+)"`).FindStringSubmatch(tag)
+	y := regexp.MustCompile(`y="(\d+)"`).FindStringSubmatch(tag)
+	require.Len(t, x, 2)
+	require.Len(t, y, 2)
+	var originX, originY int
+	_, err := fmt.Sscanf(x[1], "%d", &originX)
+	require.NoError(t, err)
+	_, err = fmt.Sscanf(y[1], "%d", &originY)
+	require.NoError(t, err)
+	return originX, originY
+}
+
+func textTag(t *testing.T, svg, label string) string {
 	t.Helper()
 	needle := ">" + label + "</text>"
 	index := strings.Index(svg, needle)
 	require.NotEqual(t, -1, index)
 	start := strings.LastIndex(svg[:index], "<text ")
 	require.NotEqual(t, -1, start)
-	tag := svg[start:index]
-	x := regexp.MustCompile(`x="(\d+)"`).FindStringSubmatch(tag)
-	size := regexp.MustCompile(`font-size="(\d+)"`).FindStringSubmatch(tag)
-	require.Len(t, x, 2)
-	require.Len(t, size, 2)
-	var origin, fontSize int
-	_, err := fmt.Sscanf(x[1], "%d", &origin)
+	return svg[start:index]
+}
+
+func viewBoxHeight(t *testing.T, svg string) int {
+	t.Helper()
+	match := regexp.MustCompile(`viewBox="0 0 \d+ (\d+)"`).FindStringSubmatch(svg)
+	require.Len(t, match, 2)
+	var height int
+	_, err := fmt.Sscanf(match[1], "%d", &height)
 	require.NoError(t, err)
-	_, err = fmt.Sscanf(size[1], "%d", &fontSize)
-	require.NoError(t, err)
-	return origin + textWidth(label, float64(fontSize), true)
+	return height
 }
 
 func TestRender_ThousandsSeparator(t *testing.T) {
@@ -233,14 +303,14 @@ func exampleInput() Input {
 		HasPrevious:              true,
 		ShareKnown:               true,
 		CostCents:                &cost,
-		Updated:                  time.Date(2026, 9, 29, 15, 0, 0, 0, time.UTC),
+		Updated:                  time.Now(),
 		Days:                     daysFor(14, 2, 1),
 		Size:                     SizeLarge,
 	}
 }
 
 func daysFor(n, superplane, people int) []DayPoint {
-	start := time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC)
+	start := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 1-n)
 	days := make([]DayPoint, n)
 	for i := range days {
 		days[i] = DayPoint{
