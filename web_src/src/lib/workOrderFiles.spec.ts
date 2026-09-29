@@ -67,8 +67,28 @@ describe("workOrderFiles", () => {
     expect(stripped).toContain("for context.");
   });
 
+  it("keeps the visible label of a stripped file ref instead of deleting the whole link", () => {
+    const id = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+    const markdown = [
+      `See also [the recording](${workOrderFileRef(id)}) for context.`,
+      `<a href="${workOrderFileRef(id)}">the attached log</a> has more detail.`,
+    ].join("\n");
+
+    const stripped = stripWorkOrderFileRefs(markdown);
+
+    expect(stripped).toContain("See also the recording for context.");
+    expect(stripped).toContain("the attached log has more detail.");
+  });
+
   it("leaves descriptions without file refs unchanged", () => {
     const markdown = "Plain text with a [normal link](https://example.com) and no attachments.";
+    expect(stripWorkOrderFileRefs(markdown)).toBe(markdown);
+  });
+
+  it("does not reformat whitespace when there is no file ref to strip", () => {
+    // Trailing double spaces are a Markdown hard line break; the cleanup pass
+    // must not run (and strip them) when nothing was actually removed.
+    const markdown = "Line one with a break.  \nLine two.\n\n\nLine three after extra blank lines.";
     expect(stripWorkOrderFileRefs(markdown)).toBe(markdown);
   });
 

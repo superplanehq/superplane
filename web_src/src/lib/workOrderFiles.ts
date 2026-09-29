@@ -123,25 +123,60 @@ export function workOrderFileRef(id: string): string {
 }
 
 // Mirrors the markdown/HTML embed shapes the editor produces for a file ref
-// (`pkg/blob/markdown.go` parses the same shapes server-side).
-const MARKDOWN_FILE_REF_PATTERN = /!?\[[^\]]*]\(([^)\s]+)\)/g;
+// (`pkg/blob/markdown.go` parses the same shapes server-side). Each pattern
+// captures the visible label (if any) ahead of the `sp-file://` target so a
+// match can be replaced with just its label instead of deleting it outright.
+const MARKDOWN_FILE_REF_PATTERN = /!?\[([^\]]*)]\(([^)\s]+)\)/g;
 const HTML_IMG_FILE_REF_PATTERN = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
-const HTML_ANCHOR_FILE_REF_PATTERN = /<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>[\s\S]*?<\/a>/gi;
+const HTML_ANCHOR_FILE_REF_PATTERN = /<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
 
 /**
- * Removes `sp-file://` embeds from a description. Duplicating a task does not
- * copy its attachments, and resubmitting the original file references would
- * make the server reject the new task (the files still belong to the source
- * task). Use this before reusing a description outside its original task.
+ * Removes `sp-file://` embeds from a description, keeping any visible label
+ * text (link/alt text) in place. Duplicating a task does not copy its
+ * attachments, and resubmitting the original file references would make the
+ * server reject the new task (the files still belong to the source task).
+ * Use this before reusing a description outside its original task.
+ *
+ * Returns the input unchanged, byte-for-byte, when it has no file refs, so
+ * descriptions that rely on Markdown whitespace (e.g. trailing double-space
+ * line breaks) are not reformatted for no reason.
  */
 export function stripWorkOrderFileRefs(markdown: string): string {
   if (!markdown) {
     return markdown;
   }
-  const dropIfFileRef = (match: string, reference: string) => (parseWorkOrderFileId(reference) ? "" : match);
-  let next = markdown.replace(MARKDOWN_FILE_REF_PATTERN, dropIfFileRef);
+  let strippedAnyRef = false;
+  // Markdown syntax puts the label before the target: `[label](target)`.
+  const keepMarkdownLabelIfFileRef = (match: string, label: string, reference: string) => {
+    if (!parseWorkOrderFileId(reference)) {
+      return match;
+    }
+    strippedAnyRef = true;
+    return label;
+  };
+  // `<a href="target">label</a>` puts the target (the href attribute) before
+  // the label (the element's inner text), the opposite order of Markdown.
+  const keepAnchorLabelIfFileRef = (match: string, reference: string, label: string) => {
+    if (!parseWorkOrderFileId(reference)) {
+      return match;
+    }
+    strippedAnyRef = true;
+    return label;
+  };
+  // `<img>` tags have no inner text to preserve, so a match is dropped outright.
+  const dropIfFileRef = (match: string, reference: string) => {
+    if (!parseWorkOrderFileId(reference)) {
+      return match;
+    }
+    strippedAnyRef = true;
+    return "";
+  };
+  let next = markdown.replace(MARKDOWN_FILE_REF_PATTERN, keepMarkdownLabelIfFileRef);
   next = next.replace(HTML_IMG_FILE_REF_PATTERN, dropIfFileRef);
-  next = next.replace(HTML_ANCHOR_FILE_REF_PATTERN, dropIfFileRef);
+  next = next.replace(HTML_ANCHOR_FILE_REF_PATTERN, keepAnchorLabelIfFileRef);
+  if (!strippedAnyRef) {
+    return markdown;
+  }
   return next
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
