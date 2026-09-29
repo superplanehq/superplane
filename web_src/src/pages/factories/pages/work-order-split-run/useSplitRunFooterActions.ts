@@ -111,7 +111,28 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   );
 
   const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
-  const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
+  const handleArchive = useCallback(
+    async (footer: Pick<SplitRunFooter, "kind" | "run">) => {
+      if (!live || !orderId || busy) {
+        return false;
+      }
+      try {
+        await applySplitRunStop("canceled", {
+          kind: footer.kind,
+          run: footer.run,
+          cancelRun: (run) => cancelRun.mutateAsync(run),
+          onClose: (result) => closeWorkOrder.mutateAsync({ orderId, result }),
+          onStatusChange: () => undefined,
+        });
+        showSuccessToast(ARCHIVE_COPY.success);
+        return true;
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, ARCHIVE_COPY.error));
+        return false;
+      }
+    },
+    [busy, cancelRun, closeWorkOrder, live, orderId],
+  );
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {

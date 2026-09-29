@@ -188,7 +188,7 @@ describe("useSplitRunFooterActions", () => {
   it("archives a draft as rejected", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
-    const archived = await result.current.handleArchive();
+    const archived = await result.current.handleArchive({ kind: "draft" });
 
     expect(archived).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
@@ -199,7 +199,7 @@ describe("useSplitRunFooterActions", () => {
     closeMutateAsync.mockRejectedValue(new Error("Failed to fetch"));
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
-    const archived = await result.current.handleArchive();
+    const archived = await result.current.handleArchive({ kind: "draft" });
 
     expect(archived).toBe(false);
     expect(showSuccessToast).not.toHaveBeenCalled();
@@ -211,11 +211,57 @@ describe("useSplitRunFooterActions", () => {
 
     await result.current.handleStop("canceled", { kind: "running" });
     await result.current.handleReject();
-    await result.current.handleArchive();
+    await result.current.handleArchive({ kind: "draft" });
 
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(updateMutateAsync).not.toHaveBeenCalled();
     expect(cancelRunMock).not.toHaveBeenCalled();
+  });
+
+  it("archives a waiting task as rejected without canceling a run", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const archived = await result.current.handleArchive({ kind: "waiting" });
+
+    expect(archived).toBe(true);
+    expect(cancelRunMock).not.toHaveBeenCalled();
+    expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+  });
+
+  it("cancels the canvas run before archiving a running task", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const archived = await result.current.handleArchive({
+      kind: "running",
+      run: { appId: "app-implement", runId: "run-9" },
+    });
+
+    expect(archived).toBe(true);
+    expect(cancelRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "app-implement", runId: "run-9" },
+      }),
+    );
+    expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
+    expect(cancelRunMock.mock.invocationCallOrder[0]).toBeLessThan(closeMutateAsync.mock.invocationCallOrder[0]);
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+    expect(showSuccessToast).not.toHaveBeenCalledWith("Task closed as rejected.");
+  });
+
+  it("does not archive a running task when cancel fails", async () => {
+    cancelRunMock.mockRejectedValue(new Error("Failed to fetch"));
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const archived = await result.current.handleArchive({
+      kind: "running",
+      run: { appId: "app-implement", runId: "run-9" },
+    });
+
+    expect(archived).toBe(false);
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to archive task");
   });
 
   it("keeps the task open when cancel fails", async () => {

@@ -37,7 +37,7 @@ export function footerMutationHandlers(
   }
   return {
     onArchive: async () => {
-      const archived = await footerActions.handleArchive();
+      const archived = await footerActions.handleArchive(fixture.footer);
       if (archived) {
         onDismiss?.();
       }

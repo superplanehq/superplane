@@ -5,14 +5,21 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type * as ApiClient from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as FactoryData from "@/hooks/useFactoryData";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
+const taskConsole = { current: true };
+const { closeMutateAsync, cancelRunMock } = vi.hoisted(() => ({
+  closeMutateAsync: vi.fn(),
+  cancelRunMock: vi.fn(),
+}));
 const mergeability = {
   current: {
     canMerge: true,
@@ -28,6 +35,14 @@ const mergeability = {
 };
 const mergeMutate = vi.fn();
 
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
+  return {
+    ...actual,
+    canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
+  };
+});
+
 vi.mock("@/hooks/useFactoryData", () => {
   const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
   return {
@@ -36,6 +51,7 @@ vi.mock("@/hooks/useFactoryData", () => {
       data: { id: "factory-1", planning: factoryPlanning.current },
       isPending: false,
     }),
+    useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
   };
 });
 
@@ -49,10 +65,15 @@ const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSe
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: () => true,
+    has: () => taskConsole.current,
     enabledExperimentalFeatures: [],
     isLoading: false,
   }),
+}));
+
+vi.mock("@/lib/toast", () => ({
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
 }));
 
 vi.mock("@monaco-editor/react", () => ({
@@ -249,6 +270,11 @@ describe("WorkOrderSplitRunPopup", () => {
     findPlanningSessionMock.mockReset();
     findPlanningSessionMock.mockResolvedValue(null);
     mergeMutate.mockReset();
+    closeMutateAsync.mockReset().mockResolvedValue({});
+    cancelRunMock.mockReset().mockResolvedValue({});
+    vi.mocked(showSuccessToast).mockReset();
+    vi.mocked(showErrorToast).mockReset();
+    taskConsole.current = true;
     mergeability.current = {
       canMerge: true,
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
@@ -1160,6 +1186,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
   it("offers automation Stop on a live running task", () => {
@@ -1464,6 +1491,120 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(card).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
+    expect(screen.getAllByRole("button", { name: "Archive" })).toHaveLength(1);
+  });
+
+  it("archives a waiting task from the header and leaves the pull request open", async () => {
+    taskConsole.current = false;
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: OPEN_WORK_ORDER.id,
+      fixture: fixtureWithReviewPullRequest("STATE_OPEN"),
+      onClose,
+    });
+
+    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Archive" })).toHaveLength(1);
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
+
+    expect(cancelRunMock).not.toHaveBeenCalled();
+    expect(closeMutateAsync).toHaveBeenCalledWith({
+      orderId: OPEN_WORK_ORDER.id,
+      result: "RESULT_REJECTED",
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+    expect(mergeMutate).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("archives a draft from the header and keeps Archive out of the decision note", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+      onClose,
+    });
+
+    const card = await screen.findByTestId("split-run-intent-status-card");
+    expect(within(card).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
+
+    expect(closeMutateAsync).toHaveBeenCalledWith({
+      orderId: DRAFT_WORK_ORDER.id,
+      result: "RESULT_REJECTED",
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the canvas run before archiving a running task", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-running",
+      fixture: SPLIT_RUN_RUNNING,
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
+
+    expect(cancelRunMock).toHaveBeenCalled();
+    expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-running", result: "RESULT_REJECTED" });
+    expect(cancelRunMock.mock.invocationCallOrder[0]).toBeLessThan(closeMutateAsync.mock.invocationCallOrder[0]);
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the popup open when archive cannot cancel the running task", async () => {
+    cancelRunMock.mockRejectedValue(new Error("Failed to fetch"));
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-running",
+      fixture: SPLIT_RUN_RUNNING,
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
+
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to archive task");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
+  });
+
+  it("hides header archive on a closed task", () => {
+    const closed = [
+      splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER),
+      splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER),
+      {
+        ...SPLIT_RUN_RUNNING,
+        footer: buildSplitRunFooter({ kind: "failed", status: "failed" }),
+        footerTone: "failed" as const,
+      },
+      {
+        ...SPLIT_RUN_RUNNING,
+        footer: buildSplitRunFooter({ kind: "done", status: "cancelled" }),
+        footerTone: "done" as const,
+      },
+    ];
+
+    for (const fixture of closed) {
+      const view = renderPopup({ fixture, canUpdate: true });
+      expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 
   it("replaces chat with the console after Start", () => {

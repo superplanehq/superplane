@@ -20,7 +20,12 @@ import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import {
+  classicSplitRunFooter,
+  isTaskResultFooter,
+  showsHeaderArchive,
+  SPLIT_RUN_ANALYZING_NOTE,
+} from "./splitRunFooter";
 import {
   defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
@@ -309,7 +314,7 @@ function analysisPopupHeader(args: {
       actions={
         <PopupHeaderActions
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
-          onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
+          onArchive={showsHeaderArchive(args.fixture.footer) ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
           taskActions={args.reviewActions}
         />
