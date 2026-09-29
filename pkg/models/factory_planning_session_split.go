@@ -196,7 +196,7 @@ func (s *FactoryPlanningSession) splitTaskPeople(tx *gorm.DB, parent *FactoryWor
 	for _, assignee := range assignees {
 		owners = append(owners, assignee.UserID)
 	}
-	creator := s.lastChatUser()
+	creator := s.LastChatUserID()
 	if creator == nil {
 		creator = parent.CreatedByID
 	}
@@ -214,7 +214,11 @@ func (s *FactoryPlanningSession) hasUserReply() bool {
 	})
 }
 
-func (s *FactoryPlanningSession) lastChatUser() *uuid.UUID {
+// LastChatUserID returns the ID of the most recent person who wrote in the
+// session, or nil when no person participated. It backstops the task-creation
+// fallback used by splits and auto-start so a creatorless draft still gets an
+// owner when a human took part in the conversation.
+func (s *FactoryPlanningSession) LastChatUserID() *uuid.UUID {
 	for i := len(s.Messages) - 1; i >= 0; i-- {
 		message := s.Messages[i]
 		if message.Role == PlanningSessionMessageRoleUser && message.UserID != nil {
