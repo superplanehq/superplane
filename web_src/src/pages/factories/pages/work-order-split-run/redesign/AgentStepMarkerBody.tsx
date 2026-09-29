@@ -52,10 +52,7 @@ export function StepMarkerDetail({
         />
       ) : null}
       {follow.showJumpToLatest ? (
-        <JumpToLatestPill
-          onJumpToLatest={() => follow.setFollowing(true)}
-          testId={`redesign-step-older-${step.id}`}
-        />
+        <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId={`redesign-step-older-${step.id}`} />
       ) : null}
     </div>
   );
