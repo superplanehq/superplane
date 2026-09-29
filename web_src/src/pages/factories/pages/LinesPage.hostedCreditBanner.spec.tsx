@@ -71,12 +71,14 @@ describe("LinesPage hosted credit banner", () => {
     );
 
     const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
-    expect(kicker).toHaveAttribute("data-kind", "trial");
+    expect(kicker).toHaveAttribute("data-kind", "trial-empty");
+    expect(kicker).toHaveTextContent("No credit");
     expect(kicker).toHaveTextContent(defaultTrialLabel);
     expect(kicker).toHaveTextContent("$0.00");
+    expect(kicker.className).toContain("bg-amber-100");
     expect(screen.getByTestId("workspace-page-header-title").parentElement).toContainElement(kicker);
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute(
       "href",
       expect.stringContaining("/settings/organization/billing"),
     );

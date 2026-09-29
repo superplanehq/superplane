@@ -291,9 +291,20 @@ func firstTagValue(text, key string) string {
 }
 
 func payloadMatchesAlertTransition(payload ErrorTrackingAlertPayload, transitions []string) bool {
-	return slices.ContainsFunc(normalizeAlertTransitions(transitions), func(transition string) bool {
+	allowed := effectiveAlertTransitions(transitions)
+	if len(allowed) == 0 {
+		return false
+	}
+	return slices.ContainsFunc(allowed, func(transition string) bool {
 		return strings.EqualFold(strings.TrimSpace(payload.AlertTransition), transition)
 	})
+}
+
+func effectiveAlertTransitions(transitions []string) []string {
+	if transitions == nil {
+		return []string{AlertTransitionTriggered}
+	}
+	return normalizeAlertTransitions(transitions)
 }
 
 func normalizeAlertTransitions(transitions []string) []string {
@@ -304,9 +315,6 @@ func normalizeAlertTransitions(transitions []string) []string {
 		}) {
 			allowed = append(allowed, known)
 		}
-	}
-	if len(allowed) == 0 {
-		return []string{AlertTransitionTriggered}
 	}
 	return allowed
 }
