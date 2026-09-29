@@ -304,7 +304,7 @@ describe("useExperimentalFeature", () => {
     const queryClient = createQueryClient();
     seedQueries(queryClient, {
       registry: {
-        features: [makeFeature({ id: "factory_jira_intake" })],
+        features: [makeFeature({ id: "factory_productive_intake" })],
       },
     });
     const organizationSpy = vi.spyOn(organizationDataModule, "useOrganization").mockReturnValue({
@@ -320,7 +320,7 @@ describe("useExperimentalFeature", () => {
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.organizationReady).toBe(false);
-    expect(result.current.has("factory_jira_intake")).toBe(false);
+    expect(result.current.has("factory_productive_intake")).toBe(false);
     organizationSpy.mockRestore();
   });
 });

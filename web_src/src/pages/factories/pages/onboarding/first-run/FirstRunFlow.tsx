@@ -96,7 +96,6 @@ export function FirstRunFlow({
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
         chrome={chromeFor(3, () => setScreen("choose"))}
-        jiraAvailable
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
