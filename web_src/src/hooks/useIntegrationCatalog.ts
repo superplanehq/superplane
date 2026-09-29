@@ -18,7 +18,6 @@ import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
-import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { areRequiredCreateFieldsFilled } from "@/ui/IntegrationCreateDialog/configurationFields";
 import { useMe } from "@/hooks/useMe";
@@ -171,18 +170,17 @@ function useIntegrationCatalogActions({
       if (!canCreateIntegrations) {
         return;
       }
-      if (
-        startCatalogHostedGitHubConnect({
-          integration,
+      if (usesHostedGitHubAppInstall(integration)) {
+        startCatalogPrivateGitHubApp({
           organizationId,
           integrationsBasePath,
-          integrationNames,
-          organizationIntegrations,
-          currentUserId,
           navigate,
+          integrationNames,
+          organizationIntegrations: organizationIntegrations ?? [],
+          currentUserId,
           createIntegrationMutation,
-        })
-      ) {
+          definition: integration,
+        });
         return;
       }
       if (
@@ -305,49 +303,6 @@ async function submitCatalogConnect({
   } catch (error) {
     showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
   }
-}
-
-function startCatalogHostedGitHubConnect({
-  integration,
-  organizationId,
-  integrationsBasePath,
-  integrationNames,
-  organizationIntegrations,
-  currentUserId,
-  navigate,
-  createIntegrationMutation,
-}: {
-  integration: IntegrationsIntegrationDefinition;
-  organizationId: string;
-  integrationsBasePath: string;
-  integrationNames: Set<string>;
-  organizationIntegrations: ReturnType<typeof useConnectedIntegrations>["data"];
-  currentUserId?: string;
-  navigate: ReturnType<typeof useNavigate>;
-  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
-}): boolean {
-  if (!usesHostedGitHubAppInstall(integration)) {
-    return false;
-  }
-
-  analytics.integrationConnectStart("github", "integrations_page", organizationId);
-  void startDirectGitHubConnect({
-    organizationId,
-    returnTo: integrationsBasePath,
-    integrationsBasePath,
-    existingNames: integrationNames,
-    connected: organizationIntegrations ?? [],
-    currentUserId,
-    goTo: navigate,
-    create: async (payload) => {
-      const response = await createIntegrationMutation.mutateAsync(payload);
-      return response.data;
-    },
-    update: persistGitHubSetupReturnPath(organizationId),
-  }).catch((error) => {
-    showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
-  });
-  return true;
 }
 
 function startCatalogHostedJiraConnect({
