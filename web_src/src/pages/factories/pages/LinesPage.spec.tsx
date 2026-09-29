@@ -18,7 +18,6 @@ import {
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_RISK_SCORE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -1190,17 +1189,18 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
+      ADD_INTAKE_COPY.comingSoon,
+    );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
 
-    expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
@@ -1228,7 +1228,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Sentry setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_SENTRY_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
