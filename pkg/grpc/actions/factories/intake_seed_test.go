@@ -839,6 +839,27 @@ func Test__DatadogSeedFillsFromTheNextIssueWhenDetailsDisagree(t *testing.T) {
 	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
 }
 
+func Test__DatadogSeedSkipsUnverifiedIssueWhenLoadFailsWithoutSummaryService(t *testing.T) {
+	const issueID = "66666666-6666-4666-8666-666666666666"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, "timeout", http.StatusGatewayTimeout)
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+		ID:  issueID,
+		URL: "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	assert.Empty(t, issues)
+}
+
 func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {
 	const issueID = "33333333-3333-4333-8333-333333333333"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
