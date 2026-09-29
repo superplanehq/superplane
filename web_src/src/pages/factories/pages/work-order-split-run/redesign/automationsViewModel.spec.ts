@@ -8,6 +8,7 @@ import {
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
 import {
   allStages,
+  agentStepsFromNotes,
   automationsFromStages,
   isConsoleTaskStage,
   outcomeSummary,
@@ -46,6 +47,43 @@ describe("automations view model", () => {
     expect(outcome.tokens).toBe("2.7k tokens");
     expect(outcome.models).toEqual(["claude-sonnet-4-6"]);
     expect(outcome.headline).toBe("Implement is running");
+  });
+});
+
+describe("agentStepsFromNotes", () => {
+  it("does not put a tool-count summary on a prompt step", () => {
+    const steps = agentStepsFromNotes([
+      {
+        id: "think",
+        at: "12:00",
+        componentName: "Thinking",
+        status: "running",
+        note: true,
+      },
+      {
+        id: "read-1",
+        at: "12:01",
+        componentName: "src/colors.ts",
+        status: "passed",
+        note: true,
+        noteParentId: "think",
+        componentType: "read",
+      },
+      {
+        id: "bash-1",
+        at: "12:02",
+        componentName: "ls",
+        status: "passed",
+        note: true,
+        noteParentId: "think",
+        componentType: "bash",
+      },
+    ]);
+
+    expect(steps).toHaveLength(1);
+    expect(steps[0]?.title).toBe("Thinking");
+    expect(steps[0]?.summary).toBe("");
+    expect(steps[0]?.toolCount).toBe(2);
   });
 });
 
@@ -215,10 +253,10 @@ describe("console automation grouping", () => {
 
     expect(address).toHaveLength(1);
     expect(address[0]?.runs).toHaveLength(2);
-    expect(address[0]?.runs.map((run) => run.id)).toEqual(["pr-feedback-run-comment-2", "pr-feedback-run-comment-1"]);
+    expect(address[0]?.runs.map((run) => run.id)).toEqual(["pr-feedback-run-comment-1", "pr-feedback-run-comment-2"]);
     expect(address[0]?.runs.map((run) => run.name)).toEqual([
-      "Address new review comment",
       "Read the requested changes",
+      "Address new review comment",
     ]);
   });
 

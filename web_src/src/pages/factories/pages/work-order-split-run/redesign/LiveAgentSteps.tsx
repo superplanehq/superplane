@@ -1,11 +1,14 @@
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { headerSpendFromUsageSeries } from "../planningHeaderSpend";
+import { AgentLiveActivity } from "../IntentAnalysisLiveWork";
 import { useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "../streamNotesFromLiveLog";
+import { useFollowLogScroll } from "../useFollowLogScroll";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
+import { JumpToLatestPill } from "../JumpToLatestPill";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
@@ -57,6 +60,14 @@ export function LiveAgentSteps({
     return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : note;
   }
 
+  // The running run streams like the refinement chat: settled steps stay
+  // rows, the running step keeps its title row, and the live activity
+  // renders reasoning and tool calls under it as they happen.
+  const liveRunner = phase.appId ? runners.find((line) => line.status === "running" && line.executionId) : undefined;
+  const steps = liveRunner
+    ? shown.agentSteps.map((step) => (step.status === "running" ? { ...step, events: [], output: undefined } : step))
+    : shown.agentSteps;
+
   return (
     <>
       {runners.map((line) => (
@@ -69,8 +80,42 @@ export function LiveAgentSteps({
           onNotes={reportNotes}
         />
       ))}
-      {shown.agentSteps.length > 0 ? <AgentStepMarkers stage={shown} expandSteps={expandSteps} /> : note}
+      {steps.length > 0 ? <AgentStepMarkers stage={{ ...shown, agentSteps: steps }} expandSteps={expandSteps} /> : null}
+      {liveRunner ? (
+        <LiveActivityScroller stageId={stage.id} tall={expandSteps}>
+          <AgentLiveActivity
+            active
+            organizationId={organizationId}
+            canvasId={phase.appId ?? ""}
+            executionId={liveRunner.executionId ?? undefined}
+            startingLabel="Starting agent…"
+            testId={`redesign-live-activity-${stage.id}`}
+          />
+        </LiveActivityScroller>
+      ) : steps.length === 0 ? (
+        note
+      ) : null}
     </>
+  );
+}
+
+/** Pins the streaming activity to its newest line inside a capped scroller. */
+function LiveActivityScroller({ stageId, tall, children }: { stageId: string; tall: boolean; children: ReactNode }) {
+  const follow = useFollowLogScroll<HTMLDivElement>(stageId, null);
+  return (
+    <div className="relative min-w-0">
+      <div
+        ref={follow.scrollRef}
+        onScroll={follow.onScroll}
+        className={tall ? "max-h-[60vh] overflow-y-auto pl-4" : "max-h-80 overflow-y-auto pl-4"}
+        data-testid={`redesign-live-scroll-${stageId}`}
+      >
+        {children}
+      </div>
+      {follow.showJumpToLatest ? (
+        <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId={`redesign-live-older-${stageId}`} />
+      ) : null}
+    </div>
   );
 }
 
