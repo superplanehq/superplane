@@ -45,7 +45,7 @@ func TestAdminSentryWebhooks(t *testing.T) {
 	t.Run("lists stored receipts without a payload", func(t *testing.T) {
 		receiptID, err := models.CreateSentryWebhookReceipt(database.Conn(), models.SentryWebhookReceipt{
 			ID:               uuid.New(),
-			ReceivedAt:       time.Date(2026, 9, 29, 11, 14, 0, 0, time.UTC),
+			ReceivedAt:       time.Now().UTC().Add(-time.Hour),
 			HookResource:     "issue",
 			Action:           "created",
 			InstallationUUID: "install-1",

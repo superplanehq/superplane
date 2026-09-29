@@ -16,7 +16,8 @@ const (
 	SentryWebhookOutcomeRejected     = "rejected"
 	SentryWebhookOutcomeFailed       = "failed"
 
-	sentryWebhookReceiptRetention = 14 * 24 * time.Hour
+	// SentryWebhookReceiptRetention is how long Installation Admin keeps a receipt.
+	SentryWebhookReceiptRetention = 14 * 24 * time.Hour
 )
 
 // SentryWebhookReceipt is one incoming Sentry webhook. It stores the event
@@ -76,12 +77,13 @@ func CreateSentryWebhookReceipt(tx *gorm.DB, receipt SentryWebhookReceipt) (uuid
 	if err := tx.Create(&receipt).Error; err != nil {
 		return uuid.Nil, err
 	}
-
-	cutoff := time.Now().UTC().Add(-sentryWebhookReceiptRetention)
-	if err := tx.Where("received_at < ?", cutoff).Delete(&SentryWebhookReceipt{}).Error; err != nil {
-		return uuid.Nil, err
-	}
 	return receipt.ID, nil
+}
+
+// DeleteExpiredSentryWebhookReceipts removes receipts older than olderThan.
+// It deletes at most limit rows so one pass cannot scan the whole table.
+func DeleteExpiredSentryWebhookReceipts(tx *gorm.DB, olderThan time.Time, limit int) (int64, error) {
+	return deleteRowsLimited(tx, &SentryWebhookReceipt{}, limit, "received_at < ?", olderThan)
 }
 
 func UpdateSentryWebhookReceiptResult(tx *gorm.DB, id uuid.UUID, status int, outcome string, integrationCount int) error {

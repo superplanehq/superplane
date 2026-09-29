@@ -99,6 +99,29 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var receipts []models.SentryWebhookReceipt
+		require.NoError(t, database.Conn().
+			Where("installation_uuid = ? AND outcome = ?", "install-1", models.SentryWebhookOutcomeRejected).
+			Find(&receipts).Error)
+		require.NotEmpty(t, receipts)
+	})
+
+	t.Run("an invalid signature does not store a receipt", func(t *testing.T) {
+		var before int64
+		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
+
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader([]byte(`{"action":"created"}`)))
+		request.Header.Set("Sentry-Hook-Signature", "not-a-signature")
+		request.Header.Set("Sentry-Hook-Resource", "issue")
+		rec := httptest.NewRecorder()
+
+		server.HandleSentryAppWebhook(rec, request)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		var after int64
+		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
+		assert.Equal(t, before, after)
 	})
 }
 

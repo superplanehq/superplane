@@ -31,6 +31,17 @@ func TestSummarizeWebhook(t *testing.T) {
 	assert.NotContains(t, summary.IssueID+summary.ProjectSlug, "secret stack")
 }
 
+func TestSummarizeWebhook_keepsInstallationWhenDataIsNotAnObject(t *testing.T) {
+	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":"not-an-object"}`)
+
+	summary := SummarizeWebhook("issue", body)
+
+	assert.Equal(t, "issue", summary.Resource)
+	assert.Equal(t, "created", summary.Action)
+	assert.Equal(t, "install-1", summary.InstallationUUID)
+	assert.Empty(t, summary.IssueID)
+}
+
 func TestHostedIssueWebhookMismatch(t *testing.T) {
 	expected := "https://app.superplane.com/api/v1/sentry/app/webhook"
 

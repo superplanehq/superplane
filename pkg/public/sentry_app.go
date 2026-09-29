@@ -99,9 +99,6 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			"hook_resource": strings.TrimSpace(r.Header.Get("Sentry-Hook-Resource")),
 			"status":        http.StatusBadRequest,
 		})
-		s.rememberSentryWebhook(r, sentryintegration.WebhookSummary{
-			Resource: r.Header.Get("Sentry-Hook-Resource"),
-		}, http.StatusBadRequest, models.SentryWebhookOutcomeRejected, 0)
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}

@@ -7,6 +7,7 @@ import {
   SENTRY_WEBHOOK_PAGE_SIZE,
   SENTRY_WEBHOOKS_EMPTY,
   SENTRY_WEBHOOKS_HELP,
+  SENTRY_WEBHOOKS_PAGE_EMPTY,
   SENTRY_WEBHOOKS_TITLE,
   sentryWebhookIssueLabel,
   sentryWebhookOutcomeLabel,
@@ -45,7 +46,23 @@ function SentryWebhooksBody({ pageState }: { pageState: ReturnType<typeof useSen
 
   const items = pageState.data?.items ?? [];
   if (items.length === 0) {
-    return <SentryWebhooksNotice message={SENTRY_WEBHOOKS_EMPTY} />;
+    if (pageState.offset === 0) {
+      return <SentryWebhooksNotice message={SENTRY_WEBHOOKS_EMPTY} />;
+    }
+    return (
+      <div className="space-y-4">
+        <SentryWebhooksNotice message={SENTRY_WEBHOOKS_PAGE_EMPTY} />
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => pageState.setOffset(Math.max(0, pageState.offset - SENTRY_WEBHOOK_PAGE_SIZE))}
+            className="px-3 py-1 rounded border border-slate-200 bg-white text-xs hover:bg-slate-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Previous
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
