@@ -55,19 +55,6 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-		hasDiscussion, err := factory.HasPRFeedbackHandlerSource(db, source)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
-		}
-		if hasDiscussion {
-			return nil, grpcerrors.AlreadyExists(
-				errFactoryPRFeedbackHandlerSourceExists,
-				"factory already has a pull request discussion handler",
-			)
-		}
-	}
-
 	settings := parsePRFeedbackSettings(defaultPRFeedbackSettings(), req.GetSettings())
 	settings.Repository = repository
 	if err := validatePRFeedbackSettingsForSource(db, orgID, source, settings, req.GetSettings()); err != nil {
@@ -90,19 +77,11 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	canvasID, err := createPRFeedbackCanvas(ctx, deps, factory, source, name, settings)
+	canvasID, handler, err := createPRFeedbackCanvasAndHandler(ctx, deps, db, orgID, factory, subject, source, name, settings)
 	if err != nil {
 		return nil, err
 	}
 
-	handler, err := createPRFeedbackHandlerOnce(db, factory, canvasID, subject, source)
-	if err != nil {
-		discardIntakeCanvas(db, orgID, canvasID)
-		if errors.Is(err, errFactoryPRFeedbackHandlerSourceExists) {
-			return nil, grpcerrors.AlreadyExists(err, "factory already has a pull request discussion handler")
-		}
-		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
-	}
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 		if err := handler.SetMaximumAttempts(db, settings.MaximumAttempts); err != nil {
 			discardIntakeCanvas(db, orgID, canvasID)
@@ -125,19 +104,52 @@ func CreateFactoryPRFeedbackHandler(
 	}, nil
 }
 
-// createPRFeedbackHandlerOnce inserts the handler while serializing concurrent
-// creates for the same factory. The factory row lock makes a second in-flight
-// request wait for the first to commit, so the duplicate re-check sees the
-// committed handler and no factory can end up with two live handlers for the
-// same source.
-func createPRFeedbackHandlerOnce(
+// createPRFeedbackCanvasAndHandler creates the canvas and handler atomically.
+// It locks the factory row first, checks the source is not a duplicate, then
+// creates the canvas outside the locked transaction, and inserts the handler
+// under the lock. If the duplicate check fails no canvas is ever published.
+func createPRFeedbackCanvasAndHandler(
+	ctx context.Context,
+	deps PRFeedbackDependencies,
 	db *gorm.DB,
+	orgID uuid.UUID,
 	factory *models.Factory,
-	canvasID uuid.UUID,
-	subject, source string,
-) (*models.FactoryPRFeedbackHandler, error) {
+	subject, source, name string,
+	settings prFeedbackSettings,
+) (uuid.UUID, *models.FactoryPRFeedbackHandler, error) {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var locked models.Factory
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", factory.ID).
+			First(&locked).
+			Error; err != nil {
+			return err
+		}
+
+		if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+			hasDiscussion, err := factory.HasPRFeedbackHandlerSource(tx, source)
+			if err != nil {
+				return err
+			}
+			if hasDiscussion {
+				return errFactoryPRFeedbackHandlerSourceExists
+			}
+		}
+		return nil
+	}); err != nil {
+		if errors.Is(err, errFactoryPRFeedbackHandlerSourceExists) {
+			return uuid.Nil, nil, grpcerrors.AlreadyExists(err, "factory already has a pull request discussion handler")
+		}
+		return uuid.Nil, nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+
+	canvasID, err := createPRFeedbackCanvas(ctx, deps, factory, source, name, settings)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+
 	var handler *models.FactoryPRFeedbackHandler
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var locked models.Factory
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", factory.ID).
@@ -156,14 +168,18 @@ func createPRFeedbackHandlerOnce(
 			}
 		}
 
-		var err error
 		handler, err = factory.CreatePRFeedbackHandler(tx, canvasID, subject, source)
 		return err
 	})
 	if err != nil {
-		return nil, err
+		discardIntakeCanvas(db, orgID, canvasID)
+		if errors.Is(err, errFactoryPRFeedbackHandlerSourceExists) {
+			return uuid.Nil, nil, grpcerrors.AlreadyExists(err, "factory already has a pull request discussion handler")
+		}
+		return uuid.Nil, nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
-	return handler, nil
+
+	return canvasID, handler, nil
 }
 
 func createPRFeedbackCanvas(

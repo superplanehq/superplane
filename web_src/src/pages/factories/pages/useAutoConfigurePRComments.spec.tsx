@@ -91,4 +91,37 @@ describe("useAutoConfigurePRComments", () => {
       }),
     );
   });
+
+  it("does not clear pending state when a later workspace switch resolves first", async () => {
+    type Resolver = (value: object) => void;
+    let resolveFirst: Resolver;
+    let resolveSecond: Resolver;
+    const firstDeferred = new Promise<object>((resolve) => { resolveFirst = resolve; });
+    const secondDeferred = new Promise<object>((resolve) => { resolveSecond = resolve; });
+
+    createHandler.mockReturnValue(firstDeferred);
+
+    const { rerender, result } = renderHook(
+      ({ organizationId, factoryId }: { organizationId: string; factoryId: string }) =>
+        useAutoConfigurePRComments({ ...baseProps, organizationId, factoryId }),
+      { initialProps: { organizationId: "org-a", factoryId: "factory-a" } },
+    );
+
+    await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(1));
+
+    createHandler.mockReturnValue(secondDeferred);
+    rerender({ organizationId: "org-b", factoryId: "factory-b" });
+
+    await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(2));
+
+    resolveSecond!({});
+    await waitFor(() => {
+      expect(result.current.pending).toBe(true);
+    });
+
+    resolveFirst!({});
+    await waitFor(() => {
+      expect(result.current.pending).toBe(false);
+    });
+  });
 });

@@ -51,6 +51,7 @@ export function useAutoConfigurePRComments({
   const scanFinished = !needsScan || catalogQuery.data !== undefined || catalogQuery.isError;
   const [creating, setCreating] = useState(false);
   const launchedRef = useRef(false);
+  const launchGenerationRef = useRef(0);
   const identity = `${organizationId}:${factoryId}:${repository.trim()}`;
   const previousIdentityRef = useRef(identity);
 
@@ -64,6 +65,7 @@ export function useAutoConfigurePRComments({
     if (previousIdentityRef.current !== identity) {
       previousIdentityRef.current = identity;
       launchedRef.current = false;
+      launchGenerationRef.current += 1;
     }
   }, [identity]);
 
@@ -72,6 +74,7 @@ export function useAutoConfigurePRComments({
       return;
     }
     launchedRef.current = true;
+    const generation = ++launchGenerationRef.current
     setCreating(true);
 
     const catalog = catalogQuery.isError ? [] : (catalogQuery.data ?? []);
@@ -91,7 +94,9 @@ export function useAutoConfigurePRComments({
         }
       })
       .finally(() => {
-        setCreating(false);
+        if (generation === launchGenerationRef.current) {
+          setCreating(false);
+        }
       });
   }, [
     shouldCreate,

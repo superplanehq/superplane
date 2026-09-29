@@ -154,6 +154,13 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, handlers, 1)
 		assert.Equal(t, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, handlers[0].Source)
+
+		var liveCount int64
+		require.NoError(t, database.DB(t.Context()).
+			Model(&models.Canvas{}).
+			Where("factory_id = ? AND deleted_at IS NULL", factory.ID).
+			Count(&liveCount).Error)
+		assert.Equal(t, int64(1), liveCount, "rejected concurrent requests must not publish a surplus canvas")
 	})
 
 	t.Run("the handler listens with the workspace connection", func(t *testing.T) {
