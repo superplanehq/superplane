@@ -152,6 +152,7 @@ func Test__UpdateFactory(t *testing.T) {
 		require.NoError(t, err)
 		line, err := factory.CreateLine(database.DB(t.Context()), "implement", nil)
 		require.NoError(t, err)
+		lineID := line.ID.String()
 
 		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
 			Id: factory.ID.String(),
@@ -159,18 +160,31 @@ func Test__UpdateFactory(t *testing.T) {
 				Enabled:         true,
 				Confidence:      true,
 				SetupCompleted:  true,
-				AutoStartLineId: line.ID.String(),
+				AutoStartLineId: &lineID,
 			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, line.ID.String(), response.Factory.Planning.GetAutoStartLineId())
 
-		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+		kept, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
 			Id: factory.ID.String(),
 			Planning: &pb.FactoryPlanning{
 				Enabled:        true,
 				Confidence:     true,
 				SetupCompleted: true,
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, line.ID.String(), kept.Factory.Planning.GetAutoStartLineId())
+
+		empty := ""
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				SetupCompleted:  true,
+				AutoStartLineId: &empty,
 			},
 		})
 		require.NoError(t, err)
@@ -189,23 +203,25 @@ func Test__UpdateFactory(t *testing.T) {
 		foreignLine, err := other.CreateLine(database.DB(t.Context()), "implement", nil)
 		require.NoError(t, err)
 
+		invalid := "not-a-uuid"
 		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
 			Id: factory.ID.String(),
 			Planning: &pb.FactoryPlanning{
 				Enabled:         true,
 				Confidence:      true,
-				AutoStartLineId: "not-a-uuid",
+				AutoStartLineId: &invalid,
 			},
 		})
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 
+		foreignID := foreignLine.ID.String()
 		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
 			Id: factory.ID.String(),
 			Planning: &pb.FactoryPlanning{
 				Enabled:         true,
 				Confidence:      true,
-				AutoStartLineId: foreignLine.ID.String(),
+				AutoStartLineId: &foreignID,
 			},
 		})
 		require.Error(t, err)

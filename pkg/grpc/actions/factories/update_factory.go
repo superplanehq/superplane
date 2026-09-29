@@ -38,7 +38,7 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 	}
 
 	if req.Planning != nil {
-		planning, err := factoryPlanningFromProto(req.Planning)
+		planning, err := factoryPlanningFromProto(req.Planning, factory.Planning())
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory")
 		}

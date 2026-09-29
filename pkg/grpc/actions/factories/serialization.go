@@ -28,30 +28,38 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 }
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
-	return &pb.FactoryPlanning{
-		Enabled:         planning.Enabled,
-		Clarity:         planning.Clarity,
-		Confidence:      planning.Confidence,
-		SetupCompleted:  planning.SetupCompleted,
-		AutoStartLineId: serializeOptionalID(planning.AutoStartLineID),
+	serialized := &pb.FactoryPlanning{
+		Enabled:        planning.Enabled,
+		Clarity:        planning.Clarity,
+		Confidence:     planning.Confidence,
+		SetupCompleted: planning.SetupCompleted,
 	}
+	if id := serializeOptionalID(planning.AutoStartLineID); id != "" {
+		serialized.AutoStartLineId = &id
+	}
+	return serialized
 }
 
-func factoryPlanningFromProto(planning *pb.FactoryPlanning) (models.FactoryPlanning, error) {
+func factoryPlanningFromProto(planning *pb.FactoryPlanning, current models.FactoryPlanning) (models.FactoryPlanning, error) {
 	if planning == nil {
 		return models.DefaultFactoryPlanning(), nil
+	}
+	result := models.FactoryPlanning{
+		Enabled:         planning.GetEnabled(),
+		Clarity:         planning.GetClarity(),
+		Confidence:      planning.GetConfidence(),
+		SetupCompleted:  planning.GetSetupCompleted(),
+		AutoStartLineID: current.AutoStartLineID,
+	}
+	if planning.AutoStartLineId == nil {
+		return result, nil
 	}
 	lineID, err := optionalAutoStartLineID(planning.GetAutoStartLineId())
 	if err != nil {
 		return models.FactoryPlanning{}, err
 	}
-	return models.FactoryPlanning{
-		Enabled:         planning.GetEnabled(),
-		Clarity:         planning.GetClarity(),
-		Confidence:      planning.GetConfidence(),
-		SetupCompleted:  planning.GetSetupCompleted(),
-		AutoStartLineID: lineID,
-	}, nil
+	result.AutoStartLineID = lineID
+	return result, nil
 }
 
 func optionalAutoStartLineID(raw string) (*uuid.UUID, error) {

@@ -991,8 +991,9 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
-  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
-  string auto_start_line_id = 5;
+  // Line that starts each task when the plan scores 5. Empty turns auto-start
+  // off. Unset on UpdateFactory leaves the current line unchanged.
+  optional string auto_start_line_id = 5;
 }
 
 message FactoryLine {
