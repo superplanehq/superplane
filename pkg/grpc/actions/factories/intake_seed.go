@@ -756,7 +756,7 @@ func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.
 	matched := make([]datadog.ErrorTrackingIssue, 0, len(issues))
 	boundary := datadogIntakeItemSource{service: service}
 	for _, issue := range issues {
-		if strings.TrimSpace(issue.ID) == "" || !boundary.ownsIssue(issue) {
+		if strings.TrimSpace(issue.ID) == "" || !boundary.ownsSearchResult(issue) {
 			continue
 		}
 		issue.URL = client.IssueURL(issue.ID)
