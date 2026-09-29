@@ -13,6 +13,7 @@ interface RiskScoreSetupDialogProps {
   organizationId: string;
   factoryId: string;
   githubIntegrationId: string;
+  githubInstallationName: string;
   appRepository: string;
   backlogRepository: string;
   defaultBranch: string;
@@ -23,8 +24,11 @@ interface RiskScoreSetupDialogProps {
 export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: props.organizationId });
 
+  const installationName = props.githubInstallationName.trim();
+  const waitingForInstallationName = Boolean(props.githubIntegrationId) && !installationName;
+
   const finish = async () => {
-    if (!props.githubIntegrationId) {
+    if (!props.githubIntegrationId || !installationName) {
       showErrorToast(RISK_SCORE_SETUP_COPY.missingGitHub);
       return;
     }
@@ -32,7 +36,7 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
       const installed = await installFactory({
         factoryId: "risk-score",
         workspaceFactoryId: props.factoryId,
-        integrations: { github: { id: props.githubIntegrationId, name: "GitHub", ready: true } },
+        integrations: { github: { id: props.githubIntegrationId, name: installationName, ready: true } },
         installParams: {
           appRepository: props.appRepository,
           backlogRepository: props.backlogRepository,
@@ -74,7 +78,7 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
       <footer className="flex items-center justify-end gap-3 pt-2">
         <Button
           type="button"
-          disabled={isInstalling}
+          disabled={isInstalling || waitingForInstallationName}
           onClick={() => void finish()}
           data-testid="risk-score-setup-finish"
         >
