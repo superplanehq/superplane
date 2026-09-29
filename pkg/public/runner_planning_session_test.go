@@ -30,6 +30,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -1312,4 +1313,222 @@ func requirePlanningWaitPending(t *testing.T, db *gorm.DB, session *models.Facto
 		require.True(t, time.Now().Before(deadline), "planning wait did not become pending")
 		time.Sleep(20 * time.Millisecond)
 	}
+}
+
+func TestBeginPlanningWaitAndNotify_AutoStartsWorkspaceDraftAtConfidenceFive(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	env := mustAutoStartPlanningEnv(t, r)
+	require.Nil(t, env.order.Origin())
+	require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "One run can finish this."))
+
+	calls := countPlanningDispatches(t)
+	require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+	require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+	assert.Equal(t, int32(1), calls.Load())
+
+	reloadedOrder, err := models.FindUnscopedWorkOrder(db, env.order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloadedOrder.State)
+	_, err = reloadedOrder.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+
+	reloadedSession, err := models.FindPlanningSession(db, env.session.OrganizationID, env.session.FactoryID, env.session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloadedSession.State)
+}
+
+func TestBeginPlanningWaitAndNotify_AutoStartIgnoresOrigin(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	env := mustAutoStartPlanningEnv(t, r)
+	originURL := "https://github.com/acme/payments/issues/1"
+	originLabel := "acme/payments#1"
+	require.NoError(t, db.Model(env.order).Updates(map[string]any{
+		"origin_url":   originURL,
+		"origin_label": originLabel,
+	}).Error)
+	require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "One run can finish this."))
+
+	calls := countPlanningDispatches(t)
+	require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+	assert.Equal(t, int32(1), calls.Load())
+
+	reloadedOrder, err := models.FindUnscopedWorkOrder(db, env.order.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloadedOrder.Origin())
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloadedOrder.State)
+}
+
+func TestBeginPlanningWaitAndNotify_AutoStartSkipsAndDoesNotDispatchAgain(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	t.Run("option off leaves the draft", func(t *testing.T) {
+		_, session, _, _ := mustPlanningRunnerSession(t, r)
+		require.NoError(t, session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, session)
+	})
+
+	t.Run("score below 5 does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, env.session.ProposeConfidence(db, 4, "Still large."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("a later lower score does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		require.NoError(t, env.session.ProposeConfidence(db, 3, "Too large now."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("pending survey does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		require.NoError(t, env.session.ProposeSurvey(db, models.PlanningSessionSurvey{
+			Questions: []models.PlanningSessionSurveyQuestion{
+				{Prompt: "Which service owns retries?", Options: []string{"Payments", "Billing"}},
+			},
+		}))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("missing line does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, db.Model(env.factory).Update("planning_auto_start_line", "missing").Error)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("line with no steps does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		empty, err := env.factory.CreateLine(db, "empty", nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(env.factory).Update("planning_auto_start_line", empty.Name).Error)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("open work order does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, db.Model(env.order).Update("state", models.FactoryWorkOrderStateOpen).Error)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+	})
+
+	t.Run("confidence check off does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, db.Model(env.factory).Update("planning_confidence", false).Error)
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("second call on the same wait does not dispatch", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, env.session.ProposeConfidence(db, 4, "Still large."))
+		calls := countPlanningDispatches(t)
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready now."))
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		assert.Equal(t, int32(0), calls.Load())
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+
+	t.Run("dispatch error leaves the draft", func(t *testing.T) {
+		env := mustAutoStartPlanningEnv(t, r)
+		require.NoError(t, env.session.ProposeConfidence(db, models.PlanningScoreMax, "Ready."))
+		original := dispatchPlanningWorkOrder
+		dispatchPlanningWorkOrder = func(context.Context, string, *pb.DispatchWorkOrderRequest) (*pb.DispatchWorkOrderResponse, error) {
+			return nil, errors.New("line was deleted")
+		}
+		t.Cleanup(func() { dispatchPlanningWorkOrder = original })
+
+		require.NoError(t, beginPlanningWaitAndNotify(db, env.session))
+		requirePlanningDraftUnchanged(t, db, env.session)
+	})
+}
+
+func mustAutoStartPlanningEnv(t *testing.T, r *support.ResourceRegistry) autoStartPlanningEnv {
+	t.Helper()
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{
+		Enabled:       true,
+		Confidence:    true,
+		AutoStart:     true,
+		AutoStartLine: line.Name,
+	}))
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	return autoStartPlanningEnv{session: session, factory: factoryModel, order: order, line: line}
+}
+
+type autoStartPlanningEnv struct {
+	session *models.FactoryPlanningSession
+	factory *models.Factory
+	order   *models.FactoryWorkOrder
+	line    *models.FactoryLine
+}
+
+func countPlanningDispatches(t *testing.T) *atomic.Int32 {
+	t.Helper()
+	calls := &atomic.Int32{}
+	original := dispatchPlanningWorkOrder
+	dispatchPlanningWorkOrder = func(ctx context.Context, organizationID string, req *pb.DispatchWorkOrderRequest) (*pb.DispatchWorkOrderResponse, error) {
+		calls.Add(1)
+		return original(ctx, organizationID, req)
+	}
+	t.Cleanup(func() { dispatchPlanningWorkOrder = original })
+	return calls
+}
+
+func requirePlanningDraftUnchanged(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {
+	t.Helper()
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := models.FindUnscopedWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+	_, err = order.FindActiveLineDispatch(db)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, reloaded.State)
 }

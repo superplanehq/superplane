@@ -211,6 +211,8 @@ export const DEFAULT_FACTORY_PLANNING = {
   clarity: true,
   confidence: true,
   setupCompleted: false,
+  autoStart: false,
+  autoStartLine: "",
 } as const;
 
 export const REFUND_FACTORY: FactoriesFactory = {
@@ -235,9 +237,22 @@ export const EMPTY_FACTORY: FactoriesFactory = {
 
 export function factoryWithPlanning(
   factory: FactoriesFactory,
-  planning: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean },
+  planning: {
+    enabled: boolean;
+    clarity: boolean;
+    confidence: boolean;
+    setupCompleted?: boolean;
+    autoStart?: boolean;
+    autoStartLine?: string;
+  },
 ): FactoriesFactory {
-  return { ...factory, planning };
+  return {
+    ...factory,
+    planning: {
+      ...DEFAULT_FACTORY_PLANNING,
+      ...planning,
+    },
+  };
 }
 
 const ACME_ONBOARDING_DONE_APP_ID = "app-acme-done";

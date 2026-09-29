@@ -445,10 +445,10 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
-	if !hasOutstandingPlanningQuestion(session) {
-		return nil
+	if hasOutstandingPlanningQuestion(session) {
+		messages.PublishPlanningAgentQuestion(session)
 	}
-	messages.PublishPlanningAgentQuestion(session)
+	maybeAutoStartPlanningDraft(db, session)
 	return nil
 }
 

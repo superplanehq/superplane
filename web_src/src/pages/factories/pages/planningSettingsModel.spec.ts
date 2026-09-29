@@ -14,7 +14,13 @@ import {
 
 describe("planningSettingsFromFactory", () => {
   it("defaults Planning on with Confidence and without Clarity", () => {
-    expect(DEFAULT_PLANNING_SETTINGS).toEqual({ enabled: true, clarity: false, confidence: true });
+    expect(DEFAULT_PLANNING_SETTINGS).toEqual({
+      enabled: true,
+      clarity: false,
+      confidence: true,
+      autoStart: false,
+      autoStartLine: "",
+    });
     expect(planningSettingsFromFactory(undefined)).toEqual(DEFAULT_PLANNING_SETTINGS);
     expect(planningSettingsFromFactory({ id: "factory-1" })).toEqual(DEFAULT_PLANNING_SETTINGS);
   });
@@ -25,7 +31,34 @@ describe("planningSettingsFromFactory", () => {
         id: "factory-1",
         planning: { enabled: false, clarity: true, confidence: false },
       }),
-    ).toEqual({ enabled: false, clarity: true, confidence: false });
+    ).toEqual({
+      enabled: false,
+      clarity: true,
+      confidence: false,
+      autoStart: false,
+      autoStartLine: "",
+    });
+  });
+
+  it("reads a stored automatic start line", () => {
+    expect(
+      planningSettingsFromFactory({
+        id: "factory-1",
+        planning: {
+          enabled: true,
+          clarity: false,
+          confidence: true,
+          autoStart: true,
+          autoStartLine: "ship",
+        },
+      }),
+    ).toEqual({
+      enabled: true,
+      clarity: false,
+      confidence: true,
+      autoStart: true,
+      autoStartLine: "ship",
+    });
   });
 });
 
@@ -82,10 +115,20 @@ describe("factoryPlanningSetupCompleted", () => {
 
 describe("planningSettingsToApi", () => {
   it("sends the stored score flags and marks setup complete", () => {
-    expect(planningSettingsToApi({ enabled: false, clarity: true, confidence: false })).toEqual({
+    expect(
+      planningSettingsToApi({
+        enabled: false,
+        clarity: true,
+        confidence: false,
+        autoStart: false,
+        autoStartLine: "",
+      }),
+    ).toEqual({
       enabled: false,
       clarity: true,
       confidence: false,
+      autoStart: false,
+      autoStartLine: "",
       setupCompleted: true,
     });
   });

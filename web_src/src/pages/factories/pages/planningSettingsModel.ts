@@ -10,13 +10,17 @@ export type PlanningDraftSettings = {
   enabled: boolean;
   clarity: boolean;
   confidence: boolean;
+  autoStart: boolean;
+  autoStartLine: string;
 };
 
-/** Mirrors DefaultFactoryPlanning on the server: Clarity is opt-in. */
+/** Mirrors DefaultFactoryPlanning on the server: Clarity and automatic start are opt-in. */
 export const DEFAULT_PLANNING_SETTINGS: PlanningDraftSettings = {
   enabled: true,
   clarity: false,
   confidence: true,
+  autoStart: false,
+  autoStartLine: "",
 };
 
 export function isPlanningSettingsTab(value: string | null | undefined): value is PlanningSettingsTab {
@@ -28,11 +32,23 @@ export function planningSettingsTabs(hasAgent: boolean): PlanningSettingsTab[] {
 }
 
 export function planningSettingsFromFactory(factory?: FactoriesFactory | null): PlanningDraftSettings {
+  const planning = factory?.planning;
   return {
-    enabled: factory?.planning?.enabled ?? DEFAULT_PLANNING_SETTINGS.enabled,
-    clarity: factory?.planning?.clarity ?? DEFAULT_PLANNING_SETTINGS.clarity,
-    confidence: factory?.planning?.confidence ?? DEFAULT_PLANNING_SETTINGS.confidence,
+    ...DEFAULT_PLANNING_SETTINGS,
+    ...definedPlanningFields({
+      enabled: planning?.enabled,
+      clarity: planning?.clarity,
+      confidence: planning?.confidence,
+      autoStart: planning?.autoStart,
+      autoStartLine: planning?.autoStartLine,
+    }),
   };
+}
+
+function definedPlanningFields(fields: Partial<PlanningDraftSettings>): Partial<PlanningDraftSettings> {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  ) as Partial<PlanningDraftSettings>;
 }
 
 export function factoryPlanningEnabled(factory?: FactoriesFactory | null): boolean {
@@ -60,6 +76,8 @@ export function planningSettingsToApi(settings: PlanningDraftSettings): Planning
     enabled: settings.enabled,
     clarity: settings.clarity,
     confidence: settings.confidence,
+    autoStart: settings.autoStart,
+    autoStartLine: settings.autoStartLine,
     setupCompleted: true,
   };
 }
