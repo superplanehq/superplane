@@ -497,6 +497,29 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	return o, nil
 }
 
+func (o *FactoryWorkOrder) ClaimAutoStart(tx *gorm.DB, lineID uuid.UUID) (bool, error) {
+	if o == nil || lineID == uuid.Nil {
+		return false, nil
+	}
+
+	now := time.Now()
+	result := tx.Model(&FactoryWorkOrder{}).
+		Where("id = ? AND state = ? AND auto_start_line_id IS NULL", o.ID, FactoryWorkOrderStateDraft).
+		Updates(map[string]any{
+			"auto_start_line_id": lineID,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+	o.AutoStartLineID = &lineID
+	o.UpdatedAt = now
+	return true, nil
+}
+
 func (o *FactoryWorkOrder) ClearAutoStart(tx *gorm.DB) (bool, error) {
 	if o == nil || o.AutoStartLineID == nil {
 		return false, nil

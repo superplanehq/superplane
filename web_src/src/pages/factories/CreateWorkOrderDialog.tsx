@@ -1,4 +1,4 @@
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -16,16 +16,15 @@ import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
-import { factoryPlanningEnabled, factoryShowsConfidence } from "./pages/planningSettingsModel";
+import { factoryPlanningEnabled } from "./pages/planningSettingsModel";
 
 interface CreateWorkOrderDialogProps {
   open: boolean;
-  lineId?: string;
   onClose: () => void;
   onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }
 
-export function CreateWorkOrderDialog({ open, lineId, onClose, onCreated }: CreateWorkOrderDialogProps) {
+export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
   const { factory } = useFactoriesLayout();
 
   if (!open) {
@@ -33,22 +32,20 @@ export function CreateWorkOrderDialog({ open, lineId, onClose, onCreated }: Crea
   }
 
   if (factoryPlanningEnabled(factory)) {
-    return <CreateWorkOrderRequestSession lineId={lineId} onClose={onClose} onCreated={onCreated} />;
+    return <CreateWorkOrderRequestSession onClose={onClose} onCreated={onCreated} />;
   }
 
   return <CreateWorkOrderDialogSession onClose={onClose} onCreated={onCreated} />;
 }
 
 function CreateWorkOrderRequestSession({
-  lineId,
   onClose,
   onCreated,
 }: {
-  lineId?: string;
   onClose: () => void;
   onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
 }) {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
   const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
 
@@ -61,7 +58,6 @@ function CreateWorkOrderRequestSession({
       isUploading={fileUpload.isUploading}
       organizationId={organizationId}
       factoryId={factoryId}
-      autoStartLine={autoStartLineForBoard(factory, lineId)}
       onClose={() => {
         if (!composer.isCreating && !fileUpload.isUploading) {
           onClose();
@@ -74,20 +70,6 @@ function CreateWorkOrderRequestSession({
       onUploadFiles={fileUpload.uploadFiles}
     />
   );
-}
-
-function autoStartLineForBoard(
-  factory: FactoriesFactory | null,
-  lineId?: string,
-): { id: string; name: string } | undefined {
-  if (!lineId || !factoryShowsConfidence(factory)) {
-    return undefined;
-  }
-  const name = factory?.lines?.find((line) => line.id === lineId)?.name?.trim();
-  if (!name) {
-    return undefined;
-  }
-  return { id: lineId, name };
 }
 
 function CreateWorkOrderDialogSession({

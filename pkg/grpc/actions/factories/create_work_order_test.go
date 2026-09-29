@@ -5,19 +5,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
 )
 
 func Test__CreateWorkOrder__AssignsTheCreator(t *testing.T) {
@@ -79,87 +76,4 @@ func Test__CreateWorkOrder__ReparentsWorkspaceFiles(t *testing.T) {
 	reparented, err := models.FindFile(database.Conn(), file.ID)
 	require.NoError(t, err)
 	assert.Equal(t, blob.ScopeTask, reparented.Scope)
-}
-
-func Test__CreateWorkOrder__StoresAutoStartLine(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	line, err := factoryModel.CreateLine(db, "ship", nil)
-	require.NoError(t, err)
-
-	resp, err := CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:       factoryModel.ID.String(),
-		Title:           "Ship the refunds line",
-		AutoStartLineId: line.ID.String(),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, line.ID.String(), resp.Order.GetAutoStartLineId())
-
-	stored, err := models.FindUnscopedWorkOrder(db, uuid.MustParse(resp.Order.Id))
-	require.NoError(t, err)
-	require.NotNil(t, stored.AutoStartLineID)
-	assert.Equal(t, line.ID, *stored.AutoStartLineID)
-}
-
-func Test__CreateWorkOrder__LeavesAutoStartOffWithoutLine(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-
-	resp, err := CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId: factoryModel.ID.String(),
-		Title:     "Ship the refunds line",
-	})
-	require.NoError(t, err)
-	assert.Empty(t, resp.Order.GetAutoStartLineId())
-
-	stored, err := models.FindUnscopedWorkOrder(db, uuid.MustParse(resp.Order.Id))
-	require.NoError(t, err)
-	assert.Nil(t, stored.AutoStartLineID)
-}
-
-func Test__CreateWorkOrder__RejectsAutoStartLine(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other"), "", "")
-	require.NoError(t, err)
-	foreignLine, err := other.CreateLine(db, "ship", nil)
-	require.NoError(t, err)
-
-	_, err = CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:       factoryModel.ID.String(),
-		Title:           "Ship the refunds line",
-		AutoStartLineId: "not-a-uuid",
-	})
-	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-
-	_, err = CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:       factoryModel.ID.String(),
-		Title:           "Ship the refunds line",
-		AutoStartLineId: foreignLine.ID.String(),
-	})
-	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-
-	planning := factoryModel.Planning()
-	planning.Confidence = false
-	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
-	line, err := factoryModel.CreateLine(db, "local", nil)
-	require.NoError(t, err)
-	_, err = CreateWorkOrder(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderRequest{
-		FactoryId:       factoryModel.ID.String(),
-		Title:           "Ship the refunds line",
-		AutoStartLineId: line.ID.String(),
-	})
-	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }

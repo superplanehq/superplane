@@ -473,13 +473,13 @@ func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanning
 		log.WithError(err).Warnf("auto-start readiness check failed for order %s", order.ID)
 		return
 	}
-	if !ready || order.AutoStartLineID == nil {
+	if !ready || factoryModel.PlanningAutoStartLineID == nil {
 		return
 	}
-	lineID := *order.AutoStartLineID
-	claimed, err := order.ClearAutoStart(db)
+	lineID := *factoryModel.PlanningAutoStartLineID
+	claimed, err := order.ClaimAutoStart(db, lineID)
 	if err != nil {
-		log.WithError(err).Warnf("auto-start could not clear the line for order %s", order.ID)
+		log.WithError(err).Warnf("auto-start could not claim the line for order %s", order.ID)
 		return
 	}
 	if !claimed {

@@ -29,23 +29,48 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
 	return &pb.FactoryPlanning{
-		Enabled:        planning.Enabled,
-		Clarity:        planning.Clarity,
-		Confidence:     planning.Confidence,
-		SetupCompleted: planning.SetupCompleted,
+		Enabled:         planning.Enabled,
+		Clarity:         planning.Clarity,
+		Confidence:      planning.Confidence,
+		SetupCompleted:  planning.SetupCompleted,
+		AutoStartLineId: serializeOptionalID(planning.AutoStartLineID),
 	}
 }
 
-func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanning {
+func factoryPlanningFromProto(planning *pb.FactoryPlanning) (models.FactoryPlanning, error) {
 	if planning == nil {
-		return models.DefaultFactoryPlanning()
+		return models.DefaultFactoryPlanning(), nil
+	}
+	lineID, err := optionalAutoStartLineID(planning.GetAutoStartLineId())
+	if err != nil {
+		return models.FactoryPlanning{}, err
 	}
 	return models.FactoryPlanning{
-		Enabled:        planning.GetEnabled(),
-		Clarity:        planning.GetClarity(),
-		Confidence:     planning.GetConfidence(),
-		SetupCompleted: planning.GetSetupCompleted(),
+		Enabled:         planning.GetEnabled(),
+		Clarity:         planning.GetClarity(),
+		Confidence:      planning.GetConfidence(),
+		SetupCompleted:  planning.GetSetupCompleted(),
+		AutoStartLineID: lineID,
+	}, nil
+}
+
+func optionalAutoStartLineID(raw string) (*uuid.UUID, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
 	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, invalidArgument("auto_start_line_id must be a UUID")
+	}
+	return &parsed, nil
+}
+
+func serializeOptionalID(id *uuid.UUID) string {
+	if id == nil || *id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }
 
 func serializeFactoryWithLines(
@@ -455,15 +480,8 @@ func serializeWorkOrder(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
-		AutoStartLineId:      serializeAutoStartLineID(order),
+		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
 	}, nil
-}
-
-func serializeAutoStartLineID(order *models.FactoryWorkOrder) string {
-	if order == nil || order.AutoStartLineID == nil {
-		return ""
-	}
-	return order.AutoStartLineID.String()
 }
 
 func serializeWorkOrderSummary(

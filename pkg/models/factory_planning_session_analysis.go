@@ -627,7 +627,7 @@ func WorkOrderReadyForAutoStart(
 	if factoryModel == nil || order == nil || session == nil {
 		return false, nil
 	}
-	if order.State != FactoryWorkOrderStateDraft || order.AutoStartLineID == nil {
+	if order.State != FactoryWorkOrderStateDraft {
 		return false, nil
 	}
 	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {

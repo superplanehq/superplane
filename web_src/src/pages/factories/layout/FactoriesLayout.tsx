@@ -116,7 +116,6 @@ function FactoriesLayoutContent({
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const {
     createWorkOrderOpen,
-    createWorkOrderLineId,
     openCreateWorkOrder,
     closeCreateWorkOrder,
     completeCreateWorkOrder,
@@ -207,7 +206,6 @@ function FactoriesLayoutContent({
       {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}
-          lineId={createWorkOrderLineId}
           onClose={closeCreateWorkOrder}
           onCreated={completeCreateWorkOrder}
         />

@@ -921,12 +921,6 @@ func TestWorkOrderReadyForAutoStart(t *testing.T) {
 	assert.False(t, ready)
 
 	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
-	order.AutoStartLineID = nil
-	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
-	require.NoError(t, err)
-	assert.False(t, ready)
-
-	order.AutoStartLineID = &line.ID
 	order.State = FactoryWorkOrderStateOpen
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)

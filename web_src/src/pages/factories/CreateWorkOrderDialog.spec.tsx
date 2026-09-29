@@ -7,11 +7,10 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
-  REFUND_LINE_PLAN_ID,
   factoryWithPlanning,
 } from "./__fixtures__/factoryPageResponses";
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
-import { CREATE_WORK_ORDER_REQUEST_COPY, createWorkOrderAutoStartHelper } from "./createWorkOrderRequestCopy";
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
 const { createMutate, dispatchMutate, meUser, showErrorToast } = vi.hoisted(() => ({
@@ -106,7 +105,6 @@ function emitFinalPhrases(transcripts: string[]) {
 
 function renderDialog(
   factory = factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: true, confidence: true }),
-  lineId?: string,
 ) {
   return render(
     <FactoriesLayoutContext.Provider
@@ -119,7 +117,7 @@ function renderDialog(
         openCreateWorkOrder: vi.fn(),
       }}
     >
-      <CreateWorkOrderDialog open lineId={lineId} onClose={vi.fn()} onCreated={vi.fn()} />
+      <CreateWorkOrderDialog open onClose={vi.fn()} onCreated={vi.fn()} />
     </FactoriesLayoutContext.Provider>,
   );
 }
@@ -226,50 +224,8 @@ describe("CreateWorkOrderDialog", () => {
       description: "Refunds fail on retry.",
       assigneeIds: [],
     });
+    expect(screen.queryByTestId("create-work-order-auto-start")).not.toBeInTheDocument();
     expect(dispatchMutate).not.toHaveBeenCalled();
-  });
-
-  it("shows Auto-start on a line board and sends the line only when it is on", async () => {
-    const user = userEvent.setup();
-    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
-    renderDialog(REFUND_FACTORY, REFUND_LINE_PLAN_ID);
-
-    expect(screen.getByTestId("create-work-order-auto-start")).toBeInTheDocument();
-    expect(screen.getByText(createWorkOrderAutoStartHelper("plan-and-implement"))).toBeInTheDocument();
-
-    await user.type(screen.getByTestId("work-order-description-input"), "Refunds fail on retry.");
-    await user.click(screen.getByTestId("create-work-order-request-create"));
-
-    expect(createMutate).toHaveBeenCalledWith({
-      title: "Refunds fail on retry.",
-      description: "Refunds fail on retry.",
-      assigneeIds: [],
-    });
-
-    await user.click(screen.getByTestId("create-work-order-auto-start"));
-    await user.click(screen.getByTestId("create-work-order-request-create"));
-
-    expect(createMutate).toHaveBeenLastCalledWith({
-      title: "Refunds fail on retry.",
-      description: "Refunds fail on retry.",
-      assigneeIds: [],
-      autoStartLineId: REFUND_LINE_PLAN_ID,
-    });
-  });
-
-  it("hides Auto-start off a line board", () => {
-    renderDialog(REFUND_FACTORY);
-
-    expect(screen.queryByTestId("create-work-order-auto-start")).not.toBeInTheDocument();
-  });
-
-  it("hides Auto-start when Confidence is off", () => {
-    renderDialog(
-      factoryWithPlanning(REFUND_FACTORY, { enabled: true, clarity: true, confidence: false }),
-      REFUND_LINE_PLAN_ID,
-    );
-
-    expect(screen.queryByTestId("create-work-order-auto-start")).not.toBeInTheDocument();
   });
 
   it("hides the dictate button when speech recognition is missing", () => {

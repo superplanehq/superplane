@@ -14,7 +14,6 @@ const MAX_DESCRIPTION_LENGTH = 5000;
 export interface CreateWorkOrderComposerDraft {
   title: string;
   description: string;
-  autoStartLineId?: string;
 }
 
 interface UseCreateWorkOrderComposerArgs {
@@ -79,7 +78,6 @@ export function useCreateWorkOrderComposer({
         title: trimmedTitle,
         description: trimmedDescription,
         assigneeIds,
-        ...(draft?.autoStartLineId ? { autoStartLineId: draft.autoStartLineId } : {}),
       });
       goToOrder(order);
     } catch (error) {

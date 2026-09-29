@@ -47,7 +47,6 @@ export function useCreateWorkOrderDialogState(
 
   return {
     createWorkOrderOpen,
-    createWorkOrderLineId: lineIdFromPathname(location.pathname),
     openCreateWorkOrder,
     closeCreateWorkOrder,
     completeCreateWorkOrder,

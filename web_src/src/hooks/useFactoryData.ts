@@ -432,7 +432,13 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       description?: string;
       key?: string;
       hostedSpendBudgetCents?: number | null;
-      planning?: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean };
+      planning?: {
+        enabled: boolean;
+        clarity: boolean;
+        confidence: boolean;
+        setupCompleted?: boolean;
+        autoStartLineId?: string;
+      };
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -495,7 +501,6 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       title: string;
       description: string;
       assigneeIds?: string[];
-      autoStartLineId?: string;
     }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
@@ -505,7 +510,6 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
             title: input.title,
             description: input.description,
             assigneeIds: input.assigneeIds,
-            ...(input.autoStartLineId ? { autoStartLineId: input.autoStartLineId } : {}),
           },
         }),
       );

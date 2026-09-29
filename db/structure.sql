@@ -361,6 +361,7 @@ CREATE TABLE public.factories (
     planning_clarity boolean DEFAULT false NOT NULL,
     planning_confidence boolean DEFAULT true NOT NULL,
     planning_setup_completed boolean DEFAULT false NOT NULL,
+    planning_auto_start_line_id uuid,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -3527,6 +3528,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 
 --
+-- Name: factories factories_planning_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4510,7 +4519,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260928131952	f
+20260928154037	f
 \.
 
 

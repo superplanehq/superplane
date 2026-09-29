@@ -16,9 +16,4 @@ export const CREATE_WORK_ORDER_REQUEST_COPY = {
   creating: "Creating...",
   expand: "Open full screen",
   collapse: "Exit full screen",
-  autoStart: "Auto-start",
 } as const;
-
-export function createWorkOrderAutoStartHelper(lineName: string): string {
-  return `Start this task on ${lineName} when the plan scores 5.`;
-}

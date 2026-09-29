@@ -1113,7 +1113,9 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	line := mustAutoStartLine(t, r, factoryModel, true)
-	order := mustSetAutoStartLine(t, db, factoryModel, session, line.ID)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
 	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
 
@@ -1159,12 +1161,15 @@ func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	assert.Equal(t, models.PlanningSessionStateRunning, updatedSession.State)
 }
 
-func TestBeginPlanningWaitAndNotify_FailedAutoStartClearsFlag(t *testing.T) {
+func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	r := support.Setup(t)
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	line := mustAutoStartLine(t, r, factoryModel, false)
-	order := mustSetAutoStartLine(t, db, factoryModel, session, line.ID)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
 	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
 
@@ -1173,7 +1178,8 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartClearsFlag(t *testing.T) {
 	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
-	assert.Nil(t, reloaded.AutoStartLineID)
+	require.NotNil(t, reloaded.AutoStartLineID)
+	assert.Equal(t, line.ID, *reloaded.AutoStartLineID)
 	_, err = reloaded.FindActiveLineDispatch(db)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
@@ -1202,20 +1208,11 @@ func mustAutoStartLine(t *testing.T, r *support.ResourceRegistry, factoryModel *
 	return line
 }
 
-func mustSetAutoStartLine(
-	t *testing.T,
-	db *gorm.DB,
-	factoryModel *models.Factory,
-	session *models.FactoryPlanningSession,
-	lineID uuid.UUID,
-) *models.FactoryWorkOrder {
+func mustEnableAutoStart(t *testing.T, db *gorm.DB, factoryModel *models.Factory, lineID uuid.UUID) {
 	t.Helper()
-	require.NotNil(t, session.DraftWorkOrderID)
-	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
-	require.NoError(t, err)
-	require.NoError(t, db.Model(order).Update("auto_start_line_id", lineID).Error)
-	order.AutoStartLineID = &lineID
-	return order
+	planning := factoryModel.Planning()
+	planning.AutoStartLineID = &lineID
+	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
 }
 
 func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {
