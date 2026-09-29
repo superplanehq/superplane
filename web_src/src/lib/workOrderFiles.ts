@@ -122,6 +122,32 @@ export function workOrderFileRef(id: string): string {
   return `${FILE_REF_SCHEME}://${id}`;
 }
 
+// Mirrors the markdown/HTML embed shapes the editor produces for a file ref
+// (`pkg/blob/markdown.go` parses the same shapes server-side).
+const MARKDOWN_FILE_REF_PATTERN = /!?\[[^\]]*]\(([^)\s]+)\)/g;
+const HTML_IMG_FILE_REF_PATTERN = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+const HTML_ANCHOR_FILE_REF_PATTERN = /<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>[\s\S]*?<\/a>/gi;
+
+/**
+ * Removes `sp-file://` embeds from a description. Duplicating a task does not
+ * copy its attachments, and resubmitting the original file references would
+ * make the server reject the new task (the files still belong to the source
+ * task). Use this before reusing a description outside its original task.
+ */
+export function stripWorkOrderFileRefs(markdown: string): string {
+  if (!markdown) {
+    return markdown;
+  }
+  const dropIfFileRef = (match: string, reference: string) => (parseWorkOrderFileId(reference) ? "" : match);
+  let next = markdown.replace(MARKDOWN_FILE_REF_PATTERN, dropIfFileRef);
+  next = next.replace(HTML_IMG_FILE_REF_PATTERN, dropIfFileRef);
+  next = next.replace(HTML_ANCHOR_FILE_REF_PATTERN, dropIfFileRef);
+  return next
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function isAllowedWorkOrderContentType(contentType: string): boolean {
   return (ALLOWED_WORK_ORDER_FILE_TYPES as readonly string[]).includes(normalizeWorkOrderFileType(contentType));
 }

@@ -17,6 +17,7 @@ import {
   revokeWorkOrderFilePreviewUrl,
   setWorkOrderFilePreviewUrl,
   resolveWorkOrderFileSrc,
+  stripWorkOrderFileRefs,
   workOrderFileDownloadMap,
   workOrderFileDownloadUrlIsFresh,
   workOrderFileRef,
@@ -42,6 +43,33 @@ describe("workOrderFiles", () => {
     const id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     setWorkOrderFilePreviewUrl(id, "blob:preview");
     expect(resolveWorkOrderFileSrc(workOrderFileRef(id), { [id]: "https://cdn.example/x.png" })).toBe("blob:preview");
+  });
+
+  it("strips embedded file refs so duplicated descriptions do not resend the original attachments", () => {
+    const id = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const markdown = [
+      "Steps to reproduce:",
+      "",
+      `![screenshot](${workOrderFileRef(id)})`,
+      "",
+      `See also [the recording](${workOrderFileRef(id)}) for context.`,
+      "",
+      `<img src="${workOrderFileRef(id)}" alt="inline" />`,
+      "",
+      `<a href="${workOrderFileRef(id)}">download</a>`,
+    ].join("\n");
+
+    const stripped = stripWorkOrderFileRefs(markdown);
+
+    expect(stripped).not.toContain(workOrderFileRef(id));
+    expect(stripped).toContain("Steps to reproduce:");
+    expect(stripped).toContain("See also");
+    expect(stripped).toContain("for context.");
+  });
+
+  it("leaves descriptions without file refs unchanged", () => {
+    const markdown = "Plain text with a [normal link](https://example.com) and no attachments.";
+    expect(stripWorkOrderFileRefs(markdown)).toBe(markdown);
   });
 
   it("accepts allowed images and rejects other types", () => {
