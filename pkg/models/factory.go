@@ -33,6 +33,7 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
@@ -50,9 +51,12 @@ type Factory struct {
 	PlanningClarity        bool
 	PlanningConfidence     bool
 	PlanningSetupCompleted bool
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
-	DeletedAt              gorm.DeletedAt `gorm:"index"`
+	// Public lets anyone with the line URL view the board. They cannot open
+	// tasks, logs, or settings.
+	Public    bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 // FactoryPlanning is the workspace toggle for draft chat plus the two
@@ -430,6 +434,26 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningClarity = planning.Clarity
 	f.PlanningConfidence = planning.Confidence
 	f.PlanningSetupCompleted = planning.SetupCompleted
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) SetPublic(tx *gorm.DB, public bool) error {
+	if f.OnboardingCompletedAt == nil {
+		return ErrFactoryOnboardingNotComplete
+	}
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public", "updated_at").
+		Updates(map[string]any{
+			"public":     public,
+			"updated_at": now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.Public = public
 	f.UpdatedAt = now
 	return nil
 }

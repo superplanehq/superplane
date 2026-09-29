@@ -285,6 +285,15 @@ func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
 	}
 }
 
+func TestSetFactoryVisibilityRequiresPublish(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	rule, ok := rules[HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/factories/{id}/visibility"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", rule.Resource)
+	assert.Equal(t, "publish", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
 func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
