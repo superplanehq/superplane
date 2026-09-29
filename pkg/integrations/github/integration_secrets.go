@@ -75,19 +75,32 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		return "", fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	installationID, err := strconv.Atoi(metadata.InstallationID)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse installation ID: %v", err)
-	}
-
-	pem, err := common.LegacyAppPrivateKey(integrationCtx, metadata)
-	if err != nil {
-		return "", fmt.Errorf("failed to find PEM: %v", err)
+	installationID := 0
+	appID := metadata.GitHubApp.ID
+	pem := ""
+	if metadata.HostedApp {
+		hosted, err := common.ResolveHostedAppBinding(integrationCtx)
+		if err != nil {
+			return "", err
+		}
+		installationID = int(hosted.ID)
+		appID = hosted.App.ID
+		pem = hosted.App.PrivateKey
+	} else {
+		var err error
+		installationID, err = strconv.Atoi(metadata.InstallationID)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse installation ID: %v", err)
+		}
+		pem, err = common.LegacyAppPrivateKey(integrationCtx, metadata)
+		if err != nil {
+			return "", fmt.Errorf("failed to find PEM: %v", err)
+		}
 	}
 
 	itr, err := ghinstallation.New(
 		&httpContextTransport{http: httpCtx},
-		metadata.GitHubApp.ID,
+		appID,
 		int64(installationID),
 		[]byte(pem),
 	)

@@ -70,7 +70,7 @@ func Test__Logout(t *testing.T) {
 	assert.Equal(t, -1, authCookie.MaxAge)
 }
 
-func Test__GitHubAppSetup_installRequestWithoutSessionRequiresLogin(t *testing.T) {
+func Test__GitHubAppSetup_installRequestWithoutSessionReturnsToApp(t *testing.T) {
 	r := support.Setup(t)
 	server, _, _ := setupTestServer(r, t)
 
@@ -82,8 +82,8 @@ func Test__GitHubAppSetup_installRequestWithoutSessionRequiresLogin(t *testing.T
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
 
-	assert.Equal(t, http.StatusTemporaryRedirect, rec.Code)
-	assert.Contains(t, rec.Header().Get("Location"), "/login")
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "/", rec.Header().Get("Location"))
 }
 
 func Test__GitHubAppSetup_ownerApprovedWithoutSession(t *testing.T) {
