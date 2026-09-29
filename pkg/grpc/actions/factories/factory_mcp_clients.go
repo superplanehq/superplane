@@ -76,7 +76,10 @@ func RevokeFactoryMCPClient(
 		if err != nil {
 			return err
 		}
-		return models.DeleteMCPOAuthRefreshTokensForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
+		if err := models.DeleteMCPOAuthRefreshTokensForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID); err != nil {
+			return err
+		}
+		return models.DeleteMCPOAuthCodesForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")

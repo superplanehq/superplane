@@ -129,3 +129,45 @@ func TestDeleteMCPOAuthRefreshTokensForClient(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, other.ID, found.ID)
 }
+
+func TestDeleteMCPOAuthCodesForClient(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	keep := insertAuthCode(t, r, factory.ID, "other-client", now.Add(time.Minute))
+	drop := insertAuthCode(t, r, factory.ID, "superplane-local", now.Add(time.Minute))
+
+	require.NoError(t, models.DeleteMCPOAuthCodesForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local"))
+	_, err = models.FindMCPOAuthCode(db, drop.CodeHash, now)
+	assert.ErrorIs(t, err, models.ErrMCPOAuthCodeNotFound)
+	found, err := models.FindMCPOAuthCode(db, keep.CodeHash, now)
+	require.NoError(t, err)
+	assert.Equal(t, keep.ID, found.ID)
+}
+
+func insertAuthCode(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	clientID string,
+	expiresAt time.Time,
+) *models.MCPOAuthCode {
+	t.Helper()
+	code := &models.MCPOAuthCode{
+		CodeHash:            uuid.NewString(),
+		ClientID:            clientID,
+		RedirectURI:         "http://localhost:8787/callback",
+		Resource:            "http://localhost:8000/mcp",
+		CodeChallenge:       "challenge",
+		CodeChallengeMethod: "S256",
+		UserID:              r.User,
+		OrganizationID:      r.Organization.ID,
+		FactoryID:           factoryID,
+		Scopes:              datatypes.NewJSONSlice([]string{"work_orders:read"}),
+		ExpiresAt:           expiresAt,
+	}
+	require.NoError(t, models.CreateMCPOAuthCode(database.DB(t.Context()), code))
+	return code
+}

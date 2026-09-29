@@ -133,6 +133,30 @@ func Test__RevokeFactoryMCPClientDeletesRotatedTokens(t *testing.T) {
 	assert.Equal(t, other.ID, found.ID)
 }
 
+func Test__RevokeFactoryMCPClientDeletesAuthorizationCodes(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	listed := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
+	pending := insertFactoryMCPAuthCode(t, r, factory.ID, localMCPClientID, now.Add(time.Minute))
+	other := insertFactoryMCPAuthCode(t, r, factory.ID, "other-client", now.Add(time.Minute))
+
+	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
+		FactoryId: factory.ID.String(),
+		ClientId:  listed.ID.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = models.FindMCPOAuthCode(db, pending.CodeHash, now)
+	assert.ErrorIs(t, err, models.ErrMCPOAuthCodeNotFound)
+	found, err := models.FindMCPOAuthCode(db, other.CodeHash, now)
+	require.NoError(t, err)
+	assert.Equal(t, other.ID, found.ID)
+}
+
 func Test__RevokeFactoryMCPClientRejectsInvalidID(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
@@ -168,6 +192,31 @@ func insertFactoryMCPRefreshToken(
 		ExpiresAt:      expiresAt,
 		CreatedAt:      createdAt,
 	}
-	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.Conn(), token))
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.DB(t.Context()), token))
 	return token
+}
+
+func insertFactoryMCPAuthCode(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	clientID string,
+	expiresAt time.Time,
+) *models.MCPOAuthCode {
+	t.Helper()
+	code := &models.MCPOAuthCode{
+		CodeHash:            uuid.NewString(),
+		ClientID:            clientID,
+		RedirectURI:         "http://localhost:8787/callback",
+		Resource:            "http://localhost:8000/mcp",
+		CodeChallenge:       "challenge",
+		CodeChallengeMethod: "S256",
+		UserID:              r.User,
+		OrganizationID:      r.Organization.ID,
+		FactoryID:           factoryID,
+		Scopes:              datatypes.NewJSONSlice([]string{"work_orders:read"}),
+		ExpiresAt:           expiresAt,
+	}
+	require.NoError(t, models.CreateMCPOAuthCode(database.DB(t.Context()), code))
+	return code
 }

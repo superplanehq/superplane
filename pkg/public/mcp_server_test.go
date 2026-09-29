@@ -308,6 +308,57 @@ func TestMCPRevokedGrantReturns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
+func TestMCPRevokedPendingCodeDoesNotRestoreAccess(t *testing.T) {
+	r, server, signer := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	claims := mcpAccessClaims(r, factory.ID)
+	insertMCPAccessGrant(t, claims)
+	token, err := mcpserver.MintAccessToken(signer, claims, time.Hour)
+	require.NoError(t, err)
+
+	code := "pending-code-" + uuid.NewString()
+	require.NoError(t, models.CreateMCPOAuthCode(db, &models.MCPOAuthCode{
+		CodeHash:            crypto.HashToken(code),
+		ClientID:            claims.ClientID,
+		RedirectURI:         mcpserver.CursorRedirectURIs[0],
+		Resource:            claims.Resource,
+		CodeChallenge:       mcp.S256Challenge(mcpTestPKCEVerifier),
+		CodeChallengeMethod: "S256",
+		UserID:              claims.UserID,
+		OrganizationID:      claims.OrgID,
+		FactoryID:           claims.FactoryID,
+		Scopes:              datatypes.NewJSONSlice(claims.Scopes),
+		ExpiresAt:           time.Now().Add(time.Minute),
+	}))
+	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(db, claims.OrgID, claims.FactoryID, claims.UserID, claims.ClientID))
+	require.NoError(t, models.DeleteMCPOAuthCodesForClient(db, claims.OrgID, claims.FactoryID, claims.UserID, claims.ClientID))
+
+	values := url.Values{}
+	values.Set("grant_type", "authorization_code")
+	values.Set("code", code)
+	values.Set("code_verifier", mcpTestPKCEVerifier)
+	values.Set("client_id", claims.ClientID)
+	values.Set("redirect_uri", mcpserver.CursorRedirectURIs[0])
+	values.Set("resource", claims.Resource)
+	tokenReq := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(values.Encode()))
+	tokenReq.Host = "localhost:8000"
+	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	tokenRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(tokenRec, tokenReq)
+	assert.Equal(t, http.StatusBadRequest, tokenRec.Code)
+	assert.Contains(t, tokenRec.Body.String(), "invalid_grant")
+
+	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
 func TestMCPProtectedResourceMetadataOnResourcePath(t *testing.T) {
 	_, server, _ := mcpEnabledServer(t)
 	req := mcpRequest(http.MethodGet, "/.well-known/oauth-protected-resource/mcp", "")

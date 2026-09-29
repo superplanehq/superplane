@@ -222,6 +222,26 @@ func DeleteMCPOAuthRefreshTokensForClient(
 		Delete(&MCPOAuthRefreshToken{}).Error
 }
 
+func DeleteMCPOAuthCodesForClient(
+	tx *gorm.DB,
+	organizationID, factoryID, userID uuid.UUID,
+	clientID string,
+) error {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return nil
+	}
+	return tx.
+		Where(
+			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ?",
+			organizationID,
+			factoryID,
+			userID,
+			clientID,
+		).
+		Delete(&MCPOAuthCode{}).Error
+}
+
 func ListMCPOAuthClientsByClientIDs(tx *gorm.DB, clientIDs []string) ([]MCPOAuthClient, error) {
 	if len(clientIDs) == 0 {
 		return nil, nil
