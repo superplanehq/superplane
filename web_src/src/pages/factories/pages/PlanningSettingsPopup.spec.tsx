@@ -14,8 +14,13 @@ import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
+import { PLANNING_SETTINGS_COPY, planningAutoStartHelper } from "./planningSettingsCopy";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
-import { DEFAULT_PLANNING_SETTINGS, type PlanningDraftSettings } from "./planningSettingsModel";
+import {
+  DEFAULT_PLANNING_SETTINGS,
+  type PlanningAutoStartLine,
+  type PlanningDraftSettings,
+} from "./planningSettingsModel";
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: vi.fn(() => ({
@@ -44,7 +49,7 @@ function defaultAgentSlot(overrides: Partial<PlanningReviewAgentSlot> = {}): Pla
 function renderPopup(
   onSave = vi.fn(),
   settings: PlanningDraftSettings = DEFAULT_PLANNING_SETTINGS,
-  options: { agent?: boolean | Partial<PlanningReviewAgentSlot> } = {},
+  options: { agent?: boolean | Partial<PlanningReviewAgentSlot>; lines?: PlanningAutoStartLine[] } = {},
 ) {
   const agentSlot = options.agent ? defaultAgentSlot(options.agent === true ? {} : options.agent) : undefined;
   render(
@@ -54,6 +59,7 @@ function renderPopup(
           <TooltipProvider>
             <PlanningSettingsPopup
               settings={settings}
+              lines={options.lines}
               onSave={onSave}
               onClose={vi.fn()}
               fixed={false}
@@ -95,6 +101,7 @@ describe("PlanningSettingsPopup", () => {
       enabled: true,
       clarity: true,
       confidence: true,
+      autoStartLineId: "",
     });
   });
 
@@ -104,6 +111,7 @@ describe("PlanningSettingsPopup", () => {
       enabled: true,
       clarity: true,
       confidence: false,
+      autoStartLineId: "",
     });
 
     await user.click(within(screen.getByTestId("planning-settings-enabled")).getByRole("switch"));
@@ -116,6 +124,7 @@ describe("PlanningSettingsPopup", () => {
       enabled: false,
       clarity: true,
       confidence: false,
+      autoStartLineId: "",
     });
   });
 
@@ -140,6 +149,50 @@ describe("PlanningSettingsPopup", () => {
     rerender(popup({ ...DEFAULT_PLANNING_SETTINGS }));
 
     expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).toBeChecked();
+  });
+
+  it("saves Auto-start on the selected line", async () => {
+    const user = userEvent.setup();
+    const lines = [
+      { id: "line-implement", name: "implement" },
+      { id: "line-hotfix", name: "hotfix" },
+    ];
+    const { onSave } = renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { lines });
+
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
+    await user.click(within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch"));
+    expect(screen.getByText(planningAutoStartHelper("implement"))).toBeInTheDocument();
+    await user.click(screen.getByTestId("planning-settings-auto-start-line"));
+    await user.click(screen.getByRole("option", { name: "hotfix" }));
+    expect(screen.getByText(planningAutoStartHelper("hotfix"))).toBeInTheDocument();
+    await user.click(screen.getByTestId("planning-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith({
+      enabled: true,
+      clarity: false,
+      confidence: true,
+      autoStartLineId: "line-hotfix",
+    });
+  });
+
+  it("names the only line when the selector is hidden", () => {
+    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { lines: [{ id: "line-implement", name: "implement" }] });
+
+    expect(screen.getByText(planningAutoStartHelper("implement"))).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-settings-auto-start-line")).not.toBeInTheDocument();
+  });
+
+  it("disables Auto-start when Planning is off and keeps the line", () => {
+    renderPopup(
+      vi.fn(),
+      { enabled: false, clarity: false, confidence: true, autoStartLineId: "line-implement" },
+      { lines: [{ id: "line-implement", name: "implement" }] },
+    );
+
+    const toggle = within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch");
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper)).toBeInTheDocument();
   });
 
   it("shows General, Agent, and Automation tabs when an agent exists", () => {

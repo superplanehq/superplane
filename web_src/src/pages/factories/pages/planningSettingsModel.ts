@@ -1,22 +1,29 @@
 import type { FactoriesFactory } from "@/api-client";
 
-import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
+import { PLANNING_SETTINGS_COPY, planningAutoStartHelper } from "./planningSettingsCopy";
 
-export { PLANNING_SETTINGS_COPY };
+export { PLANNING_SETTINGS_COPY, planningAutoStartHelper };
 
 export type PlanningSettingsTab = "general" | "agent" | "automation";
+
+export type PlanningAutoStartLine = {
+  id: string;
+  name: string;
+};
 
 export type PlanningDraftSettings = {
   enabled: boolean;
   clarity: boolean;
   confidence: boolean;
+  autoStartLineId: string;
 };
 
-/** Mirrors DefaultFactoryPlanning on the server: Clarity is opt-in. */
+/** Mirrors DefaultFactoryPlanning on the server: Clarity is opt-in. Auto-start is off. */
 export const DEFAULT_PLANNING_SETTINGS: PlanningDraftSettings = {
   enabled: true,
   clarity: false,
   confidence: true,
+  autoStartLineId: "",
 };
 
 export function isPlanningSettingsTab(value: string | null | undefined): value is PlanningSettingsTab {
@@ -27,11 +34,23 @@ export function planningSettingsTabs(hasAgent: boolean): PlanningSettingsTab[] {
   return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
 }
 
+export function planningAutoStartLines(factory?: FactoriesFactory | null): PlanningAutoStartLine[] {
+  return (factory?.lines ?? []).flatMap((line) => {
+    const id = line.id?.trim() ?? "";
+    const name = line.name?.trim() ?? "";
+    return id && name ? [{ id, name }] : [];
+  });
+}
+
 export function planningSettingsFromFactory(factory?: FactoriesFactory | null): PlanningDraftSettings {
+  const stored = factory?.planning?.autoStartLineId ?? "";
+  const lines = factory?.lines;
+  const autoStartLineId = !lines || lines.some((line) => line.id === stored) ? stored : "";
   return {
     enabled: factory?.planning?.enabled ?? DEFAULT_PLANNING_SETTINGS.enabled,
     clarity: factory?.planning?.clarity ?? DEFAULT_PLANNING_SETTINGS.clarity,
     confidence: factory?.planning?.confidence ?? DEFAULT_PLANNING_SETTINGS.confidence,
+    autoStartLineId,
   };
 }
 
@@ -60,6 +79,7 @@ export function planningSettingsToApi(settings: PlanningDraftSettings): Planning
     enabled: settings.enabled,
     clarity: settings.clarity,
     confidence: settings.confidence,
+    autoStartLineId: settings.autoStartLineId,
     setupCompleted: true,
   };
 }

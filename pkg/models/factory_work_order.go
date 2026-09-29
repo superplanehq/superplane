@@ -61,20 +61,21 @@ var (
 )
 
 type FactoryWorkOrder struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	Number         int64
-	Title          string
-	Description    string
-	State          string
-	Result         string
-	CreatedByID    *uuid.UUID
-	SourceRunID    *uuid.UUID
-	OriginURL      *string
-	OriginLabel    *string
-	Repository     *string
-	DefaultBranch  *string
+	ID              uuid.UUID
+	OrganizationID  uuid.UUID
+	FactoryID       uuid.UUID
+	Number          int64
+	Title           string
+	Description     string
+	State           string
+	Result          string
+	CreatedByID     *uuid.UUID
+	SourceRunID     *uuid.UUID
+	OriginURL       *string
+	OriginLabel     *string
+	Repository      *string
+	DefaultBranch   *string
+	AutoStartLineID *uuid.UUID
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -494,6 +495,50 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	}
 
 	return o, nil
+}
+
+func (o *FactoryWorkOrder) ClaimAutoStart(tx *gorm.DB, lineID uuid.UUID) (bool, error) {
+	if o == nil || lineID == uuid.Nil {
+		return false, nil
+	}
+
+	now := time.Now()
+	result := tx.Model(&FactoryWorkOrder{}).
+		Where("id = ? AND state = ? AND auto_start_line_id IS NULL", o.ID, FactoryWorkOrderStateDraft).
+		Updates(map[string]any{
+			"auto_start_line_id": lineID,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+	o.AutoStartLineID = &lineID
+	o.UpdatedAt = now
+	return true, nil
+}
+
+func (o *FactoryWorkOrder) ClearAutoStart(tx *gorm.DB) (bool, error) {
+	if o == nil || o.AutoStartLineID == nil {
+		return false, nil
+	}
+
+	lineID := *o.AutoStartLineID
+	now := time.Now()
+	result := tx.Model(&FactoryWorkOrder{}).
+		Where("id = ? AND auto_start_line_id = ?", o.ID, lineID).
+		Updates(map[string]any{
+			"auto_start_line_id": gorm.Expr("NULL"),
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	o.AutoStartLineID = nil
+	o.UpdatedAt = now
+	return result.RowsAffected > 0, nil
 }
 
 func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
