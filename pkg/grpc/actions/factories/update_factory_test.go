@@ -146,4 +146,69 @@ func Test__UpdateFactory(t *testing.T) {
 			SetupCompleted: true,
 		}, reloaded.Planning())
 	})
+
+	t.Run("stores and clears the auto-start line", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		line, err := factory.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				SetupCompleted:  true,
+				AutoStartLineId: line.ID.String(),
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, line.ID.String(), response.Factory.Planning.GetAutoStartLineId())
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:        true,
+				Confidence:     true,
+				SetupCompleted: true,
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, cleared.Factory.Planning.GetAutoStartLineId())
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.PlanningAutoStartLineID)
+	})
+
+	t.Run("rejects an auto-start line outside the workspace", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		other, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("other"), "", "")
+		require.NoError(t, err)
+		foreignLine, err := other.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: "not-a-uuid",
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: foreignLine.ID.String(),
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
 }
