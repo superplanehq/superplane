@@ -201,6 +201,41 @@ export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "nam
   return "implement";
 }
 
+/**
+ * One card per automation, not per run. Comment replies share a handler
+ * name even when each run has its own canvas id, so the name is the key.
+ */
+export function consoleAutomationKey(stage: Pick<AutomationStage, "id" | "appId" | "componentName">): string {
+  return stage.componentName.trim() || stage.appId || stage.id;
+}
+
+export function automationsFromStages(stages: AutomationStage[]): ConsoleAutomation[] {
+  const byKey = new Map<string, AutomationStage[]>();
+  for (const stage of stages) {
+    const key = consoleAutomationKey(stage);
+    const runs = byKey.get(key) ?? [];
+    runs.push(stage);
+    byKey.set(key, runs);
+  }
+  return [...byKey.entries()].map(([key, runs]) => {
+    const newestFirst = [...runs].sort(
+      (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
+    );
+    const name = newestFirst[0]?.componentName || key;
+    return {
+      id: consoleAutomationDomId(name, key),
+      name,
+      latest: newestFirst[0],
+      runs: newestFirst,
+    };
+  });
+}
+
+function consoleAutomationDomId(name: string, key: string): string {
+  const slug = `${name}-${key}`.toLowerCase().replace(/\W+/g, "-").replace(/^-|-$/g, "");
+  return slug || "automation";
+}
+
 export function stagesByConsoleColumn(
   groups: AutomationStageGroups,
   closerAppId?: string,
