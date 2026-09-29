@@ -31,13 +31,15 @@ export function useAutoProvisionDiscussionHandler(args: {
     }
 
     const factoryId = args.factoryId;
+    const listHandlers = listHandlersRef.current;
+    const createHandler = createHandlerRef.current;
     let active = true;
     const existing = discussionProvisionInFlight.get(factoryId);
     const attempt =
       existing ??
       provisionDiscussionHandler({
-        listHandlers: () => listHandlersRef.current(),
-        createHandler: (input) => Promise.resolve(createHandlerRef.current(input)),
+        listHandlers,
+        createHandler: (input) => Promise.resolve(createHandler(input)),
       });
     if (!existing) {
       discussionProvisionInFlight.set(factoryId, attempt);
