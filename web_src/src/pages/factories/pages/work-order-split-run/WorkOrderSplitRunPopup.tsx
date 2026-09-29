@@ -2,9 +2,12 @@ import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
@@ -124,6 +127,8 @@ function AnalysisWorkOrderPopup({
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
+  const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
@@ -189,6 +194,21 @@ function AnalysisWorkOrderPopup({
       ? review
       : undefined;
 
+  const handleDuplicate = async () => {
+    try {
+      setDuplicateBusy(true);
+      await createWorkOrder.mutateAsync({
+        title: edits.title,
+        description: popupData.sourceDescription,
+      });
+      showSuccessToast("Task duplicated to backlog.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to duplicate task."));
+    } finally {
+      setDuplicateBusy(false);
+    }
+  };
+
   return (
     <PopupShell
       testId="work-order-split-run"
@@ -223,14 +243,15 @@ function AnalysisWorkOrderPopup({
             edits,
             fixture,
             organizationId,
+            factoryId,
             factoryKey,
             orderNumber,
             lineId,
             onClose,
             fullPage,
             toggleFullPage,
-            mutations,
-            footerBusy: footerActions.busy,
+            mutations: { ...mutations, onDuplicate: handleDuplicate },
+            footerBusy: footerActions.busy || duplicateBusy,
             reviewActions,
             showOwnerRow: !unified,
             planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
@@ -280,6 +301,7 @@ function analysisPopupHeader(args: {
   edits: ReturnType<typeof useAnalysisPopupEdits>;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
@@ -311,6 +333,8 @@ function analysisPopupHeader(args: {
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
           onArchive={showsArchive(args.fixture.footer) ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
+          onDuplicate={args.mutations.onDuplicate}
+          duplicateBusy={args.footerBusy}
           taskActions={args.reviewActions}
         />
       }
