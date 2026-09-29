@@ -106,6 +106,22 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns factory task console feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryTaskConsole)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryTaskConsole, f.ID)
+		assert.Equal(t, "Task Console", f.Label)
+	})
+
+	t.Run("known id returns SuperPlane MCP server feature", func(t *testing.T) {
+		f, ok := Get(FeatureSuperPlaneMCPServer)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
+		assert.Equal(t, "SuperPlane MCP Server", f.Label)
+		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -132,6 +148,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureFactoryRiskScore))
+	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
