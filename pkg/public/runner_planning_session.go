@@ -490,7 +490,14 @@ func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanning
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 		return
 	}
-	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", ""); err != nil {
+	owner := order.CreatedByID
+	if owner == nil {
+		owner = session.CreatedByUserID
+	}
+	if owner == nil {
+		owner = session.LastChatUserID()
+	}
+	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, owner, 0, false, "", ""); err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
 	}
 }
