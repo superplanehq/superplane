@@ -96,6 +96,22 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 		assert.Empty(t, updated.ColumnColorsValue())
 	})
 
+	t.Run("saves rose and indigo", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"backlog": "rose", "verify": "indigo"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"backlog": "rose", "verify": "indigo"}, response.Line.ColumnColors)
+
+		updated, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"backlog": "rose", "verify": "indigo"}, updated.ColumnColorsValue())
+	})
+
 	t.Run("unknown color id -> error", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
