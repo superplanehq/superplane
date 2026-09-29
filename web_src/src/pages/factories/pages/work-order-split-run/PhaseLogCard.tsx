@@ -179,7 +179,11 @@ function CollapsibleStreamTitle({ text }: { text: string }) {
     <span className="flex min-w-0 flex-1 flex-col items-start">
       <span
         ref={textRef}
-        className={cn("w-full whitespace-pre-wrap break-words text-muted-foreground", !expanded && "line-clamp-2")}
+        className={cn(
+          "w-full whitespace-pre-wrap break-words text-muted-foreground",
+          !expanded && "line-clamp-2",
+          expanded && "block max-h-[min(40%,16rem)] overflow-y-auto",
+        )}
       >
         {text}
       </span>
