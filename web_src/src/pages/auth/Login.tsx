@@ -312,8 +312,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
-      // RootOrganizationRedirect picks the last organization and screen.
-      // Do not pick organizations[0] here — that sent people to abandoned orgs.
+      // No redirect address lands on `/`. RootOrganizationRedirect opens the
+      // last workspace when workspaces are on, or the last screen when they
+      // are off. Do not pick organizations[0] here — that sent people to
+      // abandoned orgs.
       window.location.href = "/";
     },
     [redirectTarget],

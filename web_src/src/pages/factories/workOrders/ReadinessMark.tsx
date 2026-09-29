@@ -57,9 +57,9 @@ const BADGE_TONE: Record<ConfidenceBand, string> = {
 const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
 
 /**
- * Board card scores as two light badges, name and number, tinted by band.
- * Same pill style as the Agent question chip. The tooltip carries the
- * verdict headline.
+ * Board card scores as two light badges, name and score out of the maximum,
+ * tinted by band. Same pill style as the Agent question chip. The tooltip
+ * carries the verdict headline.
  */
 export function CardScoreBadges({
   clarity,
@@ -98,12 +98,12 @@ export function CardScoreBadges({
               key={row.key}
               data-testid={testId ? `${testId}-${row.key}` : undefined}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
                 row.score == null ? BADGE_MUTED : BADGE_TONE[confidenceBandForScore(clampConfidenceScore(row.score))],
               )}
             >
               <span>{row.short}</span>
-              <span className="tabular-nums">{row.score == null ? "–" : clampConfidenceScore(row.score)}</span>
+              <span className="tabular-nums">{scoreText(row.score)}</span>
             </span>
           ))}
         </span>

@@ -830,7 +830,15 @@ function orderWithListChecks(fixture: FactoriesFixture, order: FactoriesWorkOrde
 
 function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
   const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
-  return orders.find((entry) => entry.id === orderId);
+  const ref = orderId.trim();
+  return orders.find((entry) => entry.id === ref || orderNumberMatches(entry, ref) || entry.key === ref);
+}
+
+function orderNumberMatches(order: FactoriesWorkOrder, ref: string): boolean {
+  if (!/^\d+$/.test(ref) || order.number === undefined || order.number === null || order.number === "") {
+    return false;
+  }
+  return String(Number(order.number)) === String(Number(ref));
 }
 
 function buildDispatchedLineDispatch(

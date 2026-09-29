@@ -66,6 +66,11 @@ func (s *FactoryService) SelectFactoryVCSProviderRepository(ctx context.Context,
 	return actions.SelectFactoryVCSProviderRepository(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)

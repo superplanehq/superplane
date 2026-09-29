@@ -86,16 +86,22 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
+	// Recorded aliases use a fixed versioned id. Today's selectable list must
+	// not change the model shown for a past dispatch or usage row.
+	dispatches := resolveDispatchModelAliases(dispatchesByOrderID[order.ID])
+	usageModels := resolveUsageModelAliases(byModel[order.ID])
+	executionModels := resolveExecutionModelAliases(modelsByExecution)
+
 	serialized, err := serializeWorkOrder(
 		factory,
 		order,
-		dispatchesByOrderID[order.ID],
+		dispatches,
 		creatorAutomations[order.ID],
 		workOrderUsageView{
 			Totals:            usageByOrder[order.ID],
-			ByModel:           byModel[order.ID],
+			ByModel:           usageModels,
 			ByMachineType:     byMachineType[order.ID],
-			ModelsByExecution: modelsByExecution,
+			ModelsByExecution: executionModels,
 		},
 	)
 	if err != nil {
@@ -287,6 +293,43 @@ func attachWorkOrderFiles(ctx context.Context, db *gorm.DB, order *pb.WorkOrder,
 	}
 	order.Files = files
 	return nil
+}
+
+func resolveDispatchModelAliases(
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+) []models.FactoryWorkOrderLineDispatchRecord {
+	for i := range dispatches {
+		dispatches[i].Model = models.ConcreteClaudeModelID(dispatches[i].Model, nil)
+	}
+	return dispatches
+}
+
+func resolveUsageModelAliases(rows []models.UsageByModel) []models.UsageByModel {
+	for i := range rows {
+		rows[i].Model = models.ConcreteClaudeModelID(rows[i].Model, nil)
+	}
+	return rows
+}
+
+func resolveExecutionModelAliases(byExecution map[uuid.UUID][]string) map[uuid.UUID][]string {
+	if len(byExecution) == 0 {
+		return byExecution
+	}
+	resolved := make(map[uuid.UUID][]string, len(byExecution))
+	for id, names := range byExecution {
+		seen := map[string]struct{}{}
+		out := make([]string, 0, len(names))
+		for _, name := range names {
+			concrete := models.ConcreteClaudeModelID(name, nil)
+			if _, dup := seen[concrete]; dup {
+				continue
+			}
+			seen[concrete] = struct{}{}
+			out = append(out, concrete)
+		}
+		resolved[id] = out
+	}
+	return resolved
 }
 
 func loadWorkOrderUsageBreakdowns(

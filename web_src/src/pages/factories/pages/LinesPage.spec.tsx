@@ -13,10 +13,11 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
+  FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -29,6 +30,7 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryGitHubIntakeSetupPath,
@@ -38,6 +40,7 @@ import {
   factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factoryRiskScoreSetupPath,
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
@@ -452,7 +455,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -1007,35 +1010,59 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
-  it("hides Add automation when custom automations are off", async () => {
+  it("shows Add automation on Verify when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Verify plus when custom automations are off", async () => {
+  it("opens the Verify catalog when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
+  });
+
+  it("opens the risk score setup page from the Verify catalog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-risk-score"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
       isPending: false,
+    });
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1162,22 +1189,45 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
+      ADD_INTAKE_COPY.comingSoon,
+    );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
+    await user.click(screen.getByTestId("add-intake-template-datadog"));
 
-    expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Datadog setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DATADOG_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const datadog = screen.getByTestId("add-intake-template-datadog");
+    expect(datadog).toBeEnabled();
+    expect(datadog).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(datadog);
+
+    expect(screen.getByTestId("datadog-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryDatadogIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("opens guided Sentry setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_SENTRY_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -12,6 +13,11 @@ import (
 func factoryErrorToStatus(err error, internalMessage string) error {
 	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 		return err
+	}
+
+	var datadogAPIErr *datadog.APIError
+	if errors.As(err, &datadogAPIErr) {
+		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
 	switch {
@@ -175,12 +181,16 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
+	case errors.Is(err, errIntakeConnectionBroken):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "Connect this intake first."))
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
 	case errors.Is(err, errIntakeRefreshUnsupported):
 		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, datadog.ErrErrorTrackingForbidden):
+		return grpcerrors.FailedPrecondition(err, datadog.ErrorTrackingForbiddenMessage)
 	case errors.Is(err, models.ErrFileNotFound):
 		return grpcerrors.NotFound(err, "file not found")
 	case errors.Is(err, models.ErrFileNotReady), errors.Is(err, models.ErrFileForeignReference), errors.Is(err, models.ErrFileInvalid), errors.Is(err, models.ErrFileContentType):
@@ -193,6 +203,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
+	case errors.Is(err, errRiskScoreDisabled):
+		return grpcerrors.FailedPrecondition(err, "Risk score is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
@@ -212,6 +224,7 @@ var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
+var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")

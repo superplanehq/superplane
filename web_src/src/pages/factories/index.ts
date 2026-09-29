@@ -43,11 +43,13 @@ export {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
+  RiskScoreSetupPage,
   SentryIntakeSetupPage,
 } from "./pages";

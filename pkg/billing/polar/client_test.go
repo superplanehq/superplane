@@ -544,6 +544,10 @@ func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {
 					"created_at":   "2026-08-27T12:00:00Z",
 					"status":       "paid",
 					"total_amount": 10000,
+					"checkout_id":  "checkout-1",
+					"currency":     "usd",
+					"net_amount":   9000,
+					"tax_amount":   1000,
 					"description":  "Hosted credit",
 					"product":      map[string]any{"name": "$100 pack"},
 				},
@@ -558,6 +562,10 @@ func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, orders, 1)
 	assert.Equal(t, "ord_1", orders[0].ID)
+	assert.Equal(t, "checkout-1", orders[0].CheckoutID)
+	assert.Equal(t, "usd", orders[0].Currency)
+	assert.Equal(t, int64(9000), orders[0].NetAmountCents)
+	assert.Equal(t, int64(1000), orders[0].TaxAmountCents)
 	assert.Equal(t, int64(10000), orders[0].AmountCents)
 	assert.Equal(t, "paid", orders[0].Status)
 	assert.Equal(t, "$100 pack", orders[0].ProductName)

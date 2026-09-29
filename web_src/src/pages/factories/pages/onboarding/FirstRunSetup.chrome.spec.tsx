@@ -111,8 +111,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectId: "",
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    setJiraCompletion: vi.fn(),
-    jiraCompletionNeedsManualColumn: false,
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,

@@ -363,6 +363,11 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
   return sourceId === "checks" ? "checks" : "comments";
 }
 
+/** Dedicated setup page for the Verify risk score automation. */
+export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/risk-score`;
+}
+
 /** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
 export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
@@ -376,6 +381,11 @@ export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey:
 /** Dedicated setup page for Sentry exception intake. */
 export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Datadog Error Tracking intake. */
+export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
 }
 
 /** Dedicated setup page for Dependabot alert intake. */

@@ -86,6 +86,18 @@ service Factories {
     };
   }
 
+  rpc SwitchFactoryModelSource(SwitchFactoryModelSourceRequest) returns (SwitchFactoryModelSourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/model-source"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Switch factory model source";
+      description: "Saves a provider key, updates the workspace agent harness, and rewrites agent nodes on workspace canvases";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/repository"
@@ -896,6 +908,19 @@ message UpdateFactoryOnboardingResponse {
   Factory factory = 1;
 }
 
+message SwitchFactoryModelSourceRequest {
+  string id = 1;
+  // hosted, anthropic, openai, or openrouter.
+  string source = 2;
+  // Provider API key. Required when this organization has no ready integration for the source.
+  string api_key = 3;
+}
+
+message SwitchFactoryModelSourceResponse {
+  Factory factory = 1;
+  string integration_id = 2;
+}
+
 message UpdateFactoryRepositoryRequest {
   string id = 1;
   // Repository slug in owner/name form.
@@ -1122,6 +1147,7 @@ message FactoryIntake {
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
+    SOURCE_DATADOG = 7;
   }
 
   enum InitialImportStatus {
@@ -1204,6 +1230,15 @@ message FactoryIntake {
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
     repeated string dependabot_severities = 17;
+    // Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
+    // On by default. An empty selection still listens for Triggered.
+    optional bool datadog_triggered_alerts = 18;
+    // Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes
+    // only. Off by default.
+    optional bool datadog_retriggered_alerts = 19;
+    // Environments that still create a task. Empty means every environment.
+    // Datadog intakes only.
+    repeated string datadog_environments = 20;
   }
 
   string id = 1;
@@ -2173,6 +2208,8 @@ message DescribeFactoryVelocityRequest {
     PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
     // Sorts on cost_cents.
     PEOPLE_SORT_COST_USD = 5;
+    // SuperPlane tasks this person opened that closed without a merge.
+    PEOPLE_SORT_FACTORY_WASTE = 6;
   }
 
   enum SortDirection {

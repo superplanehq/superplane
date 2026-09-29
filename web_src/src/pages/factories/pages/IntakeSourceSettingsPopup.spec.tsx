@@ -390,38 +390,46 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "hides connection, project, and pause controls for a %s intake",
-    (sourceId) => {
-      renderPopup({ sourceId });
+  it.each([
+    "github-issues",
+    "dependabot-alerts",
+    "sentry-exceptions",
+    "jira-issues",
+    "productive-tasks",
+    "datadog",
+  ] as const)("hides connection, project, and pause controls for a %s intake", (sourceId) => {
+    renderPopup({ sourceId });
 
-      expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
-    },
-  );
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+  });
 
-  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "deletes a %s intake after confirmation",
-    async (sourceId) => {
-      const onDelete = vi.fn();
-      const user = userEvent.setup();
-      renderPopup({ sourceId, onDelete });
+  it.each([
+    "github-issues",
+    "dependabot-alerts",
+    "sentry-exceptions",
+    "jira-issues",
+    "productive-tasks",
+    "datadog",
+  ] as const)("deletes a %s intake after confirmation", async (sourceId) => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({ sourceId, onDelete });
 
-      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
 
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-      expect(onDelete).not.toHaveBeenCalled();
-      await user.click(screen.getByTestId("intake-delete-cancel"));
-      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
-      expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-delete-cancel"));
+    expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
 
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      await user.click(screen.getByTestId("intake-delete-confirm"));
-      expect(onDelete).toHaveBeenCalledTimes(1);
-    },
-  );
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
 
   it("shows a delete error in the confirmation dialog", async () => {
     const user = userEvent.setup();

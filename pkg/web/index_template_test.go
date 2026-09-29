@@ -117,3 +117,19 @@ func TestNewIndexTemplateDataFromEnv(t *testing.T) {
 		t.Fatalf("SignupWaitlistHubSpotRegion = %q", data.SignupWaitlistHubSpotRegion)
 	}
 }
+
+func TestRenderIndexTemplateGTMConfiguration(t *testing.T) {
+	for _, value := range []string{"", "GTM-TEST123"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("GTM_CONTAINER_ID", value)
+			rendered, err := RenderIndexTemplate([]byte(`<script>window.SUPERPLANE_GTM_CONTAINER_ID = "{{ .GTMContainerID }}";</script>`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := `window.SUPERPLANE_GTM_CONTAINER_ID = "` + value + `";`
+			if !strings.Contains(string(rendered), want) {
+				t.Fatalf("missing %q in %s", want, rendered)
+			}
+		})
+	}
+}

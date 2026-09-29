@@ -1,6 +1,6 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { ExternalLink, FileImage, FileText, FileVideo, GitBranch, Link as LinkIcon } from "lucide-react";
+import { ExternalLink, FileText, GitBranch, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +12,7 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
+  fileArtifactIcon,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
 
@@ -118,13 +119,7 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
       return presentation(LinkIcon, firstLabel(name, title, compactUrlLabel(url), "Link"));
     case "file": {
       const label = firstLabel(title, filename, compactUrlLabel(url), "File");
-      if (contentType?.startsWith("image/")) {
-        return presentation(FileImage, label);
-      }
-      if (contentType?.startsWith("video/")) {
-        return presentation(FileVideo, label);
-      }
-      return presentation(FileText, label);
+      return presentation(fileArtifactIcon(contentType), label);
     }
     default:
       return presentation(url ? LinkIcon : FileText, firstLabel(title, name, compactUrlLabel(url), "Artifact"));
