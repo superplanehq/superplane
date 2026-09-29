@@ -22,6 +22,7 @@ export type WorkOrderTimelineEventKind =
   | "assigned"
   | "statusChanged"
   | "commented"
+  | "broadcast"
   | "artifactAdded"
   | "artifactsCleared"
   | "pullRequestAdded"
@@ -77,6 +78,12 @@ export interface WorkOrderTimelineComment {
   automation?: WorkOrderTimelineAutomationActor;
 }
 
+export interface WorkOrderTimelineBroadcast {
+  title: string;
+  body?: string;
+  url?: string;
+}
+
 export interface WorkOrderTimelineArtifact {
   id?: string;
   type: string;
@@ -105,6 +112,7 @@ export interface WorkOrderTimelineEvent {
   assigneeChange?: WorkOrderTimelineAssigneeChange;
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
+  broadcast?: WorkOrderTimelineBroadcast;
   artifact?: WorkOrderTimelineArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
   check?: WorkOrderTimelineCheck;

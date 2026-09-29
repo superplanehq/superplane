@@ -6,7 +6,7 @@ import { useWorkOrder } from "@/hooks/useFactoryData";
 
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
-import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
+import { phasesWithAttachedStreams, phasesWithRunArtifacts } from "./attachStreamArtifacts";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
@@ -145,7 +145,7 @@ export function SplitRunPopupTabs({
   const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
   const consoleFixture = useMemo(() => {
-    const phases = phasesWithRunArtifacts(fixture.phases, artifactIndex);
+    const phases = phasesWithAttachedStreams(phasesWithRunArtifacts(fixture.phases, artifactIndex), artifactIndex);
     return phases === fixture.phases ? fixture : { ...fixture, phases };
   }, [artifactIndex, fixture]);
   const showAutomations = refinePopupShowsAutomations({ footerKind: fixture.footer.kind, sourceOnly });

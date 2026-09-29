@@ -21,6 +21,7 @@ import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
+import { BroadcastActivityBlock } from "../../timeline/BroadcastActivityBlock";
 import { PR_FEEDBACK_SETTINGS_COPY } from "../prFeedbackSettingsCopy";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { displayRunnerModel } from "./draftStartModel";
@@ -1047,7 +1048,26 @@ function StreamNode({
           ))}
         </ol>
       ) : null}
+      <StreamBroadcasts broadcasts={line.broadcasts} />
     </li>
+  );
+}
+
+function StreamBroadcasts({ broadcasts }: { broadcasts?: SplitRunStreamLine["broadcasts"] }) {
+  if (!broadcasts?.length) {
+    return null;
+  }
+  return (
+    <div className="space-y-1 bg-muted px-2 py-1">
+      {broadcasts.map((broadcast) => (
+        <BroadcastActivityBlock
+          key={`${broadcast.title}-${broadcast.url ?? broadcast.body ?? ""}`}
+          title={broadcast.title}
+          body={broadcast.body}
+          url={broadcast.url}
+        />
+      ))}
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -80,5 +81,40 @@ describe("WorkOrderActivityTimeline pull request chip", () => {
 
     const link = screen.getByRole("link");
     expect(link.querySelector("svg")).toHaveClass("text-emerald-600");
+  });
+});
+
+describe("WorkOrderActivityTimeline broadcast", () => {
+  it("opens the preview URL when the activity row is clicked", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <WorkOrderActivityTimeline
+          organizationId="org-1"
+          factoryKey="factory-1"
+          order={ORDER}
+          events={[
+            {
+              type: "order.activity.broadcast",
+              timestamp: "2026-08-01T12:00:00.000Z",
+              event: {
+                title: "Preview environment ready",
+                body: "Open the preview.",
+                url: "https://preview.example.com/pr/42",
+                automation: { nodeName: "Create preview", appName: "Preview" },
+              },
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("link", { name: "https://preview.example.com/pr/42" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("task-activity-broadcast-toggle"));
+    expect(screen.getByRole("link", { name: "https://preview.example.com/pr/42" })).toHaveAttribute(
+      "href",
+      "https://preview.example.com/pr/42",
+    );
+    expect(screen.getByText("Open the preview.")).toBeInTheDocument();
   });
 });

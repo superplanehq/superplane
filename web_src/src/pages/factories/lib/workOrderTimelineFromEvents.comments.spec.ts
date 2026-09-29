@@ -260,4 +260,30 @@ describe("buildWorkOrderTimelineViewFromEvents: comments, artifacts, and attribu
     expect(view.events[0]?.sourceRunId).toBeUndefined();
     expect(view.events[0]?.sourceAppId).toBeUndefined();
   });
+
+  it("keeps a broadcast as its own expandable activity row", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.activity.broadcast",
+        event: {
+          title: "Preview environment ready",
+          body: "Open the preview.",
+          url: "https://preview.example.com/pr/42",
+          automation: { nodeName: "Create preview", appName: "Preview" },
+        },
+      },
+    ]);
+
+    expect(view.events[0]).toMatchObject({
+      kind: "broadcast",
+      title: "Preview environment ready",
+      broadcast: {
+        title: "Preview environment ready",
+        body: "Open the preview.",
+        url: "https://preview.example.com/pr/42",
+      },
+      actorAutomation: { nodeName: "Create preview", appName: "Preview" },
+    });
+  });
 });

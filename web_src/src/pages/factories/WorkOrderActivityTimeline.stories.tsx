@@ -101,7 +101,26 @@ export const Draft: Story = {
   },
 };
 
-/** Rich open order — comments (user + LLM) and both artifact kinds inline. */
+/** Automation posts a preview URL that opens from the activity row. */
+export const WithBroadcast: Story = {
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    events: [
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.activity.broadcast",
+        event: {
+          title: "Preview environment ready",
+          body: "Open the preview for this change.",
+          url: "https://preview.example.com/pr/42",
+          automation: { nodeName: "Create preview", appName: "Preview" },
+        },
+      },
+    ],
+  },
+};
+
 export const WithCommentsAndArtifacts: Story = {
   name: "With Comments & Artifacts",
   args: {

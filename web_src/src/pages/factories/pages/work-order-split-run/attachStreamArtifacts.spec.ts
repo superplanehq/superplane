@@ -269,4 +269,25 @@ describe("phasesWithRunArtifacts", () => {
     expect(phases[0]?.artifacts).toEqual([spec]);
     expect(phases[1]?.artifacts).toEqual([]);
   });
+
+  it("attaches a broadcast to the node that posted it", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("preview", "Create preview")],
+      [
+        {
+          type: "order.activity.broadcast",
+          timestamp: "2026-08-24T16:34:00.000Z",
+          event: {
+            title: "Preview environment ready",
+            url: "https://preview.example.com/pr/42",
+            automation: { nodeId: "preview" },
+          },
+        },
+      ],
+    );
+
+    expect(stream?.[0]?.broadcasts).toEqual([
+      { title: "Preview environment ready", body: undefined, url: "https://preview.example.com/pr/42" },
+    ]);
+  });
 });

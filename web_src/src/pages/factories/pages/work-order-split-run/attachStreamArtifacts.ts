@@ -6,7 +6,7 @@ import {
   overlayLivePullRequest,
   pullRequestFromEventPayload,
 } from "../../lib/workOrderPullRequest";
-import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
+import type { SplitRunPhase, SplitRunStreamBroadcast, SplitRunStreamLine } from "./splitRunMocks";
 
 interface EventRunRef {
   id?: string;
@@ -52,11 +52,24 @@ interface RunScoped<T> {
   runId?: string;
 }
 
+interface ActivityBroadcastPayload {
+  automation?: {
+    nodeId?: string;
+    nodeName?: string;
+  };
+  title?: string;
+  body?: string;
+  url?: string;
+  run?: EventRunRef;
+}
+
 export interface StreamArtifactIndex {
   byNodeId: Map<string, RunScoped<FactoriesWorkOrderArtifact>>;
   byNodeName: Map<string, RunScoped<FactoriesWorkOrderArtifact>>;
   pullRequestsByNodeId: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
   pullRequestsByNodeName: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
+  broadcastsByNodeId: Map<string, RunScoped<SplitRunStreamBroadcast[]>>;
+  broadcastsByNodeName: Map<string, RunScoped<SplitRunStreamBroadcast[]>>;
   /** Every artifact a canvas run produced, in the order they were added. */
   byRunId: Map<string, FactoriesWorkOrderArtifact[]>;
 }
@@ -71,6 +84,8 @@ export function streamArtifactIndexFromEvents(
     byNodeName: new Map(),
     pullRequestsByNodeId: new Map(),
     pullRequestsByNodeName: new Map(),
+    broadcastsByNodeId: new Map(),
+    broadcastsByNodeName: new Map(),
     byRunId: new Map(),
   };
   const liveById = liveArtifactsById(liveArtifacts);
@@ -123,6 +138,11 @@ function indexStreamEvent(
       index.pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
     }
   }
+
+  const broadcast = broadcastFromStreamEvent(event);
+  if (broadcast) {
+    appendBroadcast(index, nodeId, nodeName, runId, broadcast);
+  }
 }
 
 /**
@@ -148,6 +168,24 @@ export function phasesWithRunArtifacts(phases: SplitRunPhase[], index: StreamArt
     return { ...phase, artifacts };
   });
   return changed ? next : phases;
+}
+
+/** Copies indexed artifacts and broadcasts onto each phase stream. */
+export function phasesWithAttachedStreams(phases: SplitRunPhase[], index: StreamArtifactIndex): SplitRunPhase[] {
+  let changed = false;
+  const next = phases.map((phase) => {
+    const stream = attachArtifactsToStream(phase.stream, index, phase.runId);
+    if (!stream || sameStream(phase.stream, stream)) {
+      return phase;
+    }
+    changed = true;
+    return { ...phase, stream };
+  });
+  return changed ? next : phases;
+}
+
+function sameStream(left: SplitRunStreamLine[] | undefined, right: SplitRunStreamLine[]): boolean {
+  return left === right || (left?.length === right.length && left.every((line, index) => line === right[index]));
 }
 
 function appendRunArtifact(
@@ -253,6 +291,50 @@ function pullRequestFromStreamEvent(
   return overlayLivePullRequest(pullRequestFromEventPayload(payload.pullRequest), liveById);
 }
 
+function broadcastFromStreamEvent(event: FactoriesWorkOrderEvent): SplitRunStreamBroadcast | undefined {
+  if (event.type !== "order.activity.broadcast") {
+    return undefined;
+  }
+  const payload = (event.event ?? {}) as ActivityBroadcastPayload;
+  const title = payload.title?.trim();
+  const body = payload.body?.trim() || undefined;
+  const url = payload.url?.trim() || undefined;
+  if (!title || (!body && !url)) {
+    return undefined;
+  }
+  return { title, body, url };
+}
+
+function appendBroadcast(
+  index: StreamArtifactIndex,
+  nodeId: string | undefined,
+  nodeName: string | undefined,
+  runId: string | undefined,
+  broadcast: SplitRunStreamBroadcast,
+) {
+  if (nodeId) {
+    appendScopedBroadcast(index.broadcastsByNodeId, nodeId, runId, broadcast);
+    return;
+  }
+  if (nodeName) {
+    appendScopedBroadcast(index.broadcastsByNodeName, nodeName, runId, broadcast);
+  }
+}
+
+function appendScopedBroadcast(
+  target: Map<string, RunScoped<SplitRunStreamBroadcast[]>>,
+  key: string,
+  runId: string | undefined,
+  broadcast: SplitRunStreamBroadcast,
+) {
+  const current = target.get(key);
+  if (current && current.runId === runId) {
+    current.value = [...current.value, broadcast];
+    return;
+  }
+  target.set(key, { value: [broadcast], runId });
+}
+
 function eventAutomation(event: FactoriesWorkOrderEvent): { nodeId?: string; nodeName?: string } | undefined {
   const payload = (event.event ?? {}) as ArtifactAddedPayload & PullRequestEventPayload;
   return payload.automation;
@@ -286,6 +368,13 @@ function attachLineArtifact(line: SplitRunStreamLine, index: StreamArtifactIndex
   const pullRequestByName = matchesRun(index.pullRequestsByNodeName.get(line.componentName), runId);
   if (pullRequestById || pullRequestByName) {
     next.pullRequest = pullRequestById ?? pullRequestByName;
+  }
+
+  const broadcastsById = matchesRun(line.nodeId ? index.broadcastsByNodeId.get(line.nodeId) : undefined, runId);
+  const broadcastsByName = matchesRun(index.broadcastsByNodeName.get(line.componentName), runId);
+  const broadcasts = broadcastsById ?? broadcastsByName;
+  if (broadcasts?.length) {
+    next.broadcasts = broadcasts;
   }
 
   return next;

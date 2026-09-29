@@ -81,7 +81,9 @@ interface EventPayload extends LineStepExecutionPayload {
   toState?: string;
   fromResult?: string;
   toResult?: string;
+  title?: string;
   body?: string;
+  url?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
   count?: number;
@@ -101,7 +103,8 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
-  "order.check.reported": 46,
+  "order.activity.broadcast": 46,
+  "order.check.reported": 47,
   "order.artifact.added": 47,
   "order.artifacts.cleared": 50,
   "order.pull_request.added": 48,
@@ -172,6 +175,9 @@ function applyApiEventToTimeline(
       return;
     case "order.comment.added":
       appendCommentEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.activity.broadcast":
+      appendBroadcastEvent(state, index, payload, at);
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
@@ -363,6 +369,27 @@ function appendCommentEvent(
       automation: automationActor,
     },
     title: "commented",
+  });
+}
+
+function appendBroadcastEvent(state: TimelineBuildState, index: number, payload: EventPayload, at: string): void {
+  const title = payload.title?.trim() ?? "";
+  const body = payload.body?.trim() || undefined;
+  const url = payload.url?.trim() || undefined;
+  if (!title || (!body && !url)) {
+    return;
+  }
+
+  const automationActor = toAutomationActor(payload.automation);
+  state.events.push({
+    id: `broadcast-${index}`,
+    kind: "broadcast",
+    at,
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    broadcast: { title, body, url },
+    title,
   });
 }
 

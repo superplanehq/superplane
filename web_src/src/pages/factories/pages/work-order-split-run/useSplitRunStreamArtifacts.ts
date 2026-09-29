@@ -9,6 +9,8 @@ const EMPTY_INDEX: StreamArtifactIndex = {
   byNodeName: new Map(),
   pullRequestsByNodeId: new Map(),
   pullRequestsByNodeName: new Map(),
+  broadcastsByNodeId: new Map(),
+  broadcastsByNodeName: new Map(),
   byRunId: new Map(),
 };
 

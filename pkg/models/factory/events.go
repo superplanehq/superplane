@@ -15,7 +15,12 @@ const (
 	EventTypeOrderUpdated       = "order.updated"
 	EventTypeOrderStatusUpdated = "order.status.updated"
 	EventTypeOrderCommentAdded  = "order.comment.added"
-	EventTypeOrderArtifactAdded = "order.artifact.added"
+	// EventTypeOrderActivityBroadcast records content an automation
+	// posts into the task activity log. The timeline shows the title
+	// and expands the body and URL. It is not a status note: notes are
+	// current-wait metadata, and this event stays in the log.
+	EventTypeOrderActivityBroadcast = "order.activity.broadcast"
+	EventTypeOrderArtifactAdded     = "order.artifact.added"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
 	// reason — it does not back a timeline event/struct. Artifact data
 	// updates re-save the row in place and this reason tells the
@@ -153,6 +158,18 @@ type WorkOrderCommentAdded struct {
 	Author         *WorkOrderCommentAuthor `json:"author,omitempty"`
 	Run            *RunRef                 `json:"run,omitempty"`
 	MentionedUsers []UserRef               `json:"mentionedUsers,omitempty"`
+}
+
+// WorkOrderActivityBroadcast is content an automation posts into the
+// task activity log. Title is the collapsed row. Body and URL are the
+// expanded block. At least one of Body or URL is set.
+type WorkOrderActivityBroadcast struct {
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Title      string         `json:"title"`
+	Body       string         `json:"body,omitempty"`
+	URL        string         `json:"url,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {

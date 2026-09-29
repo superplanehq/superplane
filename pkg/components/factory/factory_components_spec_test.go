@@ -45,6 +45,10 @@ type fakeFactoryContext struct {
 	addArtifactResult *core.WorkOrderArtifact
 	addArtifactErr    error
 
+	broadcastCalls  int
+	broadcastParams core.BroadcastWorkOrderActivityParams
+	broadcastErr    error
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -84,6 +88,12 @@ func (f *fakeFactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderSt
 
 func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParams) error {
 	return nil
+}
+
+func (f *fakeFactoryContext) BroadcastWorkOrderActivity(params core.BroadcastWorkOrderActivityParams) error {
+	f.broadcastCalls++
+	f.broadcastParams = params
+	return f.broadcastErr
 }
 
 func (f *fakeFactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
@@ -748,6 +758,59 @@ func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {
 	assert.Equal(t, "storybook-preview", factoryCtx.addArtifactParams.Key)
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	assert.Equal(t, "workOrder.artifactAdded", stateCtx.Type)
+}
+
+func TestBroadcastTaskActivity_ValidateNodeConfiguration(t *testing.T) {
+	component := &BroadcastTaskActivity{}
+
+	t.Run("requires content or URL", func(t *testing.T) {
+		err := component.ValidateNodeConfiguration(map[string]any{
+			"orderId": "wo-1",
+			"title":   "Preview environment ready",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("rejects a relative URL", func(t *testing.T) {
+		err := component.ValidateNodeConfiguration(map[string]any{
+			"orderId": "wo-1",
+			"title":   "Preview environment ready",
+			"url":     "/preview/42",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("accepts a preview URL", func(t *testing.T) {
+		err := component.ValidateNodeConfiguration(map[string]any{
+			"orderId": "{{ order().id }}",
+			"title":   "Preview environment ready",
+			"url":     "https://preview.example.com/pr/42",
+		})
+		require.NoError(t, err)
+	})
+}
+
+func TestBroadcastTaskActivity_Execute(t *testing.T) {
+	component := &BroadcastTaskActivity{}
+	factoryCtx := &fakeFactoryContext{}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId": "wo-1",
+			"title":   "Preview environment ready",
+			"body":    "Open the preview.",
+			"url":     "https://preview.example.com/pr/42",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, factoryCtx.broadcastCalls)
+	assert.Equal(t, "wo-1", factoryCtx.broadcastParams.OrderID)
+	assert.Equal(t, "Preview environment ready", factoryCtx.broadcastParams.Title)
+	assert.Equal(t, "https://preview.example.com/pr/42", factoryCtx.broadcastParams.URL)
+	assert.Equal(t, broadcastTaskActivityEventType, stateCtx.Type)
 }
 
 func TestResolvePrArtifactState_Precedence(t *testing.T) {

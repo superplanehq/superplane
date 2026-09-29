@@ -1493,6 +1493,51 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	assert.Equal(t, "component-under-test", payload.Author.Automation.StepName)
 }
 
+func TestFactoryContext_BroadcastWorkOrderActivity(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Preview target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+
+	var reasons []string
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			reasons = append(reasons, reason)
+		})
+
+	require.NoError(t, ctx.BroadcastWorkOrderActivity(core.BroadcastWorkOrderActivityParams{
+		OrderID: order.ID.String(),
+		Title:   "Preview environment ready",
+		Body:    "Open the preview.",
+		URL:     "https://preview.example.com/pr/42",
+	}))
+
+	event := findWorkOrderEvent(t, order, factoryevents.EventTypeOrderActivityBroadcast)
+	var payload struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+		URL   string `json:"url"`
+	}
+	require.NoError(t, json.Unmarshal(event.Data, &payload))
+	assert.Equal(t, "Preview environment ready", payload.Title)
+	assert.Equal(t, "Open the preview.", payload.Body)
+	assert.Equal(t, "https://preview.example.com/pr/42", payload.URL)
+	assert.Equal(t, []string{factoryevents.EventTypeOrderActivityBroadcast}, reasons)
+
+	err = ctx.BroadcastWorkOrderActivity(core.BroadcastWorkOrderActivityParams{
+		OrderID: order.ID.String(),
+		Title:   "Preview environment ready",
+		URL:     "javascript:alert(1)",
+	})
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderActivityBroadcastInvalid)
+}
+
 func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

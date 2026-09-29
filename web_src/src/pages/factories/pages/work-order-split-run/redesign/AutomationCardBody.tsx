@@ -14,6 +14,7 @@ import { extractArtifactMarkdownBody, extractArtifactUrl, toArtifactDataRecord }
 import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { WorkOrderCheckAnalysis } from "../../../WorkOrderCheckDialog";
 import { WorkOrderPullRequestInline } from "../../../WorkOrderPullRequestInline";
+import { BroadcastActivityBlock } from "../../../timeline/BroadcastActivityBlock";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
@@ -88,6 +89,7 @@ export function AutomationCardBody({
   return (
     <div className="space-y-3">
       <StageDescription stage={latest} />
+      <StageBroadcasts phase={phase} />
       <CardPageTabs pages={pages} active={active} stage={latest} onChange={setChosen} />
       {/* The log stays mounted so live steps and spend keep streaming. */}
       {pages.includes("agent") ? (
@@ -282,6 +284,26 @@ function CheckTabValue({ check }: { check: WorkOrderCheckPresentation }) {
       {value}
       {scale}
     </span>
+  );
+}
+
+function StageBroadcasts({ phase }: { phase?: SplitRunPhase }) {
+  const broadcasts = (phase?.stream ?? []).flatMap((line) => line.broadcasts ?? []);
+  if (broadcasts.length === 0) {
+    return null;
+  }
+  return (
+    <div className="space-y-2">
+      {broadcasts.map((broadcast) => (
+        <BroadcastActivityBlock
+          key={`${broadcast.title}-${broadcast.url ?? broadcast.body ?? ""}`}
+          title={broadcast.title}
+          body={broadcast.body}
+          url={broadcast.url}
+          defaultOpen
+        />
+      ))}
+    </div>
   );
 }
 

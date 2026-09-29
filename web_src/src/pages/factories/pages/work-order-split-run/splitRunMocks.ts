@@ -85,6 +85,12 @@ export type SplitRunStreamEvent = "started" | "expanded" | "completed";
 
 export type SplitRunStreamKind = "trigger" | "filter" | "if" | "action" | "agent" | "check";
 
+export interface SplitRunStreamBroadcast {
+  title: string;
+  body?: string;
+  url?: string;
+}
+
 export interface SplitRunStreamLine {
   id: string;
   nodeId?: string;
@@ -98,6 +104,8 @@ export interface SplitRunStreamLine {
   detail?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
+  /** Content an automation posted for this node. Click the row to open it. */
+  broadcasts?: SplitRunStreamBroadcast[];
   /** Agent transcript line. No checkmark. */
   note?: boolean;
   /** Nested tool call under a Claude Code step. */

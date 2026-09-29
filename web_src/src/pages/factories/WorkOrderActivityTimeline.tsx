@@ -11,7 +11,7 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
-import { Clock, FileText, Gauge, GitPullRequest, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { Clock, FileText, Gauge, GitPullRequest, Info, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import { buildLatestArtifactDataById } from "./lib/workOrderArtifact";
 import { indexPullRequestsById } from "./lib/workOrderPullRequest";
 import {
@@ -25,6 +25,7 @@ import {
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
 import { flattenWorkOrderExecutions, getWorkOrderRunHref } from "./lib/workOrderExecutions";
 import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { BroadcastEventBody } from "./timeline/BroadcastEventBody";
 import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
 import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
@@ -340,6 +341,18 @@ function TimelineItemBody({
     );
   }
 
+  if (event.kind === "broadcast") {
+    return (
+      <BroadcastEventBody
+        event={event}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
+  }
+
   if (event.kind === "artifactAdded") {
     return (
       <ArtifactEventBody
@@ -489,6 +502,8 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
       return GitPullRequest;
     case "checkReported":
       return Gauge;
+    case "broadcast":
+      return Info;
     case "queued":
       return Clock;
     case "statusChanged":

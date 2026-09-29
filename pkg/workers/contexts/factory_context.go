@@ -575,6 +575,26 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	return nil
 }
 
+func (c *FactoryContext) BroadcastWorkOrderActivity(params core.BroadcastWorkOrderActivityParams) error {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return err
+	}
+
+	if err := order.RecordActivityBroadcast(c.tx, models.FactoryWorkOrderActivityBroadcastParams{
+		Title:      params.Title,
+		Body:       params.Body,
+		URL:        params.URL,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	}); err != nil {
+		return err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderActivityBroadcast)
+	return nil
+}
+
 func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {

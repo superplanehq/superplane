@@ -13,6 +13,7 @@ const (
 	eventTypeTaskAssigneesUpdated  = "order.assignees.updated"
 	eventTypeTaskStatusUpdated     = "order.status.updated"
 	eventTypeTaskCommentAdded      = "order.comment.added"
+	eventTypeTaskActivityBroadcast = "order.activity.broadcast"
 	eventTypeTaskArtifactAdded     = "order.artifact.added"
 	eventTypeStepExecutionCreated  = "step.execution.created"
 	eventTypeStepExecutionFinished = "step.execution.finished"
@@ -216,6 +217,14 @@ type commentAuthorEvent struct {
 	Automation *eventAutomationRef `json:"automation,omitempty"`
 }
 
+type taskActivityBroadcastEvent struct {
+	Title      string              `json:"title"`
+	Body       string              `json:"body,omitempty"`
+	URL        string              `json:"url,omitempty"`
+	Automation *eventAutomationRef `json:"automation,omitempty"`
+	Run        *eventRunRef        `json:"run,omitempty"`
+}
+
 type taskCommentAddedEvent struct {
 	Body   string              `json:"body"`
 	Author *commentAuthorEvent `json:"author,omitempty"`
@@ -313,6 +322,8 @@ func describeEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEm
 		return describeAssigneesUpdatedEvent(event, lookup)
 	case eventTypeTaskCommentAdded:
 		return describeCommentAddedEvent(event, lookup)
+	case eventTypeTaskActivityBroadcast:
+		return describeActivityBroadcastEvent(event, lookup)
 	case eventTypeTaskArtifactAdded:
 		return describeArtifactAddedEvent(event)
 	case eventTypeStepExecutionCreated:
@@ -395,6 +406,22 @@ func describeCommentAddedEvent(event openapi_client.FactoriesWorkOrderEvent, loo
 		return describeUnknownEvent(event)
 	}
 	return fmt.Sprintf("%s commented: %s", author, body)
+}
+
+func describeActivityBroadcastEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEmailLookup) string {
+	data, err := decodeEventPayload[taskActivityBroadcastEvent](event.GetEvent())
+	if err != nil || data.Title == "" {
+		return describeUnknownEvent(event)
+	}
+
+	line := data.Title
+	if actor := resolveActor(nil, data.Automation, data.Run, lookup); actor != "" {
+		line += " by " + actor
+	}
+	if data.URL != "" {
+		line += ": " + data.URL
+	}
+	return line
 }
 
 func artifactTypeName(t string) string {
