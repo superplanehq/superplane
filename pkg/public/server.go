@@ -681,13 +681,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/oauth-client", s.HandleMCPOAuthClientMetadata).Methods("GET")
-	if config.MCPServerEnabled() {
-		publicRoute.HandleFunc(mcpserver.PathProtectedResource, s.handleMCPProtectedResource).Methods("GET")
-		publicRoute.HandleFunc(mcpserver.PathAuthorizationServer, s.handleMCPAuthorizationServer).Methods("GET")
-		publicRoute.HandleFunc(mcpserver.PathToken, s.handleMCPToken).Methods("POST")
-		publicRoute.HandleFunc(mcpserver.PathRegister, s.handleMCPRegister).Methods("POST")
-		publicRoute.HandleFunc(mcpserver.PathMCP, s.handleMCP).Methods("POST")
-	}
+	publicRoute.HandleFunc(mcpserver.PathProtectedResource, s.handleMCPProtectedResource).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathProtectedResourceMCP, s.handleMCPProtectedResource).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathAuthorizationServer, s.handleMCPAuthorizationServer).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathToken, s.handleMCPToken).Methods("POST")
+	publicRoute.HandleFunc(mcpserver.PathRegister, s.handleMCPRegister).Methods("POST")
+	publicRoute.HandleFunc(mcpserver.PathMCP, s.handleMCP).Methods("GET", "POST")
 
 	//
 	// Webhook endpoints for triggers
@@ -735,9 +734,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
-	if config.MCPServerEnabled() {
-		accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
-	}
+	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()

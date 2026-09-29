@@ -20,6 +20,7 @@ import (
 func enableFactories(t *testing.T, orgID uuid.UUID) {
 	t.Helper()
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureSuperPlaneMCPServer))
 }
 
 func toolClaims(r *support.ResourceRegistry, factoryID uuid.UUID) *AccessClaims {
@@ -115,6 +116,21 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 	assert.Equal(t, "Ship MCP", payload["title"])
 	assert.Equal(t, "draft", payload["state"])
 	require.NotEmpty(t, payload["id"])
+}
+
+func TestCallToolRejectsWithoutMCPServerFlag(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "No MCP", "", "NMC")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "list_tasks", map[string]any{})
+	require.Error(t, err)
+	assert.Equal(t, "Not found", err.Error())
 }
 
 func TestListTaskArtifactsIncludesDownloadURL(t *testing.T) {

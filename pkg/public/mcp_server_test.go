@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -34,7 +33,6 @@ func mcpTestPKCEChallenge() string {
 
 func mcpEnabledServer(t *testing.T) (*support.ResourceRegistry, *Server, *jwt.Signer) {
 	t.Helper()
-	t.Setenv(config.EnvMCPServer, "yes")
 	r := support.Setup(t)
 	server, _, _ := setupTestServer(r, t)
 	return r, server, jwt.NewSigner("test-client-secret")
@@ -56,7 +54,7 @@ func TestMCPUnauthenticatedReturns401AndMetadataURL(t *testing.T) {
 	server.Router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource")
+	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }
 
 func TestMCPTokenExchangeFailureCases(t *testing.T) {
@@ -132,6 +130,7 @@ func TestMCPTokenExchangeFailureCases(t *testing.T) {
 func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 	r, server, signer := mcpEnabledServer(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
 	db := database.DB(t.Context())
 
 	factoryA, err := models.CreateFactory(db, r.Organization.ID, "Workspace A", "", "WSA")
@@ -200,4 +199,80 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "This task has no agent session.", item["text"])
 	})
+}
+
+func TestMCPAuthenticatedWithoutFeatureFlagReturns404(t *testing.T) {
+	r, server, signer := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+
+	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
+		UserID:    r.User,
+		OrgID:     r.Organization.ID,
+		FactoryID: uuid.New(),
+		Resource:  "http://localhost:8000/mcp",
+		Scopes:    mcpserver.GrantedScopes,
+	}, time.Hour)
+	require.NoError(t, err)
+
+	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestMCPDiscoveryListsAreEmpty(t *testing.T) {
+	r, server, signer := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+
+	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
+		UserID:    r.User,
+		OrgID:     r.Organization.ID,
+		FactoryID: uuid.New(),
+		Resource:  "http://localhost:8000/mcp",
+		Scopes:    mcpserver.GrantedScopes,
+	}, time.Hour)
+	require.NoError(t, err)
+
+	for _, method := range []string{"resources/list", "prompts/list", "resources/templates/list"} {
+		req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"`+method+`"}`)
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, method)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body), method)
+		assert.Nil(t, body["error"], method)
+		result, ok := body["result"].(map[string]any)
+		require.True(t, ok, method)
+		switch method {
+		case "resources/list":
+			assert.Equal(t, []any{}, result["resources"])
+		case "prompts/list":
+			assert.Equal(t, []any{}, result["prompts"])
+		case "resources/templates/list":
+			assert.Equal(t, []any{}, result["resourceTemplates"])
+		}
+	}
+}
+
+func TestMCPProtectedResourceMetadataOnResourcePath(t *testing.T) {
+	_, server, _ := mcpEnabledServer(t)
+	req := mcpRequest(http.MethodGet, "/.well-known/oauth-protected-resource/mcp", "")
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "http://localhost:8000/mcp", body["resource"])
+}
+
+func TestMCPUnauthenticatedGETReturns401(t *testing.T) {
+	_, server, _ := mcpEnabledServer(t)
+	req := mcpRequest(http.MethodGet, "/mcp", "")
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }

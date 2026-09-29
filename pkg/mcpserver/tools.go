@@ -323,6 +323,9 @@ func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope st
 	if !claims.HasScope(scope) {
 		return ToolError("Not found")
 	}
+	if !OrganizationAllowsPublicMCP(claims.OrgID) {
+		return ToolError("Not found")
+	}
 	enabled, err := models.HasExperimentalFeature(claims.OrgID, features.FeatureFactories)
 	if err != nil || !enabled {
 		return ToolError("Not found")

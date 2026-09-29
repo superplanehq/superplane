@@ -24,5 +24,5 @@ func AuthorizationServerMetadata(origin string) map[string]any {
 }
 
 func WWWAuthenticate(origin string) string {
-	return `Bearer realm="mcp", resource_metadata="` + origin + PathProtectedResource + `"`
+	return `Bearer realm="mcp", resource_metadata="` + origin + PathProtectedResourceMCP + `"`
 }

@@ -82,6 +82,14 @@ func HandleJSONRPC(ctx context.Context, runtime *Runtime, claims *AccessClaims, 
 		return rpcResult(message.ID, map[string]any{"tools": Tools()})
 	case "tools/call":
 		return callTool(ctx, runtime, claims, message)
+	case "resources/list":
+		return rpcResult(message.ID, map[string]any{"resources": []any{}})
+	case "resources/templates/list":
+		return rpcResult(message.ID, map[string]any{"resourceTemplates": []any{}})
+	case "prompts/list":
+		return rpcResult(message.ID, map[string]any{"prompts": []any{}})
+	case "logging/setLevel":
+		return rpcResult(message.ID, map[string]any{})
 	default:
 		return rpcError(message.ID, -32601, "Unknown method: "+message.Method)
 	}
@@ -98,7 +106,7 @@ func initializeResult(params json.RawMessage) map[string]any {
 	return map[string]any{
 		"protocolVersion": version,
 		"capabilities":    map[string]any{"tools": map[string]any{}},
-		"serverInfo":      map[string]any{"name": ServerName, "version": ServerVersion},
+		"serverInfo":      ServerInfo(),
 	}
 }
 

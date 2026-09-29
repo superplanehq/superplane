@@ -236,6 +236,15 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	if !mcpserver.OrganizationAllowsPublicMCP(claims.OrgID) {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	message, err := mcpserver.ParseJSONRPC(r.Body)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
