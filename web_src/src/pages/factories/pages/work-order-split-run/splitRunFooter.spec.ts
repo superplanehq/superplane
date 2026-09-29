@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   availableSplitRunStopChoices,
   buildSplitRunFooter,
+  classicSplitRunFooter,
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
   defaultSplitRunStopChoice,
   doneFooterForStatus,
@@ -209,6 +210,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
+    expect(splitRunDecisionTone(footer)).toBe("failed");
     expect(footer.sentence).toBe("This task failed.");
     expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
@@ -276,6 +278,92 @@ describe("buildSplitRunFooter", () => {
       headline: "This task is closed as failed",
       text: "Reopen this task to start the line again.",
     });
+  });
+
+  it("uses a warning strip when credit blocks an open trial", () => {
+    const footer = buildSplitRunFooter({
+      kind: "failed",
+      note: { key: "step-failed", headline: "No credit", text: "This organization is out of credit." },
+      attentionTone: "warning",
+    });
+
+    expect(footer.attentionTone).toBe("warning");
+    expect(splitRunDecisionTone(footer)).toBe("warning");
+  });
+
+  it("disables Rerun when the organization is out of credit", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, outOfCredit: true });
+
+    expect(footer.actions).toEqual([
+      REJECT,
+      {
+        id: "rerun",
+        kind: "rerun",
+        label: "Rerun",
+        emphasis: "primary",
+        disabled: true,
+        tooltip: "This organization is out of credit.",
+      },
+    ]);
+  });
+
+  it("replaces the draft verdict when the organization is out of credit", () => {
+    const creditNotice = {
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      actionLabel: "Open billing",
+      href: "/demo/organization/billing",
+      warning: true,
+    };
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: DRAFT_NOTE,
+      clarityScore: 5,
+      confidenceScore: 5,
+      outOfCredit: true,
+      creditNotice,
+    });
+
+    expect(footer.note).toEqual({
+      headline: "No credit",
+      text: "This organization is out of credit.",
+      cta: { label: "Open billing", href: "/demo/organization/billing" },
+    });
+    expect(footer.attentionTone).toBe("warning");
+    expect(footer.creditNotice).toEqual(creditNotice);
+    expect(splitRunDecisionTone(footer)).toBe("warning");
+    expect(classicSplitRunFooter(footer).note?.headline).toBe("No credit");
+    expect(classicSplitRunFooter(footer).note?.cta).toEqual({
+      label: "Open billing",
+      href: "/demo/organization/billing",
+    });
+  });
+
+  it("disables Start when the organization is out of credit", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, outOfCredit: true });
+
+    expect(footer.actions).toEqual([
+      ARCHIVE,
+      {
+        id: "start",
+        kind: "start",
+        label: "Start",
+        emphasis: "primary",
+        disabled: true,
+        tooltip: "This organization is out of credit.",
+      },
+    ]);
+  });
+
+  it("keeps Start and Rerun enabled when outOfCredit is false", () => {
+    expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, outOfCredit: false }).actions).toEqual([
+      ARCHIVE,
+      START,
+    ]);
+    expect(buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, outOfCredit: false }).actions).toEqual([
+      REJECT,
+      RERUN,
+    ]);
   });
 });
 

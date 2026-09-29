@@ -46,7 +46,9 @@ import {
   useLineBoardColumnColorViewPreference,
   type LineBoardColumnColorView,
 } from "../lib/lineBoardColumnColorViewPreference";
-import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
+import { useHostedCreditChrome, useHostedCreditRunContext } from "../lib/useHostedCreditEmptyBanner";
+import { lineAppIds } from "../lib/lineHostedCredit";
+import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
@@ -1168,6 +1170,7 @@ function LineDetail({
           factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
+          appIds={lineAppIds(line)}
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
@@ -1189,6 +1192,7 @@ function LineBoardSplitRunPopup({
   factoryKey,
   lineId,
   lineName,
+  appIds,
   peekOrderId,
   peekOrder,
   canDispatch,
@@ -1204,6 +1208,7 @@ function LineBoardSplitRunPopup({
   factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
+  appIds: string[];
   peekOrderId: string;
   peekOrder: FactoriesWorkOrderSummary;
   canDispatch: boolean;
@@ -1222,6 +1227,8 @@ function LineBoardSplitRunPopup({
   const popupOrder = describedOrder ?? peekOrder;
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const credit = useHostedCreditRunContext(organizationId, factoryKey);
+  const usesHostedRunner = useLineUsesHostedCredit(organizationId, appIds);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -1244,6 +1251,8 @@ function LineBoardSplitRunPopup({
         stoppedBy: closer.actor,
         closer,
         resolveUser,
+        credit,
+        usesHostedRunner,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
