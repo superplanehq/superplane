@@ -146,13 +146,17 @@ export function stripWorkOrderFileRefs(markdown: string): string {
     return markdown;
   }
   let strippedAnyRef = false;
-  // Markdown syntax puts the label before the target: `[label](target)`.
+  // Markdown syntax puts the label before the target: `[label](target)` for
+  // links, `![alt](target)` for images. A link's label is visible text the
+  // user wrote, so it survives. An image's alt text is not rendered next to
+  // the image (only the image itself is), so it is dropped along with the
+  // image instead of surfacing as new visible text.
   const keepMarkdownLabelIfFileRef = (match: string, label: string, reference: string) => {
     if (!parseWorkOrderFileId(reference)) {
       return match;
     }
     strippedAnyRef = true;
-    return label;
+    return match.startsWith("!") ? "" : label;
   };
   // `<a href="target">label</a>` puts the target (the href attribute) before
   // the label (the element's inner text), the opposite order of Markdown.

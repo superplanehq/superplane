@@ -67,6 +67,16 @@ describe("workOrderFiles", () => {
     expect(stripped).toContain("for context.");
   });
 
+  it("drops a stripped image's alt text instead of leaving it as visible text", () => {
+    const id = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const markdown = `Before.\n\n![screenshot.png](${workOrderFileRef(id)})\n\nAfter.`;
+
+    const stripped = stripWorkOrderFileRefs(markdown);
+
+    expect(stripped).not.toContain("screenshot.png");
+    expect(stripped).toBe("Before.\n\nAfter.");
+  });
+
   it("keeps the visible label of a stripped file ref instead of deleting the whole link", () => {
     const id = "dddddddd-dddd-dddd-dddd-dddddddddddd";
     const markdown = [
