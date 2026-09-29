@@ -28,6 +28,8 @@ export const FIRST_RUN_COPY = {
     headline: "Connect SuperPlane to GitHub",
     body: "SuperPlane reads your code and tickets, and returns finished work as pull requests.",
     signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
+    switchAccount: "(switch)",
+    switchAccountLabel: "Use a different GitHub account",
     connectGitHub: "Connect GitHub",
     connectAction: "Connect",
     stepConnected: "Connected to GitHub",
