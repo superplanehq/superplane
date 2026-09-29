@@ -1,20 +1,21 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
+import { WorkOrdersLoadedView } from "../../workOrders/WorkOrdersLoadedView";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
+import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
+import { useHostedCreditChrome } from "../../lib/useHostedCreditEmptyBanner";
+import { pullRequestsFromWorkOrders } from "../../lib/workOrderPullRequest";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
-import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
-/** Storybook-only Work Orders page with a Missions rail. */
+/** Storybook-only Tasks page with a Missions rail. */
 export function MissionsWorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: me } = useMe(false);
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const state = useWorkOrderListState(factoryId);
 
   const {
@@ -26,16 +27,19 @@ export function MissionsWorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
   if (workOrdersError) {
     return (
       <>
-        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersErrorState onRetry={() => void refetch()} />
         </div>
@@ -46,7 +50,7 @@ export function MissionsWorkOrdersPage() {
   if (isOrdersLoading || !factory) {
     return (
       <>
-        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersLoadingState />
         </div>
@@ -55,19 +59,22 @@ export function MissionsWorkOrdersPage() {
   }
 
   return (
-    <MissionsWorkOrdersLoadedView
+    <WorkOrdersLoadedView
       organizationId={organizationId}
       factoryKey={factoryKey}
       factory={factory}
       factoryLines={factory.lines ?? []}
       workOrders={workOrders}
+      pullRequests={pullRequests}
       state={state}
-      currentUserId={me?.id}
+      currentUserId={currentUserId}
       canCreate={canCreate}
       onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
+      hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+      brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
   );

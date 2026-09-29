@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
@@ -13,23 +13,28 @@ import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoar
 import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import {
+  classicSplitRunFixture,
   collectSplitRunArtifacts,
+  collectSplitRunPullRequests,
   defaultSplitRunPopupTab,
+  refinePopupShowsAutomations,
   resolveSplitRunPopupArtifacts,
-  SPLIT_RUN_PANE_GRID_CLASSNAME,
+  resolveSplitRunPopupPullRequests,
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
+  splitRunIntentDocument,
   splitRunLinkedArtifacts,
-  splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
-import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
-  it("uses a 3/2 pane split for Description", () => {
-    expect(SPLIT_RUN_PANE_GRID_CLASSNAME).toContain("minmax(0,3fr)_minmax(0,2fr)");
+  it("hides Automations on a draft refine popup", () => {
+    expect(refinePopupShowsAutomations({ footerKind: "draft" })).toBe(false);
+    expect(refinePopupShowsAutomations({ footerKind: "draft", sourceOnly: true })).toBe(true);
+    expect(refinePopupShowsAutomations({ footerKind: "running" })).toBe(true);
   });
 
   it("opens the automation run for the preferred phase, then the latest phase run", () => {
@@ -89,7 +94,7 @@ describe("splitRunPopupModel", () => {
       }),
     ).toBe(
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        from: "work-order",
+        from: "task",
         orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
         canvas: "closure",
       }),
@@ -109,32 +114,106 @@ describe("splitRunPopupModel", () => {
     expect(splitRunPhaseRunHref({ phase: prCreation! })).toBeUndefined();
   });
 
-  it("opens the description tab for drafts and done cards, and the log for later states", () => {
+  it("opens Automations only while a line run or pull request activity is active", () => {
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+          analysisRuns: [
+            {
+              canvasId: "canvas-backlog",
+              workOrderId: DRAFT_WORK_ORDER.id ?? "",
+              run: {
+                id: "run-analysis",
+                canvasId: "canvas-backlog",
+                state: "STATE_STARTED",
+                createdAt: "2026-08-28T12:00:00Z",
+                updatedAt: "2026-08-28T12:00:00Z",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("description");
     expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("log");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("log");
-  });
-
-  it("maps log-tab dots to the line status colors", () => {
-    expect(splitRunLogTabDotClass("running")).toContain("--status-running-dot");
-    expect(splitRunLogTabDotClass("waiting")).toContain("--status-waiting-dot");
-    expect(splitRunLogTabDotClass("failed")).toContain("--status-failed-dot");
-    expect(splitRunLogTabDotClass("passed")).toContain("--status-completed-dot");
-    expect(splitRunLogTabDotClass("pending")).toContain("--status-draft-dot");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
+    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("description");
+    const noActiveRuns = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER);
+    expect(
+      defaultSplitRunPopupTab({
+        ...noActiveRuns,
+        footer: { ...noActiveRuns.footer, kind: "running" },
+      }),
+    ).toBe("description");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
+              run: {
+                id: "run-pr-feedback",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("log");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
+              waitingForAccess: true,
+              run: {
+                id: "run-pr-feedback-queued",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("log");
+    expect(
+      defaultSplitRunPopupTab(
+        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+          prFeedbackRuns: [
+            {
+              canvasId: "canvas-pr-feedback",
+              pullRequestNumber: "12",
+              run: {
+                id: "run-pr-feedback",
+                canvasId: "canvas-pr-feedback",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBe("description");
+    expect(defaultSplitRunPopupTab(SPLIT_RUN_RUNNING)).toBe("log");
   });
 
   it("prefers the saved work-order description on a live order", () => {
     expect(
       splitRunSourceDescription({
-        workOrderDescription: "Saved on the work order",
+        workOrderDescription: "Saved on the task",
         artifactDescription: "Stale artifact body",
         preferWorkOrder: true,
       }),
-    ).toBe("Saved on the work order");
+    ).toBe("Saved on the task");
     expect(
       splitRunSourceDescription({
-        workOrderDescription: "Saved on the work order",
+        workOrderDescription: "Saved on the task",
         artifactDescription: "Storybook artifact body",
       }),
     ).toBe("Storybook artifact body");
@@ -152,15 +231,64 @@ describe("splitRunPopupModel", () => {
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(splitRunIntentDocument({ artifacts, description }).summary).toBeTruthy();
+    expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
   });
 
-  it("uses live artifacts for a real work order and fixture artifacts in Storybook", () => {
+  it("does not compose a description fallback while artifacts are still loading", () => {
+    expect(
+      splitRunIntentDocument({
+        artifacts: [],
+        description: "The mermaid charts are sometimes unreadable in the dark mode",
+        skipDescriptionFallback: true,
+      }),
+    ).toEqual({ title: "", summary: "", plan: "" });
+  });
+
+  it("prefers spec.md over intent.md", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "# Old intent\n\n## Executive summary\n\nOld summary.\n" },
+      },
+      {
+        id: "art-spec",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "spec.md", body: "# New spec\n\n## Executive summary\n\nNew summary.\n" },
+      },
+    ];
+
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New spec");
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("New summary.");
+    expect(splitRunLinkedArtifacts(artifacts)).toEqual([]);
+  });
+
+  it("keeps intent.md out of the Artifacts list", () => {
+    const artifacts = [
+      {
+        id: "art-intent",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "intent.md", body: "## Executive summary\n\nA retry loop." },
+      },
+      {
+        id: "art-plan",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "plan.md", body: "Add a retry." },
+      },
+    ];
+
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-plan"]);
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("A retry loop.");
+  });
+
+  it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {
     const fixtureArtifacts = collectSplitRunArtifacts(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
     const liveArtifacts = [
       {
-        id: "art-live-pr",
-        type: "TYPE_PR" as const,
-        data: { number: 88, url: "https://github.com/acme/app/pull/88" },
+        id: "art-live-link",
+        type: "TYPE_LINK" as const,
+        data: { title: "Preview", url: "https://preview.example.com/88" },
       },
     ];
 
@@ -170,13 +298,48 @@ describe("splitRunPopupModel", () => {
     );
   });
 
+  it("collects unique pull requests from fixture streams", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
+    const pullRequests = collectSplitRunPullRequests(fixture);
+
+    expect(pullRequests).toEqual([
+      expect.objectContaining({
+        number: "510",
+        url: "https://github.com/example/ledger/pull/510",
+        state: "STATE_OPEN",
+      }),
+    ]);
+  });
+
+  it("uses live pull requests for a real task and fixture pull requests in Storybook", () => {
+    const fixturePullRequests = collectSplitRunPullRequests(
+      splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER),
+    );
+    const livePullRequests = [
+      {
+        id: "pr-live",
+        number: "99",
+        url: "https://github.com/example/ledger/pull/99",
+        state: "STATE_OPEN" as const,
+      },
+    ];
+
+    expect(resolveSplitRunPopupPullRequests({ fixturePullRequests, livePullRequests, useLive: true })).toEqual(
+      livePullRequests,
+    );
+    expect(resolveSplitRunPopupPullRequests({ fixturePullRequests, livePullRequests, useLive: false })).toEqual(
+      fixturePullRequests,
+    );
+    expect(collectSplitRunPullRequests(splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]))).toEqual([]);
+  });
+
   it("lists description artifacts oldest first", () => {
     const artifacts = splitRunLinkedArtifacts([
       {
         id: "newer",
-        type: "TYPE_PR",
+        type: "TYPE_LINK",
         createdAt: "2026-08-25T12:00:00.000Z",
-        data: { number: 2 },
+        data: { title: "Preview", url: "https://preview.example.com/2" },
       },
       {
         id: "older",
@@ -194,5 +357,21 @@ describe("splitRunPopupModel", () => {
     ]);
 
     expect(artifacts.map((artifact) => artifact.id)).toEqual(["older", "newer", "undated"]);
+  });
+});
+
+describe("classicSplitRunFixture", () => {
+  it("drops the console-only closure and history phases", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
+    expect(fixture.phases.some((phase) => phase.id === "done-closure")).toBe(true);
+
+    const classic = classicSplitRunFixture(fixture);
+
+    expect(classic.phases.some((phase) => phase.id === "done-closure")).toBe(false);
+    expect(classic.phases.some((phase) => phase.historyRun)).toBe(false);
+  });
+
+  it("returns the same fixture when nothing needs filtering", () => {
+    expect(classicSplitRunFixture(SPLIT_RUN_RUNNING)).toBe(SPLIT_RUN_RUNNING);
   });
 });

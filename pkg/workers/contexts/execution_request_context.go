@@ -31,6 +31,14 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		return nil
 	}
 
+	if parameters == nil {
+		parameters = map[string]any{}
+	}
+
+	if err := models.CompletePendingExecutionActionRequests(c.tx, c.execution.ID, actionName, parameters); err != nil {
+		return err
+	}
+
 	runAt := time.Now().Add(interval)
 	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{

@@ -16,6 +16,7 @@ import {
   MAIN_X,
   assignComponentColumns,
   buildAdjacency,
+  firstSideColumnForComponent,
   computeComponentLayers,
   computeComponentSpineColumns,
   createSpinePickers,
@@ -116,7 +117,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     ctx.nodeById,
   );
 
-  const layer = computeComponentLayers(component, componentSet, rootsForComponent, ctx.incoming);
+  const layer = computeComponentLayers(component, componentSet, ctx.incoming);
   const spineColumns = computeComponentSpineColumns(
     rootsForComponent,
     componentSet,
@@ -127,7 +128,7 @@ function layoutOneComponent(component: string[], componentOriginX: number, ctx: 
     component,
     componentSet,
     spineColumns,
-    firstSideColumn: rootsForComponent.length,
+    firstSideColumn: firstSideColumnForComponent(spineColumns, layer),
     layer,
     incoming: ctx.incoming,
     isMainSuccessor: ctx.pickers.isMainSuccessor,

@@ -243,6 +243,7 @@ func (w *ExecutionTerminator) cancelComponent(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: orgUUID.String(),
 		CanvasName:     canvas.Name,
@@ -256,6 +257,8 @@ func (w *ExecutionTerminator) cancelComponent(
 		Auth:           contexts.NewAuthReader(tx, orgUUID, w.authService, nil),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
+		Usage:          contexts.NewUsageContext(orgUUID, execution),
+		HostedLLM:      contexts.NewHostedLLMContext(tx, w.encryptor, orgUUID, canvas.FactoryID),
 	}
 
 	if node.AppInstallationID != nil {

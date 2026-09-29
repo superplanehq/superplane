@@ -1,6 +1,5 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { implementationPlanMarkdown } from "../onboarding/first-run/reviewCandidateModel";
 import { doneFooterForStatus } from "./splitRunFooter";
 import type { SplitRunCanvasKey } from "./splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
@@ -17,19 +16,6 @@ function markdownArtifact(id: string, name: string, body: string): FactoriesWork
   };
 }
 
-function notifyPlanMarkdown(order: FactoriesWorkOrder): string {
-  return implementationPlanMarkdown({
-    goal: order.title ?? "Send a notification when a work-order status changes after a reopen.",
-    files: ["pkg/workers/work_order_status.go", "web_src/src/pages/factories/lib/workOrderStatusNote.ts"],
-    steps: [
-      "Find the reopen path that updates work-order status.",
-      "Send the same status-change notification that other status updates send.",
-      "Cover the reopen path with a regression test.",
-    ],
-    verify: ["A reopen sends one status-change notification.", "The existing notification suite passes."],
-  });
-}
-
 function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
   return {
     id: `art-branch-${orderId}`,
@@ -42,16 +28,14 @@ function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
   };
 }
 
-function notifyPullRequestArtifact(orderId: string): FactoriesWorkOrderArtifact {
+function notifyPullRequest(orderId: string): FactoriesFactoryPullRequest {
   return {
-    id: `art-pr-${orderId}`,
-    type: "TYPE_PR",
-    data: {
-      url: NOTIFY_PR_URL,
-      title: "Notify on status change after a reopen",
-      number: 6837,
-      state: "merged",
-    },
+    id: `pr-${orderId}`,
+    workOrderId: orderId,
+    number: "6837",
+    url: NOTIFY_PR_URL,
+    title: "Notify on status change after a reopen",
+    state: "STATE_MERGED",
   };
 }
 
@@ -101,6 +85,7 @@ function streamLine(input: {
   /** Triggers fire at a point in time, so they carry no duration. */
   duration?: string;
   artifact?: FactoriesWorkOrderArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
 }): SplitRunStreamLine {
   return {
     id: input.id,
@@ -114,6 +99,7 @@ function streamLine(input: {
     iconSlug: input.iconSlug,
     duration: input.duration,
     artifact: input.artifact,
+    pullRequest: input.pullRequest,
   };
 }
 
@@ -130,7 +116,7 @@ function notifyCiLoopStream(): SplitRunStreamLine[] {
     streamLine({
       id: "ci-report-check",
       at: "20:02:50",
-      componentType: "Report Work Order Check",
+      componentType: "Report Task Check",
       componentName: "Report CI Check",
       action: "passed",
       iconSlug: "factory",
@@ -224,7 +210,7 @@ function notifyUiPreviewStream(): SplitRunStreamLine[] {
     streamLine({
       id: "preview-report-coverage",
       at: "20:03:58",
-      componentType: "Report Work Order Check",
+      componentType: "Report Task Check",
       componentName: "Report Coverage Check",
       action: "passed",
       iconSlug: "factory",
@@ -242,7 +228,7 @@ function notifyUiPreviewStream(): SplitRunStreamLine[] {
   ];
 }
 
-function notifyPrCreationStream(pr: FactoriesWorkOrderArtifact): SplitRunStreamLine[] {
+function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStreamLine[] {
   return [
     streamLine({
       id: "onrun-onrun-otn0e9",
@@ -291,21 +277,12 @@ function notifyPrCreationStream(pr: FactoriesWorkOrderArtifact): SplitRunStreamL
     streamLine({
       id: "component-node-f069ua",
       at: "19:52:39",
-      componentType: "Add Work Order Artifact",
-      componentName: "Attach PR to Work Order",
+      componentType: "Add Pull Request",
+      componentName: "Attach PR to Task",
       action: "passed",
       iconSlug: "factory",
       duration: "1s",
-      artifact: pr,
-    }),
-    streamLine({
-      id: "set-pr-closure-note",
-      at: "19:52:39",
-      componentType: "setWorkOrderStatusNote",
-      componentName: "Set PR closure note",
-      action: "passed",
-      iconSlug: "box",
-      duration: "1s",
+      pullRequest: pr,
     }),
   ];
 }
@@ -313,9 +290,8 @@ function notifyPrCreationStream(pr: FactoriesWorkOrderArtifact): SplitRunStreamL
 export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPhase[] {
   const orderId = order.id ?? "notify";
   const description = markdownArtifact(`art-description-${orderId}`, "description.md", order.description ?? "");
-  const plan = markdownArtifact(`art-plan-${orderId}`, "PLAN.md", notifyPlanMarkdown(order));
   const branch = notifyBranchArtifact(orderId);
-  const pullRequest = notifyPullRequestArtifact(orderId);
+  const pullRequest = notifyPullRequest(orderId);
   const run = orderRun(order);
 
   return [
@@ -325,15 +301,6 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "Created manually",
       duration: "2s",
       artifacts: [description],
-    }),
-    passedPhase({
-      id: "planning-0",
-      name: "Plan",
-      componentName: "Planning",
-      duration: "2m 59s",
-      artifacts: [plan],
-      appId: "app-refund-planner",
-      canvasKey: "planning",
     }),
     passedPhase({
       id: "implementation-1",

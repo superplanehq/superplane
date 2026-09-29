@@ -28,7 +28,6 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 				"createdBy":   canvas.GetCreatedBy().Name,
 				"createdAt":   canvas.GetCreatedAt().Format(time.RFC3339),
 				"updatedAt":   canvas.GetUpdatedAt().Format(time.RFC3339),
-				"folderId":    canvas.GetFolderId(),
 				"nodes":       len(canvas.GetNodes()),
 				"edges":       len(canvas.GetEdges()),
 			}

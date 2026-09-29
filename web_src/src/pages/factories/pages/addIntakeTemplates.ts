@@ -1,6 +1,15 @@
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+} from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
   id: string;
@@ -8,55 +17,86 @@ export interface AddIntakeTemplate {
   description: string;
   /** Optional integration icon. Letter glyph when omitted. */
   iconSrc?: string;
+  /** True when SuperPlane does not create this intake yet. */
+  soon?: boolean;
+  /** Organization experimental feature that must be on for this source to be live. */
+  featureId?: string;
 }
 
+export const ADD_INTAKE_COPY = {
+  pickerTitle: "Add intake",
+  pickerDescription: "Choose a source for new backlog tasks.",
+  sourceTaken: "Already set up.",
+  comingSoon: "Coming soon.",
+} as const;
+
 /**
- * Templates in the Add intake picker. Source-based intakes and a few
- * common improvement automations.
+ * Sources in the Add intake picker. Live sources create an intake.
+ * Coming-soon sources stay visible and disabled.
  */
 export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "github-issues",
     name: "GitHub issues",
-    description: "Open issues from connected repositories.",
+    description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
+  },
+  {
+    id: "dependabot-alerts",
+    name: "Dependabot alerts",
+    description: "Creates tasks from Dependabot alerts.",
+    iconSrc: githubIcon,
+    featureId: FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  },
+  {
+    id: "jira-issues",
+    name: "Jira issues",
+    description: "Creates tasks from Jira issues.",
+    iconSrc: jiraIcon,
+    featureId: FEATURE_FACTORY_JIRA_INTAKE,
   },
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
   },
   {
-    id: "pagerduty-incidents",
-    name: "PagerDuty incidents",
-    description: "Firing incidents that need a work order.",
-    iconSrc: pagerdutyIcon,
+    id: "productive-tasks",
+    name: "Productive tasks",
+    description: "Creates tasks from Productive tasks.",
+    iconSrc: productiveIcon,
+    featureId: FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   },
   {
-    id: "improve-ci-runtime",
-    name: "Improve CI runtime",
-    description: "Find slow jobs and cut pipeline wait time.",
+    id: "datadog",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
+    iconSrc: datadogIcon,
+    featureId: FEATURE_FACTORY_DATADOG_INTAKE,
   },
   {
-    id: "improve-page-performance",
-    name: "Improve page performance",
-    description: "Track slow pages and open work to speed them up.",
-  },
-  {
-    id: "flaky-tests",
-    name: "Flaky tests",
-    description: "Catch unstable tests and create fix work orders.",
+    id: "notion",
+    name: "Notion",
+    description: "Creates tasks from Notion pages.",
+    iconSrc: notionIcon,
+    soon: true,
   },
 ];
 
-export function filterAddIntakeTemplates(query: string): AddIntakeTemplate[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) {
-    return ADD_INTAKE_TEMPLATES;
+export function isAddIntakeSoon(template: AddIntakeTemplate, hasFeature: (featureId: string) => boolean): boolean {
+  if (template.soon) {
+    return true;
   }
-  return ADD_INTAKE_TEMPLATES.filter((template) => {
-    const haystack = `${template.name} ${template.description}`.toLowerCase();
-    return haystack.includes(needle);
-  });
+  if (!template.featureId) {
+    return false;
+  }
+  return !hasFeature(template.featureId);
+}
+
+/** Catalog with Coming soon applied when the organization feature is off. */
+export function addIntakeTemplatesForOrg(hasFeature: (featureId: string) => boolean): AddIntakeTemplate[] {
+  return ADD_INTAKE_TEMPLATES.map((template) =>
+    isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template,
+  );
 }

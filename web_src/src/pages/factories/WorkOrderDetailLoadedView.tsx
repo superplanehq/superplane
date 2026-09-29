@@ -1,5 +1,6 @@
 import type {
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
@@ -7,6 +8,7 @@ import type {
   FactoriesWorkOrderState,
 } from "@/api-client";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { factoryHomePath, firstFactoryLineId } from "./lib/factoryPagePaths";
 import { latestDispatchForLine } from "./lib/workOrderNumberResolution";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
@@ -21,9 +23,11 @@ import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
 import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
+import { SendWorkOrderToBacklogDialog } from "./workOrders/SendWorkOrderToBacklogDialog";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
+  factoryId?: string;
   factoryKey: string;
   order: FactoriesWorkOrder;
   events?: FactoriesWorkOrderEvent[];
@@ -36,6 +40,9 @@ interface WorkOrderDetailLoadedViewProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  isPullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   /** Why the order is waiting, announced by automations. */
   statusNotes?: WorkOrderStatusNotePresentation[];
   /** Scores reported by automations (risk review, coverage, …). */
@@ -67,6 +74,7 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
+  onSendToBacklog?: () => void;
   /** Page chrome includes the back link. Dialog chrome is the card overlay. */
   chrome?: "page" | "dialog";
 }
@@ -74,10 +82,11 @@ interface WorkOrderDetailLoadedViewProps {
 export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps) {
   const identifier = getWorkOrderDisplayKey(props.order, props.factoryKey);
   const isDialog = props.chrome === "dialog";
+  const [backlogConfirmOpen, setBacklogConfirmOpen] = useState(false);
   return (
     <>
       <WorkOrderDetailHeader
-        orderTitle={props.order.title ?? "Work Order"}
+        orderTitle={props.order.title ?? "Task"}
         orderIdentifier={identifier === "—" ? undefined : identifier}
         backHref={isDialog ? undefined : workOrderBoardBackHref(props)}
         backLabel="Workspace"
@@ -93,9 +102,22 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         isUpdatingStatus={props.isUpdatingStatus}
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
+        onSendToBacklog={() => setBacklogConfirmOpen(true)}
         className={isDialog ? "max-w-none px-6 pt-4 pb-3 pr-12" : undefined}
       />
-      <WorkOrderDetailBody {...props} />
+      <WorkOrderDetailBody {...props} onSendToBacklog={() => setBacklogConfirmOpen(true)} />
+      {props.factoryId && props.order.id ? (
+        <SendWorkOrderToBacklogDialog
+          open={backlogConfirmOpen}
+          onOpenChange={setBacklogConfirmOpen}
+          organizationId={props.organizationId}
+          factoryId={props.factoryId}
+          orderId={props.order.id}
+          pullRequests={props.pullRequests}
+          artifacts={props.artifacts}
+          canSubmit={props.canManage}
+        />
+      ) : null}
     </>
   );
 }
@@ -114,6 +136,7 @@ function WorkOrderDetailBody(props: WorkOrderDetailLoadedViewProps) {
 
 function WorkOrderDetailMainColumn({
   organizationId,
+  factoryId,
   factoryKey,
   order,
   events,
@@ -124,6 +147,7 @@ function WorkOrderDetailMainColumn({
   onLoadMoreEvents,
   onRetryEvents,
   artifacts,
+  pullRequests,
   statusNotes,
   checks,
   isChecksLoading,
@@ -142,6 +166,7 @@ function WorkOrderDetailMainColumn({
   canManage,
   isAddingComment,
   onAddComment,
+  onSendToBacklog,
 }: WorkOrderDetailLoadedViewProps) {
   const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
   const notesToShow = statusNotes ?? [];
@@ -149,13 +174,14 @@ function WorkOrderDetailMainColumn({
 
   return (
     <div className="min-w-0">
-      {order.description ? <WorkOrderDescription description={order.description} /> : null}
+      {order.description ? <WorkOrderDescription description={order.description} files={order.files} /> : null}
 
       {showStatusNotes ? (
         <div className={order.description ? "mt-10" : undefined}>
           <WorkOrderStatusNotesSection
             notes={notesToShow}
             organizationId={organizationId}
+            factoryKey={factoryKey}
             displayStatus={displayStatus}
             isOpen={isOpen}
             isDispatchable={isDispatchable}
@@ -168,6 +194,7 @@ function WorkOrderDetailMainColumn({
             isUpdatingStatus={isUpdatingStatus}
             onClose={onClose}
             onStatusChange={onStatusChange}
+            onSendToBacklog={onSendToBacklog}
           />
         </div>
       ) : null}
@@ -187,7 +214,7 @@ function WorkOrderDetailMainColumn({
       <section className={order.description || hasChecksSection || showStatusNotes ? "mt-10" : undefined}>
         <h2 className="workspace-section-title">Activity</h2>
         <p className="workspace-body-text mt-1 text-muted-foreground">
-          Actions and comments on the work order, plus factory line runs.
+          Actions and comments on the task, plus factory line runs.
         </p>
         <div className="mt-4">
           <WorkOrderActivityTimeline
@@ -202,9 +229,11 @@ function WorkOrderDetailMainColumn({
             onLoadMoreEvents={onLoadMoreEvents}
             onRetryEvents={onRetryEvents}
             artifacts={artifacts}
+            pullRequests={pullRequests}
             footer={
               <WorkOrderCommentComposer
                 organizationId={organizationId}
+                factoryId={factoryId}
                 canComment={canManage}
                 isSubmitting={isAddingComment}
                 onSubmit={onAddComment}
@@ -224,6 +253,9 @@ function WorkOrderDetailBodyAside({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  pullRequests,
+  isPullRequestsLoading,
+  pullRequestsError,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -247,6 +279,9 @@ function WorkOrderDetailBodyAside({
         artifacts={artifacts}
         isArtifactsLoading={isArtifactsLoading}
         artifactsError={artifactsError}
+        pullRequests={pullRequests}
+        isPullRequestsLoading={isPullRequestsLoading}
+        pullRequestsError={pullRequestsError}
         displayStatus={displayStatus}
         statusMeta={statusMeta}
         assigneeIds={assigneeIds}
@@ -268,6 +303,7 @@ function WorkOrderDetailBodyAside({
 function WorkOrderStatusNotesSection({
   notes,
   organizationId,
+  factoryKey,
   displayStatus,
   isOpen,
   isDispatchable,
@@ -280,9 +316,11 @@ function WorkOrderStatusNotesSection({
   isUpdatingStatus,
   onClose,
   onStatusChange,
+  onSendToBacklog,
 }: Pick<
   WorkOrderDetailLoadedViewProps,
   | "organizationId"
+  | "factoryKey"
   | "displayStatus"
   | "isOpen"
   | "isDispatchable"
@@ -295,6 +333,7 @@ function WorkOrderStatusNotesSection({
   | "isUpdatingStatus"
   | "onClose"
   | "onStatusChange"
+  | "onSendToBacklog"
 > & { notes: WorkOrderStatusNotePresentation[] }) {
   const lastIndex = notes.length - 1;
   const statusActions = buildWorkOrderStatusActions({
@@ -315,12 +354,14 @@ function WorkOrderStatusNotesSection({
           key={note.key}
           note={note}
           organizationId={organizationId}
+          factoryKey={factoryKey}
           canClose={canClose}
           canManage={canManage}
           isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}
           statusActions={index === lastIndex ? statusActions : []}
           onClose={onClose}
           onStatusChange={onStatusChange}
+          onSendToBacklog={onSendToBacklog}
         />
       ))}
     </div>

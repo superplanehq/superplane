@@ -1,14 +1,21 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+const apiKeyNameUniqueConstraint = "unique_api_key_in_organization"
+
+var ErrAPIKeyNameAlreadyExists = errors.New("API key name already exists")
 
 type User struct {
 	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
@@ -22,6 +29,7 @@ type User struct {
 	TokenHash       string
 	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
 	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
+	IsOwner         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt
@@ -29,6 +37,10 @@ type User struct {
 
 func (u *User) IsAPIKey() bool {
 	return u.Type == UserTypeAPIKey
+}
+
+func (u *User) IsHuman() bool {
+	return u.Type == UserTypeHuman
 }
 
 func (u *User) IsExpiredAPIKey() bool {
@@ -39,6 +51,19 @@ func (u *User) HasAPIKeyCanvasScope() bool {
 	return u.IsAPIKey() && len(u.APIKeyCanvasIDs) > 0
 }
 
+func MapAPIKeyNameUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == apiKeyNameUniqueConstraint {
+		return ErrAPIKeyNameAlreadyExists
+	}
+
+	return err
+}
+
 func (u *User) GetEmail() string {
 	if u.Email != nil {
 		return *u.Email
@@ -47,13 +72,20 @@ func (u *User) GetEmail() string {
 }
 
 func (u *User) Delete() error {
-	now := time.Now()
-	return database.Conn().Unscoped().
-		Model(u).
-		Update("deleted_at", now).
-		Update("updated_at", now).
-		Update("token_hash", nil).
-		Error
+	return u.SoftDelete(database.Conn(), time.Now(), "")
+}
+
+func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) error {
+	updates := map[string]any{
+		"deleted_at": now,
+		"updated_at": now,
+		"token_hash": nil,
+	}
+	if tombstoneEmail != "" {
+		updates["email"] = tombstoneEmail
+	}
+
+	return tx.Unscoped().Model(u).Updates(updates).Error
 }
 
 func (u *User) Restore() error {
@@ -303,6 +335,33 @@ func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, erro
 	return &user, err
 }
 
+// FindActiveUserByIDAnyOrg loads an active user by ID without scoping to an
+// organization. Used by the personal API token auth path, which resolves a
+// user from a token hash before the request's organization is known.
+func FindActiveUserByIDAnyOrg(tx *gorm.DB, id uuid.UUID) (*User, error) {
+	var user User
+
+	err := tx.
+		Where("id = ?", id).
+		First(&user).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func ListActiveHumanUsersForAccount(tx *gorm.DB, accountID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("account_id = ?", accountID).
+		Where("type = ?", UserTypeHuman).
+		Find(&users).
+		Error
+	return users, err
+}
+
 func FindActiveHumanUserByAccountAndOrganization(tx *gorm.DB, orgID, accountID uuid.UUID) (*User, error) {
 	var user User
 
@@ -396,6 +455,8 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 		Joins("JOIN users ON organizations.id = users.organization_id").
 		Where("users.email = ?", utils.NormalizeEmail(email)).
 		Where("users.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL").
+		Order("organizations.created_at DESC").
 		Find(&organizations).
 		Error
 
@@ -452,11 +513,7 @@ func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string)
 	return count, nil
 }
 
-func CountOrganizationsByBillingAccount(accountID string) (int64, error) {
-	return CountOrganizationsByBillingAccountInTransaction(database.Conn(), accountID)
-}
-
-func CountOrganizationsByBillingAccountInTransaction(tx *gorm.DB, accountID string) (int64, error) {
+func CountOrganizationsByBillingAccount(tx *gorm.DB, accountID string) (int64, error) {
 	subquery := tx.
 		Table("users").
 		Select("DISTINCT ON (organization_id) organization_id, account_id").
@@ -508,6 +565,63 @@ func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*
 	}
 
 	return &user, nil
+}
+
+func SetUserIsOwner(tx *gorm.DB, userID uuid.UUID, isOwner bool) error {
+	return tx.Model(&User{}).Where("id = ?", userID).Update("is_owner", isOwner).Error
+}
+
+var ErrLastOrganizationOwner = errors.New("cannot remove the last organization owner")
+
+func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("is_owner = ?", true).
+		Where("type = ?", UserTypeHuman).
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func LockOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	return ListOrganizationOwners(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
+}
+
+func RefuseIfLastOrganizationOwner(tx *gorm.DB, orgID, userID uuid.UUID) error {
+	owners, err := LockOrganizationOwners(tx, orgID)
+	if err != nil {
+		return err
+	}
+
+	if len(owners) > 1 {
+		return nil
+	}
+
+	for i := range owners {
+		if owners[i].ID == userID {
+			return ErrLastOrganizationOwner
+		}
+	}
+
+	return nil
+}
+
+func ListOrganizationOwnerIDs(tx *gorm.DB, orgID uuid.UUID) ([]string, error) {
+	owners, err := ListOrganizationOwners(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(owners))
+	for i := range owners {
+		ids = append(ids, owners[i].ID.String())
+	}
+	return ids, nil
 }
 
 type UserAccountProvider struct {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -29,18 +30,13 @@ func ListFactoryIntakeRuns(
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
-	}
-
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory intake runs")
 	}
@@ -284,20 +280,30 @@ func latestDispatchStage(record models.FactoryWorkOrderLineDispatchRecord) strin
 }
 
 func intakeRunPlacement(run models.CanvasRun, context intakeRunContext) pb.FactoryIntakeRun_Placement {
-	analysis, ok := context.analyses[run.ID]
-	if !ok || analysis.State != models.CanvasNodeExecutionStateFinished {
-		return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
-	}
+	if context.graph.AnalysisNodeID != "" {
+		analysis, ok := context.analyses[run.ID]
+		if !ok || analysis.State != models.CanvasNodeExecutionStateFinished {
+			return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
+		}
 
-	// A failed analysis is reported as a rejection: the intake looked at the
-	// item and did not put it in the backlog.
-	if analysis.Result == models.CanvasNodeExecutionResultFailed {
-		return pb.FactoryIntakeRun_PLACEMENT_REJECTED
-	}
+		// A failed analysis is reported as a rejection: the intake looked at the
+		// item and did not put it in the backlog.
+		if analysis.Result == models.CanvasNodeExecutionResultFailed {
+			return pb.FactoryIntakeRun_PLACEMENT_REJECTED
+		}
 
-	creation, ok := context.creations[run.ID]
-	if !ok || creation.Result != models.CanvasNodeExecutionResultPassed {
-		return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
+		creation, ok := context.creations[run.ID]
+		if !ok || creation.Result != models.CanvasNodeExecutionResultPassed {
+			return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
+		}
+	} else {
+		creation, ok := context.creations[run.ID]
+		if !ok || creation.State != models.CanvasNodeExecutionStateFinished {
+			return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
+		}
+		if creation.Result != models.CanvasNodeExecutionResultPassed {
+			return pb.FactoryIntakeRun_PLACEMENT_REJECTED
+		}
 	}
 
 	if context.stages[run.ID] != "" {
@@ -322,6 +328,27 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		return nestedString(payload, "data", "issue", "title")
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return nestedString(payload, "incident", "title")
+	case models.FactoryIntakeSourceProductiveTasks:
+		return nestedString(payload, "data", "attributes", "title")
+	case models.FactoryIntakeSourceDependabotAlerts:
+		name := nestedString(payload, "alert", "dependency", "package", "name")
+		if name == "" {
+			return ""
+		}
+		return ghdependabot.TaskTitle(ghdependabot.PackageRef{
+			Name:      name,
+			Ecosystem: nestedString(payload, "alert", "dependency", "package", "ecosystem"),
+		})
+	case models.FactoryIntakeSourceJiraIssues:
+		summary := nestedString(payload, "issue", "fields", "summary")
+		key := nestedString(payload, "issue", "key")
+		if key != "" && summary != "" {
+			return key + ": " + summary
+		}
+		if key != "" {
+			return key
+		}
+		return summary
 	default:
 		return ""
 	}

@@ -61,6 +61,17 @@ func TestFactoryWorkOrder_UpdateAssignees(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, loaded.Assignees, 2)
 
+	t.Run("list assignees returns users in assignment order", func(t *testing.T) {
+		listed, err := order.ListAssignees(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, listed, 2)
+		assert.Equal(t, userID, listed[0].UserID)
+		assert.Equal(t, secondUser.ID, listed[1].UserID)
+		require.NotNil(t, listed[0].User)
+		require.NotNil(t, listed[1].User)
+		assert.Equal(t, secondUser.Name, listed[1].User.Name)
+	})
+
 	t.Run("unassigning everyone actually clears all assignees", func(t *testing.T) {
 		require.NoError(t, loaded.UpdateAssignees(database.Conn(), nil, userID))
 

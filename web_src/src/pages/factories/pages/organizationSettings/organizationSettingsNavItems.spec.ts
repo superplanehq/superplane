@@ -1,5 +1,5 @@
 import { LayoutGrid, Settings } from "lucide-react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { isOrganizationSettingsComingSoon, ORGANIZATION_SETTINGS_NAV_ITEMS } from "./organizationSettingsNavItems";
 
@@ -13,6 +13,7 @@ describe("ORGANIZATION_SETTINGS_NAV_ITEMS", () => {
       "Groups",
       "Roles",
       "Integrations",
+      "Workspace usage",
       "Usage",
       "Secrets",
     ]);
@@ -25,9 +26,14 @@ describe("ORGANIZATION_SETTINGS_NAV_ITEMS", () => {
 });
 
 describe("isOrganizationSettingsComingSoon", () => {
-  it("is false for General and Workspaces", () => {
+  it("is false for General, Workspaces, Integrations, and Workspace usage", () => {
     expect(isOrganizationSettingsComingSoon(ORGANIZATION_SETTINGS_NAV_ITEMS[0])).toBe(false);
     expect(isOrganizationSettingsComingSoon(ORGANIZATION_SETTINGS_NAV_ITEMS[1])).toBe(false);
+    expect(
+      ORGANIZATION_SETTINGS_NAV_ITEMS.filter(
+        (item) => item.id === "integrations" || item.id === "workspace-usage",
+      ).every((item) => !isOrganizationSettingsComingSoon(item)),
+    ).toBe(true);
   });
 
   it("is true for the remaining sections", () => {
@@ -36,7 +42,6 @@ describe("isOrganizationSettingsComingSoon", () => {
       "api-keys",
       "groups",
       "roles",
-      "integrations",
       "usage",
       "secrets",
     ]);

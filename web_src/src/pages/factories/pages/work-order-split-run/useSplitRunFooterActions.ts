@@ -1,10 +1,6 @@
 import { canvasesCancelRun } from "@/api-client";
-import {
-  factoryQueryKeys,
-  useCloseWorkOrder,
-  useDispatchWorkOrder,
-  useUpdateWorkOrderStatus,
-} from "@/hooks/useFactoryData";
+import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -20,49 +16,56 @@ type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   stepIndex?: number;
 };
 
+type RejectedCloseCopy = {
+  success: string;
+  error: string;
+};
+
+const REJECT_COPY: RejectedCloseCopy = {
+  success: "Task closed as rejected.",
+  error: "Failed to close task",
+};
+
+const ARCHIVE_COPY: RejectedCloseCopy = {
+  success: "Task archived.",
+  error: "Failed to archive task",
+};
+
 function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
-    return "Work order closed as completed.";
+    return "Task closed as completed.";
   }
   if (choice === "canceled") {
-    return "Work order closed as rejected.";
+    return "Task closed as rejected.";
   }
   if (choice === "reopen") {
-    return "Work order reopened.";
+    return "Task reopened.";
   }
   if (choice === "rerun-start") {
-    return "Work order started from the first step.";
+    return "Task started from the first step.";
   }
   if (choice === "rerun-step") {
-    return "Work order step started again.";
+    return "Task step started again.";
   }
-  return "Work order closed as failed.";
-}
-
-function rejectToast(): string {
-  return closeToast("canceled");
+  return "Task closed as failed.";
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
   if (choice === "reopen") {
-    return "Failed to reopen work order";
+    return "Failed to reopen task";
   }
   if (isSplitRunRerunChoice(choice)) {
-    return "Failed to start the work order";
+    return "Failed to start the task";
   }
   if (footer.kind === "running" && footer.run) {
     return "Failed to stop the run";
   }
-  return "Failed to close work order";
+  return "Failed to close task";
 }
 
-export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+function useSplitRunCancelRun(organizationId?: string, factoryId?: string, orderId?: string) {
   const queryClient = useQueryClient();
-  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
-  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
-  const live = Boolean(organizationId && factoryId && orderId);
-  const cancelRun = useMutation({
+  return useMutation({
     mutationFn: async (run: SplitRunStopRun) => {
       await canvasesCancelRun(
         withOrganizationHeader({
@@ -76,30 +79,39 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       if (!organizationId || !factoryId) {
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
-      if (orderId) {
-        await queryClient.invalidateQueries({
-          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
-        });
-      }
+      invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
     },
   });
+}
+
+export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
+  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
+  const live = Boolean(organizationId && factoryId && orderId);
+  const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
 
   const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 
-  const handleReject = useCallback(async () => {
-    if (!live || !orderId || busy) {
-      return false;
-    }
-    try {
-      await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
-      showSuccessToast(rejectToast());
-      return true;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
-      return false;
-    }
-  }, [busy, closeWorkOrder, live, orderId]);
+  const closeAsRejected = useCallback(
+    async (copy: RejectedCloseCopy) => {
+      if (!live || !orderId || busy) {
+        return false;
+      }
+      try {
+        await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
+        showSuccessToast(copy.success);
+        return true;
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, copy.error));
+        return false;
+      }
+    },
+    [busy, closeWorkOrder, live, orderId],
+  );
+
+  const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
+  const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
@@ -123,7 +135,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
           onRerun: async (rerunChoice) => {
             const lineName = footer.lineName?.trim();
             if (!lineName) {
-              throw new Error("A factory line is required to rerun this work order");
+              throw new Error("A factory line is required to rerun this task");
             }
             await dispatchWorkOrder.mutateAsync({
               orderId,
@@ -160,6 +172,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     handleStop,
     handleStopAutomation,
     handleReject,
+    handleArchive,
     busy,
   };
 }

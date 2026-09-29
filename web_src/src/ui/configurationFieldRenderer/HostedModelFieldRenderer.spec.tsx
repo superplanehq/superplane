@@ -1,28 +1,117 @@
-import { render, screen } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
-import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 
-vi.mock("@/hooks/useHostedLLMModels", () => ({
-  useHostedLLMModels: vi.fn(),
+const useCanvasMock = vi.hoisted(() =>
+  vi.fn((): { data: { metadata?: { factoryId?: string } } | undefined; isPending: boolean } => ({
+    data: undefined,
+    isPending: false,
+  })),
+);
+
+vi.mock("@/hooks/useSelectableLLMModels", () => ({
+  useSelectableLLMModels: vi.fn(),
 }));
 
-function createField(): ConfigurationField {
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: vi.fn(),
+}));
+
+vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: useCanvasMock,
+}));
+
+function createField(provider = "anthropic"): ConfigurationField {
   return {
     name: "model",
     label: "Model",
     type: "hosted-model",
-    placeholder: "sonnet",
-    typeOptions: { hostedModel: { provider: "anthropic" } },
+    placeholder: "Select a model",
+    typeOptions: { hostedModel: { provider } },
   };
 }
 
-function mockHostedModels(value: {
-  data: { enabled: boolean; models: Array<{ id: string; name: string }> };
+function createSuperPlaneField(): ConfigurationField {
+  return {
+    name: "model",
+    label: "Model",
+    type: "hosted-model",
+    placeholder: "Instance SuperPlane agent model",
+    typeOptions: { hostedModel: { provider: "all" } },
+  };
+}
+
+function mockSelectableModels(
+  data: Array<{
+    source: { id: string; name: string };
+    provider: { id: string; name: string };
+    model: { id: string; name: string };
+    key: string;
+    label: string;
+  }>,
+  options: { isLoading?: boolean; isError?: boolean } = {},
+) {
+  vi.mocked(useSelectableLLMModels).mockImplementation((_organizationId, queryOptions) => {
+    const sources = queryOptions?.sources;
+    const listed = sources ? data.filter((item) => sources.includes(item.source.id as "hosted" | "byok")) : data;
+    return {
+      data: listed,
+      isLoading: options.isLoading ?? false,
+      isError: options.isError ?? false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>;
+  });
+}
+
+function selectableModel(
+  source: "hosted" | "byok",
+  provider: string,
+  id: string,
+): {
+  source: { id: string; name: string };
+  provider: { id: string; name: string };
+  model: { id: string; name: string };
+  key: string;
+  label: string;
+} {
+  const label = provider === "openrouter" ? id : `${provider}/${id}`;
+  return {
+    source: { id: source, name: source === "hosted" ? "SuperPlane" : "Your keys" },
+    provider: { id: provider, name: provider },
+    model: { id, name: id },
+    key: `${source}::${provider}::${id}`,
+    label,
+  };
+}
+
+function mockWorkspaceUsage(value: {
+  data: { defaultHostedProvider?: string; defaultHostedModel?: string };
   isLoading: boolean;
 }) {
-  vi.mocked(useHostedLLMModels).mockReturnValue(value as unknown as ReturnType<typeof useHostedLLMModels>);
+  vi.mocked(useOrganizationWorkspaceUsage).mockReturnValue(
+    value as unknown as ReturnType<typeof useOrganizationWorkspaceUsage>,
+  );
+}
+
+async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, parentTestId: string, optionName: string) {
+  await user.hover(screen.getByTestId(parentTestId));
+  fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
+}
+
+function renderField(ui: ReactElement, path = "/") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/:organizationId/apps/:appId" element={ui} />
+        <Route path="*" element={ui} />
+      </Routes>
+    </MemoryRouter>,
+  );
 }
 
 describe("HostedModelFieldRenderer", () => {
@@ -34,65 +123,293 @@ describe("HostedModelFieldRenderer", () => {
   });
 
   beforeEach(() => {
-    mockHostedModels({
-      data: {
-        enabled: true,
-        models: [{ id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" }],
-      },
+    useCanvasMock.mockReset();
+    useCanvasMock.mockReturnValue({ data: undefined, isPending: false });
+    mockSelectableModels([
+      selectableModel("byok", "anthropic", "claude-sonnet-4-6"),
+      selectableModel("byok", "openai", "gpt-5"),
+      selectableModel("byok", "openrouter", "moonshotai/kimi-k2.6"),
+      selectableModel("hosted", "anthropic", "claude-sonnet-4-6"),
+      selectableModel("hosted", "openai", "gpt-5"),
+      selectableModel("hosted", "openrouter", "moonshotai/kimi-k2.6"),
+    ]);
+    mockWorkspaceUsage({
+      data: { defaultHostedProvider: "anthropic", defaultHostedModel: "claude-sonnet-4-6" },
       isLoading: false,
     });
   });
 
-  it("shows a free-text model field for secret credentials", () => {
-    render(
-      <HostedModelFieldRenderer
-        field={createField()}
-        value="sonnet"
-        onChange={vi.fn()}
-        organizationId="org-1"
-        allValues={{ credentials: { source: "secret" } }}
-      />,
-    );
+  it("shows organization BYOK models for a provider runner without waiting for credentials", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
 
-    expect(screen.getByDisplayValue("sonnet")).toBeInTheDocument();
-    expect(useHostedLLMModels).not.toHaveBeenCalled();
-  });
+    renderField(<HostedModelFieldRenderer field={createField()} value="" onChange={onChange} organizationId="org-1" />);
 
-  it("shows the SuperPlane-hosted allowlist when credentials are hosted", () => {
-    render(
-      <HostedModelFieldRenderer
-        field={createField()}
-        value="claude-sonnet-4-6"
-        onChange={vi.fn()}
-        organizationId="org-1"
-        allValues={{ credentials: { source: "hosted" } }}
-      />,
-    );
-
-    expect(screen.getByTestId("field-model-hosted-model")).toBeInTheDocument();
-    expect(useHostedLLMModels).toHaveBeenCalledWith("org-1", "anthropic", true);
-  });
-
-  it("explains when SuperPlane-hosted models are not configured", () => {
-    mockHostedModels({
-      data: { enabled: false, models: [] },
-      isLoading: false,
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: undefined,
+      sources: ["byok"],
+      enabled: true,
     });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 
-    render(
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    expect(screen.getByTestId("field-model-hosted-model-list")).toHaveTextContent("Model");
+    expect(screen.getByTestId("field-model-hosted-thinking")).toHaveTextContent("Thinking");
+    expect(screen.queryByRole("menuitem", { name: "openai/gpt-5" })).not.toBeInTheDocument();
+
+    await selectFlyoutOption(user, "field-model-hosted-model-list", "sonnet 4-6");
+    expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
+  });
+
+  it("shows the allowlisted Claude model for an alias without saving it", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer field={createField()} value="opus" onChange={onChange} organizationId="org-1" />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "opus 5-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "opus" })).not.toBeInTheDocument();
+  });
+
+  it("explains when organization BYOK models cannot load", () => {
+    mockSelectableModels([], { isError: true });
+
+    renderField(<HostedModelFieldRenderer field={createField()} value="" onChange={vi.fn()} organizationId="org-1" />);
+
+    expect(screen.getByText("Unable to load models. Try again.")).toBeInTheDocument();
+  });
+
+  it("explains when no organization BYOK models are selected", () => {
+    mockSelectableModels([]);
+
+    renderField(<HostedModelFieldRenderer field={createField()} value="" onChange={vi.fn()} organizationId="org-1" />);
+
+    expect(
+      screen.getByText(
+        "No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on Integrations.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("waits for the canvas factory before it loads organization BYOK models", () => {
+    useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
+
+    renderField(
+      <HostedModelFieldRenderer field={createField()} value="" onChange={vi.fn()} organizationId="org-1" />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(screen.getByText("Loading models...")).toBeInTheDocument();
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: undefined,
+      sources: ["byok"],
+      enabled: false,
+    });
+  });
+
+  it("uses an explicit factory when the route has no canvas", () => {
+    useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
+
+    renderField(
       <HostedModelFieldRenderer
         field={createField()}
         value=""
         onChange={vi.fn()}
         organizationId="org-1"
-        allValues={{ credentials: { source: "hosted" } }}
+        factoryId="factory-9"
+      />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(screen.queryByText("Loading models...")).not.toBeInTheDocument();
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: "factory-9",
+      sources: ["byok"],
+      enabled: true,
+    });
+  });
+
+  it("loads organization BYOK models for the canvas factory", () => {
+    useCanvasMock.mockReturnValue({ data: { metadata: { factoryId: "factory-1" } }, isPending: false });
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        organizationId="org-1"
+      />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toBeInTheDocument();
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: "factory-1",
+      sources: ["byok"],
+      enabled: true,
+    });
+  });
+
+  it("lists every allowlisted SuperPlane model as provider/model", async () => {
+    const user = userEvent.setup();
+
+    renderField(
+      <HostedModelFieldRenderer field={createSuperPlaneField()} value="" onChange={vi.fn()} organizationId="org-1" />,
+    );
+
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: undefined,
+      sources: ["hosted"],
+      enabled: true,
+    });
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "anthropic/claude-sonnet-4-6" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "openai/gpt-5" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "moonshotai/kimi-k2.6" })).toBeInTheDocument();
+  });
+
+  it("selects the instance SuperPlane agent model by default", () => {
+    mockWorkspaceUsage({
+      data: { defaultHostedProvider: "openai", defaultHostedModel: "gpt-5" },
+      isLoading: false,
+    });
+
+    const onChange = vi.fn();
+    renderField(
+      <HostedModelFieldRenderer field={createSuperPlaneField()} value="" onChange={onChange} organizationId="org-1" />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("openai/gpt-5");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("loads the hosted union list for the SuperPlane node factory", () => {
+    useCanvasMock.mockReturnValue({ data: { metadata: { factoryId: "factory-1" } }, isPending: false });
+
+    renderField(
+      <HostedModelFieldRenderer field={createSuperPlaneField()} value="" onChange={vi.fn()} organizationId="org-1" />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: "factory-1",
+      sources: ["hosted"],
+      enabled: true,
+    });
+  });
+
+  it("keeps an unset SuperPlane model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createSuperPlaneField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
       />,
     );
 
-    expect(
-      screen.getByText(
-        "SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and allowlist.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+    expect(screen.getByTestId("field-model-hosted-model-list")).toBeInTheDocument();
+  });
+
+  it("saves the displayed model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="opus"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "opus" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-opus-5-5", thinkingLevel: "high" });
+  });
+
+  it("keeps an empty BYOK model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
+  it("writes thinkingLevel next to the model", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });
+  });
+
+  it("clears thinkingLevel when Default is selected", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6", thinkingLevel: "high" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "Default");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
   });
 });

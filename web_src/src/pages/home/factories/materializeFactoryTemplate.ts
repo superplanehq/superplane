@@ -13,6 +13,10 @@ export const FACTORY_CANVAS_ID_PLACEHOLDER = "__FACTORY_CANVAS_ID__";
  */
 export function normalizeFactoryInstallParams(params: Record<string, string>): Record<string, string> {
   const next = { ...params };
+  if (!next.defaultBranch?.trim()) {
+    next.defaultBranch = "main";
+  }
+
   const legacyRepository = next.repository?.trim();
   if (!legacyRepository) return next;
 
@@ -109,13 +113,24 @@ export function wireFactoryIntegrations(
 
 const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
 const PLANNING_AGENT_NODE_ID = "planner-agent-no-issue";
-const PLANNING_AGENT_MODEL = "opus";
 
 export type FactoryAgentRewrite = {
   component: string;
   model: string;
-  credentials: { source: "hosted" } | { source: "integration"; name: string };
+  planningModel?: string;
+  credentials?: { source: "integration"; name: string };
 };
+
+export function factoryAppTemplateAgentFromRewrite(rewrite: FactoryAgentRewrite) {
+  const credentials = rewrite.credentials;
+  return {
+    component: rewrite.component,
+    model: rewrite.model,
+    planningModel: rewrite.planningModel,
+    credentialSource: credentials?.source ?? (rewrite.component === "runnerSuperPlane" ? "hosted" : undefined),
+    credentialIntegrationName: credentials?.source === "integration" ? credentials.name : undefined,
+  };
+}
 
 function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
   for (const node of doc.spec?.nodes ?? []) {
@@ -123,9 +138,13 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
     node.component = rewrite.component;
     const configuration = node.configuration;
     if (!configuration || typeof configuration !== "object") continue;
-    if (rewrite.credentials.source === "hosted") {
-      configuration.credentials = { source: "hosted" };
-    } else {
+    if (rewrite.component === "runnerSuperPlane") {
+      delete configuration.credentials;
+      delete configuration.model;
+      delete configuration.maxTurns;
+      continue;
+    }
+    if (rewrite.credentials?.source === "integration") {
       configuration.credentials = {
         source: "integration",
         integration: { name: rewrite.credentials.name },
@@ -136,8 +155,8 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
 }
 
 function planningAgentModel(nodeId: string | undefined, rewrite: FactoryAgentRewrite): string {
-  if (nodeId === PLANNING_AGENT_NODE_ID && rewrite.component === CLAUDE_CODE_COMPONENT) {
-    return PLANNING_AGENT_MODEL;
+  if (nodeId === PLANNING_AGENT_NODE_ID) {
+    return rewrite.planningModel || rewrite.model;
   }
   return rewrite.model;
 }
@@ -150,6 +169,9 @@ export function materializeFactoryCanvas(args: {
   integrations: IntegrationSelections;
   agentRewrite?: FactoryAgentRewrite;
 }): string {
+  if (!args.definition.canvasYaml) {
+    throw new Error(`Factory template ${args.definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(args.definition.canvasYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: args.canvasId,
   });
@@ -180,6 +202,9 @@ export function materializeFactoryCanvas(args: {
 }
 
 export function materializeFactoryConsole(definition: FactoryDefinition, canvasName: string, canvasId: string): string {
+  if (!definition.consoleYaml) {
+    throw new Error(`Factory template ${definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(definition.consoleYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: canvasId,
   });

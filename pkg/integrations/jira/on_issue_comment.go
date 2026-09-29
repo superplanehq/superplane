@@ -1,7 +1,6 @@
 package jira
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -150,7 +149,8 @@ func (t *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		Events: []string{commentEventCreated, commentEventUpdated, commentEventDeleted},
+		Events:   []string{commentEventCreated, commentEventUpdated, commentEventDeleted},
+		Projects: []string{project.Key},
 	})
 }
 
@@ -173,39 +173,55 @@ func (t *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	payload := CommentWebhookPayload{}
-	if err := json.Unmarshal(ctx.Body, &payload); err != nil {
+	payloads, err := unmarshalWebhookPayloads[CommentWebhookPayload](ctx.Body)
+	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %w", err)
 	}
 
+	for i := range payloads {
+		status, emitErr := t.emitMatchingCommentEvent(ctx, config, metadata, payloads[i])
+		if emitErr != nil {
+			return status, nil, emitErr
+		}
+	}
+
+	return http.StatusOK, nil, nil
+}
+
+func (t *OnIssueComment) emitMatchingCommentEvent(
+	ctx core.WebhookRequestContext,
+	config OnIssueCommentConfiguration,
+	metadata OnIssueCommentMetadata,
+	payload CommentWebhookPayload,
+) (int, error) {
 	action, ok := commentEventAction(payload.WebhookEvent)
 	if !ok {
 		ctx.Logger.Infof("Ignoring event - unsupported webhookEvent %q", payload.WebhookEvent)
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	if !slices.Contains(config.Events, action) {
 		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	if payload.Comment == nil || payload.Issue == nil {
 		ctx.Logger.Info("Ignoring event - missing comment or issue")
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	if metadata.Project != nil && !strings.EqualFold(issueProjectKey(payload.Issue), metadata.Project.Key) {
 		ctx.Logger.Infof("Ignoring event - project does not match %q", metadata.Project.Key)
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	matched, err := matchesContentFilter(config.ContentFilter, payload.Comment.Body)
 	if err != nil {
-		return http.StatusBadRequest, nil, err
+		return http.StatusBadRequest, err
 	}
 	if !matched {
 		ctx.Logger.Info("Ignoring event - comment does not match the content filter")
-		return http.StatusOK, nil, nil
+		return http.StatusOK, nil
 	}
 
 	event := IssueCommentEvent{
@@ -213,12 +229,11 @@ func (t *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		Comment: payload.Comment,
 		Issue:   payload.Issue,
 	}
-
 	if err := ctx.Events.Emit(IssueCommentEventPayloadType, event); err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %w", err)
 	}
 
-	return http.StatusOK, nil, nil
+	return http.StatusOK, nil
 }
 
 func (t *OnIssueComment) Cleanup(ctx core.TriggerContext) error {

@@ -3,8 +3,9 @@ import type { FactoriesFactoryIntake } from "@/api-client";
 import { lineIntakeSourceForApiSource } from "./lineIntakeModel";
 
 export const BACKLOG_CREATE_COPY = {
-  createWorkOrder: "Create work order",
+  createWorkOrder: "Create task",
   createManually: "Create task manually",
+  createManuallyHint: "Write the title and details.",
   empty: "No matching items.",
   loading: "Loading items.",
   loadingMore: "Loading more items.",
@@ -15,6 +16,8 @@ const INTAKE_NAME_SINGULAR: [RegExp, string][] = [
   [/ issues$/i, " issue"],
   [/ exceptions$/i, " exception"],
   [/ incidents$/i, " incident"],
+  [/ tasks$/i, " task"],
+  [/ alerts$/i, " alert"],
 ];
 
 export function searchPlaceholderForIntake(name: string): string {
@@ -50,6 +53,7 @@ export interface BacklogIntakeSource {
   name: string;
   iconSrc?: string;
   iconAlt: string;
+  tabLabel: string;
 }
 
 export interface BacklogIntakeGroup extends BacklogIntakeSource {
@@ -88,6 +92,7 @@ function sourceFromIntake(
     name,
     iconSrc: catalog?.iconSrcByIntakeId?.[intakeId] ?? known?.iconSrc,
     iconAlt: known?.iconAlt ?? name,
+    tabLabel: known?.tabLabel ?? name,
   };
 }
 

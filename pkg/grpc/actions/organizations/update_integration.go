@@ -33,9 +33,9 @@ func UpdateIntegration(
 	configuration map[string]any,
 	name string,
 ) (*pb.UpdateIntegrationResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+		return nil, err
 	}
 
 	ID, err := uuid.Parse(integrationID)

@@ -3,6 +3,7 @@
  */
 
 import type { ConfigurationField } from "../api-client";
+import { THINKING_LEVEL_KEY } from "./thinkingLevel";
 
 /**
  * Validates a cron expression
@@ -130,6 +131,10 @@ export function filterVisibleConfiguration(
     filtered[field.name] = filterFieldValueByVisibility(field, fieldValue);
   }
 
+  if (fields.some((field) => field.type === "hosted-model") && configuration[THINKING_LEVEL_KEY] !== undefined) {
+    filtered[THINKING_LEVEL_KEY] = configuration[THINKING_LEVEL_KEY];
+  }
+
   return filtered;
 }
 
@@ -216,69 +221,56 @@ export function validateFieldForSubmission(field: ConfigurationField, value: unk
  * Parses default values based on field type to match API expectations
  */
 export function parseDefaultValues(configurationFields: ConfigurationField[]): Record<string, unknown> {
-  return configurationFields
-    .map((field) => [field.name, field.defaultValue, field.type] as const)
-    .reduce(
-      (acc, [name, defaultValue, fieldType]) => {
-        if (name && defaultValue != null) {
-          // Parse defaultValue based on field type
-          let parsedValue: unknown = defaultValue;
+  const values: Record<string, unknown> = {};
+  for (const field of configurationFields) {
+    if (!field.name || field.defaultValue == null) {
+      continue;
+    }
+    values[field.name] = parseDefaultValue(field.type, field.defaultValue);
+  }
+  return values;
+}
 
-          if (typeof defaultValue === "string" && defaultValue !== "") {
-            switch (fieldType) {
-              case "number": {
-                const num = Number(defaultValue);
-                parsedValue = isNaN(num) ? parsedValue : num;
-                break;
-              }
-              case "boolean": {
-                parsedValue = defaultValue === "true";
-                break;
-              }
-              case "multi-select":
-              case "days-of-week":
-              case "list":
-              case "any-predicate-list": {
-                try {
-                  parsedValue = JSON.parse(defaultValue);
-                } catch {
-                  // If parsing fails, treat as single item array for multi-select
-                  if (fieldType === "multi-select") {
-                    parsedValue = [defaultValue];
-                  }
-                }
-                break;
-              }
-              case "object": {
-                try {
-                  parsedValue = JSON.parse(defaultValue);
-                } catch {
-                  // If parsing fails, keep as empty object
-                  parsedValue = {};
-                }
-                break;
-              }
-              case "timezone": {
-                if (defaultValue === "current") {
-                  const offset = -new Date().getTimezoneOffset() / 60;
-                  parsedValue = offset.toString();
-                } else {
-                  parsedValue = defaultValue;
-                }
-                break;
-              }
-              // For string, select, date, time, datetime, day-in-year, cron, url, integration, etc.
-              // keep as string
-              default:
-                parsedValue = defaultValue;
-                break;
-            }
-          }
+function parseDefaultValue(fieldType: string | undefined, defaultValue: unknown): unknown {
+  if (typeof defaultValue !== "string" || defaultValue === "") {
+    return defaultValue;
+  }
 
-          acc[name] = parsedValue;
+  switch (fieldType) {
+    case "number": {
+      const num = Number(defaultValue);
+      return isNaN(num) ? defaultValue : num;
+    }
+    case "boolean":
+      return defaultValue === "true";
+    case "multi-select":
+    case "days-of-week":
+    case "list":
+    case "any-predicate-list": {
+      try {
+        return JSON.parse(defaultValue);
+      } catch {
+        if (fieldType === "multi-select") {
+          return [defaultValue];
         }
-        return acc;
-      },
-      {} as Record<string, unknown>,
-    );
+        return defaultValue;
+      }
+    }
+    case "object": {
+      try {
+        return JSON.parse(defaultValue);
+      } catch {
+        return {};
+      }
+    }
+    case "timezone": {
+      if (defaultValue === "current") {
+        const offset = -new Date().getTimezoneOffset() / 60;
+        return offset.toString();
+      }
+      return defaultValue;
+    }
+    default:
+      return defaultValue;
+  }
 }

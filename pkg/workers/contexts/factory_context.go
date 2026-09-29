@@ -1,16 +1,30 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -24,11 +38,25 @@ type FactoryContext struct {
 	// recorded). Wired by the node executor via WithWorkOrderUpdated.
 	onWorkOrderUpdated func(factoryID, orderID, reason string)
 
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID)
+
 	// Optional notification fan-out callback: invoked with a fully built
 	// notification payload for mutations that should email work order
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onFileBindCleanup       func(FileBindCleanup)
+
+	encryptor crypto.Encryptor
+	registry  *registry.Registry
+	// remoteImageFetch, when set, copies remote images without a GitHub client.
+	remoteImageFetch storedfiles.FetchFunc
+	// readProductiveTaskFiles, when set, supplies Productive.io files without
+	// calling the Productive.io API.
+	readProductiveTaskFiles productiveFileRead
+	// readJiraIssueFiles, when set, supplies Jira files without calling the
+	// Jira API.
+	readJiraIssueFiles jiraFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -55,6 +83,13 @@ func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, 
 	return c
 }
 
+func (c *FactoryContext) WithGitHubPullRequestRecorded(
+	callback func(organizationID, factoryID, pullRequestID uuid.UUID),
+) *FactoryContext {
+	c.onGitHubPullRequestRecorded = callback
+	return c
+}
+
 func (c *FactoryContext) WithWorkOrderNotification(
 	callback func(messages.FactoryWorkOrderNotificationMessage),
 ) *FactoryContext {
@@ -62,33 +97,251 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	return c
 }
 
-func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
+// FileBindCleanup is blob deletion work that must run after the surrounding
+// database transaction commits. Apply it with ApplyFileBindCleanups.
+type FileBindCleanup struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Result         storedfiles.BindResult
+	BindErr        error
+}
+
+func (c *FactoryContext) WithFileBindCleanup(callback func(FileBindCleanup)) *FactoryContext {
+	c.onFileBindCleanup = callback
+	return c
+}
+
+func ApplyFileBindCleanups(jobs []FileBindCleanup, txErr error) {
+	for _, job := range jobs {
+		err := txErr
+		if err == nil {
+			err = job.BindErr
+		}
+		if delErr := storedfiles.ApplyBindResult(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			job.OrganizationID,
+			job.FactoryID,
+			job.Result,
+			err,
+		); delErr != nil {
+			log.WithError(delErr).Warn("Failed to delete file objects after bind")
+		}
+	}
+}
+
+func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
+	c.encryptor = encryptor
+	c.registry = registry
+	return c
+}
+
+func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *FactoryContext {
+	c.remoteImageFetch = fetch
+	return c
+}
+
+func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
-		return nil, errors.New("cannot create work order while executing another work order")
+		return nil, false, errors.New("cannot create work order while executing another work order")
 	}
 	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	if c.canvas.FactoryID == nil {
-		return nil, errors.New("app is not owned by a factory")
+		return nil, false, errors.New("app is not owned by a factory")
 	}
 
 	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+
+	skip, err := c.skipDuplicateSentryWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	skip, err = c.skipDuplicateJiraWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	skip, err = c.skipDuplicateProductiveWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	merged, err := c.mergeDependabotWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if merged {
+		return nil, false, nil
 	}
 
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	if err := c.prepareWorkOrderFiles(order); err != nil {
+		return nil, false, err
+	}
+	c.recordSentryWebhookTask(order)
+	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
-	return workOrderToCore(order), nil
+	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) skipDuplicateSentryWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	issueID, ok := sentry.IssueIDFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := sentry.LockIssueWorkOrder(c.tx, factoryModel, issueID); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := sentry.IssueHasWorkOrder(c.tx, factoryModel, issueID)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Sentry issue %s: work order already exists", issueID)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := jira.IssueRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := jira.LockIssueWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := jira.IssueHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Jira issue %s on %s: work order already exists", ref.Key, ref.Host)
+	}
+	return hasOrder, nil
+}
+
+func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := productive.TaskRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := productive.LockTaskWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	hasOrder, err := productive.TaskHasWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if hasOrder {
+		log.Infof("skipping Productive task %s in organization %s: work order already exists", ref.TaskID, ref.OrganizationID)
+	}
+	return hasOrder, nil
+}
+
+// mergeDependabotWorkOrder adds a Dependabot alert to the factory's open task
+// for the same package instead of opening a second task. GitHub raises one
+// alert per advisory per manifest, and one dependency update fixes them all.
+// It reports true when the alert was merged and no task must be created.
+func (c *FactoryContext) mergeDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghdependabot.LockPackageWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	order, err := ghdependabot.FindOpenPackageWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if order == nil {
+		return false, nil
+	}
+
+	section, ok := ghdependabot.AlertSectionFromEventData(event.Data.Data())
+	if !ok {
+		return true, nil
+	}
+	next := ghdependabot.MergeAlertSection(order.Description, section)
+	if next == order.Description {
+		log.Infof("skipping Dependabot alert for %s in %s: task %s already lists it", ref.Name, ref.Repository, order.ID)
+		return true, nil
+	}
+
+	if err := order.UpdateContent(c.tx, nil, &next); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("merged Dependabot alert for %s in %s into task %s", ref.Name, ref.Repository, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) createFactoryWorkOrder(
@@ -111,6 +364,26 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
 }
 
+func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := sentry.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendSentryWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Sentry webhook %s", order.ID, receiptID)
+	}
+}
+
 func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
 	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
 		return nil
@@ -121,7 +394,136 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 		return nil
 	}
 
+	// A Dependabot task collects every alert of one package, so its origin
+	// is the package's alerts page and not the first alert.
+	if ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data()); ok {
+		origin := ref.Origin()
+		return &origin
+	}
+
 	return models.OriginFromIntakeRootEvent(event)
+}
+
+func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) error {
+	c.ingestGitHubImages(order)
+	c.ingestProductiveFiles(order)
+	c.ingestJiraFiles(order)
+	return c.bindDescriptionFiles(order)
+}
+
+func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
+	if order == nil {
+		return
+	}
+	if len(blob.HTTPImageURLs(order.Description)) == 0 {
+		return
+	}
+	fetch := c.remoteImageFetcher()
+	if fetch == nil {
+		return
+	}
+	next, err := storedfiles.IngestRemoteImages(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		fetch,
+		blob.IsGitHubImageURL,
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		nil,
+		order.Description,
+	)
+	if err != nil || next.Markdown == order.Description {
+		return
+	}
+	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
+		_ = storedfiles.SweepObjects(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			order.OrganizationID,
+			order.FactoryID,
+			next.ObjectKeys,
+		)
+	}
+}
+
+func (c *FactoryContext) remoteImageFetcher() storedfiles.FetchFunc {
+	if c.remoteImageFetch != nil {
+		return c.remoteImageFetch
+	}
+	if c.registry == nil || c.encryptor == nil {
+		return nil
+	}
+	client := c.githubClientForCanvas()
+	if client == nil {
+		return nil
+	}
+	return func(ctx context.Context, req *http.Request) (*http.Response, error) {
+		return client.HTTPDo(req.WithContext(ctx))
+	}
+}
+
+func (c *FactoryContext) bindDescriptionFiles(order *models.FactoryWorkOrder) error {
+	if order == nil {
+		return nil
+	}
+	result, err := storedfiles.BindDescriptionFiles(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+	)
+	job := FileBindCleanup{
+		OrganizationID: order.OrganizationID,
+		FactoryID:      order.FactoryID,
+		Result:         result,
+		BindErr:        err,
+	}
+	if c.onFileBindCleanup != nil {
+		c.onFileBindCleanup(job)
+		return err
+	}
+	ApplyFileBindCleanups([]FileBindCleanup{job}, err)
+	return err
+}
+
+func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(c.tx, []uuid.UUID{c.canvas.ID})
+	if err != nil {
+		return nil
+	}
+	spec, ok := specs[c.canvas.ID]
+	if !ok {
+		return nil
+	}
+	for i := range spec.Nodes {
+		node := spec.Nodes[i]
+		if node.ComponentName() != "github.onIssue" || node.IntegrationID == nil {
+			continue
+		}
+		integrationID, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
+		if err != nil {
+			continue
+		}
+		integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, integrationID)
+		if err != nil || integration.State != models.IntegrationStateReady {
+			continue
+		}
+		client, err := githubcommon.NewClient(
+			NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
+			c.registry.HTTPContextInTransaction(c.tx),
+		)
+		if err != nil {
+			continue
+		}
+		return client
+	}
+	return nil
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
@@ -191,14 +593,6 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderCommentAdded,
-		ActorName:      c.automationName(),
-		CommentBody:    body,
-	})
 	return nil
 }
 
@@ -208,7 +602,7 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, err := order.CreateArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
 		Key:        params.Key,
@@ -219,30 +613,11 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
-	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
-		OrganizationID: order.OrganizationID.String(),
-		FactoryID:      order.FactoryID.String(),
-		OrderID:        order.ID.String(),
-		EventType:      factory.EventTypeOrderArtifactAdded,
-		ActorName:      c.automationName(),
-		ArtifactType:   artifact.Type,
-	})
-	return artifactToCore(artifact)
-}
-
-func (c *FactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	order, err := c.resolveWorkOrder(params.OrderID)
-	if err != nil {
-		return nil, err
+	if created {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+	} else {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
 	}
-
-	artifact, err := order.UpdateArtifactData(c.tx, params.Key, params.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
 	return artifactToCore(artifact)
 }
 
@@ -388,6 +763,16 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
+func (c *FactoryContext) notifyGitHubPullRequestRecorded(pullRequest *models.FactoryPullRequest) {
+	if c.onGitHubPullRequestRecorded == nil || pullRequest == nil {
+		return
+	}
+	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return
+	}
+	c.onGitHubPullRequestRecorded(pullRequest.OrganizationID, pullRequest.FactoryID, pullRequest.ID)
+}
+
 func (c *FactoryContext) notifyWorkOrderNotification(message messages.FactoryWorkOrderNotificationMessage) {
 	if c.onWorkOrderNotification == nil {
 		return
@@ -497,13 +882,340 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 }
 
 func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
-	return &core.WorkOrder{
+	item := &core.WorkOrder{
 		ID:          order.ID.String(),
 		Title:       order.Title,
 		Description: order.Description,
 		State:       order.State,
 		Result:      order.Result,
+		Number:      order.Number,
 	}
+	if origin := order.Origin(); origin != nil {
+		item.Origin = &core.WorkOrderOrigin{
+			URL:   origin.URL,
+			Label: origin.Label,
+		}
+	}
+	return item
+}
+
+func pullRequestToCore(pullRequest *models.FactoryPullRequest) *core.PullRequest {
+	item := &core.PullRequest{
+		ID:          pullRequest.ID.String(),
+		WorkOrderID: pullRequest.WorkOrderID.String(),
+		Provider:    pullRequest.Provider,
+		Repository:  pullRequest.Repository,
+		Number:      pullRequest.Number,
+		URL:         pullRequest.URL,
+		Title:       pullRequest.Title,
+		State:       pullRequest.State,
+	}
+	if pullRequest.ExternalID != nil {
+		item.ExternalID = *pullRequest.ExternalID
+	}
+	return item
+}
+
+func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest) (*core.PullRequestMatch, error) {
+	factoryModel, err := models.FindFactory(c.tx, pullRequest.OrganizationID, pullRequest.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	order, err := factoryModel.FindWorkOrder(c.tx, pullRequest.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+	workOrder := workOrderToCore(order)
+	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
+	return &core.PullRequestMatch{
+		PullRequest: pullRequestToCore(pullRequest),
+		WorkOrder:   workOrder,
+	}, nil
+}
+
+func (c *FactoryContext) currentFactory() (*models.Factory, error) {
+	if c.canvas.FactoryID == nil {
+		return nil, errors.New("app is not owned by a factory")
+	}
+	return models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+}
+
+func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	pullRequest, err := order.CreatePullRequest(c.tx, models.FactoryPullRequestParams{
+		Provider:   params.Provider,
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		Number:     params.Number,
+		URL:        params.URL,
+		Title:      params.Title,
+		State:      params.State,
+		MergedAt:   params.MergedAt,
+		ClosedAt:   params.ClosedAt,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderPullRequestAdded)
+	c.notifyGitHubPullRequestRecorded(pullRequest)
+	return pullRequestToCore(pullRequest), nil
+}
+
+func (c *FactoryContext) UpdatePullRequest(params core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := uuid.Parse(params.PullRequestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.PullRequestID, err)
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, models.FactoryPullRequestLookup{ID: id})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	if err := pullRequest.Update(c.tx, models.FactoryPullRequestPatch{
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		URL:        params.URL,
+		Title:      params.Title,
+		State:      params.State,
+		MergedAt:   params.MergedAt,
+		ClosedAt:   params.ClosedAt,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	}); err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, factory.EventTypeOrderPullRequestUpdated)
+	return pullRequestToCore(pullRequest), nil
+}
+
+func (c *FactoryContext) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	lookup := models.FactoryPullRequestLookup{
+		Provider:   params.Provider,
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		Number:     params.Number,
+		URL:        params.URL,
+	}
+	if params.ID != "" {
+		id, parseErr := uuid.Parse(params.ID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.ID, parseErr)
+		}
+		lookup.ID = id
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, lookup)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) || errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	return c.pullRequestMatch(pullRequest)
+}
+
+func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	if c.execution == nil {
+		return nil, errors.New("run is required to add pull request activity")
+	}
+
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := uuid.Parse(params.PullRequestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.PullRequestID, err)
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, models.FactoryPullRequestLookup{ID: id})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(c.tx, c.canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	access := params.Access
+	if access == "" && handler != nil && handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+		access = models.FactoryPullRequestAccessExclusive
+	}
+
+	var handlerID *uuid.UUID
+	if handler != nil {
+		handlerID = &handler.ID
+	}
+
+	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
+		RunID:             c.execution.RunID,
+		Title:             params.Title,
+		Description:       params.Description,
+		RevisionSHA:       params.Revision,
+		Access:            access,
+		FeedbackHandlerID: handlerID,
+	})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestActivityDuplicate) {
+			return nil, core.ErrPullRequestActivityAlreadyActive
+		}
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityAdded")
+	return c.activityResult(pullRequest, created.Activity, created.Revision, created.CurrentRevision, created.Outcome)
+}
+
+func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	if c.execution == nil {
+		return nil, errors.New("run is required to update pull request activity")
+	}
+
+	activity, err := models.FindPullRequestActivityByRunID(c.tx, c.execution.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	var pullRequest models.FactoryPullRequest
+	if err := c.tx.Where("id = ?", activity.PullRequestID).First(&pullRequest).Error; err != nil {
+		return nil, err
+	}
+
+	if params.Title != nil || params.Description != nil {
+		if err := activity.UpdateContent(c.tx, params.Title, params.Description); err != nil {
+			return nil, err
+		}
+	}
+
+	outcome := models.FactoryPullRequestActivityOutcomeReady
+	var currentRevision *models.FactoryPullRequestRevision
+	if params.Access == models.FactoryPullRequestAccessExclusive {
+		accessResult, accessErr := pullRequest.RequestExclusiveAccess(c.tx, activity)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		activity = accessResult.Activity
+		outcome = accessResult.Outcome
+		currentRevision = accessResult.CurrentRevision
+	} else {
+		outcome = activityOutcomeFromModel(activity)
+		if pullRequest.CurrentRevisionID != nil {
+			currentRevision, err = models.FindPullRequestRevision(c.tx, *pullRequest.CurrentRevisionID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	var revision *models.FactoryPullRequestRevision
+	if activity.RevisionID != nil {
+		revision, err = models.FindPullRequestRevision(c.tx, *activity.RevisionID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityUpdated")
+	return c.activityResult(&pullRequest, activity, revision, currentRevision, outcome)
+}
+
+func (c *FactoryContext) activityResult(
+	pullRequest *models.FactoryPullRequest,
+	activity *models.FactoryPullRequestRun,
+	revision *models.FactoryPullRequestRevision,
+	currentRevision *models.FactoryPullRequestRevision,
+	outcome models.FactoryPullRequestActivityOutcome,
+) (*core.PullRequestActivityResult, error) {
+	match, err := c.pullRequestMatch(pullRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &core.PullRequestActivityResult{
+		PullRequest: match.PullRequest,
+		WorkOrder:   match.WorkOrder,
+		Outcome:     coreActivityOutcome(outcome),
+	}
+	if activity != nil {
+		result.Activity = pullRequestActivityToCore(activity, revision)
+	}
+	if currentRevision != nil {
+		result.CurrentRevision = pullRequestRevisionToCore(currentRevision)
+		result.CurrentHeadSHA = currentRevision.SHA
+	}
+	return result, nil
+}
+
+func pullRequestActivityToCore(activity *models.FactoryPullRequestRun, revision *models.FactoryPullRequestRevision) *core.PullRequestActivity {
+	item := &core.PullRequestActivity{
+		Title:        activity.Title,
+		Description:  activity.Description,
+		Access:       activity.Access,
+		State:        activity.State,
+		Attempt:      activity.Attempt,
+		AttemptLimit: activity.AttemptLimit,
+	}
+	if revision != nil {
+		item.Revision = pullRequestRevisionToCore(revision)
+	}
+	return item
+}
+
+func pullRequestRevisionToCore(revision *models.FactoryPullRequestRevision) *core.PullRequestRevision {
+	return &core.PullRequestRevision{
+		SHA:        revision.SHA,
+		ObservedAt: revision.ObservedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+func coreActivityOutcome(outcome models.FactoryPullRequestActivityOutcome) string {
+	switch outcome {
+	case models.FactoryPullRequestActivityOutcomeWaiting:
+		return core.PullRequestActivityOutcomeWaiting
+	case models.FactoryPullRequestActivityOutcomeLimitReached:
+		return core.PullRequestActivityOutcomeLimitReached
+	default:
+		return core.PullRequestActivityOutcomeReady
+	}
+}
+
+func activityOutcomeFromModel(activity *models.FactoryPullRequestRun) models.FactoryPullRequestActivityOutcome {
+	switch activity.State {
+	case models.FactoryPullRequestActivityStateLimitReached:
+		return models.FactoryPullRequestActivityOutcomeLimitReached
+	}
+	if activity.Access == models.FactoryPullRequestAccessWaiting {
+		return models.FactoryPullRequestActivityOutcomeWaiting
+	}
+	return models.FactoryPullRequestActivityOutcomeReady
 }
 
 func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderArtifact, error) {

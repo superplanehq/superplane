@@ -20,9 +20,10 @@ var hostedLLMProviders = []string{
 }
 
 var (
-	ErrHostedLLMProviderNotFound = errors.New("hosted llm provider is not configured")
-	ErrHostedLLMProviderDisabled = errors.New("hosted llm provider is disabled")
-	ErrHostedLLMProviderNoKey    = errors.New("hosted llm provider has no API key")
+	ErrHostedLLMProviderNotFound        = errors.New("hosted llm provider is not configured")
+	ErrHostedLLMProviderDisabled        = errors.New("hosted llm provider is disabled")
+	ErrHostedLLMProviderNoKey           = errors.New("hosted llm provider has no API key")
+	ErrHostedLLMProviderNoManagementKey = errors.New("hosted llm provider has no provisioning API key")
 )
 
 // HostedLLMProvider is one SuperPlane-held provider key and model allowlist.
@@ -31,6 +32,7 @@ type HostedLLMProvider struct {
 	Provider      string
 	Enabled       bool
 	APIKey        []byte
+	ManagementKey []byte
 	BaseURL       string
 	AllowedModels datatypes.JSONSlice[string]
 	CreatedAt     time.Time
@@ -43,6 +45,10 @@ func (HostedLLMProvider) TableName() string {
 
 func (p HostedLLMProvider) HasAPIKey() bool {
 	return len(p.APIKey) > 0
+}
+
+func (p HostedLLMProvider) HasManagementKey() bool {
+	return len(p.ManagementKey) > 0
 }
 
 func (p HostedLLMProvider) HasAllowedModel() bool {
@@ -152,6 +158,7 @@ func UpsertHostedLLMProvider(tx *gorm.DB, provider HostedLLMProvider) (*HostedLL
 		DoUpdates: clause.AssignmentColumns([]string{
 			"enabled",
 			"api_key",
+			"management_key",
 			"base_url",
 			"allowed_models",
 			"updated_at",

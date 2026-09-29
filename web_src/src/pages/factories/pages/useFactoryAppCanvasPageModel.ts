@@ -2,6 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { setFactoryAppSelectedRun } from "../lib/factoryAppSearchParamFlag";
 import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
@@ -67,8 +68,16 @@ export function useFactoryAppCanvasPageModel() {
   const handleConfigureBusyChange = useCallback((busy: boolean) => {
     setConfigureBusy(busy);
   }, []);
+  const setSearchParams = route.setSearchParams;
+  const handleSelectRun = useCallback(
+    (runId: string | null) => {
+      setSearchParams((current) => setFactoryAppSelectedRun(current, runId), { replace: true });
+    },
+    [setSearchParams],
+  );
   const editActions = useFactoryAppCanvasEditActions({
     organizationId: route.organizationId,
+    factoryId: route.factoryId,
     factoryKey: route.factoryKey,
     appId: route.appId,
     from: route.from,
@@ -78,7 +87,10 @@ export function useFactoryAppCanvasPageModel() {
     isConfigure: route.isConfigure,
     agentOpen: route.agentOpen,
     componentsOpen: route.componentsOpen,
-    setSearchParams: route.setSearchParams,
+    canvas: route.canvas,
+    canUpdateCanvas,
+    configureActionsRef,
+    setSearchParams,
     navigate,
   });
 
@@ -113,5 +125,6 @@ export function useFactoryAppCanvasPageModel() {
     agentOpen: route.agentOpen,
     componentsOpen: route.componentsOpen,
     ...editActions,
+    handleSelectRun,
   };
 }

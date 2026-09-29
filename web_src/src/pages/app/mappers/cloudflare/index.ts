@@ -1,8 +1,8 @@
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { ComponentBaseMapper, EventStateRegistry, ExecutionInfo, OutputPayload, TriggerRenderer } from "../types";
 import { defaultStateFunction } from "../stateRegistry";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { onLoadBalancingHealthAlertTriggerRenderer } from "./on_load_balancing_health_alert";
 import { createMonitorMapper } from "./create_monitor";
 import { deleteMonitorMapper } from "./delete_monitor";

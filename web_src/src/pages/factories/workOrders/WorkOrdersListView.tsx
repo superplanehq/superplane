@@ -2,7 +2,7 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Link } from "react-router";
-import { factoryHomePath } from "../lib/factoryPagePaths";
+import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import { groupWorkOrderEntriesByLane, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import { WORK_ORDER_BOARD_LANES, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
@@ -15,7 +15,7 @@ interface WorkOrdersListViewProps {
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
-  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
@@ -70,7 +70,7 @@ function ListRow({
   onAssigneesSave,
 }: WorkOrdersListViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
+  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article

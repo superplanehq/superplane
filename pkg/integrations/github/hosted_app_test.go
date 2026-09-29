@@ -44,6 +44,26 @@ func Test__UseHostedInstall(t *testing.T) {
 	assert.False(t, UseHostedInstall(orgID, "slack"))
 }
 
+func Test__WantsPrivateApp(t *testing.T) {
+	assert.False(t, WantsPrivateApp("github", nil))
+	assert.False(t, WantsPrivateApp("github", map[string]any{}))
+	assert.False(t, WantsPrivateApp("github", map[string]any{"privateApp": false}))
+	assert.False(t, WantsPrivateApp("slack", map[string]any{"privateApp": true}))
+	assert.True(t, WantsPrivateApp("github", map[string]any{"privateApp": true}))
+}
+
+func Test__PreferHostedInstall(t *testing.T) {
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	orgID := "11111111-1111-1111-1111-111111111111"
+	assert.True(t, PreferHostedInstall(orgID, "github", nil))
+	assert.True(t, PreferHostedInstall(orgID, "github", map[string]any{}))
+	assert.False(t, PreferHostedInstall(orgID, "github", map[string]any{"privateApp": true}))
+	assert.False(t, PreferHostedInstall(orgID, "slack", nil))
+}
+
 func setHostedAppEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(common.EnvGitHubAppID, "99")

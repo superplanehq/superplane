@@ -1,4 +1,7 @@
 import type { ConfigurationField } from "@/api-client";
+import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
+
+const SUPERPLANE_AGENT_COMPONENT = "runnerSuperPlane";
 
 const select = (options: Array<{ label: string; value: string }>) => ({
   select: { options },
@@ -67,16 +70,6 @@ const environmentVariableSchema: ConfigurationField[] = [
     visibilityConditions: [{ field: "valueSource", values: ["secret"] }],
     requiredConditions: [{ field: "valueSource", values: ["secret"] }],
   },
-];
-
-export const PLANNING_REVIEW_ENVIRONMENT_MODEL_FIELDS = ["machineType", "model"];
-
-export const PLANNING_REVIEW_ADVANCED_FIELD_NAMES = [
-  "workingDirectory",
-  "credentials",
-  "environmentFrom",
-  "environment",
-  "executionTimeoutSeconds",
 ];
 
 export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
@@ -165,3 +158,36 @@ export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
     typeOptions: { number: { min: 0, max: 86_400 } },
   },
 ];
+
+const CLAUDE_MODEL_FIELD = PLANNING_REVIEW_RUNNER_FIELDS.find((field) => field.name === "model");
+
+/** Same field Run SuperPlane Agent uses on the automation canvas. */
+const SUPERPLANE_AGENT_MODEL_FIELD: ConfigurationField = {
+  name: "model",
+  label: "Model",
+  type: "hosted-model",
+  required: false,
+  description:
+    "Select a SuperPlane-hosted model. The instance SuperPlane agent model is used when you do not select one.",
+  placeholder: "Instance SuperPlane agent model",
+  typeOptions: { hostedModel: { provider: HOSTED_MODEL_ALL_PROVIDERS } },
+};
+
+function withModelUsedLabel(field: ConfigurationField): ConfigurationField {
+  return { ...field, label: "Model used", description: "" };
+}
+
+/** Model picker for the agent editor. SuperPlane agents use the hosted allowlist. */
+export function planningReviewModelUsedField(
+  componentName: string | undefined,
+  catalogFields?: ConfigurationField[],
+): ConfigurationField | undefined {
+  const catalogModel = catalogFields?.find((field) => field.name === "model");
+  if (catalogModel) {
+    return withModelUsedLabel(catalogModel);
+  }
+  if (componentName === SUPERPLANE_AGENT_COMPONENT) {
+    return withModelUsedLabel(SUPERPLANE_AGENT_MODEL_FIELD);
+  }
+  return CLAUDE_MODEL_FIELD ? withModelUsedLabel(CLAUDE_MODEL_FIELD) : undefined;
+}

@@ -14,18 +14,18 @@ import (
 )
 
 func TestAPIKeys(t *testing.T) {
-	t.Run("creating an API key with viewer role", func(t *testing.T) {
+	t.Run("creating an API key with operator role", func(t *testing.T) {
 		steps := &apiKeySteps{t: t}
 		steps.start()
 		steps.visitAPIKeysPage()
 		steps.clickCreateAPIKey()
 		steps.fillName("ci-deploy-bot")
 		steps.fillDescription("Deploys from CI")
-		steps.selectRole("Viewer")
+		steps.selectRole("Operator")
 		steps.submitCreate()
 		steps.assertTokenDisplayed()
 		steps.dismissTokenModal()
-		steps.assertAPIKeySavedInDB("ci-deploy-bot", "Deploys from CI", models.RoleOrgViewer)
+		steps.assertAPIKeySavedInDB("ci-deploy-bot", "Deploys from CI", models.RoleOrgOperator)
 	})
 
 	t.Run("creating an API key with admin role", func(t *testing.T) {
@@ -95,14 +95,14 @@ func TestAPIKeys(t *testing.T) {
 		steps.assertTokenDisplayed()
 	})
 
-	t.Run("viewer cannot create or manage API keys", func(t *testing.T) {
+	t.Run("operator cannot create or manage API keys", func(t *testing.T) {
 		steps := &apiKeySteps{t: t}
 		steps.start()
-		steps.givenAPIKeyExists("viewer-test-bot", "Viewer RBAC test")
-		steps.loginAsViewer()
+		steps.givenAPIKeyExists("operator-test-bot", "Operator RBAC test")
+		steps.loginAsOperator()
 		steps.visitAPIKeysPage()
 		steps.assertCreateButtonDisabled()
-		steps.clickAPIKeyLink("viewer-test-bot")
+		steps.clickAPIKeyLink("operator-test-bot")
 		steps.assertEditButtonDisabled()
 		steps.assertDeleteButtonDisabled()
 	})
@@ -316,21 +316,21 @@ func (s *apiKeySteps) clickRegenerateToken() {
 	s.session.Sleep(1000)
 }
 
-func (s *apiKeySteps) loginAsViewer() {
-	viewerEmail := support.RandomName("viewer") + "@superplane.local"
-	viewerAccount, err := models.CreateAccount("Viewer User", viewerEmail)
+func (s *apiKeySteps) loginAsOperator() {
+	operatorEmail := support.RandomName("operator") + "@superplane.local"
+	operatorAccount, err := models.CreateAccount("Operator User", operatorEmail)
 	require.NoError(s.t, err)
 
-	viewerUser, err := models.CreateUser(s.session.OrgID, viewerAccount.ID, viewerEmail, "Viewer User")
+	operatorUser, err := models.CreateUser(s.session.OrgID, operatorAccount.ID, operatorEmail, "Operator User")
 	require.NoError(s.t, err)
 
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	err = authService.AssignRole(viewerUser.ID.String(), models.RoleOrgViewer, s.session.OrgID.String(), models.DomainTypeOrganization)
+	err = authService.AssignRole(operatorUser.ID.String(), models.RoleOrgOperator, s.session.OrgID.String(), models.DomainTypeOrganization)
 	require.NoError(s.t, err)
 
-	s.session.Account = viewerAccount
+	s.session.Account = operatorAccount
 	s.session.Login()
 }
 

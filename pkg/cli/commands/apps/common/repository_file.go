@@ -16,13 +16,18 @@ const (
 	ConsoleYAMLRepositoryPath = "console.yaml"
 )
 
+func IsRepositorySpecFilePath(path string) bool {
+	normalized := NormalizeRepositoryPath(path)
+	return normalized == CanvasYAMLRepositoryPath || normalized == ConsoleYAMLRepositoryPath
+}
+
 func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID string) ([]byte, error) {
 	config := ctx.API.GetConfig()
 	if config == nil {
 		return nil, fmt.Errorf("api client config is required")
 	}
 
-	baseURL, err := config.ServerURLWithContext(ctx.Context, "CanvasRepositoryAPIService.CanvasesListCanvasRepositoryFiles")
+	baseURL, err := config.ServerURLWithContext(ctx.Context, "CanvasAPIService.CanvasesDescribeCanvas")
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +42,7 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 	}
 
 	endpoint := fmt.Sprintf(
-		"%s/api/v1/canvases/%s/repository/file?%s",
+		"%s/api/v1/canvases/%s/file?%s",
 		strings.TrimRight(baseURL, "/"),
 		url.PathEscape(canvasID),
 		values.Encode(),

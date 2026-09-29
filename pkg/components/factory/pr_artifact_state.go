@@ -21,8 +21,7 @@ type prArtifactLifecycleFieldOptions struct {
 }
 
 // prArtifactLifecycleFields is the shared state / merged / draft trio used
-// by addWorkOrderArtifact and updateWorkOrderArtifact so the two configs
-// cannot drift.
+// by addPullRequest and updatePullRequest so the two configs cannot drift.
 func prArtifactLifecycleFields(opts prArtifactLifecycleFieldOptions) []configuration.Field {
 	return []configuration.Field{
 		{

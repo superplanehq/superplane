@@ -53,7 +53,7 @@ func (o *OpenAI) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
-			Description: "Organization admin API key (sk-admin-...). Required for fetching usage data.",
+			Description: "Organization admin API key (sk-admin-...). Add it to track your OpenAI usage and costs.",
 		},
 		{
 			Name:        "baseURL",
@@ -87,7 +87,7 @@ Create an [OpenAI API key](https://platform.openai.com/api-keys) and copy it.
 
 ## Admin API Key (optional)
 
-Only required for the **Get Usage Data** component.
+Add this key to track your OpenAI usage and costs with the **Get Usage Data** component.
 
 Create an [Admin API key](https://platform.openai.com/settings/organization/admin-keys) and copy it (starts with ` + "`sk-admin-`" + `).
 
@@ -100,7 +100,7 @@ Unrestricted project keys work by default. If you use a restricted key, grant it
 
 - **Model capabilities** → **Request** — required for Text Prompt.
 - **Responses API** → **Write** — required for Text Prompt.
-- **Files** → **Write** — required when you attach files to Text Prompt.
+- **Files** → **Write** — required when Code Interpreter generates files that SuperPlane downloads.
 
 > **Note:** Both keys are shown only once — store them somewhere safe before continuing.`
 }

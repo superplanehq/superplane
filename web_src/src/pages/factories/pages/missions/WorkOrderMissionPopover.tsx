@@ -57,7 +57,7 @@ export function WorkOrderMissionPopover({
       <PopoverContent align={align} className="w-80 p-3" sideOffset={8}>
         <div className="space-y-3">
           {missions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Add a mission before you assign work orders.</p>
+            <p className="text-sm text-muted-foreground">Add a mission before you assign tasks.</p>
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="work-order-mission-select" className="text-xs">

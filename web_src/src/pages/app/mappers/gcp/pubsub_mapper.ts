@@ -9,7 +9,7 @@ import type {
 } from "../types";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import type { MetadataItem } from "@/ui/metadataList";
@@ -156,7 +156,7 @@ function formatSubscriptionType(value: string): string {
 }
 
 function pubsubMetadataList(node: NodeInfo): MetadataItem[] {
-  const config = (node.configuration as Record<string, any> | undefined) ?? {};
+  const config = (node.configuration as Record<string, unknown> | undefined) ?? {};
   const metadata: MetadataItem[] = [];
 
   const topic = config.topic || config.topicId;

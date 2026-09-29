@@ -1,15 +1,26 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+} from "@/api-client";
+import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -19,6 +30,7 @@ import {
 import { WorkOrdersHeader } from "./header/WorkOrdersHeader";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
+import { WorkOrderClosedStatusDialog } from "./WorkOrderClosedStatusDialog";
 
 interface WorkOrdersLoadedViewProps {
   organizationId: string;
@@ -26,6 +38,7 @@ interface WorkOrdersLoadedViewProps {
   factory: FactoriesFactory;
   factoryLines: FactoriesFactoryLine[];
   workOrders: FactoriesWorkOrder[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
@@ -33,31 +46,49 @@ interface WorkOrdersLoadedViewProps {
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
-  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  hostedCreditHeaderKicker?: ReactNode;
+  brokenIntegrationsBanner?: ReactNode;
 }
 
 /**
- * Data-agnostic Work Orders view. Receives raw work orders + the shared
+ * Data-agnostic Tasks view. Receives raw tasks + the shared
  * `WorkOrderListState` and renders the toolbar + selected layout. Kept
  * separate from `WorkOrdersPage` so stories can drive it with fixtures
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId } = props;
+  const { organizationId, workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    checksPassedLabels,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
+  const { data: factoryIntakes } = useFactoryIntakes(organizationId, factory.id ?? "");
+  const intakes = factoryIntakes ?? [];
+  const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
     [entries, state.scope, currentUserId],
   );
-  const filtered = useMemo(() => applyWorkOrderFilters(scoped, state.filters), [scoped, state.filters]);
+  const filtered = useMemo(
+    () => applyWorkOrderFilters(scoped, state.filters, { showPullRequestMerge }),
+    [scoped, state.filters, showPullRequestMerge],
+  );
   const searched = useMemo(() => applyWorkOrderSearch(filtered, state.search), [filtered, state.search]);
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
   const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
@@ -71,7 +102,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       );
     }
     if (ordered.length === 0) {
-      if (state.scope !== "all" && state.filterCount === 0 && state.search.trim().length === 0) {
+      if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
             scopeLabel={state.scope === "my" ? "your work" : "active work"}
@@ -96,7 +127,19 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
     };
 
     if (state.layout === "board") {
-      return <WorkOrdersBoardView {...sharedProps} />;
+      return (
+        <WorkOrdersBoardView
+          {...sharedProps}
+          factoryId={factory.id}
+          addressingFeedbackOrderIds={addressingFeedbackOrderIds}
+          addressingFeedbackLabels={addressingFeedbackLabels}
+          waitingOnChecksOrderIds={waitingOnChecksOrderIds}
+          checksPassedOrderIds={checksPassedOrderIds}
+          checksPassedLabels={checksPassedLabels}
+          fixesPausedOrderIds={fixesPausedOrderIds}
+          pullRequests={pullRequests}
+        />
+      );
     }
     if (state.layout === "list") {
       return <WorkOrdersListView {...sharedProps} />;
@@ -111,13 +154,32 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           state={state}
           entries={entries}
           factoryLines={props.factoryLines}
+          intakes={intakes}
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
+          hostedCreditHeaderKicker={props.hostedCreditHeaderKicker}
+          brokenIntegrationsBanner={props.brokenIntegrationsBanner}
+          showPullRequestMerge={showPullRequestMerge}
+          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
         />
       </div>
 
       <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
+      {closedStatusDialogOpen && factory.id ? (
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId={organizationId}
+          factoryId={factory.id}
+          factoryKey={props.factoryKey}
+          canManage={props.canDispatch}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialogOpen(false);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,222 +1,343 @@
-import type { FactoriesFactoryIntakeRun, FactoryIntakeSettings } from "@/api-client";
-import { formatTimeAgo } from "@/lib/date";
+import type { FactoriesFactoryIntakeSettings } from "@/api-client";
 
-export type IntakeListenMode = "listen" | "schedule";
+import type { LineIntakeSourceId } from "./lineIntakeModel";
+
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
-export type IntakeSettingsTab = "general" | "runs" | "automation";
+export type IntakeSettingsTab = "general" | "agent" | "automation";
 
 export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
-  return value === "general" || value === "runs" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation";
 }
-export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
-export type IntakeLineStage = "implement" | "verify" | "done";
 
-export interface IntakeAutomationRun {
-  id: string;
-  appId?: string;
-  runId?: string;
-  title: string;
-  confidencePct: number;
-  ranMinutesAgo: number;
-  analyzedMinutesAgo: number;
-  placement: IntakeTicketPlacement;
-  stage?: IntakeLineStage;
-  activity?: string;
+export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
+  return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
 }
 
 export interface IntakeSourceSettings {
   name: string;
-  listenMode: IntakeListenMode;
   confidencePct: number;
   labelFilterMode: IntakeLabelFilterMode;
   labels: string[];
+  /** Show and apply the label chip list. Off means every issue matches. */
+  filterByLabel: boolean;
   assignment: IntakeAssignmentFilter;
+  /** Create a task when a GitHub issue is created. */
+  newIssues: boolean;
+  /** Create a task when a closed GitHub issue is re-opened. */
+  reopenedIssues: boolean;
+  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  superplaneLabelAdded: boolean;
+  authorsWithAccess: boolean;
+  /** Move the originating Jira issue when SuperPlane completes the task. */
+  jiraMoveOnComplete: boolean;
+  /** Jira status name to move the issue to. Empty means the Done column. */
+  jiraCompletionColumn: string;
+  /** Create a task when a Sentry issue is created. */
+  sentryNewIssues: boolean;
+  /** Create a task when a Sentry issue becomes unresolved. */
+  sentryRegressedIssues: boolean;
+  /** Create a task when a Sentry issue is assigned. */
+  sentryAssignedIssues: boolean;
+  /** Issue levels that still create a task. Empty means every level. */
+  sentryLevels: string[];
+  /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
+  excludeKeyTasks: boolean;
+  /** Productive.io task list ids that still create a task. Empty means every task list. */
+  taskListIds: string[];
+  /** Severities that still create a task. Empty means every severity. */
+  dependabotSeverities: string[];
+  /** Create a task when Datadog reports a Triggered Error Tracking alert. */
+  datadogTriggeredAlerts: boolean;
+  /** Create a task when Datadog reports a Re-Triggered Error Tracking alert. */
+  datadogRetriggeredAlerts: boolean;
+  /** Environments that still create a task. Empty means every environment. */
+  datadogEnvironments: string[];
+  /** Datadog service the trigger watches. Saved as the intake resource, not in settings. */
+  datadogService: string;
 }
-
-export const GITHUB_INTAKE_LABEL_OPTIONS = ["bug", "enhancement", "documentation", "good first issue"] as const;
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   name: "GitHub issues",
-  listenMode: "listen",
   confidencePct: 65,
   labelFilterMode: "include",
   labels: [],
+  filterByLabel: false,
   assignment: "any",
+  newIssues: true,
+  reopenedIssues: true,
+  superplaneLabelAdded: true,
+  authorsWithAccess: false,
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
+  sentryNewIssues: true,
+  sentryRegressedIssues: false,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
+  excludeKeyTasks: true,
+  taskListIds: [],
+  dependabotSeverities: [],
+  datadogTriggeredAlerts: true,
+  datadogRetriggeredAlerts: false,
+  datadogEnvironments: [],
+  datadogService: "",
 };
+
+export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
+
+export const DEPENDABOT_INTAKE_SEVERITIES = ["critical", "high", "medium", "low"] as const;
+
+export const DEPENDABOT_INTAKE_SETTINGS_COPY = {
+  severitySection: "Create a task for these severities:",
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+} as const;
+
+export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Sentry exceptions",
+  sentryNewIssues: true,
+  sentryRegressedIssues: false,
+  sentryAssignedIssues: false,
+  sentryLevels: [],
+};
+
+export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Productive tasks",
+  excludeKeyTasks: true,
+};
+
+export const DEFAULT_DATADOG_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Datadog errors",
+  datadogTriggeredAlerts: true,
+  datadogRetriggeredAlerts: false,
+  datadogEnvironments: [],
+};
+
+export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
+  jiraMoveOnComplete: true,
+  jiraCompletionColumn: "",
+} as const;
 
 export const INTAKE_SETTINGS_COPY = {
   title: "Intake GitHub issues",
   tabsLabel: "Intake settings",
   generalTab: "General",
+  agentTab: "Agent",
   automationTab: "Automation",
   editAutomation: "Edit automation",
   automationLoading: "The automation is loading.",
   automationEmpty: "This intake has no automation yet.",
   automationError: "SuperPlane could not load the automation.",
   retryAutomation: "Try again",
-  runsTab: "Runs",
-  runsEmpty: "No runs yet.",
-  runsLoading: "Runs are loading.",
-  runsError: "SuperPlane could not load the runs.",
-  retryRuns: "Try again",
-  runWhen: "Run",
-  analysisWhen: "Analysis",
-  scoreWhen: "Score",
-  viewRun: "View run",
-  viewRunFor: (title: string) => `View run for ${title}`,
-  inBacklog: "In Backlog",
-  backlogActivity: "Waiting for review.",
-  rejected: "Rejected",
-  rejectedActivity: "A person rejected this ticket.",
-  belowThreshold: "Not moved to Backlog",
-  belowThresholdActivity: "Score is below the minimum confidence.",
-  stageImplement: "Implement",
-  stageVerify: "Verify",
-  stageDone: "Done",
-  nameLabel: "Name",
-  nameHelper: "Shown in the Intake list.",
-  listenLabel: "When to analyze",
-  listenOption: "Listen for new issues",
-  listenHelper: "Analyze a GitHub issue when it is created.",
-  scheduleOption: "Run on a schedule",
-  scheduleHelper: "Scheduled intake is not available.",
-  confidenceLabel: "Minimum confidence",
-  confidenceHelper: "Move a ticket to Backlog when the score is this value or higher.",
+  intakeSection: "Create task when:",
   filtersLabel: "Filters",
-  labelsLabel: "Labels",
-  includeLabels: "Include these labels",
-  excludeLabels: "Exclude these labels",
-  labelsHelper: "Leave all labels off to match every issue.",
-  assignmentLabel: "Assignment",
-  assignmentAny: "Any assignment",
-  assignmentAssigned: "Assigned",
-  assignmentUnassigned: "Unassigned",
+  newIssues: "A new issue is opened",
+  reopenedIssues: "A closed issue is re-opened",
+  filterByLabel: "Issue has one of these labels",
+  labelInput: "Issue label",
+  labelPlaceholder: "Type a label name",
+  labelNew: "Add label",
+  labelAdd: "Add",
+  labelCancel: "Cancel",
+  labelsLoading: "Loading labels from the repository",
+  labelsEmpty: "No labels found in the repository. Add a label name.",
+  superplaneLabelAdded: 'The "superplane" label is added to the issue',
+  authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
+  delete: "Delete intake",
+  deleteTitle: "Delete this intake?",
+  deleteDescription:
+    "SuperPlane stops new items and removes this intake from Backlog. Tasks that it created stay in Backlog.",
+  deleteCancel: "Keep intake",
+  deleteConfirm: "Delete intake",
+  deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
 
-const STAGE_LABEL: Record<IntakeLineStage, string> = {
-  implement: INTAKE_SETTINGS_COPY.stageImplement,
-  verify: INTAKE_SETTINGS_COPY.stageVerify,
-  done: INTAKE_SETTINGS_COPY.stageDone,
-};
+export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
+  return (
+    sourceId === "github-issues" ||
+    sourceId === "dependabot-alerts" ||
+    sourceId === "sentry-exceptions" ||
+    sourceId === "jira-issues" ||
+    sourceId === "productive-tasks" ||
+    sourceId === "datadog"
+  );
+}
 
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
 }
 
-export const GITHUB_INTAKE_RUNS: IntakeAutomationRun[] = [
-  {
-    id: "gh-issue-1",
-    title: "Handle duplicate refunds on retry",
-    confidencePct: 94,
-    ranMinutesAgo: 180,
-    analyzedMinutesAgo: 170,
-    placement: "progressed",
-    stage: "implement",
-    activity: "Writing the retry handler.",
-  },
-  {
-    id: "gh-issue-2",
-    title: "Return 409 when the invoice is already paid",
-    confidencePct: 88,
-    ranMinutesAgo: 120,
-    analyzedMinutesAgo: 110,
-    placement: "progressed",
-    stage: "verify",
-    activity: "Checking the 409 response.",
-  },
-  {
-    id: "gh-issue-3",
-    title: "Show a clearer empty state on the billing page",
-    confidencePct: 81,
-    ranMinutesAgo: 90,
-    analyzedMinutesAgo: 80,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-4",
-    title: "Upgrade the Node 20 base image",
-    confidencePct: 76,
-    ranMinutesAgo: 45,
-    analyzedMinutesAgo: 40,
-    placement: "rejected",
-  },
-  {
-    id: "gh-issue-5",
-    title: "Add a flake retry to the checkout e2e suite",
-    confidencePct: 68,
-    ranMinutesAgo: 20,
-    analyzedMinutesAgo: 15,
-    placement: "backlog",
-  },
-  {
-    id: "gh-issue-6",
-    title: "Document the refund webhook contract",
-    confidencePct: 52,
-    ranMinutesAgo: 8,
-    analyzedMinutesAgo: 5,
-    placement: "below-threshold",
-  },
-];
-
-export function intakeRelativeTime(minutesAgo: number): string {
-  return formatTimeAgo(new Date(Date.now() - minutesAgo * 60_000));
+export function addIntakeLabel(labels: string[], label: string): string[] {
+  const next = label.trim();
+  if (next.length === 0 || labels.includes(next)) {
+    return labels;
+  }
+  return [...labels, next];
 }
-
-export function intakeStageLabel(stage: IntakeLineStage): string {
-  return STAGE_LABEL[stage];
-}
-
-export function intakePlacementLabel(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed" && run.stage) {
-    return intakeStageLabel(run.stage);
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejected;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThreshold;
-  }
-  return INTAKE_SETTINGS_COPY.inBacklog;
-}
-
-export function intakePlacementActivity(run: IntakeAutomationRun): string {
-  if (run.placement === "progressed") {
-    return run.activity ?? "";
-  }
-  if (run.placement === "rejected") {
-    return INTAKE_SETTINGS_COPY.rejectedActivity;
-  }
-  if (run.placement === "below-threshold") {
-    return INTAKE_SETTINGS_COPY.belowThresholdActivity;
-  }
-  return INTAKE_SETTINGS_COPY.backlogActivity;
-}
-
-export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): IntakeSourceSettings {
-  const name = draft.name.trim() || DEFAULT_GITHUB_INTAKE_SETTINGS.name;
+export function normalizeIntakeSourceSettings(
+  draft: IntakeSourceSettings,
+  sourceId?: LineIntakeSourceId,
+): IntakeSourceSettings {
   const confidencePct = Math.min(100, Math.max(0, Math.round(draft.confidencePct)));
-  return { ...draft, name, confidencePct };
-}
-
-export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSettings | undefined): IntakeSourceSettings {
+  const sentryLevels = SENTRY_INTAKE_LEVELS.filter((level) => draft.sentryLevels.includes(level));
+  const dependabotSeverities = normalizeDependabotSeverities(draft.dependabotSeverities);
+  const hiddenSentryTriggers =
+    sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
+  const taskListIds = normalizeTaskListIds(draft.taskListIds);
+  const datadogEnvironments = normalizeDatadogEnvironments(draft.datadogEnvironments);
+  const datadogService = draft.datadogService.trim();
+  if (!draft.filterByLabel) {
+    return {
+      ...draft,
+      ...hiddenSentryTriggers,
+      confidencePct,
+      labels: [],
+      labelFilterMode: "include",
+      sentryLevels,
+      dependabotSeverities,
+      taskListIds,
+      datadogEnvironments,
+      datadogService,
+    };
+  }
   return {
-    name,
-    listenMode: "listen",
-    confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
-    labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
-    labels: settings?.labels ?? [],
-    assignment: assignmentFromApi(settings?.assignment),
+    ...draft,
+    ...hiddenSentryTriggers,
+    confidencePct,
+    sentryLevels,
+    dependabotSeverities,
+    taskListIds,
+    datadogEnvironments,
+    datadogService,
   };
 }
 
-export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryIntakeSettings {
+export function addIntakeEnvironment(environments: string[], environment: string): string[] {
+  return normalizeDatadogEnvironments([...environments, environment]);
+}
+
+export function removeIntakeEnvironment(environments: string[], environment: string): string[] {
+  const next = environment.trim().toLowerCase();
+  return environments.filter((entry) => entry !== next);
+}
+
+export function normalizeDependabotSeverities(severities: string[]): string[] {
+  const selected = DEPENDABOT_INTAKE_SEVERITIES.filter((severity) => severities.includes(severity));
+  if (selected.length === 0 || selected.length === DEPENDABOT_INTAKE_SEVERITIES.length) {
+    return [];
+  }
+  return [...selected];
+}
+
+export function dependabotSeveritySelected(severities: string[], severity: string): boolean {
+  if (severities.length === 0) {
+    return true;
+  }
+  return severities.includes(severity);
+}
+
+export function toggleDependabotSeverity(severities: string[], severity: string): string[] {
+  const current = severities.length === 0 ? [...DEPENDABOT_INTAKE_SEVERITIES] : [...severities];
+  const next = current.includes(severity) ? current.filter((entry) => entry !== severity) : [...current, severity];
+  return normalizeDependabotSeverities(next);
+}
+
+function normalizeTaskListIds(ids: string[]): string[] {
+  const normalized: string[] = [];
+  for (const id of ids) {
+    const next = id.trim();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
+}
+
+function normalizeDatadogEnvironments(environments: string[]): string[] {
+  const normalized: string[] = [];
+  for (const environment of environments) {
+    const next = environment.trim().toLowerCase();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
+}
+
+type IntakeToggles = Pick<
+  IntakeSourceSettings,
+  | "newIssues"
+  | "reopenedIssues"
+  | "superplaneLabelAdded"
+  | "authorsWithAccess"
+  | "sentryNewIssues"
+  | "sentryRegressedIssues"
+  | "sentryAssignedIssues"
+>;
+
+/** A response that omits a toggle predates it, so fall back to the default. */
+function intakeTogglesFromApi(settings: FactoriesFactoryIntakeSettings | undefined): IntakeToggles {
+  return {
+    newIssues: settings?.newIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.newIssues,
+    reopenedIssues: settings?.reopenedIssues ?? DEFAULT_GITHUB_INTAKE_SETTINGS.reopenedIssues,
+    superplaneLabelAdded: settings?.superplaneLabelAdded ?? DEFAULT_GITHUB_INTAKE_SETTINGS.superplaneLabelAdded,
+    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
+    sentryNewIssues: settings?.sentryNewIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryNewIssues,
+    sentryRegressedIssues: settings?.sentryRegressedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryRegressedIssues,
+    sentryAssignedIssues: settings?.sentryAssignedIssues ?? DEFAULT_SENTRY_INTAKE_SETTINGS.sentryAssignedIssues,
+  };
+}
+
+export function intakeSettingsFromApi(
+  name: string,
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): IntakeSourceSettings {
+  const labels = settings?.labels ?? [];
+  return {
+    name,
+    confidencePct: settings?.confidencePct ?? DEFAULT_GITHUB_INTAKE_SETTINGS.confidencePct,
+    labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
+    labels,
+    filterByLabel: labels.length > 0,
+    assignment: assignmentFromApi(settings?.assignment),
+    ...intakeTogglesFromApi(settings),
+    jiraMoveOnComplete: settings?.jiraMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.jiraMoveOnComplete,
+    jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
+    datadogTriggeredAlerts: settings?.datadogTriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogTriggeredAlerts,
+    datadogRetriggeredAlerts:
+      settings?.datadogRetriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogRetriggeredAlerts,
+    datadogEnvironments: normalizeDatadogEnvironments(settings?.datadogEnvironments ?? []),
+    datadogService: "",
+    ...productiveFiltersFromApi(settings),
+  };
+}
+
+function productiveFiltersFromApi(
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): Pick<IntakeSourceSettings, "excludeKeyTasks" | "taskListIds"> {
+  return {
+    excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings?.taskListIds ?? []),
+  };
+}
+
+export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
+  const labels = settings.filterByLabel ? settings.labels : [];
   return {
     confidencePct: settings.confidencePct,
-    labels: settings.labels,
+    labels,
     labelFilterMode: settings.labelFilterMode === "exclude" ? "LABEL_FILTER_MODE_EXCLUDE" : "LABEL_FILTER_MODE_INCLUDE",
     assignment:
       settings.assignment === "assigned"
@@ -224,10 +345,36 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryInta
         : settings.assignment === "unassigned"
           ? "ASSIGNMENT_UNASSIGNED"
           : "ASSIGNMENT_ANY",
+    authorsWithAccess: settings.authorsWithAccess,
+    newIssues: settings.newIssues,
+    reopenedIssues: settings.reopenedIssues,
+    superplaneLabelAdded: settings.superplaneLabelAdded,
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
+    sentryNewIssues: settings.sentryNewIssues,
+    sentryRegressedIssues: false,
+    sentryAssignedIssues: false,
+    sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
+    dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
+    excludeKeyTasks: settings.excludeKeyTasks,
+    taskListIds: normalizeTaskListIds(settings.taskListIds),
+    datadogTriggeredAlerts: settings.datadogTriggeredAlerts,
+    datadogRetriggeredAlerts: settings.datadogRetriggeredAlerts,
+    datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),
   };
 }
 
-function assignmentFromApi(assignment: FactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
+export function jiraCompletionSettingsToApi(settings: {
+  jiraMoveOnComplete: boolean;
+  jiraCompletionColumn: string;
+}): Pick<FactoriesFactoryIntakeSettings, "jiraMoveOnComplete" | "jiraCompletionColumn"> {
+  return {
+    jiraMoveOnComplete: settings.jiraMoveOnComplete,
+    jiraCompletionColumn: settings.jiraMoveOnComplete ? settings.jiraCompletionColumn.trim() : "",
+  };
+}
+
+function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
   if (assignment === "ASSIGNMENT_ASSIGNED") {
     return "assigned";
   }
@@ -235,109 +382,4 @@ function assignmentFromApi(assignment: FactoryIntakeSettings["assignment"]): Int
     return "unassigned";
   }
   return "any";
-}
-
-const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
-  PLACEMENT_BACKLOG: "backlog",
-  PLACEMENT_REJECTED: "rejected",
-  PLACEMENT_PROGRESSED: "progressed",
-  PLACEMENT_BELOW_THRESHOLD: "below-threshold",
-};
-
-const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
-  plan: "implement",
-  planning: "implement",
-  implement: "implement",
-  implementation: "implement",
-  verify: "verify",
-  verification: "verify",
-  done: "done",
-};
-
-/**
- * The server decides placement, confidence, and stage. This only turns the
- * response into the shape the list renders, and drops runs that are still
- * being analyzed: those belong in the Analyzing list.
- */
-export function intakeRunsFromApi(
-  runs: FactoriesFactoryIntakeRun[],
-  appId: string | undefined,
-  now = new Date(),
-): IntakeAutomationRun[] {
-  return runs.flatMap((run) => {
-    const id = run.id?.trim();
-    const title = run.title?.trim();
-    const placement = run.placement ? PLACEMENT_BY_API[run.placement] : undefined;
-    if (!id || !title || !placement) {
-      return [];
-    }
-
-    const stage = run.stage ? STAGE_BY_NAME[run.stage.trim().toLowerCase()] : undefined;
-    return [
-      {
-        id,
-        runId: id,
-        ...(appId ? { appId } : {}),
-        title,
-        confidencePct: run.confidencePct ?? 0,
-        ranMinutesAgo: minutesAgo(run.createdAt, now),
-        analyzedMinutesAgo: minutesAgo(run.analyzedAt ?? run.createdAt, now),
-        placement,
-        ...(stage ? { stage } : {}),
-      },
-    ];
-  });
-}
-
-interface IntakeListTicket {
-  id: string;
-  title: string;
-  appId?: string;
-  runId?: string;
-  outcome?: "analyzing" | "below-threshold";
-  confidencePct?: number;
-}
-
-/** Tickets that stay in the Intake list: still analyzing, or below the minimum. */
-export function analyzingTicketsFromApi(
-  runs: FactoriesFactoryIntakeRun[],
-  appId: string | undefined,
-): IntakeListTicket[] {
-  return runs.flatMap((run) => {
-    const ticket = intakeListTicketFromRun(run, appId);
-    return ticket ? [ticket] : [];
-  });
-}
-
-function intakeListTicketFromRun(
-  run: FactoriesFactoryIntakeRun,
-  appId: string | undefined,
-): IntakeListTicket | undefined {
-  const id = run.id?.trim();
-  const title = run.title?.trim();
-  if (!id || !title) {
-    return undefined;
-  }
-
-  const ticket: IntakeListTicket = { id, title, runId: id, ...(appId ? { appId } : {}) };
-  if (run.placement === "PLACEMENT_ANALYZING") {
-    return ticket;
-  }
-  if (run.placement !== "PLACEMENT_BELOW_THRESHOLD") {
-    return undefined;
-  }
-
-  return {
-    ...ticket,
-    outcome: "below-threshold",
-    ...(run.confidencePct != null ? { confidencePct: run.confidencePct } : {}),
-  };
-}
-
-function minutesAgo(timestamp: string | undefined, now: Date): number {
-  const value = timestamp ? Date.parse(timestamp) : Number.NaN;
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.floor((now.getTime() - value) / 60_000));
 }

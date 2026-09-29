@@ -1,18 +1,32 @@
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
+  FactoriesFactoryIntakeSettings,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
   FactoriesUpdateFactoryOnboardingBody,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
+import {
+  getFactoryDefinition,
+  ONBOARDING_EVENT_APPS,
+  ONBOARDING_LINE_APPS,
+  type FactoryAgentRewrite,
+} from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
+import type { IssuesChoiceId } from "./onboardingFixtures";
+import {
+  forgetOnboardingIntakeBinding,
+  onboardingIntakeBinding,
+  rememberOnboardingIntakeBinding,
+} from "./onboardingIntakeBinding";
 
-export const DEFAULT_LINE_NAME = "plan-and-implement";
+export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
+export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -42,6 +56,7 @@ async function installOnboardingApp(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<{ canvasId: string; canvasName: string }> {
@@ -52,6 +67,7 @@ async function installOnboardingApp(args: {
     installParams: {
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
     },
     startingTaskPrompt: "",
     navigateOnComplete: false,
@@ -70,6 +86,7 @@ async function provisionLineApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
@@ -81,6 +98,7 @@ async function provisionLineApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -92,24 +110,51 @@ async function provisionLineApps(args: {
   return steps;
 }
 
-// Event apps listen for GitHub events and are not factory line steps. Install
-// them even when the line already exists, so a retry after a failed finish
-// still creates PR Closure.
+export type ListFactoryApps = () => Promise<FactoryAutomation[]>;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// installFactoryCanvas names a new canvas after the factory definition title,
+// then appends " (N)" (uniqueCanvasName) to dodge a name collision. Match both
+// forms so a retry recognizes a copy it created under either name.
+function matchesEventAppTitle(appName: string | undefined, title: string): boolean {
+  if (!appName) return false;
+  if (appName === title) return true;
+  return new RegExp(`^${escapeRegExp(title)} \\(\\d+\\)$`).test(appName);
+}
+
+// Event apps listen for GitHub events and are not factory line steps. Skip an
+// app whose title already matches an app the workspace has, so a retry after
+// a failed finish does not create a second PR Closure. Known limitation: a
+// user-renamed app (to something other than "<title>" or "<title> (N)") is
+// not matched, so onboarding installs another copy — see ListFactoryApps,
+// which does not return the source factory id needed for an exact match.
 export async function provisionEventApps(args: {
   factoryId: string;
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
+  listApps: ListFactoryApps;
 }): Promise<void> {
+  const apps = await args.listApps();
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
+    const title = getFactoryDefinition(appFactoryId).title;
+    if (apps.some((app) => matchesEventAppTitle(app.name, title))) {
+      continue;
+    }
+
     await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId,
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -118,12 +163,37 @@ export async function provisionEventApps(args: {
 
 export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
-export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
+export type CreateFactoryIntake = (input: {
+  source: FactoriesFactoryIntakeSource;
+  integrationId?: string;
+  resourceId?: string;
+  settings?: FactoriesFactoryIntakeSettings;
+}) => Promise<FactoriesFactoryIntake>;
 
-// The GitHub intake scores new issues and opens a work order for the ones it
-// trusts. The backend reads the connection and the backlog repository from the
-// saved onboarding config, so this runs after the wizard choices are stored. A
-// retried finish must not add a second copy.
+export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
+
+function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
+  return intake.source === GITHUB_INTAKE_SOURCE || intake.source === JIRA_INTAKE_SOURCE;
+}
+
+function jiraIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, resourceId: string): boolean {
+  const binding = onboardingIntakeBinding(intake);
+  return binding.integrationId === integrationId && binding.resourceId === resourceId;
+}
+
+async function removeProvisionedIntake(
+  deleteIntake: DeleteFactoryIntake,
+  intake: FactoriesFactoryIntake,
+): Promise<void> {
+  if (!intake.id) return;
+  await deleteIntake(intake.id);
+  forgetOnboardingIntakeBinding(intake.id);
+}
+
+// The GitHub intake opens a task for each matching issue. The Backlog
+// canvas scores those tasks. The backend reads the connection and the
+// backlog repository from the saved onboarding config, so this runs after the
+// wizard choices are stored. A retried finish must not add a second copy.
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
@@ -137,6 +207,75 @@ export async function provisionGithubIntake(args: {
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
+export async function provisionJiraIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  integrationId: string;
+  resourceId: string;
+  settings?: FactoriesFactoryIntakeSettings;
+}): Promise<FactoriesFactoryIntake> {
+  const intakes = await args.listIntakes();
+  const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
+  if (existing && jiraIntakeMatches(existing, args.integrationId, args.resourceId)) {
+    return existing;
+  }
+  if (existing) {
+    await removeProvisionedIntake(args.deleteIntake, existing);
+  }
+
+  const created = await args.createIntake({
+    source: JIRA_INTAKE_SOURCE,
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+    ...(args.settings ? { settings: args.settings } : {}),
+  });
+  rememberOnboardingIntakeBinding(created.id, {
+    integrationId: args.integrationId,
+    resourceId: args.resourceId,
+  });
+  return created;
+}
+
+// Create the selected backlog intake and remove a leftover intake from an
+// earlier failed finish, so analysis follows the source the user chose.
+export async function provisionOnboardingIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  issuesChoice: IssuesChoiceId | null;
+  jira?: {
+    integrationId: string;
+    projectId: string;
+    settings?: FactoriesFactoryIntakeSettings;
+  };
+}): Promise<FactoriesFactoryIntake | undefined> {
+  const intakes = await args.listIntakes();
+  const desiredSource = args.issuesChoice === "jira" ? JIRA_INTAKE_SOURCE : GITHUB_INTAKE_SOURCE;
+  for (const intake of intakes) {
+    if (!isBacklogIntake(intake) || intake.source === desiredSource) continue;
+    await removeProvisionedIntake(args.deleteIntake, intake);
+  }
+
+  if (args.issuesChoice !== "jira") {
+    return provisionGithubIntake({
+      listIntakes: args.listIntakes,
+      createIntake: args.createIntake,
+    });
+  }
+  if (!args.jira?.integrationId || !args.jira.projectId) {
+    throw new Error("Connect Jira, then choose a project.");
+  }
+  return provisionJiraIntake({
+    listIntakes: args.listIntakes,
+    createIntake: args.createIntake,
+    deleteIntake: args.deleteIntake,
+    integrationId: args.jira.integrationId,
+    resourceId: args.jira.projectId,
+    settings: args.jira.settings,
+  });
+}
+
 export async function provisionLine(args: {
   factory: FactoriesFactory | null;
   savedLineId?: string;
@@ -144,6 +283,7 @@ export async function provisionLine(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
@@ -159,6 +299,7 @@ export async function provisionLine(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch: args.defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });

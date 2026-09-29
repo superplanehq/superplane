@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { getRepositoryMapper } from "./get_repository";
 import { getPackageMapper } from "./get_package";
 import { listPackagesMapper } from "./list_packages";

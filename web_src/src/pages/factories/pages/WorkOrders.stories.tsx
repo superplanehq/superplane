@@ -3,15 +3,16 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { EMPTY_FACTORY_KEY, PRIMARY_FACTORY_KEY, defaultFactoriesFixture } from "../__fixtures__/factoryPageResponses";
 import { emptyWorkOrdersFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
+import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../__fixtures__/usageReportFixtures";
 import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/missionMocks";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
- * Work Orders page. Storybook uses the FactoriesHarness work-orders route.
- * New Work Order opens the create dialog.
+ * Tasks page. Storybook uses the FactoriesHarness work-orders route.
+ * New Task opens the create dialog.
  */
 const meta = {
-  title: "Factories/Pages/Work Orders",
+  title: "Factories/Pages/Tasks",
   component: WorkOrdersPage,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof WorkOrdersPage>;
@@ -63,6 +64,24 @@ export const OnlyClosedOrders: Story = {
 export const EmptyWorkspace: Story = {
   name: "Empty workspace",
   render: () => <FactoriesHarness pathSuffix={emptyWorkspacePath} factoriesFixture={defaultFactoriesFixture} />,
+};
+
+/** Remaining trial credit is empty. The trial chip sits next to the title. */
+export const HostedCreditEmpty: Story = {
+  name: "Hosted credit empty",
+  render: () => {
+    withWorkOrderLayout("board");
+    return (
+      <FactoriesHarness
+        pathSuffix={workOrdersPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+          hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        }}
+      />
+    );
+  },
 };
 
 export const MissionDetailCheckout: Story = {

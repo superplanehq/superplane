@@ -1,28 +1,29 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
-import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { useBrokenIntegrationsBanner } from "../lib/useBrokenIntegrationsBanner";
+import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../workOrders/WorkOrdersEmptyStates";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 /**
- * Data + action shell for the Work Orders list. Fetches work orders and
+ * Data + action shell for the Tasks list. Fetches tasks and
  * permissions, wires mutations, and hands everything to the display-only
  * `WorkOrdersLoadedView`. Errors and loading states live here so the
  * loaded view can assume a populated payload.
  */
 export function WorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: me } = useMe(false);
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
 
-  usePageTitle(["Work Orders", factory?.name ?? "Workspace"]);
+  usePageTitle(["Tasks", factory?.name ?? "Workspace"]);
 
   const state = useWorkOrderListState(factoryId);
 
@@ -35,10 +36,13 @@ export function WorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
@@ -71,19 +75,22 @@ export function WorkOrdersPage() {
       factory={factory}
       factoryLines={factory.lines ?? []}
       workOrders={workOrders}
+      pullRequests={pullRequests}
       state={state}
-      currentUserId={me?.id}
+      currentUserId={currentUserId}
       canCreate={canCreate}
       onCreateWorkOrder={openCreateWorkOrder}
       canDispatch={canDispatch}
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
+      hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+      brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
   );
 }
 
-/** Title-only header shown while work orders load or fail to load. */
+/** Title-only header shown while tasks load or fail to load. */
 function WorkOrdersHeaderStub() {
-  return <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />;
+  return <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />;
 }

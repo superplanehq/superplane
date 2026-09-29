@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,8 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	spec, err := decodeRunClaudeCodeSpec(map[string]any{
-		"machineType": testRunnerMachineType,
+		"machineType":           testRunnerMachineType,
+		"includeVisualEvidence": true,
 		"steps": []map[string]any{
 			{"name": "Fix bug", "type": "prompt", "prompt": "fix the bug"},
 		},
@@ -31,6 +33,7 @@ func TestDecodeRunClaudeCodeSpecAppliesDefaults(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, runner.DefaultExecutionTimeoutSeconds, spec.ExecutionTimeoutSeconds)
+	assert.True(t, spec.IncludeVisualEvidence)
 	require.Len(t, spec.Steps, 1)
 	assert.Equal(t, "Fix bug", spec.Steps[0].Name)
 	assert.Equal(t, runner.AgentStepPrompt, spec.Steps[0].Type)
@@ -94,33 +97,13 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires model for hosted credentials", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		err := validateRunClaudeCodeSpec(spec)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "model is required")
-	})
-
-	t.Run("accepts hosted credentials with model", func(t *testing.T) {
+	t.Run("rejects hosted credentials", func(t *testing.T) {
 		spec := valid
 		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
 		spec.Model = "claude-sonnet-4-6"
-		require.NoError(t, validateRunClaudeCodeSpec(spec))
-	})
-
-	t.Run("rejects hosted base URL environment override", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		spec.Model = "claude-sonnet-4-6"
-		spec.Environment = []runner.EnvironmentVariable{{
-			Name:        envAnthropicBaseURL,
-			ValueSource: runner.EnvironmentValueSourceLiteral,
-			Value:       strPtr("https://attacker.example"),
-		}}
 		err := validateRunClaudeCodeSpec(spec)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), envAnthropicBaseURL)
+		assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 	})
 }
 
@@ -138,11 +121,12 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec)
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
+	assert.Contains(t, task.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
+	assert.Contains(t, task.Commands[0].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
 	assert.Equal(t, runner.LiveLogKindBash, task.Commands[1].Kind)
@@ -155,6 +139,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", task.Commands[2].Preview)
 	assert.Contains(t, task.Commands[2].Command, `cd '/tmp/workspace'`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'sonnet'`)
+	assert.NotContains(t, task.Commands[2].Command, `'high'`)
+	assert.Contains(t, task.Commands[2].Command, `_sp_install_workspace_skills "$SUPERPLANE_TASK_DIR/.claude/skills" .claude/skills`)
+	assert.Contains(t, task.Commands[2].Command, `if [ -e "$_sp_dest/$_sp_name" ]; then`)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 	assert.Equal(t, "Fix tests", task.Commands[3].Name)
 	assert.Contains(t, task.Commands[3].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/03-fix-tests.txt" 'sonnet'`)
@@ -162,9 +149,11 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
 	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 7)
+	require.Len(t, task.Files, 9)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
+	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, task.Files, "turn_telemetry.js").Content)
+	assert.Equal(t, runner.ActivityStreamScript, requireTaskFile(t, task.Files, "activity_stream.js").Content)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")
@@ -182,12 +171,154 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, "stream-json")
 	assert.Contains(t, runScript, "--append-system-prompt")
 	assert.Contains(t, runScript, "plain terminal text")
-	assert.Contains(t, runScript, "--continue")
+	assert.Contains(t, runScript, "--resume")
 	assert.Contains(t, runScript, "SUPERPLANE_RESULT_FILE")
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
+	// Planning sessions use "default" (not "plan"): plan mode blocks the
+	// planning MCP tools. Read-only is enforced via the allowedTools allowlist.
+	assert.Contains(t, runScript, `return "default"`)
+	assert.NotContains(t, runScript, "bypassPermissions")
+	assert.Contains(t, runScript, "--mcp-config")
+	assert.Contains(t, runScript, "planning_session_mcp.js")
+	assert.NotContains(t, runScript, "mcp__superplane__propose_draft")
+	assert.Contains(t, runScript, "mcp__superplane__propose_spec")
+	assert.Contains(t, runScript, "mcp__superplane__propose_clarity")
+	assert.Contains(t, runScript, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, runScript, "mcp__superplane__propose_plan")
+	assert.Contains(t, runScript, "mcp__superplane__survey")
+	assert.Contains(t, runScript, "mcp__superplane__create_task")
+	assert.Contains(t, runScript, "mcp__superplane__inspect_attachment")
+	assert.NotContains(t, runScript, "mcp__superplane__say")
+	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
+}
+
+func TestBuildClaudeCodeBrokerTaskRewritesPlanningImagePromptPaths(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := runner.MintAgentStepFileRefs(
+		[]runner.AgentStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+	}
+	attachments := []runner.TaskAttachment{{
+		ID:          fileID,
+		URL:         signed,
+		Filename:    "bug.png",
+		ContentType: "image/png",
+	}}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, attachments, true)
+
+	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
+	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
+	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, runner.AttachmentAgentInstructions)
+	assert.NotContains(t, prompt, signed)
+	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
+	assert.Equal(t, "Fetch task attachments", task.Commands[1].Name)
+	assert.Equal(t, "Process task attachments", task.Commands[2].Name)
+}
+
+func TestBuildClaudeCodeBrokerTaskKeepsLineImageURLs(t *testing.T) {
+	t.Parallel()
+
+	fileID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	original := "See ![bug](sp-file://" + fileID + ")"
+	signed := "https://app.example/api/v1/public/files/" + fileID + "?expires=1&sig=abc&sp_file=1"
+	dispatched, err := runner.MintAgentStepFileRefs(
+		[]runner.AgentStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+		func(text string) (string, error) {
+			return strings.ReplaceAll(text, "sp-file://"+fileID, signed), nil
+		},
+	)
+	require.NoError(t, err)
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr(original)}},
+	}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, dispatched, []runner.TaskAttachment{{
+		ID:          fileID,
+		URL:         signed,
+		Filename:    "bug.png",
+		ContentType: "image/png",
+	}}, false)
+
+	prompt := requireTaskFile(t, task.Files, "prompts/01-fix-panic.txt").Content
+	assert.Contains(t, prompt, signed)
+	assert.Contains(t, prompt, runner.AttachmentAgentInstructions)
+	assert.NotContains(t, prompt, "inspect_attachment")
+	assert.Contains(t, requireTaskFile(t, task.Files, "attachments/manifest.json").Content, "sp_file=1")
+}
+
+func TestBuildClaudeCodeBrokerTaskPassesThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model:         "sonnet",
+		ThinkingLevel: "high",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
+		},
+	}
+	task := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	assert.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-fix-panic.txt" 'sonnet' 'high'`)
+}
+
+func TestValidateRunClaudeCodeSpecRejectsUnknownThinking(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		MachineType: testRunnerMachineType,
+		Steps: []ClaudeCodeStep{
+			{Name: "Do the thing", Type: runner.AgentStepPrompt, Prompt: strPtr("do the thing")},
+		},
+		Credentials: runner.AgentCredentials{
+			Source: "secret",
+			Secret: secretRef("anthropic", "api_key"),
+		},
+		ThinkingLevel: "xhigh",
+	}
+	require.Error(t, validateRunClaudeCodeSpec(spec))
+}
+
+func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix the failing tests")},
+		},
+	}
+
+	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
+		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
+	}, nil, nil, false)
+	require.Len(t, task.Commands, 3)
+	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.Equal(t, "Set up Semaphore", task.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[1].Kind)
+	assert.Equal(t, "Fix tests", task.Commands[2].Name)
+	assert.Equal(t, "Fix the failing tests", task.Commands[2].Preview)
+	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, task.Files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
+		requireTaskFile(t, task.Files, "prompts/01-fix-tests.txt").Content,
+	)
 }
 
 func TestClaudeStepSlug(t *testing.T) {
@@ -203,6 +334,48 @@ func TestShellSingleQuote(t *testing.T) {
 
 	assert.Equal(t, `'hello'`, runner.ShellSingleQuote("hello"))
 	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
+}
+
+func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, nil, spec)
+	assert.Len(t, got.Commands, len(base.Commands))
+	assert.Len(t, got.Files, len(base.Files))
+}
+
+func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "opus",
+		Steps: []ClaudeCodeStep{
+			{Name: "Clone", Type: runner.AgentStepBash, Command: strPtr("git clone")},
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	last := got.Commands[len(got.Commands)-1]
+	assert.Equal(t, "Wait for the next message", last.Name)
+	assert.Equal(t, runner.LiveLogKindPrompt, last.Kind)
+	assert.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'opus'`)
+	assert.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
+	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
+	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentFetchScriptPath).Content)
+	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {

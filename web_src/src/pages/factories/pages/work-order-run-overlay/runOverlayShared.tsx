@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useDismissOnEscape } from "@/hooks/useDismissOnEscape";
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -29,7 +30,7 @@ export function RunOverlayBoardBackdrop() {
           <p className="mb-3 text-[13px] font-medium text-muted-foreground">{lane}</p>
           <div className="space-y-2">
             <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-foreground">
-              {lane === "Implement" ? "Ship idempotent refund retries" : "Queued work order"}
+              {lane === "Implement" ? "Ship idempotent refund retries" : "Queued task"}
             </div>
             <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-muted-foreground">
               {lane === "Verify" ? "Draft retry telemetry" : "Follow-up work"}
@@ -41,12 +42,40 @@ export function RunOverlayBoardBackdrop() {
   );
 }
 
+function overlayLayerClassName(fixed: boolean, fullPage: boolean) {
+  if (fullPage) {
+    // Pin to the viewport beside the sidebar. Absolute fill is clipped by the
+    // kanban overflow ancestors, so it cannot cover the main pane.
+    if (fixed) {
+      return "fixed inset-y-0 right-0 left-[var(--workspace-navigation-width)] z-50 flex bg-background p-0";
+    }
+    return "absolute inset-0 z-50 flex bg-background p-0";
+  }
+  return cn("inset-0 z-50 flex items-center justify-center bg-black/50 p-5 sm:p-10", fixed ? "fixed" : "absolute");
+}
+
+function overlayDialogClassName(wide: boolean, canvas: boolean, fullPage: boolean) {
+  if (fullPage) {
+    return "flex h-full w-full flex-col overflow-hidden bg-background dark:bg-gray-900";
+  }
+  return cn(
+    "flex max-h-[min(56rem,calc(100vh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
+    canvas
+      ? "h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))]"
+      : wide
+        ? "h-[min(48rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]"
+        : "h-[min(50rem,calc(100vh-5rem))] w-[min(70rem,calc(100vw-5rem))]",
+  );
+}
+
 export function RunOverlayFrame({
   children,
   testId,
   wide = false,
   canvas = false,
   fixed = false,
+  fullPage = false,
+  className,
   onDismiss,
 }: {
   children: ReactNode;
@@ -55,25 +84,17 @@ export function RunOverlayFrame({
   canvas?: boolean;
   /** Cover the viewport. Use on the live line board so overflow does not clip the dialog. */
   fixed?: boolean;
+  /** Fill the main pane. The factory sidebar stays visible. */
+  fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
+  useDismissOnEscape(onDismiss);
+
   return (
-    <div
-      className={cn(
-        "inset-0 z-50 flex items-center justify-center bg-black/50 p-5 sm:p-10",
-        fixed ? "fixed" : "absolute",
-      )}
-      onClick={onDismiss}
-    >
+    <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
       <div
-        className={cn(
-          "flex max-h-[min(52rem,calc(100vh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
-          canvas
-            ? "h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))]"
-            : wide
-              ? "h-[min(48rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]"
-              : "h-[min(46rem,calc(100vh-5rem))] w-[min(56rem,calc(100vw-5rem))]",
-        )}
+        className={cn(overlayDialogClassName(wide, canvas, fullPage), className)}
         data-testid={testId}
         role="dialog"
         aria-modal="true"

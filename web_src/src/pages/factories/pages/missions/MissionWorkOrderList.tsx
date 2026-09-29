@@ -4,7 +4,7 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router";
 
-import { factoryHomePath } from "../../lib/factoryPagePaths";
+import { workOrderOpenPath } from "../../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../../lib/workOrderProgress";
 import { OrgUserReference } from "../../OrgUserReference";
@@ -47,7 +47,7 @@ function MissionWorkOrderRow({
   resolveUser: OrgUserDisplayLookup;
 }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = factoryHomePath(organizationId, factoryKey);
+  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   const assignee = entry.order.assignees?.[0];
 

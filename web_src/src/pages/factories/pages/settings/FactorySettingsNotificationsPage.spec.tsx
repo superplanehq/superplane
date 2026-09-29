@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
@@ -18,7 +18,7 @@ const FILTERED_SCOPE_SETTINGS: MeNotificationSettings = {
   workspaces: {
     scope: "WORKSPACE_SCOPE_FILTERED",
     eventTypes: [],
-    filters: [{ workspaceId: REFUND_FACTORY.id, eventTypes: ["TYPE_WORK_ORDER_ASSIGNED"] }],
+    filters: [{ workspaceId: REFUND_FACTORY.id, eventTypes: ["TYPE_WORK_ORDER_STATUS_OWNED"] }],
   },
 };
 
@@ -66,7 +66,7 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
     expect(screen.getByTestId("notifications-scope-all")).toHaveTextContent("All workspaces");
     expect(screen.getByTestId("notifications-scope-filtered")).toHaveTextContent("Choose workspaces");
     expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Off");
-    expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Do not send any work order emails.");
+    expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Do not send any task emails.");
   });
 
   it("shows an explicit 'no emails' message instead of an empty area when Off is selected", async () => {
@@ -79,7 +79,7 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
     await user.click(screen.getByTestId("notifications-scope-none"));
 
     expect(screen.getByTestId("notifications-scope-off-message")).toHaveTextContent(
-      "You will not receive any work order emails.",
+      "You will not receive any task emails.",
     );
     expect(screen.getByTestId("notifications-scope-none")).toHaveAttribute("aria-checked", "true");
   });
@@ -90,6 +90,17 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
 
     expect(screen.getByTestId("notifications-scope-filtered")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("notifications-workspace-picker")).toBeInTheDocument();
-    expect(screen.getByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_ASSIGNED`)).toBeInTheDocument();
+    expect(
+      screen.getByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_STATUS_OWNED`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`notifications-type-${REFUND_FACTORY.id}-TYPE_WORK_ORDER_ASSIGNED`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Status changes on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Review requests on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Agent questions on your tasks")).toBeInTheDocument();
+    expect(screen.getByText("Ready plans on your tasks")).toBeInTheDocument();
+    expect(screen.queryByText("Added as a task owner")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mentions in task comments")).not.toBeInTheDocument();
   });
 });

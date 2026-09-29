@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,11 +57,13 @@ func (w *NodeWebhookContext) GetBaseURL() string {
 }
 
 type WebhookContext struct {
-	ID            string
-	URL           string
-	Secret        []byte
-	Metadata      any
-	Configuration any
+	ID                string
+	URL               string
+	Secret            []byte
+	Metadata          any
+	Configuration     any
+	ActiveCallbacks   map[string]bool
+	CallbackLookupErr error
 }
 
 func (w *WebhookContext) GetID() string              { return w.ID }
@@ -71,6 +74,16 @@ func (w *WebhookContext) GetConfiguration() any      { return w.Configuration }
 func (w *WebhookContext) SetSecret(secret []byte) error {
 	w.Secret = secret
 	return nil
+}
+
+func (w *WebhookContext) CallbackHasActiveNodes(webhookID string) (bool, error) {
+	if w.CallbackLookupErr != nil {
+		return false, w.CallbackLookupErr
+	}
+	if w.ActiveCallbacks == nil {
+		return false, nil
+	}
+	return w.ActiveCallbacks[webhookID], nil
 }
 
 type MetadataContext struct {
@@ -113,6 +126,7 @@ type ActionRequest struct {
 type Subscription struct {
 	ID            uuid.UUID
 	Configuration any
+	SendErr       error
 }
 
 func (c *IntegrationContext) ID() uuid.UUID {
@@ -130,6 +144,10 @@ func (c *IntegrationContext) GetMetadata() any {
 
 func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
+}
+
+func (c *IntegrationContext) Persist() error {
+	return nil
 }
 
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
@@ -209,7 +227,7 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions := make([]core.IntegrationSubscriptionContext, 0, len(c.Subscriptions))
 	for _, subscription := range c.Subscriptions {
-		subscriptions = append(subscriptions, &SubscriptionContext{config: subscription.Configuration})
+		subscriptions = append(subscriptions, &SubscriptionContext{config: subscription.Configuration, sendErr: subscription.SendErr})
 	}
 	return subscriptions, nil
 }
@@ -239,6 +257,7 @@ func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
 type SubscriptionContext struct {
 	config   any
 	messages []any
+	sendErr  error
 }
 
 func (s *SubscriptionContext) Configuration() any {
@@ -246,13 +265,18 @@ func (s *SubscriptionContext) Configuration() any {
 }
 
 func (s *SubscriptionContext) SendMessage(message any) error {
+	if s.sendErr != nil {
+		return s.sendErr
+	}
 	s.messages = append(s.messages, message)
 	return nil
 }
 
 type ExecutionStateContext struct {
 	Finished       bool
+	Cancelling     bool
 	Passed         bool
+	Cancelled      bool
 	FailureReason  string
 	FailureMessage string
 	Channel        string
@@ -263,6 +287,10 @@ type ExecutionStateContext struct {
 
 func (c *ExecutionStateContext) IsFinished() bool {
 	return c.Finished
+}
+
+func (c *ExecutionStateContext) IsCancelling() bool {
+	return c.Cancelling
 }
 
 func (c *ExecutionStateContext) Pass() error {
@@ -313,6 +341,13 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Passed = false
 	c.FailureReason = reason
 	c.FailureMessage = message
+	return nil
+}
+
+func (c *ExecutionStateContext) Cancel() error {
+	c.Finished = true
+	c.Passed = false
+	c.Cancelled = true
 	return nil
 }
 
@@ -416,9 +451,16 @@ func (c *RequestContext) ScheduleActionCall(action string, params map[string]any
 type HTTPContext struct {
 	Requests  []*http.Request
 	Responses []*http.Response
+
+	// mu guards Requests and Responses so components that issue concurrent
+	// requests (e.g. metric fan-out) can safely share a single mock context.
+	mu sync.Mutex
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.Requests = append(c.Requests, request)
 
 	if len(c.Responses) == 0 {
@@ -431,9 +473,12 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values          map[string][]byte
-	SecretKeys      map[string]map[string][]byte
-	IntegrationKeys map[string]map[string][]byte
+	Values               map[string][]byte
+	SecretKeys           map[string]map[string][]byte
+	IntegrationKeys      map[string]map[string][]byte
+	IntegrationUsage     map[string]string
+	IntegrationSetup     map[string]string
+	IntegrationSetupName map[string]string
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -458,24 +503,32 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 	return keys, nil
 }
 
-func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+func (c *SecretsContext) GetIntegrationSecrets(installationName string) (core.IntegrationSecrets, error) {
 	if c.IntegrationKeys == nil {
-		return nil, fmt.Errorf("integration secrets not configured")
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not configured")
 	}
 
 	name := strings.TrimSpace(installationName)
 	keys, ok := c.IntegrationKeys[name]
 	if !ok {
-		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not found for ref %q", name)
 	}
 
-	return keys, nil
+	return core.IntegrationSecrets{
+		Values:    keys,
+		Usage:     c.IntegrationUsage[name],
+		Setup:     c.IntegrationSetup[name],
+		SetupName: c.IntegrationSetupName[name],
+	}, nil
 }
 
 type HostedLLMContext struct {
-	Access     core.HostedLLMAccess
-	CreditErr  error
-	ResolveErr error
+	Access        core.HostedLLMAccess
+	CreditErr     error
+	ResolveErr    error
+	SelectableErr error
+	Default       core.DefaultHostedLLMModel
+	DefaultErr    error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -487,6 +540,17 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
 	return c.CreditErr
+}
+
+func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
+	return c.SelectableErr
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	if c.DefaultErr != nil {
+		return core.DefaultHostedLLMModel{}, c.DefaultErr
+	}
+	return c.Default, nil
 }
 
 type ExpressionContext struct {

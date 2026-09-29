@@ -20,6 +20,21 @@ export function leaveFactoryConfigureSearchParams(current: URLSearchParams): URL
   return next;
 }
 
+/** Set or clear `run` on the factory canvas URL. Keep other search flags. */
+export function setFactoryAppSelectedRun(params: URLSearchParams, runId: string | null): URLSearchParams {
+  const current = params.get("run");
+  if ((runId || null) === (current || null)) {
+    return params;
+  }
+  const next = new URLSearchParams(params);
+  if (runId) {
+    next.set("run", runId);
+    return next;
+  }
+  next.delete("run");
+  return next;
+}
+
 export function setSearchParamFlag(params: URLSearchParams, key: string, open: boolean): URLSearchParams {
   const isSet = params.get(key) === "1";
   if (open === isSet) {

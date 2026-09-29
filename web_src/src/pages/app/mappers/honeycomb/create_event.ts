@@ -10,7 +10,7 @@ import type {
 import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type { MetadataItem } from "@/ui/metadataList";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -101,7 +101,7 @@ function createEventSpecs(node: NodeInfo): ComponentBaseSpec[] {
 
 function createEventEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

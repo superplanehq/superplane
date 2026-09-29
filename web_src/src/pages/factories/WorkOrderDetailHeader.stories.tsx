@@ -5,7 +5,7 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 
 /**
- * Header for the work order detail page: back link + `SP-42` identifier +
+ * Header for the task detail page: back link + `SP-42` identifier +
  * title on the left, Copy link + kebab menu of lifecycle actions on the
  * right. Status and dispatch live in the sidebar, so the header stays
  * minimal.
@@ -46,7 +46,7 @@ const commonFlags = {
   orderIdentifier: "SP-42",
 };
 
-/** Open — Back to draft, Complete, Reject all available in the kebab. */
+/** Open — Complete and Reject in the kebab. */
 export const Open: Story = {
   args: {
     orderTitle: "Reconcile duplicate refunds in ledger",
@@ -62,9 +62,8 @@ export const Open: Story = {
 };
 
 /**
- * Running — Complete/Reject remain available so an operator can close
- * mid-run. Back-to-draft is hidden because the FSM rejects `open → draft`
- * while a step is still executing.
+ * Running — Complete and Reject remain available so an operator can close
+ * mid-run.
  */
 export const Running: Story = {
   args: {

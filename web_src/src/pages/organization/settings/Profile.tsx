@@ -1,57 +1,30 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
 import { Icon } from "@/components/Icon";
-import { Input } from "@/components/Input/input";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { meKeys, useMe } from "@/hooks/useMe";
-import { CopyButton } from "@/ui/CopyButton";
+import { useMe } from "@/hooks/useMe";
 import { useAccount } from "@/contexts/useAccount";
-import { showErrorToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
+import { ProfileApiTokensSection } from "./ProfileApiTokensSection";
 import { settingsCardClassName } from "./settingsPageStyles";
 
 export function Profile() {
   usePageTitle(["Profile"]);
-  const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
   const { account } = useAccount();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [token, setToken] = useState<string>("");
-  const [tokenVisible, setTokenVisible] = useState(false);
-  const [regeneratingToken, setRegeneratingToken] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
-  const errorMessage =
-    actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
+  const errorMessage = meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null;
 
   useReportPageReady(!loading, {
     failed: !!errorMessage,
   });
-
-  const handleRegenerateToken = async () => {
-    try {
-      setActionError(null);
-      setRegeneratingToken(true);
-      const response = await meRegenerateToken(withOrganizationHeader({ organizationId }));
-      setToken(response.data.token || "");
-      setTokenVisible(true);
-      queryClient.invalidateQueries({ queryKey: meKeys.me(organizationId!, true) });
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
-    } finally {
-      setRegeneratingToken(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -143,80 +116,7 @@ export function Profile() {
           </div>
         </div>
 
-        <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
-          API Token
-        </Heading>
-        <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
-          Use this token to authenticate API requests to SuperPlane. Keep your token secure and do not share it.
-        </Text>
-
-        {/* API Token Section */}
-        <div className={settingsCardClassName}>
-          <div className="space-y-4">
-            {/* Token Status */}
-            {!user.hasToken && (
-              <div className="flex items-center gap-2">
-                <Icon name="key-round" className="text-gray-500 dark:text-gray-400 text-lg" />
-                <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">No API token generated</Text>
-              </div>
-            )}
-
-            <div className="flex items-center gap-4">
-              <LoadingButton
-                onClick={handleRegenerateToken}
-                loading={regeneratingToken}
-                loadingText="Regenerating..."
-                className="flex items-center gap-2"
-              >
-                <Icon name="refresh-ccw" />
-                {user.hasToken ? "Regenerate Token" : "Generate Token"}
-              </LoadingButton>
-
-              {user.hasToken && !token && (
-                <Text className="text-gray-500 dark:text-gray-400 text-sm">
-                  Your current token is hidden for security. Generate a new token to view it.
-                </Text>
-              )}
-            </div>
-
-            {token && (
-              <div className="space-y-3">
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">New API Token</Text>
-                <div className="flex items-center gap-2 ph-no-capture">
-                  <Input
-                    type={tokenVisible ? "text" : "password"}
-                    value={token}
-                    readOnly
-                    className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => setTokenVisible(!tokenVisible)}
-                    className="flex items-center gap-1"
-                  >
-                    <Icon name={tokenVisible ? "eye-closed" : "eye"} />
-                  </Button>
-                  <CopyButton
-                    variant="button"
-                    text={token}
-                    onCopyError={() => showErrorToast("Failed to copy API token.")}
-                  >
-                    Copy
-                  </CopyButton>
-                </div>
-                <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <Icon name="key-round" className="text-amber-800 dark:text-amber-400 text-sm mt-0.5" />
-                    <Text className="text-amber-800 dark:text-amber-200 text-sm">
-                      <strong>Important:</strong> This token will only be shown once. Make sure to copy and store it
-                      securely. If you lose this token, you'll need to generate a new one.
-                    </Text>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <ProfileApiTokensSection organizationId={organizationId} />
       </div>
 
       {canChangePassword && <ChangePasswordDialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />}

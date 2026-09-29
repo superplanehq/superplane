@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { createFixtureFetch, type CanvasAppFixture } from "./handlers";
 
@@ -18,30 +18,11 @@ async function fetchFixture(path: string, fixture: CanvasAppFixture = baseFixtur
 }
 
 describe("createFixtureFetch repository routes", () => {
-  it("returns a ready repository so the Files tab query has defined data", async () => {
-    const response = await fetchFixture("/api/v1/canvases/canvas-1/repository");
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      repository: {
-        metadata: { canvasId: "canvas-1" },
-        status: { state: "STATE_READY", headSha: "storybook-fixture-head" },
-      },
-    });
-  });
-
-  it("lists the default repository file paths plus fixture contents", async () => {
-    const response = await fetchFixture("/api/v1/canvases/canvas-1/repository/files");
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      files: [{ path: "README.md" }, { path: "canvas.yaml" }, { path: "console.yaml" }],
-    });
-  });
-
   it("serves README and console.yaml bodies from the fixture", async () => {
-    const readme = await fetchFixture("/api/v1/canvases/canvas-1/repository/file?path=README.md");
+    const readme = await fetchFixture("/api/v1/canvases/canvas-1/file?path=README.md");
     expect(await readme.text()).toBe("# Hello from fixture\n");
 
-    const consoleYaml = await fetchFixture("/api/v1/canvases/canvas-1/repository/file?path=console.yaml");
+    const consoleYaml = await fetchFixture("/api/v1/canvases/canvas-1/file?path=console.yaml");
     expect(await consoleYaml.text()).toBe("kind: Console\n");
   });
 
@@ -49,7 +30,7 @@ describe("createFixtureFetch repository routes", () => {
     const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
     const fallback = vi.fn() as unknown as typeof fetch;
     const fixtureFetch = createDefaultFixtureFetch(fallback);
-    const response = await fixtureFetch("http://localhost/api/v1/canvases/any/repository/file?path=console.yaml");
+    const response = await fixtureFetch("http://localhost/api/v1/canvases/any/file?path=console.yaml");
     const text = await response.text();
     expect(text).toContain("kind: Console");
     expect(text).toContain("submit-task");
@@ -58,16 +39,6 @@ describe("createFixtureFetch repository routes", () => {
     expect(text).toContain("Create a task");
     expect(text).toContain("How it works");
     expect(text).toContain("Your Factory Pipeline");
-  });
-
-  it("honors an explicit repositoryFilePaths override", async () => {
-    const response = await fetchFixture("/api/v1/canvases/canvas-1/repository/files", {
-      ...baseFixture,
-      repositoryFilePaths: ["docs/guide.md", "canvas.yaml"],
-    });
-    await expect(response.json()).resolves.toEqual({
-      files: [{ path: "docs/guide.md" }, { path: "canvas.yaml" }],
-    });
   });
 });
 
@@ -201,5 +172,20 @@ describe("createFixtureFetch agent gates", () => {
     await expect(features.json()).resolves.toMatchObject({
       features: expect.arrayContaining([expect.objectContaining({ id: "claude_managed_agents", released: true })]),
     });
+  });
+});
+
+describe("createFixtureFetch integrations", () => {
+  it("defaults githubAppConfigured to true", async () => {
+    const response = await fetchFixture("/api/v1/integrations");
+    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: true });
+  });
+
+  it("keeps an explicit githubAppConfigured false from the fixture", async () => {
+    const response = await fetchFixture("/api/v1/integrations", {
+      ...baseFixture,
+      integrations: { integrations: [], githubAppConfigured: false },
+    });
+    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: false });
   });
 });

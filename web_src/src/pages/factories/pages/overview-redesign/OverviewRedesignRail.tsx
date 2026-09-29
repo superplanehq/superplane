@@ -12,7 +12,7 @@ import type {
   WorkspaceReadiness,
 } from "./overviewRedesignMocks";
 
-/* ------------------------- Suggested work orders ------------------------- */
+/* ------------------------- Suggested tasks ------------------------- */
 
 function confidenceChipClassName(confidencePct: number) {
   if (confidencePct >= 80) {
@@ -27,7 +27,7 @@ function confidenceChipClassName(confidencePct: number) {
 export function SuggestionsCard({ suggestions }: { suggestions: SuggestionsState }) {
   return (
     <OverviewCard
-      title="Suggested work orders"
+      title="Suggested tasks"
       subtitle="Candidates from repository analysis."
       preview
       testId="overview-suggestions-card"
@@ -87,7 +87,7 @@ function SuggestionsCardBody({ suggestions }: { suggestions: SuggestionsState })
               size="xs"
               variant="outline"
               className="shrink-0"
-              onClick={() => console.warn("mock action: review work order candidate", candidate.id)}
+              onClick={() => console.warn("mock action: review task candidate", candidate.id)}
             >
               Review
             </Button>

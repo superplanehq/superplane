@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { deletePackageMapper } from "./delete_package";
 import { buildDetailsCtx, buildOutput, buildPackageOperationResult } from "./test_helpers";
 

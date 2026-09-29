@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type {
   FactoriesFactoryLine,
   FactoriesLineRef,
@@ -14,7 +14,9 @@ import {
   collectLineBacklogOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
+  growPhaseRunWindow,
   isDoneLineColumn,
+  LINE_PHASE_RUNS_PAGE_SIZE,
   linePhaseRunHref,
   resolvePhaseRunStatus,
 } from "./linePhaseRuns";
@@ -136,7 +138,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
   });
 
-  it("keeps closed work orders off the stage columns", () => {
+  it("keeps closed tasks off the stage columns", () => {
     const closed = {
       ...order("wo-closed", "Closed", [
         {
@@ -158,7 +160,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual([]);
   });
 
-  it("places a multi-step work order only in its furthest active step", () => {
+  it("places a multi-step task only in its furthest active step", () => {
     const orders = [
       order("wo-progress", "Progressing", [
         {
@@ -203,7 +205,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-progress"]);
   });
 
-  it("places a failed mid-line work order only on the failed step", () => {
+  it("places a failed mid-line task only on the failed step", () => {
     const orders = [
       order("wo-fail", "Failing", [
         {
@@ -396,7 +398,7 @@ describe("linePhaseRunHref", () => {
 });
 
 describe("collectLineBacklogOrders", () => {
-  it("returns only draft orders that are not on a line", () => {
+  it("returns draft orders, including those with a finished line history", () => {
     const onLine = order("wo-on-line", "On line", [
       {
         id: "e-on",
@@ -440,9 +442,49 @@ describe("collectLineBacklogOrders", () => {
       lineDispatches: [],
     };
 
-    const backlog = collectLineBacklogOrders([onLine, otherLine, draft, open, closed]);
+    const returned: FactoriesWorkOrder = {
+      ...order("wo-returned", "Returned", [
+        {
+          id: "e-cancelled",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_CANCELLED",
+          createdAt: "2026-08-11T15:00:00.000Z",
+          updatedAt: "2026-08-11T15:00:00.000Z",
+        },
+      ]),
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T15:30:00.000Z",
+    };
 
-    expect(backlog.map((entry) => entry.id)).toEqual(["wo-draft"]);
+    const backlog = collectLineBacklogOrders([onLine, otherLine, draft, returned, open, closed]);
+
+    expect(backlog.map((entry) => entry.id)).toEqual(["wo-returned", "wo-draft"]);
+  });
+
+  it("keeps a returned draft off the Plan column", () => {
+    const returned: FactoriesWorkOrder = {
+      ...order("wo-returned", "Returned", [
+        {
+          id: "e-cancelled",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_CANCELLED",
+          createdAt: "2026-08-11T15:00:00.000Z",
+          updatedAt: "2026-08-11T15:00:00.000Z",
+        },
+      ]),
+      state: "STATE_DRAFT",
+    };
+
+    const board = buildLinePhaseBoard(LINE, [returned], APPS);
+
+    expect(workOrderIds(board)).toEqual([]);
+    expect(collectLineBacklogOrders([returned]).map((entry) => entry.id)).toEqual(["wo-returned"]);
   });
 });
 
@@ -480,6 +522,25 @@ describe("findClosureAutomationApp", () => {
       name: "PR Closure",
     });
   });
+
+  it("ignores a custom canvas that reuses the PR Closure name", () => {
+    expect(
+      findClosureAutomationApp([
+        { id: "app-custom-close", name: "PR Closure", columnKey: "done" },
+        { id: "app-custom-verify", name: "PR Closure", columnKey: "verify" },
+      ]),
+    ).toBeUndefined();
+  });
+});
+
+describe("growPhaseRunWindow", () => {
+  it("raises the window when it already showed every run", () => {
+    expect(growPhaseRunWindow(LINE_PHASE_RUNS_PAGE_SIZE, 3, 5)).toBe(5);
+  });
+
+  it("keeps the current page when the list was already windowed", () => {
+    expect(growPhaseRunWindow(LINE_PHASE_RUNS_PAGE_SIZE, 8, 9)).toBe(LINE_PHASE_RUNS_PAGE_SIZE);
+  });
 });
 
 describe("isDoneLineColumn", () => {
@@ -487,21 +548,5 @@ describe("isDoneLineColumn", () => {
     expect(isDoneLineColumn({ stepName: "Done", appId: "app-plan" })).toBe(true);
     expect(isDoneLineColumn({ stepName: "Phase 4", appId: "app-refund-done" })).toBe(true);
     expect(isDoneLineColumn({ stepName: "Plan", appId: "app-plan" })).toBe(false);
-  });
-});
-
-describe("resolvePhaseRunStatus", () => {
-  it("maps execution states to board labels", () => {
-    expect(resolvePhaseRunStatus({ state: "STATE_STARTED" })).toEqual({ kind: "running", label: "Executing" });
-    expect(resolvePhaseRunStatus({ state: "STATE_CANCELLING" })).toEqual({ kind: "running", label: "Cancelling" });
-    expect(resolvePhaseRunStatus({ state: "STATE_PENDING" })).toEqual({ kind: "queued", label: "Queued" });
-    expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_PASSED" })).toEqual({
-      kind: "idle",
-      label: "Passed",
-    });
-    expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_FAILED" })).toEqual({
-      kind: "failed",
-      label: "Failed",
-    });
   });
 });

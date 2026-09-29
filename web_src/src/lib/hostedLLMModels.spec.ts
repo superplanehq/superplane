@@ -1,13 +1,105 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import {
   compareModelLabels,
   filterModelIds,
+  hostedLLMModelKey,
+  displayModelName,
+  hostedLLMTechnicalName,
+  hostedLLMTechnicalNameFromKey,
+  shortClaudeModelLabel,
+  specificModelId,
   hostedModelIds,
+  parseHostedLLMModelKey,
   pickHostedAnthropicModel,
   pickHostedModel,
+  newestClaudeModelInFamily,
   uniqueSortedModelIds,
 } from "./hostedLLMModels";
+
+describe("newestClaudeModelInFamily", () => {
+  const anthropicKeyModels = [
+    "claude-3-7-sonnet-20250219",
+    "claude-sonnet-4-20250514",
+    "claude-sonnet-4-5-20250929",
+    "claude-sonnet-4-6",
+    "claude-opus-4-20250514",
+    "claude-opus-4-1-20250805",
+    "claude-opus-5-5",
+    "claude-haiku-4-5-20251001",
+  ];
+
+  it("picks the newest Sonnet, not the one with a snapshot date", () => {
+    expect(newestClaudeModelInFamily(anthropicKeyModels, "sonnet")).toBe("claude-sonnet-4-6");
+  });
+
+  it("picks the newest Opus", () => {
+    expect(newestClaudeModelInFamily(anthropicKeyModels, "opus")).toBe("claude-opus-5-5");
+  });
+
+  it("compares versions as numbers", () => {
+    expect(newestClaudeModelInFamily(["claude-opus-9", "claude-opus-10"], "opus")).toBe("claude-opus-10");
+  });
+
+  it("uses the later snapshot for the same version", () => {
+    expect(newestClaudeModelInFamily(["claude-sonnet-4-5-20250929", "claude-sonnet-4-5-20251115"], "sonnet")).toBe(
+      "claude-sonnet-4-5-20251115",
+    );
+  });
+
+  it("returns undefined when the family is missing", () => {
+    expect(newestClaudeModelInFamily(["claude-opus-5-5"], "sonnet")).toBeUndefined();
+    expect(newestClaudeModelInFamily([], "opus")).toBeUndefined();
+  });
+});
+
+describe("specificModelId", () => {
+  it("replaces a Claude alias with the newest model in that family", () => {
+    const ids = ["claude-haiku-4-5", "claude-opus-4-6", "claude-opus-5-5", "claude-sonnet-4-6", "claude-sonnet-4-5"];
+    expect(specificModelId("sonnet", ids)).toBe("claude-sonnet-4-6");
+    expect(specificModelId("opus", ids)).toBe("claude-opus-5-5");
+    expect(specificModelId("haiku", ids)).toBe("claude-haiku-4-5");
+  });
+
+  it("leaves a versioned id unchanged", () => {
+    expect(specificModelId("claude-sonnet-4-6", ["claude-sonnet-4-6", "claude-opus-5-5"])).toBeUndefined();
+    expect(specificModelId("gpt-5", ["gpt-5"])).toBeUndefined();
+  });
+});
+
+describe("displayModelName", () => {
+  it("uses the same Claude label for a provider path and a bare id", () => {
+    expect(displayModelName("anthropic/claude-opus-5-5")).toBe("opus 5-5");
+    expect(displayModelName("claude-opus-5-5")).toBe("opus 5-5");
+    expect(displayModelName("claude-sonnet-4-6")).toBe("sonnet 4-6");
+    expect(displayModelName("anthropic/claude-fable-5")).toBe("fable 5");
+    expect(displayModelName("anthropic/claude-fable-5-1")).toBe("fable 5-1");
+  });
+
+  it("keeps the last segment of a non-Claude id", () => {
+    expect(displayModelName("openai/gpt-5")).toBe("gpt-5");
+    expect(displayModelName("hosted::openrouter::x-ai/grok-4.6")).toBe("grok-4.6");
+    expect(displayModelName("opus")).toBe("opus 5-5");
+    expect(displayModelName("sonnet")).toBe("sonnet 4-6");
+  });
+});
+
+describe("shortClaudeModelLabel", () => {
+  it("shows the Claude family and version", () => {
+    expect(shortClaudeModelLabel("claude-opus-5-5")).toBe("opus 5-5");
+    expect(shortClaudeModelLabel("claude-opus-5.5")).toBe("opus 5.5");
+    expect(shortClaudeModelLabel("claude-sonnet-4-6")).toBe("sonnet 4-6");
+    expect(shortClaudeModelLabel("claude-haiku-4-5")).toBe("haiku 4-5");
+    expect(shortClaudeModelLabel("claude-fable-5")).toBe("fable 5");
+    expect(shortClaudeModelLabel("claude-fable-5-1")).toBe("fable 5-1");
+  });
+
+  it("leaves other model ids unchanged", () => {
+    expect(shortClaudeModelLabel("opus")).toBeUndefined();
+    expect(shortClaudeModelLabel("gpt-5")).toBeUndefined();
+    expect(shortClaudeModelLabel("anthropic/claude-opus-5-5")).toBeUndefined();
+  });
+});
 
 describe("uniqueSortedModelIds", () => {
   it("sorts model ids by name and drops blanks and duplicates", () => {
@@ -44,7 +136,14 @@ describe("compareModelLabels", () => {
 });
 
 describe("pickHostedAnthropicModel", () => {
-  it("prefers a Sonnet id from the allowlist", () => {
+  it("prefers Claude Opus 5.5 from the allowlist", () => {
+    expect(
+      pickHostedAnthropicModel(["claude-opus-4-6", "claude-sonnet-4-6", "claude-opus-5-5", "claude-haiku-4-5"]),
+    ).toBe("claude-opus-5-5");
+    expect(pickHostedAnthropicModel(["claude-sonnet-4-6", "claude-opus-5.5"])).toBe("claude-opus-5.5");
+  });
+
+  it("prefers a Sonnet id when Opus 5.5 is not allowlisted", () => {
     expect(pickHostedAnthropicModel(["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"])).toBe(
       "claude-sonnet-4-6",
     );
@@ -64,7 +163,13 @@ describe("pickHostedModel", () => {
     expect(pickHostedModel("openai", ["gpt-4.1", "gpt-5", "o3"])).toBe("gpt-5");
   });
 
-  it("prefers a Sonnet id from the OpenRouter allowlist", () => {
+  it("prefers Grok 4.7 from the OpenRouter allowlist", () => {
+    expect(pickHostedModel("openrouter", ["anthropic/claude-sonnet-4-6", "x-ai/grok-4.7", "openai/gpt-4.1"])).toBe(
+      "x-ai/grok-4.7",
+    );
+  });
+
+  it("prefers a Sonnet id from the OpenRouter allowlist when Grok 4.7 is absent", () => {
     expect(pickHostedModel("openrouter", ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"])).toBe(
       "anthropic/claude-sonnet-4-6",
     );
@@ -83,5 +188,27 @@ describe("hostedModelIds", () => {
       "sonnet",
       "opus",
     ]);
+  });
+});
+
+describe("hostedLLMTechnicalName", () => {
+  it("uses provider/model for native Anthropic and OpenAI ids", () => {
+    expect(hostedLLMTechnicalName("anthropic", "claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6");
+    expect(hostedLLMTechnicalName("openai", "gpt-5")).toBe("openai/gpt-5");
+  });
+
+  it("keeps OpenRouter ids as provider/model", () => {
+    expect(hostedLLMTechnicalName("openrouter", "moonshotai/kimi-k2.6")).toBe("moonshotai/kimi-k2.6");
+  });
+});
+
+describe("hostedLLMModelKey", () => {
+  it("encodes and parses provider::model keys", () => {
+    expect(hostedLLMModelKey("openrouter", "anthropic/claude-sonnet-4")).toBe("openrouter::anthropic/claude-sonnet-4");
+    expect(parseHostedLLMModelKey("openrouter::anthropic/claude-sonnet-4")).toEqual({
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4",
+    });
+    expect(hostedLLMTechnicalNameFromKey("anthropic::claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6");
   });
 });

@@ -1,7 +1,8 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ConfigurationField } from "@/api-client";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { ConfigurationFieldRenderer } from "./index";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 
@@ -13,6 +14,60 @@ const runTitleField: ConfigurationField = {
   togglable: true,
   placeholder: "{{ root().data.context }}",
 };
+
+describe("ConfigurationFieldRenderer togglable Claude admin key", () => {
+  const adminKeyField: ConfigurationField = {
+    name: "adminKey",
+    type: "string",
+    label: "Admin API Key",
+    description: "Use this key only to fetch usage and cost reports.",
+    required: false,
+    sensitive: true,
+    togglable: true,
+  };
+
+  it("hides the admin key input until the optional setting is enabled", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: undefined,
+        onChange: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByText("Admin API Key")).toBeInTheDocument();
+    expect(screen.queryByTestId("string-field-adminkey")).not.toBeInTheDocument();
+  });
+
+  it("shows the admin key input when the optional setting is enabled", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: "",
+        onChange: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByTestId("string-field-adminkey")).toBeInTheDocument();
+  });
+
+  it("turns the optional admin key off", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: "",
+        onChange,
+      }),
+    );
+
+    await user.click(screen.getByRole("switch"));
+
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+});
 
 describe("ConfigurationFieldRenderer run title copy", () => {
   it("explains disabled trigger run title customization", () => {

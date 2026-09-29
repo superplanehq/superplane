@@ -1,36 +1,78 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
-import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
+import {
+  composeIntentDocument,
+  EMPTY_INTENT_DOCUMENT,
+  INTENT_ARTIFACT_NAME,
+  SPEC_ARTIFACT_NAME,
+  type IntentDocument,
+  parseIntentDocument,
+} from "../../lib/intentDocument";
+import {
+  extractArtifactMarkdownBody,
+  extractArtifactName,
+  extractArtifactTitle,
+  toArtifactDataRecord,
+} from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "./splitRunMocks";
+import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunFixture, type SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
 
-/** Description uses a 3/2 reading-to-side split. */
-export const SPLIT_RUN_PANE_GRID_CLASSNAME =
-  "grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]";
+/**
+ * The classic tabbed popup predates the console. Drop the console-only
+ * phases (runs from earlier dispatches and the closure card) so orgs
+ * without the Task Console feature see the original timeline.
+ */
+export function classicSplitRunFixture(fixture: SplitRunFixture): SplitRunFixture {
+  const phases = fixture.phases.filter((phase) => !phase.historyRun && phase.id !== SPLIT_RUN_CLOSURE_PHASE_ID);
+  return phases.length === fixture.phases.length ? fixture : { ...fixture, phases };
+}
+
+export function refinePopupShowsAutomations(args: {
+  footerKind: SplitRunFixture["footer"]["kind"];
+  sourceOnly?: boolean;
+}) {
+  if (args.sourceOnly) {
+    return true;
+  }
+  return args.footerKind !== "draft";
+}
+
+/** Refine overlay size. Chat-only is 48rem. Plan open is 80rem. */
+export const SPLIT_RUN_POPUP_DIALOG_CLASSNAME =
+  "has-[[data-refine-chat-solo]]:w-[min(48rem,calc(100vw-5rem))] has-[[data-refine-plan-open]]:w-[min(80rem,calc(100vw-5rem))] transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+
+/** Refine chat column. */
+export const SPLIT_RUN_CHAT_COLUMN_CLASSNAME = "mx-auto w-full max-w-5xl px-4";
+
+/** Reserve the scrollbar lane on the log and the composer so their right edges stay aligned. */
+export const SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME = "overflow-y-auto [scrollbar-gutter:stable]";
+
+/** Shared height for the chat composer and the spec decision row. */
+export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =
+  "flex shrink-0 items-center border-t border-border bg-background px-5 py-3 min-h-[5.5rem]";
 
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
 
-const LOG_TAB_DOT: Record<SplitRunPhaseStatus, string> = {
-  passed: "bg-[color:var(--status-completed-dot)]",
-  running: "bg-[color:var(--status-running-dot)]",
-  waiting: "bg-[color:var(--status-waiting-dot)]",
-  failed: "bg-[color:var(--status-failed-dot)]",
-  pending: "bg-[color:var(--status-draft-dot)]",
-};
+export function isWorkOrderDescriptionName(name: string): boolean {
+  return DESCRIPTION_NAMES.includes(name);
+}
+const PLAN_NAMES = ["plan.md"];
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  if (fixture.openPhaseId) {
-    return "log";
-  }
-  return fixture.footer.kind === "draft" || fixture.footer.kind === "done" ? "description" : "log";
+  const hasRunningLineStep = fixture.phases.some((phase) => phase.stepIndex != null && phase.status === "running");
+  return hasRunningLineStep || hasActivePullRequestActivity(fixture) ? "log" : "description";
 }
 
-export function splitRunLogTabDotClass(status: SplitRunPhaseStatus): string {
-  return LOG_TAB_DOT[status];
+export function hasActivePullRequestActivity(fixture: SplitRunFixture): boolean {
+  return fixture.phases.some(
+    (phase) =>
+      Boolean(phase.pullRequestActivity) &&
+      (phase.status === "running" || phase.status === "pending" || phase.status === "waiting"),
+  );
 }
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {
@@ -94,7 +136,7 @@ export function splitRunPhaseRunHref(args: {
     return undefined;
   }
   return factoryAppSplitRunPath(organizationId, factoryKey, phase.appId, {
-    from: "work-order",
+    from: "task",
     orderNumber,
     lineId,
     runId: phase.runId,
@@ -113,6 +155,17 @@ export function resolveSplitRunPopupArtifacts(args: {
   return args.fixtureArtifacts;
 }
 
+export function resolveSplitRunPopupPullRequests(args: {
+  fixturePullRequests: FactoriesFactoryPullRequest[];
+  livePullRequests?: FactoriesFactoryPullRequest[];
+  useLive: boolean;
+}): FactoriesFactoryPullRequest[] {
+  if (args.useLive) {
+    return args.livePullRequests ?? [];
+  }
+  return args.fixturePullRequests;
+}
+
 export function collectSplitRunArtifacts(fixture: SplitRunFixture): FactoriesWorkOrderArtifact[] {
   const seen = new Set<string>();
   const artifacts: FactoriesWorkOrderArtifact[] = [];
@@ -129,15 +182,48 @@ export function collectSplitRunArtifacts(fixture: SplitRunFixture): FactoriesWor
   return artifacts;
 }
 
-export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
-  for (const name of DESCRIPTION_NAMES) {
-    const artifact = artifacts.find((entry) => artifactName(entry) === name);
-    const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact?.data))?.trim();
-    if (body) {
-      return body;
+/** Unique pull requests from every phase stream, first occurrence wins. */
+export function collectSplitRunPullRequests(fixture: SplitRunFixture): FactoriesFactoryPullRequest[] {
+  const seen = new Set<string>();
+  const pullRequests: FactoriesFactoryPullRequest[] = [];
+  for (const phase of fixture.phases) {
+    for (const line of phase.stream) {
+      const pullRequest = line.pullRequest;
+      if (!pullRequest) {
+        continue;
+      }
+      const key = pullRequest.id ?? pullRequest.url ?? String(pullRequest.number ?? "");
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      pullRequests.push(pullRequest);
     }
   }
-  return "";
+  return pullRequests;
+}
+
+export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
+  return firstArtifactMarkdown(artifacts, DESCRIPTION_NAMES);
+}
+
+export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
+  return firstArtifactMarkdown(artifacts, [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME]);
+}
+
+export function splitRunIntentDocument(args: {
+  artifacts: FactoriesWorkOrderArtifact[];
+  description: string;
+  skipDescriptionFallback?: boolean;
+}): IntentDocument {
+  const intent = splitRunIntentMarkdown(args.artifacts);
+  if (intent) {
+    return parseIntentDocument(intent);
+  }
+  if (args.skipDescriptionFallback) {
+    return EMPTY_INTENT_DOCUMENT;
+  }
+  return composeIntentDocument(args.description, firstArtifactMarkdown(args.artifacts, PLAN_NAMES));
 }
 
 /** Live saves win. Storybook still prefers artifact markdown. */
@@ -161,7 +247,11 @@ export function splitRunLinkedArtifacts(
 ): FactoriesWorkOrderArtifact[] {
   return artifacts
     .filter((artifact) => {
-      if (DESCRIPTION_NAMES.includes(artifactName(artifact))) {
+      if (
+        DESCRIPTION_NAMES.includes(artifactName(artifact)) ||
+        artifactName(artifact) === INTENT_ARTIFACT_NAME ||
+        artifactName(artifact) === SPEC_ARTIFACT_NAME
+      ) {
         return false;
       }
       return !isOriginTicketArtifact(artifact, source);
@@ -178,13 +268,18 @@ function artifactCreatedAtMs(artifact: FactoriesWorkOrderArtifact): number {
   return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
-function artifactName(artifact: FactoriesWorkOrderArtifact): string {
-  const data = toArtifactDataRecord(artifact.data);
-  if (typeof data?.name === "string" && data.name.trim()) {
-    return data.name.trim();
-  }
-  if (typeof data?.title === "string" && data.title.trim()) {
-    return data.title.trim();
+function firstArtifactMarkdown(artifacts: FactoriesWorkOrderArtifact[], names: readonly string[]): string {
+  for (const name of names) {
+    const artifact = artifacts.find((entry) => artifactName(entry) === name);
+    const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact?.data))?.trim();
+    if (body) {
+      return body;
+    }
   }
   return "";
+}
+
+function artifactName(artifact: FactoriesWorkOrderArtifact): string {
+  const data = toArtifactDataRecord(artifact.data);
+  return extractArtifactName(data)?.trim() || extractArtifactTitle(data)?.trim() || "";
 }

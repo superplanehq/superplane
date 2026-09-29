@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import yaml from "js-yaml";
 
 import { getFactoryDefinition } from "./index";
 import {
   FACTORY_CANVAS_ID_PLACEHOLDER,
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   normalizeFactoryInstallParams,
@@ -62,6 +63,7 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/web",
       backlogRepository: "acme/web",
+      defaultBranch: "main",
     });
     expect(
       normalizeFactoryInstallParams({
@@ -73,7 +75,24 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "main",
     });
+  });
+
+  it("substitutes the default branch placeholder", () => {
+    expect(
+      substituteInstallParams("base: {{ install_params.defaultBranch }}", {
+        defaultBranch: "staging",
+      }),
+    ).toBe("base: staging");
+  });
+
+  it("defaults defaultBranch to main when absent or blank", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
+      "staging",
+    );
   });
 
   it("wires integration refs onto matching components", () => {
@@ -213,92 +232,70 @@ spec:
     });
   });
 
+  it("materializes hosted SuperPlane agents without credentials or model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("software-factory"),
+      canvasName: "My Factory",
+      canvasId: "canvas-123",
+      installParams: { repository: "acme/web" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+      },
+    });
+
+    const doc = yaml.load(canvasYaml) as {
+      spec?: { nodes?: Array<{ component?: string; configuration?: Record<string, unknown> }> };
+    };
+    const agents = (doc.spec?.nodes ?? []).filter((node) => node.component === "runnerSuperPlane");
+    expect(agents.length).toBeGreaterThan(0);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+    for (const agent of agents) {
+      expect(agent.configuration?.credentials).toBeUndefined();
+      expect(agent.configuration?.model).toBeUndefined();
+      expect(agent.configuration?.maxTurns).toBeUndefined();
+    }
+  });
+
   it("exposes separate app and backlog install params on the bundled definition", () => {
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
 
-  it("keeps the planning agent on Opus when Claude Code credentials become hosted", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-planning"),
-      canvasName: "Plan",
-      canvasId: "canvas-hosted-plan",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
+  it("maps SuperPlane rewrites to hosted credential source for the backend template", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      model: "",
+      planningModel: "",
+      credentialSource: "hosted",
+      credentialIntegrationName: undefined,
+    });
+  });
+
+  it("maps integration rewrites to the selected installation name", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
         component: "runnerClaudeCode",
-        model: "claude-sonnet-4-6",
-        credentials: { source: "hosted" },
-      },
+        model: "sonnet",
+        planningModel: "opus",
+        credentials: { source: "integration", name: "acme-claude" },
+      }),
+    ).toEqual({
+      component: "runnerClaudeCode",
+      model: "sonnet",
+      planningModel: "opus",
+      credentialSource: "integration",
+      credentialIntegrationName: "acme-claude",
     });
-
-    expect(canvasYaml).toMatch(/id: planner-agent-no-issue[\s\S]*model: opus/);
-    expect(canvasYaml).not.toContain("model: claude-sonnet-4-6");
-  });
-
-  it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-implementation"),
-      canvasName: "Implementation",
-      canvasId: "canvas-hosted",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerClaudeCode",
-        model: "claude-sonnet-4-6",
-        credentials: { source: "hosted" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*source: hosted/);
-    expect(canvasYaml).toContain("model: claude-sonnet-4-6");
-    expect(canvasYaml).not.toMatch(/credentials:[\s\S]*source: integration[\s\S]*name: claude/);
-    expect(canvasYaml).not.toContain("model: sonnet");
-  });
-
-  it("rewrites Claude Code nodes to hosted OpenRouter with an allowlisted model", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-planning"),
-      canvasName: "Planning",
-      canvasId: "canvas-openrouter",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerOpenRouter",
-        model: "openai/gpt-4.1",
-        credentials: { source: "hosted" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*source: hosted/);
-    expect(canvasYaml).toContain("model: openai/gpt-4.1");
-    expect(canvasYaml).not.toContain("runnerClaudeCode");
-  });
-
-  it("rewrites Claude Code nodes to an OpenRouter integration", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-pr"),
-      canvasName: "Verify",
-      canvasId: "canvas-or-byok",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-        openrouter: { id: "int-3", name: "acme-openrouter", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerOpenRouter",
-        model: "anthropic/claude-sonnet-4-6",
-        credentials: { source: "integration", name: "acme-openrouter" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*name: acme-openrouter/);
-    expect(canvasYaml).not.toContain("runnerClaudeCode");
   });
 });

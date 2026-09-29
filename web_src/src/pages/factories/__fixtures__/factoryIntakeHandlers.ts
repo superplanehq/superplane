@@ -1,4 +1,4 @@
-import type { FactoriesFactoryIntake, FactoryIntakeSettings } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryIntakeSettings } from "@/api-client";
 import type { FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 import type { FactoriesFixture } from "./factoryPageResponses";
@@ -10,8 +10,10 @@ export interface FactoryIntakeRoute {
 
 const INTAKE_NAME_BY_SOURCE: Record<string, string> = {
   SOURCE_GITHUB_ISSUES: "GitHub issues",
+  SOURCE_JIRA_ISSUES: "Jira issues",
   SOURCE_SENTRY_EXCEPTIONS: "Sentry exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "PagerDuty incidents",
+  SOURCE_DATADOG: "Datadog errors",
 };
 
 function route(pattern: string): RegExp {
@@ -77,7 +79,7 @@ function updateOrDeleteFactoryIntake(
     return null;
   }
 
-  const request = (body ?? {}) as { name?: unknown; settings?: FactoryIntakeSettings };
+  const request = (body ?? {}) as { name?: unknown; settings?: FactoriesFactoryIntakeSettings };
   const updated: FactoriesFactoryIntake = {
     ...intakes[index],
     ...(stringValue(request.name) ? { name: stringValue(request.name) } : {}),

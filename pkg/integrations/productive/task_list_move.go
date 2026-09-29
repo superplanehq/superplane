@@ -1,0 +1,566 @@
+package productive
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// TaskListMove is a Productive.io task changing task lists. From and To are
+// task list ids. An empty From means the task had no list.
+type TaskListMove struct {
+	From string
+	To   string
+}
+
+const (
+	// taskActivityMatchWindow is how far an activity may sit from the webhook
+	// timestamp and still belong to that delivery. A later edit must not replace
+	// the change this delivery reported.
+	taskActivityMatchWindow = 2 * time.Minute
+
+	// taskActivityPageSize is how many activities each page requests.
+	taskActivityPageSize = 20
+
+	// maxTaskActivityPages bounds how many pages the lookup walks, so a
+	// misbehaving pagination cursor cannot loop forever.
+	maxTaskActivityPages = 20
+)
+
+// errTaskUpdateActivityUnavailable means this delivery's changeset could not
+// be read.
+var errTaskUpdateActivityUnavailable = errors.New("task update activity unavailable")
+
+type taskActivity struct {
+	at        time.Time
+	changeset any
+}
+
+// taskUpdateChangesetAt reads the changeset for one delivered update.
+// Productive.io webhooks carry the task after the change, not the fields
+// that changed. The activity feed shows the change, matched to this delivery
+// by time and by the task state in the webhook.
+func (c *Client) taskUpdateChangesetAt(taskID string, deliveredAt time.Time, document map[string]any) (any, bool, error) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" || deliveredAt.IsZero() {
+		return nil, false, nil
+	}
+
+	labels := &taskListLabels{client: c, projectID: taskProjectID(document)}
+	activities := []taskActivity{}
+	var changeset any
+	var bestDelta time.Duration
+	var labelErr error
+	found := false
+	for page := 1; page <= maxTaskActivityPages; page++ {
+		body, err := c.execRequest(http.MethodGet, c.taskActivityURL(taskID, deliveredAt, page), nil)
+		if err != nil {
+			// This page can still hold the closest change. Fail the lookup so
+			// Productive.io retries, instead of emitting an older match.
+			return nil, false, err
+		}
+
+		response := resourceListResponse{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, false, fmt.Errorf("error parsing task activities: %v", err)
+		}
+
+		pageActivities := taskActivitiesFromDocuments(response.Data)
+		resolved, err := labels.withTaskListIDs(pageActivities)
+		if err != nil {
+			// A task list lookup can fail for a nearby list change. Keep the
+			// page so an update that does not name a list can still match.
+			// The error is returned only when an unresolved label may be
+			// this delivery.
+			labelErr = err
+		} else {
+			pageActivities = resolved
+		}
+		activities = append(activities, pageActivities...)
+		changeset, bestDelta, found = activityForDelivery(activities, deliveredAt, document)
+		if len(response.Data) < taskActivityPageSize || activityPageBeforeWindow(pageActivities, deliveredAt) {
+			break
+		}
+		// Later pages are older. Stop once none of them can sit closer to
+		// this delivery than the activity already found.
+		if found && !laterPageCanBeCloser(activities, deliveredAt, bestDelta) {
+			break
+		}
+	}
+
+	if labelErr != nil && listLabelBlocksMatch(activities, deliveredAt, found, bestDelta) {
+		return nil, false, labelErr
+	}
+	return changeset, found, nil
+}
+
+func (c *Client) taskActivityURL(taskID string, deliveredAt time.Time, page int) string {
+	params := url.Values{}
+	params.Set("filter[task_id]", taskID)
+	params.Set("filter[event]", "update")
+	params.Set("filter[item_type]", "task")
+	params.Set("filter[type]", "2")
+	params.Set("filter[after]", deliveredAt.Add(-taskActivityMatchWindow).Format(time.RFC3339Nano))
+	params.Set("filter[before]", deliveredAt.Add(taskActivityMatchWindow).Format(time.RFC3339Nano))
+	// Productive.io rejects a sort on activities with 422. The default
+	// order is newest first.
+	params.Set("page[number]", strconv.Itoa(page))
+	params.Set("page[size]", strconv.Itoa(taskActivityPageSize))
+	return fmt.Sprintf("%s/activities?%s", c.BaseURL, params.Encode())
+}
+
+func taskActivitiesFromDocuments(documents []resourceDocument) []taskActivity {
+	activities := make([]taskActivity, 0, len(documents))
+	for _, activity := range documents {
+		at, ok := parseActivityTime(stringAttribute(activity.Attributes["created_at"]))
+		if !ok {
+			continue
+		}
+		activities = append(activities, taskActivity{at: at, changeset: activity.Attributes["changeset"]})
+	}
+	return activities
+}
+
+// listLabelBlocksMatch reports that an unresolved task list label may be
+// the activity for this delivery. A label farther from the delivery than a
+// matched update must not fail that update.
+func listLabelBlocksMatch(activities []taskActivity, deliveredAt time.Time, found bool, bestDelta time.Duration) bool {
+	for _, activity := range activities {
+		if activity.at.IsZero() || !changesetNeedsTaskListIDs(activity.changeset) {
+			continue
+		}
+		delta := activity.at.Sub(deliveredAt)
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta > taskActivityMatchWindow {
+			continue
+		}
+		if !found || delta <= bestDelta {
+			return true
+		}
+	}
+	return false
+}
+
+// changesetNeedsTaskListIDs reports that a changeset names a task list by
+// label. Productive.io writes "<folder name>: <list name>", not an id.
+func changesetNeedsTaskListIDs(changeset any) bool {
+	fields := changesetFields(changeset)
+	for _, key := range taskListChangeKeys {
+		value, found := fields[key]
+		if !found {
+			continue
+		}
+		from, to, ok := changePair(value)
+		if !ok {
+			continue
+		}
+		if taskListLabelNeedsID(from) || taskListLabelNeedsID(to) {
+			return true
+		}
+	}
+	return false
+}
+
+func taskListLabelNeedsID(value string) bool {
+	return value != "" && !isTaskListID(value)
+}
+
+// activityPageBeforeWindow reports that this page is older than the match
+// window. Later pages are older because the query sorts newest first.
+func activityPageBeforeWindow(activities []taskActivity, deliveredAt time.Time) bool {
+	if len(activities) == 0 {
+		return false
+	}
+
+	newest := activities[0].at
+	for _, activity := range activities[1:] {
+		if activity.at.After(newest) {
+			newest = activity.at
+		}
+	}
+	return newest.Before(deliveredAt.Add(-taskActivityMatchWindow))
+}
+
+func activityForDelivery(activities []taskActivity, deliveredAt time.Time, document map[string]any) (any, time.Duration, bool) {
+	if deliveredAt.IsZero() {
+		return nil, 0, false
+	}
+
+	var changeset any
+	var bestDelta time.Duration
+	found := false
+	for _, activity := range activities {
+		if activity.at.IsZero() || activity.changeset == nil {
+			continue
+		}
+		delta := activity.at.Sub(deliveredAt)
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta > taskActivityMatchWindow {
+			continue
+		}
+		if !changesetMatchesDocument(activity.changeset, document) {
+			continue
+		}
+		if found && delta >= bestDelta {
+			continue
+		}
+		changeset = activity.changeset
+		bestDelta = delta
+		found = true
+	}
+	return changeset, bestDelta, found
+}
+
+// laterPageCanBeCloser reports whether an older page can beat bestDelta.
+// The query sorts newest first, so later pages are older than the oldest
+// activity already read.
+func laterPageCanBeCloser(activities []taskActivity, deliveredAt time.Time, bestDelta time.Duration) bool {
+	if bestDelta == 0 {
+		return false
+	}
+
+	oldest, ok := oldestActivityTime(activities)
+	if !ok || oldest.After(deliveredAt) {
+		return true
+	}
+	return deliveredAt.Sub(oldest) < bestDelta
+}
+
+func oldestActivityTime(activities []taskActivity) (time.Time, bool) {
+	var oldest time.Time
+	found := false
+	for _, activity := range activities {
+		if activity.at.IsZero() {
+			continue
+		}
+		if !found || activity.at.Before(oldest) {
+			oldest = activity.at
+			found = true
+		}
+	}
+	return oldest, found
+}
+
+func changesetMatchesDocument(changeset any, document map[string]any) bool {
+	if listID, ok := changesetListAfter(changeset); ok && listID != taskListID(document) {
+		return false
+	}
+	if title, ok := changesetTitleAfter(changeset); ok && title != taskAttribute(document, "title") {
+		return false
+	}
+	return true
+}
+
+func changesetListAfter(changeset any) (string, bool) {
+	fields := changesetFields(changeset)
+	for _, key := range taskListChangeKeys {
+		value, found := fields[key]
+		if !found {
+			continue
+		}
+		_, to, ok := changePair(value)
+		if ok {
+			return to, true
+		}
+	}
+	return "", false
+}
+
+func changesetTitleAfter(changeset any) (string, bool) {
+	_, after, ok := changePair(changesetFields(changeset)["title"])
+	if !ok {
+		return "", false
+	}
+	return after, true
+}
+
+func taskAttribute(document map[string]any, name string) string {
+	attributes, _ := document["attributes"].(map[string]any)
+	return strings.TrimSpace(changesetValue(attributes[name]))
+}
+
+func deliveryCreatedAt(body []byte) (time.Time, bool) {
+	var payload struct {
+		Created string `json:"created"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return time.Time{}, false
+	}
+	return parseActivityTime(payload.Created)
+}
+
+func parseActivityTime(value string) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+var taskListChangeKeys = []string{"task_list_id", "milestone_id", "task_list"}
+
+// taskListLabels maps the task list labels in an activity changeset to task
+// list ids. Productive.io writes a list as "<folder name>: <list name>", for
+// example "Folder: Bugs", not as an id.
+type taskListLabels struct {
+	client    *Client
+	projectID string
+	ids       map[string]string
+}
+
+func (l *taskListLabels) withTaskListIDs(activities []taskActivity) ([]taskActivity, error) {
+	for i, activity := range activities {
+		changeset, err := l.changesetWithTaskListIDs(activity.changeset)
+		if err != nil {
+			return nil, err
+		}
+		activities[i].changeset = changeset
+	}
+	return activities, nil
+}
+
+func (l *taskListLabels) changesetWithTaskListIDs(changeset any) (any, error) {
+	fields := changesetFields(changeset)
+	for _, key := range taskListChangeKeys {
+		value, found := fields[key]
+		if !found {
+			continue
+		}
+		from, to, ok := changePair(value)
+		if !ok {
+			return changeset, nil
+		}
+		fromID, err := l.id(from)
+		if err != nil {
+			return nil, err
+		}
+		toID, err := l.id(to)
+		if err != nil {
+			return nil, err
+		}
+		fields[key] = []any{fromID, toID}
+		return fields, nil
+	}
+	return changeset, nil
+}
+
+// id returns the task list id for a label. A value that is already an id,
+// or a label that matches no list, is returned unchanged.
+func (l *taskListLabels) id(label string) (string, error) {
+	if label == "" || isTaskListID(label) || l.projectID == "" {
+		return label, nil
+	}
+	if l.ids == nil {
+		ids, err := l.client.taskListIDsByLabel(l.projectID)
+		if err != nil {
+			return "", err
+		}
+		l.ids = ids
+	}
+	if id, ok := l.ids[label]; ok {
+		return id, nil
+	}
+	return label, nil
+}
+
+func isTaskListID(value string) bool {
+	_, err := strconv.ParseUint(value, 10, 64)
+	return err == nil
+}
+
+type taskListsWithFolders struct {
+	Data     []resourceDocument `json:"data"`
+	Included []resourceDocument `json:"included"`
+}
+
+// taskListIDsByLabel maps "<folder name>: <list name>" to the id of every
+// task list in the project. A list name alone also maps to its id when no
+// other list has that name.
+func (c *Client) taskListIDsByLabel(projectID string) (map[string]string, error) {
+	ids := map[string]string{}
+	nameCounts := map[string]int{}
+	nameIDs := map[string]string{}
+	labelCounts := map[string]int{}
+	labelIDs := map[string]string{}
+	for page := 1; page <= maxProjectPages; page++ {
+		params := url.Values{}
+		params.Set("filter[project_id]", projectID)
+		params.Set("include", "folder")
+		params.Set("page[number]", strconv.Itoa(page))
+		params.Set("page[size]", strconv.Itoa(projectsPageSize))
+
+		body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/task_lists?%s", c.BaseURL, params.Encode()), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		response := taskListsWithFolders{}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("error parsing task lists: %v", err)
+		}
+
+		folderNames := map[string]string{}
+		for _, included := range response.Included {
+			if included.Type == "folders" {
+				folderNames[included.ID] = strings.TrimSpace(stringAttribute(included.Attributes["name"]))
+			}
+		}
+		for _, list := range response.Data {
+			name := strings.TrimSpace(stringAttribute(list.Attributes["name"]))
+			if name == "" {
+				continue
+			}
+			nameCounts[name]++
+			nameIDs[name] = list.ID
+			if folder := folderNames[list.Relationships["folder"].Data.ID]; folder != "" {
+				label := folder + ": " + name
+				labelCounts[label]++
+				labelIDs[label] = list.ID
+			}
+		}
+
+		if len(response.Data) < projectsPageSize {
+			break
+		}
+	}
+
+	// Two lists can share a folder name and a list name. Mapping that label
+	// to one id would record a move onto the wrong list.
+	for label, count := range labelCounts {
+		if count == 1 {
+			ids[label] = labelIDs[label]
+		}
+	}
+	for name, count := range nameCounts {
+		if _, taken := ids[name]; count == 1 && !taken {
+			ids[name] = nameIDs[name]
+		}
+	}
+	return ids, nil
+}
+
+func taskListMoveFromChangeset(changeset any) (TaskListMove, bool) {
+	fields := changesetFields(changeset)
+	for _, key := range taskListChangeKeys {
+		value, found := fields[key]
+		if !found {
+			continue
+		}
+		from, to, ok := changePair(value)
+		if !ok || to == "" || from == to {
+			return TaskListMove{}, false
+		}
+		return TaskListMove{From: from, To: to}, true
+	}
+	return TaskListMove{}, false
+}
+
+func changesetFields(changeset any) map[string]any {
+	switch typed := changeset.(type) {
+	case map[string]any:
+		return lowerFieldKeys(typed)
+	case []any:
+		fields := map[string]any{}
+		for _, item := range typed {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			name := strings.ToLower(strings.TrimSpace(changesetValue(firstField(entry, "attribute", "field", "name"))))
+			if name == "" {
+				for key, value := range lowerFieldKeys(entry) {
+					fields[key] = value
+				}
+				continue
+			}
+			fields[name] = entry
+		}
+		return fields
+	default:
+		return nil
+	}
+}
+
+func lowerFieldKeys(fields map[string]any) map[string]any {
+	lowered := make(map[string]any, len(fields))
+	for key, value := range fields {
+		lowered[strings.ToLower(strings.TrimSpace(key))] = value
+	}
+	return lowered
+}
+
+func changePair(value any) (string, string, bool) {
+	switch typed := value.(type) {
+	case []any:
+		if len(typed) < 2 {
+			return "", "", false
+		}
+		return changesetValue(typed[0]), changesetValue(typed[1]), true
+	case map[string]any:
+		before, beforeOK := namedChangesetValue(typed, "old", "from", "previous")
+		after, afterOK := namedChangesetValue(typed, "new", "to", "current")
+		if !beforeOK || !afterOK {
+			return "", "", false
+		}
+		return before, after, true
+	default:
+		return "", "", false
+	}
+}
+
+func namedChangesetValue(fields map[string]any, names ...string) (string, bool) {
+	lowered := lowerFieldKeys(fields)
+	for _, name := range names {
+		value, ok := lowered[name]
+		if !ok {
+			continue
+		}
+		return changesetValue(value), true
+	}
+	return "", false
+}
+
+func firstField(fields map[string]any, names ...string) any {
+	lowered := lowerFieldKeys(fields)
+	for _, name := range names {
+		value, ok := lowered[name]
+		if ok {
+			return value
+		}
+	}
+	return nil
+}
+
+func changesetValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case json.Number:
+		return typed.String()
+	case int:
+		return strconv.Itoa(typed)
+	case int64:
+		return strconv.FormatInt(typed, 10)
+	case map[string]any:
+		// Productive.io wraps each changeset value, for example
+		// {"value": "Folder: Bugs"}.
+		return changesetValue(typed["value"])
+	default:
+		return ""
+	}
+}

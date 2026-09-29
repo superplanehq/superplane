@@ -1,5 +1,5 @@
 import { Position, type Edge, type Node } from "@xyflow/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import {
   FACTORY_SPINE_HANDLE_ID,
@@ -37,7 +37,7 @@ describe("buildStyledCanvasEdges factory run routing", () => {
       nodes,
       isVerticalFlow: true,
       resolvedThemeIsDark: false,
-      edgeDefaults: { type: "custom", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
+      edgeDefaults: { type: "custom", style: { stroke: "#94a3b8", strokeWidth: 2 } },
       hoveredEdgeId: null,
       isEditMode: false,
       isReadOnly: false,

@@ -2,7 +2,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
-  FactoryApp,
+  FactoryAutomation,
   FactoryLineStep,
 } from "@/api-client";
 
@@ -20,31 +20,31 @@ export function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
 export const PLAN_LINE_DONE_APP_ID = "app-refund-done";
 const PLAN_LINE_BACKLOG_APP_ID = "app-refund-backlog";
 
-export const BACKLOG_APP: FactoryApp = {
+export const BACKLOG_APP: FactoryAutomation = {
   id: PLAN_LINE_BACKLOG_APP_ID,
   name: "Ingest",
-  description: "Create a work order when a GitHub issue gets the factory label or is assigned to the SuperPlane agent.",
+  description: "Create a task when a GitHub issue gets the factory label or is assigned to the SuperPlane agent.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
 
-export const SENTRY_INTAKE_APP: FactoryApp = {
+export const SENTRY_INTAKE_APP: FactoryAutomation = {
   id: "app-refund-sentry",
   name: "Sentry",
-  description: "Create a work order when Sentry opens an issue.",
+  description: "Create a task when Sentry opens an issue.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
 
-export const SLACK_INTAKE_APP: FactoryApp = {
+export const SLACK_INTAKE_APP: FactoryAutomation = {
   id: "app-refund-slack",
   name: "Slack",
-  description: "Create a work order when someone mentions the SuperPlane agent in Slack.",
+  description: "Create a task when someone mentions the SuperPlane agent in Slack.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
 
-export const PLAN_LINE_APPS: FactoryApp[] = [
+export const PLAN_LINE_APPS: FactoryAutomation[] = [
   BACKLOG_APP,
   SENTRY_INTAKE_APP,
   SLACK_INTAKE_APP,
@@ -60,7 +60,7 @@ export const PLAN_LINE_APPS: FactoryApp[] = [
   {
     id: PLAN_LINE_DONE_APP_ID,
     name: "Done",
-    description: "Completes or rejects the work order when a pull request merges or closes.",
+    description: "Completes or rejects the task when a pull request merges or closes.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },

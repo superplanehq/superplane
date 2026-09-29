@@ -78,9 +78,19 @@ function appendWebhookRequestValues(values: Record<string, string>, webhookData:
   }
 }
 
+interface WebhookEventPayload {
+  data?: { body?: { run_name?: string } };
+  _webhook?: WebhookEventData;
+  timestamp?: string;
+}
+
+function webhookEventPayload(context: TriggerEventContext): WebhookEventPayload | undefined {
+  return context.event?.data as WebhookEventPayload | undefined;
+}
+
 function getWebhookEventTitle(context: TriggerEventContext): string {
   // Check for run_name in the webhook request body
-  const runName = (context.event?.data?.data as { body?: { run_name?: string } })?.body?.run_name;
+  const runName = webhookEventPayload(context)?.data?.body?.run_name;
   if (runName) {
     return `${runName}`;
   }
@@ -101,8 +111,9 @@ export const webhookTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const webhookData = context.event?.data?._webhook as WebhookEventData | undefined;
-    const receivedOn = (context.event?.data?.["timestamp"] as string) || context.event?.createdAt;
+    const payload = webhookEventPayload(context);
+    const webhookData = payload?._webhook;
+    const receivedOn = payload?.timestamp || context.event?.createdAt;
     const values: Record<string, string> = {
       "Received on": receivedOn ? new Date(receivedOn).toLocaleString() : "n/a",
       Response: "200",

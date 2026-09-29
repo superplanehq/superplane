@@ -17,6 +17,7 @@ import {
   type HomePageFixture,
   type StorybookOrgIntegration,
 } from "@/pages/home/__fixtures__/handlers";
+import { createStorybookAccountState } from "@/pages/home/__fixtures__/storybookAccountState";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 
 function emptyOrgWorkspaceCatchAll(url: URL): { json: unknown } | null {
@@ -29,6 +30,14 @@ function emptyOrgWorkspaceCatchAll(url: URL): { json: unknown } | null {
     return { json: {} };
   }
   return null;
+}
+
+function fixtureFetchBaseHref(): string {
+  const href = globalThis.location?.href;
+  if (typeof href === "string" && (href.startsWith("http://") || href.startsWith("https://"))) {
+    return href;
+  }
+  return "http://localhost/";
 }
 
 function requestUrl(input: RequestInfo | URL): string {
@@ -62,9 +71,10 @@ export function createOrgWorkspaceFixtureFetch(
   // Connect flows push into this list, so each fetch impl owns a private copy.
   const orgIntegrations: StorybookOrgIntegration[] = structuredClone(options?.orgIntegrations ?? []);
   const agentMessages = createStorybookAgentMessageStore(appFixture?.agentMessages?.messages);
+  const accountState = createStorybookAccountState(homeFixture.organizationId);
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
+    const url = new URL(requestUrl(input), fixtureFetchBaseHref());
     const method = requestMethod(input, init);
     const body = await readRequestJson(input, init);
     const agentRoute = matchStorybookAgentMessageRoute({
@@ -88,6 +98,7 @@ export function createOrgWorkspaceFixtureFetch(
       appFixture,
       factoriesFixture,
       orgIntegrations,
+      accountState,
     });
     if (!resolved) {
       return fallback(input, init);
@@ -141,8 +152,14 @@ async function resolveOrgWorkspaceFixture(args: {
   appFixture?: CanvasAppFixture;
   factoriesFixture?: FactoriesFixture;
   orgIntegrations: StorybookOrgIntegration[];
+  accountState: ReturnType<typeof createStorybookAccountState>;
 }) {
-  const { url, method, input, init, body, homeFixture, appFixture, factoriesFixture, orgIntegrations } = args;
+  const { url, method, input, init, body, homeFixture, appFixture, factoriesFixture, orgIntegrations, accountState } =
+    args;
+  const accountResolved = accountState.match(url, method, body);
+  if (accountResolved) {
+    return accountResolved;
+  }
   // Omit `appFixture` when unset so matchCanvasAppFixture uses its Software Factory default.
   const homeResolved = matchHomePageFixture(url, method, homeFixture);
   const canvasResolved = matchCanvasAppFixture(url, appFixture, method, body);

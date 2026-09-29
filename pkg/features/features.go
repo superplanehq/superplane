@@ -24,6 +24,54 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
+// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactoryJiraIntake = "factory_jira_intake"
+
+// FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
+// Productive.io in the Backlog column menu until the flow is generally
+// available.
+const FeatureFactoryProductiveIntake = "factory_productive_intake"
+
+// FeatureFactoryDependabotIntake gates Dependabot alert intake from the
+// Backlog column menu until the flow is generally available.
+const FeatureFactoryDependabotIntake = "factory_dependabot_intake"
+
+// FeatureFactoryDatadogIntake gates Datadog Error Tracking intake from the
+// Backlog column menu until the flow is generally available.
+const FeatureFactoryDatadogIntake = "factory_datadog_intake"
+
+// FeatureWorkspaceModels gates the in-progress workspace Models settings
+// page until it is ready for general use.
+const FeatureWorkspaceModels = "workspace_models"
+
+// FeatureOrganizationBYOK gates the organization LLM Models settings page
+// until the BYOK UX is ready for general use.
+const FeatureOrganizationBYOK = "organization_byok"
+
+// FeatureFactoryCustomAutomations gates blank custom automations on Verify,
+// Done, and phase columns until the flow is generally available.
+const FeatureFactoryCustomAutomations = "factory_custom_automations"
+
+// FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
+const FeatureWorkspaceMCP = "workspace_mcp"
+
+// FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
+const FeatureWorkspaceSkills = "workspace_skills"
+
+// FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
+// the Merge button on pull request review until the feature is generally
+// available.
+const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
+
+// FeatureFactoryRiskScore gates the Risk score automation on the Verify
+// column until the flow is generally available.
+const FeatureFactoryRiskScore = "factory_risk_score"
+
+// FeatureFactoryTaskConsole gates the unified task popup: one console
+// timeline with a summary panel instead of the Task and Automations tabs.
+const FeatureFactoryTaskConsole = "factory_task_console"
+
 func released() *bool {
 	v := true
 	return &v
@@ -33,6 +81,18 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
+	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
+	{ID: FeatureFactoryDependabotIntake, Label: "Factory Dependabot Intake", Description: "Add Dependabot alert intake from the Backlog column menu"},
+	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
+	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
+	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
+	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
+	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
+	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
+	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
+	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 }
 
 func All() []Feature {

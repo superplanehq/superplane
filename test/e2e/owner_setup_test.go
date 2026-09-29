@@ -13,6 +13,9 @@ import (
 )
 
 func TestOwnerSetupFlow(t *testing.T) {
+	t.Cleanup(func() {
+		middleware.MarkOwnerSetupCompleted()
+	})
 	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -45,7 +48,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 type ownerSetupSteps struct {
 	t       *testing.T
 	session *session.TestSession
-	orgID   string
+	orgSlug string
 }
 
 func (s *ownerSetupSteps) start() {
@@ -128,12 +131,13 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 	org, err := models.FindOrganizationByName("Demo")
 	assert.NoError(s.t, err, "find organization Demo")
 
-	s.orgID = org.ID.String()
+	s.orgSlug = org.Slug
 }
 
 func (s *ownerSetupSteps) assertRedirectedToOrganization() {
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.orgID, "expected to be redirected into the organization")
+	// The app lands on "/" first and then resolves the organization redirect
+	// after several async requests, so poll instead of checking once.
+	s.session.WaitUntilURLContains("/" + s.orgSlug)
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {

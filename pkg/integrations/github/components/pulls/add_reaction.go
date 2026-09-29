@@ -59,7 +59,9 @@ func (c *AddReaction) Documentation() string {
 
 ## Output
 
-Returns the created GitHub reaction object, including id, content, user, and timestamp.`
+If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
+
+If the resolved comment ID is blank, the component finishes with success and emits no reaction object. Downstream nodes that wait for that output do not run.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -108,7 +110,7 @@ func (c *AddReaction) Configuration() []configuration.Field {
 			Label:       "Comment ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "ID of the comment to react to",
+			Description: "ID of the comment to react to. If the resolved value is blank, the component does not add a reaction.",
 		},
 		{
 			Name:     "content",
@@ -176,6 +178,14 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 
 	if config.Target != ReactionTargetIssueComment && config.Target != ReactionTargetReviewComment {
 		return fmt.Errorf("invalid target: %s", config.Target)
+	}
+
+	if strings.TrimSpace(config.CommentID) == "" {
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			"github.reaction",
+			[]any{},
+		)
 	}
 
 	commentID, err := parseCommentID(config.CommentID)

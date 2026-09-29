@@ -16,9 +16,9 @@ import (
 
 // FakeConfig is a test stub implementation of the CLI's core.ConfigContext.
 type FakeConfig struct {
-	URL           string
-	ActiveApp     string
-	ActiveFactory string
+	URL             string
+	ActiveApp       string
+	ActiveWorkspace string
 }
 
 func (f *FakeConfig) GetActiveApp() string {
@@ -33,12 +33,12 @@ func (f *FakeConfig) SetActiveApp(appID string) error {
 	return nil
 }
 
-func (f *FakeConfig) GetActiveFactory() string {
-	return f.ActiveFactory
+func (f *FakeConfig) GetActiveWorkspace() string {
+	return f.ActiveWorkspace
 }
 
-func (f *FakeConfig) SetActiveFactory(factoryID string) error {
-	f.ActiveFactory = factoryID
+func (f *FakeConfig) SetActiveWorkspace(workspaceID string) error {
+	f.ActiveWorkspace = workspaceID
 	return nil
 }
 

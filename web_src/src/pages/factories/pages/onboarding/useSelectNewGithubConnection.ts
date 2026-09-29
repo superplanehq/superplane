@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { OrganizationsIntegration } from "@/api-client";
+import { hostedGitHubInstallRequested, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 
@@ -22,14 +23,14 @@ export function useOnboardingGithubConnections(args: {
   selectNewest: boolean;
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
-  onConnectionSelected: () => void;
+  onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
 }): IntegrationInstanceSummary {
   const githubConnections =
     args.integrationData.find((integration) => integration.name === "github") ?? EMPTY_GITHUB_CONNECTIONS;
 
   useSelectNewGithubConnection({
     openSection: args.openSection,
-    selectNewest: args.selectNewest,
+    selectNewest: args.selectNewest && !githubConnectStillWaiting(githubConnections.allInstances),
     readyInstances: githubConnections.readyInstances,
     selections: args.selections,
     selectInstance: args.selectInstance,
@@ -37,6 +38,20 @@ export function useOnboardingGithubConnections(args: {
   });
 
   return githubConnections;
+}
+
+/**
+ * True when a connect still waits for an account choice or for a GitHub
+ * admin to approve an install request. The return URL also carries
+ * `pick=newest`, so without this check the wizard would select an older
+ * ready connection and skip the waiting screen.
+ */
+function githubConnectStillWaiting(instances: OrganizationsIntegration[]): boolean {
+  return instances.some((instance) => {
+    if (instance.status?.state === "ready") return false;
+    const metadata = instance.status?.metadata;
+    return pendingGitHubInstallations(metadata).length >= 1 || hostedGitHubInstallRequested(metadata);
+  });
 }
 
 function newestReadyInstance(instances: OrganizationsIntegration[]): OrganizationsIntegration | undefined {
@@ -52,8 +67,11 @@ function newestReadyInstance(instances: OrganizationsIntegration[]): Organizatio
  * reports the selection so the wizard can continue.
  *
  * The round trip reloads the page, so the in-memory "just connected" hint is
- * gone. Only runs when the return URL asks for it (`pick=newest`), and at most
+ * gone. Runs only when the return URL asks for it (`pick=newest`), and at most
  * once, so the user can still choose a different connection afterwards.
+ *
+ * No other path auto-selects. An install request approved outside the round
+ * trip shows the account picker again, and the user selects the account.
  */
 function useSelectNewGithubConnection(args: {
   openSection: WizardStepId;
@@ -61,14 +79,15 @@ function useSelectNewGithubConnection(args: {
   readyInstances: IntegrationInstanceSummary["readyInstances"];
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
-  onConnectionSelected: () => void;
+  onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
 }) {
   const selectedNewConnection = useRef(false);
-  const { openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected } = args;
+  const { openSection, selectNewest, readyInstances, selections, selectInstance } = args;
+  const { onConnectionSelected } = args;
 
   useEffect(() => {
-    if (selectedNewConnection.current || !selectNewest || openSection !== "vcs") return;
-    if (readyInstances.length === 0) return;
+    if (selectedNewConnection.current || openSection !== "vcs") return;
+    if (!selectNewest || readyInstances.length === 0) return;
 
     const newest = newestReadyInstance(readyInstances);
     const id = newest?.metadata?.id;
@@ -76,6 +95,6 @@ function useSelectNewGithubConnection(args: {
 
     selectedNewConnection.current = true;
     if (selections.github?.id !== id) selectInstance("github", id);
-    onConnectionSelected();
+    void onConnectionSelected(newest);
   }, [openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected]);
 }

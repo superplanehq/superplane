@@ -1,7 +1,7 @@
-import type { FactoriesFactoryLine, FactoryApp, FactoryLineStep } from "@/api-client";
+import type { FactoriesFactoryLine, FactoryAutomation, FactoryLineStep } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps } from "@/hooks/useFactoryData";
+import { useFactoryAutomations } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
@@ -25,7 +25,7 @@ export function FactoryLineEditPage() {
   const isCreate = !lineId;
   const canUpdate = canAct("factories", "update");
 
-  const { data: factoryApps = [], isLoading: appsLoading } = useFactoryApps(organizationId, factoryId);
+  const { data: factoryApps = [], isLoading: appsLoading } = useFactoryAutomations(organizationId, factoryId);
 
   const line = useMemo(() => {
     if (isCreate || !lineId) {
@@ -94,7 +94,7 @@ interface LineEditCardProps {
   isCreate: boolean;
   line: FactoriesFactoryLine | null;
   organizationId: string;
-  factoryApps: FactoryApp[];
+  factoryApps: FactoryAutomation[];
   isSaving: boolean;
   onSave: (input: { name: string; steps: FactoryLineStep[] }) => Promise<void>;
   onCancel: () => void;

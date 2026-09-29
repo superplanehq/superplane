@@ -39,10 +39,10 @@ func structFromAnyMap(t *testing.T, value map[string]any) *structpb.Struct {
 }
 
 func TestMapCanvasNameUniqueConstraintError(t *testing.T) {
-	t.Run("maps workflow name unique violation to already exists", func(t *testing.T) {
+	t.Run("maps organization name unique violation to already exists", func(t *testing.T) {
 		err := mapCanvasNameUniqueConstraintError(&pgconn.PgError{
 			Code:           "23505",
-			ConstraintName: "workflows_organization_id_name_key",
+			ConstraintName: "workflows_organization_id_name_active_key",
 		})
 
 		assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
@@ -53,6 +53,15 @@ func TestMapCanvasNameUniqueConstraintError(t *testing.T) {
 			}
 			return err.Error()
 		}())
+	})
+
+	t.Run("maps factory name unique violation to already exists", func(t *testing.T) {
+		err := mapCanvasNameUniqueConstraintError(&pgconn.PgError{
+			Code:           "23505",
+			ConstraintName: "workflows_factory_id_name_active_key",
+		})
+
+		assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 	})
 
 	t.Run("maps model duplicate name error to already exists", func(t *testing.T) {

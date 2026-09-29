@@ -25,20 +25,26 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
-	}
-
 	period := clampUsagePeriodDays(int(req.GetPeriodDays()))
 	since := time.Now().AddDate(0, 0, -period)
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
+	}
+	factoryID := factory.ID
+
+	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
+		OrganizationID: orgID,
+		FactoryID:      &factoryID,
+		Since:          since,
+	})
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
+	computeTotals, byMachine, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
 		OrganizationID: orgID,
 		FactoryID:      &factoryID,
 		Since:          since,
@@ -52,16 +58,31 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	return &pb.DescribeFactoryUsageResponse{
-		TotalTokens:            totals.TotalTokens,
-		TotalCostCents:         totals.CostCents(),
-		PeriodDays:             int32(period),
-		ByModel:                serializeUsageByModel(byModel),
-		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
-		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
-		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
-		RemainingCreditWarning: credit.Warning,
-	}, nil
+	budget, err := models.DescribeFactoryHostedBudget(db, factory)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
+	}
+
+	ledger := totals.Add(computeTotals)
+	resp := &pb.DescribeFactoryUsageResponse{
+		TotalTokens:                   ledger.TotalTokens,
+		TotalCostCents:                ledger.CostCents(),
+		PeriodDays:                    int32(period),
+		ByModel:                       serializeUsageByModel(byModel),
+		RemainingCreditCents:          pricebook.MicrosToCents(credit.RemainingMicros),
+		GrantTotalCents:               pricebook.MicrosToCents(credit.GrantMicros),
+		HostedBilledCents:             pricebook.MicrosToCents(credit.BilledMicros),
+		RemainingCreditWarning:        credit.Warning,
+		FactoryHostedBilledCents:      pricebook.MicrosToCents(budget.BilledMicros),
+		FactoryRemainingCreditCents:   pricebook.MicrosToCents(budget.RemainingMicros),
+		FactoryRemainingCreditWarning: budget.Warning,
+		TotalDurationSeconds:          ledger.DurationSeconds,
+		ByMachineType:                 serializeUsageByMachineType(byMachine),
+	}
+	if budget.BudgetCents != nil {
+		resp.HostedSpendBudgetCents = budget.BudgetCents
+	}
+	return resp, nil
 }
 
 func clampUsagePeriodDays(period int) int {
@@ -82,6 +103,18 @@ func serializeUsageByModel(rows []models.UsageByModel) []*pb.UsageByModel {
 			Model:       row.Model,
 			TotalTokens: row.TotalTokens,
 			CostCents:   row.CostCents(),
+		})
+	}
+	return out
+}
+
+func serializeUsageByMachineType(rows []models.UsageByMachineType) []*pb.UsageByMachineType {
+	out := make([]*pb.UsageByMachineType, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       row.CostCents(),
 		})
 	}
 	return out

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -114,6 +115,36 @@ func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 		Update("state", NodeExecutionRequestStateCompleted).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, actionName string, parameters map[string]any) error {
+	params, err := json.Marshal(parameters)
+	if err != nil {
+		return err
+	}
+
+	var ids []uuid.UUID
+	err = tx.Model(&CanvasNodeRequest{}).
+		Where("execution_id = ?", executionID).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Where("type = ?", NodeRequestTypeInvokeAction).
+		Where("spec->'invoke_action'->>'action_name' = ?", actionName).
+		Where("spec->'invoke_action'->'parameters' = ?::jsonb", string(params)).
+		Pluck("id", &ids).
+		Error
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	return tx.Model(&CanvasNodeRequest{}).
+		Where("id IN ?", ids).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).Error
 }
 
 func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) error {

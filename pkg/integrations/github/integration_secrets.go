@@ -13,7 +13,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
-const integrationSecretGitHubToken = "GITHUB_TOKEN"
+const (
+	integrationSecretGitHubToken = "GITHUB_TOKEN"
+	githubSetupName              = "Set up GitHub"
+)
+
+const githubSecretUsage = `A GitHub token is available in the GITHUB_TOKEN environment variable.
+The gh CLI is already installed on this runner. Use gh. Do not download or install gh.
+gh reads GITHUB_TOKEN.
+Use normal HTTPS repository URLs such as https://github.com/<owner>/<repo>.git.
+Do not put the token in URLs, commands, Git configuration, or output.`
+
+const githubSetupScript = `set -euo pipefail
+: "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+gh auth setup-git --hostname github.com --force
+`
 
 type httpContextTransport struct {
 	http core.HTTPContext

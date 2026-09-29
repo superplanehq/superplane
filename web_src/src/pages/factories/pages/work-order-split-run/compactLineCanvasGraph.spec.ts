@@ -1,5 +1,5 @@
 import { Position, type Edge } from "@xyflow/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
@@ -14,7 +14,7 @@ type RoutedEdge = Edge & {
 
 function messyIfCanvas(): SplitRunCanvasModel {
   return {
-    key: "planning",
+    key: "implementation",
     title: "Create Implementation Plan",
     nodes: [
       { id: "on-run", name: "On Run", component: "triggerOnRun", position: { x: 12, y: 0 } },
@@ -32,10 +32,10 @@ function messyIfCanvas(): SplitRunCanvasModel {
         component: "runnerClaudeCode",
         position: { x: 220, y: 720 },
       },
-      { id: "artifact", name: "Add Plan Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
+      { id: "artifact", name: "Add Task Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
       {
         id: "false-agent",
-        name: "Agent - No GH Issue Plan",
+        name: "Draft Implementation Plan",
         component: "runnerClaudeCode",
         configuration: {
           steps: [
@@ -101,5 +101,23 @@ describe("compactLineCanvasGraph", () => {
     expect(falseEdge?.data).toMatchObject({ channelLabel: "false" });
     expect(mergeEdge?.data).toMatchObject({ channelLabel: "passed" });
     expect(trueEdge?.type).toBe("custom");
+  });
+
+  it("marks the selected node so the compact canvas can highlight it", () => {
+    const { nodes } = compactLineCanvasGraph(messyIfCanvas(), "comment", undefined, false);
+    expect(nodes.find((node) => node.id === "comment")?.data.isSelected).toBe(true);
+    expect(nodes.find((node) => node.id === "on-run")?.data.isSelected).toBe(false);
+  });
+
+  it("attaches an edit href only to the selected node", () => {
+    const { nodes } = compactLineCanvasGraph(
+      messyIfCanvas(),
+      "comment",
+      undefined,
+      false,
+      (nodeId) => `/edit?node=${nodeId}`,
+    );
+    expect(nodes.find((node) => node.id === "comment")?.data.editHref).toBe("/edit?node=comment");
+    expect(nodes.find((node) => node.id === "on-run")?.data.editHref).toBeUndefined();
   });
 });

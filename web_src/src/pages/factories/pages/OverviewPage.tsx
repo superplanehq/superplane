@@ -81,7 +81,7 @@ function WorkOrdersOverviewCard({
     <section className={cn("overflow-hidden", factoryCardClassName)} data-testid="overview-work-orders-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Work Orders</h2>
+          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Tasks</h2>
           <p className="text-[12px] text-muted-foreground">Recent activity by status.</p>
         </div>
         <Link
@@ -95,11 +95,11 @@ function WorkOrdersOverviewCard({
 
       <div>
         {error ? (
-          <p className="px-4 py-6 text-[13px] text-destructive">Failed to load work orders.</p>
+          <p className="px-4 py-6 text-[13px] text-destructive">Failed to load tasks.</p>
         ) : isLoading ? (
-          <p className="px-4 py-6 text-[13px] text-muted-foreground">Loading work orders…</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">Loading tasks…</p>
         ) : orders.length === 0 ? (
-          <p className="px-4 py-6 text-[13px] text-muted-foreground">No work orders yet.</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">No tasks yet.</p>
         ) : (
           <ul>
             {orders.map((order) => {
@@ -128,7 +128,7 @@ function WorkOrdersOverviewCard({
                       {statusMeta.label}
                     </Badge>
                     <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
-                      {order.title || "Untitled work order"}
+                      {order.title || "Untitled task"}
                     </p>
                     <span className="shrink-0 text-[12px] text-muted-foreground">{timeLabel}</span>
                     <ChevronRight

@@ -10,6 +10,7 @@ import (
 const (
 	emailTypeMagicCode             = "magic_code"
 	emailTypeWorkOrderNotification = "work_order_notification"
+	emailTypeSupportFeedback       = "support_feedback"
 
 	emailWorkerReasonInvalidMessage = "invalid_message"
 	emailWorkerReasonSendError      = "send_error"

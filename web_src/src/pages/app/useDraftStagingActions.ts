@@ -51,31 +51,25 @@ type UseDraftStagingActionsOptions = {
   factoryContext?: boolean;
 };
 
-export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
+function useCommitStagingAction(options: UseDraftStagingActionsOptions) {
   const {
     organizationId,
     canvasId,
     activeCanvasVersionId,
-    hasEditableVersion,
     ensureVersionActionDraftReady,
     commitCanvasStagingMutation,
-    discardCanvasStagingMutation,
     draftCanvasSpecsRef,
     setDraftCanvasSpec,
-    setActiveCanvasVersion,
     setStagingResetNonce,
     consoleMutationGenerationRef,
     setIsPreparingVersionAction,
     flushRepositoryFileStaging,
-    cancelPendingCanvasSaves,
-    onCanvasDraftRestoredToCommitted,
     onCommittedVersionId,
     registerIgnoredCanvasUpdatedEcho,
     factoryContext = false,
   } = options;
   const queryClient = useQueryClient();
   const [commitStagingPending, setCommitStagingPending] = useState(false);
-  const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleCommitStaging = useCallback(
     async (commitMessage: string, options?: { versionId?: string }): Promise<boolean> => {
@@ -141,6 +135,29 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     ],
   );
 
+  return { handleCommitStaging, commitStagingPending };
+}
+
+function useResetStagingAction(options: UseDraftStagingActionsOptions) {
+  const {
+    organizationId,
+    canvasId,
+    activeCanvasVersionId,
+    hasEditableVersion,
+    discardCanvasStagingMutation,
+    draftCanvasSpecsRef,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setStagingResetNonce,
+    consoleMutationGenerationRef,
+    setIsPreparingVersionAction,
+    cancelPendingCanvasSaves,
+    onCanvasDraftRestoredToCommitted,
+    factoryContext = false,
+  } = options;
+  const queryClient = useQueryClient();
+  const [resetStagingPending, setResetStagingPending] = useState(false);
+
   const handleResetStaging = useCallback(async () => {
     if (!hasEditableVersion || !activeCanvasVersionId) {
       return;
@@ -185,5 +202,11 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     factoryContext,
   ]);
 
+  return { handleResetStaging, resetStagingPending };
+}
+
+export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
+  const { handleCommitStaging, commitStagingPending } = useCommitStagingAction(options);
+  const { handleResetStaging, resetStagingPending } = useResetStagingAction(options);
   return { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending };
 }

@@ -16,9 +16,16 @@ interface CreateFactoryAppDialogProps {
   isSaving: boolean;
   onClose: () => void;
   onCreate: (input: { name: string; description: string }) => Promise<void>;
+  showDescription?: boolean;
 }
 
-export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: CreateFactoryAppDialogProps) {
+export function CreateFactoryAppDialog({
+  open,
+  isSaving,
+  onClose,
+  onCreate,
+  showDescription = true,
+}: CreateFactoryAppDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
@@ -94,20 +101,22 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
             {nameError ? <p className="text-xs text-red-600">{nameError}</p> : null}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="factory-app-description-input">Description</Label>
-            <Textarea
-              id="factory-app-description-input"
-              value={description}
-              onChange={(event) => {
-                if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
-                  setDescription(event.target.value);
-                }
-              }}
-              maxLength={MAX_DESCRIPTION_LENGTH}
-              rows={3}
-            />
-          </div>
+          {showDescription ? (
+            <div className="space-y-2">
+              <Label htmlFor="factory-app-description-input">Description</Label>
+              <Textarea
+                id="factory-app-description-input"
+                value={description}
+                onChange={(event) => {
+                  if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
+                    setDescription(event.target.value);
+                  }
+                }}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                rows={3}
+              />
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter className="flex-row justify-start gap-3 sm:justify-start">

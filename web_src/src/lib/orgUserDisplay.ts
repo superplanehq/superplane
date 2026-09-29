@@ -1,5 +1,7 @@
 import type { SuperplaneUsersUser } from "@/api-client";
 
+import { getNameInitials } from "@/lib/nameInitials";
+
 export const UNKNOWN_ORG_USER_NAME = "Unknown member";
 
 export interface OrgUserDisplay {
@@ -12,13 +14,7 @@ export interface OrgUserDisplay {
 export type OrgUserDisplayLookup = (userId: string | undefined, fallbackName?: string) => OrgUserDisplay | null;
 
 export function getUserInitials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  return getNameInitials(name);
 }
 
 export function getOrgUserDisplayFromUser(user: SuperplaneUsersUser): OrgUserDisplay | null {

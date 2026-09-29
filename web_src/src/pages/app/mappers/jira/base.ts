@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";

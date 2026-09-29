@@ -21,10 +21,21 @@ CLAUDE.local.md
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+.agents/skills/reui/
+.claude/skills/reui/
+.cursor/skills/reui/
+.cursor/rules/reui.mdc
+.cursor/mcp.json
+.mcp.json
+.opencode/
+opencode.json
 .worktrees/
 .superpowers/
 docs/superpowers/
 coverage-go.out
+.local/
+wrk3.yml
+.wrk3-compose.lock
 
 # Generated protobuf and OpenAPI artifacts
 /pkg/protos/

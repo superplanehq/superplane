@@ -7,7 +7,6 @@ import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvase
 interface IntakeCanvasSpec {
   triggerComponent: string;
   triggerName: string;
-  classifyPrompt: string;
   createTitle: string;
   createDescription: string;
   title: string;
@@ -17,33 +16,60 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
   "github-issues": {
     triggerComponent: "github.onIssue",
     triggerName: "On Issue",
-    classifyPrompt: "Classify this GitHub issue. Accept it only when it should become a work order.",
     createTitle: "{{ root().data.issue.title }}",
     createDescription: "{{ root().data.issue.body }}",
     title: "GitHub issue intake",
   },
+  "dependabot-alerts": {
+    triggerComponent: "github.onDependabotAlert",
+    triggerName: "On Dependabot Alert",
+    createTitle:
+      'Bump {{ root().data.alert.dependency.package.name ?? "dependency" }} in {{ root().data.alert.dependency.manifest_path ?? "the manifest" }}',
+    createDescription: "{{ root().data.alert.html_url }}",
+    title: "Dependabot alert intake",
+  },
+  "jira-issues": {
+    triggerComponent: "jira.onIssue",
+    triggerName: "On Issue",
+    createTitle: "{{ root().data.issue.key }}: {{ root().data.issue.fields.summary }}",
+    // Jira sends the raw description as an Atlassian Document Format object.
+    // The trigger reports a plain text copy next to it.
+    createDescription: "{{ root().data.description }}",
+    title: "Jira issue intake",
+  },
   "sentry-exceptions": {
     triggerComponent: "sentry.onIssue",
     triggerName: "On Issue",
-    classifyPrompt: "Classify this Sentry exception. Accept it only when it should become a work order.",
     createTitle: "{{ root().data.data.issue.title }}",
-    createDescription: "{{ root().data.data.issue.permalink }}",
+    createDescription: "{{ root().data.description }}",
     title: "Sentry exception intake",
   },
   "pagerduty-incidents": {
     triggerComponent: "pagerduty.onIncident",
     triggerName: "On Incident",
-    classifyPrompt: "Classify this PagerDuty incident. Accept it only when it should become a work order.",
     createTitle: "{{ root().data.incident.title }}",
     createDescription: "{{ root().data.incident.html_url }}",
     title: "PagerDuty incident intake",
+  },
+  "productive-tasks": {
+    triggerComponent: "productive.onTask",
+    triggerName: "On Task",
+    createTitle: "{{ root().data.data.attributes.title }}",
+    createDescription: "{{ root().data.data.attributes.description }}",
+    title: "Productive task intake",
+  },
+  datadog: {
+    triggerComponent: "datadog.onErrorTrackingAlert",
+    triggerName: "On Error Tracking Alert",
+    createTitle: "{{ root().data.title }}",
+    createDescription: "{{ root().data.body }}\n\n{{ root().data.link }}",
+    title: "Datadog error intake",
   },
 };
 
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {
   const spec = INTAKE_CANVAS_BY_SOURCE[source.id];
   const triggerId = `${source.id}-trigger`;
-  const runnerId = `${source.id}-classify`;
   const createId = `${source.id}-create`;
 
   const nodes: ComponentsNode[] = [
@@ -55,31 +81,18 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
       position: { x: 160, y: 80 },
     },
     {
-      id: runnerId,
-      name: "Classify intake",
-      type: "TYPE_ACTION",
-      component: "runnerClaudeCode",
-      configuration: {
-        prompt: spec.classifyPrompt,
-      },
-      position: { x: 160, y: 260 },
-    },
-    {
       id: createId,
-      name: "Create Work Order",
+      name: "Create Task",
       type: "TYPE_ACTION",
       component: "createWorkOrder",
       configuration: {
         title: spec.createTitle,
         description: spec.createDescription,
       },
-      position: { x: 160, y: 440 },
+      position: { x: 160, y: 260 },
     },
   ];
-  const edges: ComponentsEdge[] = [
-    { channel: "default", sourceId: triggerId, targetId: runnerId },
-    { channel: "default", sourceId: runnerId, targetId: createId },
-  ];
+  const edges: ComponentsEdge[] = [{ channel: "default", sourceId: triggerId, targetId: createId }];
 
   return {
     key: "intake",
@@ -88,8 +101,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
     edges,
     statuses: {
       [triggerId]: "passed",
-      [runnerId]: "running",
-      [createId]: "pending",
+      [createId]: "running",
     } satisfies Record<string, FactoryNodeStatus>,
     metrics: {},
   };

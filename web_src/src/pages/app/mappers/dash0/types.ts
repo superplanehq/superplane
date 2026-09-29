@@ -128,3 +128,22 @@ export interface DeleteCheckRuleConfiguration {
   checkRule: string;
   dataset: string;
 }
+
+export interface CheckRulePayload {
+  id?: string;
+  name?: string;
+  expression?: string;
+  interval?: string;
+  for?: string;
+  keepFiringFor?: string;
+  enabled?: boolean;
+  deleted?: boolean;
+  thresholds?: { degraded?: number | string; critical?: number | string };
+  labels?: Record<string, string>;
+}
+
+export interface HttpSyntheticCheckPayload {
+  id?: string;
+  deleted?: boolean;
+  metadata?: { labels?: Record<string, string> };
+}

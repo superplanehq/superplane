@@ -1,0 +1,214 @@
+package organizations
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+func ListBYOKLLMModels(
+	ctx context.Context,
+	reg *registry.Registry,
+	orgID string,
+	req *pb.ListBYOKLLMModelsRequest,
+) (*pb.ListBYOKLLMModelsResponse, error) {
+	tx := database.DB(ctx)
+	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list byok models")
+	if err != nil {
+		return nil, err
+	}
+
+	integration, err := models.FindReadyBYOKIntegration(tx, scope.OrganizationID, scope.Provider)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
+	}
+
+	if integration == nil {
+		selected, err := resolveBYOKSelectedModels(tx, scope)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.ListBYOKLLMModelsResponse{Selected: serializeHostedLLMModels(selected)}, nil
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+	if err := enableAllBYOKModelsByDefault(tx, scope.OrganizationID, scope.Provider, candidates); err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
+	}
+	selected, err := resolveBYOKSelectedModels(tx, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ListBYOKLLMModelsResponse{
+		Connected:     true,
+		IntegrationId: integration.ID.String(),
+		Candidates:    candidates,
+		Selected:      namedHostedLLMModels(selected, candidates),
+	}, nil
+}
+
+func resolveBYOKSelectedModels(tx *gorm.DB, scope llmModelListScope) ([]string, error) {
+	selected, err := models.ResolveSelectableLLMModels(
+		tx,
+		scope.OrganizationID,
+		scope.FactoryID,
+		scope.Provider,
+		models.UsageFundingSourceBYOK,
+	)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
+	}
+	return selected, nil
+}
+
+func UpdateBYOKLLMModels(
+	ctx context.Context,
+	orgID string,
+	req *pb.UpdateBYOKLLMModelsRequest,
+) (*pb.UpdateBYOKLLMModelsResponse, error) {
+	organizationID, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	saved, err := models.UpsertOrganizationBYOKModelAllowlist(
+		database.DB(ctx),
+		organizationID,
+		req.GetProvider(),
+		datatypes.JSONSlice[string](req.GetAllowedModels()),
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "unsupported") || strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "empty") {
+			return nil, grpcerrors.InvalidArgument(err, err.Error())
+		}
+		return nil, grpcerrors.Internal(err, "failed to update byok models")
+	}
+
+	return &pb.UpdateBYOKLLMModelsResponse{
+		Selected: serializeHostedLLMModels(saved.AllowedModels),
+	}, nil
+}
+
+func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *models.Integration) ([]*pb.HostedLLMModel, error) {
+	if reg == nil {
+		return nil, fmt.Errorf("integration registry is required")
+	}
+	integration, err := reg.GetIntegration(instance.AppName)
+	if err != nil {
+		return nil, err
+	}
+
+	integrationCtx := contexts.NewIntegrationContext(
+		tx,
+		nil,
+		instance,
+		reg.Encryptor,
+		reg,
+		nil,
+	)
+	resources, err := integration.ListResources("model", core.ListResourcesContext{
+		Logger: log.WithFields(log.Fields{
+			"integration_id":   instance.ID.String(),
+			"integration_name": instance.AppName,
+			"resource_type":    "model",
+		}),
+		HTTP:        reg.HTTPContext(),
+		Integration: integrationCtx,
+		Parameters:  map[string]string{"type": "model"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*pb.HostedLLMModel, 0, len(resources))
+	seen := map[string]struct{}{}
+	for _, resource := range resources {
+		id := strings.TrimSpace(resource.ID)
+		if id == "" {
+			id = strings.TrimSpace(resource.Name)
+		}
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		name := strings.TrimSpace(resource.Name)
+		if name == "" {
+			name = id
+		}
+		out = append(out, &pb.HostedLLMModel{Id: id, Name: name})
+	}
+	return out, nil
+}
+
+// ListConnectedBYOKModelIDs returns the model ids that the integration key can use.
+func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration *models.Integration) ([]string, error) {
+	if integration == nil {
+		return nil, grpcerrors.Internal(fmt.Errorf("integration is required"), "failed to list byok models")
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		id := strings.TrimSpace(candidate.GetId())
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// classifyBYOKListError maps a failure from listBYOKCandidateModels to a
+// client-safe gRPC error. Provider auth failures, transport errors, timeouts,
+// and provider outages are user-fixable or transient, so they are reported as
+// FailedPrecondition rather than Internal. Rate-limited requests are reported
+// as ResourceExhausted. Anything else keeps the safe Internal default so real
+// bugs still surface as a 500 and page the on-call.
+func classifyBYOKListError(err error) error {
+	switch {
+	case core.IsProviderRateLimited(err):
+		return grpcerrors.ResourceExhausted(err, "The model provider rate limited the request. Try again shortly.")
+	case core.IsProviderAuthOrNetworkError(err):
+		return grpcerrors.FailedPrecondition(err, "Could not reach the model provider to list models. Check the connected API key and try again.")
+	default:
+		return grpcerrors.Internal(err, "failed to list byok models")
+	}
+}
+
+func namedHostedLLMModels(ids []string, candidates []*pb.HostedLLMModel) []*pb.HostedLLMModel {
+	names := map[string]string{}
+	for _, candidate := range candidates {
+		names[candidate.GetId()] = candidate.GetName()
+	}
+	out := make([]*pb.HostedLLMModel, 0, len(ids))
+	for _, id := range ids {
+		name := names[id]
+		if name == "" {
+			name = id
+		}
+		out = append(out, &pb.HostedLLMModel{Id: id, Name: name})
+	}
+	return out
+}

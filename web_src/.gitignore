@@ -26,3 +26,7 @@ dist-ssr
 
 *storybook.log
 storybook-static
+
+# Vitest 5 artifacts (coverage, HTML/JSON/JUnit reports, attachments)
+.vitest
+coverage

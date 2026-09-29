@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 type openAICompatClient struct {
@@ -55,6 +56,79 @@ func (c *openAICompatClient) ListModels(ctx context.Context) ([]Model, error) {
 		}
 	}
 	return models, nil
+}
+
+type openRouterCatalogResponse struct {
+	Data []openRouterCatalogModel `json:"data"`
+}
+
+type openRouterCatalogModel struct {
+	ID      string                `json:"id"`
+	Pricing openRouterCatalogRate `json:"pricing"`
+}
+
+type openRouterCatalogRate struct {
+	Prompt            string `json:"prompt"`
+	Completion        string `json:"completion"`
+	InputCacheRead    string `json:"input_cache_read"`
+	InputCacheWrite   string `json:"input_cache_write"`
+	InternalReasoning string `json:"internal_reasoning"`
+}
+
+func (c *openAICompatClient) listCatalogPrices(ctx context.Context) ([]CatalogPrice, error) {
+	body, err := c.doJSON(ctx, http.MethodGet, c.baseURL+"/models", nil, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var response openRouterCatalogResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("decode %s catalog prices: %w", c.provider, err)
+	}
+
+	prices := make([]CatalogPrice, 0, len(response.Data))
+	for _, item := range response.Data {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		rate, ok := catalogRateFromUSD(item.Pricing)
+		if !ok {
+			continue
+		}
+		prices = append(prices, CatalogPrice{ID: id, Rate: rate})
+	}
+	return prices, nil
+}
+
+func catalogRateFromUSD(pricing openRouterCatalogRate) (pricebook.Rate, bool) {
+	input, ok := pricebook.CentsPerMillionFromUSDPerToken(pricing.Prompt)
+	if !ok {
+		return pricebook.Rate{}, false
+	}
+	output, ok := pricebook.CentsPerMillionFromUSDPerToken(pricing.Completion)
+	if !ok {
+		return pricebook.Rate{}, false
+	}
+	cacheRead, ok := pricebook.CentsPerMillionFromUSDPerToken(pricing.InputCacheRead)
+	if !ok {
+		return pricebook.Rate{}, false
+	}
+	cacheWrite, ok := pricebook.CentsPerMillionFromUSDPerToken(pricing.InputCacheWrite)
+	if !ok {
+		return pricebook.Rate{}, false
+	}
+	reasoning, ok := pricebook.CentsPerMillionFromUSDPerToken(pricing.InternalReasoning)
+	if !ok {
+		return pricebook.Rate{}, false
+	}
+	return pricebook.Rate{
+		Input:      input,
+		Output:     output,
+		CacheRead:  cacheRead,
+		CacheWrite: cacheWrite,
+		Reasoning:  reasoning,
+	}, true
 }
 
 type openAIChatRequest struct {

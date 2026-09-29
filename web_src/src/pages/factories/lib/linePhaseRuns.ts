@@ -6,21 +6,20 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
-import {
-  dispatchStepRows,
-  isActiveWorkOrderExecution,
-  isQueuedStepRow,
-  type WorkOrderStepRow,
-} from "./workOrderExecutions";
+import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
+import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
+
+export { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
-export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending";
+export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending" | "cancelled";
 
 export type LinePhaseRunCard = {
   executionId: string;
   workOrderId: string;
-  /** Raw work order, so the board can build the shared work order card model. */
+  /** Raw task, so the board can build the shared task card model. */
   order: FactoriesWorkOrder;
   execution: WorkOrderStepRow;
 };
@@ -40,8 +39,22 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
+ * When the column already showed every run, keep new runs in the window.
+ * Overflowing columns stay at their current page until scroll loads more.
+ */
+export function growPhaseRunWindow(visibleCount: number, previousTotal: number, totalRuns: number): number {
+  if (totalRuns <= previousTotal) {
+    return visibleCount;
+  }
+  if (visibleCount < previousTotal) {
+    return visibleCount;
+  }
+  return Math.max(visibleCount, totalRuns);
+}
+
+/**
  * Destination for a phase-board card: the split-run page for this phase.
- * Never the work order page — that destination stays on the Work Orders list.
+ * Never the task page — that destination stays on the Tasks list.
  */
 export function linePhaseRunHref(
   organizationId: string,
@@ -69,7 +82,7 @@ export function linePhaseRunHref(
 }
 
 /**
- * Builds the Lines detail board: one column per line step. Each work order
+ * Builds the Lines detail board: one column per line step. Each task
  * appears once, in the column for its current (furthest active, else furthest
  * finished) step on this line — newest cards first within a column. Work
  * orders that reached a terminal outcome move to the Done column instead.
@@ -105,7 +118,7 @@ export function buildLinePhaseBoard(
 
 /**
  * True when the last step is the line's own Done automation. Such a line keeps
- * finished work orders on that step; every other line hands them to the board
+ * finished tasks on that step; every other line hands them to the board
  * Done column, which no app backs.
  */
 export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
@@ -114,16 +127,17 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft work orders that are not on a line yet. Newest updated drafts
- * come first.
+ * Draft tasks. A draft that already ran on a line still belongs
+ * here. Newest updated drafts come first.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
   return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
 }
 
 /**
- * Closed work that belongs on this line, plus open work still on a Done or
- * PR-closure step. Newest orders come first.
+ * Completed and failed work that belongs on this line, plus open work still on
+ * a Done or PR-closure step. Newest orders come first. Rejected and canceled
+ * tasks stay off this column. Find them from Status in Filter.
  */
 export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
@@ -133,10 +147,13 @@ export function collectLineDoneOrders(
   const doneById = new Map<string, FactoriesWorkOrder>();
 
   for (const order of workOrders) {
-    if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
+    if (!order.id || !belongsToLineBoard(order, line.id)) {
       continue;
     }
-    doneById.set(order.id, order);
+    const status = getWorkOrderDisplayStatus(order);
+    if (status === "completed" || status === "failed") {
+      doneById.set(order.id, order);
+    }
   }
 
   for (const column of board) {
@@ -144,7 +161,11 @@ export function collectLineDoneOrders(
       continue;
     }
     for (const run of column.runs) {
-      if (run.order.id) {
+      if (!run.order.id) {
+        continue;
+      }
+      const status = getWorkOrderDisplayStatus(run.order);
+      if (status === "completed" || status === "running" || status === "waiting") {
         doneById.set(run.order.id, run.order);
       }
     }
@@ -153,9 +174,52 @@ export function collectLineDoneOrders(
   return [...doneById.values()].sort(compareOrdersNewestFirst);
 }
 
+/** Open work that waits for review after the last stage passed. Newest first. */
+export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWorkOrder[] {
+  const lastStage = lineStageColumns(board).at(-1);
+  if (!lastStage) {
+    return [];
+  }
+
+  const verifyById = new Map<string, FactoriesWorkOrder>();
+  for (const run of lastStage.runs) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+      continue;
+    }
+    verifyById.set(run.order.id, run.order);
+  }
+
+  return [...verifyById.values()].sort(compareOrdersNewestFirst);
+}
+
+function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
+  if (run.order.state === "STATE_CLOSED") {
+    return false;
+  }
+  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
+    return false;
+  }
+  return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";
+}
+
 /** Stage columns only. Done is a fixed bookend, not a line step. */
 export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] {
   return columns.filter((column) => !isDoneLineColumn(column));
+}
+
+/** Stage columns with waiting review work already moved to Verify. */
+export function visibleLineStageColumns(
+  columns: LinePhaseColumn[],
+  verifyOrders: FactoriesWorkOrder[],
+): LinePhaseColumn[] {
+  const verifyIds = new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
+  return lineStageColumns(columns).map((column) => {
+    const runs = column.runs.filter((run) => !verifyIds.has(run.workOrderId));
+    if (runs.length === column.runs.length) {
+      return column;
+    }
+    return { ...column, runs, tick: resolvePhaseTick(runs) };
+  });
 }
 
 /** Factory-level intake automation. It is not a line step. */
@@ -173,11 +237,12 @@ export function findBacklogAutomationApp(
 
 /** Factory-level PR Closure automation. It is not a line step. */
 export function findClosureAutomationApp(
-  apps: Array<{ id?: string; name?: string }>,
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
 ): { id: string; name: string } | undefined {
   const match = apps.find(
     (app) =>
       Boolean(app.id) &&
+      !app.columnKey?.trim() &&
       (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
   );
   if (!match?.id) {
@@ -198,16 +263,13 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
 }
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
-  if (!order.id || order.state !== "STATE_DRAFT") {
-    return false;
-  }
-  return (order.lineDispatches ?? []).length === 0;
+  return Boolean(order.id) && order.state === "STATE_DRAFT";
 }
 
-// A finished work order belongs on this board when it ran on this line, or
+// A finished task belongs on this board when it ran on this line, or
 // when it closed before any line picked it up — the same rule the shared
 // backlog follows.
-function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+export function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
   const dispatches = order.lineDispatches ?? [];
   if (dispatches.length === 0) {
     return true;
@@ -222,38 +284,6 @@ function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWork
     return rightTime - leftTime;
   }
   return (right.id ?? "").localeCompare(left.id ?? "");
-}
-
-export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
-  kind: "running" | "waiting" | "queued" | "failed" | "idle";
-  label: string;
-} {
-  if (isQueuedStepRow(execution)) {
-    const position = execution.queuePosition ?? 0;
-    return { kind: "queued", label: position > 0 ? `Queued #${position}` : "Queued" };
-  }
-  if (execution.state === "STATE_STARTED") {
-    return { kind: "running", label: "Executing" };
-  }
-  if (execution.state === "STATE_CANCELLING") {
-    // In-flight like Automations (running tick), but keep Cancelling label.
-    return { kind: "running", label: "Cancelling" };
-  }
-  if (execution.state === "STATE_PENDING") {
-    return { kind: "queued", label: "Queued" };
-  }
-  if (execution.state === "STATE_FINISHED") {
-    if (execution.result === "RESULT_PASSED") {
-      return { kind: "idle", label: "Passed" };
-    }
-    if (execution.result === "RESULT_FAILED") {
-      return { kind: "failed", label: "Failed" };
-    }
-    if (execution.result === "RESULT_CANCELLED") {
-      return { kind: "idle", label: "Cancelled" };
-    }
-  }
-  return { kind: "idle", label: "Unknown" };
 }
 
 /** Board-level status for a phase column header. */
@@ -347,7 +377,7 @@ function appendCurrentRunForOrder(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id || order.state === "STATE_CLOSED") {
+  if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
     return;
   }
 

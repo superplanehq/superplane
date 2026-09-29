@@ -3,7 +3,7 @@ import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import type { CloudWatchAlarm } from "./types";

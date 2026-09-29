@@ -1,3 +1,5 @@
+import { parseAndFormatTokenCount } from "@/lib/formatTokenCount";
+
 import type { RunOverlayProvider } from "../work-order-run-overlay/workOrderRunOverlayMocks";
 
 export function formatCostCents(cents?: string): string | undefined {
@@ -12,19 +14,7 @@ export function formatCostCents(cents?: string): string | undefined {
 }
 
 export function formatTokenCount(tokens?: string): string | undefined {
-  if (tokens == null || tokens === "") {
-    return undefined;
-  }
-  const count = Number(tokens);
-  if (!Number.isFinite(count)) {
-    return undefined;
-  }
-  if (count >= 1000) {
-    const thousands = count / 1000;
-    const compact = thousands >= 10 ? thousands.toFixed(0) : thousands.toFixed(1).replace(/\.0$/, "");
-    return `${compact}k tokens`;
-  }
-  return `${count} tokens`;
+  return parseAndFormatTokenCount(tokens);
 }
 
 export function clockLabel(iso?: string): string {

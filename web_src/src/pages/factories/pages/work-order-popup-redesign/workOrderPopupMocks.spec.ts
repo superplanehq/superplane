@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
 
 import { OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -40,7 +40,7 @@ describe("popupFixtureForWorkOrder", () => {
       ["Backlog", "passed"],
       ["Implement", "running"],
     ]);
-    expect(fixture.log[0]?.title).toBe("Create work order");
+    expect(fixture.log[0]?.title).toBe("Create task");
     expect(fixture.log[0]?.artifactId).toBe("art-description");
   });
 
@@ -65,7 +65,7 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.log.at(-1)?.state).toBe("running");
   });
 
-  it("shows notes only when the work order is waiting", () => {
+  it("shows notes only when the task is waiting", () => {
     const fixture = popupFixtureForWorkOrder(
       order({
         title: "Waiting job",
@@ -79,7 +79,7 @@ describe("popupFixtureForWorkOrder", () => {
       }),
     );
 
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.at(-1)?.state).toBe("failed");
   });
@@ -104,10 +104,10 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.map((entry) => [entry.actor, entry.title])).toEqual([
-      ["Backlog", "Create work order"],
+      ["Backlog", "Create task"],
       ["Implement", "Implement"],
       ["Verify", "Verify"],
-      ["Done", "Complete work order"],
+      ["Done", "Complete task"],
     ]);
   });
 
@@ -136,8 +136,7 @@ describe("popupFixtureForWorkOrder", () => {
 
     expect(fixture.log.at(-1)).toMatchObject({
       actor: "Done",
-      title: "Complete work order from merged pull request",
-      artifactId: "art-pr-closure",
+      title: "Complete task from merged pull request",
     });
   });
 
@@ -180,8 +179,8 @@ describe("popupFixtureForWorkOrder", () => {
       }),
     );
 
-    expect(userReject.log.at(-1)?.title).toBe("Reject work order");
-    expect(automationReject.log.at(-1)?.title).toBe("Reject work order from closed pull request");
+    expect(userReject.log.at(-1)?.title).toBe("Reject task");
+    expect(automationReject.log.at(-1)?.title).toBe("Reject task from closed pull request");
   });
 
   it("shows a backlog create step with description.md for a user draft", () => {
@@ -199,7 +198,7 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.map((entry) => [entry.actor, entry.title, entry.state])).toEqual([
-      ["Backlog", "Create work order", "passed"],
+      ["Backlog", "Create task", "passed"],
     ]);
     expect(fixture.log[0]?.artifactId).toBe("art-description");
     expect(fixture.description.data).toMatchObject({ name: "description.md", body: "User-written scope." });
@@ -211,13 +210,13 @@ describe("popupFixtureForWorkOrder", () => {
         title: "Ingested job",
         description: "Issue body from GitHub.",
         state: "STATE_DRAFT",
-        createdBy: { automation: { appId: "app-ingest", appName: "Ingest", nodeName: "Create Work Order" } },
+        createdBy: { automation: { appId: "app-ingest", appName: "Ingest", nodeName: "Create Task" } },
         lineDispatches: [],
       }),
     );
 
     expect(fixture.log.map((entry) => [entry.actor, entry.title, entry.state])).toEqual([
-      ["Backlog", "Create work order from GitHub issue", "passed"],
+      ["Backlog", "Create task from GitHub issue", "passed"],
     ]);
     expect(fixture.log[0]?.artifactId).toBe("art-description");
   });

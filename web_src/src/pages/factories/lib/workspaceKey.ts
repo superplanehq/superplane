@@ -2,7 +2,7 @@
  * Utilities for the Jira-style workspace key attached to every factory.
  *
  * A key is 2-5 uppercase Latin letters, unique per organization, and drives
- * the human-readable identifier for every work order that belongs to the
+ * the human-readable identifier for every task that belongs to the
  * workspace: `${key}-${number}` (for example, `SP-1`).
  *
  * Backend validation is authoritative — these helpers only shape the input
@@ -50,7 +50,7 @@ export function suggestWorkspaceKeyFromName(name: string): string {
 }
 
 /**
- * Render the display identifier for a work order (`SP-42`). Returns an
+ * Render the display identifier for a task (`SP-42`). Returns an
  * empty string when either the key or the number is missing so callers
  * can fall back to whatever short identifier they already show.
  *

@@ -1,4 +1,4 @@
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import type { MergeRequest } from "./types";
 
 // buildReviewerDetails renders the shared details for the add/remove reviewer

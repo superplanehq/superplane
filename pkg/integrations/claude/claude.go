@@ -55,8 +55,9 @@ func (i *Claude) Configuration() []configuration.Field {
 			Label:       "Admin API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Admin API key, required for fetching usage and cost reports.",
+			Description: "Use this key only to fetch usage and cost reports.",
 			Required:    false,
+			Togglable:   true,
 		},
 	}
 }

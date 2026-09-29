@@ -8,7 +8,7 @@ import { useMissionAssignment } from "./useMissionAssignment";
 import { resolveMissionForWorkOrder } from "./missionListModel";
 import { WorkOrderMissionPopover } from "./WorkOrderMissionPopover";
 
-/** Storybook-only Overview row. Assign this work order to one mission, or to none. */
+/** Storybook-only Overview row. Assign this task to one mission, or to none. */
 export function WorkOrderMissionOverviewRow({ workOrderId }: { workOrderId: string }) {
   const { missions, missionByWorkOrderId, assignMission } = useMissionAssignment();
   const mission = resolveMissionForWorkOrder(missions, missionByWorkOrderId, workOrderId);
@@ -20,7 +20,7 @@ export function WorkOrderMissionOverviewRow({ workOrderId }: { workOrderId: stri
       showSuccessToast(`Assigned to ${next.name}.`);
       return;
     }
-    showSuccessToast("This work order has no mission.");
+    showSuccessToast("This task has no mission.");
   };
 
   return (

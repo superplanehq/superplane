@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { baseMapper } from "./base";
 import { eventStateRegistry } from "./index";
@@ -148,7 +148,7 @@ describe("baseMapper.getExecutionDetails", () => {
 
   it("truncates long SQL queries", () => {
     const ctx = buildDetailsCtx({ execution: { configuration: { sql: "SELECT " + "a".repeat(200) + " FROM logs" } } });
-    const sql = baseMapper.getExecutionDetails(ctx)["SQL"];
+    const sql = baseMapper.getExecutionDetails(ctx)["SQL"] as string;
     expect(sql.length).toBeLessThanOrEqual(123);
     expect(sql).toContain("...");
   });

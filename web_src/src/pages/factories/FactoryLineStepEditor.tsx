@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,8 +15,8 @@ interface FactoryLineStepEditorProps {
   organizationId: string;
   index: number;
   step: DraftStep;
-  apps: FactoryApp[];
-  appById: Map<string, FactoryApp>;
+  apps: FactoryAutomation[];
+  appById: Map<string, FactoryAutomation>;
   onChange: (step: DraftStep) => void;
 }
 
@@ -92,7 +92,7 @@ export function FactoryLineStepEditor({
             placeholder="10"
           />
           <p className="text-xs text-muted-foreground">
-            Maximum number of work orders to be processed in parallel at this step.
+            Maximum number of tasks to be processed in parallel at this step.
           </p>
         </div>
       </div>

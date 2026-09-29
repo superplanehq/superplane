@@ -1,0 +1,525 @@
+import { StrictMode } from "react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TooltipProvider } from "@/ui/tooltip";
+
+import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import {
+  analysisChat,
+  HIGH_CLARITY,
+  HIGH_CONFIDENCE,
+  INTENT,
+  INTENT_DOC,
+  IntentDocumentResizeObserver,
+  notifyIntentResize,
+  renderIntentDocument,
+} from "./WorkOrderIntentDocument.testHelpers";
+import { WorkOrderIntentDocument } from "./WorkOrderIntentDocument";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
+import { resetStreamMemoryForTests } from "./useStreamOnUpdate";
+import type { SplitRunSource } from "./splitRunSource";
+
+vi.mock("@/hooks/useOrgUserLookup", () => ({
+  useOrgUserLookup: () => ({
+    resolveUser: (id: string | undefined, name?: string) =>
+      id ? { id, name: name ?? "Ada Lovelace", initials: "AL" } : null,
+    isLoading: false,
+  }),
+}));
+
+const GITHUB_SOURCE: SplitRunSource = {
+  kind: "intake",
+  name: "GitHub issues",
+  iconSrc: "/github.svg",
+  iconAlt: "GitHub",
+  ticket: { label: "acme/payments-service#842", href: "https://github.com/acme/payments-service/issues/842" },
+};
+
+describe("WorkOrderIntentDocument", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.unstubAllGlobals();
+    resetStreamMemoryForTests();
+  });
+
+  it("shows the original request and the generated summary", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={HIGH_CONFIDENCE}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-session")).toHaveTextContent("Show a clearer empty state");
+    expect(screen.queryByText("Original request")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-description")).toHaveTextContent(
+      "Imported from GitHub: billing empty state is unclear.",
+    );
+    expect(screen.getByRole("heading", { name: "Clearer empty state" })).toBeInTheDocument();
+    const summary = screen.getByTestId("split-run-intent-summary");
+    expect(summary.parentElement).not.toHaveAttribute("data-streaming");
+    expect(summary).toHaveTextContent("A person can add a payment method from the empty billing page.");
+    expect(within(summary).getByRole("heading", { name: "Problem" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Proposed outcome" })).toBeInTheDocument();
+    expect(within(summary).getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
+    expect(within(summary).queryByRole("heading", { name: "Scope" })).not.toBeInTheDocument();
+    const result = screen.getByTestId("split-run-intent-result");
+    const clarityChip = within(result).getByTestId("split-run-intent-clarity");
+    expect(clarityChip).toHaveAccessibleName("Clarity 4/5");
+    expect(clarityChip).toHaveTextContent("Clarity");
+    expect(clarityChip).toHaveTextContent("4");
+    expect(
+      within(clarityChip).getByTestId("split-run-intent-clarity-meter").querySelectorAll("[data-filled='true']"),
+    ).toHaveLength(4);
+    const chip = within(result).getByTestId("split-run-intent-confidence");
+    expect(chip).toHaveAccessibleName("Confidence 4/5");
+    expect(chip).toHaveTextContent("Confidence");
+    expect(
+      within(chip).getByTestId("split-run-intent-confidence-meter").querySelectorAll("[data-filled='true']"),
+    ).toHaveLength(4);
+    expect(screen.queryByTestId("split-run-intent-clarity-copy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence-copy")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-overview-checks"),
+    ).toBeNull();
+  });
+
+  it("reveals each score why on hover and pins it on click", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={HIGH_CONFIDENCE}
+      />,
+    );
+
+    await user.hover(screen.getByTestId("split-run-intent-confidence"));
+    expect(await screen.findByTestId("split-run-intent-confidence-copy")).toHaveTextContent(
+      "This issue is a good fit for an agent on this factory line.",
+    );
+    await user.click(screen.getByTestId("split-run-intent-clarity"));
+    expect(await screen.findByTestId("split-run-intent-clarity-copy")).toHaveTextContent(HIGH_CLARITY.summary);
+    expect(screen.getByTestId("split-run-intent-clarity")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows a dash for Clarity when only Confidence exists", () => {
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} confidence={HIGH_CONFIDENCE} />);
+
+    expect(screen.getByTestId("split-run-intent-confidence")).toHaveAccessibleName("Confidence 4/5");
+    expect(screen.getByTestId("split-run-intent-clarity")).toHaveTextContent("–");
+  });
+
+  it("puts source context on the left after Start and hides confidence", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={HIGH_CONFIDENCE}
+        contextSidebar={<aside data-testid="split-run-overview-sidebar">Source</aside>}
+      />,
+    );
+
+    const request = screen.getByTestId("split-run-intent-request");
+    const result = screen.getByTestId("split-run-intent-result");
+    expect(within(request).getByTestId("split-run-overview-sidebar")).toHaveTextContent("Source");
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
+    expect(within(result).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
+  });
+
+  it("keeps a decision note on the plan pane", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        resultFooter={<div data-testid="split-run-review">Ready</div>}
+      />,
+    );
+
+    expect(within(screen.getByTestId("split-run-intent-result")).getByTestId("split-run-review")).toHaveTextContent(
+      "Ready",
+    );
+    expect(within(screen.getByTestId("split-run-intent-request")).queryByTestId("split-run-review")).toBeNull();
+  });
+
+  it("shows the summary and the full plan", () => {
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
+
+    expect(screen.getByTestId("split-run-intent-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-plan")).toHaveTextContent("The empty state tells the user");
+    expect(screen.getByTestId("split-run-intent-plan-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show full plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hide full plan" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-body").querySelector('[data-slot="separator"]')).not.toBeNull();
+  });
+
+  it("starts the request pane at two fifths width and lets the reader drag the split", () => {
+    renderIntentDocument(<WorkOrderIntentDocument {...INTENT_DOC} artifacts={[INTENT]} />);
+
+    const request = screen.getByTestId("split-run-intent-request");
+    const handle = screen.getByTestId("split-run-intent-resize-handle");
+    expect(request.style.getPropertyValue("--intent-left")).toBe("40%");
+    expect(handle).toHaveAttribute("aria-label", "Resize the request and plan");
+
+    const split = request.parentElement;
+    expect(split).toBeTruthy();
+    vi.spyOn(split as HTMLElement, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 400,
+      right: 1000,
+      width: 1000,
+      height: 400,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(handle, { clientX: 500, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 620, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 620, pointerId: 1 });
+    expect(request.style.getPropertyValue("--intent-left")).toBe("62%");
+  });
+
+  it("shows the request as the first chat message on the right", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        source={GITHUB_SOURCE}
+        analysis={analysisChat({ composer: "Need the existing empty-state component." })}
+      />,
+    );
+
+    const chat = within(screen.getByTestId("split-run-intent-request")).getByTestId("split-run-intent-chat");
+    expect(chat).toBeInTheDocument();
+    expect(within(chat).queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
+    expect(within(chat).getByTestId("split-run-description")).toHaveClass("justify-end");
+    expect(within(chat).getByTestId("split-run-source")).toHaveTextContent("acme/payments-service#842");
+    expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.request)).not.toBeInTheDocument();
+    expect(within(chat).queryByText(CREATE_WITH_AGENT_COPY.you)).not.toBeInTheDocument();
+    expect(within(chat).getByTestId("split-run-description").querySelector(".sp-chat-outgoing")).not.toBeNull();
+    expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
+    const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
+    expect(within(pendingChips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
+    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
+    expect(
+      within(pendingChips).getByTestId("split-run-intent-plan-chip-analyzing").querySelector(".t-matrix"),
+    ).not.toBeNull();
+    expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer-card")).toHaveAttribute("data-slot", "input-group");
+    expect(screen.getByTestId("split-run-intent-chat-log").className).toContain("[scrollbar-gutter:stable]");
+    expect(within(chat).getByTestId("split-run-description")).toHaveTextContent(
+      "Imported from GitHub: billing empty state is unclear.",
+    );
+    expect(within(chat).getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
+    expect(within(chat).queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-state", "closed");
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("split-run-intent-resize-handle")).toHaveClass("lg:hidden");
+    expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
+    const columns = screen.getAllByTestId("split-run-intent-chat-column");
+    expect(columns.length).toBeGreaterThanOrEqual(2);
+    for (const column of columns) {
+      expect(column).toHaveClass("mx-auto", "max-w-5xl", "px-4");
+    }
+    expect(columns[0]).toContainElement(screen.getByTestId("split-run-description"));
+    expect(columns[columns.length - 1]).toContainElement(screen.getByTestId("split-run-intent-composer"));
+    expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=input-group]")).not.toBeNull();
+    expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
+    expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
+    expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+    expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
+    const send = screen.getByTestId("split-run-intent-composer-send");
+    expect(send).toHaveAttribute("data-size", "icon-sm");
+    expect(send).toHaveAttribute("aria-label", ANALYSIS_PLANNING_COPY.send);
+    expect(send.children).toHaveLength(1);
+  });
+
+  it("streams the summary when the spec updates after open", () => {
+    const { rerender } = renderIntentDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          streamKey="order-stream"
+          artifacts={[{ ...INTENT, data: { ...INTENT.data, body: "# Old title\n\nOld summary only.\n" } }]}
+        />
+      </StrictMode>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-stream" artifacts={[INTENT]} />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
+    expect(screen.getByTestId("split-run-intent-summary")).toHaveTextContent("A");
+    expect(screen.queryByRole("heading", { name: "Constraints" })).not.toBeInTheDocument();
+  });
+
+  it("streams the first spec that arrives while the card is open", () => {
+    const { rerender } = renderIntentDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-first-spec" artifacts={[]} isAnalyzing />
+      </StrictMode>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-first-spec" artifacts={[INTENT]} isAnalyzing />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).toHaveAttribute("data-streaming");
+    expect(screen.queryByRole("heading", { name: "Constraints" })).not.toBeInTheDocument();
+  });
+
+  it("does not stream when artifacts load after the card opens", () => {
+    const { rerender } = renderIntentDocument(
+      <StrictMode>
+        <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-open" streamReady={false} artifacts={[]} />
+      </StrictMode>,
+    );
+
+    expect(screen.queryByRole("heading", { name: INTENT_DOCUMENT_TITLE })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the spec" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).not.toHaveAttribute("data-reveal");
+
+    rerender(
+      <TooltipProvider>
+        <StrictMode>
+          <WorkOrderIntentDocument {...INTENT_DOC} streamKey="order-open" streamReady artifacts={[INTENT]} />
+        </StrictMode>
+      </TooltipProvider>,
+    );
+
+    expect(screen.queryByRole("status", { name: "Loading the spec" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-result")).toHaveAttribute("data-reveal");
+    expect(screen.getByTestId("split-run-intent-summary").parentElement).not.toHaveAttribute("data-streaming");
+    expect(screen.getByRole("heading", { name: "Constraints" })).toBeInTheDocument();
+  });
+
+  it("keeps the stored transcript outside the current run activity", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "waiting",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [
+              { id: "user-1", kind: "text", role: "user", text: "Use the current empty-state component." },
+              { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan with that constraint." },
+              { id: "survey-1", kind: "text", role: "user", origin: "survey", text: "What is the priority? High" },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    expect(within(transcript).getByText("Use the current empty-state component.")).toBeInTheDocument();
+    expect(within(transcript).getByText("I updated the plan with that constraint.")).toBeInTheDocument();
+    expect(within(transcript).getByText("What is the priority?")).toBeInTheDocument();
+    expect(within(transcript).queryByText(CREATE_WITH_AGENT_COPY.youSurvey)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Use the current empty-state component.")).toHaveLength(1);
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
+  });
+
+  it("does not restream the last agent line after a survey answer", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          canSend: false,
+          view: {
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            messages: [
+              {
+                id: "agent-1",
+                kind: "text",
+                role: "agent",
+                text: "Because the premise is false, I scored this low (confidence 2) and asked one clarifying question: close it as already fixed with a test, upgrade the plain-text 404 into a real page, or provide steps where the 500 still occurs. Spec, score, and survey are published. Files written: /tmp/intake-analysis.json and /tmp/intent.md.",
+              },
+              {
+                id: "survey-1",
+                kind: "text",
+                role: "user",
+                origin: "survey",
+                text: "The delete route already returns 404 for a missing puppy. Add a test and close the ticket.",
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const transcript = screen.getByTestId("split-run-intent-transcript");
+    expect(within(transcript).getByText(/Because the premise is false/)).toBeInTheDocument();
+    expect(transcript.querySelector(".sp-stream-w")).toBeNull();
+    expect(screen.getAllByText(/Because the premise is false/)).toHaveLength(1);
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveTextContent("Starting analysis…");
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.machineStarting)).not.toBeInTheDocument();
+  });
+
+  it("does not send a multi-question survey when Next is clicked", async () => {
+    const user = userEvent.setup();
+    const onSubmitSurvey = vi.fn();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          onSubmitSurvey,
+          view: {
+            machineStatus: "waiting",
+            messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need two details." }],
+            survey: {
+              id: "survey-1",
+              questions: [
+                { prompt: "What is the priority?", options: ["High", "Low"] },
+                { prompt: "What is the scope?", options: ["One file", "The service"] },
+              ],
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("split-run-intent-chat-log")).getByTestId("create-with-agent-survey"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+
+    expect(onSubmitSurvey).not.toHaveBeenCalled();
+    expect(screen.getByText("What is the scope?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
+  });
+
+  it("waits for the final agent message before it shows a survey", () => {
+    const survey = {
+      id: "survey-1",
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+    };
+    const { rerender } = renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: {
+            machineStatus: "running",
+            canvasId: "canvas-1",
+            canvasRunId: "run-1",
+            executionId: "exec-1",
+            survey,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("create-with-agent-survey")).not.toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider>
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          artifacts={[INTENT]}
+          analysis={analysisChat({
+            view: {
+              machineStatus: "waiting",
+              canvasId: "canvas-1",
+              canvasRunId: "run-1",
+              executionId: "exec-1",
+              messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need one detail." }],
+              survey,
+            },
+          })}
+        />
+      </TooltipProvider>,
+    );
+
+    const log = screen.getByTestId("split-run-intent-chat-log");
+    const message = within(log).getByTestId("split-run-intent-transcript");
+    expect(message).toHaveTextContent("I need one detail.");
+    const question = within(log).getByText("What is the priority?");
+    expect(message.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("streams the analysis agent in the left chat", () => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        analysis={analysisChat({
+          view: { machineStatus: "running", canvasId: "canvas-1", canvasRunId: "run-1", executionId: "exec-1" },
+        })}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("split-run-intent-chat")).getByTestId("split-run-intent-thinking"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-planning")).not.toBeInTheDocument();
+  });
+
+  it("collapses a long request and expands it on Show more", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        description={"Imported from GitHub.\n\n" + "Need a payment method.\n".repeat(40)}
+        artifacts={[INTENT]}
+      />,
+    );
+
+    const content = screen.getByTestId("work-order-description-markdown").parentElement;
+    Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 640 });
+    act(() => notifyIntentResize());
+
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+    expect(content).toHaveStyle({ maxHeight: "220px" });
+
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(screen.getByRole("button", { name: /show less/i })).toBeInTheDocument();
+    expect(content).not.toHaveStyle({ maxHeight: "220px" });
+  });
+});

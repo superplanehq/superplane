@@ -25,24 +25,15 @@ type ArtifactDataEntry struct {
 }
 
 type AddWorkOrderArtifactConfiguration struct {
-	OrderID      string `json:"orderId" mapstructure:"orderId"`
-	ArtifactType string `json:"artifactType" mapstructure:"artifactType"`
-	URL          string `json:"url" mapstructure:"url"`
-	Number       string `json:"number" mapstructure:"number"`
-	// State / Merged / Draft accept expressions, so a flow can wire
-	// them directly to a `github.onPullRequest` payload. `any` because
-	// after resolution the value may be a bool, string, or number.
-	State       any                 `json:"state,omitempty" mapstructure:"state,omitempty"`
-	Merged      any                 `json:"merged,omitempty" mapstructure:"merged,omitempty"`
-	Draft       any                 `json:"draft,omitempty" mapstructure:"draft,omitempty"`
-	Title       string              `json:"title" mapstructure:"title"`
-	Body        string              `json:"body" mapstructure:"body"`
-	Name        string              `json:"name" mapstructure:"name"`
-	Repository  string              `json:"repository" mapstructure:"repository"`
-	ArtifactKey string              `json:"artifactKey" mapstructure:"artifactKey"`
-	MergedAt    string              `json:"mergedAt" mapstructure:"mergedAt"`
-	ClosedAt    string              `json:"closedAt" mapstructure:"closedAt"`
-	Data        []ArtifactDataEntry `json:"data" mapstructure:"data"`
+	OrderID      string              `json:"orderId" mapstructure:"orderId"`
+	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
+	URL          string              `json:"url" mapstructure:"url"`
+	Title        string              `json:"title" mapstructure:"title"`
+	Body         string              `json:"body" mapstructure:"body"`
+	Name         string              `json:"name" mapstructure:"name"`
+	Repository   string              `json:"repository" mapstructure:"repository"`
+	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
+	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
 
 func (c *AddWorkOrderArtifact) Name() string {
@@ -50,30 +41,31 @@ func (c *AddWorkOrderArtifact) Name() string {
 }
 
 func (c *AddWorkOrderArtifact) Label() string {
-	return "Add Work Order Artifact"
+	return "Add Task Artifact"
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (PR, markdown note, branch, or link) to a work order"
+	return "Attach a typed artifact (markdown note, branch, or link) to a task"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order.
+	return `The Add Task Artifact component stores a typed artifact against a task.
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`merged`" + `, ` + "`draft`" + `, ` + "`mergedAt`" + `, and ` + "`closedAt`" + `. The ` + "`state`" + ` field (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) drives the icon/color of the artifact chip in the work order UI. ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` all accept expressions, so a flow can wire them straight to a ` + "`github.onPullRequest`" + ` payload: a GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` folds into SuperPlane's ` + "`state: \"merged\"`" + ` before it hits the artifact. Set ` + "`mergedAt`" + ` / ` + "`closedAt`" + ` (RFC3339, usually from the GitHub event) when you attach an already-merged or closed PR so Velocity uses the real day instead of now.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` and ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL), or an explicit ` + "`url`" + `. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time and does not wait for a pull request.
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` and ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL), or an explicit ` + "`url`" + `. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time.
 - **Link** (` + "`link`" + `): requires ` + "`url`" + ` (must be http or https); optional ` + "`title`" + ` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR, markdown, and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
+Use the Add Pull Request component to attach a pull request to a task.
 
-Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
+Markdown and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
-A pull request's ` + "`state`" + ` normally changes after it's attached — set ` + "`artifactKey`" + ` at attach time, then use ` + "`updateWorkOrderArtifact`" + ` (targeting the same key) from a ` + "`github.onPullRequest`" + ` flow to keep it current as the PR is drafted, reopened, closed, or merged.
+Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this task. Keys are unique per factory.
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
+If you set a key, later runs update that artifact when ` + "`orderId`" + ` identifies the task that owns it. A run that targets another task with the same key fails. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
+
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
 
 func (c *AddWorkOrderArtifact) Icon() string {
@@ -91,13 +83,10 @@ func (c *AddWorkOrderArtifact) ExampleOutput() map[string]any {
 		"data": map[string]any{
 			"artifact": map[string]any{
 				"id":   "art-123",
-				"type": "pr",
+				"type": "markdown",
 				"data": map[string]any{
-					"url":      "https://github.com/example/repo/pull/42",
-					"number":   "42",
-					"title":    "Draft implementation",
-					"state":    "open",
-					"provider": "github",
+					"title": "Design notes",
+					"body":  "Investigation notes.",
 				},
 			},
 		},
@@ -109,18 +98,17 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
-	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
-	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch", "link"}}}
-	titledTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown", "link"}}}
-	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown", "link"}}}
+	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch", "link"}}}
+	titledTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown", "link"}}}
+	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown", "link"}}}
 
-	fields := []configuration.Field{
+	return []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
@@ -131,11 +119,10 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Description: "The kind of artifact to store",
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
-			Default:     "pr",
+			Default:     "markdown",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Pull Request", Value: "pr"},
 						{Label: "Markdown", Value: "markdown"},
 						{Label: "Branch", Value: "branch"},
 						{Label: "Link", Value: "link"},
@@ -146,34 +133,18 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request, branch, or external resource (must be http or https). Required for pull requests and links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the branch or external resource (must be http or https). Required for links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
 			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "artifactType", Values: []string{"pr", "link"}},
+				{Field: "artifactType", Values: []string{"link"}},
 			},
 		},
 		{
-			Name:                 "number",
-			Label:                "Number",
-			Description:          "Optional pull request number (rendered as #<n>)",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			VisibilityConditions: prOnly,
-		},
-	}
-
-	fields = append(fields, prArtifactLifecycleFields(prArtifactLifecycleFieldOptions{
-		Visibility:   prOnly,
-		StateDefault: "open",
-	})...)
-
-	return append(fields,
-		configuration.Field{
 			Name:                 "body",
 			Label:                "Body",
-			Description:          "Markdown note body — rendered inline in the work order timeline",
+			Description:          "Markdown note body — rendered inline in the task timeline",
 			Type:                 configuration.FieldTypeText,
 			Required:             false,
 			VisibilityConditions: markdownOnly,
@@ -181,7 +152,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"markdown"}},
 			},
 		},
-		configuration.Field{
+		{
 			Name:                 "name",
 			Label:                "Name",
 			Description:          "Branch name (e.g. feature/refund-retry)",
@@ -192,7 +163,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				{Field: "artifactType", Values: []string{"branch"}},
 			},
 		},
-		configuration.Field{
+		{
 			Name:                 "repository",
 			Label:                "Repository",
 			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). Required when URL is empty. SuperPlane writes a GitHub tree URL from this value and the branch name.",
@@ -200,7 +171,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: branchOnly,
 		},
-		configuration.Field{
+		{
 			Name:                 "title",
 			Label:                "Title",
 			Description:          "Optional artifact title — for links, this becomes the chip's label (e.g. \"Preview\")",
@@ -208,34 +179,16 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Required:             false,
 			VisibilityConditions: titledTypes,
 		},
-		configuration.Field{
+		{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
-			Description: "Optional queryable key for this artifact (e.g. a pull request's URL), unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
+			Description: "Optional key, unique per factory. Later runs update this artifact when Task ID matches the owner. A different task with this key fails.",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
 			Default:     "",
 		},
-		configuration.Field{
-			Name:                 "mergedAt",
-			Label:                "Merged At",
-			Description:          "Optional RFC3339 merge timestamp — usually {{ event.data.pull_request.merged_at }}. Set when attaching an already-merged PR so Velocity attributes it to the real merge day; unset falls back to now.",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Togglable:            true,
-			VisibilityConditions: prOnly,
-		},
-		configuration.Field{
-			Name:                 "closedAt",
-			Label:                "Closed At",
-			Description:          "Optional RFC3339 close timestamp — usually {{ event.data.pull_request.closed_at }}. Set when attaching an already-closed PR so Velocity waste attributes it to the real close day.",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Togglable:            true,
-			VisibilityConditions: prOnly,
-		},
-		configuration.Field{
+		{
 			Name:                 "data",
 			Label:                "Metadata",
 			Description:          "Extra name/value pairs merged into the artifact's data map (typed fields above take precedence on name collisions)",
@@ -255,7 +208,7 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 				},
 			},
 		},
-	)
+	}
 }
 
 func (c *AddWorkOrderArtifact) ValidateNodeConfiguration(config map[string]any) error {
@@ -327,13 +280,10 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
-		"url":      config.URL,
-		"number":   config.Number,
-		"title":    config.Title,
-		"body":     config.Body,
-		"name":     config.Name,
-		"mergedAt": config.MergedAt,
-		"closedAt": config.ClosedAt,
+		"url":   config.URL,
+		"title": config.Title,
+		"body":  config.Body,
+		"name":  config.Name,
 	}
 
 	for key, value := range typed {
@@ -349,21 +299,6 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 	data = applyBranchTreeURL(config, data)
 	if err := requireReachableBranchURL(config.ArtifactType, data); err != nil {
 		return nil, err
-	}
-
-	if config.ArtifactType != "pr" {
-		return data, nil
-	}
-
-	updates, err := prArtifactStateUpdates(config.State, config.Merged, config.Draft)
-	if err != nil {
-		return nil, err
-	}
-	if len(updates) > 0 {
-		data = ensureArtifactData(data)
-		for key, value := range updates {
-			data[key] = value
-		}
 	}
 
 	return data, nil

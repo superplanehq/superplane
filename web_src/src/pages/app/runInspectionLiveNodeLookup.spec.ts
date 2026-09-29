@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";

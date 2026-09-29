@@ -21,7 +21,7 @@ export function SearchField({ inputRef, open, value, onOpen, onChange, onClose }
         variant="ghost"
         size="icon"
         onClick={onOpen}
-        aria-label="Search work orders"
+        aria-label="Search tasks"
         className="size-8 shrink-0 text-muted-foreground"
         data-testid="work-orders-search-trigger"
       >
@@ -49,7 +49,7 @@ export function SearchField({ inputRef, open, value, onOpen, onChange, onClose }
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Search…"
-        aria-label="Search work orders"
+        aria-label="Search tasks"
         className="!h-8 w-[200px] pl-8 pr-8 text-[13px] shadow-none"
         data-testid="work-orders-search-input"
       />

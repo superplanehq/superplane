@@ -1,13 +1,20 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { overlayHeaderSpend, type LiveHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleDollarSign, Clock, FileText, UserPlus, XIcon } from "lucide-react";
+import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
+import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
+import {
+  workOrderSpendBreakdownRows,
+  type WorkOrderUsageByMachineType,
+  type WorkOrderUsageByModel,
+} from "../../lib/workOrderUsage";
 import { OrgUserReference } from "../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderAssigneesPopover } from "../../WorkOrderAssigneesPopover";
@@ -23,6 +30,8 @@ export function PopupShell({
   fixed = false,
   wide = false,
   canvas = false,
+  fullPage = false,
+  className,
   onDismiss,
 }: {
   testId: string;
@@ -30,12 +39,42 @@ export function PopupShell({
   fixed?: boolean;
   wide?: boolean;
   canvas?: boolean;
+  fullPage?: boolean;
+  className?: string;
   onDismiss?: () => void;
 }) {
   return (
-    <RunOverlayFrame testId={testId} fixed={fixed} wide={wide} canvas={canvas} onDismiss={onDismiss}>
+    <RunOverlayFrame
+      testId={testId}
+      fixed={fixed}
+      wide={wide}
+      canvas={canvas}
+      fullPage={fullPage}
+      className={className}
+      onDismiss={onDismiss}
+    >
       {children}
     </RunOverlayFrame>
+  );
+}
+
+const OPEN_FULL_SCREEN_LABEL = "Open full screen";
+const EXIT_FULL_SCREEN_LABEL = "Exit full screen";
+const POPUP_HEADER_ICON_BUTTON =
+  "flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10";
+
+function PopupFullScreenButton({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  const label = expanded ? EXIT_FULL_SCREEN_LABEL : OPEN_FULL_SCREEN_LABEL;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={POPUP_HEADER_ICON_BUTTON}
+      aria-label={label}
+      data-testid="popup-fullscreen-button"
+    >
+      {expanded ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+    </button>
   );
 }
 
@@ -44,16 +83,24 @@ export function PopupHeader({
   children,
   onClose,
   actions,
+  accessory,
+  leading,
+  expanded = false,
+  onToggleExpanded,
   canEditTitle = false,
   titleBusy = false,
   onTitleSave,
   titleTestId = "popup-work-order-title",
-  titleAriaLabel = "Work order title",
+  titleAriaLabel = "Task title",
 }: {
   title: string;
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
+  accessory?: ReactNode;
+  leading?: ReactNode;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   canEditTitle?: boolean;
   titleBusy?: boolean;
   onTitleSave?: (next: string) => void;
@@ -65,6 +112,7 @@ export function PopupHeader({
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-3">
+            {leading}
             <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
               {canEditTitle && onTitleSave ? (
                 <ClickToRename
@@ -84,25 +132,24 @@ export function PopupHeader({
           </div>
           {children}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {actions}
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            aria-label="Close"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
+        <div className="flex shrink-0 flex-col items-end justify-between self-stretch gap-2">
+          <div className="flex items-center gap-2">
+            {actions}
+            {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
+            <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+          {accessory}
         </div>
       </div>
     </header>
   );
 }
 
-type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "startedLabel" | "elapsed" | "costUsd" | "tokensLabel">;
+type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
 
-/** Owner, elapsed time, and spend. No status, author, or ticket key. */
+/** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
   className,
@@ -112,6 +159,9 @@ export function OwnerTimeCostRow({
   assigneeIds = [],
   ownerBusy = false,
   onOwnerSave,
+  usageByModel,
+  usageByMachineType,
+  liveSpend,
 }: {
   fixture: OwnerTimeCostFields;
   className?: string;
@@ -121,7 +171,11 @@ export function OwnerTimeCostRow({
   assigneeIds?: string[];
   ownerBusy?: boolean;
   onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
+  usageByModel?: WorkOrderUsageByModel[];
+  usageByMachineType?: WorkOrderUsageByMachineType[];
+  liveSpend?: LiveHeaderSpend;
 }) {
+  const spend = overlayHeaderSpend(fixture.costUsd, fixture.tokensLabel, liveSpend);
   const ownerMark = (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       {assigneeIds.length > 0 || !canEditOwner ? (
@@ -137,7 +191,7 @@ export function OwnerTimeCostRow({
 
   return (
     <div
-      className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
+      className={cn("mt-2 flex w-full flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-foreground", className)}
       data-testid="popup-owner-time-cost"
     >
       {canEditOwner && organizationId && onOwnerSave ? (
@@ -162,18 +216,50 @@ export function OwnerTimeCostRow({
       ) : (
         ownerMark
       )}
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground" title={fixture.startedLabel}>
-        <Clock className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">{fixture.elapsed}</span>
-      </span>
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-        <CircleDollarSign className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">
-          {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
-        </span>
+      <span className="text-foreground">
+        <OwnerSpendValue costUsd={spend.costUsd} usageByModel={usageByModel} usageByMachineType={usageByMachineType} />{" "}
+        <span className="text-muted-foreground">·</span> {spend.tokensLabel}
       </span>
       {children}
     </div>
+  );
+}
+
+function OwnerSpendValue({
+  costUsd,
+  usageByModel,
+  usageByMachineType,
+}: {
+  costUsd: string;
+  usageByModel?: WorkOrderUsageByModel[];
+  usageByMachineType?: WorkOrderUsageByMachineType[];
+}) {
+  const rows = workOrderSpendBreakdownRows(usageByModel, usageByMachineType);
+  if (rows.length === 0) {
+    return <span data-testid="popup-spend-value">{costUsd}</span>;
+  }
+  return (
+    <HoverCard openDelay={0} closeDelay={80}>
+      <HoverCardTrigger asChild>
+        <span
+          className="cursor-default underline underline-offset-2"
+          data-testid="popup-spend-breakdown-trigger"
+          tabIndex={0}
+        >
+          {costUsd}
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-64 space-y-1.5 p-3 text-[13px]" data-testid="popup-spend-breakdown">
+        {rows.map((row) => (
+          <div className="flex items-baseline justify-between gap-3" key={row.label}>
+            <span className="min-w-0 truncate text-foreground">{row.label}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {row.detail ? `${row.detail} · ${row.spend}` : row.spend}
+            </span>
+          </div>
+        ))}
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -227,6 +313,7 @@ export function WaitingNotes({ notes }: { notes: PopupFixture["waitingNotes"] })
           key={note.key}
           note={note}
           organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey={PRIMARY_FACTORY_KEY}
           canClose={false}
           canManage={false}
           isBusy={false}

@@ -1,4 +1,4 @@
-import type { FactoryApp, FactoryLineStep } from "@/api-client";
+import type { FactoryAutomation, FactoryLineStep } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ const stepFieldClassName = "w-full min-w-0";
 
 interface FactoryLineFormProps {
   organizationId: string;
-  apps: FactoryApp[];
+  apps: FactoryAutomation[];
   initialName?: string;
   initialSteps?: FactoryLineStep[];
   isSaving: boolean;
@@ -45,7 +45,7 @@ export function FactoryLineForm({
   }, [initialName, initialSteps]);
 
   const appById = useMemo(() => {
-    const map = new Map<string, FactoryApp>();
+    const map = new Map<string, FactoryAutomation>();
     for (const app of apps) {
       if (app.id) {
         map.set(app.id, app);

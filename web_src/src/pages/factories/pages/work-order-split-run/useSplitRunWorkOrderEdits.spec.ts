@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { canEditSplitRunContent, canEditSplitRunDescription } from "./useSplitRunWorkOrderEdits";
 
 describe("canEditSplitRunContent", () => {
-  it("allows title and owner edits until the work order is done", () => {
+  it("allows title edits until the task is done", () => {
     expect(canEditSplitRunContent("draft")).toBe(true);
     expect(canEditSplitRunContent("running")).toBe(true);
     expect(canEditSplitRunContent("waiting")).toBe(true);
     expect(canEditSplitRunContent("failed")).toBe(true);
+    expect(canEditSplitRunContent("stopped")).toBe(true);
     expect(canEditSplitRunContent("done")).toBe(false);
     expect(canEditSplitRunContent("draft", false)).toBe(false);
   });

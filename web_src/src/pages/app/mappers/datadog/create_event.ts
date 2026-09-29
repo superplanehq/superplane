@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -54,13 +54,13 @@ export const createEventMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { alertType?: string; priority?: string } | undefined;
 
-  if (configuration.alertType) {
+  if (configuration?.alertType) {
     metadata.push({ icon: "activity", label: `Type: ${configuration.alertType}` });
   }
 
-  if (configuration.priority) {
+  if (configuration?.priority) {
     metadata.push({ icon: "flag", label: `Priority: ${configuration.priority}` });
   }
 
@@ -69,7 +69,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
@@ -82,40 +82,35 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
+function addDetail(details: Record<string, string>, key: string, value: string | number | undefined) {
+  if (value) {
+    details[key] = String(value);
+  }
+}
+
+function addUnixSecondsDetail(details: Record<string, string>, key: string, value: number | undefined) {
+  if (value) {
+    details[key] = new Date(value * 1000).toLocaleString();
+  }
+}
+
+function addJoinedDetail(details: Record<string, string>, key: string, values?: string[]) {
+  if (values && values.length > 0) {
+    details[key] = values.join(", ");
+  }
+}
+
 function getDetailsForEvent(event: DatadogEvent): Record<string, string> {
   const details: Record<string, string> = {};
 
-  if (event?.id) {
-    details["Event ID"] = String(event.id);
-  }
-
-  if (event?.title) {
-    details["Title"] = event.title;
-  }
-
-  if (event?.text) {
-    details["Text"] = event.text;
-  }
-
-  if (event?.date_happened) {
-    details["Created At"] = new Date(event.date_happened * 1000).toLocaleString();
-  }
-
-  if (event?.alert_type) {
-    details["Alert Type"] = event.alert_type;
-  }
-
-  if (event?.priority) {
-    details["Priority"] = event.priority;
-  }
-
-  if (event?.tags && event.tags.length > 0) {
-    details["Tags"] = event.tags.join(", ");
-  }
-
-  if (event?.url) {
-    details["Event URL"] = event.url;
-  }
+  addDetail(details, "Event ID", event.id);
+  addDetail(details, "Title", event.title);
+  addDetail(details, "Text", event.text);
+  addUnixSecondsDetail(details, "Created At", event.date_happened);
+  addDetail(details, "Alert Type", event.alert_type);
+  addDetail(details, "Priority", event.priority);
+  addJoinedDetail(details, "Tags", event.tags);
+  addDetail(details, "Event URL", event.url);
 
   return details;
 }

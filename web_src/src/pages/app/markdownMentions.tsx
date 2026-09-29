@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type ReactElement } from "react";
 
 import { Avatar } from "@/components/Avatar/avatar";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -38,6 +38,26 @@ export function WorkOrderMentionText({
   );
 }
 
+export function WorkOrderPersonMention({
+  person,
+  className,
+}: {
+  person: Pick<WorkOrderMentionCandidate, "name" | "avatarUrl" | "email">;
+  className?: string;
+}) {
+  return (
+    <MentionHoverCard person={person}>
+      <span
+        className={cn("work-order-mention inline-flex items-center gap-1 px-1 align-middle", className)}
+        data-testid="work-order-mention"
+      >
+        <Avatar src={person.avatarUrl} initials={getUserInitials(person.name)} alt="" className="size-3.5" />
+        {person.name}
+      </span>
+    </MentionHoverCard>
+  );
+}
+
 function WorkOrderMentionToken({
   text,
   person,
@@ -69,9 +89,19 @@ function WorkOrderMentionToken({
     return pill;
   }
 
+  return <MentionHoverCard person={person}>{pill}</MentionHoverCard>;
+}
+
+function MentionHoverCard({
+  person,
+  children,
+}: {
+  person: Pick<WorkOrderMentionCandidate, "name" | "avatarUrl" | "email">;
+  children: ReactElement;
+}) {
   return (
     <HoverCard openDelay={200} closeDelay={100}>
-      <HoverCardTrigger asChild>{pill}</HoverCardTrigger>
+      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
         side="top"
         align="start"

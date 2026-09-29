@@ -144,6 +144,39 @@ export function formatClockDurationLabel(label: string): string {
   return formatClockDuration(ms);
 }
 
+/** Compact Go-style duration: `30s`, `1m2s`, `1h30m`. */
+export function formatGoDuration(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return "";
+  }
+  if (durationMs < 1000) {
+    return "<1s";
+  }
+
+  const duration = toDurationParts(Math.round(durationMs / 1000) * 1000);
+  return [
+    duration.days ? `${duration.days}d` : "",
+    duration.hours ? `${duration.hours}h` : "",
+    duration.minutes ? `${duration.minutes}m` : "",
+    duration.seconds ? `${duration.seconds}s` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
+/** Turn a stored label such as `1m 12s` or `4m so far` into `1m12s` / `4m`. */
+export function formatGoDurationLabel(label: string): string {
+  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
+    return "";
+  }
+  const ms = parseSpokenDurationMs(trimmed);
+  if (ms === null) {
+    return trimmed;
+  }
+  return formatGoDuration(ms);
+}
+
 export function formatMinutesSecondsDuration(durationMs: number): string {
   if (durationMs <= 0) return "";
   if (durationMs < 1000) return "<1s";

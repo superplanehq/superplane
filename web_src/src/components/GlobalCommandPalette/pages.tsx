@@ -34,6 +34,7 @@ export type CommandPalettePageProps = {
   createAppDisabled: boolean;
   // Search mode
   searchActive: boolean;
+  searchLoading: boolean;
   searchResults: PaletteAction[];
   handleSetSearch: (value: string) => void;
   handleOpenChange: (open: boolean) => void;

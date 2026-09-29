@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 
 describe("exprEvaluator", () => {
@@ -14,13 +14,19 @@ describe("exprEvaluator", () => {
     );
   });
 
-  it("evaluates order context helper", () => {
+  it("evaluates order and task context helpers", () => {
     expect(
       evaluateExpr("order().title", {
         __order: { id: "order-1", title: "Ship feature", artifacts: [{ type: "pr" }] },
       }),
     ).toBe("Ship feature");
+    expect(
+      evaluateExpr("task().title", {
+        __order: { id: "order-1", title: "Ship feature", artifacts: [{ type: "pr" }] },
+      }),
+    ).toBe("Ship feature");
     expect(evaluateExpr("order()", {})).toBeNull();
+    expect(evaluateExpr("task()", {})).toBeNull();
   });
 
   it("evaluates expr-compatible string and array slices", () => {

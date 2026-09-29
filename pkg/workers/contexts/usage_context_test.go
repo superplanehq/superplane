@@ -41,7 +41,7 @@ func Test__UsageContext__KeepsSpendWhenExecutorTransactionRollsBack(t *testing.T
 	require.Error(t, err)
 
 	var count int64
-	require.NoError(t, database.Conn().Model(&models.LLMUsageEvent{}).
+	require.NoError(t, database.Conn().Model(&models.WorkspaceUsageEvent{}).
 		Where("node_execution_id = ?", nodeExecution.ID).
 		Count(&count).Error)
 	assert.Equal(t, int64(1), count)

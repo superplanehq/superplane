@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
@@ -54,8 +54,6 @@ const toolSidebarState = {
   handleToolSidebarToggle: vi.fn(),
   openToolSidebar: vi.fn(),
   closeToolSidebar: vi.fn(),
-  agentMode: "operator" as const,
-  switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
 const runsSidebarState = {

@@ -26,9 +26,9 @@ func UpdateIntegrationSecret(
 	secretName string,
 	value string,
 ) (*pb.UpdateIntegrationSecretResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
+		return nil, err
 	}
 
 	id, err := uuid.Parse(integrationID)

@@ -591,8 +591,8 @@ spec:
           File a clear, well-formed issue for the factory from a short description.
           Applying the "factory" label starts the factory on it.
 
-          Also reachable from the Work Order Dispatch onRun entrypoint when a factory line
-          sends a work order (title and description).
+          Also reachable from the Task Dispatch onRun entrypoint when a factory line
+          sends a task (title and description).
       position:
         x: 72
         'y': 3960
@@ -1395,7 +1395,7 @@ spec:
         'y': 380
       isCollapsed: true
     - id: work-order-dispatch
-      name: Work Order Dispatch
+      name: Task Dispatch
       type: TYPE_TRIGGER
       component: onRun
       configuration:

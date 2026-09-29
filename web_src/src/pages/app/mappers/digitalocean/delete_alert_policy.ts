@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,

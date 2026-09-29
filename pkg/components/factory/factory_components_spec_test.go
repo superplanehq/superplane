@@ -2,7 +2,9 @@ package factory
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,11 +30,6 @@ type fakeFactoryContext struct {
 	findOrder  *core.WorkOrder
 	findErr    error
 
-	updateArtifactCalls  int
-	updateArtifactParams core.UpdateWorkOrderArtifactParams
-	updateArtifactResult *core.WorkOrderArtifact
-	updateArtifactErr    error
-
 	reportCheckCalls  int
 	reportCheckParams core.ReportWorkOrderCheckParams
 	reportCheckResult *core.WorkOrderCheck
@@ -42,10 +39,35 @@ type fakeFactoryContext struct {
 	setStatusNoteParams core.SetWorkOrderStatusNoteParams
 	setStatusNoteResult *core.WorkOrderStatusNote
 	setStatusNoteErr    error
+
+	addArtifactCalls  int
+	addArtifactParams core.AddWorkOrderArtifactParams
+	addArtifactResult *core.WorkOrderArtifact
+	addArtifactErr    error
+
+	lastActivityParams core.AddPullRequestActivityParams
+	activityResult     *core.PullRequestActivityResult
+	activityErr        error
+
+	lastUpdateParams core.UpdatePullRequestActivityParams
+	updateResult     *core.PullRequestActivityResult
+	updateErr        error
+
+	createCalls   int
+	createCreated bool
+	createOrder   *core.WorkOrder
+	createErr     error
 }
 
-func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
-	return nil, nil
+func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	f.createCalls++
+	if f.createErr != nil {
+		return nil, false, f.createErr
+	}
+	if f.createOrder != nil {
+		return f.createOrder, f.createCreated, nil
+	}
+	return nil, f.createCreated, nil
 }
 
 func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
@@ -64,14 +86,16 @@ func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParam
 	return nil
 }
 
-func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	return nil, nil
-}
-
-func (f *fakeFactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	f.updateArtifactCalls++
-	f.updateArtifactParams = params
-	return f.updateArtifactResult, f.updateArtifactErr
+func (f *fakeFactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	f.addArtifactCalls++
+	f.addArtifactParams = params
+	if f.addArtifactErr != nil {
+		return nil, f.addArtifactErr
+	}
+	if f.addArtifactResult != nil {
+		return f.addArtifactResult, nil
+	}
+	return &core.WorkOrderArtifact{ID: "art-1", Type: params.Type, Data: params.Data}, nil
 }
 
 func (f *fakeFactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
@@ -84,6 +108,97 @@ func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStat
 	f.setStatusNoteCalls++
 	f.setStatusNoteParams = params
 	return f.setStatusNoteResult, f.setStatusNoteErr
+}
+
+func (f *fakeFactoryContext) AddPullRequest(_ core.AddPullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) UpdatePullRequest(_ core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) FindPullRequest(_ core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	f.lastActivityParams = params
+	if f.activityErr != nil {
+		return nil, f.activityErr
+	}
+	if f.activityResult != nil {
+		return f.activityResult, nil
+	}
+	return &core.PullRequestActivityResult{
+		PullRequest: &core.PullRequest{ID: params.PullRequestID, Number: 42},
+		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
+		Activity:    &core.PullRequestActivity{Title: params.Title, Description: params.Description, Access: core.PullRequestActivityAccessConcurrent, State: "active"},
+		Outcome:     core.PullRequestActivityOutcomeReady,
+	}, nil
+}
+
+func (f *fakeFactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	f.lastUpdateParams = params
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	if f.updateResult != nil {
+		return f.updateResult, nil
+	}
+	description := ""
+	if params.Description != nil {
+		description = *params.Description
+	}
+	title := ""
+	if params.Title != nil {
+		title = *params.Title
+	}
+	return &core.PullRequestActivityResult{
+		PullRequest: &core.PullRequest{ID: "pr-1", Number: 42},
+		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
+		Activity:    &core.PullRequestActivity{Title: title, Description: description, Access: params.Access, State: "active"},
+		Outcome:     core.PullRequestActivityOutcomeReady,
+	}, nil
+}
+
+func TestCreateWorkOrder_Execute(t *testing.T) {
+	component := &CreateWorkOrder{}
+	workOrder := &core.WorkOrder{ID: "wo-1", Title: "t", State: "draft"}
+
+	t.Run("emits workOrder.created when a task is inserted", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createCreated: true, createOrder: workOrder}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"title": "t"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.createCalls)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Equal(t, "workOrder.created", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
+
+	t.Run("passes silently when the issue already has a task", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createCreated: false}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"title": "t"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, factoryCtx.createCalls)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Empty(t, stateCtx.Channel, "skip must not emit on any channel")
+		assert.Empty(t, stateCtx.Type)
+		assert.Nil(t, stateCtx.Payloads)
+	})
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
@@ -368,16 +483,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	c := &AddWorkOrderArtifact{}
 	fields := c.Configuration()
 
-	t.Run("requires url for pr", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-		})
-		if err == nil {
-			t.Fatal("expected error for pr without url")
-		}
-	})
-
 	t.Run("requires body for markdown", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
@@ -463,24 +568,11 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 
 	t.Run("requires orderId", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
+			"artifactType": "markdown",
+			"body":         "notes",
 		})
 		if err == nil {
 			t.Fatal("expected error for missing orderId")
-		}
-	})
-
-	t.Run("accepts valid pr", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
-			"number":       "1",
-			"title":        "Draft",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
@@ -559,7 +651,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("url field is visible for pr, branch, and link", func(t *testing.T) {
+	t.Run("url field is visible for branch and link", func(t *testing.T) {
 		var urlField *configuration.Field
 		for i := range fields {
 			if fields[i].Name == "url" {
@@ -577,7 +669,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		if condition.Field != "artifactType" {
 			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
 		}
-		for _, want := range []string{"pr", "branch", "link"} {
+		for _, want := range []string{"branch", "link"} {
 			found := false
 			for _, got := range condition.Values {
 				if got == want {
@@ -591,11 +683,11 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
+	t.Run("accepts link with free-form data entries", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/pr-1",
 			"data": []any{
 				map[string]any{"name": "provider", "value": "github"},
 			},
@@ -606,318 +698,58 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	})
 }
 
-func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
-	component := &UpdateWorkOrderArtifact{}
-	artifact := &core.WorkOrderArtifact{ID: "art-1", WorkOrderID: "wo-1", Type: "pr", Data: map[string]any{
-		"url":   "https://github.com/example/repo/pull/1",
-		"state": "merged",
-	}}
+func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
+	c := &AddWorkOrderArtifact{}
+	docs := c.Documentation()
+	assert.Contains(t, docs, "later runs update that artifact when")
+	assert.Contains(t, docs, "orderId")
+	assert.Contains(t, docs, "A run that targets another task with the same key fails")
+	assert.Contains(t, docs, "values that you leave blank are cleared")
+	assert.Contains(t, docs, "The first run sets the type")
+	assert.Contains(t, docs, "A later run with a different type fails")
+	assert.Contains(t, docs, "Keys are unique per factory")
 
-	t.Run("merges state and title into the artifact resolved by key", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "merged",
-				"title":       "Retitled PR",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, 1, factoryCtx.updateArtifactCalls)
-		assert.Equal(t, "wo-1", factoryCtx.updateArtifactParams.OrderID)
-		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.updateArtifactParams.Key)
-		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false, "title": "Retitled PR"}, factoryCtx.updateArtifactParams.Data)
-		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-		assert.Equal(t, "workOrder.artifactUpdated", stateCtx.Type)
-		assert.Len(t, stateCtx.Payloads, 1)
-	})
-
-	t.Run("omits blank fields from the merge so they're left untouched", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "draft",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "draft", "merged": false, "draft": true}, factoryCtx.updateArtifactParams.Data)
-	})
-
-	t.Run("propagates errors from the factory context", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactErr: errors.New("boom")}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "open",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.Error(t, err)
-	})
-
-	// A `github.onPullRequest` merged event carries `{ state: "closed",
-	// merged: true }`; the update must resolve to SuperPlane's `merged`
-	// so the chip flips to purple without an if-node in the flow.
-	t.Run("resolves merged=true (with state=closed) to SuperPlane state=merged", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "closed",
-				"merged":      true,
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false}, factoryCtx.updateArtifactParams.Data)
-	})
-
-	// Flow templates resolve values to strings, so `merged: "true"` must
-	// work the same as a native bool.
-	t.Run("accepts a stringified merged flag from a templated input", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"merged":      "true",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "merged", "merged": true, "draft": false}, factoryCtx.updateArtifactParams.Data)
-	})
-
-	// Velocity relies on the artifact table's merged_at column. The model
-	// falls back to now when the canvas only sends state, but a canvas
-	// that has GitHub's real timestamp should pass it through.
-	t.Run("forwards mergedAt and closedAt to the factory context", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "merged",
-				"mergedAt":    "2026-08-17T12:34:56Z",
-				"closedAt":    "2026-08-17T12:00:00Z",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{
-			"state":    "merged",
-			"merged":   true,
-			"draft":    false,
-			"mergedAt": "2026-08-17T12:34:56Z",
-			"closedAt": "2026-08-17T12:00:00Z",
-		}, factoryCtx.updateArtifactParams.Data)
-	})
-}
-
-func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
-	c := &UpdateWorkOrderArtifact{}
+	var artifactKey *configuration.Field
 	fields := c.Configuration()
-
-	t.Run("requires orderId", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"artifactKey": "https://github.com/example/repo/pull/1",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing orderId")
+	for i := range fields {
+		if fields[i].Name == "artifactKey" {
+			artifactKey = &fields[i]
+			break
 		}
-	})
-
-	t.Run("requires artifactKey", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId": "{{ order().id }}",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing artifactKey")
-		}
-	})
-
-	t.Run("accepts orderId, artifactKey, and state", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":     "{{ order().id }}",
-			"artifactKey": "https://github.com/example/repo/pull/1",
-			"state":       "merged",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	}
+	require.NotNil(t, artifactKey)
+	assert.True(t, strings.Contains(artifactKey.Description, "Later runs update this artifact when Task ID matches the owner"))
+	assert.True(t, strings.Contains(artifactKey.Description, "A different task with this key fails"))
 }
 
-func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
-	entries := []ArtifactDataEntry{
-		{Name: "number", Value: "482"},
-		{Name: "provider", Value: "github"},
-		{Name: "", Value: "ignored"},
-	}
-	out := artifactDataToMap(entries)
-	if got := out["number"]; got != "482" {
-		t.Fatalf("expected number=482, got %v", got)
-	}
-	if got := out["provider"]; got != "github" {
-		t.Fatalf("expected provider=github, got %v", got)
-	}
-	if len(out) != 2 {
-		t.Fatalf("expected only two entries (blank names skipped), got %d", len(out))
-	}
-	if artifactDataToMap(nil) != nil {
-		t.Fatal("expected nil map when no entries were provided")
-	}
-}
-
-func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		Number:       "9",
-		Title:        "Typed title",
-		Data: []ArtifactDataEntry{
-			{Name: "url", Value: "https://evil.example/typosquat"},
-			{Name: "provider", Value: "github"},
+func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {
+	component := &AddWorkOrderArtifact{}
+	factoryCtx := &fakeFactoryContext{
+		addArtifactResult: &core.WorkOrderArtifact{
+			ID:   "art-1",
+			Type: "link",
+			Data: map[string]any{"url": "https://preview.example.com/v2"},
 		},
-	})
+	}
+	stateCtx := &contexts.ExecutionStateContext{}
 
-	if got := data["url"]; got != "https://github.com/example/repo/pull/9" {
-		t.Fatalf("expected typed url to win, got %v", got)
-	}
-	if got := data["provider"]; got != "github" {
-		t.Fatalf("expected free-form provider to survive, got %v", got)
-	}
-	if got := data["number"]; got != "9" {
-		t.Fatalf("expected typed number, got %v", got)
-	}
-	if got := data["title"]; got != "Typed title" {
-		t.Fatalf("expected typed title, got %v", got)
-	}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId":      "wo-1",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/v2",
+			"artifactKey":  "storybook-preview",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, factoryCtx.addArtifactCalls)
+	assert.Equal(t, "storybook-preview", factoryCtx.addArtifactParams.Key)
+	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+	assert.Equal(t, "workOrder.artifactAdded", stateCtx.Type)
 }
 
-func TestBuildArtifactData_IncludesPrState(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "draft",
-	})
-
-	if got := data["state"]; got != "draft" {
-		t.Fatalf("expected state=draft, got %v", got)
-	}
-	if got := data["merged"]; got != false {
-		t.Fatalf("expected merged=false when state is draft, got %v", got)
-	}
-	if got := data["draft"]; got != true {
-		t.Fatalf("expected draft=true when state is draft, got %v", got)
-	}
-}
-
-func TestBuildArtifactData_IncludesMergedAndClosedAt(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "merged",
-		MergedAt:     "2026-08-17T12:34:56Z",
-		ClosedAt:     "2026-08-17T12:00:00Z",
-	})
-
-	if got := data["mergedAt"]; got != "2026-08-17T12:34:56Z" {
-		t.Fatalf("expected mergedAt to pass through, got %v", got)
-	}
-	if got := data["closedAt"]; got != "2026-08-17T12:00:00Z" {
-		t.Fatalf("expected closedAt to pass through, got %v", got)
-	}
-}
-
-// A `github.onPullRequest` merged event carries `{ state: "closed",
-// merged: true }`; the artifact must persist as merged so the chip
-// renders purple, not red.
-func TestBuildArtifactData_MergedFlagWinsOverStateClosed(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "closed",
-		Merged:       true,
-	})
-
-	if got := data["state"]; got != "merged" {
-		t.Fatalf("expected state=merged, got %v", got)
-	}
-}
-
-// Flow templates resolve values to strings; the `Merged` field must
-// accept "true" so a caller doesn't need a boolean cast in the expression.
-func TestBuildArtifactData_MergedFlagAcceptsStringTrue(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		Merged:       "true",
-	})
-
-	if got := data["state"]; got != "merged" {
-		t.Fatalf("expected state=merged when merged=\"true\", got %v", got)
-	}
-}
-
-// GitHub draft PRs stay `state: "open"`; without picking up the `draft`
-// flag the chip would render green.
-func TestBuildArtifactData_DraftFlagRendersAsDraftWhenNotMerged(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "open",
-		Draft:        true,
-	})
-
-	if got := data["state"]; got != "draft" {
-		t.Fatalf("expected state=draft, got %v", got)
-	}
-}
-
-// A merged PR that once was a draft must not flip back to draft on the
-// next redisplay.
-func TestBuildArtifactData_MergedBeatsDraft(t *testing.T) {
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		Merged:       true,
-		Draft:        true,
-	})
-
-	if got := data["state"]; got != "merged" {
-		t.Fatalf("expected merged to beat draft, got %v", got)
-	}
-}
-
-// resolvePrArtifactState is the small state-machine both the add and the
-// update components rely on; test it directly so intent is unambiguous
-// and doesn't drift from the frontend's `extractPrArtifactState`.
 func TestResolvePrArtifactState_Precedence(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -951,41 +783,6 @@ func TestResolvePrArtifactState_Precedence(t *testing.T) {
 	}
 }
 
-func TestBuildArtifactData_IgnoresPrLifecycleOnNonPr(t *testing.T) {
-	// Switching a node from PR to branch/markdown can leave the sticky
-	// `state` default (and leftover merged/draft flags) in the config.
-	// Those fields are PR-only and must not be written — or reject the attach.
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "branch",
-		Name:         "feature/refund-retry",
-		Repository:   "example/repo",
-		State:        "open",
-		Merged:       true,
-		Draft:        true,
-	})
-	if _, ok := data["state"]; ok {
-		t.Fatal("expected leftover PR state not to be stored on a branch artifact")
-	}
-	if _, ok := data["merged"]; ok {
-		t.Fatal("expected leftover merged flag not to be stored on a branch artifact")
-	}
-	if _, ok := data["draft"]; ok {
-		t.Fatal("expected leftover draft flag not to be stored on a branch artifact")
-	}
-}
-
-func TestBuildArtifactData_DoesNotRejectInvalidStateOnMarkdown(t *testing.T) {
-	data, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
-		ArtifactType: "markdown",
-		Body:         "note body",
-		State:        "in_review",
-	})
-	require.NoError(t, err)
-	if _, ok := data["state"]; ok {
-		t.Fatal("expected leftover PR state not to be stored on a markdown artifact")
-	}
-}
-
 func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "markdown",
@@ -1013,32 +810,6 @@ func mustBuildArtifactData(t *testing.T, config AddWorkOrderArtifactConfiguratio
 	return data
 }
 
-func TestBuildArtifactData_RejectsInvalidResolvedState(t *testing.T) {
-	_, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "in_review",
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid pull request state")
-}
-
-func TestBuildArtifactData_CanonicalFlagsOverwriteFreeFormMerged(t *testing.T) {
-	// A leftover `merged: true` in free-form metadata must not outrank
-	// an explicit SuperPlane `state: open` after resolve — otherwise the
-	// chip stays purple on the next page load.
-	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "open",
-		Data:         []ArtifactDataEntry{{Name: "merged", Value: "true"}},
-	})
-
-	assert.Equal(t, "open", data["state"])
-	assert.Equal(t, false, data["merged"])
-	assert.Equal(t, false, data["draft"])
-}
-
 func TestPrArtifactStateUpdates_ClearsStaleMergedFlag(t *testing.T) {
 	updates, err := prArtifactStateUpdates(nil, false, nil)
 	require.NoError(t, err)
@@ -1053,28 +824,173 @@ func TestPrArtifactStateUpdates_DoesNotPersistVetoedMergedState(t *testing.T) {
 	assert.Equal(t, map[string]any{"merged": false}, updates)
 }
 
-func TestUpdateWorkOrderArtifact_Execute_RejectsInvalidState(t *testing.T) {
-	component := &UpdateWorkOrderArtifact{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"orderId":     "wo-1",
-			"artifactKey": "https://github.com/example/repo/pull/1",
-			"state":       "in_review",
-		},
-		ExecutionState: &contexts.ExecutionStateContext{},
-		Factory:        &fakeFactoryContext{},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid pull request state")
-}
-
 func TestPrArtifactLifecycleFields_SharedByAddAndUpdate(t *testing.T) {
-	addNames := fieldNames((&AddWorkOrderArtifact{}).Configuration())
-	updateNames := fieldNames((&UpdateWorkOrderArtifact{}).Configuration())
+	addNames := fieldNames((&AddPullRequest{}).Configuration())
+	updateNames := fieldNames((&UpdatePullRequest{}).Configuration())
 	for _, name := range []string{"state", "merged", "draft"} {
 		assert.Contains(t, addNames, name)
 		assert.Contains(t, updateNames, name)
 	}
+}
+
+func TestAddPullRequestActivity_Execute(t *testing.T) {
+	component := &AddPullRequestActivity{}
+
+	t.Run("passes Markdown content to the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"pullRequestId": "pr-1",
+				"title":         "Address **review** comment",
+				"description":   "Please add [tests](https://example.com/tests).",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "pr-1", factoryCtx.lastActivityParams.PullRequestID)
+		assert.Equal(t, "Address **review** comment", factoryCtx.lastActivityParams.Title)
+		assert.Equal(t, "Please add [tests](https://example.com/tests).", factoryCtx.lastActivityParams.Description)
+		assert.Equal(t, "pullRequest.activityAdded", stateCtx.Type)
+		require.Len(t, stateCtx.Payloads, 1)
+		payload, ok := stateCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Address **review** comment", data["title"])
+		assert.Equal(t, "Please add [tests](https://example.com/tests).", data["description"])
+	})
+
+	t.Run("passes without output when another activity owns the revision", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{activityErr: core.ErrPullRequestActivityAlreadyActive}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"pullRequestId": "pr-1", "revision": "abc", "access": "concurrent"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Empty(t, stateCtx.Channel)
+		assert.Empty(t, stateCtx.Payloads)
+	})
+
+	t.Run("waits when exclusive access is not available", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{activityResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Outcome:     core.PullRequestActivityOutcomeWaiting,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+		requestCtx := &contexts.RequestContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"pullRequestId": "pr-1", "access": "exclusive"},
+			ExecutionState: stateCtx,
+			Requests:       requestCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.False(t, stateCtx.Finished)
+		assert.Equal(t, acquireAccessHookName, requestCtx.Action)
+		assert.GreaterOrEqual(t, requestCtx.Duration, 10*time.Second)
+	})
+}
+
+func TestUpdatePullRequestActivity_Execute(t *testing.T) {
+	component := &UpdatePullRequestActivity{}
+
+	t.Run("updates Markdown content", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"title":       "Checks **passed**",
+				"description": "View the [run](https://example.com/run).",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, factoryCtx.lastUpdateParams.Title)
+		assert.Equal(t, "Checks **passed**", *factoryCtx.lastUpdateParams.Title)
+		require.NotNil(t, factoryCtx.lastUpdateParams.Description)
+		assert.Equal(t, "View the [run](https://example.com/run).", *factoryCtx.lastUpdateParams.Description)
+		assert.Equal(t, "pullRequest.activityUpdated", stateCtx.Type)
+	})
+
+	t.Run("emits limitReached when the handler is at the attempt limit", func(t *testing.T) {
+		limit := 3
+		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Activity:    &core.PullRequestActivity{AttemptLimit: &limit},
+			Outcome:     core.PullRequestActivityOutcomeLimitReached,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+		runs := &contexts.RunExecutionContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"access": "exclusive"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+			Runs:           runs,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, core.PullRequestActivityOutcomeLimitReached, stateCtx.Channel)
+		assert.Equal(t, []string{"Automatic fixes paused after 3 attempts"}, runs.AddErrorCalls)
+	})
+
+	t.Run("emits default when only the description is updated after the limit", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Outcome:     core.PullRequestActivityOutcomeLimitReached,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+		runs := &contexts.RunExecutionContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"description": "Automatic fixes paused after 3 attempts"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+			Runs:           runs,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
+		assert.Empty(t, runs.AddErrorCalls)
+	})
+}
+
+func TestPullRequestActivity_OutputChannels(t *testing.T) {
+	channels := pullRequestActivityChannels()
+	names := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		names = append(names, channel.Name)
+	}
+	assert.Equal(t, []string{core.DefaultOutputChannel.Name, core.PullRequestActivityOutcomeLimitReached}, names)
+}
+
+func TestAddPullRequestActivity_ValidatesConfiguration(t *testing.T) {
+	fields := (&AddPullRequestActivity{}).Configuration()
+
+	t.Run("requires pullRequestId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{})
+		require.Error(t, err)
+	})
+
+	t.Run("accepts an optional description", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"pullRequestId": "pr-1",
+			"description":   "Please add tests for the retry path.",
+		})
+		require.NoError(t, err)
+	})
 }
 
 func fieldNames(fields []configuration.Field) []string {

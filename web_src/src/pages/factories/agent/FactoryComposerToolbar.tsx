@@ -2,15 +2,10 @@ import { memo, useRef } from "react";
 import { ArrowUp, ImagePlus, Loader2, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { ALLOWED_IMAGE_TYPES } from "@/components/AgentSidebar/useImageAttachments";
 import { factoryAgentIconButtonClassName } from "./factoryAgentChrome";
-import { FactoryModeToggle } from "./FactoryModeToggle";
 
 interface ComposerToolbarProps {
-  agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
-  modeDisabled?: boolean;
   onClearChat: () => void;
   clearing: boolean;
   sending: boolean;
@@ -92,9 +87,6 @@ function ClearChatButton({ onClearChat, clearing }: { onClearChat: () => void; c
 }
 
 export const FactoryComposerToolbar = memo(function FactoryComposerToolbar({
-  agentMode,
-  onModeSwitch,
-  modeDisabled,
   onClearChat,
   clearing,
   sending,
@@ -110,7 +102,6 @@ export const FactoryComposerToolbar = memo(function FactoryComposerToolbar({
     <div className="flex items-center justify-between gap-2 px-2 pb-2">
       <div className="flex min-w-0 items-center gap-1">
         <AttachImageButton canAttach={canAttach} onAddFiles={onAddFiles} />
-        <FactoryModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
         <ClearChatButton onClearChat={onClearChat} clearing={clearing} />
       </div>
       <div className="flex min-w-0 shrink-0 items-center gap-2">

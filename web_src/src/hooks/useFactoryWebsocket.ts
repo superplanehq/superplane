@@ -1,9 +1,18 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import { factoriesDescribeWorkOrder } from "@/api-client";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
+import { factoryWorkOrdersPagePrefix } from "@/pages/factories/lib/workOrderListPagination";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
+import {
+  applyWorkOrderToListCaches,
+  cachedWorkOrderIdsFromLists,
+  removeWorkOrderFromListCaches,
+} from "./workOrderListCache";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/factories/`;
 
@@ -50,6 +59,8 @@ export function canvasRunsForWorkOrders(orders: FactoriesWorkOrder[]): Array<{ a
   return runs;
 }
 
+type WorkOrderQueryClient = ReturnType<typeof useQueryClient>;
+
 function cachedWorkOrdersForInvalidation(
   queryClient: ReturnType<typeof useQueryClient>,
   organizationId: string,
@@ -68,19 +79,23 @@ function cachedWorkOrdersForInvalidation(
   return [...list.filter((order) => order.id === orderId), ...(detail && detail.id === orderId ? [detail] : [])];
 }
 
-export function invalidateFactoryWorkOrderQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
+function invalidateOrdersList(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string) {
+  // exact: the detail, events, and artifacts keys extend this prefix.
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
+    exact: true,
+  });
+  void queryClient.invalidateQueries({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  });
+}
+
+function invalidateCachedCanvasRuns(
+  queryClient: WorkOrderQueryClient,
   organizationId: string,
   factoryId: string,
   orderId?: string,
-): void {
-  void queryClient.invalidateQueries({
-    queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
-  });
-  void queryClient.invalidateQueries({
-    queryKey: factoryQueryKeys.detail(organizationId, factoryId),
-  });
-
+) {
   for (const run of canvasRunsForWorkOrders(
     cachedWorkOrdersForInvalidation(queryClient, organizationId, factoryId, orderId),
   )) {
@@ -88,6 +103,107 @@ export function invalidateFactoryWorkOrderQueries(
       queryKey: canvasKeys.run(run.appId, run.runId),
     });
   }
+}
+
+async function describeWorkOrder(
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+): Promise<FactoriesWorkOrder> {
+  const response = await factoriesDescribeWorkOrder(
+    withOrganizationHeader({
+      organizationId,
+      path: { factoryId, orderId },
+    }),
+  );
+  if (!response.data?.order) {
+    throw new Error("Task not found");
+  }
+  return response.data.order;
+}
+
+function cachedWorkOrderIds(queryClient: WorkOrderQueryClient, organizationId: string, factoryId: string): string[] {
+  return cachedWorkOrderIdsFromLists(queryClient, organizationId, factoryId);
+}
+
+function invalidateTaskActivity(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderIds: string[],
+) {
+  for (const orderId of orderIds) {
+    invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, orderId),
+    });
+  }
+}
+
+function isMissingWorkOrderError(error: unknown): boolean {
+  return isNotFoundError(error) || (error instanceof Error && /404|not found/i.test(error.message));
+}
+
+function dropMissingWorkOrder(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+) {
+  removeWorkOrderFromListCaches(queryClient, organizationId, factoryId, orderId);
+  queryClient.removeQueries({
+    queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+    exact: true,
+  });
+}
+
+async function refreshUpdatedWorkOrder(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  isCurrent: () => boolean,
+) {
+  invalidateTaskActivity(queryClient, organizationId, factoryId, [orderId]);
+  const order = await describeWorkOrder(organizationId, factoryId, orderId);
+  if (!isCurrent()) {
+    return;
+  }
+  queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId), order);
+  applyWorkOrderToListCaches(queryClient, organizationId, factoryId, orderId, order);
+}
+
+function invalidateFactoryWorkOrdersOnReconnect(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+) {
+  invalidateOrdersList(queryClient, organizationId, factoryId);
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.planningSessions(organizationId, factoryId),
+  });
+  invalidateTaskActivity(
+    queryClient,
+    organizationId,
+    factoryId,
+    cachedWorkOrderIds(queryClient, organizationId, factoryId),
+  );
+}
+
+export function invalidateFactoryWorkOrderQueries(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId?: string,
+): void {
+  invalidateOrdersList(queryClient, organizationId, factoryId);
+  invalidateCachedCanvasRuns(queryClient, organizationId, factoryId, orderId);
 
   if (!orderId) {
     return;
@@ -95,37 +211,23 @@ export function invalidateFactoryWorkOrderQueries(
 
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+    exact: true,
   });
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId),
   });
-  // Artifact state (e.g. a PR flipping open/draft/closed/merged via
-  // updateWorkOrderArtifact) and new artifacts (addWorkOrderArtifact)
-  // both land here — without this, the sidebar artifact list and the
-  // timeline's live-data overlay silently go stale until a manual reload.
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
   });
-  // Check reports (reportWorkOrderCheck) update the scorecards in place;
-  // refetch so a re-scored check shows its new value and trend delta.
   void queryClient.invalidateQueries({
-    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
+    queryKey: factoryQueryKeys.planningSession(organizationId, factoryId, orderId),
   });
 }
 
 export function useFactoryWebsocket(organizationId: string, factoryId: string, enabled = true): void {
   const queryClient = useQueryClient();
   const hasConnectedOnce = useRef(false);
-
-  const invalidate = useCallback(
-    (orderId?: string) => {
-      if (!organizationId || !factoryId) {
-        return;
-      }
-      invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
-    },
-    [queryClient, organizationId, factoryId],
-  );
+  const refreshVersion = useRef(new Map<string, number>());
 
   const onMessage = useCallback(
     (event: MessageEvent<unknown>) => {
@@ -133,12 +235,28 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       if (!data || data.event !== "work_order_updated") {
         return;
       }
-      if (data.payload?.factoryId && data.payload.factoryId !== factoryId) {
+      if (!organizationId || !factoryId) {
         return;
       }
-      invalidate(data.payload?.orderId);
+      const orderId = data.payload?.orderId;
+      if (!orderId || (data.payload?.factoryId && data.payload.factoryId !== factoryId)) {
+        return;
+      }
+      const version = (refreshVersion.current.get(orderId) ?? 0) + 1;
+      refreshVersion.current.set(orderId, version);
+      const isCurrent = () => refreshVersion.current.get(orderId) === version;
+      void refreshUpdatedWorkOrder(queryClient, organizationId, factoryId, orderId, isCurrent).catch((error) => {
+        if (!isMissingWorkOrderError(error)) {
+          console.warn("factory ws: failed to refresh work order", error);
+          return;
+        }
+        if (!isCurrent()) {
+          return;
+        }
+        dropMissingWorkOrder(queryClient, organizationId, factoryId, orderId);
+      });
     },
-    [factoryId, invalidate],
+    [queryClient, organizationId, factoryId],
   );
 
   const onOpen = useCallback(() => {
@@ -146,10 +264,13 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       hasConnectedOnce.current = true;
       return;
     }
+    if (!organizationId || !factoryId) {
+      return;
+    }
 
     // Catch updates missed while disconnected; WS is the only push channel.
-    invalidate();
-  }, [invalidate]);
+    invalidateFactoryWorkOrdersOnReconnect(queryClient, organizationId, factoryId);
+  }, [queryClient, organizationId, factoryId]);
 
   const url = organizationId && factoryId ? `${SOCKET_SERVER_URL}${factoryId}?organization_id=${organizationId}` : null;
 

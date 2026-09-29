@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -121,6 +121,7 @@ describe("searchBacklogIntakeItems", () => {
     expect(sources.map((source) => source.name)).toEqual(["GitHub issues", "Sentry exceptions", "Linear issues"]);
     expect(sources[0]?.iconSrc).toBe(githubIcon);
     expect(sources[0]?.iconAlt).toBe("GitHub");
+    expect(sources[0]?.tabLabel).toBe("GitHub");
     expect(sources[1]?.iconSrc).toBe(sentryIcon);
     expect(sources[2]?.iconSrc).toBe("/linear.svg");
   });
@@ -134,6 +135,29 @@ describe("searchBacklogIntakeItems", () => {
         name: "GitHub issues",
         iconSrc: githubIcon,
         iconAlt: "GitHub",
+        tabLabel: "GitHub",
+      },
+    ]);
+  });
+
+  it("labels a Dependabot alerts intake Dependabot and keeps the GitHub icon", () => {
+    const sources = listBacklogIntakeSources({
+      intakes: [
+        {
+          id: "intake-dependabot",
+          name: "Dependabot alerts",
+          source: "SOURCE_DEPENDABOT_ALERTS",
+        },
+      ],
+    });
+
+    expect(sources).toEqual([
+      {
+        intakeId: "intake-dependabot",
+        name: "Dependabot alerts",
+        iconSrc: githubIcon,
+        iconAlt: "GitHub",
+        tabLabel: "Dependabot",
       },
     ]);
   });
@@ -142,5 +166,7 @@ describe("searchBacklogIntakeItems", () => {
     expect(searchPlaceholderForIntake("GitHub issues")).toBe("Import from GitHub issue");
     expect(searchPlaceholderForIntake("Sentry exceptions")).toBe("Import from Sentry exception");
     expect(searchPlaceholderForIntake("PagerDuty incidents")).toBe("Import from PagerDuty incident");
+    expect(searchPlaceholderForIntake("Productive tasks")).toBe("Import from Productive task");
+    expect(searchPlaceholderForIntake("Dependabot alerts")).toBe("Import from Dependabot alert");
   });
 });

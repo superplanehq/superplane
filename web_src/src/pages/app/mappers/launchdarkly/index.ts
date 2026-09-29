@@ -2,7 +2,7 @@ import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from ".
 import { onFeatureFlagChangeTriggerRenderer } from "./on_feature_flag_change";
 import { getFeatureFlagMapper } from "./get_feature_flag";
 import { deleteFeatureFlagMapper } from "./delete_feature_flag";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getFeatureFlag: getFeatureFlagMapper,

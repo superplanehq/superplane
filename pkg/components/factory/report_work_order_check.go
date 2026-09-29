@@ -55,17 +55,17 @@ func (c *ReportWorkOrderCheck) Name() string {
 }
 
 func (c *ReportWorkOrderCheck) Label() string {
-	return "Report Work Order Check"
+	return "Report Task Check"
 }
 
 func (c *ReportWorkOrderCheck) Description() string {
-	return "Report a scored or pass/fail check (risk, coverage, CI) on a work order"
+	return "Report a scored or pass/fail check (risk, coverage, CI) on a task"
 }
 
 func (c *ReportWorkOrderCheck) Documentation() string {
-	return `The Report Work Order Check component stores a scored check against a work order. Checks appear as scorecards on the work order page, next to the description.
+	return `The Report Task Check component stores a scored check against a task. Checks appear as scorecards on the task page, next to the description.
 
-Each check is identified by its ` + "`checkKey`" + ` (for example ` + "`risk-review`" + `). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
+Each check is identified by its ` + "`checkKey`" + ` (for example ` + "`risk-review`" + `). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the task timeline.
 
 A check is either scored or a pass/fail verdict, controlled by ` + "`format`" + `:
 
@@ -82,7 +82,7 @@ For example, a risk score from 0 to 10 where lower is better, with ` + "`caution
 
 ` + "`score`" + `, ` + "`maxScore`" + `, and ` + "`passed`" + ` accept expressions, so a preceding automation run can feed them (e.g. ` + "`{{ previous().data.risk.score }}`" + `). Use ` + "`analysis`" + ` for the full markdown report — it renders when a user opens the check.
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.`
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run. This component can only be used in factory-owned apps.`
 }
 
 func (c *ReportWorkOrderCheck) Icon() string {
@@ -128,8 +128,8 @@ func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
@@ -137,7 +137,7 @@ func (c *ReportWorkOrderCheck) Configuration() []configuration.Field {
 		{
 			Name:        "checkKey",
 			Label:       "Check Key",
-			Description: "Stable identifier for this check on the work order (e.g. risk-review). Reports with the same key update the same check.",
+			Description: "Stable identifier for this check on the task (e.g. risk-review). Reports with the same key update the same check.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 		},

@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -33,20 +36,16 @@ func IsNotFoundError(err error) bool {
 }
 
 func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationPropertyStorageReader, apiToken string) (*Client, error) {
-	url, err := parameters.GetString("organizationUrl")
+	orgURL, err := parameters.GetString("organizationUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
 	}
 
-	return &Client{
-		OrgURL:   url,
-		APIToken: string(apiToken),
-		http:     http,
-	}, nil
+	return newClient(http, orgURL, apiToken)
 }
 
 func NewClientWithStorageContexts(http core.HTTPContext, parameters core.IntegrationPropertyStorageReader, secrets core.IntegrationSecretStorageReader) (*Client, error) {
-	url, err := parameters.GetString("organizationUrl")
+	orgURL, err := parameters.GetString("organizationUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)
 	}
@@ -56,11 +55,7 @@ func NewClientWithStorageContexts(http core.HTTPContext, parameters core.Integra
 		return nil, err
 	}
 
-	return &Client{
-		OrgURL:   url,
-		APIToken: string(apiToken),
-		http:     http,
-	}, nil
+	return newClient(http, orgURL, apiToken)
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -78,11 +73,61 @@ func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, err
 		return nil, err
 	}
 
+	return newClient(http, string(orgURL), string(apiToken))
+}
+
+func newClient(http core.HTTPContext, orgURL, apiToken string) (*Client, error) {
+	parsed, err := ParseOrganizationURL(orgURL)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		OrgURL:   string(orgURL),
-		APIToken: string(apiToken),
+		OrgURL:   parsed,
+		APIToken: apiToken,
 		http:     http,
 	}, nil
+}
+
+// ParseOrganizationURL validates a Semaphore organization URL and returns the
+// origin only (https + host + optional port). Trailing slashes, extra paths,
+// query strings, and a missing https scheme are accepted and normalized.
+func ParseOrganizationURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("organization URL is required")
+	}
+
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid organization URL")
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "https" {
+		return "", fmt.Errorf("organization URL must use https")
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return "", fmt.Errorf("organization URL must include a host")
+	}
+	if strings.ContainsAny(host, " \t") {
+		return "", fmt.Errorf("invalid organization URL")
+	}
+	if parsed.User != nil {
+		return "", fmt.Errorf("organization URL must not include credentials")
+	}
+
+	if port := parsed.Port(); port != "" {
+		return scheme + "://" + net.JoinHostPort(host, port), nil
+	}
+
+	return scheme + "://" + host, nil
 }
 
 type ProjectResponse struct {

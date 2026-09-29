@@ -5,7 +5,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import { resolveComponentLabel } from "./runNodeConfigurationFields";
 import type { RunInspectorNodeSection } from "./types";
 

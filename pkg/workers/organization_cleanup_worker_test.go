@@ -17,7 +17,7 @@ func Test__CanvasCleanupWorker_GracePeriod(t *testing.T) {
 	defer r.Close()
 
 	t.Run("skips cleanup while canvas is still within grace period", func(t *testing.T) {
-		worker := NewCanvasCleanupWorker(r.GitProvider)
+		worker := NewCanvasCleanupWorker()
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		require.NoError(t, canvas.SoftDelete())
@@ -35,7 +35,7 @@ func Test__CanvasCleanupWorker_GracePeriod(t *testing.T) {
 	})
 
 	t.Run("cleans up canvas after grace period expires", func(t *testing.T) {
-		worker := NewCanvasCleanupWorker(r.GitProvider)
+		worker := NewCanvasCleanupWorker()
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		require.NoError(t, canvas.SoftDelete())
@@ -58,7 +58,7 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 	defer r.Close()
 
 	t.Run("skips cleanup while organization is still within grace period", func(t *testing.T) {
-		worker := NewOrganizationCleanupWorker(r.GitProvider)
+		worker := NewOrganizationCleanupWorker()
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 		require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
@@ -85,8 +85,8 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		defer r2.Close()
 
 		cleaner := &cleanupProvider{}
-		canvasWorker := NewCanvasCleanupWorker(r2.GitProvider, cleaner)
-		worker := NewOrganizationCleanupWorker(r2.GitProvider, cleaner)
+		canvasWorker := NewCanvasCleanupWorker(cleaner)
+		worker := NewOrganizationCleanupWorker(cleaner)
 		canvas, _ := support.CreateCanvas(t, r2.Organization.ID, r2.User, []models.CanvasNode{}, []models.Edge{})
 		orphanSession := createAgentSessionWithMessage(t, r2.Organization.ID, r2.User, uuid.New())
 

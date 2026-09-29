@@ -1,13 +1,22 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryAutomation } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import { unmockedSrc } from "@/test/unmockedModule";
+
+vi.mock("@monaco-editor/react", () => {
+  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
+    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
+  }
+  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
+});
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  DRAFT_WORK_ORDER,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
@@ -25,8 +34,16 @@ function renderLinesBoard(
   return render(<LinesBoardSpecHarness path={path} openCreateWorkOrder={openCreateWorkOrder} factory={factory} />);
 }
 
+const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
-const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
+const useFactoryBoardWorkOrders = vi.fn(() => ({
+  workOrders: useFactoryWorkOrders().data ?? [],
+  isLoading: false,
+  backlog: idleBoardPage(),
+  open: idleBoardPage(),
+  done: idleBoardPage(),
+}));
+const useFactoryAutomations = vi.fn(() => ({ data: [] as FactoryAutomation[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
@@ -34,19 +51,72 @@ const searchFactoryIntakeItems = vi.fn(() => ({
   isError: false,
 }));
 const importFactoryIntakeItem = vi.fn();
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("./planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: vi.fn(async () => null),
+  sendPlanningSessionMessage: vi.fn(),
+  answerPlanningSessionSurvey: vi.fn(),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
+
+const REFUND_INTAKE_SEARCH = {
+  data: [
+    {
+      id: "12",
+      key: "#12",
+      title: "Handle duplicate refunds",
+      body: "Retrying a refund posts twice.",
+      url: "https://github.com/acme/payments/issues/12",
+    },
+  ],
+  isLoading: false,
+  isError: false,
+};
+
+async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("lines-backlog-create"));
+  await user.click(screen.getByTestId("lines-backlog-create-item-12"));
+}
 
 vi.mock("@/hooks/useFactoryData", () => ({
+  useFactory: () => ({
+    data: { id: "factory-1", planning: { enabled: true, clarity: true, confidence: true } },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryApps: () => useFactoryApps(),
+  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
+  useCreateFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryAutomation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -55,8 +125,10 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useDeleteFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
   useImportFactoryIntakeItem: () => ({ mutateAsync: importFactoryIntakeItem, isPending: false }),
+  useRefreshBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -68,8 +140,12 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
   }),
 }));
 
+vi.mock("@/pages/home/useInstallFactory", () => ({
+  useInstallFactory: () => ({ installFactory: vi.fn(), isInstalling: false }),
+}));
+
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -80,12 +156,13 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
-vi.mock("@/hooks/useWorkOrderChecks", () => ({
-  useWorkOrderChecks: () => ({ data: [] }),
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
+  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
-vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
-  const actual = await importOriginal<typeof canvasData>();
+vi.mock("@/hooks/useCanvasData", () => {
+  const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
@@ -98,10 +175,15 @@ describe("LinesPage backlog create", () => {
   beforeEach(() => {
     window.localStorage.clear();
     useFactoryWorkOrders.mockReturnValue({ data: [] });
-    useFactoryApps.mockReturnValue({ data: [] });
+    useFactoryAutomations.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("keeps a create ghost card at the bottom of the backlog", async () => {
@@ -114,8 +196,8 @@ describe("LinesPage backlog create", () => {
     const list = screen.getByTestId("lines-backlog-column-scroll");
     const items = within(list).getAllByRole("listitem");
     expect(items.at(-1)).toHaveAttribute("data-testid", "lines-backlog-create-ghost-item");
-    expect(within(items.at(-1)!).getByRole("button", { name: "Create work order" })).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(within(items.at(-1)!).getByRole("button", { name: "Create task" })).toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-backlog-create-ghost"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
@@ -125,7 +207,7 @@ describe("LinesPage backlog create", () => {
     renderLinesBoard();
 
     expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("hides the create ghost card when the backlog is at capacity", async () => {
@@ -144,36 +226,40 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
   });
 
-  it("creates work orders from the backlog header plus", async () => {
+  it("creates tasks from the backlog header plus", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create task manually" }));
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
-  it("imports an intake item and opens the work order popup", async () => {
+  it("does not refine a backlog draft from the task popup", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+      ...REFUND_FACTORY,
+      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "acme/payments" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+
+    const dialog = await screen.findByTestId("work-order-split-run");
+    expect(within(dialog).queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-with-agent-dialog")).not.toBeInTheDocument();
+  });
+
+  it("imports an intake item and opens the task popup", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    searchFactoryIntakeItems.mockReturnValue({
-      data: [
-        {
-          id: "12",
-          key: "#12",
-          title: "Handle duplicate refunds",
-          body: "Retrying a refund posts twice.",
-          url: "https://github.com/acme/payments/issues/12",
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
+    searchFactoryIntakeItems.mockReturnValue(REFUND_INTAKE_SEARCH);
     importFactoryIntakeItem.mockResolvedValue({
       id: "wo-imported-12",
       title: "Handle duplicate refunds",
@@ -182,9 +268,7 @@ describe("LinesPage backlog create", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
-    await user.click(screen.getByTestId("lines-backlog-create-item-12"));
+    await importRefundIssue(user);
 
     expect(importFactoryIntakeItem).toHaveBeenCalledWith({
       intakeId: GITHUB_ISSUES_INTAKE_ID,
@@ -193,7 +277,28 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
-    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+  });
+
+  it("opens the popup from a just-imported order that already has a number", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    searchFactoryIntakeItems.mockReturnValue(REFUND_INTAKE_SEARCH);
+    importFactoryIntakeItem.mockResolvedValue({
+      id: "wo-imported-12",
+      number: "12",
+      title: "Handle duplicate refunds",
+      state: "STATE_DRAFT",
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await importRefundIssue(user);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    });
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
@@ -205,6 +310,6 @@ describe("LinesPage backlog create", () => {
 
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 });

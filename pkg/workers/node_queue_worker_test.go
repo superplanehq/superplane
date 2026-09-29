@@ -28,7 +28,7 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -118,7 +118,7 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -176,7 +176,7 @@ func Test__NodeQueueWorker_SkipsMissingNode(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 
 	err := worker.tryProcessReadyNode(uuid.New(), "deleted-node", time.Now())
 	require.NoError(t, err)
@@ -187,7 +187,7 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -292,7 +292,7 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -395,13 +395,13 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the node concurrently.
 	//
 	go func() {
-		worker1 := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+		worker1 := NewNodeQueueWorker(r.Registry, amqpURL)
 		logger := log.NewEntry(log.New())
 		results <- worker1.LockAndProcessNode(logger, *node, time.Now())
 	}()
 
 	go func() {
-		worker2 := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+		worker2 := NewNodeQueueWorker(r.Registry, amqpURL)
 		logger := log.NewEntry(log.New())
 		results <- worker2.LockAndProcessNode(logger, *node, time.Now())
 	}()
@@ -437,7 +437,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionFinishedRoutingKey)
@@ -532,7 +532,7 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	triggerNode := "trigger-1"
@@ -644,7 +644,7 @@ func Test__NodeQueueWorker_DeferredQueueItemDoesNotPublishConsumed(t *testing.T)
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -703,7 +703,7 @@ func Test__NodeQueueWorker_SkipsQueueItemForCancellingRun(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionPendingRoutingKey)
@@ -784,7 +784,7 @@ func Test__NodeQueueWorker_SkipsConfigurationErrorQueueItemForCancellingRun(t *t
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
 	executionFinishedConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionFinishedRoutingKey)

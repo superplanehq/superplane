@@ -6,6 +6,8 @@ import { Trash2 } from "lucide-react";
 interface FactoryDeleteDialogProps {
   open: boolean;
   factoryName: string;
+  title?: string;
+  description?: string;
   canDelete: boolean;
   isDeleting: boolean;
   onClose: () => void;
@@ -15,6 +17,8 @@ interface FactoryDeleteDialogProps {
 export function FactoryDeleteDialog({
   open,
   factoryName,
+  title,
+  description,
   canDelete,
   isDeleting,
   onClose,
@@ -22,9 +26,9 @@ export function FactoryDeleteDialog({
 }: FactoryDeleteDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} size="lg" className="text-left">
-      <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{factoryName}"?</DialogTitle>
+      <DialogTitle className="text-gray-800 dark:text-red-100">{title ?? `Delete "${factoryName}"?`}</DialogTitle>
       <DialogDescription className="text-sm text-gray-800 dark:text-gray-400">
-        This cannot be undone. Are you sure you want to continue?
+        {description ?? "This cannot be undone. Are you sure you want to continue?"}
       </DialogDescription>
       <DialogActions>
         <LoadingButton

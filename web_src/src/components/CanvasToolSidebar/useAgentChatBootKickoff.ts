@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import type { useAgentChatMessages, useSendAgentChatMessage } from "@/hooks/useAgentChats";
 import {
@@ -14,14 +13,12 @@ export function useAgentChatBootKickoff({
   sendMutation,
   chatId,
   canvasId,
-  agentMode,
   isAutoLayoutOnUpdateEnabled,
 }: {
   messagesQuery: ReturnType<typeof useAgentChatMessages>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
   canvasId: string;
-  agentMode: AgentMode;
   isAutoLayoutOnUpdateEnabled: boolean;
 }) {
   const [bootReadinessSignal, setBootReadinessSignal] = useState(0);
@@ -58,7 +55,6 @@ export function useAgentChatBootKickoff({
       .mutateAsync({
         chatId,
         content: createSystemMessage(bootMessage),
-        mode: agentMode,
         autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
       })
       .then(() => {
@@ -74,7 +70,6 @@ export function useAgentChatBootKickoff({
     bootReadinessSignal,
     chatId,
     canvasId,
-    agentMode,
     isAutoLayoutOnUpdateEnabled,
     sendMutation,
   ]);

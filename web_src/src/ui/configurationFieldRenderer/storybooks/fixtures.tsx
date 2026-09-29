@@ -11,7 +11,9 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 import { hostedLLMModelsQueryKey } from "@/hooks/useHostedLLMModels";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { secretKeys } from "@/hooks/useSecrets";
-import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
+import { selectableLLMModelsQueryKey } from "@/hooks/useSelectableLLMModels";
+import { SELECTABLE_LLM_SOURCE_BYOK, SELECTABLE_LLM_SOURCE_HOSTED } from "@/lib/selectableLLMModels";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 
 export type RendererCategory =
   | "Basic Inputs"
@@ -739,22 +741,19 @@ export const rendererExamples: RendererExample[] = [
     source: "Special field type",
     goType: "FieldTypeHostedModel",
     docsDescription:
-      "Use `hosted-model` when SuperPlane-hosted credentials are selected so the operator picks a model from the installation allowlist.",
+      "Use `hosted-model` so the operator picks a SuperPlane-hosted model or an organization BYOK model.",
     field: baseField({
       name: "model",
       label: "Model",
       type: "hosted-model",
-      description: "Select a SuperPlane-hosted model from the installation allowlist.",
-      placeholder: "Select a SuperPlane-hosted model",
+      description: "Select a model from Organization LLM Models.",
+      placeholder: "Select a model",
       typeOptions: {
         hostedModel: {
           provider: "anthropic",
         },
       },
     }),
-    allValues: {
-      credentials: { source: "hosted" },
-    },
     initialValue: "claude-sonnet-4-6",
   },
   {
@@ -981,6 +980,15 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(
     hostedLLMModelsQueryKey(STORY_DOMAIN_ID, "anthropic"),
     storybookHostedLlmModels("anthropic"),
+  );
+  const selectableModels = storybookSelectableLlmModels();
+  queryClient.setQueryData(
+    selectableLLMModelsQueryKey(STORY_DOMAIN_ID, undefined, SELECTABLE_LLM_SOURCE_HOSTED),
+    selectableModels.filter((model) => model.source.id === SELECTABLE_LLM_SOURCE_HOSTED),
+  );
+  queryClient.setQueryData(
+    selectableLLMModelsQueryKey(STORY_DOMAIN_ID, undefined, SELECTABLE_LLM_SOURCE_BYOK),
+    selectableModels.filter((model) => model.source.id === SELECTABLE_LLM_SOURCE_BYOK),
   );
 
   Object.entries(mockSecretDetails).forEach(([secretRef, secret]) => {

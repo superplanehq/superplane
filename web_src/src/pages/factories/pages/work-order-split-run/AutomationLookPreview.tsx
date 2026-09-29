@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { formatClockDurationLabel } from "@/lib/duration";
 import { cn } from "@/lib/utils";
+import { CircleX, RotateCw } from "lucide-react";
 import { useState } from "react";
 
 import { PhaseGlyph } from "../linePhaseGlyph";
@@ -96,13 +96,13 @@ export function AutomationLookPreview({ look }: { look: AutomationLook }) {
 
   return (
     <div className="flex h-[32rem] min-h-0 w-full max-w-xl flex-col border border-border bg-background">
-      <div className="flex items-center gap-3 px-3 pt-3">
+      <div className="flex items-center justify-between gap-3 px-3 pt-3">
         <SectionTitle>Automations</SectionTitle>
         <span className="text-xs font-medium text-muted-foreground">Follow</span>
       </div>
-      <ol className="min-h-0 flex-1 list-none space-y-1 overflow-y-auto px-3 py-3">
+      <ol className="min-h-0 flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
         {phases.map((phase) => (
-          <li key={phase.id}>
+          <li key={phase.id} className="first:mt-3">
             <AutomationRow
               look={look}
               phase={phase}
@@ -121,16 +121,26 @@ export function AutomationLookPreview({ look }: { look: AutomationLook }) {
 function previewHeaderAction(status: SplitRunPhaseStatus, onStop: () => void, onRerun: () => void) {
   if (status === "running") {
     return (
-      <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
-        Stop
-      </Button>
+      <button
+        type="button"
+        aria-label="Stop"
+        className="inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        onClick={onStop}
+      >
+        <CircleX className="size-3.5" aria-hidden />
+      </button>
     );
   }
   if (status === "failed") {
     return (
-      <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
-        Rerun
-      </Button>
+      <button
+        type="button"
+        aria-label="Rerun"
+        className="inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+        onClick={onRerun}
+      >
+        <RotateCw className="size-3.5" aria-hidden />
+      </button>
     );
   }
   return null;

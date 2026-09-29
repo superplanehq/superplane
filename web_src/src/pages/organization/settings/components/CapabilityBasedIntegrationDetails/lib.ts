@@ -15,7 +15,7 @@ export type DisplayCapability = {
 };
 
 /** Same chip styling as inline `code` in Integration setup instructions markdown. */
-export const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs";
+export const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground";
 
 export function getCapabilityLabel(capability: DisplayCapability): string {
   return capability.definition?.label || capability.definition?.name || capability.name || "Unnamed capability";
@@ -74,8 +74,8 @@ export function getCapabilityStatusBadgeDotClassName(state: IntegrationCapabilit
 
 export const getActiveTabClass = (activeTab?: boolean) => {
   return activeTab
-    ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300";
+    ? "border-foreground text-foreground"
+    : "border-transparent text-muted-foreground hover:text-foreground";
 };
 
 export type WorkflowGroup = {

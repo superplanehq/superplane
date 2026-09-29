@@ -312,10 +312,10 @@ func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
 	require.Contains(t, err.Error(), "pass --app-id")
 	require.Empty(t, config.GetActiveApp())
 
-	err = config.SetActiveFactory("factory-from-env-run")
+	err = config.SetActiveWorkspace("workspace-from-env-run")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "pass --factory")
-	require.Empty(t, config.GetActiveFactory())
+	require.Contains(t, err.Error(), "pass --workspace")
+	require.Empty(t, config.GetActiveWorkspace())
 
 	current, ok := GetCurrentContext()
 	require.True(t, ok)
@@ -332,4 +332,45 @@ func TestEnvironmentContextRequiresURLAndToken(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), EnvURL)
 	require.Contains(t, err.Error(), EnvToken)
+}
+
+func TestCurrentContext_GetActiveWorkspace_FallsBackToFactory(t *testing.T) {
+	setupViper(t)
+
+	factoryID := "factory-1"
+	ctx := ConfigContext{URL: "https://app.superplane.com", Organization: "test-org", APIToken: "tok", Factory: &factoryID}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+	require.Equal(t, "factory-1", current.GetActiveWorkspace())
+}
+
+func TestCurrentContext_GetActiveWorkspace_PrefersWorkspace(t *testing.T) {
+	setupViper(t)
+
+	factoryID := "factory-1"
+	workspaceID := "ws-1"
+	ctx := ConfigContext{
+		URL:          "https://app.superplane.com",
+		Organization: "test-org",
+		APIToken:     "tok",
+		Factory:      &factoryID,
+		Workspace:    &workspaceID,
+	}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+	require.Equal(t, "ws-1", current.GetActiveWorkspace())
+}
+
+func TestCurrentContext_SetActiveWorkspace_WritesWorkspace(t *testing.T) {
+	setupViper(t)
+
+	ctx := ConfigContext{URL: "https://app.superplane.com", Organization: "test-org", APIToken: "tok"}
+	current := NewCurrentContext(ctx).(*CurrentContext)
+
+	err := current.SetActiveWorkspace("ws-1")
+	require.NoError(t, err)
+
+	saved, ok := GetCurrentContext()
+	require.True(t, ok)
+	require.NotNil(t, saved.Workspace)
+	require.Equal(t, "ws-1", *saved.Workspace)
+	require.Nil(t, saved.Factory)
 }

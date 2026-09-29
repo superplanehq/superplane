@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "bun:test";
 import {
   AGENT_SUGGESTIONS_STORAGE_KEY,
   clearAgentSuggestions,

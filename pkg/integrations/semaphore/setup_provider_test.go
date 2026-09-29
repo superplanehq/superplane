@@ -166,6 +166,14 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "organization URL is required")
+
+		_, err = s.OnStepSubmit(core.SetupStepContext{
+			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: map[string]any{"organizationUrl": "ftp://org.semaphoreci.com"}},
+			Logger:     logger,
+			Properties: &contexts.IntegrationPropertyStorage{},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "organization URL must use https")
 	})
 
 	t.Run("selectOrganization success", func(t *testing.T) {
@@ -186,6 +194,26 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 		require.NoError(t, getErr)
 		assert.Equal(t, orgURL, stored)
 		assert.Contains(t, next.Instructions, orgURL)
+	})
+
+	t.Run("selectOrganization normalizes trailing slash and extra path", func(t *testing.T) {
+		intCtx := &contexts.IntegrationContext{}
+		props := intCtx.Properties()
+		next, err := s.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{
+				Name:   SetupStepSelectOrganization,
+				Inputs: map[string]any{"organizationUrl": " https://org.semaphoreci.com/projects/ "},
+			},
+			Logger:     logger,
+			Properties: props,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+
+		stored, getErr := props.GetString("organizationUrl")
+		require.NoError(t, getErr)
+		assert.Equal(t, "https://org.semaphoreci.com", stored)
+		assert.Contains(t, next.Instructions, "https://org.semaphoreci.com/people")
 	})
 
 	t.Run("enterAPIToken validation", func(t *testing.T) {

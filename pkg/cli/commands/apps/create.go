@@ -39,6 +39,15 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		localFiles = append(localFiles, *c.files...)
 	}
 
+	var stagedFiles []common.RepositoryFileStaging
+	if len(localFiles) > 0 {
+		prepared, err := prepareCreateRepositoryFiles(localFiles)
+		if err != nil {
+			return err
+		}
+		stagedFiles = prepared
+	}
+
 	request := openapi_client.NewCanvasesCreateCanvasRequest()
 	request.SetName(name)
 	if description != "" {
@@ -59,16 +68,11 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	canvasID := resp.Canvas.Metadata.GetId()
-	if len(localFiles) == 0 {
+	if len(stagedFiles) == 0 {
 		return printCreateResponse(ctx, *resp.Canvas, nil)
 	}
 
 	commitMessage, err := resolveCreateCommitMessage(c.message, name)
-	if err != nil {
-		return err
-	}
-
-	stagedFiles, err := prepareCreateRepositoryFiles(localFiles)
 	if err != nil {
 		return err
 	}
@@ -117,6 +121,9 @@ func prepareCreateRepositoryFiles(localFiles []string) ([]common.RepositoryFileS
 		repositoryPath := common.RepositoryPathFromLocalFile(trimmedPath)
 		if _, exists := seenPaths[repositoryPath]; exists {
 			return nil, fmt.Errorf("duplicate repository file %q", repositoryPath)
+		}
+		if !common.IsRepositorySpecFilePath(repositoryPath) {
+			return nil, fmt.Errorf("only canvas.yaml and console.yaml can be staged; %q is not supported", repositoryPath)
 		}
 		seenPaths[repositoryPath] = struct{}{}
 
@@ -184,15 +191,16 @@ func NewCreateCommand(options core.BindOptions) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create an app",
-		Long: `Create an app by name and optionally commit repository files.
+		Long: `Create an app by name and optionally commit spec files.
 
 Examples:
   superplane apps create --name "My App"
-  superplane apps create --name "My App" --file canvas.yaml --file console.yaml --file README.md
+  superplane apps create --name "My App" --file canvas.yaml --file console.yaml
 
 When --file is provided, the command creates an empty app, stages the files, and
-commits them in one step. canvas.yaml and console.yaml do not need metadata.id
-or metadata.canvasId beforehand; those fields are filled in automatically.
+commits them in one step. Only canvas.yaml and console.yaml can be staged.
+Those files do not need metadata.id or metadata.canvasId beforehand; those
+fields are filled in automatically.
 
 AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 - ` + core.SkillsInstallCommand("superplane-app-builder") + `

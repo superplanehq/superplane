@@ -1,13 +1,23 @@
-import type { FactoriesFactoryLine } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import type { ReactNode } from "react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
 import { factorySectionHeaderClassName } from "../../pages/factoryPageLayoutStyles";
-import { buildAssigneeFilterOptions, buildLineFilterOptions } from "../../lib/workOrderFilterOptions";
-import { WORK_ORDER_SCOPES, type WorkOrderListEntry } from "../../lib/workOrderListModel";
+import {
+  buildAssigneeFilterOptions,
+  buildLineFilterOptions,
+  buildSourceFilterOptions,
+} from "../../lib/workOrderFilterOptions";
+import {
+  countWorkOrderFilters,
+  visibleWorkOrderFilters,
+  WORK_ORDER_SCOPES,
+  type WorkOrderListEntry,
+} from "../../lib/workOrderListModel";
 import { DisplayMenu } from "./DisplayMenu";
 import { FilterChips } from "./FilterChips";
 import { FilterMenu } from "./FilterMenu";
@@ -19,14 +29,19 @@ interface WorkOrdersHeaderProps {
   /** Every entry before scope/filters, used to build the assignee options. */
   entries: WorkOrderListEntry[];
   factoryLines: FactoriesFactoryLine[];
+  intakes?: FactoriesFactoryIntake[];
   onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
+  hostedCreditHeaderKicker?: ReactNode;
+  brokenIntegrationsBanner?: ReactNode;
+  showPullRequestMerge?: boolean;
+  onOpenStatusDialog?: () => void;
 }
 
 /**
- * Compact title bar for the Work Orders page. Title, scope, and Filter
- * stay on the left. Search, Display, and New sit on the right.
+ * Compact title bar for the Tasks page. Title stays on the left.
+ * Scope, Filter, Search, Display, and New sit on the right.
  *
  * The Filter menu and the chip row read from one shared set of options, so
  * both always show the same labels.
@@ -35,20 +50,28 @@ export function WorkOrdersHeader({
   state,
   entries,
   factoryLines,
+  intakes = [],
   onCreateWorkOrder,
   canCreate,
   permissionsLoading,
+  hostedCreditHeaderKicker,
+  brokenIntegrationsBanner,
+  showPullRequestMerge = false,
+  onOpenStatusDialog,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const lineOptions = buildLineFilterOptions(factoryLines);
+  const sourceOptions = buildSourceFilterOptions(intakes, entries);
   const assigneeOptions = buildAssigneeFilterOptions(entries);
+  const visibleFilterCount = countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge));
 
   return (
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       data-testid="work-orders-header"
-      title="Work Orders"
-      leading={
+      title="Tasks"
+      leading={hostedCreditHeaderKicker}
+      actions={
         <>
           <ScopePills
             value={state.scope}
@@ -56,11 +79,14 @@ export function WorkOrdersHeader({
             options={WORK_ORDER_SCOPES}
             testIdPrefix="work-orders-scope"
           />
-          <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
-        </>
-      }
-      actions={
-        <>
+          <FilterMenu
+            state={state}
+            lineOptions={lineOptions}
+            sourceOptions={sourceOptions}
+            assigneeOptions={assigneeOptions}
+            showPullRequestMerge={showPullRequestMerge}
+            onOpenStatusDialog={onOpenStatusDialog}
+          />
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}
@@ -72,7 +98,7 @@ export function WorkOrdersHeader({
           <DisplayMenu state={state} />
           <PermissionTooltip
             allowed={canCreate || permissionsLoading}
-            message="You don't have permission to create work orders."
+            message="You do not have permission to create tasks."
           >
             <Button
               type="button"
@@ -82,14 +108,25 @@ export function WorkOrdersHeader({
               data-testid="work-order-list-create-button"
             >
               <Plus className="size-3.5" aria-hidden />
-              New work order
+              New task
             </Button>
           </PermissionTooltip>
         </>
       }
       belowRow={
-        state.filterCount > 0 ? (
-          <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        brokenIntegrationsBanner || visibleFilterCount > 0 ? (
+          <>
+            {brokenIntegrationsBanner}
+            {visibleFilterCount > 0 ? (
+              <FilterChips
+                state={state}
+                lineOptions={lineOptions}
+                sourceOptions={sourceOptions}
+                assigneeOptions={assigneeOptions}
+                showPullRequestMerge={showPullRequestMerge}
+              />
+            ) : null}
+          </>
         ) : undefined
       }
     />

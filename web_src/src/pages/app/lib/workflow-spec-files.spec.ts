@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { CanvasesCanvas } from "@/api-client";
 
@@ -42,7 +42,7 @@ describe("workflow-spec-files", () => {
     expect(spec?.nodes?.[0]?.id).toBe("node-1");
   });
 
-  it("Files tab canvas.yaml matches export payload", () => {
+  it("materialized canvas.yaml matches export payload", () => {
     const exportPayload = buildCanvasYamlExportPayload(sampleWorkflow);
     const files = buildAppFiles({
       canvas: sampleWorkflow,

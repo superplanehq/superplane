@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
@@ -15,13 +14,8 @@ func DeleteFactory(ctx context.Context, organizationID, factoryID string) (*pb.D
 		return nil, factoryErrorToStatus(err, "failed to delete factory")
 	}
 
-	id, err := parseFactoryID(factoryID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to delete factory")
-	}
-
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		factory, err := models.FindFactory(tx, orgID, id)
+		factory, err := findFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
 		}

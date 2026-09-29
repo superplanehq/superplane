@@ -53,24 +53,6 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		require.NotEmpty(t, artifacts)
 	})
 
-	t.Run("creates pr artifact", func(t *testing.T) {
-		data, err := structpb.NewStruct(map[string]any{
-			"url":    "https://github.com/org/repo/pull/7",
-			"number": float64(7),
-		})
-		require.NoError(t, err)
-
-		resp, err := CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
-			FactoryId: factoryModel.ID.String(),
-			OrderId:   order.ID.String(),
-			Type:      pb.WorkOrderArtifact_TYPE_PR,
-			Data:      data,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, pb.WorkOrderArtifact_TYPE_PR, resp.Artifact.Type)
-		assert.Equal(t, "https://github.com/org/repo/pull/7", resp.Artifact.Data.AsMap()["url"])
-	})
-
 	t.Run("creates branch artifact", func(t *testing.T) {
 		data, err := structpb.NewStruct(map[string]any{"name": "feature/login"})
 		require.NoError(t, err)
@@ -166,7 +148,7 @@ func Test__CreateWorkOrderArtifact(t *testing.T) {
 		_, err = CreateWorkOrderArtifact(ctx, r.Organization.ID.String(), &pb.CreateWorkOrderArtifactRequest{
 			FactoryId: factoryModel.ID.String(),
 			OrderId:   order.ID.String(),
-			Type:      pb.WorkOrderArtifact_TYPE_PR,
+			Type:      pb.WorkOrderArtifact_TYPE_LINK,
 			Data:      data,
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)

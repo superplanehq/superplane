@@ -6,8 +6,10 @@
 {{end}}{{.UpdatedLabel}}
 {{if .Detail}}
 {{.Detail}}
+{{end}}{{if .DetailCtaURL}}
+{{if .DetailCtaLabel}}{{.DetailCtaLabel}}: {{end}}{{.DetailCtaURL}}
 {{end}}
-Open the work order in SuperPlane:
+Open the task in SuperPlane:
 {{.WorkOrderLink}}
 
 You receive this email because of your notification settings in SuperPlane. To change them, open workspace settings and select Notifications.

@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { workOrderFileContentTypeMap, workOrderFileDownloadMap } from "@/lib/workOrderFiles";
 
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { WorkOrderDescriptionEditor } from "../../WorkOrderDescriptionEditor";
 
-const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_DESCRIPTION_LENGTH = 20000;
 
 /**
  * Description on the split-run Description tab. Drafts can switch the
@@ -15,16 +18,34 @@ export function WorkOrderSplitRunDescription({
   description,
   canEdit = false,
   busy = false,
+  collapsible = true,
   onSave,
+  files,
+  organizationId,
+  factoryId,
+  orderId,
 }: {
   description: string;
   canEdit?: boolean;
   busy?: boolean;
+  collapsible?: boolean;
   onSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(description);
   const [draft, setDraft] = useState(description);
+  const canUpload = Boolean(organizationId && factoryId);
+  const fileUrls = useMemo(() => workOrderFileDownloadMap(files), [files]);
+  const fileContentTypes = useMemo(() => workOrderFileContentTypeMap(files), [files]);
+  const fileUpload = useWorkOrderFileUpload({
+    organizationId: organizationId ?? "",
+    factoryId: factoryId ?? "",
+    orderId,
+  });
 
   useEffect(() => {
     setSaved(description);
@@ -47,7 +68,7 @@ export function WorkOrderSplitRunDescription({
   };
 
   const body = saved.trim() ? (
-    <WorkOrderDescription description={saved} />
+    <WorkOrderDescription description={saved} files={files} collapsible={collapsible} />
   ) : (
     <p className="text-[13px] text-muted-foreground">No description yet.</p>
   );
@@ -87,7 +108,7 @@ export function WorkOrderSplitRunDescription({
               type="button"
               size="sm"
               className="h-6 px-2.5 text-[13px]"
-              disabled={busy}
+              disabled={busy || fileUpload.isUploading}
               onClick={() => void handleSave()}
             >
               Save
@@ -96,9 +117,13 @@ export function WorkOrderSplitRunDescription({
           <WorkOrderDescriptionEditor
             value={draft}
             maxLength={MAX_DESCRIPTION_LENGTH}
-            disabled={busy}
+            disabled={busy || fileUpload.isUploading}
             className="min-h-32 pr-28 text-[13px] leading-[1.625] [&>p:first-child]:mt-0"
             onChange={setDraft}
+            fileUrls={fileUrls}
+            fileContentTypes={fileContentTypes}
+            onUploadFiles={canUpload ? fileUpload.uploadFiles : undefined}
+            isUploading={fileUpload.isUploading}
           />
         </div>
       ) : (

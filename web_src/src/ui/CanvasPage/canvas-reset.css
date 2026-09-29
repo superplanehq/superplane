@@ -21,9 +21,9 @@
 
 /* Factory canvases: Storybook WorkOrderCanvas edge weight + slate stroke. */
 .sp-canvas.sp-canvas-factory {
-  --xy-edge-stroke: #cbd5e1;
-  --xy-edge-stroke-selected: #94a3b8;
-  --xy-edge-stroke-width: 1.5;
+  --xy-edge-stroke: #94a3b8;
+  --xy-edge-stroke-selected: #64748b;
+  --xy-edge-stroke-width: 2;
   --sp-handle-border: #e5e7eb;
   --sp-handle-border-hover: #cbd5e1;
   --sp-handle-highlight-border: #94a3b8;
@@ -32,7 +32,7 @@
 .dark .sp-canvas.sp-canvas-factory {
   --xy-edge-stroke: #4a4740;
   --xy-edge-stroke-selected: #6b6560;
-  --xy-edge-stroke-width: 1.5;
+  --xy-edge-stroke-width: 2;
   --sp-handle-border: #4a4740;
   --sp-handle-border-hover: #6b6560;
   --sp-handle-highlight-border: #8a847c;
@@ -145,7 +145,10 @@
   stroke: #fca5a5 !important;
 }
 
-.dark .sp-canvas.sp-canvas-factory .react-flow__edge.sp-edge-factory-failed.sp-edge-factory-touching .react-flow__edge-path {
+.dark
+  .sp-canvas.sp-canvas-factory
+  .react-flow__edge.sp-edge-factory-failed.sp-edge-factory-touching
+  .react-flow__edge-path {
   stroke: #f87171 !important;
 }
 
@@ -165,7 +168,7 @@
 }
 
 .sp-canvas.sp-canvas-factory .react-flow__connectionline path {
-  stroke-width: 1.5 !important;
+  stroke-width: 2 !important;
 }
 
 .sp-canvas .react-flow__handle {
@@ -215,7 +218,10 @@
 .sp-canvas .sp-append-source-handle {
   background-color: var(--sp-append-handle-bg, #ffffff);
   color: var(--sp-append-handle-icon, #94a3b8);
-  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  transition:
+    border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    background-color 0.2s ease-in-out;
 }
 
 .sp-canvas .sp-append-source-handle:hover {
@@ -227,7 +233,9 @@
   opacity: 0;
   pointer-events: none;
   --sp-append-preview-connector-offset-y: 1px;
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .sp-canvas .react-flow__handle.sp-append-source-hitbox.plus-hovered + .sp-append-source-preview {
@@ -240,7 +248,9 @@
   pointer-events: none;
   --edge-label-scale: 0.92;
   transform-origin: center;
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .sp-canvas .edge-label-visible {
@@ -251,7 +261,10 @@
 }
 
 .sp-canvas .edge-label .edge-label-button {
-  transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .sp-canvas .edge-label-visible .edge-label-button:hover {

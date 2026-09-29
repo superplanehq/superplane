@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Upload Vite dist to Cloudflare R2 at releases/<git sha>/.
+# aws s3 sync is idempotent: a second upload of the same prefix does not fail.
+
+set -euo pipefail
+
+if [ -z "${GIT_SHA:-}" ]; then
+  echo "GIT_SHA is required" >&2
+  exit 1
+fi
+
+if [ -z "${DIST_DIR:-}" ]; then
+  echo "DIST_DIR is required" >&2
+  exit 1
+fi
+
+if [ ! -d "${DIST_DIR}" ]; then
+  echo "DIST_DIR does not exist: ${DIST_DIR}" >&2
+  exit 1
+fi
+
+if [ -z "${R2_BUCKET:-}" ]; then
+  echo "R2_BUCKET is required" >&2
+  exit 1
+fi
+
+if [ -z "${R2_ACCOUNT_ID:-}" ]; then
+  echo "R2_ACCOUNT_ID is required" >&2
+  exit 1
+fi
+
+if [ -z "${AWS_ACCESS_KEY_ID:-}" ]; then
+  echo "AWS_ACCESS_KEY_ID is required" >&2
+  exit 1
+fi
+
+if [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+  echo "AWS_SECRET_ACCESS_KEY is required" >&2
+  exit 1
+fi
+
+if [ -z "${R2_ASSET_BASE_URL:-}" ]; then
+  echo "R2_ASSET_BASE_URL is required" >&2
+  exit 1
+fi
+
+index_html="${DIST_DIR}/index.html"
+if [ ! -f "${index_html}" ]; then
+  echo "index.html not found in DIST_DIR: ${DIST_DIR}" >&2
+  exit 1
+fi
+
+if ! grep -q "${R2_ASSET_BASE_URL}" "${index_html}"; then
+  echo "index.html does not contain R2_ASSET_BASE_URL: ${R2_ASSET_BASE_URL}" >&2
+  exit 1
+fi
+
+if ! command -v aws >/dev/null 2>&1; then
+  echo "Installing AWS CLI..."
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  sudo /tmp/aws/install
+fi
+
+endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+prefix="releases/${GIT_SHA}/"
+
+echo "Uploading static assets to s3://${R2_BUCKET}/${prefix}"
+aws s3 sync "${DIST_DIR}" "s3://${R2_BUCKET}/${prefix}" \
+  --endpoint-url "${endpoint}"

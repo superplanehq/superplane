@@ -3,12 +3,10 @@ package canvases
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,7 +14,22 @@ import (
 	"gorm.io/gorm"
 )
 
+const CurrentStagingCannotBeDiscardedMessage = "current staging cannot be discarded"
+const StagedCanvasChangedMessage = "staged canvas changed"
+
 func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
+	return putCanvasStaging(ctx, db, canvas, operations, false, "")
+}
+
+func PutCanvasStagingReplacingStale(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
+	return putCanvasStaging(ctx, db, canvas, operations, true, "")
+}
+
+func PutCanvasStagingMatchingCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation, expectedCanvasYAML string) (*pb.StagingSummary, error) {
+	return putCanvasStaging(ctx, db, canvas, operations, false, expectedCanvasYAML)
+}
+
+func putCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, operations []*pb.CanvasRepositoryFileOperation, replaceIfStale bool, expectedCanvasYAML string) (*pb.StagingSummary, error) {
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -24,53 +37,45 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 
 	userID := uuid.MustParse(user)
 
-	//
-	// Find the base version id for the staging update.
-	//
-	baseVersionID, err := findBaseVersionIDForStagingUpdate(db, canvas, userID)
+	validated, err := validatedStagedSpecOperations(operations)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, operation := range operations {
-		if operation == nil {
-			continue
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockStagedFilesForUser(tx, canvas.ID, userID); err != nil {
+			return grpcerrors.Internal(err, "failed to stage")
 		}
 
-		normalized := normalizeRepositoryFilePath(operation.GetPath())
-		if normalized == "" {
-			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
-		}
-		if normalized == gitprovider.ReservedSuperPlanePath ||
-			strings.HasPrefix(normalized, gitprovider.ReservedSuperPlanePath+"/") {
-			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("path %q is reserved for SuperPlane", operation.GetPath()))
+		if expectedCanvasYAML != "" {
+			if err := requireCanvasYAMLUnchanged(tx, canvas, userID, expectedCanvasYAML); err != nil {
+				return err
+			}
 		}
 
-		if operation.GetDelete() {
-			if err := models.MarkStagedFilePathDeleted(
-				db,
+		baseVersionID, err := stagingBaseVersionID(tx, canvas, userID, replaceIfStale)
+		if err != nil {
+			return err
+		}
+
+		for _, operation := range validated {
+			if _, err := models.UpsertStagedFile(
+				tx,
 				canvas.ID,
 				userID,
-				*baseVersionID,
+				baseVersionID,
 				canvas.OrganizationID,
-				normalized,
+				operation.path,
+				operation.content,
 			); err != nil {
-				return nil, grpcerrors.Internal(err, "failed to stage deletion")
+				return grpcerrors.Internal(err, "failed to stage")
 			}
-			continue
 		}
 
-		if _, err := models.UpsertStagedFile(
-			db,
-			canvas.ID,
-			userID,
-			*baseVersionID,
-			canvas.OrganizationID,
-			normalized,
-			string(operation.GetContent()),
-		); err != nil {
-			return nil, grpcerrors.Internal(err, "failed to stage")
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
@@ -85,31 +90,88 @@ func PutCanvasStaging(ctx context.Context, db *gorm.DB, canvas *models.Canvas, o
 	return buildStagingSummary(canvas, rows), nil
 }
 
-func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID) (*uuid.UUID, error) {
+func requireCanvasYAMLUnchanged(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID, expectedCanvasYAML string) error {
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load live version")
+		return grpcerrors.Internal(err, "failed to load live version")
 	}
 
 	stagedFiles, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load staging")
+		return grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	//
-	// If we already have staged files, use the base version id of the first staged file.
-	//
-	if len(stagedFiles) > 0 {
-		baseVersionID := stagedFiles[0].BaseVersionID
-		if baseVersionID != liveVersion.ID {
-			return nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be updated")
+	current, err := effectiveSpecYAML(canvas, liveVersion, canvas.OrganizationID.String(), stagedFiles, CanvasYAMLRepositoryPath)
+	if err != nil {
+		return err
+	}
+	if current != expectedCanvasYAML {
+		return grpcerrors.FailedPrecondition(nil, StagedCanvasChangedMessage)
+	}
+
+	return nil
+}
+
+func stagingBaseVersionID(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID, replaceIfStale bool) (uuid.UUID, error) {
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	if err != nil {
+		return uuid.Nil, grpcerrors.Internal(err, "failed to load live version")
+	}
+
+	stagedFiles, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
+	if err != nil {
+		return uuid.Nil, grpcerrors.Internal(err, "failed to load staging")
+	}
+
+	if len(stagedFiles) == 0 {
+		return liveVersion.ID, nil
+	}
+
+	baseVersionID := stagedFiles[0].BaseVersionID
+	if baseVersionID == liveVersion.ID {
+		if replaceIfStale {
+			return uuid.Nil, grpcerrors.FailedPrecondition(nil, CurrentStagingCannotBeDiscardedMessage)
+		}
+		return baseVersionID, nil
+	}
+
+	if !replaceIfStale {
+		return uuid.Nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be updated")
+	}
+
+	if err := models.DiscardStagedFilesForUser(db, canvas.ID, userID, nil); err != nil {
+		return uuid.Nil, grpcerrors.Internal(err, "failed to discard staging")
+	}
+
+	return liveVersion.ID, nil
+}
+
+type stagedSpecOperation struct {
+	path    string
+	content string
+}
+
+func validatedStagedSpecOperations(operations []*pb.CanvasRepositoryFileOperation) ([]stagedSpecOperation, error) {
+	validated := make([]stagedSpecOperation, 0, len(operations))
+	for _, operation := range operations {
+		if operation == nil {
+			continue
 		}
 
-		return &baseVersionID, nil
+		normalized, err := requireStagedSpecFilePath(operation.GetPath())
+		if err != nil {
+			return nil, err
+		}
+
+		if operation.GetDelete() {
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		validated = append(validated, stagedSpecOperation{
+			path:    normalized,
+			content: string(operation.GetContent()),
+		})
 	}
 
-	//
-	// Otherwise, use the live version id.
-	//
-	return &liveVersion.ID, nil
+	return validated, nil
 }

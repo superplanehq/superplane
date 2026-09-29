@@ -1,7 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
+import { unmockedSrc } from "@/test/unmockedModule";
 import { executions, renderInspector, runningExecutions, runningRun } from "./RunInspectorPanel.spec.fixtures";
 
 let mockedExecutions = executions;
@@ -24,8 +25,8 @@ const describeRunMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
 const deleteNodeQueueItemMock = vi.fn();
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),

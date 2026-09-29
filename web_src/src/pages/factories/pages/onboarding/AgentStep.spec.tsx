@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { FACTORIES_ORGANIZATION_ID } from "@/pages/factories/__fixtures__/factoryPageResponses";
 
@@ -13,8 +13,8 @@ const spendState: { remainingCreditCents: string; grantTotalCents: string } = {
   grantTotalCents: "5000",
 };
 
-vi.mock("@/hooks/useOrganizationLLMSpend", () => ({
-  useOrganizationLLMSpend: () => ({ data: spendState }),
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: spendState }),
 }));
 
 function renderAgentStep(args?: {
@@ -48,7 +48,7 @@ describe("AgentStep", () => {
     expect(screen.getByText("SuperPlane-hosted credit")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "This organization has $41.24 of hosted credit. You can continue without connecting your own keys.",
+        "This organization has $41.24 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
       ),
     ).toBeInTheDocument();
   });
@@ -62,14 +62,14 @@ describe("AgentStep", () => {
     expect(screen.queryByTestId("hosted-credit-grant")).not.toBeInTheDocument();
   });
 
-  it("shows Anthropic, OpenAI, and OpenRouter as connectable, and Cursor as coming soon", () => {
+  it("shows Anthropic, OpenAI, and OpenRouter as connectable", () => {
     renderAgentStep({ spend: { remainingCreditCents: "0", grantTotalCents: "0" } });
 
     expect(screen.getByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Connect Cursor/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
   it("asks to connect a provider when a grant exists but remaining credit is empty", () => {
@@ -78,7 +78,9 @@ describe("AgentStep", () => {
     });
 
     expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
-    expect(screen.getByText("Hosted credit is empty. Connect a provider to continue.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Trial credit is used up. Subscribe to Business or connect a provider to continue."),
+    ).toBeInTheDocument();
   });
 
   it("connects OpenAI without selecting a single harness", async () => {

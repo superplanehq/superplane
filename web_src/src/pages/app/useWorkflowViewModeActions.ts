@@ -3,14 +3,12 @@ import { useCallback } from "react";
 interface WorkflowViewModeActionsConfig {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   isRunInspectionMode: boolean;
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   handleExitConsoleMode: () => void;
   handleExitMemoryMode: () => void;
-  handleExitFilesMode: () => void;
   handleClearRunInspection: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
@@ -20,14 +18,12 @@ interface WorkflowViewModeActionsConfig {
 export function useWorkflowViewModeActions({
   isConsoleMode,
   isMemoryMode,
-  isFilesMode,
   isRunInspectionMode,
   hasEditableVersion,
   canUpdateCanvas,
   canvasDeletedRemotely,
   handleExitConsoleMode,
   handleExitMemoryMode,
-  handleExitFilesMode,
   handleClearRunInspection,
   handleToggleEditMode,
   setIsConsoleAddPanelOpen,
@@ -42,20 +38,14 @@ export function useWorkflowViewModeActions({
       handleExitMemoryMode();
       return;
     }
-    if (isFilesMode) {
-      handleExitFilesMode();
-      return;
-    }
     if (isRunInspectionMode) {
       handleClearRunInspection();
     }
   }, [
     handleClearRunInspection,
     handleExitConsoleMode,
-    handleExitFilesMode,
     handleExitMemoryMode,
     isConsoleMode,
-    isFilesMode,
     isMemoryMode,
     isRunInspectionMode,
   ]);

@@ -2,7 +2,7 @@
 import { act, fireEvent, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type { BlockData } from "./Block";
 
@@ -599,6 +599,50 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 
+  it("selects the deep-linked node when the edit sidebar opens from the URL", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="editing"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const nodes = reactFlowPropsRef.current?.nodes as Array<{ id: string; selected?: boolean }>;
+      expect(nodes.find((node) => node.id === "node-1")?.selected).toBe(true);
+    });
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+  });
+
   it("closes hidden live sidebar state from canvas pane click", async () => {
     const onSidebarChange = vi.fn();
     const getSidebarData = vi.fn(() => ({
@@ -676,6 +720,8 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
 
   function renderCanvas(overrides: {
     fitViewContentKey?: string;
+    lockNativeZoom?: boolean;
+    factoryDisplayLayout?: boolean;
     hasFitToViewRef: { current: boolean };
     lastFittedContentKeyRef: { current: string | null };
   }) {
@@ -707,6 +753,43 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     expect(lastFittedContentKeyRef.current).toBe("canvas-1:v1");
+  });
+
+  it("fits immediately when factoryDisplayLayout is set", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ factoryDisplayLayout: true, hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 0,
+      }),
+    );
+  });
+
+  it("locks the first-load fit to 100% zoom when lockNativeZoom is set", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ lockNativeZoom: true, hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(fitViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        minZoom: 1,
+        maxZoom: 1,
+        duration: 500,
+      }),
+    );
   });
 
   it("re-fits when the content key changes (canvas/version switch)", () => {
@@ -895,62 +978,5 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     expect(setViewport).toHaveBeenCalled();
-  });
-
-  it("applies a live focus request after leaving files mode remounts ReactFlow", async () => {
-    // Files mode replaces ReactFlow with a backdrop, so agent:focus-node cannot
-    // reach CanvasContent. focusRequest on AppPage must survive the remount.
-    const focusNode = {
-      id: "node-1",
-      position: { x: 0, y: 0 },
-      data: { label: "Node 1", type: "component" },
-    };
-    getNodesMock.mockReturnValue([focusNode]);
-
-    const { rerender } = render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="files"
-          nodes={[focusNode]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="v1"
-          focusRequest={{ nodeId: "node-1", requestId: 42, targetMode: "live", tab: "settings" }}
-        />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByTestId("canvas-files-backdrop")).toBeInTheDocument();
-    expect(reactFlowPropsRef.current).toBeNull();
-
-    rerender(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="version-live"
-          nodes={[focusNode]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="v1"
-          focusRequest={{ nodeId: "node-1", requestId: 42, targetMode: "live", tab: "settings" }}
-        />
-      </MemoryRouter>,
-    );
-
-    act(() => {
-      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
-    });
-
-    await waitFor(() => {
-      expect(fitViewMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          nodes: [focusNode],
-          duration: 500,
-        }),
-      );
-    });
   });
 });

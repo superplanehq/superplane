@@ -26,6 +26,7 @@ export function HomeIntegrationCreateDialog({
   onRefetch,
   setupReturnTo,
   preferredCreateName,
+  hiddenFieldNames,
 }: {
   open: boolean;
   dialogIntegrationName: string | null;
@@ -34,6 +35,8 @@ export function HomeIntegrationCreateDialog({
   integrationHomeHref?: string;
   setupReturnTo?: string;
   preferredCreateName?: string;
+  /** Configuration field names this flow never shows for the open integration. */
+  hiddenFieldNames?: string[];
   dialogDefinition: unknown;
   defaultDialogName: string;
   existingIntegrationNames: Set<string>;
@@ -100,6 +103,7 @@ export function HomeIntegrationCreateDialog({
       initialConfiguration={resumePendingForDialog?.spec?.configuration as Record<string, unknown> | undefined}
       setupReturnTo={setupReturnTo}
       existingIntegrationNames={existingIntegrationNames}
+      hiddenFieldNames={hiddenFieldNames}
     />
   );
 }

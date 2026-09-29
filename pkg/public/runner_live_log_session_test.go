@@ -29,18 +29,15 @@ func mustRunnerLiveLogServer(t *testing.T, r *support.ResourceRegistry) (*Server
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
-	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
+	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
 	return server, signer
 }
 
@@ -204,6 +201,22 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
 		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
 		assert.Contains(t, rec.Body.String(), "not configured")
+	})
+
+	t.Run("returns stream session with public broker URL", func(t *testing.T) {
+		t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
+		t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
+
+		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-public-1", map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: "task-public-ok",
+		})
+		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var session runneraction.LiveLogSession
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+		assert.Equal(t, "http://localhost:8091/v1/tasks/task-public-ok/live-logs", session.StreamURL)
 	})
 
 	t.Run("returns stream session for runnerBash", func(t *testing.T) {

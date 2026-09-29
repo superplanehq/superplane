@@ -1,33 +1,27 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder } from "@/api-client";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { Button } from "@/components/ui/button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { appPath } from "@/lib/appPaths";
+import { factoryAppPath } from "../lib/factoryPagePaths";
 import { cn } from "@/lib/utils";
-import {
-  Calendar,
-  ChevronDown,
-  CircleDollarSign,
-  CircleDot,
-  ExternalLink,
-  Loader2,
-  User,
-  UserPlus,
-} from "lucide-react";
+import { Calendar, CircleDollarSign, CircleDot, ExternalLink, Loader2, User, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import { resolveWorkOrderCreatorDisplay } from "../lib/workOrderCreator";
 import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
 import type { WorkOrderDisplayStatus } from "../lib/workOrderProgress";
-import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../lib/workOrderUsage";
+import {
+  formatCompactTokens,
+  formatDurationSeconds,
+  formatUsdCents,
+  parseWorkOrderMetric,
+} from "../lib/workOrderUsage";
 import { OrgUserReference } from "../OrgUserReference";
-import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
 import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
@@ -40,19 +34,18 @@ interface WorkOrderSidebarOverviewProps {
 
 export function WorkOrderSidebarOverview({
   organizationId,
+  factoryKey,
   order,
   displayStatus,
   statusMeta,
   assigneeIds,
   assigneeNames,
-  canAssign,
-  isAssigneesSaving,
-  onAssigneesSave,
 }: WorkOrderSidebarOverviewProps) {
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
-  const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const durationSeconds = parseWorkOrderMetric(order.totalDurationSeconds);
+  const showSpending = totalTokens > 0 || totalCostCents > 0 || durationSeconds > 0;
   const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
@@ -64,17 +57,10 @@ export function WorkOrderSidebarOverview({
         </OverviewRow>
 
         <OverviewRow icon={<UserPlus className="size-3.5" aria-hidden />} srLabel="Author">
-          <CreatorValue organizationId={organizationId} order={order} />
+          <CreatorValue organizationId={organizationId} factoryKey={factoryKey} order={order} />
         </OverviewRow>
 
-        <AssigneeOverviewRow
-          organizationId={organizationId}
-          assigneeIds={assigneeIds}
-          assigneeNames={assigneeNames}
-          canEdit={canAssign}
-          isSaving={isAssigneesSaving}
-          onSave={onAssigneesSave}
-        />
+        <AssigneeOverviewRow organizationId={organizationId} assigneeIds={assigneeIds} assigneeNames={assigneeNames} />
 
         {MissionSlot ? <MissionSlot workOrderId={order.id ?? ""} /> : null}
 
@@ -86,8 +72,8 @@ export function WorkOrderSidebarOverview({
 
         {showSpending ? (
           <OverviewRow icon={<CircleDollarSign className="size-3.5" aria-hidden />} srLabel="Spending">
-            <span title={formatSpendingTooltip(totalTokens, totalCostCents)}>
-              {formatSpendingLine(totalTokens, totalCostCents)}
+            <span title={formatSpendingTooltip(totalTokens, totalCostCents, durationSeconds)}>
+              {formatSpendingLine(totalTokens, totalCostCents, durationSeconds)}
             </span>
           </OverviewRow>
         ) : null}
@@ -131,11 +117,19 @@ function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplay
   );
 }
 
-function CreatorValue({ organizationId, order }: { organizationId: string; order: FactoriesWorkOrder }) {
+function CreatorValue({
+  organizationId,
+  factoryKey,
+  order,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  order: FactoriesWorkOrder;
+}) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const automation = order.createdBy?.automation;
   if (isAutomationRefResolved(automation)) {
-    return <AutomationLink organizationId={organizationId} automation={automation} />;
+    return <AutomationLink organizationId={organizationId} factoryKey={factoryKey} automation={automation} />;
   }
   const display = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   if (display) {
@@ -150,16 +144,18 @@ function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref i
 
 export function AutomationLink({
   organizationId,
+  factoryKey,
   automation,
 }: {
   organizationId: string;
+  factoryKey: string;
   automation: FactoriesAutomationRef;
 }) {
   const label = automation.nodeName || automation.appName || "Automation";
   if (automation.appId) {
     return (
       <Link
-        to={appPath(organizationId, automation.appId)}
+        to={factoryAppPath(organizationId, factoryKey, automation.appId)}
         className="inline-flex min-w-0 max-w-full items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
       >
         <span className="truncate">{label}</span>
@@ -174,42 +170,17 @@ function AssigneeOverviewRow({
   organizationId,
   assigneeIds,
   assigneeNames,
-  canEdit,
-  isSaving,
-  onSave,
 }: {
   organizationId: string;
   assigneeIds: string[];
   assigneeNames: string[];
-  canEdit: boolean;
-  isSaving: boolean;
-  onSave: (assigneeIds: string[]) => Promise<void>;
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   return (
     <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Owner">
-      <PermissionTooltip allowed={canEdit} message="You don't have permission to update the owner.">
-        <WorkOrderAssigneesPopover
-          organizationId={organizationId}
-          selectedIds={assigneeIds}
-          onSave={onSave}
-          isSaving={isSaving}
-          canEdit={canEdit}
-          align="end"
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={!canEdit || isSaving}
-            aria-label={assigneeIds.length > 0 ? `Owner: ${assigneeNames.filter(Boolean).join(", ")}` : "Assign owner"}
-            className="-my-1.5 -mr-1.5 h-auto w-full min-w-0 justify-start gap-1.5 whitespace-normal rounded-md py-1.5 pr-1.5 pl-0 text-left text-[13px] tracking-[-0.01em] text-foreground hover:bg-accent/60 focus-visible:bg-accent/60"
-            data-testid="work-order-edit-assignees"
-          >
-            <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
-            <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </Button>
-        </WorkOrderAssigneesPopover>
-      </PermissionTooltip>
+      <span data-testid="work-order-edit-assignees">
+        <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
+      </span>
     </OverviewRow>
   );
 }
@@ -224,28 +195,39 @@ function AssigneeButtonBody({
   resolveUser: ReturnType<typeof useOrgUserLookup>["resolveUser"];
 }) {
   if (assigneeIds.length === 0) {
-    return <span className="min-w-0 truncate text-muted-foreground">Assign…</span>;
+    return <span className="min-w-0 truncate text-muted-foreground">No owner</span>;
   }
   const display = resolveUser(assigneeIds[0], assigneeNames[0]);
   return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
 }
 
-function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactNode {
-  const tokens = totalTokens > 0 ? formatCompactTokens(totalTokens) : null;
-  const usd = totalCostCents > 0 ? formatUsdCents(totalCostCents) : null;
-  if (tokens && usd) {
+function formatSpendingLine(totalTokens: number, totalCostCents: number, durationSeconds: number): ReactNode {
+  const parts: ReactNode[] = [];
+  if (totalCostCents > 0) {
+    parts.push(formatUsdCents(totalCostCents));
+  }
+  if (totalTokens > 0) {
+    parts.push(formatCompactTokens(totalTokens));
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
+  }
+  return parts.reduce<ReactNode>((acc, part, index) => {
+    if (index === 0) {
+      return part;
+    }
     return (
       <>
-        {usd} <span className="text-muted-foreground">·</span> {tokens}
+        {acc} <span className="text-muted-foreground">·</span> {part}
       </>
     );
-  }
-  return usd ?? tokens ?? "";
+  }, "");
 }
 
-function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
+function formatSpendingTooltip(totalTokens: number, totalCostCents: number, durationSeconds: number): string {
   const parts: string[] = [];
   if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
   if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
+  if (durationSeconds > 0) parts.push(formatDurationSeconds(durationSeconds));
   return parts.join(" · ");
 }

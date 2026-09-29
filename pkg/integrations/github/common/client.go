@@ -36,15 +36,24 @@ type Client struct {
 }
 
 func IsNotFoundError(err error) bool {
+	return githubStatusCode(err) == http.StatusNotFound
+}
+
+func IsForbiddenError(err error) bool {
+	return githubStatusCode(err) == http.StatusForbidden
+}
+
+func githubStatusCode(err error) int {
 	var githubErr *github.ErrorResponse
-	if errors.As(err, &githubErr) && githubErr.Response != nil && githubErr.Response.StatusCode == http.StatusNotFound {
-		return true
+	if errors.As(err, &githubErr) && githubErr.Response != nil {
+		return githubErr.Response.StatusCode
 	}
 
 	var installationErr *ghinstallation.HTTPError
-	return errors.As(err, &installationErr) &&
-		installationErr.Response != nil &&
-		installationErr.Response.StatusCode == http.StatusNotFound
+	if errors.As(err, &installationErr) && installationErr.Response != nil {
+		return installationErr.Response.StatusCode
+	}
+	return 0
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
@@ -201,6 +210,141 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+// ListPullRequests returns one page of a repository's pull requests.
+//
+// This is the plain REST endpoint, which draws on the 5000-per-hour budget.
+// Prefer it over a Search query, because Search allows only 30 requests a
+// minute per installation.
+func (c *Client) ListPullRequests(
+	ctx context.Context,
+	repository string,
+	opts *github.PullRequestListOptions,
+) ([]*github.PullRequest, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.List(ctx, owner, name, opts)
+}
+
+// HeadFilter builds the "owner:branch" value GitHub's pull request list "head"
+// filter requires, using repository to resolve the owner the same way every
+// other call on this client does. If branch already carries an "owner:"
+// prefix (for example, a cross-repository head), it is returned unchanged.
+func (c *Client) HeadFilter(repository, branch string) string {
+	branch = strings.TrimSpace(branch)
+	if strings.Contains(branch, ":") {
+		return branch
+	}
+
+	owner, _ := c.ownerAndName(repository)
+	return owner + ":" + branch
+}
+
+// ListCommits returns one page of a repository's commits.
+//
+// The commit message carries the trailers a squashed merge collected, which name
+// the co-authors of the work. A pull request listing does not include them.
+func (c *Client) ListCommits(
+	ctx context.Context,
+	repository string,
+	opts *github.CommitsListOptions,
+) ([]*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListCommits(ctx, owner, name, opts)
+}
+
+func (c *Client) ListReviews(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestReview, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestReview
+	for {
+		reviews, resp, err := c.underlying.PullRequests.ListReviews(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list reviews: %w", err)
+		}
+
+		all = append(all, reviews...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+func (c *Client) ListPullRequestComments(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.PullRequestListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListComments(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pull request comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+func (c *Client) ListPullRequestReviewComments(
+	ctx context.Context,
+	repository string,
+	pullNumber int,
+	reviewID int64,
+) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListReviewComments(ctx, owner, name, pullNumber, reviewID, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list review comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+// ListIssueComments returns an issue's comments oldest first, paginating
+// through every page. It uses the REST Issues.ListComments endpoint, which
+// returns issue comments only, never pull request review comments.
+func (c *Client) ListIssueComments(ctx context.Context, repository string, issueNumber int) ([]*github.IssueComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.IssueListCommentsOptions{
+		Sort:        github.Ptr("created"),
+		Direction:   github.Ptr("asc"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.IssueComment
+	for {
+		comments, resp, err := c.underlying.Issues.ListComments(ctx, owner, name, issueNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issue comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Edit(ctx, owner, name, pullNumber, pullRequest)
@@ -246,6 +390,23 @@ func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref s
 func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
+}
+
+// GetBranchProtection returns required status checks for a branch. A missing
+// or unreadable rule is not an error: GitHub answers 404 when the branch is
+// open, and 403 when the installation cannot read Administration rules.
+func (c *Client) GetBranchProtection(ctx context.Context, repository, branch string) (*github.Protection, error) {
+	owner, name := c.ownerAndName(repository)
+	protection, _, err := c.underlying.Repositories.GetBranchProtection(ctx, owner, name, branch)
+	if err != nil {
+		// 404: the branch is open. 403: the installation cannot read
+		// Administration rules. Neither should hide observed PR checks.
+		if IsNotFoundError(err) || IsForbiddenError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return protection, nil
 }
 
 func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
@@ -308,6 +469,63 @@ func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber in
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
+// ListOpenDependabotAlerts reads open Dependabot alerts for a repository,
+// newest first. GitHub returns 403 when alerts are turned off or the app
+// cannot read them.
+func (c *Client) ListOpenDependabotAlerts(ctx context.Context, repository string, limit int) ([]*github.DependabotAlert, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	state := "open"
+	sort := "created"
+	direction := "desc"
+	return c.underlying.Dependabot.ListRepoAlerts(ctx, owner, name, &github.ListAlertsOptions{
+		State:     &state,
+		Sort:      &sort,
+		Direction: &direction,
+		ListOptions: github.ListOptions{
+			PerPage: limit,
+		},
+	})
+}
+
+func (c *Client) ListAllOpenDependabotAlerts(ctx context.Context, repository string) ([]*github.DependabotAlert, error) {
+	owner, name := c.ownerAndName(repository)
+	state := "open"
+	sort := "created"
+	direction := "desc"
+	options := &github.ListAlertsOptions{
+		State:     &state,
+		Sort:      &sort,
+		Direction: &direction,
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
+	}
+
+	alerts := []*github.DependabotAlert{}
+	for {
+		page, response, err := c.underlying.Dependabot.ListRepoAlerts(ctx, owner, name, options)
+		if err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, page...)
+		if response.NextPage == 0 {
+			return alerts, nil
+		}
+		options.ListOptions.Page = response.NextPage
+	}
+}
+
+func (c *Client) GetDependabotAlert(ctx context.Context, repository string, number int) (*github.DependabotAlert, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Dependabot.GetRepoAlert(ctx, owner, name, number)
+}
+
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Edit(ctx, owner, name, issueNumber, issue)
@@ -326,6 +544,14 @@ func (c *Client) RemoveLabelForIssue(ctx context.Context, repository string, iss
 func (c *Client) ListLabelsForIssue(ctx context.Context, repository string, issueNumber int) ([]*github.Label, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.ListLabelsByIssue(ctx, owner, name, issueNumber, nil)
+}
+
+// ListLabelsForRepository lists the labels defined in a repository, not the
+// labels of a single issue. Settings screens use it to offer the labels that
+// exist instead of a hardcoded list.
+func (c *Client) ListLabelsForRepository(ctx context.Context, repository string, opts *github.ListOptions) ([]*github.Label, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.ListLabels(ctx, owner, name, opts)
 }
 
 func (c *Client) GetRef(repository string, ref string) (*github.Reference, *github.Response, error) {
@@ -464,6 +690,13 @@ func (r graphQLResponse) err() error {
 	}
 
 	return errors.New(strings.Join(messages, ": "))
+}
+
+func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
+	if c == nil || c.underlying == nil {
+		return nil, fmt.Errorf("github client is not configured")
+	}
+	return c.underlying.Client().Do(req)
 }
 
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {

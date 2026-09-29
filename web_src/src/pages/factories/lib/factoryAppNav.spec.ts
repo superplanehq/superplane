@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { resolveFactoryAppBackNav } from "./factoryAppNav";
 import { factoryAppConfigurePath, factoryAppPath, factoryAppRunPath } from "./factoryPagePaths";
 
@@ -10,16 +10,16 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns automation detail when appId present", () => {
+  it("returns the automations list when appId is present", () => {
     expect(
       resolveFactoryAppBackNav("org", "fac", {
         from: "automations",
         appId: "app-1",
-        appName: "Label to work order",
+        appName: "Label to task",
       }),
     ).toEqual({
-      label: "Label to work order",
-      href: "/org/workspaces/fac/automations/app-1",
+      label: "Automations",
+      href: "/org/workspaces/fac/automations",
     });
   });
 
@@ -37,19 +37,24 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns the line board when from=work-order", () => {
-    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42", lineId: "line-1" })).toEqual(
-      {
-        label: "Back",
-        href: "/org/workspaces/fac/lines/line-1",
-      },
-    );
+  it("returns the task permalink when from=task has a number", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "task", orderNumber: "42", lineId: "line-1" })).toEqual({
+      label: "Back",
+      href: "/org/workspaces/fac/task/42",
+    });
   });
 
-  it("falls back to the workspace index when from=work-order has no line", () => {
-    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order" })).toEqual({
+  it("falls back to the workspace index when from=task has no line", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "task" })).toEqual({
       label: "Back",
       href: "/org/workspaces/fac",
+    });
+  });
+
+  it("still resolves the task permalink for the legacy from=work-order value", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42" })).toEqual({
+      label: "Back",
+      href: "/org/workspaces/fac/task/42",
     });
   });
 });
@@ -57,16 +62,16 @@ describe("resolveFactoryAppBackNav", () => {
 describe("factoryAppPath", () => {
   it("builds embed path with run and from", () => {
     expect(factoryAppRunPath("org", "fac", "app-1", "run-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?run=run-1&from=automations",
+      "/org/workspaces/fac/automations/app-1?run=run-1&from=automations",
     );
     expect(factoryAppPath("org", "fac", "app-1", { from: "lines", lineId: "line-1" })).toBe(
-      "/org/workspaces/fac/apps/app-1?from=lines&lineId=line-1",
+      "/org/workspaces/fac/automations/app-1?from=lines&lineId=line-1",
     );
   });
 
-  it("builds configure path with configure=1 and components closed", () => {
+  it("builds configure path with the agent panel open and components closed", () => {
     expect(factoryAppConfigurePath("org", "fac", "app-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?configure=1&from=automations",
+      "/org/workspaces/fac/automations/app-1?configure=1&agent=1&from=automations",
     );
   });
 });

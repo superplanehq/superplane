@@ -1,0 +1,12 @@
+.git
+.gitignore
+bin/
+dist/
+.semaphore/
+.DS_Store
+*.db
+*.db-shm
+*.db-wal
+**/README.md
+ARCHITECTURE.md
+test/

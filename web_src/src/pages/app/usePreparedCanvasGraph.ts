@@ -20,7 +20,7 @@ interface PreparedCanvasGraph {
 const EMPTY_NODE_MAP = {};
 
 /**
- * Builds the nodes and edges of a canvas the same way the canvas editor does,
+ * Builds the nodes and edges of a canvas the same way the live canvas does,
  * without run data. Use it to show a canvas outside its page, for example in a
  * settings popup, so both views stay identical.
  */
@@ -54,19 +54,20 @@ export function usePreparedCanvasGraph(
       return { nodes: [], edges: [], isLoading };
     }
 
-    const { nodes, edges } = prepareData(
-      canvas,
-      catalog.triggers,
-      catalog.components,
-      EMPTY_NODE_MAP,
-      EMPTY_NODE_MAP,
-      EMPTY_NODE_MAP,
-      canvas.metadata?.id ?? "",
+    const { nodes, edges } = prepareData({
+      workflow: canvas,
+      triggers: catalog.triggers,
+      components: catalog.components,
+      nodeEventsMap: EMPTY_NODE_MAP,
+      nodeExecutionsMap: EMPTY_NODE_MAP,
+      nodeQueueItemsMap: EMPTY_NODE_MAP,
+      workflowId: canvas.metadata?.id ?? "",
       queryClient,
-      me,
-      "edit",
-    );
+      user: me,
+      canvasMode: "live",
+      organizationId,
+    });
 
     return { nodes, edges, isLoading: false };
-  }, [canvas, catalog, isLoading, me, queryClient]);
+  }, [canvas, catalog, isLoading, me, organizationId, queryClient]);
 }

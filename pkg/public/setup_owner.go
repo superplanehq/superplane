@@ -8,13 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
-	"github.com/superplanehq/superplane/pkg/usage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +21,8 @@ type SetupOwnerRequest struct {
 }
 
 type SetupOwnerResponse struct {
-	OrganizationID string `json:"organization_id"`
+	OrganizationID   string `json:"organization_id"`
+	OrganizationSlug string `json:"organization_slug"`
 }
 
 func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
@@ -72,12 +68,6 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		}
 		account.InstallationAdmin = true
 
-		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
-			Organizations: 1,
-		}); err != nil {
-			return err
-		}
-
 		// Hash and store password
 		passwordHash, err := crypto.HashPassword(req.Password)
 		if err != nil {
@@ -103,15 +93,14 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return nil
+
+		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
+			return err
+		}
+		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	})
 
 	if err != nil {
-		if status.Code(err) == codes.ResourceExhausted {
-			http.Error(w, err.Error(), http.StatusTooManyRequests)
-			return
-		}
-
 		log.Errorf("Failed to set up owner account: %v", err)
 		http.Error(w, "Failed to set up owner account", http.StatusInternalServerError)
 		return
@@ -121,12 +110,6 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	middleware.MarkOwnerSetupCompleted()
 	s.registry.HTTPContext().InvalidatePolicyCache()
 
-	// Create account cookie so the owner is signed in
-	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
-	if err := organizationCreatedMessage.Publish(); err != nil {
-		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
-	}
-
 	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate account token for owner: %v", err)
 		http.Error(w, "Failed to create owner session", http.StatusInternalServerError)
@@ -135,6 +118,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SetupOwnerResponse{
-		OrganizationID: organization.ID.String(),
+		OrganizationID:   organization.ID.String(),
+		OrganizationSlug: organization.Slug,
 	})
 }

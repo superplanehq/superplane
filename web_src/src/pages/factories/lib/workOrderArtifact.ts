@@ -1,4 +1,17 @@
+import { FileImage, FileText, FileVideo } from "lucide-react";
+
 export type ArtifactData = Record<string, unknown> | undefined;
+
+/** Image, video, or document icon. Same choice the artifact row already uses. */
+export function fileArtifactIcon(contentType?: string): typeof FileText {
+  if (contentType?.startsWith("image/")) {
+    return FileImage;
+  }
+  if (contentType?.startsWith("video/")) {
+    return FileVideo;
+  }
+  return FileText;
+}
 
 /** GitHub-style pull request lifecycle states a PR artifact's chip can render. */
 export type PrArtifactState = "open" | "draft" | "closed" | "merged";
@@ -6,7 +19,7 @@ export type PrArtifactState = "open" | "draft" | "closed" | "merged";
 const PR_ARTIFACT_STATES: readonly PrArtifactState[] = ["open", "draft", "closed", "merged"];
 
 // Keys we accept for the PR number in the free-form artifact data map.
-// The Add Work Order Artifact component's example uses `number`; some
+// The Add Task Artifact component's example uses `number`; some
 // authors reach for `prNumber`. Tolerate both so links render as `#1234`
 // regardless of which convention was used.
 const PR_NUMBER_KEYS = ["number", "prNumber"] as const;
@@ -46,7 +59,7 @@ export function extractArtifactUrl(data: ArtifactData): string | undefined {
 }
 
 /**
- * Browse URL for a branch artifact that carries no `url`. The Add Work Order
+ * Browse URL for a branch artifact that carries no `url`. The Add Task
  * Artifact component writes a tree URL at attach time, so this only covers
  * branches attached before that: they hold `repository` (`owner/repo` or a
  * repository http(s) URL) plus the branch `name`.
@@ -72,6 +85,14 @@ export function extractArtifactTitle(data: ArtifactData): string | undefined {
 
 export function extractArtifactName(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "name");
+}
+
+export function extractArtifactFilename(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "filename");
+}
+
+export function extractArtifactContentType(data: ArtifactData): string | undefined {
+  return extractArtifactField(data, "contentType");
 }
 
 /**

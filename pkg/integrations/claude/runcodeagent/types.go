@@ -27,9 +27,6 @@ const (
 	maxPollErrors     = 5
 	finalMessageReads = 15
 
-	// Where attached files are mounted inside the sandbox.
-	attachmentsMountDir = "/workspace/attachments"
-
 	networkingUnrestricted = "unrestricted"
 	networkingLimited      = "limited"
 )
@@ -62,7 +59,6 @@ type Spec struct {
 	Model        string    `json:"model" mapstructure:"model"`
 	Networking   string    `json:"networking" mapstructure:"networking"`
 	AllowedHosts []string  `json:"allowedHosts" mapstructure:"allowedHosts"`
-	Files        []string  `json:"files" mapstructure:"files"`
 	// PersistSession keeps the Managed Agents session (and the environment it
 	// runs in) after the run finishes so the transcript stays readable in the
 	// Anthropic Console.
@@ -70,6 +66,12 @@ type Spec struct {
 	// OutputSchema is a JSON Schema the agent is asked (via a prompt suffix, not
 	// a server-enforced constraint) to match in its final message.
 	OutputSchema string `json:"outputSchema" mapstructure:"outputSchema"`
+	// ResolvesIssue is the GitHub issue the work order driving this run was
+	// imported from, if any. It is resolved from order().origin at execution
+	// time (see resolveResolvesIssue), never from user configuration, and is
+	// used to ask the agent to add a "This resolves #N" backlink to the pull
+	// request it opens.
+	ResolvesIssue *IssueRef `json:"-" mapstructure:"-"`
 }
 
 // SecretRef references a SuperPlane secret by name and key.
@@ -99,7 +101,6 @@ type ExecutionMetadata struct {
 	AgentID       string           `json:"agentId,omitempty" mapstructure:"agentId,omitempty"`
 	EnvironmentID string           `json:"environmentId,omitempty" mapstructure:"environmentId,omitempty"`
 	VaultID       string           `json:"vaultId,omitempty" mapstructure:"vaultId,omitempty"`
-	FileIDs       []string         `json:"fileIds,omitempty" mapstructure:"fileIds,omitempty"`
 	Repository    string           `json:"repository,omitempty" mapstructure:"repository,omitempty"`
 	Branch        string           `json:"branch,omitempty" mapstructure:"branch,omitempty"`
 	PrURL         string           `json:"prUrl,omitempty" mapstructure:"prUrl,omitempty"`

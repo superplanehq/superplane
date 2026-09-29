@@ -1,14 +1,30 @@
 package core
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ErrWorkOrderNotFound is returned by FindWorkOrder when nothing matches
 // the given lookup. Components that treat "not found" as benign (e.g. a
 // PR merge with no tracked order) check for it with errors.Is.
 var ErrWorkOrderNotFound = errors.New("work order not found")
 
+// ErrPullRequestNotFound is returned by FindPullRequest when nothing
+// matches. Components that treat "not found" as benign check for it with
+// errors.Is.
+var ErrPullRequestNotFound = errors.New("pull request not found")
+
+// ErrPullRequestActivityAlreadyActive is returned by AddPullRequestActivity
+// when another active activity already owns the same handler and revision.
+var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity already active for this handler and revision")
+
 type FactoryContext interface {
-	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
+	// CreateWorkOrder reports whether a row was inserted via the second
+	// return value; callers must skip downstream emits when `created` is
+	// false so a duplicate Sentry intake item does not leak into the
+	// timeline.
+	CreateWorkOrder(params WorkOrderParams) (order *WorkOrder, created bool, err error)
 	// FindWorkOrder resolves a work order by id or by one of its
 	// artifacts' keys, without requiring the current run to be attached
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
@@ -20,12 +36,6 @@ type FactoryContext interface {
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
-	// UpdateWorkOrderArtifact merges Data into an artifact already
-	// attached to the work order, resolved by the key it was given at
-	// attach time (AddWorkOrderArtifactParams.Key). This is how a
-	// PR artifact's `state` stays in sync with GitHub after the initial
-	// attach — see the updateWorkOrderArtifact component.
-	UpdateWorkOrderArtifact(params UpdateWorkOrderArtifactParams) (*WorkOrderArtifact, error)
 	// ReportWorkOrderCheck upserts a scored check on the work order,
 	// keyed by CheckKey: the first report creates the check, later
 	// reports with the same key update it in place and keep the prior
@@ -38,6 +48,11 @@ type FactoryContext interface {
 	// it. Any lifecycle transition clears the whole set. The order must
 	// be open.
 	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
+	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
+	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
+	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
+	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
+	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
 }
 
 type WorkOrderParams struct {
@@ -79,22 +94,12 @@ type AddWorkOrderArtifactParams struct {
 	Data    map[string]any
 	// Key optionally tags the artifact with a queryable key so a later
 	// FindWorkOrder(by: artifactKey) can resolve the work order from it.
+	// When set, AddWorkOrderArtifact creates the artifact on the first
+	// call and replaces its data on later calls. Replacement is
+	// wholesale: fields absent from the later call are cleared. The
+	// first call sets the type; a later call with a different type
+	// fails. Keys are unique per factory.
 	Key string
-}
-
-// UpdateWorkOrderArtifactParams targets an existing artifact by the key
-// it was attached with, rather than by id — the same key
-// FindWorkOrder(by: artifactKey) uses, typically a pull request's URL.
-// Data is shallow-merged into the artifact's existing data, not
-// replaced wholesale, so e.g. sending only `{"state": "merged"}` leaves
-// `title`/`number` untouched.
-type UpdateWorkOrderArtifactParams struct {
-	// OrderID identifies the work order to target; see
-	// UpdateWorkOrderStatusParams.OrderID.
-	OrderID string
-	// Key is required: the artifactKey the artifact was attached with.
-	Key  string
-	Data map[string]any
 }
 
 // ReportWorkOrderCheckParams carries one check report. Format must be
@@ -135,12 +140,117 @@ type SetWorkOrderStatusNoteParams struct {
 	ShowOnlyWhenWaiting bool
 }
 
+type WorkOrderOrigin struct {
+	URL   string `json:"url"`
+	Label string `json:"label,omitempty"`
+}
+
 type WorkOrder struct {
+	ID          string           `json:"id"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	State       string           `json:"state"`
+	Result      string           `json:"result,omitempty"`
+	Number      int64            `json:"number,omitempty"`
+	Key         string           `json:"key,omitempty"`
+	Origin      *WorkOrderOrigin `json:"origin,omitempty"`
+}
+
+type PullRequest struct {
 	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	WorkOrderID string `json:"workOrderId"`
+	Provider    string `json:"provider"`
+	ExternalID  string `json:"externalId,omitempty"`
+	Repository  string `json:"repository"`
+	Number      int64  `json:"number"`
+	URL         string `json:"url"`
+	Title       string `json:"title,omitempty"`
 	State       string `json:"state"`
-	Result      string `json:"result,omitempty"`
+}
+
+type PullRequestMatch struct {
+	PullRequest *PullRequest
+	WorkOrder   *WorkOrder
+}
+
+type AddPullRequestParams struct {
+	OrderID    string
+	Provider   string
+	ExternalID string
+	Repository string
+	Number     int64
+	URL        string
+	Title      string
+	State      string
+	MergedAt   *time.Time
+	ClosedAt   *time.Time
+}
+
+type UpdatePullRequestParams struct {
+	PullRequestID string
+	ExternalID    *string
+	Repository    *string
+	URL           *string
+	Title         *string
+	State         *string
+	MergedAt      *time.Time
+	ClosedAt      *time.Time
+}
+
+type FindPullRequestParams struct {
+	ID         string
+	Provider   string
+	ExternalID string
+	Repository string
+	Number     int64
+	URL        string
+}
+
+const (
+	PullRequestActivityAccessConcurrent = "concurrent"
+	PullRequestActivityAccessExclusive  = "exclusive"
+
+	PullRequestActivityOutcomeReady        = "ready"
+	PullRequestActivityOutcomeWaiting      = "waiting"
+	PullRequestActivityOutcomeLimitReached = "limitReached"
+)
+
+type AddPullRequestActivityParams struct {
+	PullRequestID string
+	Title         string
+	Description   string
+	Revision      string
+	Access        string
+}
+
+type UpdatePullRequestActivityParams struct {
+	Title       *string
+	Description *string
+	Access      string
+}
+
+type PullRequestRevision struct {
+	SHA        string `json:"sha"`
+	ObservedAt string `json:"observedAt,omitempty"`
+}
+
+type PullRequestActivity struct {
+	Title        string               `json:"title,omitempty"`
+	Description  string               `json:"description,omitempty"`
+	Access       string               `json:"access"`
+	State        string               `json:"state"`
+	Attempt      *int                 `json:"attempt,omitempty"`
+	AttemptLimit *int                 `json:"attemptLimit,omitempty"`
+	Revision     *PullRequestRevision `json:"revision,omitempty"`
+}
+
+type PullRequestActivityResult struct {
+	PullRequest     *PullRequest
+	WorkOrder       *WorkOrder
+	Activity        *PullRequestActivity
+	CurrentRevision *PullRequestRevision
+	CurrentHeadSHA  string
+	Outcome         string
 }
 
 type WorkOrderArtifact struct {

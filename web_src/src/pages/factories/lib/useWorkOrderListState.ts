@@ -1,22 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   EMPTY_WORK_ORDER_FILTERS,
+  WORK_ORDER_FILTER_LABELS,
   WORK_ORDER_LAYOUTS,
   WORK_ORDER_ORDERINGS,
   WORK_ORDER_SCOPES,
   countWorkOrderFilters,
+  type WorkOrderFilterLabel,
   type WorkOrderFilters,
   type WorkOrderLayoutId,
   type WorkOrderOrdering,
   type WorkOrderScope,
 } from "./workOrderListModel";
-import { WORK_ORDER_DISPLAY_STATUSES, type WorkOrderDisplayStatus } from "./workOrderProgress";
+import {
+  WORK_ORDER_BOARD_FILTER_STATUSES,
+  isWorkOrderDialogStatus,
+  type WorkOrderDisplayStatus,
+} from "./workOrderProgress";
 
-/** One of the three dimensions the Filter menu can narrow. */
+/** One of the dimensions the Filter menu can narrow. */
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
 
 /**
- * Title-bar and view state for the Work Orders page.
+ * Title-bar and view state for the Tasks page.
  *
  * Layout and ordering are pure display preferences that don't reference
  * factory-specific data, so they're persisted in `localStorage` under a
@@ -65,7 +71,8 @@ const DEFAULT_SCOPE: WorkOrderScope = "all";
 const VALID_LAYOUTS = new Set(WORK_ORDER_LAYOUTS.map((item) => item.id));
 const VALID_ORDERINGS = new Set(WORK_ORDER_ORDERINGS.map((item) => item.id));
 const VALID_SCOPES = new Set(WORK_ORDER_SCOPES.map((item) => item.id));
-const VALID_DISPLAY_STATUSES = new Set<string>(WORK_ORDER_DISPLAY_STATUSES);
+const VALID_BOARD_FILTER_STATUSES = new Set<string>(WORK_ORDER_BOARD_FILTER_STATUSES);
+const VALID_FILTER_LABELS = new Set<string>(WORK_ORDER_FILTER_LABELS);
 
 /** Per-factory key, falling back to a bare key when `factoryId` is unavailable. */
 function scopedStorageKey(prefix: string, factoryId: string): string {
@@ -104,7 +111,7 @@ function sanitizeStatuses(value: unknown): WorkOrderDisplayStatus[] {
     return [];
   }
   return value.filter(
-    (entry): entry is WorkOrderDisplayStatus => typeof entry === "string" && VALID_DISPLAY_STATUSES.has(entry),
+    (entry): entry is WorkOrderDisplayStatus => typeof entry === "string" && VALID_BOARD_FILTER_STATUSES.has(entry),
   );
 }
 
@@ -114,6 +121,15 @@ function sanitizeIds(value: unknown): string[] {
     return [];
   }
   return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function sanitizeLabels(value: unknown): WorkOrderFilterLabel[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (entry): entry is WorkOrderFilterLabel => typeof entry === "string" && VALID_FILTER_LABELS.has(entry),
+  );
 }
 
 function readPersistedFilters(key: string): WorkOrderFilters {
@@ -131,7 +147,9 @@ function readPersistedFilters(key: string): WorkOrderFilters {
     }
     return {
       statuses: sanitizeStatuses(parsed.statuses),
+      labels: sanitizeLabels(parsed.labels),
       lineIds: sanitizeIds(parsed.lineIds),
+      sourceIds: sanitizeIds(parsed.sourceIds),
       assigneeIds: sanitizeIds(parsed.assigneeIds),
     };
   } catch {
@@ -153,7 +171,7 @@ function writePersistedFilters(key: string, filters: WorkOrderFilters) {
 /**
  * Owns `scope` and `filters`, namespacing their storage per `factoryId` and
  * resetting `search`/`searchOpen`/`filterMenuOpen` whenever `factoryId`
- * changes (the Work Orders route can be revisited across factories without
+ * changes (the Tasks route can be revisited across factories without
  * necessarily remounting its page component).
  *
  * Reset-on-factory-change and persist-on-value-change are both driven by
@@ -255,6 +273,9 @@ export function useWorkOrderListState(factoryId: string): WorkOrderListState {
 
   const toggleFilter = useCallback(
     (dimension: WorkOrderFilterDimension, value: string) => {
+      if (dimension === "statuses" && isWorkOrderDialogStatus(value)) {
+        return;
+      }
       setFilters((current) => {
         const values = current[dimension] as string[];
         const next = values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];

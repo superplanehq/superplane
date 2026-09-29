@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { EventInfo, TriggerEventContext, TriggerRendererContext } from "../types";
 import { onAlertTriggerRenderer } from "./on_alert";

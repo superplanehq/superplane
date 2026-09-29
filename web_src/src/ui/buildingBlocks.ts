@@ -35,7 +35,9 @@ function superplane(
   isFactoryApp: boolean,
 ): BuildingBlockCategory | null {
   const blocks: BuildingBlock[] = [
-    ...triggers.filter((t) => isSuperPlaneBlock(t)).map((t) => toTriggerBlock(t)),
+    ...triggers
+      .filter((t) => isSuperPlaneBlock(t) || (isFactoryApp && isFactoryBlock(t)))
+      .map((t) => toTriggerBlock(t)),
     ...components
       .filter((c) => isSuperPlaneBlock(c) || (isFactoryApp && isFactoryBlock(c)))
       .map((c) => toComponentBlock(c)),
@@ -184,9 +186,10 @@ const RUNNER_BLOCK_ORDER: Record<string, number> = {
   runnerBash: 1,
   runnerJS: 2,
   runnerPython: 3,
-  runnerClaudeCode: 4,
-  runnerCodex: 5,
-  runnerOpenRouter: 6,
+  runnerSuperPlane: 4,
+  runnerClaudeCode: 5,
+  runnerCodex: 6,
+  runnerOpenRouter: 7,
 };
 
 function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
@@ -207,6 +210,7 @@ function isRunnerBlock(component: { name?: string }): boolean {
     name === "runnerJS" ||
     name === "runnerBash" ||
     name === "runnerPython" ||
+    name === "runnerSuperPlane" ||
     name === "runnerClaudeCode" ||
     name === "runnerCodex" ||
     name === "runnerOpenRouter"
@@ -215,12 +219,17 @@ function isRunnerBlock(component: { name?: string }): boolean {
 
 const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp", "addRunError"]);
 const FACTORY_BLOCK_NAMES = new Set([
+  "onWorkOrder",
   "createWorkOrder",
   "findWorkOrder",
   "updateWorkOrderStatus",
   "addWorkOrderComment",
   "addWorkOrderArtifact",
-  "updateWorkOrderArtifact",
+  "addPullRequest",
+  "updatePullRequest",
+  "findPullRequest",
+  "addPullRequestActivity",
+  "updatePullRequestActivity",
   "reportWorkOrderCheck",
 ]);
 

@@ -21,23 +21,13 @@ func ListWorkOrderArtifacts(
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
-	}
-
 	db := database.DB(ctx)
-	factoryModel, err := models.FindFactory(db, orgID, factoryID)
+	factoryModel, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}
 
-	order, err := factoryModel.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factoryModel, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order artifacts")
 	}
@@ -97,14 +87,14 @@ func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.Use
 
 func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 	switch t {
-	case models.FactoryWorkOrderArtifactTypePR:
-		return pb.WorkOrderArtifact_TYPE_PR
 	case models.FactoryWorkOrderArtifactTypeMarkdown:
 		return pb.WorkOrderArtifact_TYPE_MARKDOWN
 	case models.FactoryWorkOrderArtifactTypeBranch:
 		return pb.WorkOrderArtifact_TYPE_BRANCH
 	case models.FactoryWorkOrderArtifactTypeLink:
 		return pb.WorkOrderArtifact_TYPE_LINK
+	case models.FactoryWorkOrderArtifactTypeFile:
+		return pb.WorkOrderArtifact_TYPE_FILE
 	default:
 		return pb.WorkOrderArtifact_TYPE_UNSPECIFIED
 	}
@@ -112,14 +102,15 @@ func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 
 func artifactTypeFromProto(t pb.WorkOrderArtifact_Type) (string, bool) {
 	switch t {
-	case pb.WorkOrderArtifact_TYPE_PR:
-		return models.FactoryWorkOrderArtifactTypePR, true
 	case pb.WorkOrderArtifact_TYPE_MARKDOWN:
 		return models.FactoryWorkOrderArtifactTypeMarkdown, true
 	case pb.WorkOrderArtifact_TYPE_BRANCH:
 		return models.FactoryWorkOrderArtifactTypeBranch, true
 	case pb.WorkOrderArtifact_TYPE_LINK:
 		return models.FactoryWorkOrderArtifactTypeLink, true
+	// File artifacts are created only by the task-scoped runner upload API.
+	case pb.WorkOrderArtifact_TYPE_FILE:
+		return "", false
 	}
 	return "", false
 }

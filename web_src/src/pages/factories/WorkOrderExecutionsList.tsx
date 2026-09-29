@@ -18,7 +18,7 @@ interface WorkOrderExecutionsListProps {
   factoryKey: string;
   orderNumber?: string;
   /**
-   * Every traversal (line dispatch) of this work order, oldest first. Two
+   * Every traversal (line dispatch) of this task, oldest first. Two
    * dispatches of the same line render as two separate groups here — this
    * is the audit-trail view, unlike the sidebar's compact per-line summary.
    */
@@ -33,7 +33,7 @@ export function WorkOrderExecutionsList({
   orderNumber,
   dispatches,
   variant = "default",
-  emptyMessage = "No line runs yet. Dispatch this work order to a line to start execution.",
+  emptyMessage = "No line runs yet. Dispatch this task to a line to start execution.",
 }: WorkOrderExecutionsListProps) {
   const groups = dispatches ?? [];
 
@@ -149,7 +149,7 @@ function QueuedStepRow({ queueItem }: { queueItem: FactoriesWorkOrderQueueItem }
 
 // A step the traversal is waiting to enter: the step is at its parallelism
 // limit, so no run exists yet. Position is the 1-based place in the step's
-// queue across all work orders of the line.
+// queue across all tasks of the line.
 function QueuedStepMeta({ queueItem, size = "sm" }: { queueItem: FactoriesWorkOrderQueueItem; size?: "sm" | "md" }) {
   const stepLabel = queueItem.stepName?.trim() || "Unnamed step";
   const iconClassName = cn("shrink-0 text-amber-500", size === "md" ? "h-4 w-4" : "h-3.5 w-3.5");

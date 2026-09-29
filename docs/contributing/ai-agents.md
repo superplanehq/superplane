@@ -14,11 +14,13 @@ for here. Don't just use AI to do the same work faster. Use it to do work you co
 The repository includes `AGENTS.md` files that contain guidelines, coding standards, and project structure
 information for AI agents:
 
-- **[AGENTS.md](../../AGENTS.md)** - Repository guidelines for backend/GoLang work
+- **[AGENTS.md](../../AGENTS.md)** - Repository guidelines. Read this file in full. It states that generated SDK and proto output is gitignored.
+- **[pkg/models/AGENTS.md](../../pkg/models/AGENTS.md)** - Database transaction and model API rules. Read this when you edit `pkg/models`.
 - **[web_src/AGENTS.md](../../web_src/AGENTS.md)** - Frontend-specific guidelines for TypeScript/React work
+- **[cursor-cloud.md](cursor-cloud.md)** - Docker-in-Docker notes for Cursor Cloud VMs only
 
 These files are automatically loaded in Cursor as workspace rules. For other tools, you can provide them as
-context to your AI agent.
+context to your AI agent. Factory agents must not truncate `AGENTS.md` with `head` or a partial read.
 
 We encourage you to use these files with your AI agents and contribute improvements to them. The goal is to
 encode good taste into these files, the patterns, principles, and preferences that make code and product feel right.

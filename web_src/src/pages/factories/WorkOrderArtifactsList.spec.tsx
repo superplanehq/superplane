@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
 
@@ -10,9 +10,9 @@ describe("WorkOrderArtifactsList", () => {
         isLoading={false}
         artifacts={[
           {
-            id: "pr",
-            type: "TYPE_PR",
-            data: { title: "#42", url: "https://example.com/pull/42" },
+            id: "link",
+            type: "TYPE_LINK",
+            data: { title: "Design doc", url: "https://example.com/design" },
           },
           {
             id: "note",
@@ -23,14 +23,36 @@ describe("WorkOrderArtifactsList", () => {
       />,
     );
 
-    const pullRequest = screen.getByRole("link");
+    const link = screen.getByRole("link");
     const note = screen.getByRole("button", { name: "Release note" });
 
-    expect(pullRequest).toHaveClass("inline-flex", "w-full", "justify-start");
+    expect(link).toHaveClass("inline-flex", "w-full", "justify-start");
     expect(note).toHaveClass("inline-flex", "w-full", "justify-start", "p-0");
     expect(note).not.toHaveAttribute("data-slot", "button");
 
     fireEvent.click(note);
     expect(screen.getByRole("dialog").parentElement).toBe(document.body);
+  });
+
+  it("shows a loading skeleton instead of a loading sentence", () => {
+    render(<WorkOrderArtifactsList isLoading artifacts={[]} />);
+
+    expect(screen.getByRole("status", { name: "Loading artifacts" })).toBeInTheDocument();
+    expect(screen.queryByText("Loading artifacts…")).not.toBeInTheDocument();
+  });
+
+  it("fades the artifact list in after a loading stretch", () => {
+    const { rerender } = render(<WorkOrderArtifactsList isLoading artifacts={[]} />);
+    rerender(
+      <WorkOrderArtifactsList
+        isLoading={false}
+        artifacts={[
+          { id: "link", type: "TYPE_LINK", data: { title: "Design doc", url: "https://example.com/design" } },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("status", { name: "Loading artifacts" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list")).toHaveAttribute("data-reveal");
   });
 });

@@ -4,16 +4,17 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
+  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { ListNotesResponse, Note } from "./types";
+import type { ListNotesConfiguration, ListNotesResponse, Note } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -75,8 +76,8 @@ export const listNotesMapper: ComponentBaseMapper = {
     return renderWithTimeAgo("no notes", date);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
+    const details: Record<string, string> = {};
 
     // Add "Checked at" timestamp
     if (context.execution.createdAt) {
@@ -93,18 +94,18 @@ export const listNotesMapper: ComponentBaseMapper = {
 function metadataList(node: { configuration?: unknown }): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   if (!node) return metadata;
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as unknown as ListNotesConfiguration | undefined;
 
-  if (configuration.incidentId) {
+  if (configuration?.incidentId) {
     metadata.push({ icon: "alert-triangle", label: `Incident: ${configuration.incidentId}` });
   }
 
   return metadata;
 }
 
-function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer((rootTriggerNode as any)?.trigger?.name || "");
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const notes = getNotes(execution);

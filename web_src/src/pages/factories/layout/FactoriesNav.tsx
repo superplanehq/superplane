@@ -19,8 +19,8 @@ const RECENT_STATUS_DOT_CLASS: Record<WorkOrderDisplayStatus, string> = {
   running: "bg-[color:var(--status-running-dot)]",
   failed: "bg-[color:var(--status-failed-dot)]",
   rejected: "bg-[color:var(--status-failed-dot)]",
-  completed: "bg-[color:var(--status-completed-dot)]",
   cancelled: "bg-[color:var(--status-cancelled-dot)]",
+  completed: "bg-[color:var(--status-completed-dot)]",
 };
 
 export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: FactoriesNavProps) {
@@ -52,7 +52,7 @@ export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: F
       </ul>
 
       {recentWorkOrders.length > 0 ? (
-        <section aria-label="Recent work orders">
+        <section aria-label="Recent tasks">
           <p className="px-2.5 pb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
             Recent
           </p>
@@ -76,7 +76,7 @@ export function FactoriesNav({ organizationId, factoryKey, recentWorkOrders }: F
                     }
                     data-testid={`factories-nav-recent-${order.id}`}
                   >
-                    <p className="truncate">{order.title || "Untitled work order"}</p>
+                    <p className="truncate">{order.title || "Untitled task"}</p>
                     <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} aria-hidden />
                       {statusMeta.label}

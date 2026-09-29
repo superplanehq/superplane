@@ -15,6 +15,13 @@ type AgentCredentials struct {
 	Integration configuration.IntegrationRef `mapstructure:"integration"`
 }
 
+func RejectHostedCredentials(credentials AgentCredentials) error {
+	if IsHostedCredentials(credentials.Source) {
+		return fmt.Errorf("hosted credentials are not supported; use Run SuperPlane Agent")
+	}
+	return nil
+}
+
 func ValidateAgentCredentials(credentials AgentCredentials, integrationRequired bool) error {
 	switch credentials.Source {
 	case CredentialsSourceSecret:
@@ -46,11 +53,11 @@ func InjectSecretAPIKey(ctx core.ExecutionContext, environment []BrokerEnvironme
 }
 
 func InjectIntegrationKeys(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, integration configuration.IntegrationRef) ([]BrokerEnvironmentVariable, error) {
-	keys, err := ctx.Secrets.GetIntegrationKeys(integration.Name)
+	secrets, err := ctx.Secrets.GetIntegrationSecrets(integration.Name)
 	if err != nil {
 		return nil, fmt.Errorf("resolve integration: %w", err)
 	}
-	for name, value := range keys {
+	for name, value := range secrets.Values {
 		environment = append(environment, BrokerEnvironmentVariable{Name: name, Value: string(value)})
 	}
 	return environment, nil
@@ -63,12 +70,15 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 	if err := ctx.HostedLLM.AssertCreditAvailable(); err != nil {
 		return core.HostedLLMAccess{}, err
 	}
+	if strings.TrimSpace(model) == "" {
+		return core.HostedLLMAccess{}, fmt.Errorf("model is required for SuperPlane-hosted credentials")
+	}
+	if err := ctx.HostedLLM.AssertModelSelectable(provider, "hosted", model); err != nil {
+		return core.HostedLLMAccess{}, err
+	}
 	access, err := ctx.HostedLLM.Resolve(provider)
 	if err != nil {
 		return core.HostedLLMAccess{}, err
-	}
-	if strings.TrimSpace(model) == "" {
-		return core.HostedLLMAccess{}, fmt.Errorf("model is required for SuperPlane-hosted credentials")
 	}
 	if !access.AllowsModel(model) {
 		return core.HostedLLMAccess{}, fmt.Errorf("model %s is not on the SuperPlane-hosted allowlist", model)
@@ -91,19 +101,6 @@ func InjectHostedCredentials(environment []BrokerEnvironmentVariable, apiKeyEnv,
 		extra = append(extra, BrokerEnvironmentVariable{Name: baseURLEnv, Value: strings.TrimRight(trimmed, "/")})
 	}
 	return InjectHostedAPIKey(environment, apiKeyEnv, apiKey, extra...)
-}
-
-// ValidateHostedAgentSpec rejects hosted nodes that omit the model or try to
-// override reserved provider env vars. environmentFrom can still import those
-// names from a secret; InjectHostedCredentials strips them at execute time.
-func ValidateHostedAgentSpec(credentials AgentCredentials, model string, environment []EnvironmentVariable, reservedEnvNames ...string) error {
-	if !IsHostedCredentials(credentials.Source) {
-		return nil
-	}
-	if strings.TrimSpace(model) == "" {
-		return fmt.Errorf("model is required for SuperPlane-hosted credentials")
-	}
-	return ValidateReservedEnvironmentNames(environment, reservedEnvNames...)
 }
 
 func dropEnvironmentNames(environment []BrokerEnvironmentVariable, names ...string) []BrokerEnvironmentVariable {

@@ -1,8 +1,14 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type {
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesFactoryPullRequest,
+} from "@/api-client";
 
 import { WorkOrderSidebarFactoryLines } from "./sidebar/WorkOrderSidebarFactoryLines";
 import { WorkOrderSidebarOverview } from "./sidebar/WorkOrderSidebarOverview";
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
+import { WorkOrderPullRequestsList } from "./WorkOrderPullRequestsList";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
@@ -12,6 +18,9 @@ interface WorkOrderDetailSidebarProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  isPullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -27,7 +36,7 @@ interface WorkOrderDetailSidebarProps {
   onDispatch: (input: { lineName: string }) => Promise<void>;
 }
 
-/** Work order overview, factory lines, and artifacts. */
+/** Task overview, factory lines, and artifacts. */
 export function WorkOrderDetailSidebar({
   organizationId,
   factoryKey,
@@ -35,6 +44,9 @@ export function WorkOrderDetailSidebar({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  pullRequests = [],
+  isPullRequestsLoading = false,
+  pullRequestsError = null,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -53,6 +65,7 @@ export function WorkOrderDetailSidebar({
     <div className="flex flex-col gap-6">
       <WorkOrderSidebarOverview
         organizationId={organizationId}
+        factoryKey={factoryKey}
         order={order}
         displayStatus={displayStatus}
         statusMeta={statusMeta}
@@ -76,6 +89,12 @@ export function WorkOrderDetailSidebar({
       />
 
       <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+
+      <WorkOrderPullRequestsList
+        pullRequests={pullRequests}
+        isLoading={isPullRequestsLoading}
+        error={pullRequestsError}
+      />
     </div>
   );
 }

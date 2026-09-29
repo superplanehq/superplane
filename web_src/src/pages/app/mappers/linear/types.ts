@@ -1,6 +1,6 @@
 /** Shapes returned by the Linear GraphQL API and delivered by Linear webhooks. */
 
-import type { Predicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
 
 export interface LinearTeam {
   id?: string;

@@ -1,6 +1,8 @@
 import React, { useEffect } from "react";
 import { useAccount } from "../contexts/useAccount";
 import { useNavigate, useLocation } from "react-router";
+import { useWorkspaceLoading } from "../hooks/useWorkspaceLoading";
+import { WORKSPACE_LOADING_COPY } from "../lib/workspaceLoadingCopy";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -10,6 +12,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { account, loading } = useAccount();
   const navigate = useNavigate();
   const location = useLocation();
+  const overlayHandles = useWorkspaceLoading(WORKSPACE_LOADING_COPY.account, loading);
   const shouldRedirectToLogin = !loading && !account;
 
   useEffect(() => {
@@ -21,8 +24,10 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     navigate(`/login?redirect=${redirectParam}`, { replace: true });
   }, [location.pathname, location.search, navigate, shouldRedirectToLogin]);
 
-  // Show loading spinner while fetching account
   if (loading) {
+    if (overlayHandles) {
+      return null;
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="flex flex-col items-center space-y-4">

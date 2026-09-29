@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { resolveWorkOrderCreatorDisplay, workOrderOwnerDisplay } from "./workOrderCreator";
 
@@ -60,5 +60,34 @@ describe("workOrderOwnerDisplay", () => {
 
   it("returns the fallback when createdBy is empty", () => {
     expect(workOrderOwnerDisplay({}, FALLBACK_OWNER)).toBe(FALLBACK_OWNER);
+  });
+
+  it("resolves the user's avatar from the org members list when resolveUser finds one", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId
+        ? { id: userId, name: name ?? "Member", initials: "M", avatarUrl: "https://example.com/avatar.jpg" }
+        : null;
+
+    expect(
+      workOrderOwnerDisplay({ createdBy: { user: { id: "user-1", name: "Ada" } } }, FALLBACK_OWNER, resolveUser),
+    ).toEqual({
+      id: "user-1",
+      name: "Ada",
+      initials: "M",
+      avatarUrl: "https://example.com/avatar.jpg",
+    });
+  });
+
+  it("falls back to initials when resolveUser finds no avatar for the user", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId ? { id: userId, name: name ?? "Member", initials: "AD" } : null;
+
+    expect(
+      workOrderOwnerDisplay({ createdBy: { user: { id: "user-1", name: "Ada" } } }, FALLBACK_OWNER, resolveUser),
+    ).toEqual({
+      id: "user-1",
+      name: "Ada",
+      initials: "AD",
+    });
   });
 });

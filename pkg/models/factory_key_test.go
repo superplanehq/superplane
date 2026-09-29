@@ -85,6 +85,69 @@ func TestCreateFactory_RejectsDuplicateKey(t *testing.T) {
 	assert.ErrorIs(t, err, models.ErrFactoryKeyAlreadyExists)
 }
 
+func TestFindFactoryByRef(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, "SuperPlane", "", "SUPER")
+	require.NoError(t, err)
+
+	t.Run("finds by UUID", func(t *testing.T) {
+		found, err := models.FindFactoryByRef(db, r.Organization.ID, factory.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, factory.ID, found.ID)
+	})
+
+	t.Run("finds by key case-insensitively", func(t *testing.T) {
+		found, err := models.FindFactoryByRef(db, r.Organization.ID, "super")
+		require.NoError(t, err)
+		assert.Equal(t, factory.ID, found.ID)
+	})
+
+	t.Run("rejects a workspace name", func(t *testing.T) {
+		_, err := models.FindFactoryByRef(db, r.Organization.ID, "SuperPlane")
+		assert.ErrorIs(t, err, models.ErrFactoryKeyInvalid)
+	})
+
+	t.Run("returns not found for unknown key", func(t *testing.T) {
+		_, err := models.FindFactoryByRef(db, r.Organization.ID, "ZZZZ")
+		assert.ErrorIs(t, err, models.ErrFactoryNotFound)
+	})
+}
+
+func TestFindWorkOrderByRef(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Numbers", "", "NUM")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "one", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("finds by UUID", func(t *testing.T) {
+		found, err := factory.FindWorkOrderByRef(db, order.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("finds by number", func(t *testing.T) {
+		found, err := factory.FindWorkOrderByRef(db, "1")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("finds by key case-insensitively", func(t *testing.T) {
+		found, err := factory.FindWorkOrderByRef(db, "num-1")
+		require.NoError(t, err)
+		assert.Equal(t, order.ID, found.ID)
+	})
+
+	t.Run("returns not found for unknown ref", func(t *testing.T) {
+		_, err := factory.FindWorkOrderByRef(db, "99")
+		assert.ErrorIs(t, err, models.ErrFactoryWorkOrderNotFound)
+	})
+}
+
 func TestCreateWorkOrder_AllocatesSequentialNumbers(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

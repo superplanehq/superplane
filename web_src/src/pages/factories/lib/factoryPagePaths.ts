@@ -1,3 +1,5 @@
+import { replaceFactoryKeySegment } from "./factoryKeyResolution";
+
 export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
@@ -7,8 +9,14 @@ export function newFactoryPath(organizationId: string) {
   return `${factoryListPath(organizationId)}/new`;
 }
 
+/**
+ * Every workspace-scoped path is built from this function, so lowercasing the
+ * key here makes lowercase the canonical URL form everywhere: the stored
+ * `factory.key` (and the settings page that displays it) stay uppercase —
+ * only the URL segment is lowercased.
+ */
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
-  return `${factoryListPath(organizationId)}/${factoryKey}`;
+  return `${factoryListPath(organizationId)}/${factoryKey.toLowerCase()}`;
 }
 
 export function factoryOverviewPath(organizationId: string, factoryKey: string) {
@@ -22,7 +30,7 @@ export function firstFactoryLineId(
   return factory?.lines?.find((line) => Boolean(line.id))?.id;
 }
 
-/** First line name on a factory, used to Start a new work order. */
+/** First line name on a factory, used to Start a new task. */
 export function firstFactoryLineName(
   factory: { lines?: Array<{ name?: string }> | null } | null | undefined,
 ): string | undefined {
@@ -40,6 +48,50 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
   return factoryDetailPath(organizationId, factoryKey);
 }
 
+const WORKSPACE_PAGES_TO_KEEP = ["/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
+
+function workspacePageToKeep(pathnameRest: string): boolean {
+  if (WORKSPACE_LIST_PAGES_TO_KEEP.includes(pathnameRest)) {
+    return true;
+  }
+  return WORKSPACE_PAGES_TO_KEEP.some((prefix) => pathnameRest === prefix || pathnameRest.startsWith(`${prefix}/`));
+}
+
+/**
+ * Path after a workspace switch. Keeps settings, Velocity, and other pages
+ * that exist in every workspace. A line board, task, or app URL opens the
+ * new workspace home — those identifiers belong to one workspace.
+ */
+export function pathAfterWorkspaceSwitch({
+  pathname,
+  organizationId,
+  currentFactoryKey,
+  nextFactory,
+}: {
+  pathname: string;
+  organizationId: string;
+  currentFactoryKey: string;
+  nextFactory: { key?: string; lines?: Array<{ id?: string }> | null };
+}): string {
+  const nextKey = nextFactory.key;
+  if (!nextKey) {
+    return pathname;
+  }
+
+  // `currentFactoryKey` (from `factory.key`) is always uppercase, but the
+  // `pathname` segment is the canonical (lowercase) URL form — normalize
+  // before comparing so the prefix match doesn't fail on case alone.
+  const currentKeySegment = currentFactoryKey.toLowerCase();
+  const prefix = `/${organizationId}/workspaces/${currentKeySegment}`;
+  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+  if (workspacePageToKeep(rest)) {
+    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextKey);
+  }
+
+  return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
+}
+
 /** Opens the line board with the Intake drawer beside the columns. */
 export const INTAKE_SEARCH_PARAM = "intake";
 /**
@@ -47,7 +99,7 @@ export const INTAKE_SEARCH_PARAM = "intake";
  * intakes on the same source, so the identifier is the intake, not the source.
  */
 export const INTAKE_ID_SEARCH_PARAM = "intakeId";
-/** Opens intake settings on a tab: general, runs, or automation. */
+/** Opens intake settings on a tab: general, agent, runs, or automation. */
 export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
 
 export function factoryIntakePath(
@@ -78,12 +130,148 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
+/** Legacy query that opened Add Jira intake on the line board. */
+export const JIRA_INTAKE_SETUP_SEARCH_PARAM = "jiraIntake";
+/** Connection created in this OAuth round trip. The Jira callback appends it. */
+export const JIRA_INTAKE_INTEGRATION_SEARCH_PARAM = "jiraIntegrationId";
+
+/** Dedicated setup page for Jira issue intake. */
+export function factoryJiraIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  options?: { integrationId?: string },
+) {
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/jira`;
+  const integrationId = options?.integrationId?.trim();
+  if (!integrationId) {
+    return path;
+  }
+  const params = new URLSearchParams();
+  params.set(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
+}
+
+export function isJiraIntakeSetupSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(JIRA_INTAKE_SETUP_SEARCH_PARAM) === "1";
+}
+
+export function jiraIntakeIntegrationIdFromSearch(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(JIRA_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
+}
+
+export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
+/** Opens PR feedback settings on a tab: general, agent, or automation. */
+export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
+
+export function factoryPRFeedbackPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+  handlerId?: string,
+) {
+  const params = new URLSearchParams();
+  params.set(PR_FEEDBACK_SEARCH_PARAM, "1");
+  if (handlerId) {
+    params.set(PR_FEEDBACK_HANDLER_SEARCH_PARAM, handlerId);
+  }
+  if (settingsTab) {
+    params.set(PR_FEEDBACK_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function isPRFeedbackSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SEARCH_PARAM) === "1";
+}
+
+export function prFeedbackSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
+}
+
+export function prFeedbackHandlerIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
+}
+
+export const PLANNING_SEARCH_PARAM = "planning";
+/** Opens Planning settings on a tab: general, agent, or automation. */
+export const PLANNING_SETTINGS_SEARCH_PARAM = "planningSettings";
+
+export function factoryPlanningPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+) {
+  const params = new URLSearchParams();
+  params.set(PLANNING_SEARCH_PARAM, "1");
+  if (settingsTab) {
+    params.set(PLANNING_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function isPlanningSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SEARCH_PARAM) === "1";
+}
+
+export function planningSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PLANNING_SETTINGS_SEARCH_PARAM);
+}
+
+/** Opens the per-column Automations drawer. Value is a column key. */
+export const COLUMN_AUTOMATIONS_SEARCH_PARAM = "automations";
+
+export function factoryColumnAutomationsPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | null | undefined,
+  columnKey: string,
+) {
+  const params = new URLSearchParams();
+  params.set(COLUMN_AUTOMATIONS_SEARCH_PARAM, columnKey);
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function columnAutomationsKeyFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(COLUMN_AUTOMATIONS_SEARCH_PARAM);
+}
+
+/** Opens the column-automation view popup on the line board. Value is the canvas id. */
+export const COLUMN_AUTOMATION_VIEW_SEARCH_PARAM = "automationView";
+
+export function factoryColumnAutomationViewPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | null | undefined,
+  canvasId: string,
+) {
+  const params = new URLSearchParams();
+  params.set(COLUMN_AUTOMATION_VIEW_SEARCH_PARAM, canvasId);
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function columnAutomationViewCanvasIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(COLUMN_AUTOMATION_VIEW_SEARCH_PARAM);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }
 
 export function workOrdersPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/tasks`;
 }
 
 export function createWorkOrderPath(organizationId: string, factoryKey: string) {
@@ -91,22 +279,56 @@ export function createWorkOrderPath(organizationId: string, factoryKey: string) 
 }
 
 /**
- * Canonical work order permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
- * (singular segment, sibling of `work-orders`). `orderNumber` is the
+ * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/task/{orderNumber}`
+ * (singular segment, sibling of the plural `tasks` list). `orderNumber` is the
  * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
  * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
  */
-export function workOrderDetailPath(organizationId: string, factoryKey: string, orderNumber: string | number) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
+export function workOrderDetailPath(
+  organizationId: string,
+  factoryKey: string,
+  orderNumber: string | number,
+  lineId?: string | null,
+) {
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/task/${orderNumber}`;
+  const boardLineId = lineId?.trim();
+  if (!boardLineId) {
+    return path;
+  }
+  return `${path}?${WORK_ORDER_LINE_SEARCH_PARAM}=${encodeURIComponent(boardLineId)}`;
+}
+
+/** Line id carried on a task permalink when the popup opened from a board. */
+export const WORK_ORDER_LINE_SEARCH_PARAM = "lineId";
+
+export function workOrderBoardLineIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(WORK_ORDER_LINE_SEARCH_PARAM);
 }
 
 /**
- * Old id-based work order URL shape, kept around only so the legacy
- * redirect route can compare against it / build test fixtures. New code
- * should always call `workOrderDetailPath`.
+ * Opens a task at its canonical permalink. Falls back to the line
+ * board when the order has no number yet.
+ */
+export function workOrderOpenPath(
+  organizationId: string,
+  factoryKey: string,
+  orderNumber: string | number | null | undefined,
+  fallbackLineId?: string | null,
+) {
+  if (orderNumber === undefined || orderNumber === null || String(orderNumber).trim() === "") {
+    return factoryHomePath(organizationId, factoryKey, fallbackLineId);
+  }
+  return workOrderDetailPath(organizationId, factoryKey, orderNumber);
+}
+
+/**
+ * Old id-based task URL shape (`.../work-orders/{orderId}`), kept around only
+ * so the legacy redirect route can compare against it / build test fixtures.
+ * New code should always call `workOrderDetailPath`.
  */
 export function legacyWorkOrderDetailPath(organizationId: string, factoryKey: string, orderId: string) {
-  return `${workOrdersPath(organizationId, factoryKey)}/${orderId}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders/${orderId}`;
 }
 
 export function linesPath(organizationId: string, factoryKey: string) {
@@ -125,18 +347,71 @@ export function editFactoryLinePath(organizationId: string, factoryKey: string, 
   return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
 }
 
+export type PRFeedbackSetupKind = "comments" | "checks";
+
+/** Dedicated setup page for the next-steps banner CTA (comments or checks wizard). */
+export function factoryPRFeedbackSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  kind: PRFeedbackSetupKind,
+) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/${kind}`;
+}
+
+export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
+  return sourceId === "checks" ? "checks" : "comments";
+}
+
+/** Dedicated setup page for the Verify risk score automation. */
+export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/risk-score`;
+}
+
+/** Dedicated setup page for GitHub issue intake. */
+export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/github`;
+}
+
+/** Dedicated setup page for Sentry exception intake. */
+export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Datadog Error Tracking intake. */
+export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
+}
+
+/** Dedicated setup page for Dependabot alert intake. */
+export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;
+}
+
+/** Dedicated setup page for Productive.io task intake. */
+export function factoryProductiveIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/productive`;
+}
+
 export function automationsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/automations`;
 }
 
 export function automationDetailPath(organizationId: string, factoryKey: string, appId: string) {
-  return `${automationsPath(organizationId, factoryKey)}/${appId}`;
+  return factoryAppPath(organizationId, factoryKey, appId, { from: "automations" });
 }
 
-export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
+export type FactoryAppNavFrom = "automations" | "lines" | "task" | "overview";
 
+/**
+ * Parses the `from` nav hint, accepting the legacy `work-order` value (from
+ * links generated before the task rename) and normalizing it to `task`.
+ */
 export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom | undefined {
-  if (value === "automations" || value === "lines" || value === "work-order" || value === "overview") {
+  if (value === "work-order") {
+    return "task";
+  }
+  if (value === "automations" || value === "lines" || value === "task" || value === "overview") {
     return value;
   }
   return undefined;
@@ -145,7 +420,7 @@ export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom 
 export type FactoryAppNavOptions = {
   from?: FactoryAppNavFrom;
   lineId?: string;
-  /** Work order `number` (route identifier), not the database id. */
+  /** Task `number` (route identifier), not the database id. */
   orderNumber?: string;
   runId?: string;
   /**
@@ -153,8 +428,12 @@ export type FactoryAppNavOptions = {
    * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
    */
   configure?: boolean;
+  /** Open the agent sidebar in factory edit mode (`agent=1`). */
+  agent?: boolean;
   /** Open the components panel in factory edit mode (`blocks=1`). */
   blocks?: boolean;
+  /** Open the component sidebar on this node (`sidebar=1&node=`). */
+  nodeId?: string;
 };
 
 function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
@@ -168,8 +447,15 @@ function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
   if (options.configure) {
     params.set("configure", "1");
   }
+  if (options.agent) {
+    params.set("agent", "1");
+  }
   if (options.blocks) {
     params.set("blocks", "1");
+  }
+  if (options.nodeId) {
+    params.set("sidebar", "1");
+    params.set("node", options.nodeId);
   }
   if (options.from) {
     params.set("from", options.from);
@@ -193,6 +479,10 @@ export function factoryAppConfigurePath(
   return factoryAppPath(organizationId, factoryKey, appId, {
     ...options,
     configure: true,
+    agent: options?.agent ?? true,
+    // Component edit is not run inspection. A leftover `run` param would hide
+    // the editor sidebar and strip `node` while Configure starts.
+    runId: options?.nodeId ? undefined : options?.runId,
   });
 }
 
@@ -212,7 +502,7 @@ export function factoryAppPath(
   appId: string,
   options?: FactoryAppNavOptions,
 ) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}${buildFactoryAppSearchParams(options)}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}${buildFactoryAppSearchParams(options)}`;
 }
 
 export function factoryAppRunPath(
@@ -248,23 +538,61 @@ export function factoryAppSplitRunPath(
     search.set("canvas", options.canvas);
   }
   const qs = search.toString();
-  return `${factoryDetailPath(organizationId, factoryKey)}/apps/${appId}/split-run${qs ? `?${qs}` : ""}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/automations/${appId}/split-run${qs ? `?${qs}` : ""}`;
 }
 
 export function factorySettingsPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/settings`;
 }
 
-export function factorySettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
+export type FactorySettingsScope = "account" | "workspace" | "organization";
+
+export function factorySettingsSectionPath(
+  organizationId: string,
+  factoryKey: string,
+  scope: FactorySettingsScope,
+  section: string,
+) {
+  return `${factorySettingsPath(organizationId, factoryKey)}/${scope}/${section}`;
 }
 
-export function organizationSettingsPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/organization`;
+export function factorySettingsWorkspaceGeneralPath(organizationId: string, factoryKey: string) {
+  return factorySettingsSectionPath(organizationId, factoryKey, "workspace", "general");
 }
 
-export function organizationSettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${organizationSettingsPath(organizationId, factoryKey)}/${section}`;
+export type OrganizationSettingsLocationState = {
+  fromFactoryKey?: string;
+};
+
+export function organizationSettingsPath(organizationId: string) {
+  return `/${organizationId}/organization`;
+}
+
+export function organizationSettingsSectionPath(organizationId: string, section: string) {
+  return `${organizationSettingsPath(organizationId)}/${section}`;
+}
+
+export function organizationSettingsBackPath(organizationId: string, fromFactoryKey?: string) {
+  if (fromFactoryKey) {
+    return factoryDetailPath(organizationId, fromFactoryKey);
+  }
+  return factoryListPath(organizationId);
+}
+
+/**
+ * Swaps the `/:organizationId` route segment, leaving the rest of the path
+ * untouched so settings (and other workspace pages) stay in context.
+ */
+export function replaceOrganizationSegment(
+  pathname: string,
+  currentOrganizationId: string,
+  nextOrganizationId: string,
+): string {
+  const prefix = `/${currentOrganizationId}`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return factoryListPath(nextOrganizationId);
+  }
+  return `/${nextOrganizationId}${pathname.slice(prefix.length)}`;
 }
 
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */
@@ -276,7 +604,7 @@ export function factorySettingsGeneralPathAfterKeyChange(
   if (!nextKey || nextKey === previousKey) {
     return null;
   }
-  return factorySettingsSectionPath(organizationId, nextKey, "general");
+  return factorySettingsWorkspaceGeneralPath(organizationId, nextKey);
 }
 
 export function factoryMissionsPath(organizationId: string, factoryKey: string) {

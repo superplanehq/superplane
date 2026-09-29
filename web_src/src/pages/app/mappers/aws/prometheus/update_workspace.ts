@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, SubtitleContext } from "../../types";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import {
   buildPrometheusComponentProps,
   firstOutputData,

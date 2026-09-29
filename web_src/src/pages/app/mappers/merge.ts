@@ -10,8 +10,8 @@ import type {
   OutputPayload,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getTriggerRenderer } from ".";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
+import { getTriggerRenderer } from "./mapperLookup";
 import { truncate } from "./safeMappers";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
@@ -163,7 +163,7 @@ export const mergeMapper: ComponentBaseMapper = {
     return getMergeSubtitle(context.execution);
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as ExecutionMetadata | undefined;
 

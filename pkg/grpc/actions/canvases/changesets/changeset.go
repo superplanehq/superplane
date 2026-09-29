@@ -56,6 +56,10 @@ type ChangeNode struct {
 	// Concurrency is the node's inline concurrency spec. Nil leaves the node
 	// with the default of one execution at a time.
 	Concurrency *models.ConcurrencySpec
+
+	// Metadata is opaque node state from YAML or a generated graph. Setup may
+	// add keys. Extra keys must survive create and update.
+	Metadata map[string]any
 }
 
 type ChangeEdge struct {

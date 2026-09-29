@@ -4,7 +4,8 @@ import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
 import type { StorybookUsageReport } from "./usageReportFixtures";
 
-const GITHUB_CONNECTION_ID = "storybook-github-connection";
+/** GitHub connection every workspace story shares. */
+export const GITHUB_CONNECTION_ID = "storybook-github-connection";
 const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
 
 /** App repository the setup stories continue with. Served by the resources fixture. */
@@ -23,11 +24,45 @@ export const GITHUB_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   readyConnection("github", GITHUB_CONNECTION_ID, "acme-github"),
 ];
 
+/** Two ready Sentry connections, so the intake wizard can offer a choice. */
+export const SENTRY_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
+  readyConnection("sentry", "storybook-sentry-connection", "acme-sentry"),
+  readyConnection("sentry", "storybook-sentry-eu-connection", "acme-sentry-eu"),
+];
+
+/** Two ready Jira connections, so the intake wizard can offer a choice. */
+export const JIRA_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
+  readyConnection("jira", "storybook-jira-connection", "acme-jira"),
+  readyConnection("jira", "storybook-jira-eu-connection", "acme-jira-eu"),
+];
+
 /** GitHub and Claude both installed, the state of an organization that already ships with SuperPlane. */
 export const CONNECTED_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   ...GITHUB_SETUP_INTEGRATIONS,
   readyConnection("claude", CLAUDE_CONNECTION_ID, "acme-claude"),
 ];
+
+/**
+ * A GitHub connect the storybook user just authorized on GitHub: still
+ * pending, with the account picker data the OAuth callback stored.
+ */
+export const PENDING_PICKER_INTEGRATION: StorybookOrgIntegration = {
+  metadata: { id: "storybook-github-pending", name: "github-2", integrationName: "github" },
+  status: {
+    state: "pending",
+    metadata: {
+      startedByUserID: "storybook-user",
+      startedByGitHubLogin: "forestileao",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [
+        { id: "11", accountLogin: "forestigamer" },
+        { id: "22", accountLogin: "forestileao" },
+      ],
+    },
+  },
+  spec: { configuration: {} },
+};
 
 const vcsAnswered: FactoriesFactoryOnboarding = { vcsIntegrationId: GITHUB_CONNECTION_ID };
 const repositoryAnswered: FactoriesFactoryOnboarding = { ...vcsAnswered, appRepository: SETUP_APP_REPOSITORY };
@@ -58,11 +93,12 @@ export const SETUP_ANSWERS = {
 /** Default dataset with saved setup answers on the primary workspace. */
 export function factoriesFixtureWithSetupAnswers(
   onboarding: FactoriesFactoryOnboarding,
-  options?: { organizationLlmSpend?: StorybookUsageReport },
+  options?: { organizationWorkspaceUsage?: StorybookUsageReport },
 ): FactoriesFixture {
   return {
     ...defaultFactoriesFixture,
-    organizationLlmSpend: options?.organizationLlmSpend ?? defaultFactoriesFixture.organizationLlmSpend,
+    organizationWorkspaceUsage:
+      options?.organizationWorkspaceUsage ?? defaultFactoriesFixture.organizationWorkspaceUsage,
     factories: defaultFactoriesFixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),

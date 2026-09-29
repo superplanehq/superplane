@@ -3,6 +3,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useAvailableIntegrations, useIntegrationMutations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
+import { integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { CircleX } from "lucide-react";
@@ -11,7 +12,7 @@ import { Header } from "./Header";
 import { IntegrationTabs } from "./IntegrationTabs";
 import { useIntegrationDetailsState } from "./useIntegrationDetailsState";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, type NavigateFunction } from "react-router";
 
 interface CapabilityBasedIntegrationDetailsProps {
   organizationId: string;
@@ -23,6 +24,7 @@ export function CapabilityBasedIntegrationDetails({
   integration,
 }: CapabilityBasedIntegrationDetailsProps) {
   const navigate = useNavigate();
+  const integrationsHref = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const integrationId = integration.metadata?.id;
   const integrationName = integration.metadata?.name;
@@ -39,16 +41,6 @@ export function CapabilityBasedIntegrationDetails({
   const detailsState = useIntegrationDetailsState(integration);
   const integrationMutations = useIntegrationMutations(organizationId, integrationId || "");
 
-  const handleDelete = async () => {
-    if (!canDeleteIntegrations) return;
-    try {
-      await integrationMutations.deleteMutation.mutateAsync({ integrationName: providerName });
-      navigate(`/${organizationId}/settings/integrations`);
-    } catch {
-      showErrorToast("Failed to delete integration");
-    }
-  };
-
   const handleCapabilitiesSubmit = async (newStates: IntegrationCapabilityState[]) => {
     if (!canUpdateIntegrations || newStates.length === 0) return;
     try {
@@ -56,7 +48,7 @@ export function CapabilityBasedIntegrationDetails({
       const updated = response.data?.integration ?? null;
 
       if (updated?.status?.setupState?.currentStep) {
-        navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+        navigate(integrationSetupPath(integrationsHref, providerName), {
           state: { integrationId },
         });
         return;
@@ -144,9 +136,35 @@ export function CapabilityBasedIntegrationDetails({
         canDeleteIntegrations={canDeleteIntegrations}
         isDeleting={integrationMutations.deleteMutation.isPending}
         hasDeleteError={integrationMutations.deleteMutation.isError}
-        onDelete={handleDelete}
+        onDelete={() =>
+          deleteCapabilityBasedIntegration({
+            canDeleteIntegrations,
+            deleteMutation: integrationMutations.deleteMutation,
+            providerName,
+            navigate,
+            integrationsHref,
+          })
+        }
         onClose={() => setShowDeleteConfirm(false)}
       />
     </div>
   );
+}
+
+type DeleteIntegrationMutation = ReturnType<typeof useIntegrationMutations>["deleteMutation"];
+
+async function deleteCapabilityBasedIntegration(args: {
+  canDeleteIntegrations: boolean;
+  deleteMutation: DeleteIntegrationMutation;
+  providerName: string;
+  navigate: NavigateFunction;
+  integrationsHref: string;
+}) {
+  if (!args.canDeleteIntegrations) return;
+  try {
+    await args.deleteMutation.mutateAsync({ integrationName: args.providerName });
+    args.navigate(args.integrationsHref);
+  } catch {
+    showErrorToast("Failed to delete integration");
+  }
 }

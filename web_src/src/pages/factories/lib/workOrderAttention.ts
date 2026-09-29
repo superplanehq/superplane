@@ -1,60 +1,117 @@
-import { CircleCheck, CircleX, MessageCircleQuestion, Timer, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleX, LoaderCircle, type LucideIcon } from "lucide-react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
-/** Why a waiting work order needs a person. Matches the Overview redesign. */
-export type WorkOrderAttentionReason = "approval" | "question" | "failed" | "stalled";
+/** Why a waiting task needs a person, or why it is addressing feedback. */
+export type WorkOrderAttentionReason =
+  | "approval"
+  | "feedback"
+  | "checks"
+  | "checksPassed"
+  | "fixesPaused"
+  | "failed"
+  | "stopped";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
-  approval: "Review requested",
-  question: "Agent question",
+  approval: "Waiting for user review",
+  feedback: "Addressing user feedback",
+  checks: "Waiting on status checks",
+  checksPassed: "Status checks passed",
+  fixesPaused: "Automatic fixes paused",
   failed: "Run failed",
-  stalled: "No progress",
+  stopped: "Stopped",
 };
 
 export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReason, string> = {
   approval: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  question: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  feedback: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  checks: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  checksPassed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  fixesPaused: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   failed: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
-  stalled: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
+  stopped: "border-slate-500/40 bg-slate-500/15 text-slate-800 dark:text-slate-300",
 };
 
 export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideIcon> = {
   approval: CircleCheck,
-  question: MessageCircleQuestion,
+  feedback: LoaderCircle,
+  checks: LoaderCircle,
+  checksPassed: CircleCheck,
+  fixesPaused: CircleX,
   failed: CircleX,
-  stalled: Timer,
+  stopped: CircleX,
 };
 
 /**
- * Maps a work order to an attention reason. Closed failed orders and
- * waiting orders with a failed latest step are Run failed. A visible
- * status note is Review requested. Waiting with no note is No progress.
- * Other statuses return null. The note body is not classified.
+ * Maps a task to attention reasons. Closed failed orders and waiting
+ * orders with a failed latest step are Run failed. A cancelled latest
+ * step is Stopped. An exclusive or discussion PR-feedback run is
+ * Addressing user feedback. An active concurrent check wait is Waiting
+ * on status checks and hides user review. A check handler at its attempt
+ * limit is Automatic fixes paused and hides user review. A finished
+ * passed check wait is Status checks passed. A visible status note is
+ * Waiting for user review.
+ * Waiting with no note returns none. Other statuses return none.
+ * The note body is not classified.
  */
-export function getWorkOrderAttentionReason(order: FactoriesWorkOrder): WorkOrderAttentionReason | null {
+export function getWorkOrderAttentionReasons(
+  order: FactoriesWorkOrder,
+  options: {
+    addressingFeedback?: boolean;
+    waitingOnChecks?: boolean;
+    checksPassed?: boolean;
+    fixesPaused?: boolean;
+  } = {},
+): WorkOrderAttentionReason[] {
   const status = getWorkOrderDisplayStatus(order);
   if (status === "failed") {
-    return "failed";
+    return ["failed"];
   }
   if (status !== "waiting") {
-    return null;
+    return [];
   }
 
   const latest = latestExecution(order);
   if (latest?.result === "RESULT_FAILED") {
-    return "failed";
+    return ["failed"];
+  }
+  if (latest?.result === "RESULT_CANCELLED") {
+    return ["stopped"];
+  }
+  if (options.addressingFeedback) {
+    return ["feedback"];
+  }
+  if (options.waitingOnChecks) {
+    return ["checks"];
+  }
+  if (options.fixesPaused) {
+    return ["fixesPaused"];
   }
 
+  const reasons: WorkOrderAttentionReason[] = [];
   const notes = presentWorkOrderStatusNotes(order.statusNotes, status);
   if (notes.length > 0) {
-    return "approval";
+    reasons.push("approval");
   }
+  if (options.checksPassed) {
+    reasons.push("checksPassed");
+  }
+  return reasons;
+}
 
-  return "stalled";
+export function getWorkOrderAttentionReason(
+  order: FactoriesWorkOrder,
+  options: {
+    addressingFeedback?: boolean;
+    waitingOnChecks?: boolean;
+    checksPassed?: boolean;
+    fixesPaused?: boolean;
+  } = {},
+): WorkOrderAttentionReason | null {
+  return getWorkOrderAttentionReasons(order, options)[0] ?? null;
 }
 
 function latestExecution(order: FactoriesWorkOrder): FactoriesWorkOrderExecution | null {

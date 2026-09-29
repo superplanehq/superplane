@@ -24,10 +24,10 @@ const (
 )
 
 var machineTypeSelectOptions = []configuration.FieldOption{
-	{Label: MachineTypeE1LargeAMD64, Value: MachineTypeE1LargeAMD64},
-	{Label: MachineTypeE1LargeARM64, Value: MachineTypeE1LargeARM64},
-	{Label: MachineTypeE1TinyAMD64, Value: MachineTypeE1TinyAMD64},
-	{Label: MachineTypeE1TinyARM64, Value: MachineTypeE1TinyARM64},
+	{Label: "Large x64", Value: MachineTypeE1LargeAMD64},
+	{Label: "Large ARM", Value: MachineTypeE1LargeARM64},
+	{Label: "Small x64", Value: MachineTypeE1TinyAMD64},
+	{Label: "Small ARM", Value: MachineTypeE1TinyARM64},
 }
 
 func requireMachineType(machineType string) (string, error) {
@@ -39,15 +39,18 @@ func requireMachineType(machineType string) (string, error) {
 }
 
 // resolveBrokerFleetID is the fleet_id sent to the task broker.
-// TASK_BROKER_FLEET_ID overrides the node machine type when set, so a local
-// broker with one fleet (for example aws-standard-1) can run nodes that still
-// select e1-large-amd64 in the canvas.
+// TASK_BROKER_FLEET_ID overrides the node machine type when set. When it is
+// empty, a local Docker broker URL uses fleet local so the sibling worker can
+// claim the task.
 func resolveBrokerFleetID(machineType string) (string, error) {
 	if _, err := requireMachineType(machineType); err != nil {
 		return "", err
 	}
 	if fleet := strings.TrimSpace(os.Getenv("TASK_BROKER_FLEET_ID")); fleet != "" {
 		return fleet, nil
+	}
+	if isLocalTaskBrokerURL(os.Getenv("TASK_BROKER_BASE_URL")) {
+		return localComposeFleetID, nil
 	}
 	return strings.TrimSpace(machineType), nil
 }

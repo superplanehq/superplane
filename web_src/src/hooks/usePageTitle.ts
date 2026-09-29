@@ -12,7 +12,7 @@ export interface UsePageTitleOptions {
    * child's effects before its already-mounted parent's effects, so an
    * unconditional parent `usePageTitle` call would otherwise overwrite the
    * leaf page's more specific title on the very commit it first renders
-   * (e.g. a hard reload straight to a work order permalink). Once the leaf
+   * (e.g. a hard reload straight to a task permalink). Once the leaf
    * is mounted it becomes the sole owner of `document.title`.
    */
   enabled?: boolean;

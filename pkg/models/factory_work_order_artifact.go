@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
 	FactoryWorkOrderArtifactTypeLink     = factory.ArtifactTypeLink
+	FactoryWorkOrderArtifactTypeFile     = factory.ArtifactTypeFile
 
 	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
 	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
@@ -30,23 +30,6 @@ const (
 )
 
 const factoryWorkOrderArtifactKeyUniqueConstraint = "idx_factory_work_order_artifacts_factory_key_unique"
-
-// Valid values for a PR artifact's optional `data.state` field. Mirrors
-// GitHub's own pull request lifecycle states so the UI can render the
-// matching icon/color (see WorkOrderArtifactInline.tsx).
-const (
-	PrArtifactStateOpen   = "open"
-	PrArtifactStateDraft  = "draft"
-	PrArtifactStateClosed = "closed"
-	PrArtifactStateMerged = "merged"
-)
-
-var validPrArtifactStates = map[string]bool{
-	PrArtifactStateOpen:   true,
-	PrArtifactStateDraft:  true,
-	PrArtifactStateClosed: true,
-	PrArtifactStateMerged: true,
-}
 
 var (
 	ErrFactoryWorkOrderArtifactNotFound         = errors.New("factory work order artifact not found")
@@ -62,11 +45,8 @@ type FactoryWorkOrderArtifact struct {
 	Type           string
 	Data           datatypes.JSON
 	Key            *string
-	// MergedAt / ClosedAt are append-only. A later reopen does not clear them.
-	MergedAt    *time.Time
-	ClosedAt    *time.Time
-	CreatedByID *uuid.UUID
-	CreatedAt   time.Time
+	CreatedByID    *uuid.UUID
+	CreatedAt      time.Time
 
 	CreatedBy *User `gorm:"foreignKey:CreatedByID"`
 }
@@ -112,16 +92,9 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		return nil, err
 	}
 
-	dataJSON, err := encodeArtifactData(params.Data)
+	dataJSON, err := encodeGuardedArtifactData(params.Data)
 	if err != nil {
 		return nil, err
-	}
-	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
-		return nil, fmt.Errorf(
-			"%w: artifact data exceeds %d bytes",
-			ErrFactoryWorkOrderArtifactInvalid,
-			MaxFactoryWorkOrderArtifactDataBytes,
-		)
 	}
 
 	// An explicitly empty key must land as NULL, not "" — the partial
@@ -140,10 +113,6 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	}
 
 	now := time.Now()
-	mergedAt, closedAt, err := extractPrLifecycleTimestamps(artifactType, params.Data, now, nil, nil, "")
-	if err != nil {
-		return nil, err
-	}
 	artifact := &FactoryWorkOrderArtifact{
 		ID:             uuid.New(),
 		OrganizationID: o.OrganizationID,
@@ -152,8 +121,6 @@ func (o *FactoryWorkOrder) CreateArtifact(
 		Type:           artifactType,
 		Data:           dataJSON,
 		Key:            key,
-		MergedAt:       mergedAt,
-		ClosedAt:       closedAt,
 		CreatedByID:    params.CreatedBy,
 		CreatedAt:      now,
 	}
@@ -179,6 +146,62 @@ func (o *FactoryWorkOrder) CreateArtifact(
 	return artifact, nil
 }
 
+// UpsertArtifact creates the artifact, or replaces its data when a key
+// already points at one on this work order. The bool is true when a new
+// row was inserted. An empty key always inserts.
+func (o *FactoryWorkOrder) UpsertArtifact(
+	db *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, bool, error) {
+	if strings.TrimSpace(params.Key) == "" {
+		artifact, err := o.CreateArtifact(db, params)
+		return artifact, true, err
+	}
+
+	var (
+		artifact *FactoryWorkOrderArtifact
+		created  bool
+	)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		existing, findErr := o.FindArtifactByKey(tx, params.Key)
+		if findErr == nil {
+			replaced, replaceErr := o.replaceArtifactData(tx, existing, params)
+			if replaceErr != nil {
+				return replaceErr
+			}
+			artifact = replaced
+			created = false
+			return nil
+		}
+		if !errors.Is(findErr, ErrFactoryWorkOrderArtifactNotFound) {
+			return findErr
+		}
+
+		createdArtifact, createErr := o.CreateArtifact(tx, params)
+		if createErr == nil {
+			artifact = createdArtifact
+			created = true
+			return nil
+		}
+		if !errors.Is(createErr, ErrFactoryWorkOrderArtifactKeyAlreadyExists) {
+			return createErr
+		}
+
+		replaced, retryErr := o.replaceKeyedArtifactAfterConflict(tx, params)
+		if retryErr != nil {
+			return retryErr
+		}
+		artifact = replaced
+		created = false
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	return artifact, created, nil
+}
+
 // UpdateArtifactData resolves the artifact tagged with `key` under this
 // work order (the same key an earlier CreateArtifact call set via
 // FactoryWorkOrderArtifactParams.Key, typically the PR's URL), shallow-
@@ -187,12 +210,8 @@ func (o *FactoryWorkOrder) CreateArtifact(
 // `order.artifact.*` timeline event — a PR flipping open → draft →
 // merged should update the live chip, not spam the timeline with one
 // entry per transition. Callers still notify the websocket channel
-// (see FactoryContext.UpdateWorkOrderArtifact) so the UI refreshes.
-func (o *FactoryWorkOrder) UpdateArtifactData(
-	tx *gorm.DB,
-	key string,
-	updates map[string]any,
-) (*FactoryWorkOrderArtifact, error) {
+// (see FactoryContext websocket notify) so the UI refreshes.
+func (o *FactoryWorkOrder) FindArtifactByKey(tx *gorm.DB, key string) (*FactoryWorkOrderArtifact, error) {
 	trimmedKey := strings.TrimSpace(key)
 	if trimmedKey == "" {
 		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
@@ -207,6 +226,18 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFactoryWorkOrderArtifactNotFound
 		}
+		return nil, err
+	}
+	return &artifact, nil
+}
+
+func (o *FactoryWorkOrder) UpdateArtifactData(
+	tx *gorm.DB,
+	key string,
+	updates map[string]any,
+) (*FactoryWorkOrderArtifact, error) {
+	artifact, err := o.FindArtifactByKey(tx, key)
+	if err != nil {
 		return nil, err
 	}
 
@@ -224,46 +255,17 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 		return nil, err
 	}
 
-	dataJSON, err := encodeArtifactData(merged)
-	if err != nil {
-		return nil, err
-	}
-	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
-		return nil, fmt.Errorf(
-			"%w: artifact data exceeds %d bytes",
-			ErrFactoryWorkOrderArtifactInvalid,
-			MaxFactoryWorkOrderArtifactDataBytes,
-		)
-	}
-
-	mergedAt, closedAt, err := extractPrLifecycleTimestamps(
-		artifact.Type,
-		merged,
-		time.Now(),
-		artifact.MergedAt,
-		artifact.ClosedAt,
-		readArtifactState(artifact.Data),
-	)
+	dataJSON, err := encodeGuardedArtifactData(merged)
 	if err != nil {
 		return nil, err
 	}
 
-	columnUpdates := map[string]any{"data": dataJSON}
-	if mergedAt != nil && artifact.MergedAt == nil {
-		columnUpdates["merged_at"] = mergedAt
-		artifact.MergedAt = mergedAt
-	}
-	if closedAt != nil && artifact.ClosedAt == nil {
-		columnUpdates["closed_at"] = closedAt
-		artifact.ClosedAt = closedAt
-	}
-
-	if err := tx.Model(&artifact).Updates(columnUpdates).Error; err != nil {
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
 		return nil, err
 	}
 	artifact.Data = dataJSON
 
-	return &artifact, nil
+	return artifact, nil
 }
 
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {
@@ -282,63 +284,111 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 	return artifacts, nil
 }
 
-type FactoryPRArtifactFilter struct {
-	MergedFrom *time.Time
-	MergedTo   *time.Time
-	ClosedFrom *time.Time
-	ClosedTo   *time.Time
-	State      string
-}
-
-func ListFactoryPRArtifacts(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPRArtifactFilter) ([]FactoryWorkOrderArtifact, error) {
-	query := tx.
-		Where("factory_id = ? AND type = ?", factoryID, FactoryWorkOrderArtifactTypePR)
-
-	if filter.State != "" {
-		if _, ok := validPrArtifactStates[filter.State]; !ok {
-			return nil, fmt.Errorf("%w: invalid state filter %q", ErrFactoryWorkOrderArtifactInvalid, filter.State)
-		}
-	}
-
-	switch filter.State {
-	case PrArtifactStateMerged:
-		query = query.Where("merged_at IS NOT NULL")
-	case PrArtifactStateClosed:
-		query = query.Where("closed_at IS NOT NULL AND merged_at IS NULL")
-	}
-
-	if filter.MergedFrom != nil {
-		query = query.Where("merged_at >= ?", *filter.MergedFrom)
-	}
-	if filter.MergedTo != nil {
-		query = query.Where("merged_at < ?", *filter.MergedTo)
-	}
-	if filter.ClosedFrom != nil {
-		query = query.Where("closed_at >= ?", *filter.ClosedFrom)
-	}
-	if filter.ClosedTo != nil {
-		query = query.Where("closed_at < ?", *filter.ClosedTo)
-	}
-
-	var artifacts []FactoryWorkOrderArtifact
-	err := query.
-		Order("merged_at DESC NULLS LAST").
-		Order("closed_at DESC NULLS LAST").
-		Find(&artifacts).
-		Error
+// DeleteArtifacts removes every artifact row for this order and records
+// one timeline event. It does not delete git branches.
+func (o *FactoryWorkOrder) DeleteArtifacts(tx *gorm.DB, actor *uuid.UUID) (int, error) {
+	artifacts, err := o.ListArtifacts(tx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return artifacts, nil
+	if len(artifacts) == 0 {
+		return 0, nil
+	}
+
+	err = tx.Where("work_order_id = ?", o.ID).Delete(&FactoryWorkOrderArtifact{}).Error
+	if err != nil {
+		return 0, err
+	}
+
+	if err := o.RecordArtifactsCleared(tx, len(artifacts), actor); err != nil {
+		return 0, err
+	}
+
+	return len(artifacts), nil
 }
 
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {
-	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch, FactoryWorkOrderArtifactTypeLink:
+	case FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch, FactoryWorkOrderArtifactTypeLink:
 		return true
 	}
 	return false
+}
+
+func (o *FactoryWorkOrder) replaceKeyedArtifactAfterConflict(
+	tx *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	existing, err := findFactoryWorkOrderArtifactByKey(tx, o.OrganizationID, o.FactoryID, params.Key)
+	if err != nil {
+		if errors.Is(err, ErrFactoryWorkOrderArtifactNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+		}
+		return nil, err
+	}
+	if existing.WorkOrderID != o.ID {
+		return nil, ErrFactoryWorkOrderArtifactKeyAlreadyExists
+	}
+
+	return o.replaceArtifactData(tx, existing, params)
+}
+
+func (o *FactoryWorkOrder) replaceArtifactData(
+	tx *gorm.DB,
+	artifact *FactoryWorkOrderArtifact,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, error) {
+	requestedType := strings.TrimSpace(params.Type)
+	if artifact.Type != requestedType {
+		return nil, fmt.Errorf(
+			"%w: stored type is %q, requested type is %q",
+			ErrFactoryWorkOrderArtifactInvalid,
+			artifact.Type,
+			requestedType,
+		)
+	}
+
+	if err := validateArtifactData(artifact.Type, params.Data); err != nil {
+		return nil, err
+	}
+
+	dataJSON, err := encodeGuardedArtifactData(params.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Model(artifact).Update("data", dataJSON).Error; err != nil {
+		return nil, err
+	}
+	artifact.Data = dataJSON
+
+	return artifact, nil
+}
+
+func findFactoryWorkOrderArtifactByKey(
+	tx *gorm.DB,
+	organizationID, factoryID uuid.UUID,
+	key string,
+) (*FactoryWorkOrderArtifact, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, fmt.Errorf("%w: artifact key is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key = ?", organizationID, factoryID, trimmedKey).
+		First(&artifact).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactNotFound
+		}
+		return nil, err
+	}
+
+	return &artifact, nil
 }
 
 // validateArtifactData enforces the required-field rules for each
@@ -347,23 +397,6 @@ func IsValidWorkOrderArtifactType(t string) bool {
 // URL-scheme guard that applies regardless of type.
 func validateArtifactData(artifactType string, data map[string]any) error {
 	switch artifactType {
-	case FactoryWorkOrderArtifactTypePR:
-		if extractArtifactString(data, "url") == "" {
-			return fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
-		}
-		if state := extractArtifactString(data, "state"); state != "" && !validPrArtifactStates[state] {
-			return fmt.Errorf(
-				"%w: invalid pull request state %q (want one of open, draft, closed, merged)",
-				ErrFactoryWorkOrderArtifactInvalid,
-				state,
-			)
-		}
-		if err := validateOptionalTimestamp(data, "mergedAt"); err != nil {
-			return err
-		}
-		if err := validateOptionalTimestamp(data, "closedAt"); err != nil {
-			return err
-		}
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(data, "body") == "" {
 			return fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
@@ -375,6 +408,23 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 	case FactoryWorkOrderArtifactTypeLink:
 		if extractArtifactString(data, "url") == "" {
 			return fmt.Errorf("%w: link artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeFile:
+		if extractArtifactString(data, "fileId") == "" ||
+			extractArtifactString(data, "filename") == "" ||
+			extractArtifactString(data, "contentType") == "" ||
+			extractArtifactString(data, "title") == "" ||
+			extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: file artifacts require fileId, filename, contentType, title, and url", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if _, err := uuid.Parse(extractArtifactString(data, "fileId")); err != nil {
+			return fmt.Errorf("%w: file artifacts require a valid fileId", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if !IsAllowedArtifactContentType(extractArtifactString(data, "contentType")) {
+			return fmt.Errorf("%w: file artifact content type is not supported", ErrFactoryWorkOrderArtifactInvalid)
+		}
+		if size, ok := extractArtifactSize(data); !ok || size <= 0 || size > int64(MaxArtifactFileBytes) {
+			return fmt.Errorf("%w: file artifacts require a valid sizeBytes", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)
@@ -411,6 +461,22 @@ func isSafeArtifactURL(raw string) bool {
 	return parsed.Host != ""
 }
 
+func encodeGuardedArtifactData(data map[string]any) (datatypes.JSON, error) {
+	dataJSON, err := encodeArtifactData(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(dataJSON) > MaxFactoryWorkOrderArtifactDataBytes {
+		return nil, fmt.Errorf(
+			"%w: artifact data exceeds %d bytes",
+			ErrFactoryWorkOrderArtifactInvalid,
+			MaxFactoryWorkOrderArtifactDataBytes,
+		)
+	}
+
+	return dataJSON, nil
+}
+
 func encodeArtifactData(data map[string]any) (datatypes.JSON, error) {
 	if len(data) == 0 {
 		return datatypes.JSON([]byte("{}")), nil
@@ -442,6 +508,27 @@ func extractArtifactString(data map[string]any, key string) string {
 	return strings.TrimSpace(value)
 }
 
+func extractArtifactSize(data map[string]any) (int64, bool) {
+	switch value := data["sizeBytes"].(type) {
+	case int:
+		return int64(value), true
+	case int32:
+		return int64(value), true
+	case int64:
+		return value, true
+	case float64:
+		if value != float64(int64(value)) {
+			return 0, false
+		}
+		return int64(value), true
+	case json.Number:
+		size, err := value.Int64()
+		return size, err == nil
+	default:
+		return 0, false
+	}
+}
+
 func validateOptionalTimestamp(data map[string]any, key string) error {
 	raw := extractArtifactString(data, key)
 	if raw == "" {
@@ -451,70 +538,4 @@ func validateOptionalTimestamp(data map[string]any, key string) error {
 		return fmt.Errorf("%w: %s must be RFC3339 (got %q)", ErrFactoryWorkOrderArtifactInvalid, key, raw)
 	}
 	return nil
-}
-
-func extractPrLifecycleTimestamps(
-	artifactType string,
-	data map[string]any,
-	now time.Time,
-	existingMerged, existingClosed *time.Time,
-	previousState string,
-) (mergedAt *time.Time, closedAt *time.Time, err error) {
-	if artifactType != FactoryWorkOrderArtifactTypePR {
-		return nil, nil, nil
-	}
-
-	state := extractArtifactString(data, "state")
-
-	if existingMerged == nil {
-		mergedAt, err = stampPRLifecycleTime(data, "mergedAt", state, previousState, PrArtifactStateMerged, now)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	if existingClosed == nil {
-		closedAt, err = stampPRLifecycleTime(data, "closedAt", state, previousState, PrArtifactStateClosed, now)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	return mergedAt, closedAt, nil
-}
-
-func stampPRLifecycleTime(
-	data map[string]any,
-	key, state, previousState, targetState string,
-	now time.Time,
-) (*time.Time, error) {
-	if extractArtifactString(data, key) != "" {
-		return pickTimestamp(data, key, now)
-	}
-	if state != targetState || previousState == targetState {
-		return nil, nil
-	}
-	return pickTimestamp(data, key, now)
-}
-
-func readArtifactState(raw datatypes.JSON) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var data map[string]any
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return ""
-	}
-	return extractArtifactString(data, "state")
-}
-
-func pickTimestamp(data map[string]any, key string, fallback time.Time) (*time.Time, error) {
-	raw := extractArtifactString(data, key)
-	if raw == "" {
-		t := fallback
-		return &t, nil
-	}
-	parsed, err := time.Parse(time.RFC3339, raw)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s must be RFC3339 (got %q)", ErrFactoryWorkOrderArtifactInvalid, key, raw)
-	}
-	return &parsed, nil
 }

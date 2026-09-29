@@ -8,14 +8,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { hiddenFieldsForHostedJira } from "@/lib/integrations";
+import { configurationWithSetupReturnPath } from "@/lib/integrationSetupReturn";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { getApiErrorMessage } from "@/lib/errors";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
-import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import {
+  areRequiredCreateFieldsFilled,
+  selectCreateStepFields,
+  selectVisibleFields,
+  selectWebhookStepFields,
+} from "./configurationFields";
 import { createWithGeneratedName, useGeneratedIntegrationName } from "./generatedName";
 import { IntegrationCreateDialogFooter } from "./IntegrationCreateDialogFooter";
 import { useBrowserActionSetup } from "./useBrowserActionSetup";
@@ -50,6 +56,8 @@ export interface IntegrationCreateDialogProps {
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
   initialStepFieldNames?: string[];
+  /** Configuration field names this flow never shows, e.g. optional keys that would distract during onboarding. */
+  hiddenFieldNames?: string[];
   /** Optional custom description for the webhook completion step. */
   webhookStepDescription?: ReactNode;
   /** Pre-created integration state for resuming a flow started inline (e.g. browser action after inline creation). */
@@ -65,6 +73,7 @@ export interface IntegrationCreateDialogProps {
 }
 
 const NO_EXISTING_NAMES: Set<string> = new Set();
+const NO_HIDDEN_FIELDS: string[] = [];
 
 export function IntegrationCreateDialog({
   open,
@@ -79,6 +88,7 @@ export function IntegrationCreateDialog({
   onCapabilitySetupRequired,
   instructionsEndBeforeHeading,
   initialStepFieldNames,
+  hiddenFieldNames = NO_HIDDEN_FIELDS,
   webhookStepDescription,
   initialCreatedIntegrationId,
   initialBrowserAction,
@@ -109,11 +119,16 @@ export function IntegrationCreateDialog({
     return idx >= 0 ? raw.slice(0, idx).trim() : raw;
   }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
-  const configurationFields = useMemo(() => {
-    const fields = integrationDefinition?.configuration ?? [];
-    if (!initialStepFieldNames?.length) return fields;
-    return fields.filter((f) => f.name && initialStepFieldNames.includes(f.name));
-  }, [integrationDefinition?.configuration, initialStepFieldNames]);
+  const { createStepFields, webhookStepFields } = useMemo(() => {
+    const visibleFields = selectVisibleFields(
+      integrationDefinition?.configuration,
+      hiddenFieldsForHostedJira(integrationDefinition, hiddenFieldNames),
+    );
+    return {
+      createStepFields: selectCreateStepFields(visibleFields, initialStepFieldNames),
+      webhookStepFields: selectWebhookStepFields(visibleFields, initialStepFieldNames),
+    };
+  }, [integrationDefinition, hiddenFieldNames, initialStepFieldNames]);
 
   const isGitHub = integrationDefinition?.name === "github";
   const {
@@ -188,6 +203,9 @@ export function IntegrationCreateDialog({
     setCreatedName,
   ]);
 
+  const canSubmit =
+    Boolean(effectiveIntegrationName.trim()) && areRequiredCreateFieldsFilled(createStepFields, configuration);
+
   const handleSubmit = useCallback(async () => {
     if (!integrationDefinition?.name || !organizationId) return;
     const definitionName = integrationDefinition.name;
@@ -196,18 +214,28 @@ export function IntegrationCreateDialog({
       showErrorToast("Integration name is required");
       return;
     }
+    if (!areRequiredCreateFieldsFilled(createStepFields, configuration)) {
+      showErrorToast("Enter every required field.");
+      return;
+    }
 
     setCreateError(null);
     setIsCreatePending(true);
     try {
+      const createConfiguration = configurationWithSetupReturnPath(configuration, setupReturnTo);
       const created = isGitHub
         ? await createWithGeneratedName({
             baseName: githubBaseName,
             takenNames: existingIntegrationNames,
-            create: (name) => onCreateIntegration({ integrationName: definitionName, name, configuration }),
+            create: (name) =>
+              onCreateIntegration({ integrationName: definitionName, name, configuration: createConfiguration }),
           })
         : {
-            result: await onCreateIntegration({ integrationName: definitionName, name: nextName, configuration }),
+            result: await onCreateIntegration({
+              integrationName: definitionName,
+              name: nextName,
+              configuration: createConfiguration,
+            }),
             name: nextName,
           };
 
@@ -246,7 +274,7 @@ export function IntegrationCreateDialog({
       }
     } catch (error) {
       setCreateError(error);
-      showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+      showErrorToast(getApiErrorMessage(error, "Failed to create integration"));
     } finally {
       setIsCreatePending(false);
     }
@@ -254,6 +282,7 @@ export function IntegrationCreateDialog({
     integrationDefinition?.name,
     organizationId,
     effectiveIntegrationName,
+    createStepFields,
     configuration,
     existingIntegrationNames,
     githubBaseName,
@@ -264,6 +293,7 @@ export function IntegrationCreateDialog({
     onCapabilitySetupRequired,
     setCreateIntegrationBrowserAction,
     setCreatedName,
+    setupReturnTo,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
@@ -284,7 +314,6 @@ export function IntegrationCreateDialog({
 
   const displayName =
     getIntegrationTypeDisplayName(undefined, integrationDefinition.name) || integrationDefinition.name;
-  const createErrorNotice = createError ? getUsageLimitNotice(createError, organizationId) : null;
   const resolvedHomeHref =
     resolvedIntegrationId && organizationId
       ? `/${organizationId}/settings/integrations/${resolvedIntegrationId}`
@@ -360,27 +389,21 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
-              {(integrationDefinition?.configuration ?? [])
-                .filter((f: ConfigurationField) => {
-                  if (!f.name) return false;
-                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
-                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                })
-                .map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={configuration[field.name!]}
-                    onChange={(value) =>
-                      setConfiguration((prev) => ({
-                        ...prev,
-                        [field.name!]: value,
-                      }))
-                    }
-                    allValues={configuration}
-                    organizationId={organizationId}
-                  />
-                ))}
+              {webhookStepFields.map((field: ConfigurationField) => (
+                <ConfigurationFieldRenderer
+                  key={field.name}
+                  field={field}
+                  value={configuration[field.name!]}
+                  onChange={(value) =>
+                    setConfiguration((prev) => ({
+                      ...prev,
+                      [field.name!]: value,
+                    }))
+                  }
+                  allValues={configuration}
+                  organizationId={organizationId}
+                />
+              ))}
             </>
           ) : (
             <>
@@ -399,9 +422,9 @@ export function IntegrationCreateDialog({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
               )}
-              {configurationFields.length > 0 && (
+              {createStepFields.length > 0 && (
                 <div className="space-y-4">
-                  {configurationFields.map((field: ConfigurationField) => {
+                  {createStepFields.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
                       <ConfigurationFieldRenderer
@@ -431,7 +454,7 @@ export function IntegrationCreateDialog({
           browserActionCompleted={browserActionCompleted}
           mutationPending={updateIntegrationMutation.isPending}
           isCreatePending={isCreatePending}
-          integrationName={effectiveIntegrationName}
+          canSubmit={canSubmit}
           onCompleteWebhookSetup={handleCompleteWebhookSetup}
           onBrowserActionContinue={handleBrowserActionContinue}
           onBrowserActionConfigSave={handleBrowserActionConfigSave}
@@ -440,8 +463,7 @@ export function IntegrationCreateDialog({
           onClose={handleClose}
         />
 
-        {createError && createErrorNotice ? <UsageLimitAlert notice={createErrorNotice} className="mt-4" /> : null}
-        {createError && !createErrorNotice ? (
+        {createError ? (
           <Alert variant="destructive" className="mt-4">
             <AlertTitle>Unable to create integration</AlertTitle>
             <AlertDescription>Failed to create integration: {getApiErrorMessage(createError)}</AlertDescription>

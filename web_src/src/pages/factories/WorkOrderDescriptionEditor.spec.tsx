@@ -1,8 +1,24 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
+
+vi.mock("@/hooks/useSkillSlashCandidates", () => ({
+  useSkillSlashCandidates: (
+    _organizationId: string | undefined,
+    _factoryId: string | undefined,
+    filter: string,
+    enabled: boolean,
+  ) => {
+    if (!enabled) {
+      return [];
+    }
+    const all = [{ id: "1", command: "oypirate", title: "Oy Pirate!", description: "Talk like a pirate." }];
+    const needle = filter.trim().toLowerCase();
+    return needle ? all.filter((candidate) => candidate.command.includes(needle)) : all;
+  },
+}));
 
 const PASTED_MARKDOWN = `## Papercuts
 These are small improvements or issues that improve quality of life.
@@ -47,7 +63,27 @@ function stubClientRects(target: object) {
   });
 }
 
+afterEach(async () => {
+  // @tiptap/react schedules editor.destroy() on a ~1ms setTimeout after the
+  // component unmounts. Unmount now and flush that timer here, while the jsdom
+  // window still exists, so the destroy does not fire during environment
+  // teardown and throw "ReferenceError: window is not defined" (which Vitest
+  // reports as an unhandled error and fails the run even though every test
+  // passed).
+  cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+});
+
 describe("WorkOrderDescriptionEditor", () => {
+  it("focuses the editor when autoFocus is set", async () => {
+    render(<WorkOrderDescriptionEditor autoFocus value="" maxLength={5000} disabled={false} onChange={vi.fn()} />);
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+    });
+  });
+
   it("renders pasted markdown as a heading, paragraph, and list", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -129,6 +165,46 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(screen.getByRole("button", { name: "Link" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Underline" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Strikethrough" })).toBeInTheDocument();
+  });
+
+  it("inserts an uploaded image as an sp-file markdown ref", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onUploadFiles = vi.fn().mockResolvedValue([
+      {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        filename: "bug.png",
+        contentType: "image/png",
+        ref: "sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        previewUrl: "blob:preview",
+        isImage: true,
+      },
+    ]);
+
+    render(
+      <WorkOrderDescriptionEditor
+        value=""
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        onUploadFiles={onUploadFiles}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    const file = new File(["png"], "bug.png", { type: "image/png" });
+    fireEvent.paste(input, {
+      clipboardData: {
+        files: [file],
+        getData: () => "",
+      },
+    });
+
+    expect(onUploadFiles).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onChange.mock.calls.at(-1)?.[0]).toContain("sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    });
   });
 
   it("turns selected text into a heading from the heading menu", async () => {
@@ -223,9 +299,8 @@ describe("WorkOrderDescriptionEditor", () => {
 
     const input = await screen.findByTestId("work-order-description-input");
     await user.click(input);
-    fireEvent.paste(input, {
-      clipboardData: { getData: () => "" },
-    });
+    await user.paste("");
+    await user.click(input);
     await user.keyboard("{Control>}a{/Control}");
     await user.click(await screen.findByRole("button", { name: "Bold" }));
 
@@ -278,5 +353,138 @@ describe("WorkOrderDescriptionEditor", () => {
     await user.keyboard("{Enter}");
 
     expect(input.querySelector("strong")).toHaveTextContent("Hello world");
+  });
+
+  it("resolves sp-file image refs to download URLs when fileUrls are provided", async () => {
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    const img = input.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
+
+  it("keeps sp-file refs in the markdown output when fileUrls are provided", async () => {
+    const user = userEvent.setup();
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard(" ");
+
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toContain(`sp-file://${fileId}`);
+    expect(onChange.mock.calls.at(-1)?.[0]).not.toContain(downloadUrl);
+  });
+
+  it("does not re-scan or modify document when fileUrls reference changes with identical mappings", async () => {
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const downloadUrl = "https://cdn.example.com/files/shot.png";
+    const initial = `![screenshot](sp-file://${fileId})`;
+
+    const { rerender } = render(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    const img = input.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+
+    // Re-render with a new object reference containing the exact same mapping
+    rerender(
+      <WorkOrderDescriptionEditor
+        value={initial}
+        maxLength={5000}
+        disabled={false}
+        onChange={vi.fn()}
+        fileUrls={{ [fileId]: downloadUrl }}
+      />,
+    );
+
+    expect(img?.getAttribute("src")).toBe(downloadUrl);
+  });
+
+  it("removes an inline image from the hover control when canRemoveImages is on", async () => {
+    const user = userEvent.setup();
+    const fileId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value={`Refunds fail.\n\n![screenshot](sp-file://${fileId})`}
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        canRemoveImages
+        fileUrls={{ [fileId]: "https://cdn.example.com/files/shot.png" }}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`create-work-order-request-inline-image-remove-${fileId}`));
+
+    await waitFor(() => {
+      const next = onChange.mock.calls.at(-1)?.[0] as string;
+      expect(next).toContain("Refunds fail.");
+      expect(next).not.toContain(`sp-file://${fileId}`);
+    });
+  });
+
+  it("inserts a skill command from the slash menu", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <WorkOrderDescriptionEditor
+        value=""
+        maxLength={5000}
+        disabled={false}
+        organizationId="org-1"
+        factoryId="factory-1"
+        onChange={onChange}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    await user.keyboard("/oy");
+
+    expect(await screen.findByTestId("skill-slash-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("skill-slash-menu")).toHaveClass("fixed", "z-[70]");
+    await user.click(screen.getByTestId("skill-slash-option-oypirate"));
+
+    await waitFor(() => {
+      expect(String(onChange.mock.calls.at(-1)?.[0])).toContain("/oypirate");
+    });
   });
 });

@@ -80,4 +80,135 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
+
+	t.Run("sets hosted spend limit", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		budget := int64(2500)
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                     factory.ID.String(),
+			HostedSpendBudgetCents: &budget,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory)
+		require.NotNil(t, response.Factory.HostedSpendBudgetCents)
+		assert.Equal(t, int64(2500), *response.Factory.HostedSpendBudgetCents)
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                     factory.ID.String(),
+			ClearHostedSpendBudget: true,
+		})
+		require.NoError(t, err)
+		assert.Nil(t, cleared.Factory.HostedSpendBudgetCents)
+	})
+
+	t.Run("defaults Planning on with Confidence and without Clarity", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Planning)
+		assert.True(t, response.Factory.Planning.Enabled)
+		assert.False(t, response.Factory.Planning.Clarity)
+		assert.True(t, response.Factory.Planning.Confidence)
+	})
+
+	t.Run("updates Planning and keeps score flags when Planning is off", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:        false,
+				Clarity:        true,
+				Confidence:     false,
+				SetupCompleted: true,
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.Factory.Planning)
+		assert.False(t, response.Factory.Planning.Enabled)
+		assert.True(t, response.Factory.Planning.Clarity)
+		assert.False(t, response.Factory.Planning.Confidence)
+		assert.True(t, response.Factory.Planning.SetupCompleted)
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPlanning{
+			Enabled:        false,
+			Clarity:        true,
+			Confidence:     false,
+			SetupCompleted: true,
+		}, reloaded.Planning())
+	})
+
+	t.Run("stores and clears the auto-start line", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		line, err := factory.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				SetupCompleted:  true,
+				AutoStartLineId: line.ID.String(),
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, line.ID.String(), response.Factory.Planning.GetAutoStartLineId())
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:        true,
+				Confidence:     true,
+				SetupCompleted: true,
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, cleared.Factory.Planning.GetAutoStartLineId())
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.PlanningAutoStartLineID)
+	})
+
+	t.Run("rejects an auto-start line outside the workspace", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		other, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("other"), "", "")
+		require.NoError(t, err)
+		foreignLine, err := other.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: "not-a-uuid",
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: foreignLine.ID.String(),
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
 }

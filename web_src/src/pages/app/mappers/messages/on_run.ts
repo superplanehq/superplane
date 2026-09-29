@@ -40,14 +40,7 @@ export const onRunTriggerRenderer: TriggerRenderer = {
       values.App = eventData.app.id;
     }
 
-    if (eventData?.parameters && typeof eventData.parameters === "object" && !Array.isArray(eventData.parameters)) {
-      for (const [key, value] of Object.entries(eventData.parameters)) {
-        const formatted = formatEventValue(value);
-        if (formatted.length > 0) {
-          values[key] = formatted;
-        }
-      }
-    }
+    Object.assign(values, parameterEventValues(eventData?.parameters));
 
     if (context.event?.createdAt) {
       values["Received at"] = new Date(context.event.createdAt).toLocaleString();
@@ -95,6 +88,21 @@ export function onRunTitle(eventData: OnRunEventData | undefined): string {
   }
 
   return "App run";
+}
+
+function parameterEventValues(parameters: unknown): Record<string, string> {
+  if (!parameters || typeof parameters !== "object" || Array.isArray(parameters)) {
+    return {};
+  }
+
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    const formatted = formatEventValue(value);
+    if (formatted.length > 0) {
+      values[key] = formatted;
+    }
+  }
+  return values;
 }
 
 function formatEventValue(value: unknown): string {

@@ -1,80 +1,101 @@
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { ORGANIZATION_SETTINGS_NAV_ITEMS } from "./organizationSettingsNavItems";
 
-describe("OrganizationSettingsLayout", () => {
+describe("legacy factory organization settings routes", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("shows back to workspace, the organization name, and the settings menu", async () => {
+  it("keeps the workspace and opens Organization General", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/general`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
 
-    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    expect(await screen.findByTestId("organization-settings-overview-name")).toHaveTextContent("SuperPlane");
-
-    const backLink = within(sidebar).getByTestId("organization-settings-back");
-    const name = within(sidebar).getByTestId("organization-settings-name");
-    const general = within(sidebar).getByTestId("organization-settings-nav-general");
-    const labels = ORGANIZATION_SETTINGS_NAV_ITEMS.map((item) =>
-      within(sidebar).getByTestId(`organization-settings-nav-${item.id}`),
-    );
-
-    expect(backLink).toHaveTextContent("Back to workspace");
-    expect(name).toHaveTextContent("SuperPlane");
-    expect(labels.map((item) => item.textContent)).toEqual(ORGANIZATION_SETTINGS_NAV_ITEMS.map((item) => item.label));
-    expect(within(sidebar).getByTestId("organization-settings-nav-workspaces")).not.toHaveAttribute(
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(general).toHaveAttribute("aria-current", "page");
-    expect(backLink.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(name.compareDocumentPosition(general) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }, 10000);
 
-  it("opens a workspaces table from the Workspaces menu item", async () => {
-    const user = userEvent.setup();
+  it("redirects the direct organization route to a workspace Organization Spending page", async () => {
+    render(<FactoriesHarness pathSuffix="organization/llm-spend" factoriesFixture={defaultFactoriesFixture} />);
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  }, 10000);
+
+  it("redirects workspace-usage into Organization Spending", async () => {
+    render(<FactoriesHarness pathSuffix="organization/workspace-usage" factoriesFixture={defaultFactoriesFixture} />);
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
+    ).toBeInTheDocument();
+  }, 10000);
+
+  it("opens Workspace Usage directly, no redirect", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/general`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/usage`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
 
-    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    await user.click(within(sidebar).getByTestId("organization-settings-nav-workspaces"));
-
-    const table = await screen.findByTestId("organization-settings-workspaces-table");
-    expect(table).toHaveTextContent("Semaphore");
-    expect(table).toHaveTextContent("RF");
-    expect(table).toHaveTextContent("SuperPlane");
-    expect(table).toHaveTextContent("PF");
-    expect(within(sidebar).getByTestId("organization-settings-nav-workspaces")).toHaveAttribute("aria-current", "page");
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
   }, 10000);
 
-  it("opens a coming-soon page for Members", async () => {
-    const user = userEvent.setup();
+  it("redirects the old Organization Usage URL into Workspace Usage", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/general`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/usage`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
 
-    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    await user.click(within(sidebar).getByTestId("organization-settings-nav-members"));
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByRole("heading", { name: "Usage" })).toBeInTheDocument();
+  }, 10000);
 
-    expect(await screen.findByTestId("factory-settings-soon")).toBeInTheDocument();
-    expect(within(sidebar).getByTestId("organization-settings-nav-members")).toHaveAttribute("aria-current", "page");
+  it("redirects the old LLM spend URL into Organization Spending", async () => {
+    render(
+      <FactoriesHarness pathSuffix="settings/llm-spend?credit=added" factoriesFixture={defaultFactoriesFixture} />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
+    ).toBeInTheDocument();
   }, 10000);
 });

@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { FactoriesWorkOrder } from "@/api-client";
 
-import { getWorkOrderAttentionReason, WORK_ORDER_ATTENTION_LABEL } from "./workOrderAttention";
+import {
+  getWorkOrderAttentionReason,
+  getWorkOrderAttentionReasons,
+  WORK_ORDER_ATTENTION_LABEL,
+} from "./workOrderAttention";
 
 function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
   return {
@@ -17,11 +21,11 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
 }
 
 describe("getWorkOrderAttentionReason", () => {
-  it("returns null when the work order is not waiting or failed", () => {
+  it("returns null when the task is not waiting or failed", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_DRAFT" }))).toBeNull();
   });
 
-  it("labels a closed failed work order as Run failed", () => {
+  it("labels a closed failed task as Run failed", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_CLOSED", result: "RESULT_FAILED" }))).toBe("failed");
   });
 
@@ -50,7 +54,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.failed).toBe("Run failed");
   });
 
-  it("labels a visible status note as Review requested", () => {
+  it("labels a visible status note as Waiting for user review", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -85,11 +89,130 @@ describe("getWorkOrderAttentionReason", () => {
         }),
       ),
     ).toBe("approval");
-    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Review requested");
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
   });
 
-  it("labels idle waiting work as No progress", () => {
-    expect(getWorkOrderAttentionReason(order())).toBe("stalled");
-    expect(WORK_ORDER_ATTENTION_LABEL.stalled).toBe("No progress");
+  it("labels an active check wait as Waiting on status checks without user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { waitingOnChecks: true })).toEqual(["checks"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
+    expect(WORK_ORDER_ATTENTION_LABEL.checks).toBe("Waiting on status checks");
+  });
+
+  it("labels a paused fixer as Automatic fixes paused without user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { fixesPaused: true })).toEqual(["fixesPaused"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.fixesPaused).toBe("Automatic fixes paused");
+  });
+
+  it("labels passed checks and keeps user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { checksPassed: true })).toEqual(["approval", "checksPassed"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.checksPassed).toBe("Status checks passed");
+  });
+
+  it("labels an active PR-feedback run as Addressing user feedback", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          statusNotes: [
+            {
+              key: "pr-closure",
+              headline: "Waiting for user review",
+              body: "Tag `@superplaneagent` to request changes.",
+            },
+          ],
+        }),
+        { addressingFeedback: true },
+      ),
+    ).toBe("feedback");
+    expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing user feedback");
+  });
+
+  it("labels a cancelled latest step as Stopped", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [
+                {
+                  id: "e1",
+                  step: "implement",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_CANCELLED",
+                  updatedAt: "2024-06-02T00:00:00Z",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toBe("stopped");
+    expect(WORK_ORDER_ATTENTION_LABEL.stopped).toBe("Stopped");
+  });
+
+  it("does not label an earlier failed step when a later step passed", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [
+                {
+                  id: "e-failed",
+                  step: "implement",
+                  stepIndex: 5,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_FAILED",
+                  updatedAt: "2024-06-02T10:00:00Z",
+                },
+                {
+                  id: "e-passed",
+                  step: "implement",
+                  stepIndex: 7,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  updatedAt: "2024-06-02T11:00:00Z",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("does not label idle waiting work as an attention reason", () => {
+    expect(getWorkOrderAttentionReason(order())).toBeNull();
+    expect(getWorkOrderAttentionReasons(order())).toEqual([]);
   });
 });

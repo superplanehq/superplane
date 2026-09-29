@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -53,6 +54,13 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		ManagementKey: string(managementKey),
 		http:          httpClient,
 	}, nil
+}
+
+func NewManagementClient(httpClient core.HTTPContext, managementKey string) *Client {
+	return &Client{
+		ManagementKey: strings.TrimSpace(managementKey),
+		http:          httpClient,
+	}
 }
 
 // readAll drains a response body.
@@ -113,29 +121,10 @@ type ProviderRouting struct {
 	DataCollection    string   `json:"data_collection,omitempty"`
 }
 
-// Message is one chat message. Content is a plain string for text-only
-// messages, or []ContentPart when attachments are inlined.
+// Message is one chat message.
 type Message struct {
 	Role    string `json:"role"`
 	Content any    `json:"content"`
-}
-
-// ContentPart is a content block: text, image_url, or file. OpenRouter has no
-// Files API, so attachments are inlined here as base64 data URLs.
-type ContentPart struct {
-	Type     string    `json:"type"`
-	Text     string    `json:"text,omitempty"`
-	ImageURL *ImageURL `json:"image_url,omitempty"`
-	File     *FilePart `json:"file,omitempty"`
-}
-
-type ImageURL struct {
-	URL string `json:"url"`
-}
-
-type FilePart struct {
-	Filename string `json:"filename"`
-	FileData string `json:"file_data"`
 }
 
 type ChatCompletionResponse struct {
@@ -357,6 +346,71 @@ func (c *Client) GetKey() (*KeyInfo, error) {
 	return &response.Data, nil
 }
 
+type CreateKeyRequest struct {
+	Name      string `json:"name"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+type CreatedKey struct {
+	Key  string
+	Hash string
+}
+
+type createKeyResponse struct {
+	Key  string `json:"key"`
+	Data struct {
+		Hash string `json:"hash"`
+	} `json:"data"`
+}
+
+func (c *Client) CreateKey(req CreateKeyRequest) (*CreatedKey, error) {
+	if strings.TrimSpace(c.ManagementKey) == "" {
+		return nil, fmt.Errorf("provisioning API key is not configured")
+	}
+
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create key request: %v", err)
+	}
+
+	body, err := c.execRequestWithKey(context.Background(), http.MethodPost, baseURL+"/keys", bytes.NewReader(payload), c.ManagementKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var response createKeyResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create key response: %v", err)
+	}
+	if strings.TrimSpace(response.Key) == "" || strings.TrimSpace(response.Data.Hash) == "" {
+		return nil, fmt.Errorf("create key response is missing key or hash")
+	}
+
+	return &CreatedKey{Key: response.Key, Hash: response.Data.Hash}, nil
+}
+
+func (c *Client) DeleteKey(hash string) error {
+	if strings.TrimSpace(c.ManagementKey) == "" {
+		return fmt.Errorf("provisioning API key is not configured")
+	}
+
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return fmt.Errorf("key hash is required")
+	}
+
+	_, err := c.execRequestWithKey(context.Background(), http.MethodDelete, baseURL+"/keys/"+url.PathEscape(hash), nil, c.ManagementKey)
+	if err == nil {
+		return nil
+	}
+
+	var apiErr *core.ProviderAPIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	return err
+}
+
 func (c *Client) CreateChatCompletion(req ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -410,7 +464,8 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		message := fmt.Sprintf("request failed: %v", err)
+		return nil, core.NewProviderTransportError(message, errors.New(message))
 	}
 	defer res.Body.Close()
 
@@ -428,7 +483,9 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 // apiError turns OpenRouter's {"error":{...}} body into a message that keeps
 // the details callers act on: the providers actually serving a model when
-// routing excluded them all, and the backoff hint on a rate limit.
+// routing excluded them all, and the backoff hint on a rate limit. The
+// returned error is a *core.ProviderAPIError so callers can classify the
+// failure (auth, rate limit, unavailable) without matching on message text.
 func apiError(statusCode int, body []byte) error {
 	var parsed struct {
 		Error struct {
@@ -438,7 +495,8 @@ func apiError(statusCode int, body []byte) error {
 	}
 
 	if err := json.Unmarshal(body, &parsed); err != nil || parsed.Error.Message == "" {
-		return fmt.Errorf("request got %d code: %s", statusCode, string(body))
+		message := fmt.Sprintf("request got %d code: %s", statusCode, string(body))
+		return core.NewProviderAPIError(statusCode, message, errors.New(message))
 	}
 
 	message := fmt.Sprintf("request got %d code: %s", statusCode, parsed.Error.Message)
@@ -451,5 +509,5 @@ func apiError(statusCode int, body []byte) error {
 		message += fmt.Sprintf(" (retry after %v seconds)", retryAfter)
 	}
 
-	return fmt.Errorf("%s", message)
+	return core.NewProviderAPIError(statusCode, message, errors.New(message))
 }

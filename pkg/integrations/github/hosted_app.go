@@ -23,6 +23,24 @@ func UseHostedInstall(orgID, integrationName string) bool {
 	return integrationName == "github" && UseHostedApp(orgID)
 }
 
+const configPrivateApp = "privateApp"
+
+// WantsPrivateApp is true when CreateIntegration asked for a customer GitHub
+// App instead of SuperPlane's public App.
+func WantsPrivateApp(integrationName string, config map[string]any) bool {
+	if integrationName != "github" || config == nil {
+		return false
+	}
+	value, ok := config[configPrivateApp].(bool)
+	return ok && value
+}
+
+// PreferHostedInstall is the default GitHub create path. A privateApp
+// configuration flag opts out and uses the customer GitHub App wizard.
+func PreferHostedInstall(orgID, integrationName string, config map[string]any) bool {
+	return UseHostedInstall(orgID, integrationName) && !WantsPrivateApp(integrationName, config)
+}
+
 var factoriesEnabled = factoriesEnabledForOrg
 
 func factoriesEnabledForOrg(orgID string) bool {

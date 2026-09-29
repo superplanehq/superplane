@@ -1,4 +1,4 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,7 +46,7 @@ export function AutomationCard({
   emphasized,
   actions,
 }: {
-  app: FactoryApp;
+  app: FactoryAutomation;
   href?: string;
   tick: FactoryAutomationTick;
   statusLabel: string;
@@ -341,9 +341,9 @@ export function AutomationsPageList({
 }: {
   organizationId: string;
   factoryKey: string;
-  apps: FactoryApp[];
+  apps: FactoryAutomation[];
   workOrders: Parameters<typeof resolveFactoryAutomationStatus>[1];
-  actionsForApp: (app: FactoryApp) => AutomationCardActions;
+  actionsForApp: (app: FactoryAutomation) => AutomationCardActions;
 }) {
   return (
     <ul className="flex flex-col gap-2" data-testid="automations-list">

@@ -10,11 +10,11 @@ import type {
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "../..";
+import { getState, getStateMap, getTriggerRenderer } from "../../mapperLookup";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import { getQueueNameFromUrl } from "./utils";
 
 interface PurgeQueueConfiguration {
@@ -85,7 +85,7 @@ function purgeQueueMetadataList(node: NodeInfo): MetadataItem[] {
 
 function purgeQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

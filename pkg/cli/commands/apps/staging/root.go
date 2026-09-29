@@ -28,11 +28,11 @@ To commit a single file directly without a separate staging step, pass
 	var updateFiles []string
 	updateCmd := &cobra.Command{
 		Use:   "update [app]",
-		Short: "Stage one or more repository files",
-		Long: `Stage local files for an app without committing them.
+		Short: "Stage canvas.yaml or console.yaml",
+		Long: `Stage local spec files for an app without committing them.
 
-Each --file path is mapped to a repository path using the file name only
-(for example, canvas.yaml and README.md).`,
+Each --file path is mapped to a repository path using the file name only.
+Only canvas.yaml and console.yaml can be staged.`,
 		Args: cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringArrayVar(&updateFiles, "file", nil, "local file to stage (repeatable)")

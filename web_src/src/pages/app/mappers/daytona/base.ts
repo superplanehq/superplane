@@ -1,6 +1,6 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -40,7 +40,7 @@ export const baseMapper: ComponentBaseMapper = {
     if (!payload) {
       return { Response: "No data returned" };
     }
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as Record<string, unknown> | undefined;
 
     if (!responseData) {
       return { Response: "No data returned" };

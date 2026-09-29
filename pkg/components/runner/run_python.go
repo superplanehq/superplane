@@ -292,10 +292,11 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
+	environment := resolved.Variables
 
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
@@ -304,10 +305,6 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 
 	messageChain, err := messageChainJSON(ctx.Expressions)
 	if err != nil {
-		return err
-	}
-
-	if err := ensureRunnerMinutesAvailable(ctx); err != nil {
 		return err
 	}
 
@@ -362,7 +359,7 @@ func (c *RunPython) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 }
 
 func (c *RunPython) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return cancelBrokerTask(ctx, RunPythonFinishedEventType)
 }
 
 func (c *RunPython) Cleanup(ctx core.SetupContext) error { return nil }

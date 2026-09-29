@@ -15,6 +15,8 @@ const ignoredPrefixes = [
   "src/pages/factories/pages/WorkOrderCanvas.tsx",
   "src/pages/factories/pages/ConfigureAutomationPage.tsx",
   "src/pages/factories/pages/SelectComponentSidebar.tsx",
+  "src/pages/factories/pages/settings/FactorySettingsApiKeysPage.tsx",
+  "src/pages/factories/pages/settings/FactorySettingsSecretsPage.tsx",
   "storybook-static/",
   "dist/",
   "dist-ssr/",

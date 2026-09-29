@@ -1,68 +1,252 @@
 import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Text } from "@/components/Text/text";
-import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
-import { compareModelLabels } from "@/lib/hostedLLMModels";
+import { preferredFactoryScope, useCanvasFactoryScope } from "@/hooks/useCanvasFactoryScope";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
+import { HOSTED_MODEL_ALL_PROVIDERS, shortClaudeModelLabel } from "@/lib/hostedLLMModels";
+import {
+  byokRunnerModelOptions,
+  defaultByokRunnerModel,
+  hostedSelectableLLMModelKey,
+  normalizeSuperPlaneModelValue,
+  SELECTABLE_LLM_SOURCE_BYOK,
+  SELECTABLE_LLM_SOURCE_HOSTED,
+  selectableLLMModelsForProvider,
+  type SelectableLLMSourceID,
+} from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
+import { THINKING_LEVEL_KEY, THINKING_LEVELS, normalizeThinkingLevel } from "@/lib/thinkingLevel";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 import type { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 
-function credentialsSource(allValues?: Record<string, unknown>): string {
-  const credentials = allValues?.credentials;
-  if (!credentials || typeof credentials !== "object" || Array.isArray(credentials)) {
-    return "";
-  }
-
-  const source = (credentials as Record<string, unknown>).source;
-  return typeof source === "string" ? source : "";
-}
-
 export const HostedModelFieldRenderer: React.FC<FieldRendererProps> = (props) => {
-  if (credentialsSource(props.allValues) !== "hosted") {
-    return <StringFieldRenderer {...props} />;
+  const provider = props.field.typeOptions?.hostedModel?.provider ?? "";
+  if (provider === HOSTED_MODEL_ALL_PROVIDERS) {
+    return <SuperPlaneModelField {...props} />;
   }
-  return <HostedModelSelect {...props} />;
+  if (provider !== "") {
+    return <ProviderBYOKModelField {...props} />;
+  }
+  return <StringFieldRenderer {...props} />;
 };
 
-function HostedModelSelect({ field, value, onChange, organizationId, readOnly = false }: FieldRendererProps) {
-  const provider = field.typeOptions?.hostedModel?.provider ?? "";
-  const { data, isLoading } = useHostedLLMModels(organizationId, provider, true);
-  const models = [...(data?.models ?? [])].sort((left, right) =>
-    compareModelLabels(left.name || left.id || "", right.name || right.id || ""),
-  );
-
-  if (!organizationId) {
-    return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
+function SuperPlaneModelField({
+  field,
+  value,
+  onChange,
+  onValuesChange,
+  allValues,
+  organizationId,
+  factoryId,
+  readOnly = false,
+}: FieldRendererProps) {
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED], factoryId);
+  const usage = useOrganizationWorkspaceUsage(organizationId ?? "");
+  const status = modelFieldStatus(organizationId, selection.isLoading || usage.isLoading, selection.isError);
+  if (status) {
+    return status;
   }
-
-  if (isLoading) {
-    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading SuperPlane-hosted models...</Text>;
-  }
-
-  if (data?.enabled !== true || models.length === 0) {
+  if (selection.models.length === 0) {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
-        SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and
-        allowlist.
+        No SuperPlane-hosted models are allowlisted. Ask an installation admin to add a key and select models.
       </Text>
     );
   }
 
-  const current = typeof value === "string" ? value : "";
-  const testId = field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined;
+  const options = selection.models.map((model) => ({ value: model.key, label: model.label }));
+  const current = normalizeSuperPlaneModelValue(typeof value === "string" ? value : "");
+  const selected = superPlanePickerValue(
+    current,
+    hostedSelectableLLMModelKey(usage.data?.defaultHostedProvider ?? "", usage.data?.defaultHostedModel ?? ""),
+    options,
+  );
 
   return (
-    <Select value={current} onValueChange={(next) => onChange(next || undefined)} disabled={readOnly}>
-      <SelectTrigger className="w-full" data-testid={testId}>
-        <SelectValue placeholder={field.placeholder || "Select a SuperPlane-hosted model"} />
-      </SelectTrigger>
-      <SelectContent position="popper" className="max-h-60">
-        {models.map((model) => (
-          <SelectItem key={model.id} value={model.id ?? ""}>
-            {model.name || model.id}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <ModelThinkingSelect
+      fieldName={field.name}
+      model={selected}
+      committedModel={current}
+      thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
+      placeholder={field.placeholder || "Instance SuperPlane agent model"}
+      readOnly={readOnly}
+      options={options}
+      onCommit={(nextModel, nextThinking) =>
+        commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
+      }
+    />
   );
+}
+
+function superPlanePickerValue(current: string, defaultKey: string, models: Array<{ value: string }>): string {
+  if (current !== "" && models.some((model) => model.value === current)) {
+    return current;
+  }
+  if (models.some((model) => model.value === defaultKey)) {
+    return defaultKey;
+  }
+  return "";
+}
+
+function ProviderBYOKModelField({
+  field,
+  value,
+  onChange,
+  onValuesChange,
+  allValues,
+  organizationId,
+  factoryId,
+  readOnly = false,
+}: FieldRendererProps) {
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK], factoryId);
+  const status = modelFieldStatus(organizationId, selection.isLoading, selection.isError);
+  if (status) {
+    return status;
+  }
+
+  const provider = field.typeOptions?.hostedModel?.provider ?? "";
+  const providerModels = selectableLLMModelsForProvider(selection.models, provider);
+  const current = typeof value === "string" ? value : "";
+  const resolved = defaultByokRunnerModel(
+    current,
+    provider,
+    providerModels.map((model) => model.model.id),
+  );
+  const shown = resolved ?? current;
+  const options = byokRunnerModelOptions(providerModels, shown).map((option) => ({
+    value: option.value,
+    label: shortClaudeModelLabel(option.value) ?? option.label,
+  }));
+  if (options.length === 0) {
+    return (
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on
+        Integrations.
+      </Text>
+    );
+  }
+
+  return (
+    <ModelThinkingSelect
+      fieldName={field.name}
+      model={shown}
+      committedModel={current.trim() === "" ? current : shown}
+      thinkingLevel={normalizeThinkingLevel(allValues?.[THINKING_LEVEL_KEY])}
+      placeholder={field.placeholder || "Select a model"}
+      readOnly={readOnly}
+      options={options}
+      onCommit={(nextModel, nextThinking) =>
+        commitModelAndThinking(field.name, nextModel, nextThinking, onChange, onValuesChange)
+      }
+    />
+  );
+}
+
+function commitModelAndThinking(
+  fieldName: string | undefined,
+  model: string,
+  thinkingLevel: string,
+  onChange: (next: unknown) => void,
+  onValuesChange?: (patch: Record<string, unknown>) => void,
+) {
+  const modelValue = model || undefined;
+  const thinkingValue = thinkingLevel || undefined;
+  if (onValuesChange && fieldName) {
+    onValuesChange({ [fieldName]: modelValue, [THINKING_LEVEL_KEY]: thinkingValue });
+    return;
+  }
+  onChange(modelValue);
+}
+
+function ModelThinkingSelect({
+  fieldName,
+  model,
+  committedModel,
+  thinkingLevel,
+  placeholder,
+  readOnly,
+  options,
+  onCommit,
+}: {
+  fieldName?: string;
+  model: string;
+  committedModel: string;
+  thinkingLevel: string;
+  placeholder: string;
+  readOnly?: boolean;
+  options: Array<{ value: string; label: string }>;
+  onCommit: (model: string, thinkingLevel: string) => void;
+}) {
+  const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
+  const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
+  const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={readOnly}
+          data-testid={fieldName ? toTestId(`field-${fieldName}-hosted-model`) : undefined}
+          className="h-8 w-full justify-between px-2.5 font-normal shadow-xs"
+        >
+          <span className="truncate">{selectedLabel}</span>
+          <ChevronDown className="size-4 opacity-50" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-44">
+        <DropdownMenuValueSub
+          label="Model"
+          testId={modelListTestId}
+          value={model}
+          options={options}
+          onValueChange={(nextModel) => onCommit(nextModel, thinkingLevel)}
+        />
+        <DropdownMenuValueSub
+          label="Thinking"
+          testId={thinkingTestId}
+          value={thinkingLevel}
+          options={[...THINKING_LEVELS]}
+          onValueChange={(nextThinking) => onCommit(committedModel, nextThinking)}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function modelFieldStatus(organizationId: string | undefined, isLoading: boolean, isError: boolean) {
+  if (!organizationId) {
+    return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
+  }
+  if (isLoading) {
+    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading models...</Text>;
+  }
+  if (isError) {
+    return <Text className="text-sm text-gray-500 dark:text-gray-400">Unable to load models. Try again.</Text>;
+  }
+  return null;
+}
+
+function useSelectablePickerModels(
+  organizationId: string | undefined,
+  sources: SelectableLLMSourceID[],
+  explicitFactoryId?: string,
+) {
+  const canvasScope = useCanvasFactoryScope(organizationId);
+  const { factoryId, waitingForCanvas } = preferredFactoryScope(explicitFactoryId, canvasScope);
+  const query = useSelectableLLMModels(organizationId, {
+    factoryId,
+    sources,
+    enabled: Boolean(organizationId) && !waitingForCanvas,
+  });
+  return {
+    isLoading: waitingForCanvas || query.isLoading,
+    isError: Boolean(query.isError),
+    models: query.data ?? [],
+  };
 }

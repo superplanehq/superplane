@@ -8,6 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { buildDailyVelocity } from "./buildDailyVelocity";
 import { VELOCITY_BY_PERIOD, type VelocityPeriodDays, type VelocityPeriodStats } from "./lineVelocityMockData";
@@ -25,11 +26,7 @@ const dailyVelocityChartConfig = {
 } satisfies ChartConfig;
 
 function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
-  }
-  return String(value);
+  return formatCompactTokenValue(value);
 }
 
 function formatUsd(value: number) {
@@ -54,7 +51,15 @@ function DailyVelocityChart({ stats }: { stats: VelocityPeriodStats }) {
     >
       <BarChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
+        <XAxis
+          dataKey="day"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          interval={0}
+          padding="gap"
+          className="text-[11px]"
+        />
         <YAxis
           allowDecimals={false}
           tickLine={false}

@@ -3,7 +3,7 @@ import { ComponentSidebar } from "./";
 import GithubIcon from "@/assets/icons/integrations/github.svg";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
-import { DEFAULT_EVENT_STATE_MAP } from "../componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "../componentBase/eventState";
 
 const meta: Meta<typeof ComponentSidebar> = {
   title: "ui/ComponentSidebar",

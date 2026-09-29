@@ -1,0 +1,84 @@
+import { Editor } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import { describe, expect, it } from "bun:test";
+import { insertUploadedFiles } from "./workOrderDescriptionFiles";
+import { WorkOrderImage } from "./workOrderDescriptionImage";
+
+function markdownEditor() {
+  return new Editor({
+    extensions: [StarterKit, WorkOrderImage],
+    content: "",
+  });
+}
+
+describe("insertUploadedFiles", () => {
+  it("inserts an image markdown node for image uploads", () => {
+    const editor = markdownEditor();
+    insertUploadedFiles(editor, [
+      {
+        id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        filename: "shot.png",
+        contentType: "image/png",
+        ref: "sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        previewUrl: "blob:preview",
+        isImage: true,
+      },
+    ]);
+
+    expect(editor.getHTML()).toContain('src="sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"');
+    editor.destroy();
+  });
+
+  it("inserts a markdown link for non-image uploads", () => {
+    const editor = markdownEditor();
+    insertUploadedFiles(editor, [
+      {
+        id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        filename: "notes.txt",
+        contentType: "text/plain",
+        ref: "sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        previewUrl: "blob:preview",
+        isImage: false,
+      },
+    ]);
+
+    expect(editor.getHTML()).toContain("sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    editor.destroy();
+  });
+
+  it("inserts an image markdown node for video uploads", () => {
+    const editor = markdownEditor();
+    insertUploadedFiles(editor, [
+      {
+        id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        filename: "clip.mp4",
+        contentType: "video/mp4",
+        ref: "sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        previewUrl: "blob:preview",
+        isImage: false,
+        isVideo: true,
+      },
+    ]);
+
+    expect(editor.getHTML()).toContain("sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    editor.destroy();
+  });
+
+  it("inserts an image markdown node for audio uploads", () => {
+    const editor = markdownEditor();
+    insertUploadedFiles(editor, [
+      {
+        id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        filename: "note.mp3",
+        contentType: "audio/mpeg",
+        ref: "sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        previewUrl: "blob:preview",
+        isImage: false,
+        isAudio: true,
+      },
+    ]);
+
+    expect(editor.getHTML()).toContain("sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    editor.destroy();
+  });
+});

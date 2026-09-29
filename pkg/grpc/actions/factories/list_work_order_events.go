@@ -23,26 +23,16 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order events")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list work order events")
-	}
-
 	limit := getWorkOrderEventsLimit(req.GetLimit())
 	before := getWorkOrderEventsBefore(req.GetBefore())
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
 
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}

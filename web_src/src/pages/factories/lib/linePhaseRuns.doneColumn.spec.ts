@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type {
   FactoriesFactoryLine,
   FactoriesWorkOrder,
@@ -64,7 +64,7 @@ function closedOrder(args: {
 }
 
 describe("buildLinePhaseBoard with a board Done column", () => {
-  it("takes a completed work order off the phase columns", () => {
+  it("takes a completed task off the phase columns", () => {
     const done = closedOrder({ id: "wo-done", result: "RESULT_COMPLETED", lineId: "line-1" });
 
     const board = buildLinePhaseBoard(LINE, [done], APPS);
@@ -73,7 +73,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
     expect(board.flatMap((column) => column.runs)).toEqual([]);
   });
 
-  it("takes a failed work order off the phase columns", () => {
+  it("takes a failed task off the phase columns", () => {
     const failed = closedOrder({
       id: "wo-failed",
       result: "RESULT_FAILED",
@@ -105,12 +105,24 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 });
 
 describe("collectLineDoneOrders", () => {
-  it("returns completed, rejected, and canceled orders of this line, newest first", () => {
+  it("returns completed and failed orders of this line, newest first", () => {
     const completed = closedOrder({
       id: "wo-completed",
       result: "RESULT_COMPLETED",
       lineId: "line-1",
       updatedAt: "2026-08-11T12:00:00.000Z",
+    });
+    const olderCompleted = closedOrder({
+      id: "wo-completed-old",
+      result: "RESULT_COMPLETED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T11:00:00.000Z",
+    });
+    const failed = closedOrder({
+      id: "wo-failed",
+      result: "RESULT_FAILED",
+      lineId: "line-1",
+      updatedAt: "2026-08-11T12:30:00.000Z",
     });
     const rejected = closedOrder({
       id: "wo-rejected",
@@ -126,9 +138,9 @@ describe("collectLineDoneOrders", () => {
       updatedAt: "2026-08-11T13:00:00.000Z",
     });
 
-    const done = collectLineDoneOrders([completed, rejected, canceled], LINE);
+    const done = collectLineDoneOrders([completed, olderCompleted, failed, rejected, canceled], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-rejected", "wo-canceled", "wo-completed"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-failed", "wo-completed", "wo-completed-old"]);
   });
 
   it("leaves out open orders and orders of another line", () => {
@@ -146,5 +158,14 @@ describe("collectLineDoneOrders", () => {
     const done = collectLineDoneOrders([closedInBacklog], LINE);
 
     expect(done.map((entry) => entry.id)).toEqual(["wo-backlog-closed"]);
+  });
+
+  it("excludes a rejected draft and a rejected order that already dispatched", () => {
+    const rejectedDraft = closedOrder({ id: "wo-rejected-draft", result: "RESULT_REJECTED" });
+    const rejectedAfterRun = closedOrder({ id: "wo-rejected-ran", result: "RESULT_REJECTED", lineId: "line-1" });
+
+    const done = collectLineDoneOrders([rejectedDraft, rejectedAfterRun], LINE);
+
+    expect(done).toEqual([]);
   });
 });

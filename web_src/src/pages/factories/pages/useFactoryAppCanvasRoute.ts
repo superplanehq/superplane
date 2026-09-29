@@ -22,7 +22,8 @@ function readFactoryAppOrderRef(searchParams: URLSearchParams): string | null {
 
 export function useFactoryAppCanvasRoute() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
-  const { appId = "" } = useParams<{ appId: string }>();
+  const params = useParams<{ appId?: string; automationId?: string }>();
+  const appId = params.automationId ?? params.appId ?? "";
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     data: canvas,

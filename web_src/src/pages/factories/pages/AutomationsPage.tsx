@@ -10,10 +10,21 @@ import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
+import { usePRFeedbackWorkOrderAttention } from "./useWorkOrderPRFeedbackRunHref";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(model.workOrders);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    checksPassedLabels,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
 
   // Above the list/detail branching below (hooks can't be conditional): this
   // single call covers both the Automations list and the in-page detail view
@@ -35,10 +46,18 @@ export function AutomationsPage() {
   const selectedApp = model.selectedApp;
   const workOrderCardContext = {
     organizationId: model.organizationId,
+    factoryId: model.factoryId,
     factoryKey: model.factoryKey,
     factoryLines: model.factory?.lines ?? [],
     canDispatch: model.canUpdateWorkOrders,
     canAssign: model.canUpdateWorkOrders,
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    checksPassedLabels,
+    fixesPausedOrderIds,
+    pullRequests,
     ...cardActions,
   };
 
@@ -63,7 +82,7 @@ export function AutomationsPage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Automations"
-        subtitle="Automations are one-step lines. Each one listens for a trigger and runs a canvas when it fires."
+        subtitle="Automations are one-step lines. Each one listens for a trigger and runs its steps when it fires."
         actions={
           <PermissionTooltip
             allowed={model.canCreateApp || model.permissionsLoading}

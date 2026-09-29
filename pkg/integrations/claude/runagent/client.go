@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -46,13 +44,6 @@ type CreateManagedSessionRequest struct {
 	AgentVersion  *int
 	EnvironmentID string
 	VaultIDs      []string
-	Resources     []FileResource
-}
-
-// FileResource is a file uploaded via the Files API to mount into the session.
-type FileResource struct {
-	FileID    string
-	MountPath string
 }
 
 // ManagedSession is a subset of the session resource returned by the API.
@@ -87,19 +78,11 @@ type SessionEventError struct {
 	Message string `json:"message"`
 }
 
-// sessionResourceBody is a file resource mounted into the session.
-type sessionResourceBody struct {
-	Type      string `json:"type"`
-	FileID    string `json:"file_id"`
-	MountPath string `json:"mount_path"`
-}
-
 // createManagedSessionBody is the JSON body for session creation.
 type createManagedSessionBody struct {
-	Agent         any                   `json:"agent"`
-	EnvironmentID string                `json:"environment_id"`
-	VaultIDs      []string              `json:"vault_ids,omitempty"`
-	Resources     []sessionResourceBody `json:"resources,omitempty"`
+	Agent         any      `json:"agent"`
+	EnvironmentID string   `json:"environment_id"`
+	VaultIDs      []string `json:"vault_ids,omitempty"`
 }
 
 type userMessageTextBlock struct {
@@ -159,24 +142,11 @@ func buildCreateSessionBody(req CreateManagedSessionRequest) (createManagedSessi
 		}
 	}
 
-	body := createManagedSessionBody{
+	return createManagedSessionBody{
 		Agent:         agent,
 		EnvironmentID: req.EnvironmentID,
 		VaultIDs:      nonEmptyStrings(req.VaultIDs),
-	}
-
-	if len(req.Resources) > 0 {
-		body.Resources = make([]sessionResourceBody, len(req.Resources))
-		for i, r := range req.Resources {
-			body.Resources[i] = sessionResourceBody{
-				Type:      "file",
-				FileID:    r.FileID,
-				MountPath: r.MountPath,
-			}
-		}
-	}
-
-	return body, nil
+	}, nil
 }
 
 func nonEmptyStrings(in []string) []string {
@@ -542,78 +512,6 @@ func (c *Client) SendManagedSessionInterrupt(sessionID string) error {
 	return err
 }
 
-// UploadFile uploads a file to the Anthropic Files API and returns its ID.
-// The file can then be mounted into a session via CreateManagedSessionRequest.Resources.
-// AddSessionResource attaches a file resource to an existing session.
-// POST /v1/sessions/{id}/resources
-func (c *Client) AddSessionResource(sessionID string, resource FileResource) error {
-	if sessionID == "" {
-		return fmt.Errorf("session id is required")
-	}
-	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID) + "/resources"
-	body := map[string]string{
-		"type":       "file",
-		"file_id":    resource.FileID,
-		"mount_path": resource.MountPath,
-	}
-	b, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshal resource: %w", err)
-	}
-	_, err = c.execRequestWithBeta(http.MethodPost, URL, bytes.NewBuffer(b), anthropicBetaManagedAgents)
-	return err
-}
-
-func (c *Client) UploadFile(content io.Reader, filename string) (string, error) {
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", filepath.Base(filename))
-	if err != nil {
-		return "", fmt.Errorf("create multipart file: %w", err)
-	}
-	if _, err := io.Copy(part, content); err != nil {
-		return "", fmt.Errorf("copy file content: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("close multipart writer: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/files", &body)
-	if err != nil {
-		return "", fmt.Errorf("build upload request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("x-api-key", c.APIKey)
-	req.Header.Set("anthropic-version", anthropicVersionValue)
-	req.Header.Set("anthropic-beta", anthropicBetaManagedAgents)
-
-	res, err := c.http.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("upload file: %w", err)
-	}
-	defer res.Body.Close()
-
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("read upload response: %w", err)
-	}
-
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return "", fmt.Errorf("upload file failed (%d): %s", res.StatusCode, string(resBody))
-	}
-
-	var result struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(resBody, &result); err != nil {
-		return "", fmt.Errorf("decode upload response: %w", err)
-	}
-	if result.ID == "" {
-		return "", fmt.Errorf("upload returned empty file ID")
-	}
-	return result.ID, nil
-}
-
 // DeleteManagedSession removes a session (DELETE /v1/sessions/{id}).
 // The API does not allow deleting a running session without interrupting first.
 func (c *Client) DeleteManagedSession(sessionID string) error {
@@ -627,7 +525,7 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 
 // SessionFile is a file surfaced by the Files API for a Managed Agents
 // session. Files the agent writes to /mnt/session/outputs/ are captured with
-// downloadable=true; input files mounted into the session are not downloadable.
+// downloadable=true.
 type SessionFile struct {
 	ID           string `json:"id"`
 	Filename     string `json:"filename"`
@@ -685,8 +583,7 @@ func (c *Client) ListSessionFiles(sessionID string) ([]SessionFile, error) {
 
 // ListSessionFilesWithRetry lists session files, retrying while the listing
 // has no downloadable entries — the agent's outputs can take a few seconds to
-// be indexed after the session goes idle, and mounted input copies (which are
-// never downloadable) may appear before them.
+// be indexed after the session goes idle.
 func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay time.Duration) ([]SessionFile, error) {
 	if attempts < 1 {
 		attempts = 1
@@ -730,27 +627,6 @@ func (c *Client) DownloadFileContent(fileID string) ([]byte, error) {
 		return nil, fmt.Errorf("file id is required")
 	}
 	return c.execRequestWithBeta(http.MethodGet, c.FileContentURL(fileID), nil, anthropicBetaManagedAgents)
-}
-
-// DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
-func (c *Client) DeleteFile(fileID string) error {
-	if fileID == "" {
-		return nil
-	}
-	URL := c.BaseURL + "/files/" + url.PathEscape(fileID)
-	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
-	return err
-}
-
-// CleanupFiles deletes a list of uploaded files, logging failures.
-func (c *Client) CleanupFiles(fileIDs []string, logWarn func(string, ...any)) {
-	for _, id := range fileIDs {
-		if err := c.DeleteFile(id); err != nil {
-			if logWarn != nil {
-				logWarn("Failed to delete uploaded file %s: %v", id, err)
-			}
-		}
-	}
 }
 
 // CreateVault creates a temporary vault and returns its ID.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { InternalNode, Node } from "@xyflow/react";
 import {
   CANVAS_VIEWPORT_CULL_PADDING_PX,

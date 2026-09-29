@@ -4,19 +4,24 @@ import { organizationsListHostedLlmModels } from "@/api-client";
 import type { OrganizationsListHostedLlmModelsResponse } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-export function hostedLLMModelsQueryKey(organizationId: string, provider: string) {
-  return ["organizations", organizationId, "hosted-llm-models", provider] as const;
+export function hostedLLMModelsQueryKey(organizationId: string, provider: string, factoryId?: string) {
+  return ["organizations", organizationId, "hosted-llm-models", provider, factoryId ?? ""] as const;
 }
 
-export function useHostedLLMModels(organizationId: string | undefined, provider: string | undefined, enabled: boolean) {
+export function useHostedLLMModels(
+  organizationId: string | undefined,
+  provider: string | undefined,
+  enabled: boolean,
+  factoryId?: string,
+) {
   return useQuery({
-    queryKey: hostedLLMModelsQueryKey(organizationId ?? "", provider ?? ""),
+    queryKey: hostedLLMModelsQueryKey(organizationId ?? "", provider ?? "", factoryId),
     queryFn: async (): Promise<OrganizationsListHostedLlmModelsResponse> => {
       const response = await organizationsListHostedLlmModels(
         withOrganizationHeader({
           organizationId: organizationId!,
           path: { id: organizationId! },
-          query: { provider },
+          query: { provider, factoryId },
         }),
       );
       return response.data ?? {};

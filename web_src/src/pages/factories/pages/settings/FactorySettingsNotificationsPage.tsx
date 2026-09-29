@@ -171,7 +171,23 @@ export function FactorySettingsNotificationsPage() {
   return (
     <FactorySettingsPageFrame
       title="Notifications"
-      subtitle="Choose which work order emails you receive. You never get an email about your own actions."
+      subtitle="Choose which task emails you receive. You never get an email about your own actions."
+      actions={
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You do not have permission to change notification settings."
+        >
+          <LoadingButton
+            disabled={isLoading || !canUpdate || !isDirty}
+            loading={updateSettings.isPending}
+            loadingText="Saving..."
+            onClick={() => void handleSave()}
+            data-testid="notifications-save"
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
+      }
     >
       <div className="space-y-6" data-testid="factory-settings-notifications-form">
         <FactorySettingsCard>
@@ -221,20 +237,6 @@ export function FactorySettingsNotificationsPage() {
             ) : null}
           </div>
         </FactorySettingsCard>
-        <PermissionTooltip
-          allowed={canUpdate || permissionsLoading}
-          message="You do not have permission to change notification settings."
-        >
-          <LoadingButton
-            disabled={isLoading || !canUpdate || !isDirty}
-            loading={updateSettings.isPending}
-            loadingText="Saving..."
-            onClick={() => void handleSave()}
-            data-testid="notifications-save"
-          >
-            Save
-          </LoadingButton>
-        </PermissionTooltip>
       </div>
     </FactorySettingsPageFrame>
   );
@@ -264,7 +266,7 @@ const WORKSPACE_SCOPE_OPTIONS: WorkspaceScopeOption[] = [
     value: "none",
     id: "notifications-scope-none",
     label: "Off",
-    description: "Do not send any work order emails.",
+    description: "Do not send any task emails.",
   },
 ];
 
@@ -340,7 +342,7 @@ function WorkspaceScopeSection({
           data-testid="notifications-scope-off-message"
         >
           <BellOff className="size-4 shrink-0" aria-hidden />
-          <span>You will not receive any work order emails.</span>
+          <span>You will not receive any task emails.</span>
         </div>
       ) : null}
       {scopeError ? <p className="text-[11px] text-destructive">{scopeError}</p> : null}

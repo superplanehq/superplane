@@ -2,10 +2,14 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesWorkOrderArtifact,
+  FactoryIntakeHealth,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -32,9 +36,22 @@ import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvase
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
-export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
+export {
+  ADD_INTAKE_COPY,
+  ADD_INTAKE_TEMPLATES,
+  addIntakeTemplatesForOrg,
+  isAddIntakeSoon,
+  type AddIntakeTemplate,
+} from "./addIntakeTemplates";
 
-export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents";
+export type LineIntakeSourceId =
+  | "github-issues"
+  | "dependabot-alerts"
+  | "jira-issues"
+  | "sentry-exceptions"
+  | "pagerduty-incidents"
+  | "productive-tasks"
+  | "datadog";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -44,12 +61,13 @@ export interface LineIntakeSource {
   description: string;
   iconSrc: string;
   iconAlt: string;
+  tabLabel: string;
   /** How SuperPlane receives events from this source. */
   listen: {
     kind: LineIntakeListenKind;
     label: string;
   };
-  /** Runner that classifies whether the event becomes a work order. */
+  /** Runner that classifies whether the event becomes a task. */
   evaluate: {
     label: string;
     rule: string;
@@ -62,65 +80,148 @@ export interface LineIntakeSource {
 }
 
 /**
- * Intake is an automation that listens to an external source, decides which
- * events to take in, and creates backlog work orders with that context.
+ * Intake is an automation that listens to an external source and creates
+ * backlog tasks. SuperPlane scores those tasks in Backlog.
  */
 export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "github-issues",
     name: "GitHub issues",
-    description: "Open issues from connected repositories.",
+    description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
+    tabLabel: "GitHub",
     listen: {
       kind: "webhook",
       label: "On GitHub issue",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the issue and decides whether to create a work order.",
+      label: "Create a task",
+      rule: "A matching GitHub issue becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "dependabot-alerts",
+    name: "Dependabot alerts",
+    description: "Creates tasks from Dependabot alerts.",
+    iconSrc: githubIcon,
+    iconAlt: "GitHub",
+    tabLabel: "Dependabot",
+    listen: {
+      kind: "webhook",
+      label: "On Dependabot alert",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Dependabot alert becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "jira-issues",
+    name: "Jira issues",
+    description: "Creates tasks from Jira issues.",
+    iconSrc: jiraIcon,
+    iconAlt: "Jira",
+    tabLabel: "Jira",
+    listen: {
+      kind: "webhook",
+      label: "On Jira issue",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Jira issue becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
     },
   },
   {
     id: "sentry-exceptions",
     name: "Sentry exceptions",
-    description: "Unresolved errors from production.",
+    description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
+    tabLabel: "Sentry",
     listen: {
       kind: "webhook",
       label: "On Sentry exception",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the exception and decides whether to create a work order.",
+      label: "Create a task",
+      rule: "A matching Sentry exception becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
     },
   },
   {
     id: "pagerduty-incidents",
     name: "PagerDuty incidents",
-    description: "Firing incidents that need a work order.",
+    description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
     iconAlt: "PagerDuty",
+    tabLabel: "PagerDuty",
     listen: {
       kind: "webhook",
       label: "On PagerDuty incident",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the incident and decides whether to create a work order.",
+      label: "Create a task",
+      rule: "A matching PagerDuty incident becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "productive-tasks",
+    name: "Productive tasks",
+    description: "Create tasks from Productive tasks.",
+    iconSrc: productiveIcon,
+    iconAlt: "Productive",
+    tabLabel: "Productive",
+    listen: {
+      kind: "webhook",
+      label: "On Productive task",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Productive task becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "datadog",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
+    iconSrc: datadogIcon,
+    iconAlt: "Datadog",
+    tabLabel: "Datadog",
+    listen: {
+      kind: "webhook",
+      label: "On Error Tracking alert",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Datadog Error Tracking alert becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
     },
   },
 ];
@@ -155,20 +256,35 @@ export interface ConfiguredLineIntakeSource {
   /** Canvas that implements the intake, used to open the automation editor. */
   appId: string;
   healthy: boolean;
+  paused: boolean;
   settings: IntakeSourceSettings;
   source: LineIntakeSource;
+  /** Why the intake is unhealthy. HEALTH_OK when it can receive items. */
+  health?: FactoryIntakeHealth;
+  /** Live trigger connection. Empty when the intake is unbound. */
+  integrationId?: string;
+  /** Live trigger resource, such as a Jira project key. */
+  resourceId?: string;
 }
 
 const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = {
   SOURCE_GITHUB_ISSUES: "github-issues",
+  SOURCE_DEPENDABOT_ALERTS: "dependabot-alerts",
+  SOURCE_JIRA_ISSUES: "jira-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
+  SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
+  SOURCE_DATADOG: "datadog",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
   "github-issues": "SOURCE_GITHUB_ISSUES",
+  "dependabot-alerts": "SOURCE_DEPENDABOT_ALERTS",
+  "jira-issues": "SOURCE_JIRA_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
+  "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
+  datadog: "SOURCE_DATADOG",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
@@ -189,8 +305,15 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         intakeId,
         appId: intake.canvasId?.trim() ?? "",
         healthy: intake.healthy !== false,
-        settings: intakeSettingsFromApi(name, intake.settings),
+        paused: intake.paused === true,
+        settings: {
+          ...intakeSettingsFromApi(name, intake.settings),
+          datadogService: intake.resourceId?.trim() ?? "",
+        },
         source: { ...source, name },
+        health: intake.health,
+        integrationId: intake.integrationId?.trim() || undefined,
+        resourceId: intake.resourceId?.trim() || undefined,
       },
     ];
   });
@@ -223,14 +346,6 @@ export function isBelowThresholdTicket(ticket: LineIntakeAnalyzingTicket): boole
   return ticket.outcome === "below-threshold";
 }
 
-/** Analyzing tickets stay on top. Tickets that did not make it stay below. */
-export function sortIntakeTicketsByOutcome(tickets: LineIntakeAnalyzingTicket[]): LineIntakeAnalyzingTicket[] {
-  return [
-    ...tickets.filter((ticket) => !isBelowThresholdTicket(ticket)),
-    ...tickets.filter((ticket) => isBelowThresholdTicket(ticket)),
-  ];
-}
-
 export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): number | undefined {
   if (ticket.confidenceScore != null) {
     return ticket.confidenceScore;
@@ -241,35 +356,22 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
   return undefined;
 }
 
+/** Row title on the board. It says what the intake listens to, and nothing else. */
+export function lineIntakeListenTitle(source: LineIntakeSource, paused = false): string {
+  if (paused) {
+    return `Listening to ${source.name} is paused`;
+  }
+  return `Listening to ${source.name}`;
+}
+
 export const LINE_INTAKE_COPY = {
-  analyzingTitle: "Analyzing",
-  analyzingHelper: "Tickets from this intake.",
-  analyzingStatus: "Analyzing",
-  analyzingEmpty: "No tickets in analysis.",
-  belowThresholdStatus: "Not accepted",
-  belowThresholdHelper: "Not accepted. The score is below the minimum confidence.",
-  needsRepair: "Needs repair",
-  needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
+  paused: "Paused",
+  pausedHelper: "New items do not become tasks. You can still import one item by hand.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",
   analysisCompleteHelper: "SuperPlane did not change the ticket. Review the plan before work starts.",
 } as const;
-
-/** GitHub issues pulled in for first-run analysis. Scores land on the board later. */
-export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
-  { id: "gh-issue-1", title: "Handle duplicate refunds on retry" },
-  { id: "gh-issue-2", title: "Return 409 when the invoice is already paid" },
-  { id: "gh-issue-3", title: "Show a clearer empty state on the billing page" },
-  { id: "gh-issue-4", title: "Upgrade the Node 20 base image" },
-  { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
-  { id: "gh-issue-6", title: "Document the refund webhook contract", outcome: "below-threshold", confidencePct: 58 },
-  { id: "gh-issue-7", title: "Make the billing dashboard faster", outcome: "below-threshold", confidencePct: 52 },
-  { id: "gh-issue-8", title: "Redesign the invoice settings page", outcome: "below-threshold", confidencePct: 44 },
-  { id: "gh-issue-9", title: "Investigate flaky payouts in staging", outcome: "below-threshold", confidencePct: 38 },
-  { id: "gh-issue-10", title: "Move the ledger to a new database", outcome: "below-threshold", confidencePct: 27 },
-  { id: "gh-issue-11", title: "Payments break for some customers", outcome: "below-threshold", confidencePct: 12 },
-];
 
 const OWNER = {
   id: STORYBOOK_ME_USER_ID,
@@ -573,7 +675,7 @@ function ticketAnalysisCanvas(complete: boolean): SplitRunCanvasModel {
 }
 
 /**
- * Builds the same popup shape as a line-board work order: log on the left,
+ * Builds the same popup shape as a line-board task: log on the left,
  * automation canvas on the right. Phases are listen → evaluate → backlog.
  */
 export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvasModel {
@@ -586,7 +688,7 @@ export function intakeAutomationFixture(source: LineIntakeSource, appId?: string
     {
       key: `${source.id}-backlog`,
       headline: "Accepted events go to Backlog",
-      text: `${source.evaluate.rule} Accepted items become work orders in Backlog with the source context.`,
+      text: `${source.evaluate.rule} Accepted items become tasks in Backlog with the source context.`,
     },
   ];
 

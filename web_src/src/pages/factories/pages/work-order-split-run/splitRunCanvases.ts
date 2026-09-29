@@ -1,38 +1,40 @@
 import type {
   ComponentsEdge,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrderArtifact,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { parseCanvasYamlMetadata, parseCanvasYamlToSpec } from "@/pages/app/lib/canvas-yaml-staging";
+import { AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
-import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import {
+  OPEN_WORK_ORDER_ARTIFACTS,
+  OPEN_WORK_ORDER_PULL_REQUESTS,
+} from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
-import issueIntakeYaml from "@/pages/home/factories/line-apps/issue-intake.canvas.yaml?raw";
-import planningYaml from "@/pages/home/factories/line-apps/planning.canvas.yaml?raw";
-import implementationYaml from "@/pages/home/factories/line-apps/implementation.canvas.yaml?raw";
-import prClosureYaml from "@/pages/home/factories/line-apps/pr-closure.canvas.yaml?raw";
+import issueIntakeYaml from "@factory-templates/issue-intake.canvas.yaml?raw";
+import implementationYaml from "@factory-templates/line-implementation.canvas.yaml?raw";
+import prClosureYaml from "@factory-templates/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import { DESCRIPTION_ARTIFACT, PR_CLOSURE_PR_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import riskAssessmentYaml from "./risk-assessment.canvas.yaml?raw";
 import sentryIntakeYaml from "./sentry-intake.canvas.yaml?raw";
 import slackIntakeYaml from "./slack-intake.canvas.yaml?raw";
 
 import { parseClaudeCodeLog, type ClaudeCodeLogStep } from "./parseClaudeCodeLog";
 import implementationClaudeLog from "./implementation-claude-log.txt?raw";
-import planningClaudeLog from "./planning-claude-log.txt?raw";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamKind, SplitRunStreamLine } from "./splitRunMocks";
 
-export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "planning" | "implementation" | "risk" | "closure";
+export type SplitRunCanvasKey = "intake" | "sentry" | "slack" | "implementation" | "risk" | "closure";
 
-const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "planning", "implementation", "risk", "closure"];
+const CANVAS_KEYS: SplitRunCanvasKey[] = ["intake", "sentry", "slack", "implementation", "risk", "closure"];
 
 const CANVAS_HINTS: { needles: string[]; key: SplitRunCanvasKey }[] = [
   { needles: ["sentry"], key: "sentry" },
   { needles: ["slack"], key: "slack" },
   { needles: ["ingest", "intake", "backlog"], key: "intake" },
-  { needles: ["plan"], key: "planning" },
   { needles: ["implement"], key: "implementation" },
   { needles: ["verify", "verifier", "risk", "ci"], key: "risk" },
   { needles: ["closure", "done"], key: "closure" },
@@ -61,7 +63,6 @@ const LINE_AUTOMATION_LABEL: Record<SplitRunCanvasKey, { name: string; component
   intake: { name: "Backlog", componentName: "Ingest" },
   sentry: { name: "Backlog", componentName: "Sentry" },
   slack: { name: "Backlog", componentName: "Slack" },
-  planning: { name: "Plan", componentName: "Planning" },
   implementation: { name: "Implement", componentName: "Implementation" },
   risk: { name: "Verify", componentName: "Risk Assessment" },
   closure: { name: "Done", componentName: "PR Closure" },
@@ -93,7 +94,6 @@ const CANVAS_YAML: Record<SplitRunCanvasKey, string> = {
   intake: issueIntakeYaml,
   sentry: sentryIntakeYaml,
   slack: slackIntakeYaml,
-  planning: planningYaml,
   implementation: implementationYaml,
   risk: riskAssessmentYaml,
   closure: prClosureYaml,
@@ -174,7 +174,7 @@ function takenNodeIds(
         continue;
       }
       const source = nodes.find((node) => node.id === id);
-      if (edge.channel === "passed" && status === "running" && source?.component === "runnerClaudeCode") {
+      if (edge.channel === "passed" && status === "running" && isAgentHarnessNode(source)) {
         continue;
       }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
@@ -290,13 +290,21 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
 const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; iconSrc?: string }> = {
   onRun: { title: "On Run", iconSlug: "play" },
   runnerBash: { title: "Run Bash", iconSlug: "code" },
+  runnerSuperPlane: { title: "Run SuperPlane Agent", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
+  runnerCodex: { title: "Run Codex", iconSlug: "code" },
+  runnerOpenRouter: { title: "Run OpenRouter Agent", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
   if: { title: "If", iconSlug: "split" },
   filter: { title: "Filter", iconSlug: "funnel" },
-  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "factory" },
+  addWorkOrderArtifact: { title: "Add Task Artifact", iconSlug: "factory" },
+  addPullRequest: { title: "Add Pull Request", iconSlug: "factory" },
+  updatePullRequest: { title: "Update Pull Request", iconSlug: "factory" },
+  findPullRequest: { title: "Find Pull Request", iconSlug: "factory" },
+  addPullRequestActivity: { title: "Add Pull Request Activity", iconSlug: "factory" },
+  updatePullRequestActivity: { title: "Update Pull Request Activity", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
-  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
+  reportWorkOrderCheck: { title: "Report Task Check", iconSlug: "factory" },
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
   "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },
   "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "github" },
@@ -305,10 +313,9 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
-  findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
-  updateWorkOrderArtifact: { title: "Update Work Order Artifact", iconSlug: "factory" },
-  createWorkOrder: { title: "Create Work Order", iconSlug: "factory" },
-  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
+  findWorkOrder: { title: "Find Task", iconSlug: "factory" },
+  createWorkOrder: { title: "Create Task", iconSlug: "factory" },
+  updateWorkOrderStatus: { title: "Update Task Status", iconSlug: "factory" },
 };
 
 export function componentPresentation(component?: string): { title: string; iconSlug: string; iconSrc?: string } {
@@ -347,7 +354,7 @@ const CLOSURE_NOTES: FactoriesWorkOrderArtifact = {
   data: {
     name: "closure.md",
     title: "closure.md",
-    body: "The pull request merged. SuperPlane closed the work order.",
+    body: "The pull request merged. SuperPlane closed the task.",
   },
 };
 
@@ -374,70 +381,94 @@ export function richStreamForCanvas(
   let tick = 0;
 
   for (const node of canvas.nodes) {
-    if (!node.id) {
-      continue;
-    }
-    const nodeStatus = canvas.statuses[node.id] ?? "pending";
-    const presentation = componentPresentation(node.component);
-    const componentName = node.name ?? presentation.title;
-    const lineStatus = streamStatusForNode(nodeStatus);
-    const kind = classifyNode(node);
-    const streamKind = streamKindForNode(node);
-
-    const artifact =
-      kind === "check" || nodeStatus === "did_not_run"
-        ? undefined
-        : artifactForNode(node.id, canvas.key, description, options?.demoArtifacts !== false);
-    const name = kind === "check" ? checkName(node.id, componentName) : componentName;
-    lines.push({
-      id: node.id,
-      nodeId: node.id,
-      at: clockAt(tick),
-      componentName: name,
-      status: lineStatus,
-      artifact,
-      kind: streamKind,
-      componentType: componentTypeLabel(node.component),
-      action: actionForStreamLine(streamKind, nodeStatus, node.id),
-      iconSlug: presentation.iconSlug,
-      iconSrc: presentation.iconSrc,
-    });
-    tick += 1;
-
-    if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const step of claudeCodeChildren(node, canvas.key, options?.demoArtifacts !== false)) {
-        const stepId = `${node.id}-note-${tick}`;
-        lines.push({
-          id: stepId,
-          nodeId: node.id,
-          at: clockAt(tick),
-          componentName: step.name,
-          status: step.status,
-          detail: step.output,
-          note: true,
-          componentType: step.type,
-        });
-        tick += 1;
-        for (const command of step.commands) {
-          lines.push({
-            id: `${node.id}-cmd-${tick}`,
-            nodeId: node.id,
-            at: clockAt(tick),
-            componentName: command.name,
-            status: command.status,
-            detail: command.output,
-            note: true,
-            noteParentId: stepId,
-            noteDepth: 1,
-            componentType: command.type,
-          });
-          tick += 1;
-        }
-      }
-    }
+    tick = appendRichStreamNode({ lines, node, canvas, description, options, tick });
   }
 
   return lines;
+}
+
+function appendRichStreamNode({
+  lines,
+  node,
+  canvas,
+  description,
+  options,
+  tick,
+}: {
+  lines: SplitRunStreamLine[];
+  node: ComponentsNode;
+  canvas: SplitRunCanvasModel;
+  description: FactoriesWorkOrderArtifact | undefined;
+  options: { demoArtifacts?: boolean } | undefined;
+  tick: number;
+}): number {
+  if (!node.id) {
+    return tick;
+  }
+  const nodeStatus = canvas.statuses[node.id] ?? "pending";
+  const presentation = componentPresentation(node.component);
+  const componentName = node.name ?? presentation.title;
+  const lineStatus = streamStatusForNode(nodeStatus);
+  const kind = classifyNode(node);
+  const streamKind = streamKindForNode(node);
+  const skipOutputs = hidesProducedOutputs(kind, nodeStatus);
+  const showDemo = options?.demoArtifacts !== false;
+
+  lines.push({
+    id: node.id,
+    nodeId: node.id,
+    at: clockAt(tick),
+    componentName: kind === "check" ? checkName(node.id, componentName) : componentName,
+    status: lineStatus,
+    artifact: skipOutputs ? undefined : artifactForNode(node.id, canvas.key, description, showDemo),
+    pullRequest: skipOutputs ? undefined : pullRequestForNode(node.id, showDemo),
+    kind: streamKind,
+    componentType: componentTypeLabel(node.component),
+    action: actionForStreamLine(streamKind, nodeStatus, node.id),
+    iconSlug: presentation.iconSlug,
+    iconSrc: presentation.iconSrc,
+  });
+  tick += 1;
+
+  if (kind !== "agent" || nodeStatus === "did_not_run" || nodeStatus === "pending") {
+    return tick;
+  }
+
+  for (const step of claudeCodeChildren(node, canvas.key, showDemo)) {
+    const stepId = `${node.id}-note-${tick}`;
+    lines.push({
+      id: stepId,
+      nodeId: node.id,
+      at: clockAt(tick),
+      componentName: step.name,
+      status: step.status,
+      detail: step.output,
+      note: true,
+      componentType: step.type,
+    });
+    tick += 1;
+    for (const command of step.commands) {
+      lines.push({
+        id: `${node.id}-cmd-${tick}`,
+        nodeId: node.id,
+        at: clockAt(tick),
+        componentName: command.name,
+        status: command.status,
+        detail: command.output,
+        note: true,
+        noteParentId: stepId,
+        noteDepth: 1,
+        componentType: command.type,
+      });
+      tick += 1;
+    }
+  }
+
+  return tick;
+}
+
+function isAgentHarnessNode(node: ComponentsNode | undefined): boolean {
+  return Boolean(node?.component && AGENT_HARNESS_COMPONENTS.has(node.component));
 }
 
 export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
@@ -451,7 +482,7 @@ export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
   if (component === "if") {
     return "if";
   }
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {
@@ -482,10 +513,14 @@ function actionForStreamLine(kind: SplitRunStreamKind, nodeStatus: FactoryNodeSt
   return "passed";
 }
 
+function hidesProducedOutputs(kind: "agent" | "check" | "artifact" | "simple", nodeStatus: string): boolean {
+  return kind === "check" || nodeStatus === "did_not_run";
+}
+
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {
   const component = node.component ?? "";
   const name = `${node.name ?? ""} ${componentPresentation(component).title}`.toLowerCase();
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {
@@ -517,7 +552,6 @@ export function claudeCodeSteps(node: ComponentsNode): Array<{ name: string; typ
 }
 
 const CLAUDE_CODE_LOGS: Partial<Record<SplitRunCanvasKey, string>> = {
-  planning: planningClaudeLog,
   implementation: implementationClaudeLog,
 };
 
@@ -535,16 +569,13 @@ function claudeCodeChildren(
 }
 
 function agentNotes(nodeId: string): string[] {
-  if (nodeId.startsWith("planner-agent")) {
-    return ["Clone Repo", "Write Implementation Plan", "Use plan as output"];
-  }
   if (nodeId.startsWith("implementation-agent")) {
     return ["Reading plan.md.", "Opening the refund reconciliation worker.", "Adding the timeout-then-retry test."];
   }
   if (nodeId === "assess-pr-risk") {
     return ["Reading the pull request diff.", "Scoring retry-policy risk.", "Writing the risk review."];
   }
-  return ["Reading the work order.", "Writing the change.", "Running the local checks."];
+  return ["Reading the task.", "Writing the change.", "Running the local checks."];
 }
 
 function checkName(nodeId: string, fallback: string): string {
@@ -565,6 +596,7 @@ function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
   if (status === "running") return "running";
   if (status === "passed" || status === "triggered") return "passed";
   if (status === "failed") return "failed";
+  if (status === "cancelled") return "cancelled";
   return "pending";
 }
 
@@ -586,13 +618,7 @@ function artifactForNode(
   if (nodeId === "add-branch-artifact") {
     return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-branch-1");
   }
-  if (nodeId === "attach-pr-artifact") {
-    return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-pr-1");
-  }
-  if (nodeId === "stamp-pr-merged") {
-    return PR_CLOSURE_PR_ARTIFACT;
-  }
-  if (nodeId === "find-work-order") {
+  if (nodeId === "find-work-order" || nodeId === "find-pull-request") {
     return MERGE_SCREENSHOT;
   }
   if (nodeId === "complete-work-order") {
@@ -600,6 +626,25 @@ function artifactForNode(
   }
   if (nodeId === "report-risk-check" && key === "risk") {
     return CLOSURE_NOTES;
+  }
+  return undefined;
+}
+
+function pullRequestForNode(nodeId: string, demoArtifacts: boolean): FactoriesFactoryPullRequest | undefined {
+  if (!demoArtifacts) {
+    return undefined;
+  }
+  if (nodeId === "attach-pr-artifact") {
+    return OPEN_WORK_ORDER_PULL_REQUESTS[0];
+  }
+  if (nodeId === "stamp-pr-merged") {
+    return {
+      ...(OPEN_WORK_ORDER_PULL_REQUESTS[0] ?? {}),
+      number: "510",
+      url: "https://github.com/example/ledger/pull/510",
+      title: "Send refund receipts after provider confirm",
+      state: "STATE_MERGED",
+    };
   }
   return undefined;
 }

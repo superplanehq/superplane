@@ -46,7 +46,7 @@ func Test_ListGroupUsers(t *testing.T) {
 	})
 
 	t.Run("empty group - no users", func(t *testing.T) {
-		require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "empty-group", models.RoleOrgViewer, "Empty Group", "Empty group description"))
+		require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "empty-group", models.RoleOrgOperator, "Empty Group", "Empty group description"))
 
 		resp, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "empty-group", r.AuthService)
 		require.NoError(t, err)

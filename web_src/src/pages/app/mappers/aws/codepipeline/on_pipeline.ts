@@ -5,8 +5,8 @@ import type { TriggerProps } from "@/ui/trigger";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { Predicate } from "../../utils";
-import { formatPredicate, stringOrDash } from "../../utils";
+import type { Predicate } from "../../eventDisplay";
+import { formatPredicate, stringOrDash } from "../../eventDisplay";
 
 interface OnPipelineConfiguration {
   region?: string;

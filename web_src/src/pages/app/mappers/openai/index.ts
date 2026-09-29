@@ -1,7 +1,7 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { baseMapper } from "./base";
 import { getUsageMapper } from "./get_usage";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   textPrompt: baseMapper,

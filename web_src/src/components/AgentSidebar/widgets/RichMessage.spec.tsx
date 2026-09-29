@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { RichMessage } from "./RichMessage";
 
 // Stub Monaco — irrelevant to layout-only assertions and slow to load.

@@ -1,4 +1,4 @@
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { cn } from "@/lib/utils";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
@@ -10,16 +10,18 @@ import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 export function AgentStep({
   organizationId,
   setup,
+  showHostedCredit = true,
   onRequestConnect,
 }: {
   organizationId: string;
   setup: OnboardingSetupApi;
+  showHostedCredit?: boolean;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
-  const spend = useOrganizationLLMSpend(organizationId);
+  const spend = useOrganizationWorkspaceUsage(organizationId);
   const grantTotalCents = parseWorkOrderMetric(spend.data?.grantTotalCents);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  const showGrant = shouldShowHostedCreditGrant(grantTotalCents);
+  const showGrant = showHostedCredit && shouldShowHostedCreditGrant(grantTotalCents);
 
   return (
     <div className="grid gap-3">

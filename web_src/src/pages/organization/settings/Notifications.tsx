@@ -28,5 +28,5 @@ export function Notifications() {
     return <Navigate to={factoryListPath(organizationId)} replace />;
   }
 
-  return <Navigate to={factorySettingsSectionPath(organizationId, factory.key, "notifications")} replace />;
+  return <Navigate to={factorySettingsSectionPath(organizationId, factory.key, "account", "notifications")} replace />;
 }

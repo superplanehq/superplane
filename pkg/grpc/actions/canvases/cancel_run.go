@@ -43,21 +43,15 @@ func CancelRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID uu
 			return grpcerrors.NotFound(nil, "run not found")
 		}
 
-		if run.State == models.CanvasRunStateFinished {
-			return nil
+		cancellation, cancelErr := run.RequestCancellation(tx, &user.ID)
+		if cancelErr != nil {
+			return cancelErr
 		}
-
-		drainResult, err = run.DrainForCancellation(tx, &user.ID)
-		if err != nil {
-			return err
+		if cancellation != nil {
+			drainResult = cancellation.Drain
+			publishCancelled = cancellation.NewlyCancelling
 		}
-
-		if run.State == models.CanvasRunStateCancelling {
-			return nil
-		}
-
-		publishCancelled = true
-		return run.MarkAsCancelling(tx, &user.ID)
+		return nil
 	})
 
 	if err != nil {

@@ -68,7 +68,7 @@ const nodes: Node<StepNodeData>[] = [
         agent: "github-worker",
         attempt: "1 / 1",
         output: "Opened draft PR #148 against main.",
-        logs: ["Authenticated GitHub app", "Created draft pull request", "Linked work order"],
+        logs: ["Authenticated GitHub app", "Created draft pull request", "Linked task"],
         inputs: ["head: feat/invite-poc", "base: main", "draft: true"],
       },
     },
@@ -210,7 +210,7 @@ const nodes: Node<StepNodeData>[] = [
     { x: SIDE_X, y: 920 },
     {
       title: "Mark Plan Done",
-      componentName: "Update Work Order Status",
+      componentName: "Update Task Status",
       provider: "superplane",
       status: "pending",
       detail: "waits on implementation",
@@ -246,7 +246,7 @@ const nodes: Node<StepNodeData>[] = [
     { x: SIDE_X, y: 1180 },
     {
       title: "Mark Implementation Done",
-      componentName: "Update Work Order Status",
+      componentName: "Update Task Status",
       provider: "superplane",
       status: "pending",
       detail: "on babysit passed",

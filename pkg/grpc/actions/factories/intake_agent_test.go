@@ -11,11 +11,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ResolveIntakeAgent(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+		})
+		require.NoError(t, err)
+	})
 
 	newFactoryIn := func(t *testing.T, organizationID uuid.UUID) *models.Factory {
 		t.Helper()
@@ -37,6 +46,22 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, "runnerCodex", agent.Component)
 		assert.Equal(t, runner.CredentialsSourceIntegration, agent.Credentials["source"])
 		assert.Equal(t, integrationName(t, organization.ID, agentID), integrationRefName(t, agent))
+	})
+
+	t.Run("an agent on an installation still names the model it runs", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+
+		for app, model := range map[string]string{"claude": "claude-opus-5-5", "openai": "gpt-5"} {
+			factory := newFactoryIn(t, organization.ID)
+			agentID := createReadyOnboardingIntegration(t, organization.ID, app)
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				AgentIntegrationID: &agentID,
+			}))
+
+			agent := resolveIntakeAgent(db, factory)
+			require.NotNil(t, agent)
+			assert.Equal(t, model, agent.Model, "installation %s", app)
+		}
 	})
 
 	t.Run("OpenRouter needs the model the runner asks for", func(t *testing.T) {
@@ -79,7 +104,37 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, integrationName(t, organization.ID, claudeID), integrationRefName(t, agent))
 	})
 
-	t.Run("an organization without an installation runs on hosted credentials", func(t *testing.T) {
+	t.Run("a SuperPlane harness ignores organization installations", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		createReadyOnboardingIntegration(t, organization.ID, "claude")
+		enableHostedSuperPlaneAgent(t, db)
+
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Empty(t, agent.Credentials)
+		assert.Empty(t, agent.Model)
+	})
+
+	t.Run("an organization without an installation runs on the SuperPlane agent", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		enableHostedSuperPlaneAgent(t, db)
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Empty(t, agent.Credentials)
+		assert.Empty(t, agent.Model)
+	})
+
+	t.Run("hosted intake needs the instance SuperPlane agent model", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
 		clearHostedLLMProviders(t, db)
@@ -87,15 +142,19 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 			Provider:      models.UsageProviderAnthropic,
 			Enabled:       true,
 			APIKey:        []byte("test-hosted-key"),
-			AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-sonnet-4-6"},
+			AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
 		})
 		require.NoError(t, err)
 
 		agent := resolveIntakeAgent(db, factory)
-		require.NotNil(t, agent)
-		assert.Equal(t, "runnerClaudeCode", agent.Component)
-		assert.Equal(t, map[string]any{"source": runner.CredentialsSourceHosted}, agent.Credentials)
-		assert.Equal(t, "claude-sonnet-4-6", agent.Model)
+		assert.Nil(t, agent)
 	})
 
 	t.Run("a workspace with no agent at all leaves the node incomplete", func(t *testing.T) {
@@ -127,24 +186,103 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	})
 }
 
-func Test__HostedIntakeModel(t *testing.T) {
-	t.Run("prefers the model the hint names", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"gpt-5-mini", "gpt-4.1"},
-		}
-		assert.Equal(t, "gpt-5-mini", hostedIntakeModel(provider, "gpt-5"))
+func Test__ResolveGitHubInstallationName(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	newFactoryIn := func(t *testing.T, organizationID uuid.UUID) *models.Factory {
+		t.Helper()
+		factory, err := models.CreateFactory(db, organizationID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		return factory
+	}
+
+	t.Run("uses the workspace VCS installation when several GitHub installs are ready", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		firstID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		chosenID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &chosenID,
+		}))
+
+		assert.Equal(t, integrationName(t, organization.ID, chosenID), resolveGitHubInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, firstID), resolveGitHubInstallationName(db, factory))
 	})
 
-	t.Run("takes the first model when the hint misses", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"  ", "z-model", "a-model"},
-		}
-		assert.Equal(t, "a-model", hostedIntakeModel(provider, "sonnet"))
+	t.Run("falls back to a ready GitHub install when setup has no VCS", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		githubID := createReadyOnboardingIntegration(t, organization.ID, "github")
+
+		assert.Equal(t, integrationName(t, organization.ID, githubID), resolveGitHubInstallationName(db, factory))
 	})
 
-	t.Run("reports no model for an empty allowlist", func(t *testing.T) {
-		assert.Empty(t, hostedIntakeModel(models.HostedLLMProvider{}, "sonnet"))
+	t.Run("does not use another GitHub install when the workspace VCS is not ready", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		vcs, err := models.CreateIntegration(
+			uuid.New(),
+			organization.ID,
+			"github",
+			support.RandomName("github"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		otherID := createReadyOnboardingIntegration(t, organization.ID, "github")
+		vcsID := vcs.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &vcsID,
+		}))
+
+		assert.Equal(t, intakeGitHubAppName, resolveGitHubInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, otherID), resolveGitHubInstallationName(db, factory))
 	})
+}
+
+func Test__IntakeAgentModel(t *testing.T) {
+	t.Run("keeps the model the agent carries", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerCodex", Model: "gpt-5-mini"}
+		assert.Equal(t, "gpt-5-mini", agent.model())
+	})
+
+	t.Run("takes the default of the runner when the agent names none", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerCodex"}
+		assert.Equal(t, "gpt-5", agent.model())
+	})
+
+	t.Run("an intake without an agent takes the default of the default runner", func(t *testing.T) {
+		var agent *intakeAgent
+		assert.Equal(t, intakeAgentSpecs[0].model, agent.model())
+	})
+
+	t.Run("a runner an intake cannot score with has no model to name", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerBash"}
+		assert.Empty(t, agent.model())
+	})
+}
+
+func enableHostedSuperPlaneAgent(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	clearHostedLLMProviders(t, db)
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	provider := models.UsageProviderAnthropic
+	model := "claude-sonnet-4-6"
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: &provider,
+		DefaultHostedModel:    &model,
+	})
+	require.NoError(t, err)
 }
 
 func integrationName(t *testing.T, organizationID uuid.UUID, integrationID string) string {

@@ -8,7 +8,7 @@ export function resolveFactoryAppCanvasSubtitle({
   if (description) {
     return description;
   }
-  return `Canvas · ${factoryName?.trim() || "Workspace"}`;
+  return `Automation · ${factoryName?.trim() || "Workspace"}`;
 }
 
 export function resolveFactoryAppCanvasTitle(name?: string) {

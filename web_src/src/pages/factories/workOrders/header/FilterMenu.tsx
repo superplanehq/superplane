@@ -13,38 +13,54 @@ import {
 } from "@/ui/dropdownMenu";
 import { Check, Funnel } from "lucide-react";
 import type { WorkOrderFilterDimension, WorkOrderListState } from "../../lib/useWorkOrderListState";
-import { buildStatusFilterOptions, type WorkOrderFilterOption } from "../../lib/workOrderFilterOptions";
-import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME, MENU_TRIGGER_CLASSNAME } from "./menuStyles";
+import {
+  buildLabelFilterOptions,
+  buildStatusFilterOptions,
+  type WorkOrderFilterOption,
+} from "../../lib/workOrderFilterOptions";
+import { countWorkOrderFilters, visibleWorkOrderFilters } from "../../lib/workOrderListModel";
+import { isWorkOrderDialogStatus } from "../../lib/workOrderProgress";
+import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
   state: WorkOrderListState;
   /** Omit on a line board: the page is already scoped to one line. */
   lineOptions?: WorkOrderFilterOption[];
+  sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
+  /** When false, hide Mergeable so the menu matches the card pill. */
+  showPullRequestMerge?: boolean;
+  onOpenStatusDialog?: () => void;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
-export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuProps) {
-  const filterCount = lineOptions ? state.filterCount : state.filterCount - state.filters.lineIds.length;
+export function FilterMenu({
+  state,
+  lineOptions,
+  sourceOptions,
+  assigneeOptions,
+  showPullRequestMerge = false,
+  onOpenStatusDialog,
+}: FilterMenuProps) {
+  const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
+  const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
   return (
     <DropdownMenu open={state.filterMenuOpen} onOpenChange={state.setFilterMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          size="sm"
-          className={MENU_TRIGGER_CLASSNAME}
+          size="icon"
+          aria-label="Filter"
+          className="relative size-8 shrink-0 text-muted-foreground"
           data-testid="work-orders-filter-trigger"
         >
           <Funnel className="size-3.5" aria-hidden />
-          Filter
           {filterCount > 0 ? (
-            <span className="ml-0.5 rounded bg-accent px-1 text-[10px] text-foreground">{filterCount}</span>
-          ) : (
-            <kbd className="ml-0.5 hidden rounded border border-border px-1 font-sans text-[10px] text-muted-foreground sm:inline">
-              F
-            </kbd>
-          )}
+            <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-foreground">
+              {filterCount}
+            </span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
@@ -56,6 +72,15 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
           dimension="statuses"
           state={state}
           options={buildStatusFilterOptions()}
+          onOpenStatusDialog={onOpenStatusDialog}
+        />
+
+        <FilterSubMenu
+          label="Label"
+          resetLabel="Any label"
+          dimension="labels"
+          state={state}
+          options={buildLabelFilterOptions(showPullRequestMerge)}
         />
 
         {lineOptions ? (
@@ -68,6 +93,14 @@ export function FilterMenu({ state, lineOptions, assigneeOptions }: FilterMenuPr
             emptyLabel="No lines yet"
           />
         ) : null}
+
+        <FilterSubMenu
+          label="Source"
+          resetLabel="Any source"
+          dimension="sourceIds"
+          state={state}
+          options={sourceOptions}
+        />
 
         <FilterSubMenu
           label="Owner"
@@ -88,9 +121,18 @@ interface FilterSubMenuProps {
   state: WorkOrderListState;
   options: WorkOrderFilterOption[];
   emptyLabel?: string;
+  onOpenStatusDialog?: () => void;
 }
 
-function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabel }: FilterSubMenuProps) {
+function FilterSubMenu({
+  label,
+  resetLabel,
+  dimension,
+  state,
+  options,
+  emptyLabel,
+  onOpenStatusDialog,
+}: FilterSubMenuProps) {
   const selected: readonly string[] = state.filters[dimension];
   return (
     <DropdownMenuSub>
@@ -118,14 +160,24 @@ function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabe
             <DropdownMenuItem
               key={option.value}
               className={MENU_ITEM_CLASSNAME}
+              data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
+                if (dimension === "statuses" && isWorkOrderDialogStatus(option.value)) {
+                  state.setFilterMenuOpen(false);
+                  onOpenStatusDialog?.();
+                  return;
+                }
                 state.toggleFilter(dimension, option.value);
               }}
             >
               {option.dot ? <span className={cn("size-1.5 rounded-full", option.dot)} aria-hidden /> : null}
               <span className="flex-1 truncate">{option.label}</span>
-              {selected.includes(option.value) ? <Check className="size-3.5" aria-hidden /> : null}
+              {dimension === "statuses" && isWorkOrderDialogStatus(option.value) ? null : selected.includes(
+                  option.value,
+                ) ? (
+                <Check className="size-3.5" aria-hidden />
+              ) : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuSubContent>

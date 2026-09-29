@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
 import { EMPTY_DISPLAY_VALUE, formatConfigurationValue } from "./formatConfigurationValue";
 
@@ -115,5 +115,21 @@ describe("formatConfigurationValue", () => {
       kind: "expression",
       displayText: "https://api.example.com/hook",
     });
+  });
+
+  it("shows SuperPlane model keys as provider/model", () => {
+    const field: ConfigurationField = {
+      name: "model",
+      label: "Model",
+      type: "hosted-model",
+      typeOptions: { hostedModel: { provider: "all" } },
+    };
+    expect(formatConfigurationValue(field, "openrouter::moonshotai/kimi-k2.6").displayText).toBe(
+      "moonshotai/kimi-k2.6",
+    );
+    expect(formatConfigurationValue(field, "hosted::openrouter::moonshotai/kimi-k2.6").displayText).toBe(
+      "moonshotai/kimi-k2.6",
+    );
+    expect(formatConfigurationValue(field, "").displayText).toBe("Instance SuperPlane agent model");
   });
 });

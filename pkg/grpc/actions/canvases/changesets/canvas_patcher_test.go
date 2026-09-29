@@ -827,7 +827,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "integration is required for github.getIssue")
 	})
@@ -856,7 +859,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "invalid integration id")
 	})
@@ -887,7 +893,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "integration "+missingIntegrationID+" not found")
 	})

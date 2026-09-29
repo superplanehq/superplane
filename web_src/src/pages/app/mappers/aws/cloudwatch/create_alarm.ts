@@ -8,7 +8,7 @@ import type {
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import {
   alarmConsoleUrl,
   alarmFromOutputs,

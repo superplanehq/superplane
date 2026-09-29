@@ -2,8 +2,8 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import type { Predicate } from "../utils";
-import { formatPredicate } from "../utils";
+import type { Predicate } from "../eventDisplay";
+import { formatPredicate } from "../eventDisplay";
 import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
 

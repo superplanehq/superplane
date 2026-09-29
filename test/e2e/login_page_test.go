@@ -150,107 +150,96 @@ func (steps *TestLoginPageSteps) SetInvalidAuthCookie() {
 const googleDevAccountEmail = "dev@superplane.local"
 
 func TestGoogleSSONoAccountSignup(t *testing.T) {
-	t.Run("google sign-in without an account asks to create one", func(t *testing.T) {
-		steps := &googleSSONoAccountSteps{t: t}
+	runProviderSSONoAccountSignup(t, providerSSOCase{
+		provider:      "google",
+		continueLabel: "Continue with Google",
+		screenshot:    "sso-no-account",
+	})
+}
+
+func TestGitHubSSONoAccountSignup(t *testing.T) {
+	runProviderSSONoAccountSignup(t, providerSSOCase{
+		provider:      "github",
+		continueLabel: "Continue with GitHub",
+		screenshot:    "sso-github-no-account",
+	})
+}
+
+type providerSSOCase struct {
+	provider      string
+	continueLabel string
+	screenshot    string
+}
+
+func runProviderSSONoAccountSignup(t *testing.T, spec providerSSOCase) {
+	t.Helper()
+
+	t.Run(spec.provider+" sign-in without an account creates one", func(t *testing.T) {
+		steps := &providerSSONoAccountSteps{t: t, spec: spec}
 		steps.start()
 		steps.visitLoginPage()
 		steps.capture("01-login")
-		steps.clickContinueWithGoogle()
-		steps.assertNoAccountPromptVisible()
-		steps.capture("02-prompt")
-		steps.clickCreateAccount()
+		steps.clickContinue()
 		steps.assertAccountCreatedAndSignedIn()
-		steps.capture("03-after-create")
+		steps.capture("02-after-create")
 	})
 
-	t.Run("use a different account returns to sign in", func(t *testing.T) {
-		steps := &googleSSONoAccountSteps{t: t}
+	t.Run("existing "+spec.provider+" user signs in from the login page", func(t *testing.T) {
+		steps := &providerSSONoAccountSteps{t: t, spec: spec}
 		steps.start()
+		steps.givenTheDevAccountExists()
 		steps.visitLoginPage()
-		steps.clickContinueWithGoogle()
-		steps.assertNoAccountPromptVisible()
-		steps.clickUseADifferentAccount()
-		steps.assertLoginPageVisible()
-	})
-
-	t.Run("existing google user signs in from the login page", func(t *testing.T) {
-		steps := &googleSSONoAccountSteps{t: t}
-		steps.start()
-		steps.givenTheGoogleDevAccountExists()
-		steps.visitLoginPage()
-		steps.clickContinueWithGoogle()
+		steps.clickContinue()
 		steps.assertLeftLoginPage()
 	})
 }
 
-type googleSSONoAccountSteps struct {
+type providerSSONoAccountSteps struct {
 	t       *testing.T
 	session *session.TestSession
+	spec    providerSSOCase
 }
 
-func (s *googleSSONoAccountSteps) start() {
+func (s *providerSSONoAccountSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 }
 
-func (s *googleSSONoAccountSteps) visitLoginPage() {
+func (s *providerSSONoAccountSteps) visitLoginPage() {
 	s.session.Visit("/login")
-	s.session.AssertVisible(q.Text("Continue with Google"))
+	s.session.AssertVisible(q.Text(s.spec.continueLabel))
 }
 
-func (s *googleSSONoAccountSteps) clickContinueWithGoogle() {
-	s.session.Click(q.Text("Continue with Google"))
+func (s *providerSSONoAccountSteps) clickContinue() {
+	s.session.Click(q.Text(s.spec.continueLabel))
 }
 
-func (s *googleSSONoAccountSteps) assertNoAccountPromptVisible() {
-	s.session.AssertVisible(q.Text("No account found"))
-	s.session.AssertVisible(q.Text("This Google account does not have a SuperPlane account."))
-	s.session.AssertVisible(q.Text("Create an account to continue."))
-	s.session.AssertVisible(q.Text("Create account"))
-	s.session.AssertVisible(q.Text("Use a different account"))
-	s.session.AssertURLContains("auth_error=signup_required")
-	s.session.AssertURLContains("provider=google")
-}
-
-func (s *googleSSONoAccountSteps) clickCreateAccount() {
-	s.session.Click(q.Text("Create account"))
-}
-
-func (s *googleSSONoAccountSteps) clickUseADifferentAccount() {
-	s.session.Click(q.Text("Use a different account"))
-}
-
-func (s *googleSSONoAccountSteps) assertAccountCreatedAndSignedIn() {
+func (s *providerSSONoAccountSteps) assertAccountCreatedAndSignedIn() {
 	waitErr := s.session.Page().WaitForURL("**/welcome**", pw.PageWaitForURLOptions{
 		Timeout: pw.Float(s.sessionTimeout()),
 	})
 	require.NoError(s.t, waitErr)
+	assert.NotContains(s.t, s.session.Page().URL(), "auth_error")
 
 	account, err := models.FindAccountByEmail(googleDevAccountEmail)
 	require.NoError(s.t, err)
 	assert.Equal(s.t, googleDevAccountEmail, account.Email)
 }
 
-func (s *googleSSONoAccountSteps) assertLoginPageVisible() {
-	s.session.AssertVisible(q.Text("Welcome to SuperPlane"))
-	s.session.AssertVisible(q.Text("Continue with Google"))
-	assert.NotContains(s.t, s.session.Page().URL(), "auth_error=signup_required")
-}
-
-func (s *googleSSONoAccountSteps) givenTheGoogleDevAccountExists() {
+func (s *providerSSONoAccountSteps) givenTheDevAccountExists() {
 	_, err := models.CreateAccount("Dev User", googleDevAccountEmail)
 	require.NoError(s.t, err)
 }
 
-func (s *googleSSONoAccountSteps) assertLeftLoginPage() {
+func (s *providerSSONoAccountSteps) assertLeftLoginPage() {
 	s.session.WaitUntilURLDoesNotContain("/login")
 	currentURL := s.session.Page().URL()
-	assert.NotContains(s.t, currentURL, "auth_error=signup_required")
+	assert.NotContains(s.t, currentURL, "auth_error")
 }
 
-func (s *googleSSONoAccountSteps) capture(name string) {
+func (s *providerSSONoAccountSteps) capture(name string) {
 	s.session.Sleep(300)
-	path := fmt.Sprintf("/app/tmp/screenshots/sso-no-account-%s.png", name)
+	path := fmt.Sprintf("/app/tmp/screenshots/%s-%s.png", s.spec.screenshot, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		s.t.Fatalf("screenshot dir %s: %v", path, err)
 	}
@@ -264,6 +253,6 @@ func (s *googleSSONoAccountSteps) capture(name string) {
 	}
 }
 
-func (s *googleSSONoAccountSteps) sessionTimeout() float64 {
+func (s *providerSSONoAccountSteps) sessionTimeout() float64 {
 	return 15000
 }

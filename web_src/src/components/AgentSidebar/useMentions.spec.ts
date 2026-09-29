@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { useMentions } from "./useMentions";
 
 describe("useMentions", () => {
@@ -308,6 +308,42 @@ describe("useMentions", () => {
         result.current.setCursorPos(2);
       });
       expect(result.current.showDropdown).toBe(true);
+    });
+  });
+
+  describe("skill slash", () => {
+    it("opens the skill dropdown after /", () => {
+      const { result } = renderHook(() => useMentions());
+      act(() => {
+        result.current.setValue("/oy");
+        result.current.setCursorPos(3);
+      });
+      expect(result.current.showSkillDropdown).toBe(true);
+      expect(result.current.showDropdown).toBe(false);
+      expect(result.current.filter).toBe("oy");
+    });
+
+    it("inserts the skill command and keeps it as slash text", () => {
+      const { result } = renderHook(() => useMentions());
+      act(() => {
+        result.current.setValue("/oy");
+        result.current.setCursorPos(3);
+      });
+      act(() => {
+        result.current.insertSkill("oypirate");
+      });
+      expect(result.current.value).toBe("/oypirate ");
+      expect(result.current.getMarkdown()).toBe("/oypirate ");
+      expect(result.current.showSkillDropdown).toBe(false);
+    });
+
+    it("closes the skill dropdown after a trailing space", () => {
+      const { result } = renderHook(() => useMentions());
+      act(() => {
+        result.current.setValue("/oypirate ");
+        result.current.setCursorPos(10);
+      });
+      expect(result.current.showSkillDropdown).toBe(false);
     });
   });
 });

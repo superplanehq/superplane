@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Build the production runner image. On a real main push, also upload CDN
+# assets to R2 and push the image to GHCR.
+#
+# PR / other refs: bake the frontend inside Docker (no CDN, no R2, no push).
+# Main branch push: Vite with the R2 base URL, sync dist to R2, then
+# image.build FRONTEND_PREBUILT=1 and image.push.
+#
+# Requires a running compose app (make dev.up) and frontend deps
+# (make dev.setup.npm). Main also needs GHCR_PUSH_TOKEN and r2-static-assets.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+ASSET_CDN_ORIGIN="https://assets.superplane.com"
+
+is_main_branch_push() {
+  [[ "${SEMAPHORE_GIT_REF_TYPE:-}" == "branch" && "${SEMAPHORE_GIT_BRANCH:-}" == "main" ]]
+}
+
+compose_exec() {
+  local files=(-f docker-compose.dev.yml)
+  if [[ -n "${CI:-}" ]]; then
+    files+=(-f docker-compose.ci.yml)
+  fi
+  docker compose "${files[@]}" exec -T "$@"
+}
+
+build_frontend_for_cdn() {
+  local asset_base_url="$1"
+
+  echo "Building frontend with VITE_ASSET_BASE_URL=${asset_base_url}"
+  make pb.gen
+  compose_exec -e VITE_ASSET_BASE_URL="${asset_base_url}" app bash -lc \
+    "cd web_src && VITE_ASSET_BASE_URL='${asset_base_url}' npm run build"
+}
+
+upload_static_assets() {
+  local git_sha="$1"
+  local asset_base_url="$2"
+
+  echo "Uploading static assets to R2..."
+  GIT_SHA="${git_sha}" \
+    R2_ASSET_BASE_URL="${asset_base_url}" \
+    DIST_DIR=pkg/web/assets/dist \
+    bash scripts/upload-static-assets-r2
+}
+
+publish_main_image() {
+  local image_tag
+  local asset_base_url
+
+  image_tag="$(git rev-list -1 HEAD -- .)"
+  asset_base_url="${ASSET_CDN_ORIGIN}/releases/${image_tag}/"
+
+  build_frontend_for_cdn "${asset_base_url}"
+  upload_static_assets "${image_tag}" "${asset_base_url}"
+
+  make image.build \
+    IMAGE_TAG="${image_tag}" \
+    VITE_ASSET_BASE_URL="${asset_base_url}" \
+    FRONTEND_PREBUILT=1
+  make image.auth
+  make image.push IMAGE_TAG="${image_tag}"
+}
+
+if is_main_branch_push; then
+  echo "Main branch push: CDN frontend, R2 upload, GHCR push"
+  publish_main_image
+  exit 0
+fi
+
+echo "PR image build: bake frontend in Docker without CDN or R2"
+make image.build

@@ -1,44 +1,39 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { posthog } from "@/posthog";
-import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
+import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
+import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
-import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
+import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
-import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
+import { sphereFor } from "./first-run/firstRunSphereFor";
+import {
+  agentFinishReady,
+  isAgentProviderConnected,
+  type OnboardingAgentCredentialChoice,
+} from "./onboardingAgentReadiness";
+import { WIZARD_STEPS } from "./onboardingFixtures";
+import { afterOnboardingPath } from "./useFinishOnboarding";
+import {
+  useFirstRunSetupFlow,
+  useFreshConnectionsOnConnectScreen,
+  type FirstRunScreen,
+  type FirstRunSetupFlow,
+  type IntegrationId,
+  type OnboardingPageModel,
+} from "./useFirstRunSetupFlow";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
-import type { useOnboardingPageModel } from "./useOnboardingPageModel";
-
-type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-
-type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
-
-const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
-  vcs: "connect",
-  repo: "choose",
-  issues: "tickets",
-  agent: "agent",
-  // The first-run screens derive the workspace name from the repository, so the
-  // last saved answer opens the coding agent screen.
-  name: "agent",
-};
-
-const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
-  connect: "vcs",
-  choose: "repo",
-  tickets: "issues",
-  agent: "agent",
-};
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
@@ -48,18 +43,34 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   agent: 4,
 };
 
+// A bring-your-own-key organization chooses the model source before the backlog.
+const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
+  ...STEP_INDEX_FOR_SCREEN,
+  agent: 3,
+  tickets: 4,
+};
+
+// The reverse path walks the exact screens in reverse order, back to the
+// welcome screen. The connect screen has two pages (the Connect GitHub page
+// and the account picker), so `backActionFor` in FirstRunSetup handles the
+// connect and choose screens itself.
+const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  connect: "welcome",
+  tickets: "choose",
+  agent: "tickets",
+};
+
+const BACK_SCREEN_AGENT_FIRST: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  ...BACK_SCREEN,
+  agent: "choose",
+  tickets: "agent",
+};
+
 /**
  * The first-run screens have no coding agent screen. This screen keeps the
  * wizard step copy, because provisioning needs a connected agent.
  */
 const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
-
-/**
- * GitHub Issues is the only source setup can connect, so the tickets screen
- * opens with it selected. Jira and Linear stay marked as coming soon.
- */
-const DEFAULT_TICKET_SOURCE: FirstRunTicketSource = "github-issues";
-const DEFAULT_ISSUES_CHOICE: IssuesChoiceId = "vcs";
 
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
@@ -71,142 +82,172 @@ function signOut() {
   window.location.href = "/logout";
 }
 
-/**
- * Selects the connection when the organization has exactly one ready GitHub
- * connection. The first-run connect screen shows connection state only, so
- * setup must not wait for a choice the screen cannot offer.
- */
-function useSingleGithubConnection(model: OnboardingPageModel) {
-  const selected = model.selectedVcsConnectionId;
-  const readyInstances = model.githubConnections.readyInstances;
-  const selectConnection = model.selectVcsConnection;
-  const attempted = useRef(false);
+type AgentModelSource = {
+  offered: boolean;
+  choice: OnboardingAgentCredentialChoice | null;
+  onSelect: (choice: OnboardingAgentCredentialChoice) => void;
+};
 
-  useEffect(() => {
-    if (attempted.current || selected || readyInstances.length !== 1) return;
-    const integrationId = readyInstances[0]?.metadata?.id;
-    if (!integrationId) return;
-    attempted.current = true;
-    selectConnection(integrationId);
-  }, [readyInstances, selectConnection, selected]);
-}
-
-/** Reports a failed repository list, which the choose screen shows as empty. */
-function useRepositoryErrorToast(error: unknown) {
-  const reported = useRef<unknown>(null);
-
-  useEffect(() => {
-    if (!error || reported.current === error) return;
-    reported.current = error;
-    showErrorToast(getApiErrorMessage(error, "Failed to load repositories"));
-  }, [error]);
+function agentScreenBody(modelSource: AgentModelSource): string {
+  if (modelSource.choice === "own-key") return FIRST_RUN_COPY.agent.ownKeyBody;
+  if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
+  return AGENT_STEP.purpose;
 }
 
 function AgentScreen({
   organizationId,
   setup,
   chrome,
+  sphere,
   saving,
+  loading,
+  hostedAgentReady,
+  modelSource,
   onRequestConnect,
   onContinue,
 }: {
   organizationId: string;
   setup: OnboardingSetupApi;
   chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   saving: boolean;
+  loading: boolean;
+  hostedAgentReady: boolean;
+  modelSource: AgentModelSource;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
+  const canFinish = agentFinishReady({
+    modelSourceChoice: modelSource.offered,
+    credentialChoice: modelSource.choice,
+    providerConnected: isAgentProviderConnected(setup.connected),
+    agentReady: setup.agentReady,
+    hostedAgentReady,
+  });
+  const showProviders = !modelSource.offered || modelSource.choice === "own-key";
   return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} width="wide">
+    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
+        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
-        <FirstRunPanel>
-          <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={onRequestConnect} />
-        </FirstRunPanel>
-        <LoadingButton
-          type="button"
-          className="w-full"
-          disabled={!setup.agentReady}
-          loading={saving}
-          loadingText="Finishing setup..."
-          onClick={onContinue}
-          data-testid="first-run-finish-setup"
-        >
-          Finish setup
-        </LoadingButton>
+        {loading ? (
+          <p className="text-[13px] text-muted-foreground" role="status">
+            {FIRST_RUN_COPY.agent.loading}
+          </p>
+        ) : null}
+        {modelSource.offered ? (
+          <FirstRunPanel>
+            <FirstRunModelSourceChoice
+              disabled={saving || loading}
+              modelSource={modelSource.choice}
+              onSelectModelSource={modelSource.onSelect}
+            />
+          </FirstRunPanel>
+        ) : null}
+        {showProviders ? (
+          <fieldset disabled={saving || loading} className="mx-0 min-w-0 border-0 p-0">
+            <FirstRunPanel>
+              <AgentStep
+                organizationId={organizationId}
+                setup={setup}
+                showHostedCredit={modelSource.choice !== "own-key"}
+                onRequestConnect={onRequestConnect}
+              />
+            </FirstRunPanel>
+          </fieldset>
+        ) : null}
+        <div className="space-y-3">
+          <LoadingButton
+            type="button"
+            className="w-full"
+            disabled={!canFinish || loading}
+            loading={saving}
+            loadingText={FIRST_RUN_COPY.finish.saving}
+            onClick={onContinue}
+            data-testid="first-run-finish-setup"
+          >
+            {modelSource.offered ? FIRST_RUN_COPY.tickets.continue : FIRST_RUN_COPY.finish.action}
+          </LoadingButton>
+        </div>
       </div>
     </FirstRunShell>
   );
 }
 
 /**
- * Screen order and answer saving for workspace setup. The first-run screens
- * stay presentational, so this hook holds every step that talks to the API.
+ * Back walks the exact screens in reverse order: repository, account picker,
+ * Connect GitHub, welcome. The picker is a page of the connect screen, so
+ * Back on the picker closes it instead of changing screens.
  */
-function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory } = useFactoriesLayout();
-  const [searchParams] = useSearchParams();
-  const setup = model.setup;
+function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
+  if (target === "connect" && flow.pickerShowing) {
+    return flow.closePicker;
+  }
+  if (target === "choose") {
+    return () => flow.goToScreen("connect", "picker");
+  }
+  const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
+  return backScreen ? () => flow.goToScreen(backScreen) : undefined;
+}
 
-  const [screen, setScreen] = useState<FirstRunScreen>(() => {
-    const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
-    return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
-  });
-  const openStep = useRef(model.openSection);
-
-  useSingleGithubConnection(model);
-  useRepositoryErrorToast(model.repositoriesError);
-
-  // Setup selects the connection GitHub returns with, then opens the next step.
-  useEffect(() => {
-    if (model.openSection === openStep.current) return;
-    openStep.current = model.openSection;
-    setScreen(SCREEN_FOR_STEP[model.openSection]);
-  }, [model.openSection]);
-
-  const goToScreen = (next: FirstRunScreen) => {
-    const step = STEP_FOR_SCREEN[next];
-    if (step) {
-      // Keeps the provider return URL on the step the user is answering.
-      openStep.current = step;
-      model.setOpenSection(step);
-    }
-    setScreen(next);
-  };
-
-  const continueFromRepository = async () => {
-    const repository = setup.selectedRepo;
-    if (!repository) return;
-    setup.commitRepoStep();
-    if (!(await model.saveRepository(repository))) return;
-    goToScreen("tickets");
-  };
-
-  const continueFromTickets = async () => {
-    setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
-    setup.commitIssuesStep();
-    if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
-    goToScreen("agent");
-  };
-
-  const selectTicketSource = (source: FirstRunTicketSource) => {
-    // Jira and Linear are not connectable yet, so the screen shows them as
-    // coming soon and reports GitHub Issues only.
-    if (source !== DEFAULT_TICKET_SOURCE) return;
-    setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
-  };
-
+/** Picker data for the connect screen. The Connect GitHub page passes none. */
+function pickerPropsFor(flow: FirstRunSetupFlow) {
+  if (!flow.pickerShowing) {
+    return {};
+  }
   return {
-    screen,
-    goToScreen,
-    continueFromRepository,
-    continueFromTickets,
-    selectTicketSource,
+    pendingInstallations: flow.accountPicker?.installations,
+    githubState: flow.accountPicker?.state,
+    githubAppSlug: flow.accountPicker?.appSlug,
+    githubLogin: flow.accountPicker?.githubLogin,
   };
+}
+
+/** Hosted credentials provision from this screen, so it shows finish progress. */
+function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
+  return ticketsFinishSetup ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue;
+}
+
+function TicketsScreenHost({
+  flow,
+  model,
+  saving,
+  chrome,
+  sphere,
+}: {
+  flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
+  saving: boolean;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
+  return (
+    <FirstRunTicketsScreen
+      ticketSource={flow.ticketSource}
+      chrome={chrome}
+      sphere={sphere}
+      jiraAvailable={flow.jiraAvailable}
+      jiraFeatureLoading={flow.jiraFeatureLoading}
+      jiraChoiceBlock={flow.jiraChoiceBlock}
+      continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
+      continuePending={flow.agentGatePending}
+      saving={flow.blockingAction === "saving-ticket-source" || finishing}
+      savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      jiraConnected={model.setup.connected.has("jira")}
+      jiraProjects={model.jiraProjects}
+      jiraProjectsLoading={model.jiraProjectsLoading}
+      jiraProjectsError={model.jiraProjectsError}
+      jiraProjectId={model.jiraProjectId}
+      onSelectTicketSource={flow.selectTicketSource}
+      onConnectJira={() => void flow.connectJira()}
+      onSelectJiraProject={model.setJiraProjectId}
+      onRetryJiraProjects={model.retryJiraProjects}
+      onAnalyzeTickets={() => void flow.continueFromTickets()}
+    />
+  );
 }
 
 /**
@@ -215,22 +256,55 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId } = useFactoriesLayout();
+  const { organizationId, factoryId, factories } = useFactoriesLayout();
+  const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
+  const destination = model.provisionedDestination;
+  useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
+  const accountOrganizations = useAccountOrganizations();
 
-  const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
-    displayName: firstNameOf(account?.name),
-    email: account?.email,
-    onLogOut: signOut,
-    stepIndex: STEP_INDEX_FOR_SCREEN[target],
-  });
+  // The placeholder workspace under setup is itself in `factories`, so
+  // another workspace exists when any factory has a different id.
+  const hasOtherWorkspace = factories.some((existing) => existing.id !== factoryId);
+  // The organization switch is only for other organizations. Another
+  // workspace in this organization uses the workspace switch.
+  const otherOrganizations = (accountOrganizations.data ?? []).filter(
+    (organization) => !organizationMatchesRoute(organization, organizationId),
+  );
+
+  const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
+    return {
+      displayName: firstNameOf(account?.name),
+      email: account?.email,
+      onLogOut: signOut,
+      organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
+      workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
+      stepIndex: (flow.agentBeforeTickets ? STEP_INDEX_FOR_SCREEN_AGENT_FIRST : STEP_INDEX_FOR_SCREEN)[target],
+      stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+      onBack: backActionFor(target, flow),
+      busy: flow.busy,
+    };
+  };
+
+  if (destination) {
+    return (
+      <FirstRunAnalysisHost
+        organizationId={destination.organizationId}
+        factoryId={factoryId}
+        chrome={{ displayName: firstNameOf(account?.name), email: account?.email, onLogOut: signOut, stepIndex: 4 }}
+        selectedRepo={setup.selectedRepo}
+        onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
+      />
+    );
+  }
 
   if (flow.screen === "welcome") {
     return (
       <FirstRunWelcomeScreen
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
+        sphere={sphereFor("welcome", setup.selectedRepo)}
         onGetStarted={() => flow.goToScreen("connect")}
       />
     );
@@ -239,10 +313,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        githubConnected={setup.vcsReady}
+        loading={flow.pickerLoading}
+        installRequested={flow.installRequested}
+        githubOrganizations={flow.githubOrganizations}
+        {...pickerPropsFor(flow)}
+        bindingInstallationId={flow.bindingInstallationId}
+        connecting={flow.blockingAction === "opening-github"}
         chrome={chromeFor("connect")}
-        onConnectGitHub={() => model.requestConnect("github")}
-        onContinue={() => flow.goToScreen("choose")}
+        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", setup.selectedRepo)}
+        onConnectGitHub={() => void flow.connectGitHub()}
+        onUseInstallation={flow.useInstallation}
+        onInstallOther={() => void flow.installOnAnotherAccount()}
       />
     );
   }
@@ -252,7 +333,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunChooseScreen
         repositories={model.repositories}
         selectedRepository={setup.selectedRepo}
+        loading={model.repositoriesLoading}
+        saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
+        sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
+        organizationName={model.githubOwner}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}
         onContinue={() => void flow.continueFromRepository()}
@@ -262,12 +347,12 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
 
   if (flow.screen === "tickets") {
     return (
-      <FirstRunTicketsScreen
-        ticketSource={DEFAULT_TICKET_SOURCE}
+      <TicketsScreenHost
+        flow={flow}
+        model={model}
+        saving={model.saving}
         chrome={chromeFor("tickets")}
-        continueLabel={FIRST_RUN_COPY.tickets.continue}
-        onSelectTicketSource={flow.selectTicketSource}
-        onAnalyzeTickets={() => void flow.continueFromTickets()}
+        sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}
       />
     );
   }
@@ -277,9 +362,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
-      saving={model.saving}
+      sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
+      saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
+      loading={model.agentLoading}
+      hostedAgentReady={model.hostedAgentReady}
+      modelSource={{
+        offered: flow.agentBeforeTickets,
+        choice: flow.credentialChoice,
+        onSelect: flow.selectCredentialChoice,
+      }}
       onRequestConnect={model.requestConnect}
-      onContinue={() => void model.finish()}
+      onContinue={() => void flow.continueFromAgent()}
     />
   );
 }

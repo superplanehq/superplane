@@ -124,6 +124,68 @@ func Test__RunFinalizer_FinalizesRunAfterQueueItemDeleted(t *testing.T) {
 	assert.NotNil(t, updatedRun.FinishedAt)
 }
 
+func Test__RunFinalizer_EndsPlanningSessionWhenRunFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	canvas, run := setupCancelledComponentRun(t, r)
+	session := attachPlanningSessionToRun(t, r, canvas.ID, run.ID)
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerQueueItemDeleted))
+
+	reloaded, err := models.FindPlanningSession(database.Conn(), session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+	require.NotNil(t, reloaded.EndedAt)
+}
+
+func Test__RunFinalizer_EndsPlanningSessionWhenRunPasses(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	router := NewEventRouter(amqpURL)
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	logger := log.NewEntry(log.New())
+	canvas, run, rootEvent := setupPassedComponentRun(t, r)
+
+	session := attachPlanningSessionToRun(t, r, canvas.ID, run.ID)
+
+	events, err := models.ListCanvasEvents(database.Conn(), canvas.ID, "component-1", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.NoError(t, router.LockAndProcessEvent(logger, events[0], time.Now()))
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerEventTerminal))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEvent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+
+	reloaded, err := models.FindPlanningSession(database.Conn(), session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+	require.NotNil(t, reloaded.EndedAt)
+}
+
+func Test__RunFinalizer_LeavesEndedPlanningSessionEnded(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	canvas, run := setupCancelledComponentRun(t, r)
+	session := attachPlanningSessionToRun(t, r, canvas.ID, run.ID)
+	require.NoError(t, session.End(database.Conn()))
+
+	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerQueueItemDeleted))
+
+	reloaded, err := models.FindPlanningSession(database.Conn(), session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+}
+
 func Test__RunFinalizer_DoesNotFinalizeRunWithOpenWork(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -222,47 +284,59 @@ func Test__RunFinalizer_SweepTouchesUpdatedAtWhenRunHasOpenWork(t *testing.T) {
 	assert.Equal(t, models.CanvasRunStateStarted, touchedRun.State)
 }
 
-func Test__RunFinalizer_FinalizesCancellingRunWithForcedCancelledResult(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
+func Test__RunFinalizer_FinalizesCancellingRunWithRequestedResult(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		complete       bool
+		expectedResult string
+	}{
+		{name: "cancellation", expectedResult: models.CanvasRunResultCancelled},
+		{name: "completion", complete: true, expectedResult: models.CanvasRunResultPassed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
 
-	amqpURL, _ := config.RabbitMQURL()
-	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+			amqpURL, _ := config.RabbitMQURL()
+			finalizer := NewRunFinalizer(amqpURL, r.Registry)
 
-	node := "component-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{NodeID: node, Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-	)
+			node := "component-1"
+			canvas, _ := support.CreateCanvas(
+				t,
+				r.Organization.ID,
+				r.User,
+				[]models.CanvasNode{{NodeID: node, Type: models.NodeTypeComponent}},
+				[]models.Edge{},
+			)
 
-	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
-	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
-	require.NoError(t, err)
-	require.NoError(t, event.Routed())
+			event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+			run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+			require.NoError(t, err)
+			require.NoError(t, event.Routed())
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
-	execution.RunID = run.ID
-	require.NoError(t, database.Conn().Save(execution).Error)
-	require.NoError(t, execution.Cancel(nil))
+			execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+			execution.RunID = run.ID
+			require.NoError(t, database.Conn().Save(execution).Error)
 
-	now := time.Now()
-	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
-		"state":        models.CanvasRunStateCancelling,
-		"cancelled_at": now,
-		"cancelled_by": r.User,
-	}).Error)
+			require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+				if test.complete {
+					_, err := run.RequestCompletion(tx, &r.User)
+					return err
+				}
 
-	require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+				_, err := run.RequestCancellation(tx, &r.User)
+				return err
+			}))
+			require.NoError(t, execution.Cancel(nil))
 
-	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+			require.NoError(t, finalizer.finalizeRun(canvas.ID, run.ID, runFinalizerTriggerExecutionFinished))
+
+			updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+			assert.Equal(t, test.expectedResult, updatedRun.Result)
+		})
+	}
 }
 
 func Test__RunFinalizer_SweepCancellingRuns_FinalizesWhenNoOpenWork(t *testing.T) {
@@ -572,7 +646,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 			Entrypoint: secondEntry,
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -640,7 +714,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 	onlyApp, onlyEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: onlyApp.ID, Entrypoint: onlyEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -705,7 +779,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchAfterSettledSt
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var inFlight *models.FactoryLineStepResult
@@ -769,7 +843,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchWithOpenStep(t
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var finalized *models.FactoryLineStepResult
@@ -837,7 +911,7 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -893,7 +967,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -954,7 +1028,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var result *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -971,7 +1045,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 		{Type: models.FactoryLineStepTypeRunApp, AppID: insertedApp.ID, Entrypoint: insertedEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	now := time.Now()
 	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
@@ -1040,7 +1114,7 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 			Entrypoint: secondEntry,
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1106,7 +1180,7 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 			Entrypoint: "missing-entrypoint",
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1152,7 +1226,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__RollsUpUsageWhenAlreadyFini
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1202,6 +1276,84 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__RollsUpUsageWhenAlreadyFini
 	assert.Equal(t, int64(2), stepCount)
 }
 
+func setupCancelledComponentRun(t *testing.T, r *support.ResourceRegistry) (*models.Canvas, *models.CanvasRun) {
+	t.Helper()
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	require.NoError(t, execution.Cancel(nil))
+	return canvas, run
+}
+
+func setupPassedComponentRun(t *testing.T, r *support.ResourceRegistry) (*models.Canvas, *models.CanvasRun, *models.CanvasEvent) {
+	t.Helper()
+	trigger := "trigger-1"
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: trigger, Type: models.NodeTypeTrigger},
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: trigger, TargetID: node, Channel: "default"},
+		},
+	)
+
+	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, trigger, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
+	require.NoError(t, err)
+	require.NoError(t, triggerEvent.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
+	return canvas, run, triggerEvent
+}
+
+func attachPlanningSessionToRun(t *testing.T, r *support.ResourceRegistry, canvasID, runID uuid.UUID) *models.FactoryPlanningSession {
+	t.Helper()
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	session := &models.FactoryPlanningSession{
+		ID:              uuid.New(),
+		OrganizationID:  r.Organization.ID,
+		FactoryID:       factoryModel.ID,
+		CreatedByUserID: &r.User,
+		Repository:      "acme/payments",
+		Kind:            models.PlanningSessionKindTaskCreation,
+		State:           models.PlanningSessionStateRunning,
+		CanvasID:        &canvasID,
+		CanvasRunID:     &runID,
+		HeartbeatAt:     now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, database.Conn().Create(session).Error)
+	return session
+}
+
 func Test__RunFinalizer__FinalizeRun__RollsUpUsageWhenAlreadyFinished(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -1221,7 +1373,7 @@ func Test__RunFinalizer__FinalizeRun__RollsUpUsageWhenAlreadyFinished(t *testing
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {

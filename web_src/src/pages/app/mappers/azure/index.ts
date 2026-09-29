@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 import { onBlobCreatedTriggerRenderer } from "./on_blob_created";
 import { onBlobDeletedTriggerRenderer } from "./on_blob_deleted";
 import { onImagePushedTriggerRenderer } from "./on_image_pushed";

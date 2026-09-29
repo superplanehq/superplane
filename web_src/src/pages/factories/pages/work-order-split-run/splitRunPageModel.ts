@@ -1,6 +1,9 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderCheck } from "@/api-client";
+import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } from "./splitRunCanvases";
 import {
   SPLIT_RUN_RUNNING,
@@ -37,21 +40,52 @@ export function resolveSplitRunOrder(
   return byNumber ?? findWorkOrderByRunId(workOrders, runId) ?? null;
 }
 
+export type FixtureForSplitRunPageOptions = {
+  prFeedbackRuns?: PRFeedbackLogRun[];
+  analysisRuns?: BacklogAnalysisRun[];
+  artifacts?: FactoriesWorkOrderArtifact[];
+  /** True while the Backlog automation still scores this draft, including the
+   * optimistic window before its run appears in `analysisRuns`. */
+  isAnalyzing?: boolean;
+  /** Looks up an org member's display (name, initials, avatar) by id. */
+  resolveUser?: OrgUserDisplayLookup;
+};
+
 export function fixtureForSplitRunPage(
   order: FactoriesWorkOrder | null,
   orderChecks: FactoriesWorkOrderCheck[],
   lineId: string | null,
+  options?: FixtureForSplitRunPageOptions,
 ): SplitRunFixture | null {
   if (!order) {
     return null;
   }
-  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId, demoArtifacts: false });
+  return splitRunFixtureForWorkOrder(order, {
+    checks: orderChecks,
+    lineId,
+    demoArtifacts: false,
+    prFeedbackRuns: options?.prFeedbackRuns,
+    analysisRuns: options?.analysisRuns,
+    artifacts: options?.artifacts,
+    isAnalyzing: options?.isAnalyzing,
+    resolveUser: options?.resolveUser,
+  });
 }
 
-export function phaseForSplitRunCanvas(fixture: SplitRunFixture | null, canvasKey?: SplitRunCanvasKey): SplitRunPhase {
+export function phaseForSplitRunCanvas(
+  fixture: SplitRunFixture | null,
+  canvasKey?: SplitRunCanvasKey,
+  runId?: string | null,
+): SplitRunPhase {
   const fallback = implementFallbackPhase();
   if (!fixture) {
     return fallback;
+  }
+  if (runId) {
+    const byRun = fixture.phases.find((entry) => entry.runId === runId);
+    if (byRun) {
+      return byRun;
+    }
   }
   if (canvasKey) {
     return fixture.phases.find((entry) => canvasKeyForPhase(entry) === canvasKey) ?? fixture.phases[0] ?? fallback;

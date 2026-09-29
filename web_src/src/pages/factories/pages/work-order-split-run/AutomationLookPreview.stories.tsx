@@ -6,7 +6,7 @@ import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { AutomationLookPreview } from "./AutomationLookPreview";
 
 const meta = {
-  title: "Factories/Pages/Work Order Split Run/Automation look",
+  title: "Factories/Pages/Task Split Run/Automation look",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },

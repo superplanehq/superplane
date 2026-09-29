@@ -8,13 +8,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 )
 
 func RecordRunnerLLMUsage(usage core.UsageRecorder, logger *log.Entry, finishedEventType string, configuration any, result json.RawMessage) {
 	if usage == nil {
 		return
 	}
-	provider, ok := providerForFinishedEvent(finishedEventType)
+	provider, ok := providerForFinishedEvent(finishedEventType, configuration)
 	if !ok {
 		return
 	}
@@ -34,9 +35,9 @@ func ParseRunnerLLMUsage(provider string, configuration any, result json.RawMess
 		return core.UsageRecord{}, false
 	}
 
-	model := strings.TrimSpace(parsed.Model)
+	model := pricebook.CatalogModelID(parsed.Model)
 	if model == "" {
-		model = configurationString(configuration, "model")
+		model = pricebook.CatalogModelID(configurationString(configuration, "model"))
 	}
 	if model == "" {
 		model = "unknown"
@@ -58,7 +59,7 @@ func ParseRunnerLLMUsage(provider string, configuration any, result json.RawMess
 	}, true
 }
 
-func providerForFinishedEvent(finishedEventType string) (string, bool) {
+func providerForFinishedEvent(finishedEventType string, configuration any) (string, bool) {
 	switch finishedEventType {
 	case "runnerClaudeCode.finished":
 		return models.UsageProviderAnthropic, true
@@ -66,6 +67,12 @@ func providerForFinishedEvent(finishedEventType string) (string, bool) {
 		return models.UsageProviderOpenAI, true
 	case "runnerOpenRouter.finished":
 		return models.UsageProviderOpenRouter, true
+	case "runnerSuperPlane.finished":
+		provider := configurationString(configuration, "hostedProvider")
+		if provider == "" {
+			return "", false
+		}
+		return provider, true
 	default:
 		return "", false
 	}

@@ -17,12 +17,15 @@ const (
 	EventTypeOrderCommentAdded  = "order.comment.added"
 	EventTypeOrderArtifactAdded = "order.artifact.added"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
-	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
-	// back a timeline event/struct. Flipping a PR artifact's state
-	// shouldn't spam the timeline with one entry per open/draft/closed/
-	// merged transition; the row is updated in place and this reason
-	// just tells the frontend which query to invalidate.
+	// reason — it does not back a timeline event/struct. Artifact data
+	// updates re-save the row in place and this reason tells the
+	// frontend which query to invalidate.
 	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// EventTypeOrderArtifactsCleared records a bulk delete of task
+	// artifacts when a person sends the task to the backlog.
+	EventTypeOrderArtifactsCleared   = "order.artifacts.cleared"
+	EventTypeOrderPullRequestAdded   = "order.pull_request.added"
+	EventTypeOrderPullRequestUpdated = "order.pull_request.updated"
 	// EventTypeOrderCheckReported records every check report, including
 	// re-reports of the same check key. The check row itself is
 	// latest-only state (one row per key, updated in place); the events
@@ -39,6 +42,14 @@ const (
 	// same way status changes and comments do. Clearing rides on
 	// `order.status.updated`.
 	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
+	// EventTypeOrderAgentQuestion is a notification-only reason: the
+	// planning agent is waiting for an answer on a task. It does not
+	// back a timeline event.
+	EventTypeOrderAgentQuestion = "order.agent_question"
+	// EventTypeOrderPlanReady is a notification-only reason: refinement
+	// ended and the planning spec artifact exists. It does not back a
+	// timeline event.
+	EventTypeOrderPlanReady = "order.plan_ready"
 
 	// Factory line events
 	EventTypeLineStepExecutionQueued   = "step.execution.queued"
@@ -55,10 +66,10 @@ const (
 
 // Artifact types
 const (
-	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
 	ArtifactTypeLink     = "link"
+	ArtifactTypeFile     = "file"
 )
 
 // Check levels. The reporting component computes the level from its
@@ -152,6 +163,28 @@ type WorkOrderArtifactAdded struct {
 	Run        *RunRef        `json:"run,omitempty"`
 }
 
+type WorkOrderArtifactsCleared struct {
+	Order *WorkOrderRef `json:"order,omitempty"`
+	Count int           `json:"count"`
+	User  *UserRef      `json:"user,omitempty"`
+}
+
+type WorkOrderPullRequestAdded struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
+type WorkOrderPullRequestUpdated struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
 type WorkOrderCheckReported struct {
 	Order      *WorkOrderRef  `json:"order,omitempty"`
 	Check      *CheckRef      `json:"check,omitempty"`
@@ -183,6 +216,9 @@ type LineStepExecutionFinished struct {
 	Line     *LineRef      `json:"line,omitempty"`
 	App      *AppRef       `json:"app,omitempty"`
 	Run      *RunRef       `json:"run,omitempty"`
+	// User is who cancelled the canvas run, when this finish is a
+	// cancellation. Passed finishes leave it empty.
+	User *UserRef `json:"user,omitempty"`
 }
 
 // Refs
@@ -217,6 +253,16 @@ type ArtifactRef struct {
 	ID   uuid.UUID      `json:"id"`
 	Type string         `json:"type"`
 	Data map[string]any `json:"data,omitempty"`
+}
+
+type PullRequestRef struct {
+	ID         uuid.UUID `json:"id"`
+	Provider   string    `json:"provider,omitempty"`
+	Repository string    `json:"repository,omitempty"`
+	Number     int64     `json:"number,omitempty"`
+	URL        string    `json:"url,omitempty"`
+	Title      string    `json:"title,omitempty"`
+	State      string    `json:"state,omitempty"`
 }
 
 // CheckRef snapshots a check report for the timeline. PreviousScore is

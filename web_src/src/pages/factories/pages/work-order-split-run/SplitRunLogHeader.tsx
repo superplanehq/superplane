@@ -1,36 +1,13 @@
-import { Label } from "@/components/ui/label";
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/ui/switch";
 import { Maximize2 } from "lucide-react";
-import { useId } from "react";
 
 import { SectionTitle } from "../work-order-popup-redesign/popupShared";
 
-export function SplitRunLogHeader({
-  following,
-  onFollowingChange,
-  expandHref,
-  className,
-}: {
-  following: boolean;
-  onFollowingChange: (next: boolean) => void;
-  expandHref?: string | null;
-  className?: string;
-}) {
-  const followId = useId();
-
+export function SplitRunLogHeader({ expandHref, className }: { expandHref?: string | null; className?: string }) {
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
-      <div className="flex min-w-0 items-center gap-3">
-        <SectionTitle>Automations</SectionTitle>
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
-            Follow
-          </Label>
-          <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
-        </div>
-      </div>
+      <SectionTitle>Automations</SectionTitle>
       {expandHref ? (
         <Link
           href={expandHref}

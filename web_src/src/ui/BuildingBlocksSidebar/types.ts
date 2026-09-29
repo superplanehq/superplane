@@ -1,4 +1,4 @@
-import type { ActionsOutputChannel } from "@/api-client";
+import type { ActionsOutputChannel, ConfigurationField } from "@/api-client";
 
 export interface BuildingBlock {
   name: string;
@@ -6,7 +6,7 @@ export interface BuildingBlock {
   description?: string;
   type: "trigger" | "component";
   outputChannels?: Array<ActionsOutputChannel>;
-  configuration?: any[];
+  configuration?: ConfigurationField[];
   icon?: string;
   color?: string;
   id?: string;

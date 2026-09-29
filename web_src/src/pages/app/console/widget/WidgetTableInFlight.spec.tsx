@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "bun:test";
 
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";

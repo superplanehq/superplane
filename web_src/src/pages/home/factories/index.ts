@@ -1,20 +1,13 @@
-import type { InstallParam } from "@/pages/install/types";
-
-import type { FactoryDefinition } from "./types";
+import type { FactoryDefinition, InstallParam } from "./types";
 import factoryMeta from "./software-factory/factory.json";
 import factoryParams from "./software-factory/params.json";
 import softwareFactoryCanvasYaml from "./software-factory/canvas.yaml?raw";
 import softwareFactoryConsoleYaml from "./software-factory/console.yaml?raw";
-import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
-import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
-import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
-import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
-import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
-import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
-export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
+export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition, InstallParam } from "./types";
 export {
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   normalizeFactoryInstallParams,
@@ -40,11 +33,10 @@ function buildSoftwareFactory(): FactoryDefinition {
   };
 }
 
-// Onboarding provisions a factory line as separate, focused apps — one per
-// phase — mirroring the production setup. Each app exposes a single onRun
-// entrypoint that the line calls in order, passing the work order through.
+// Onboarding provisions a factory line as focused apps. Each app exposes a
+// single onRun entrypoint that the line calls in order, passing the task
+// through.
 const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.addIssueLabel": "github",
   "github.createIssueComment": "github",
   "github.createPullRequest": "github",
 };
@@ -53,8 +45,6 @@ function buildOnboardingApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
-  consoleYaml: string;
   integrations: string[];
   componentIntegrations: Record<string, string>;
   entrypointNodeId: string;
@@ -75,8 +65,6 @@ function buildOnboardingApp(args: {
     },
     source: { type: "bundled" },
     installParams: factoryParams.install_params as InstallParam[],
-    canvasYaml: args.canvasYaml,
-    consoleYaml: args.consoleYaml,
   };
 }
 
@@ -84,14 +72,12 @@ function buildLineApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
   entrypointNodeId: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
     ...args,
     integrations: ["github", "claude"],
     componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
-    consoleYaml: lineAppConsoleYaml,
   });
 }
 
@@ -104,15 +90,12 @@ function buildEventApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
   triggerNodeId: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
     id: args.id,
     title: args.title,
     description: args.description,
-    canvasYaml: args.canvasYaml,
-    consoleYaml: eventAppConsoleYaml,
     integrations: ["github"],
     componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: args.triggerNodeId,
@@ -121,9 +104,8 @@ function buildEventApp(args: {
 
 /**
  * Ordered factory-line apps provisioned during onboarding. Each entry maps to a
- * bundled app template and the line step that calls its onRun entrypoint. The
- * bundled Verify app stays available for manual install, because the line hands
- * the pull request to review from Implement.
+ * bundled app template and the line step that calls its onRun entrypoint.
+ * Implement opens the pull request and hands review to the wait note.
  */
 export interface OnboardingLineApp {
   factoryId: string;
@@ -131,7 +113,6 @@ export interface OnboardingLineApp {
 }
 
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
-  { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
   { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
 ];
 
@@ -142,33 +123,23 @@ export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
-  "line-planning": buildLineApp({
-    id: "line-planning",
-    title: "Plan",
-    description: "Read the work order and write an implementation plan.",
-    canvasYaml: planningCanvasYaml,
-    entrypointNodeId: "onrun-create-plan",
-  }),
   "line-implementation": buildLineApp({
     id: "line-implementation",
     title: "Implement",
-    description: "Create a branch, implement the plan, and open a draft pull request.",
-    canvasYaml: implementationCanvasYaml,
+    description: "Create a branch, implement the task, and open a pull request.",
     entrypointNodeId: "onrun-implement",
-  }),
-  "line-pr": buildLineApp({
-    id: "line-pr",
-    title: "Verify",
-    description: "Open a draft pull request and hand the work order to review.",
-    canvasYaml: prCanvasYaml,
-    entrypointNodeId: "onrun-open-pr",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",
     title: "PR Closure",
-    description: "Close the work order when the attached pull request merges or is closed without a merge.",
-    canvasYaml: prClosureCanvasYaml,
+    description: "Close the task when the attached pull request merges or is closed without a merge.",
     triggerNodeId: "on-pr-closed",
+  }),
+  "risk-score": buildEventApp({
+    id: "risk-score",
+    title: "Risk score",
+    description: "Score a pull request when it opens or updates.",
+    triggerNodeId: "on-pr-risk",
   }),
 };
 

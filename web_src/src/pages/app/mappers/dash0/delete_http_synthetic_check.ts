@@ -1,6 +1,6 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getState, getStateMap, getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import type { DeleteHttpSyntheticCheckConfiguration } from "./types";
+import type { DeleteHttpSyntheticCheckConfiguration, HttpSyntheticCheckPayload } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
@@ -41,7 +41,7 @@ export const deleteHttpSyntheticCheckMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as HttpSyntheticCheckPayload | undefined;
 
     const details: Record<string, string> = {};
 
@@ -84,7 +84,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [

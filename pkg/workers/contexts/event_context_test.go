@@ -57,4 +57,62 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 2}))
 		assert.Len(t, newEvents, 2)
 	})
+
+	t.Run("skips events when the canvas has no live version", func(t *testing.T) {
+		canvas, nodes := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID:        triggerNodeID,
+					Name:          triggerNodeID,
+					Type:          models.NodeTypeTrigger,
+					Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{}),
+				},
+			},
+			nil,
+		)
+
+		// The schema keeps live_version_id NOT NULL, so a canvas without a
+		// live version cannot be stored. Point the canvas at the live version
+		// of another canvas instead: the live version lookup for this canvas
+		// then finds nothing, the same not-found error a nil live version
+		// produces.
+		other, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		require.NotNil(t, other.LiveVersionID)
+		require.NoError(t, database.Conn().
+			Model(&models.Canvas{}).
+			Where("id = ?", canvas.ID).
+			Update("live_version_id", *other.LiveVersionID).
+			Error)
+
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil, nil)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
+		support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	})
+
+	t.Run("skips events when the canvas is gone", func(t *testing.T) {
+		canvas, nodes := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID:        triggerNodeID,
+					Name:          triggerNodeID,
+					Type:          models.NodeTypeTrigger,
+					Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{}),
+				},
+			},
+			nil,
+		)
+		require.NoError(t, database.Conn().Delete(&models.Canvas{}, canvas.ID).Error)
+
+		ctx := NewEventContext(database.Conn(), &nodes[0], nil, nil)
+		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
+		support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	})
 }

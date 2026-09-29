@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createEvent, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
-import { vi } from "vitest";
+import { vi } from "bun:test";
 import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
@@ -127,6 +127,7 @@ export function renderInspector({
           account: account ? { ...account, has_password: account.has_password ?? false } : null,
           loading: false,
           setupRequired: false,
+          refreshAccount: async () => undefined,
         }}
       >
         <ThemeProvider>

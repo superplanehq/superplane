@@ -2,7 +2,7 @@ import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from ".
 import { onMentionTriggerRenderer } from "./on_mention";
 import { sendMessageMapper } from "./send_message";
 import { waitForButtonClickMapper, WAIT_FOR_BUTTON_CLICK_STATE_REGISTRY } from "./wait_for_button_click";
-import { buildActionStateRegistry } from "../utils";
+import { buildActionStateRegistry } from "../eventDisplay";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   sendMessage: sendMessageMapper,

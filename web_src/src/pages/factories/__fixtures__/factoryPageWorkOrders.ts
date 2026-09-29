@@ -79,8 +79,8 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
     {
       key: "pr-closure",
       kind: "info",
-      headline: "Listening for user review",
-      body: "This automation finished and opened [PR #6812](https://github.com/superplanehq/superplane/pull/6812). Task will automatically close when the pull request is closed or merged.",
+      headline: "Waiting for user review",
+      body: "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.",
       ctaLabel: "Review PR #6812",
       ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
       automation: { appId: "app-refund-verifier", appName: "PR Closure" },
@@ -90,7 +90,7 @@ export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
 };
 
 /**
- * Second open work order assigned to the storybook user so the FactoryDetailPage
+ * Second open task assigned to the storybook user so the FactoryDetailPage
  * "Populated" story shows a real list under the default `mine + open` filters.
  */
 export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
@@ -193,20 +193,26 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   origin: githubOrigin(103),
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
-    planLineDispatch([
-      planLineExecution("implement", {
-        id: "2",
-        state: "STATE_STARTED",
-        result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
-        updatedAt: HOUR_AGO,
-        totalTokens: "900",
-        costCents: "28",
-      }),
-    ]),
+    planLineDispatch(
+      [
+        planLineExecution("implement", {
+          id: "2",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
+          updatedAt: HOUR_AGO,
+          totalTokens: "900",
+          costCents: "28",
+          models: ["anthropic/claude-sonnet-4-6"],
+        }),
+      ],
+      { model: "anthropic/claude-sonnet-4-6" },
+    ),
   ],
   totalTokens: "2700",
   totalCostCents: "73",
+  usageByModel: [{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }],
+  usageByMachineType: [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
 };
 
 // Storybook user is co-assigned so "mine + failed" surfaces this order.
@@ -250,18 +256,18 @@ export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
   title: "Draft: rework refund telemetry",
   description: [
     "**Describe the request:**",
-    "Let a user add emoji reactions on a work order itself (not only on comments).",
+    "Let a user add emoji reactions on a task itself (not only on comments).",
     "",
     "___",
     "",
     "**Describe your use-case:**",
-    "There is no reaction UI on a work order. People need a quick signal on the order (acknowledge, +1) without leaving a comment.",
+    "There is no reaction UI on a task. People need a quick signal on the order (acknowledge, +1) without leaving a comment.",
     "",
     "___",
     "",
     "**Describe functionality:**",
-    "- React to an existing work order with an emoji.",
-    "- Show reactions on the work order details page.",
+    "- React to an existing task with an emoji.",
+    "- Show reactions on the task details page.",
     "- A user can add or remove their own reaction.",
   ].join("\n"),
   state: "STATE_DRAFT",
@@ -433,7 +439,7 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER: FactoriesWorkOrder = {
   description: [
     "Customers do not receive a receipt after a refund confirms at the provider.",
     "",
-    "Send the receipt when the provider webhook reports success. PR Closure completes the work order after the pull request merges.",
+    "Send the receipt when the provider webhook reports success. PR Closure completes the task after the pull request merges.",
   ].join("\n"),
   state: "STATE_CLOSED",
   result: "RESULT_COMPLETED",

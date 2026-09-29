@@ -15,7 +15,7 @@ import { WorkOrderRunOverlayPlayground } from "./WorkOrderRunOverlayPlayground";
  * n8n / SuperPlane canvas executions.
  */
 const meta = {
-  title: "Factories/Pages/Work Order Run Overlay",
+  title: "Factories/Pages/Task Run Overlay",
   parameters: { layout: "fullscreen" },
   decorators: [
     withFactoriesTheme,

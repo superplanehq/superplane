@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 const (
 	githubOAuthTokenURL        = "https://github.com/login/oauth/access_token"
 	githubUserInstallationsURL = "https://api.github.com/user/installations"
+	githubUserURL              = "https://api.github.com/user"
 )
 
 type githubOAuthTokenResponse struct {
@@ -38,6 +40,13 @@ type githubUserInstallation struct {
 	} `json:"account"`
 }
 
+// allowsRebind reports whether a bound hosted connection can move to another
+// installation: the CSRF state survived the first bind and the request
+// carries it.
+func allowsRebind(metadata common.Metadata, state string) bool {
+	return metadata.HostedApp && metadata.State != "" && state == metadata.State
+}
+
 func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	metadata, ok := decodeHostedMetadata(ctx)
 	if !ok {
@@ -45,12 +54,15 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+
+	// A bound connection refreshes its account picker through OAuth when the
+	// state is valid, so the member can install the App on another account.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
 	if state == "" || state != metadata.State {
 		http.Error(ctx.Response, "invalid state", http.StatusBadRequest)
 		return
@@ -94,22 +106,48 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	switch len(installations) {
-	case 0:
-		g.redirectToHostedInstall(ctx, metadata, app.Slug)
-	case 1:
-		if err := g.bindHostedInstallation(ctx, metadata, installations[0].ID); err != nil {
-			ctx.Logger.Errorf("%v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		redirectToIntegrationSettings(ctx)
-	default:
-		metadata.PendingInstallations = installations
-		ctx.Integration.SetMetadata(metadata)
-		ctx.Integration.RemoveBrowserAction()
-		redirectToIntegrationSettings(ctx)
+	// The request callback from GitHub does not name the requested
+	// organization, so Sync later finds this member's install request on
+	// GitHub through this login.
+	login, err := fetchGitHubUserLogin(ctx.HTTP, token)
+	if err != nil {
+		ctx.Logger.Errorf("failed to fetch GitHub user login: %v", err)
+	} else {
+		metadata.StartedByGitHubLogin = login
 	}
+
+	if len(installations) == 0 {
+		g.redirectToHostedInstall(ctx, metadata, app.Slug)
+		return
+	}
+
+	// Even a single installation goes through the account picker. A silent
+	// bind would lock the connection to that account (often the user's
+	// personal one) with no way to install the App on an organization.
+	metadata.SetPendingInstallations(installations)
+
+	// Remove only the requests that the refreshed picker can now offer. Other
+	// organization requests can continue to wait on the same connection.
+	unresolved := []common.InstallRequest{}
+	for _, request := range metadata.CurrentInstallRequests() {
+		if !installationsIncludeAccount(installations, request.AccountLogin) {
+			unresolved = append(unresolved, request)
+		}
+	}
+	metadata.SetInstallRequests(unresolved)
+
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.RemoveBrowserAction()
+	redirectToIntegrationSettings(ctx)
+}
+
+func installationsIncludeAccount(installations []common.PendingInstallation, account string) bool {
+	if account == "" {
+		return false
+	}
+	return slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
+		return strings.EqualFold(installation.AccountLogin, account)
+	})
 }
 
 func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
@@ -119,13 +157,17 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+
+	// A bound connection accepts a rebind with a valid state, so the
+	// onboarding account picker can move it to another account. A request
+	// without that state is a stale callback and goes back to settings.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
-	installationID := ctx.Request.URL.Query().Get("installation_id")
 	if state == "" || state != metadata.State || installationID == "" {
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return
@@ -208,6 +250,42 @@ func exchangeGitHubUserOAuthToken(httpCtx core.HTTPContext, clientID, clientSecr
 	}
 
 	return token.AccessToken, nil
+}
+
+func fetchGitHubUserLogin(httpCtx core.HTTPContext, token string) (string, error) {
+	if httpCtx == nil {
+		return "", fmt.Errorf("HTTP context is required")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, githubUserURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	response, err := httpCtx.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", fmt.Errorf("GitHub user request failed: status %d", response.StatusCode)
+	}
+
+	var payload struct {
+		Login string `json:"login"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", err
+	}
+
+	return payload.Login, nil
 }
 
 func listUserAppInstallations(httpCtx core.HTTPContext, token string, appID int64) ([]common.PendingInstallation, error) {

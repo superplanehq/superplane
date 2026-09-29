@@ -84,7 +84,7 @@ const SENTRY_FACTORY_HTTP_500_MARKDOWN = `[View in Sentry](${SENTRY_FACTORY_HTTP
 ## Root Cause
 
 - **File:** [\`pkg/models/factory.go → FindFactory()\`](https://github.com/superplanehq/superplane/blob/b15b021643cf349c7184b6a544a55eab7247e72d/pkg/models/factory.go#L202)
-- **Pull Request:** [feat: Work Orders List Page v3 #6671](https://github.com/superplanehq/superplane/pull/6671)
+- **Pull Request:** [feat: Tasks List Page v3 #6671](https://github.com/superplanehq/superplane/pull/6671)
 
 ## Suggested Fix
 

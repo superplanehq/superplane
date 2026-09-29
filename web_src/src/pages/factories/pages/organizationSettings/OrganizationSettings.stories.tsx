@@ -1,33 +1,206 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { OrganizationSettingsLayout } from "./OrganizationSettingsLayout";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
+import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
+import {
+  BUSINESS_ORGANIZATION_BILLING,
+  DEFAULT_FACTORY_USAGE,
+  PURCHASED_CREDIT_USAGE_REPORT,
+  SPENT_CREDIT_USAGE_REPORT,
+  STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+} from "../../__fixtures__/usageReportFixtures";
+import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
-  title: "Factories/Pages/OrganizationSettings",
-  component: OrganizationSettingsLayout,
+  title: "Factories/Pages/Settings/Organization",
+  component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof OrganizationSettingsLayout>;
+} satisfies Meta<typeof FactorySettingsLayout>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const organizationSettingsPath = (page: string) => `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${page}`;
+
 export const General: Story = {
   render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("general")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Members: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("members")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Integrations: Story = {
+  render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/general`}
+      pathSuffix={organizationSettingsPath("integrations")}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };
 
-export const Workspaces: Story = {
+export const ApiKeys: Story = {
+  name: "API keys",
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("api-keys")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Secrets: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("secrets")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Spending: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("spending")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const SpendingEmpty: Story = {
+  name: "Spending (empty)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/organization/workspaces`}
-      factoriesFixture={defaultFactoriesFixture}
+      pathSuffix={organizationSettingsPath("spending")}
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationSpendingReport: EMPTY_ORG_SPENDING_REPORT }}
+    />
+  ),
+};
+
+export const Billing: Story = {
+  name: "Billing (Business)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationBilling: BUSINESS_ORGANIZATION_BILLING,
+        organizationCreditGrants: MIXED_CREDIT_GRANTS,
+        organizationWorkspaceUsage: {
+          ...PURCHASED_CREDIT_USAGE_REPORT,
+          billingEnabled: true,
+          hasBillingCustomer: true,
+          invoices: [
+            {
+              id: "ord_storybook_business",
+              createdAt: "2026-09-10T12:00:00Z",
+              amountCents: "19900",
+              status: "paid",
+              productName: "Business",
+            },
+            {
+              id: "ord_storybook_1",
+              createdAt: "2026-09-01T12:00:00Z",
+              amountCents: "2500",
+              status: "paid",
+              productName: "Hosted credit 25",
+            },
+            {
+              id: "ord_storybook_refund",
+              createdAt: "2026-08-15T12:00:00Z",
+              amountCents: "5000",
+              status: "refunded",
+              productName: "Hosted credit 50",
+            },
+          ],
+        },
+      }}
+    />
+  ),
+};
+
+export const BillingEmptyHistory: Story = {
+  name: "Billing (trial welcome)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationCreditGrants: [],
+        organizationWorkspaceUsage: {
+          ...defaultFactoriesFixture.organizationWorkspaceUsage!,
+          billingEnabled: true,
+          hasBillingCustomer: false,
+        },
+      }}
+    />
+  ),
+};
+
+export const BillingEmptyNoCard: Story = {
+  name: "Billing (empty credit, no card)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationWorkspaceUsage: {
+          ...DEFAULT_FACTORY_USAGE,
+          remainingCreditCents: "0",
+          hostedBilledCents: "5000",
+          remainingCreditWarning: true,
+          billingEnabled: true,
+          hasBillingCustomer: false,
+        },
+        organizationBilling: {
+          ...defaultFactoriesFixture.organizationBilling,
+          remainingCreditCents: "0",
+          welcomeRemainingCents: "0",
+        },
+      }}
+    />
+  ),
+};
+
+export const BillingEmptyCredit: Story = {
+  name: "Billing (empty credit, card on file)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("billing")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+        organizationBilling: {
+          ...defaultFactoriesFixture.organizationBilling,
+          remainingCreditCents: "0",
+          welcomeRemainingCents: "0",
+        },
+      }}
+    />
+  ),
+};
+
+export const Usage: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("usage")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const UsageEmpty: Story = {
+  name: "Usage (empty)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("usage")}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        usageHistoryByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
+      }}
     />
   ),
 };

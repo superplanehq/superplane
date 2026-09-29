@@ -1,0 +1,311 @@
+import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
+import { describe, expect, it } from "bun:test";
+
+import {
+  VELOCITY_PERIOD_OPTIONS,
+  formatPersonWaste,
+  hasVelocityOutput,
+  isVelocityPeriodDays,
+  roundedShares,
+  toVelocityReport,
+  velocityBreakdownSeries,
+  velocityLegendLabel,
+  type VelocityIntakeSeries,
+} from "./factoryVelocityReport";
+
+const RESPONSE: FactoriesDescribeFactoryVelocityResponse = {
+  totals: {
+    superplaneMerged: 20,
+    peopleMerged: 30,
+    waste: 5,
+    wastePct: 20,
+    costCents: "12000",
+    tokens: "450000",
+    wasteCostCents: "2500",
+    // Fewer tasks than pull request closes: one task merged two pull requests.
+    tasksClosed: 24,
+    tasksWaste: 6,
+  },
+  previousTotals: {
+    superplaneMerged: 10,
+    peopleMerged: 25,
+    waste: 6,
+    wastePct: 38,
+    costCents: "9000",
+    tokens: "300000",
+    wasteCostCents: "3000",
+    tasksClosed: 15,
+    tasksWaste: 6,
+  },
+  hasPreviousWindow: true,
+  points: [
+    {
+      day: "1",
+      superplaneMerged: 3,
+      peopleMerged: 4,
+      waste: 1,
+      costCents: "800",
+      tokens: "12000",
+      wasteCostCents: "150",
+      intake: [
+        { key: "github-issues", merged: 2 },
+        { key: "manual", merged: 1 },
+      ],
+    },
+  ],
+  intakeSources: [
+    { key: "github-issues", label: "GitHub issue", merged: 14 },
+    { key: "manual", label: "Manually created", merged: 6 },
+  ],
+  people: [
+    {
+      id: "user-1",
+      name: "Igor Šarčević",
+      email: "igor@superplane.com",
+      avatarUrl: "https://avatars.example/igor.png",
+      authoredMerged: 7,
+      factoryMerged: 5,
+      factoryWaste: 2,
+      medianCycleHours: 18,
+      costCents: "3000",
+    },
+  ],
+  hasPeopleCohort: true,
+  repository: "acme/refunds",
+};
+
+describe("toVelocityReport", () => {
+  it("adds people and SuperPlane merges into one merged total", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.totals.merged).toBe(50);
+    expect(report.totals.peopleMerged).toBe(30);
+    expect(report.totals.superplaneMerged).toBe(20);
+  });
+
+  it("converts cents to dollars and spreads spend over the closed tasks", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.totals.costUsd).toBe(120);
+    expect(report.totals.wasteCostUsd).toBe(25);
+    expect(report.totals.tokens).toBe(450_000);
+    expect(report.totals.costPerTask).toBe(5);
+  });
+
+  it("counts tasks apart from the pull requests they opened", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.totals.tasksClosed).toBe(24);
+    expect(report.totals.tasksWaste).toBe(6);
+    expect(report.totals.taskWasteRate).toBe(25);
+  });
+
+  it("reports no task waste and no cost per task when no task closed", () => {
+    const report = toVelocityReport({
+      ...RESPONSE,
+      totals: { superplaneMerged: 3, peopleMerged: 0, waste: 1, costCents: "5000" },
+    });
+
+    expect(report.totals.taskWasteRate).toBe(0);
+    expect(report.totals.costPerTask).toBe(0);
+  });
+
+  it("reports no previous totals when the API has no earlier window", () => {
+    const report = toVelocityReport({ ...RESPONSE, hasPreviousWindow: false });
+
+    expect(report.previous).toBeUndefined();
+  });
+
+  it("maps previous totals when the API has an earlier window", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.previous?.merged).toBe(35);
+    expect(report.previous?.costPerTask).toBe(6);
+  });
+
+  it("keys the intake counts of a day by source", () => {
+    const [point] = toVelocityReport(RESPONSE).points;
+
+    expect(point.merged).toBe(7);
+    expect(point.costUsd).toBe(8);
+    expect(point.intake).toEqual({ "github-issues": 2, manual: 1 });
+  });
+
+  it("gives every intake source a color and a label", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.intakeSeries).toHaveLength(2);
+    expect(report.intakeSeries[0].label).toBe("GitHub issue");
+    expect(report.intakeSeries[0].color).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(report.intakeSeries[1].color).not.toBe(report.intakeSeries[0].color);
+  });
+
+  it("labels an intake source by its key when the API sends no label", () => {
+    const report = toVelocityReport({
+      ...RESPONSE,
+      intakeSources: [{ key: "linear-issues", merged: 4 }],
+    });
+
+    expect(report.intakeSeries[0].label).toBe("linear-issues");
+  });
+
+  it("names a person without a display name by email", () => {
+    const report = toVelocityReport({
+      ...RESPONSE,
+      people: [{ id: "user-2", email: "pedro@superplane.com", authoredMerged: 1 }],
+    });
+
+    expect(report.people[0].name).toBe("pedro@superplane.com");
+    expect(report.people[0].avatarUrl).toBeUndefined();
+  });
+
+  it("tolerates a response with no series at all", () => {
+    const report = toVelocityReport({});
+
+    expect(report.totals.merged).toBe(0);
+    expect(report.totals.tasksClosed).toBe(0);
+    expect(report.points).toEqual([]);
+    expect(report.intakeSeries).toEqual([]);
+    expect(report.people).toEqual([]);
+    expect(report.hasPeopleCohort).toBe(false);
+    expect(report.repository).toBeUndefined();
+  });
+
+  it("reports the total people count and whether more pages are available", () => {
+    const report = toVelocityReport({ ...RESPONSE, peopleTotal: 12, peopleHasMore: true });
+
+    expect(report.peopleTotal).toBe(12);
+    expect(report.peopleHasMore).toBe(true);
+  });
+
+  it("falls back the total to the page length when the API omits it", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.peopleTotal).toBe(RESPONSE.people?.length);
+    expect(report.peopleHasMore).toBe(false);
+  });
+});
+
+describe("hasVelocityOutput", () => {
+  it("is false when the window holds no merges, no waste and no spend", () => {
+    expect(hasVelocityOutput(toVelocityReport({}))).toBe(false);
+  });
+
+  it("is true when the window only holds spend", () => {
+    const report = toVelocityReport({ totals: { costCents: "500" } });
+
+    expect(hasVelocityOutput(report)).toBe(true);
+  });
+
+  it("is true when the window only holds waste", () => {
+    const report = toVelocityReport({ totals: { waste: 2 } });
+
+    expect(hasVelocityOutput(report)).toBe(true);
+  });
+});
+
+describe("formatPersonWaste", () => {
+  it("shows the waste count and the rounded share of SuperPlane closures", () => {
+    expect(formatPersonWaste({ factoryWaste: 3, factoryMerged: 9 })).toBe("3 (25%)");
+  });
+
+  it("shows zero when every SuperPlane closure merged", () => {
+    expect(formatPersonWaste({ factoryWaste: 0, factoryMerged: 5 })).toBe("0 (0%)");
+  });
+
+  it("shows an em dash when the person has no SuperPlane closures", () => {
+    expect(formatPersonWaste({ factoryWaste: 0, factoryMerged: 0 })).toBe("—");
+  });
+});
+
+describe("VELOCITY_PERIOD_OPTIONS", () => {
+  it("offers 7d next to 14d and 30d", () => {
+    expect(VELOCITY_PERIOD_OPTIONS).toEqual([
+      { value: "7", label: "7d" },
+      { value: "14", label: "14d" },
+      { value: "30", label: "30d" },
+    ]);
+  });
+
+  it("accepts only the period values the selector shows", () => {
+    expect(isVelocityPeriodDays(7)).toBe(true);
+    expect(isVelocityPeriodDays(14)).toBe(true);
+    expect(isVelocityPeriodDays(30)).toBe(true);
+    expect(isVelocityPeriodDays(1)).toBe(false);
+    expect(isVelocityPeriodDays(90)).toBe(false);
+  });
+});
+
+describe("roundedShares", () => {
+  it("keeps exact halves", () => {
+    expect(roundedShares([55, 45])).toEqual([55, 45]);
+  });
+
+  it("gives the leftover point to the earliest equal share", () => {
+    expect(roundedShares([1, 1, 1])).toEqual([34, 33, 33]);
+  });
+
+  it("rounds 1 of 3 up on the larger count", () => {
+    expect(roundedShares([1, 2])).toEqual([33, 67]);
+  });
+
+  it("returns zeros when the total is zero", () => {
+    expect(roundedShares([0, 0])).toEqual([0, 0]);
+  });
+
+  it("gives the whole period to the only positive count", () => {
+    expect(roundedShares([5, 0])).toEqual([100, 0]);
+  });
+
+  it("gives a tied remainder to the larger count, then the earlier index", () => {
+    expect(roundedShares([4, 1, 1])).toEqual([67, 17, 16]);
+  });
+
+  it("adds up to 100 for every generated set with a positive total", () => {
+    for (let length = 1; length <= 6; length += 1) {
+      for (let seed = 0; seed < 24; seed += 1) {
+        const values = Array.from({ length }, (_, index) => (seed * (index + 3) + index * 5) % 19);
+        if (values.reduce((sum, value) => sum + value, 0) <= 0) continue;
+
+        const shares = roundedShares(values);
+
+        expect(shares.every((share) => Number.isInteger(share))).toBe(true);
+        expect(shares.reduce((sum, share) => sum + share, 0)).toBe(100);
+      }
+    }
+  });
+});
+
+describe("velocityLegendLabel", () => {
+  it("appends the whole-number share", () => {
+    expect(velocityLegendLabel("Automated via SuperPlane", 55)).toBe("Automated via SuperPlane (55%)");
+  });
+
+  it("returns the plain label when the share is missing", () => {
+    expect(velocityLegendLabel("Manual work", undefined)).toBe("Manual work");
+  });
+});
+
+describe("velocityBreakdownSeries", () => {
+  const intakeSeries: VelocityIntakeSeries[] = [
+    { key: "github-issues", label: "GitHub issue", color: "#3b82f6", merged: 4 },
+  ];
+
+  it("splits origin into people and SuperPlane", () => {
+    expect(velocityBreakdownSeries("origin", intakeSeries).map((series) => series.key)).toEqual([
+      "people",
+      "superplane",
+    ]);
+  });
+
+  it("splits outcome into merged and closed without merge", () => {
+    expect(velocityBreakdownSeries("outcome", intakeSeries).map((series) => series.key)).toEqual(["merged", "waste"]);
+  });
+
+  it("takes the intake bands from the report, so unused sources stay hidden", () => {
+    expect(velocityBreakdownSeries("intake", intakeSeries)).toEqual([
+      { key: "github-issues", label: "GitHub issue", color: "#3b82f6" },
+    ]);
+    expect(velocityBreakdownSeries("intake", [])).toEqual([]);
+  });
+});

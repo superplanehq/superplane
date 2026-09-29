@@ -31,7 +31,7 @@ interface FactoriesHarnessProps {
    * Storybook-only: replace selected factory page elements.
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
-   * Work Orders defaults to the missions page so the sidebar keeps missions.
+   * Tasks defaults to the missions page so the sidebar keeps missions.
    * Setup + Get started overview are enabled by default.
    */
   pageOverrides?: OrgWorkspacePageOverrides;
@@ -43,6 +43,10 @@ interface FactoriesHarnessProps {
   openAgentSidebar?: boolean;
   /** Organization connections the story starts with. Defaults to none. */
   orgIntegrations?: StorybookOrgIntegration[];
+  /** Extra organization experimental features to enable on top of the defaults (factories, managed agents). */
+  experimentalFeatures?: string[];
+  /** Override Storybook preview flags. Defaults turn the design-review surfaces on. */
+  previewFlags?: Partial<FactoryPreviewFlags>;
 }
 
 function DefaultWikiWireframe() {
@@ -52,7 +56,11 @@ function DefaultWikiWireframe() {
 const defaultFactoryAppFixture = refundLineCanvasFixture();
 
 /** Stories keep hidden-in-app surfaces visible for design review. */
-const PREVIEW_FLAGS: FactoryPreviewFlags = { addIntakeControl: true };
+const PREVIEW_FLAGS: FactoryPreviewFlags = {
+  addIntakeControl: true,
+  columnAutomations: true,
+  columnAutomationRows: true,
+};
 
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
@@ -68,6 +76,8 @@ export function FactoriesHarness({
   enableOnboarding = true,
   openAgentSidebar = false,
   orgIntegrations,
+  experimentalFeatures = [],
+  previewFlags,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -76,6 +86,7 @@ export function FactoriesHarness({
       ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
       FEATURE_FACTORIES,
       FEATURE_CLAUDE_MANAGED_AGENTS,
+      ...experimentalFeatures,
     ],
     factories: factoriesFixture.factories.map((factory) => ({
       id: factory.id ?? "",
@@ -108,7 +119,7 @@ export function FactoriesHarness({
   );
 
   const withMissions = (
-    <FactoryPreviewFlagsContext.Provider value={PREVIEW_FLAGS}>
+    <FactoryPreviewFlagsContext.Provider value={{ ...PREVIEW_FLAGS, ...previewFlags }}>
       <MissionAssignmentProvider>
         <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
           {harness}

@@ -1,29 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
+
+import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+} from "@/lib/experimentalFeatures";
 
 import {
   ADD_INTAKE_TEMPLATES,
-  filterAddIntakeTemplates,
-  GITHUB_ISSUES_ANALYZING_TICKETS,
+  addIntakeTemplatesForOrg,
+  apiIntakeSource,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
   intakeTicketConfidenceScore,
+  isLineIntakeSourceId,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
-  sortIntakeTicketsByOutcome,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Sentry, and PagerDuty as automations that feed Backlog", () => {
+  it("defines GitHub, Jira, Sentry, PagerDuty, Productive.io, and Datadog as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
+      "dependabot-alerts",
+      "jira-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
+      "productive-tasks",
+      "datadog",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
     expect(github?.listen.kind).toBe("webhook");
     expect(github?.accept.destination).toBe("backlog");
+    expect(github?.evaluate.label).toBe("Create a task");
+    expect(github?.evaluate.rule).toContain("scores it there");
   });
 
   it("maps declared intakes to configured sources, keyed by intake id", () => {
@@ -54,18 +67,74 @@ describe("lineIntakeModel", () => {
           labelFilterMode: "LABEL_FILTER_MODE_EXCLUDE",
           assignment: "ASSIGNMENT_UNASSIGNED",
         },
+        health: "HEALTH_MISSING_INTEGRATION",
+        integrationId: "jira-1",
+        resourceId: "ENG",
       },
     ]);
 
     expect(intake?.source.name).toBe("GitHub issues");
     expect(intake?.healthy).toBe(false);
+    expect(intake?.health).toBe("HEALTH_MISSING_INTEGRATION");
+    expect(intake?.integrationId).toBe("jira-1");
+    expect(intake?.resourceId).toBe("ENG");
+    expect(intake?.paused).toBe(false);
     expect(intake?.settings).toMatchObject({
       name: "GitHub issues",
       confidencePct: 80,
       labels: ["bug"],
+      filterByLabel: true,
       labelFilterMode: "exclude",
       assignment: "unassigned",
     });
+  });
+
+  it("maps the Jira integration and project from the intake API", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-jira",
+        canvasId: "canvas-jira",
+        source: "SOURCE_JIRA_ISSUES",
+        integrationId: "jira-1",
+        resourceId: "ENG",
+        settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "Done" },
+      },
+    ]);
+
+    expect(intake?.integrationId).toBe("jira-1");
+    expect(intake?.resourceId).toBe("ENG");
+    expect(intake?.settings.jiraMoveOnComplete).toBe(true);
+    expect(intake?.settings.jiraCompletionColumn).toBe("Done");
+  });
+
+  it("maps the Datadog service onto the settings draft", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-datadog",
+        canvasId: "canvas-datadog",
+        source: "SOURCE_DATADOG",
+        integrationId: "datadog-1",
+        resourceId: "checkout",
+      },
+    ]);
+
+    expect(intake?.integrationId).toBe("datadog-1");
+    expect(intake?.resourceId).toBe("checkout");
+    expect(intake?.settings.datadogService).toBe("checkout");
+  });
+
+  it("carries the paused state from the intake API", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-1",
+        canvasId: "canvas-1",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        paused: true,
+      },
+    ]);
+
+    expect(intake?.paused).toBe(true);
+    expect(intake?.source.id).toBe("sentry-exceptions");
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
@@ -179,22 +248,6 @@ describe("lineIntakeModel", () => {
     expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket" })).toBeUndefined();
   });
 
-  it("keeps analyzing tickets over the tickets below the minimum confidence", () => {
-    expect(
-      sortIntakeTicketsByOutcome([
-        { id: "gh-1", title: "Below", outcome: "below-threshold", confidencePct: 20 },
-        { id: "gh-2", title: "Analyzing" },
-      ]).map((ticket) => ticket.id),
-    ).toEqual(["gh-2", "gh-1"]);
-
-    expect(GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold")).toHaveLength(6);
-    expect(
-      GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold").every(
-        (ticket) => (ticket.confidencePct ?? 100) < 60,
-      ),
-    ).toBe(true);
-  });
-
   // The analysis of a ticket under the minimum confidence is over. The popup
   // must show the finished run and the score, not a run that is still going.
   it("marks the analysis of a ticket below the minimum confidence as finished", () => {
@@ -278,39 +331,80 @@ describe("lineIntakeModel", () => {
     expect(fixture.waitingNotes[0]?.text).toContain("Backlog");
 
     const canvas = fixture.phases[0]?.canvas;
-    expect(canvas?.nodes.map((node) => node.component)).toEqual([
-      "github.onIssue",
-      "runnerClaudeCode",
-      "createWorkOrder",
-    ]);
+    expect(canvas?.nodes.map((node) => node.component)).toEqual(["github.onIssue", "createWorkOrder"]);
   });
 
-  it("builds Sentry and PagerDuty canvases from catalogue triggers", () => {
+  it("builds Sentry, PagerDuty, and Productive.io canvases from catalogue triggers", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
-      "runnerClaudeCode",
       "createWorkOrder",
     ]);
 
     const pagerduty = intakeAutomationFixture(lineIntakeSourceById("pagerduty-incidents")!);
     expect(pagerduty.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "pagerduty.onIncident",
-      "runnerClaudeCode",
+      "createWorkOrder",
+    ]);
+
+    const productive = intakeAutomationFixture(lineIntakeSourceById("productive-tasks")!);
+    expect(productive.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
+      "productive.onTask",
       "createWorkOrder",
     ]);
   });
 
-  it("lists six add-intake templates including CI and page performance", () => {
-    expect(ADD_INTAKE_TEMPLATES).toHaveLength(6);
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-ci-runtime");
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-page-performance");
+  it("lists GitHub, Dependabot, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion add-intake sources", () => {
+    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
+      "github-issues",
+      "dependabot-alerts",
+      "jira-issues",
+      "sentry-exceptions",
+      "productive-tasks",
+      "datadog",
+      "notion",
+    ]);
+    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
-  it("filters add-intake templates by name or description", () => {
-    expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
-    expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
-    expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("")).toHaveLength(6);
+  it("marks Jira, Productive.io, and Datadog as coming soon when their organization features are off", () => {
+    const templates = addIntakeTemplatesForOrg(() => false);
+
+    expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
+  });
+
+  it("keeps Jira, Productive.io, and Datadog live when their organization features are on", () => {
+    const templates = addIntakeTemplatesForOrg((featureId) =>
+      [
+        FEATURE_FACTORY_DATADOG_INTAKE,
+        FEATURE_FACTORY_DEPENDABOT_INTAKE,
+        FEATURE_FACTORY_JIRA_INTAKE,
+        FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+      ].includes(featureId),
+    );
+
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
+  });
+
+  it("maps every intake template id to an API source the picker can create", () => {
+    for (const template of ADD_INTAKE_TEMPLATES) {
+      if (!isLineIntakeSourceId(template.id)) {
+        continue;
+      }
+      expect(apiIntakeSource(template.id)).toBeDefined();
+    }
+
+    expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
+    expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
   });
 });

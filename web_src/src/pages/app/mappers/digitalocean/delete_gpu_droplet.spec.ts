@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { deleteGPUDropletMapper } from "./delete_gpu_droplet";
 import { buildDetailsCtx, buildOutput } from "./gpu_droplet_test_helpers";
 

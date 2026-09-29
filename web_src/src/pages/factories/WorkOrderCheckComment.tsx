@@ -9,8 +9,8 @@ import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation
 import { WorkOrderCheckAnalysis } from "./WorkOrderCheckDialog";
 
 /**
- * One check as a details/summary row: score, label, and name, then a
- * single-line summary. Analysis opens below.
+ * One check as a details/summary row: score, label, and name, then the
+ * full summary. Analysis opens below.
  */
 export function WorkOrderCheckComment({
   check,
@@ -48,7 +48,7 @@ export function WorkOrderCheckComment({
             <span className="text-[13px] text-muted-foreground">{check.name}</span>
           </div>
           {check.summary ? (
-            <p className="mt-1 truncate text-[13px] leading-5 text-foreground">{check.summary}</p>
+            <p className="mt-1 break-words text-[13px] leading-5 text-foreground">{check.summary}</p>
           ) : null}
         </div>
         <ChevronDown

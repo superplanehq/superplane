@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -31,6 +32,20 @@ func (c *WebhookContext) GetID() string {
 
 func (c *WebhookContext) GetURL() string {
 	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.baseURL, c.webhook.ID)
+}
+
+func (c *WebhookContext) CallbackHasActiveNodes(webhookID string) (bool, error) {
+	id, err := uuid.Parse(webhookID)
+	if err != nil {
+		return false, fmt.Errorf("invalid webhook id: %w", err)
+	}
+
+	nodes, err := models.FindActiveWebhookNodesInTransaction(c.tx, id)
+	if err != nil {
+		return false, err
+	}
+
+	return len(nodes) > 0, nil
 }
 
 func (c *WebhookContext) GetSecret() ([]byte, error) {

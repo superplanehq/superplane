@@ -11,6 +11,27 @@ import type {
 import { baseMapper } from "./base";
 import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 
+type InvokeFunctionData = {
+  functionName?: string;
+  executionId?: string;
+  resultRaw?: unknown;
+  result?: unknown;
+};
+
+type InvokeFunctionOutputPayload = OutputPayload & {
+  data?: InvokeFunctionData;
+};
+
+function invokeFunctionResultDisplay(data: InvokeFunctionData | undefined): string | undefined {
+  if (data?.resultRaw !== undefined) {
+    return String(data.resultRaw);
+  }
+  if (data?.result !== undefined) {
+    return typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+  }
+  return undefined;
+}
+
 export const invokeFunctionMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
@@ -20,9 +41,9 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const outputs = context.execution.outputs as { default?: InvokeFunctionOutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
-    const data = payload?.data as Record<string, any> | undefined;
+    const data = payload?.data;
 
     const details: Record<string, string> = {};
 
@@ -31,18 +52,17 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
     }
 
     if (data?.functionName) {
-      const parts = String(data.functionName).split("/");
+      const parts = data.functionName.split("/");
       details["Function"] = parts[parts.length - 1] ?? data.functionName;
     }
 
     if (data?.executionId) {
-      details["Execution ID"] = String(data.executionId);
+      details["Execution ID"] = data.executionId;
     }
 
-    if (data?.resultRaw !== undefined) {
-      details["Result"] = String(data.resultRaw);
-    } else if (data?.result !== undefined) {
-      details["Result"] = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+    const resultDisplay = invokeFunctionResultDisplay(data);
+    if (resultDisplay !== undefined) {
+      details["Result"] = resultDisplay;
     }
 
     return details;

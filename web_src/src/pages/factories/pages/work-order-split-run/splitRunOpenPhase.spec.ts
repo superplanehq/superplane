@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import {
@@ -45,6 +45,25 @@ describe("autoExpandedPhaseId", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
     expect(fixture.openPhaseId).toBe("pr-creation-2");
     expect(autoExpandedPhaseId(fixture)).toBe("pr-creation-2");
+  });
+
+  it("expands the oldest active PR feedback run", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-fb",
+            canvasId: "canvas-fb",
+            state: "STATE_PENDING",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(autoExpandedPhaseId(fixture)).toBe("pr-feedback-run-fb");
   });
 
   it("does not expand a passed current step while the order waits", () => {

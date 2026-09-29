@@ -107,7 +107,7 @@ export function useBacklogCreateMenu(
         onImported?.(order.id, order);
       }
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "SuperPlane could not create the work order."));
+      showErrorToast(getApiErrorMessage(error, "SuperPlane could not create the task."));
     }
   };
 

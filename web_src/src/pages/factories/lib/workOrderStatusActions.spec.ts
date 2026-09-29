@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { buildWorkOrderStatusActions, type WorkOrderStatusActionInput } from "./workOrderStatusActions";
 
@@ -17,12 +17,8 @@ function labelsOf(overrides: Partial<WorkOrderStatusActionInput> = {}) {
 }
 
 describe("buildWorkOrderStatusActions", () => {
-  it("offers Complete, Reject, and Back to draft for an open waiting order", () => {
-    expect(labelsOf({ displayStatus: "waiting", isOpen: true })).toEqual(["Complete", "Reject", "Back to draft"]);
-  });
-
-  it("hides Back to draft while a line is running", () => {
-    expect(labelsOf({ displayStatus: "running", isOpen: true })).toEqual(["Complete", "Reject"]);
+  it("offers Complete and Reject for an open waiting order", () => {
+    expect(labelsOf({ displayStatus: "waiting", isOpen: true })).toEqual(["Complete", "Reject"]);
   });
 
   it("offers Reject for a draft order", () => {
@@ -36,7 +32,34 @@ describe("buildWorkOrderStatusActions", () => {
     ).toEqual(["Reject"]);
   });
 
-  it("offers Reopen for a closed order", () => {
+  it("offers Send to backlog and Reopen for a failed or rejected order", () => {
+    expect(
+      labelsOf({
+        displayStatus: "failed",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
+    expect(
+      labelsOf({
+        displayStatus: "rejected",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
+    expect(
+      labelsOf({
+        displayStatus: "cancelled",
+        isOpen: false,
+        isDispatchable: false,
+        isClosed: true,
+      }),
+    ).toEqual(["Send to backlog", "Reopen"]);
+  });
+
+  it("offers Reopen for a completed order", () => {
     expect(
       labelsOf({
         displayStatus: "completed",

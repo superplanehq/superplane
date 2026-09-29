@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestParseRunnerLLMUsageFromClaudeCodeResult(t *testing.T) {
@@ -107,11 +109,17 @@ func TestParseRunnerLLMUsageFromMergedPlanResult(t *testing.T) {
 }
 
 type recordingUsage struct {
-	records []core.UsageRecord
+	records  []core.UsageRecord
+	computes []core.ComputeUsageRecord
 }
 
 func (r *recordingUsage) Record(record core.UsageRecord) error {
 	r.records = append(r.records, record)
+	return nil
+}
+
+func (r *recordingUsage) RecordCompute(record core.ComputeUsageRecord) error {
+	r.computes = append(r.computes, record)
 	return nil
 }
 
@@ -130,4 +138,86 @@ func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	assert.Equal(t, models.UsageProviderAnthropic, recorder.records[0].Provider)
 	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
 	assert.Equal(t, models.UsageIdempotencyKeyRunner, recorder.records[0].IdempotencyKey)
+}
+
+func TestRecordRunnerLLMUsageFromSuperPlaneFinishedEvent(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	RecordRunnerLLMUsage(
+		recorder,
+		nil,
+		"runnerSuperPlane.finished",
+		map[string]any{
+			"hostedProvider": models.UsageProviderOpenRouter,
+			"model":          "anthropic/claude-sonnet-4-6",
+			"credentials":    map[string]any{"source": "hosted"},
+		},
+		json.RawMessage(`{"usage":{"input_tokens":5,"output_tokens":2},"model":"anthropic/claude-sonnet-4-6"}`),
+	)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, models.UsageProviderOpenRouter, recorder.records[0].Provider)
+	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", recorder.records[0].Model)
+}
+
+func TestParsedSuperPlaneOpenRouterModelsArePriced(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		model string
+		want  string
+	}{
+		{name: "anthropic prefix", model: "anthropic/claude-sonnet-4-6", want: "anthropic/claude-sonnet-4-6"},
+		{name: "openrouter gateway", model: "openrouter/anthropic/claude-sonnet-4-6", want: "anthropic/claude-sonnet-4-6"},
+		{name: "gemini", model: "google/gemini-3.7-flash", want: "google/gemini-3.7-flash"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := json.Marshal(map[string]any{
+				"model": tc.model,
+				"usage": map[string]any{"input_tokens": 5, "output_tokens": 2},
+			})
+			require.NoError(t, err)
+
+			record, ok := ParseRunnerLLMUsage(
+				models.UsageProviderOpenRouter,
+				map[string]any{
+					"model":       tc.model,
+					"credentials": map[string]any{"source": CredentialsSourceHosted},
+				},
+				result,
+			)
+			require.True(t, ok)
+			assert.Equal(t, tc.want, record.Model)
+			assert.True(t, pricebook.IsPriced(record.Provider, record.Model))
+		})
+	}
+}
+
+func TestProcessBrokerTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	state := &contexts.ExecutionStateContext{Finished: true}
+	exit := 0
+	task := &Task{
+		Status:   "succeeded",
+		ExitCode: &exit,
+		Result:   json.RawMessage(`{"usage":{"input_tokens":1200,"output_tokens":80},"model":"claude-sonnet-4-6"}`),
+	}
+
+	require.NoError(t, processBrokerTaskStatus(
+		state,
+		task,
+		"runnerClaudeCode.finished",
+		"",
+		nil,
+		recorder,
+		map[string]any{"credentials": map[string]any{"source": "hosted"}},
+	))
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, int64(1280), recorder.records[0].TotalTokens)
+	assert.Empty(t, state.Payloads)
 }

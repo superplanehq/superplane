@@ -11,16 +11,16 @@ import (
 // makes the agent clone, work, push, and open (or update) a pull request, then
 // report the PR URL in a machine-readable form. schema, when non-nil, adds
 // instructions asking the agent to also include a JSON block matching it.
-func buildPrompt(spec Spec, pr *pullRequestInfo, branch string, hasFiles bool, attr commitAttribution, schema map[string]any) string {
+func buildPrompt(spec Spec, pr *pullRequestInfo, branch string, attr commitAttribution, schema map[string]any) string {
 	if pr != nil {
-		return buildPRPrompt(spec, pr, hasFiles, attr, schema)
+		return buildPRPrompt(spec, pr, attr, schema)
 	}
-	return buildRepositoryPrompt(spec, branch, hasFiles, attr, schema)
+	return buildRepositoryPrompt(spec, branch, attr, schema)
 }
 
-func buildRepositoryPrompt(spec Spec, branch string, hasFiles bool, attr commitAttribution, schema map[string]any) string {
+func buildRepositoryPrompt(spec Spec, branch string, attr commitAttribution, schema map[string]any) string {
 	var b strings.Builder
-	writeIntro(&b, hasFiles)
+	writeIntro(&b)
 
 	fmt.Fprintf(&b, "1. Clone the repository and enter it:\n")
 	fmt.Fprintf(&b, "     git clone %s repo && cd repo\n", authenticatedCloneURL(spec.Repository))
@@ -37,14 +37,17 @@ func buildRepositoryPrompt(spec Spec, branch string, hasFiles bool, attr commitA
 			target = "the default branch"
 		}
 		fmt.Fprintf(&b, "5. Open a pull request from %s into %s (use the GitHub API with $GITHUB_TOKEN, or the gh CLI).\n", branch, target)
+		if ref := spec.ResolvesIssue; ref != nil {
+			fmt.Fprintf(&b, "   Include \"This resolves %s\" in the pull request description so GitHub closes the issue when the PR merges.\n", issueBacklinkReference(*ref, spec.Repository))
+		}
 	}
 	writeFinalMarker(&b, prEnabled(spec), schema)
 	return b.String()
 }
 
-func buildPRPrompt(spec Spec, pr *pullRequestInfo, hasFiles bool, attr commitAttribution, schema map[string]any) string {
+func buildPRPrompt(spec Spec, pr *pullRequestInfo, attr commitAttribution, schema map[string]any) string {
 	var b strings.Builder
-	writeIntro(&b, hasFiles)
+	writeIntro(&b)
 	fmt.Fprintf(&b, "You are updating the existing pull request %s.\n\n", pr.HTMLURL)
 
 	fmt.Fprintf(&b, "1. Clone the repository and switch to the pull request's branch (it already exists on origin):\n")
@@ -74,12 +77,9 @@ func commitInstruction(attr commitAttribution) string {
 	return "Commit your changes with a clear message"
 }
 
-func writeIntro(b *strings.Builder, hasFiles bool) {
+func writeIntro(b *strings.Builder) {
 	b.WriteString("You are an autonomous coding agent in a fresh Linux sandbox with network access. ")
 	b.WriteString("A GitHub token is available in the $GITHUB_TOKEN environment variable.\n")
-	if hasFiles {
-		fmt.Fprintf(b, "Attached files are available under %s.\n", attachmentsMountDir)
-	}
 	b.WriteString("\nFollow these steps:\n")
 }
 

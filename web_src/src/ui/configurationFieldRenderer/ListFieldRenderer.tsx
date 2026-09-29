@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
-import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { listFieldItemTitle } from "./listFieldItemTitle";
@@ -207,16 +206,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       );
     }
 
-    if (itemDefinition?.type === "repository-file") {
-      return (
-        <RepositoryFileFieldRenderer
-          field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "repository-file" }}
-          value={item}
-          onChange={(val) => updateItem(index, val)}
-        />
-      );
-    }
-
     return (
       <Input
         type={itemDefinition?.type === "number" ? "number" : "text"}
@@ -307,7 +296,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       >
                         <span
                           className={cn(
-                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800",
+                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800 dark:text-gray-100",
                             isItemOpen && "sr-only",
                           )}
                         >

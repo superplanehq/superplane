@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,13 +40,14 @@ type FactoryWorkOrderExecution struct {
 	RunID          *uuid.UUID
 	Status         string
 	Result         string
-	// Aggregate usage populated by runners. Both default to zero; the API
+	// Aggregate usage populated by runners. All default to zero; the API
 	// only surfaces non-zero values to the UI.
-	TotalTokens int64
-	CostCents   int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	FinishedAt  *time.Time
+	TotalTokens     int64
+	DurationSeconds int64
+	CostCents       int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	FinishedAt      *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {
@@ -212,6 +214,7 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		Line:     dispatch.Ref(),
 		App:      &factory.AppRef{ID: run.WorkflowID, Name: e.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
+		User:     cancelledByUserRef(run.CancelledBy),
 	}
 
 	jsonData, err := json.Marshal(data)
@@ -320,5 +323,22 @@ func RootEventSourcePayload(eventData any) any {
 		return eventData
 	}
 
-	return source
+	sourceMap, ok := source.(map[string]any)
+	if !ok {
+		return source
+	}
+	if _, exists := sourceMap["superplaneReceiptId"]; !exists {
+		return source
+	}
+
+	cleaned := maps.Clone(sourceMap)
+	delete(cleaned, "superplaneReceiptId")
+	return cleaned
+}
+
+func cancelledByUserRef(cancelledBy *uuid.UUID) *factory.UserRef {
+	if cancelledBy == nil {
+		return nil
+	}
+	return &factory.UserRef{ID: *cancelledBy}
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { manageInstancePowerMapper, MANAGE_INSTANCE_POWER_STATE_REGISTRY } from "./manage_instance_power";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";

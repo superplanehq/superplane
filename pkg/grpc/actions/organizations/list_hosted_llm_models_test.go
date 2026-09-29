@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
@@ -65,4 +66,19 @@ func Test__ListHostedLLMModels(t *testing.T) {
 	assert.True(t, resp.Enabled)
 	require.Len(t, resp.Models, 2)
 	assert.Equal(t, "openai/gpt-4.1", resp.Models[0].Id)
+
+	_, err = ListHostedLLMModels(context.Background(), "not-a-uuid", &pb.ListHostedLLMModelsRequest{Provider: "anthropic"})
+	require.Error(t, err)
+
+	_, err = ListHostedLLMModels(context.Background(), r.Organization.ID.String(), &pb.ListHostedLLMModelsRequest{
+		Provider:  "anthropic",
+		FactoryId: "not-a-uuid",
+	})
+	require.Error(t, err)
+
+	_, err = ListHostedLLMModels(context.Background(), r.Organization.ID.String(), &pb.ListHostedLLMModelsRequest{
+		Provider:  "anthropic",
+		FactoryId: uuid.NewString(),
+	})
+	require.Error(t, err)
 }

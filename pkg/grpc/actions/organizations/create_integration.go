@@ -15,27 +15,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
-}
-
-func CreateIntegrationWithUsage(
+func CreateIntegration(
 	ctx context.Context,
-	usageService usage.Service,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	baseURL string,
@@ -49,10 +43,11 @@ func CreateIntegrationWithUsage(
 		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s not found", integrationName))
 	}
 
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization")
+		return nil, err
 	}
+	orgID = org.String()
 
 	//
 	// Check if an integration with this name already exists in the organization
@@ -60,17 +55,6 @@ func CreateIntegrationWithUsage(
 	_, err = models.FindIntegrationByName(database.Conn(), org, name)
 	if err == nil {
 		return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
-	}
-
-	integrationCount, err := models.CountIntegrationsByOrganization(orgID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to count integrations")
-	}
-
-	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID, &usagepb.OrganizationState{
-		Integrations: int32(integrationCount + 1),
-	}, nil); err != nil {
-		return nil, err
 	}
 
 	//
@@ -82,11 +66,15 @@ func CreateIntegrationWithUsage(
 		AppName: integrationName,
 	})
 
+	configMap := configurationMap(appConfig)
+
 	//
 	// If the integration and organization support the new flow, use it.
 	// Public GitHub App install skips the wizard and uses Sync instead.
+	// privateApp opts out of hosted install. The wizard still needs
+	// new_integration_setup_flow.
 	//
-	if registry.UseNewSetupFlow(org, integrationName) && !github.UseHostedInstall(org.String(), integrationName) {
+	if usesSetupWizard(registry, org, integrationName, configMap) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
@@ -104,7 +92,7 @@ func CreateIntegrationWithUsage(
 	//
 	// Otherwise, use the old flow.
 	//
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, configMap, integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
 		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
@@ -118,6 +106,16 @@ func CreateIntegrationWithUsage(
 
 	userID, _ := authentication.GetUserIdFromMetadata(ctx)
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
+}
+
+func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
+	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
+		return false
+	}
+	if sentry.PreferHostedInstall(integrationName, config) {
+		return false
+	}
+	return reg.UseNewSetupFlow(orgID, integrationName)
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
@@ -176,6 +174,8 @@ func syncIntegration(
 	actorUserID string,
 ) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("syncing integration %s", newIntegration.ID)
+
+	sentry.EnableHostedInstallBind(registry.Encryptor)
 
 	integrationCtx := contexts.NewIntegrationContext(
 		database.Conn(),
@@ -466,6 +466,15 @@ func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_Ca
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
 
+func isClearedSensitiveValue(value any) bool {
+	if value == nil {
+		return true
+	}
+
+	s, ok := value.(string)
+	return ok && s == ""
+}
+
 func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
 	result := maps.Clone(config)
 
@@ -476,6 +485,12 @@ func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Regist
 
 		value, exists := config[field.Name]
 		if !exists {
+			continue
+		}
+
+		if isClearedSensitiveValue(value) {
+			delete(result, field.Name)
+			delete(existingConfig, field.Name)
 			continue
 		}
 
@@ -530,4 +545,11 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
+}
+
+func configurationMap(appConfig *structpb.Struct) map[string]any {
+	if appConfig == nil {
+		return map[string]any{}
+	}
+	return appConfig.AsMap()
 }

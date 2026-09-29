@@ -35,23 +35,24 @@ func UpdateWorkOrderAssignees(
 		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update work order assignees")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
-	}
-
-	orderID, err := parseOrderID(req.GetOrderId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
-	}
-
 	tx := database.DB(ctx)
+	resolvedFactory, err := findFactory(tx, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(tx, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
+	}
+	orderID := resolvedOrder.ID
+
 	assigneeIDs, err := parseAssigneeIDs(tx, orgID, req.GetAssigneeIds())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
 	}
 
-	var newlyAssignedIDs []string
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -63,13 +64,7 @@ func UpdateWorkOrderAssignees(
 			return err
 		}
 
-		previousAssignees := order.AssigneeIDs()
-		if err := order.UpdateAssignees(tx, assigneeIDs, updatedBy); err != nil {
-			return err
-		}
-
-		newlyAssignedIDs = newAssigneeIDs(previousAssignees, assigneeIDs)
-		return nil
+		return order.UpdateAssignees(tx, assigneeIDs, updatedBy)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")
@@ -81,20 +76,6 @@ func UpdateWorkOrderAssignees(
 		factoryevents.EventTypeOrderAssigneesUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
-	}
-
-	if len(newlyAssignedIDs) > 0 {
-		notification := messages.FactoryWorkOrderNotificationMessage{
-			OrganizationID:  orgID.String(),
-			FactoryID:       factoryID.String(),
-			OrderID:         orderID.String(),
-			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
-			ActorUserID:     updatedBy.String(),
-			AssignedUserIDs: newlyAssignedIDs,
-		}
-		if err := notification.Publish(); err != nil {
-			log.WithError(err).Warnf("Failed to publish work order notification for order %s", orderID)
-		}
 	}
 
 	factory, err := models.FindFactory(tx, orgID, factoryID)
@@ -115,21 +96,4 @@ func UpdateWorkOrderAssignees(
 	return &pb.UpdateWorkOrderAssigneesResponse{
 		Order: serialized,
 	}, nil
-}
-
-// newAssigneeIDs returns the IDs present in next but not in previous —
-// the users who should receive a "you were assigned" notification.
-func newAssigneeIDs(previous, next []uuid.UUID) []string {
-	previousSet := make(map[uuid.UUID]struct{}, len(previous))
-	for _, id := range previous {
-		previousSet[id] = struct{}{}
-	}
-
-	var added []string
-	for _, id := range next {
-		if _, ok := previousSet[id]; !ok {
-			added = append(added, id.String())
-		}
-	}
-	return added
 }

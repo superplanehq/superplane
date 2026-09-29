@@ -54,6 +54,7 @@ func (e *EventDistributer) Start() error {
 		Handler    func(delivery tackle.Delivery) error
 	}{
 		{messages.EventsExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
+		{messages.CanvasExchange, messages.RunPendingRoutingKey, e.createHandler(eventdistributer.HandlePendingCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasRunRoutingKey, e.createHandler(eventdistributer.HandleCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
 		{messages.CanvasExchange, messages.CanvasQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},
@@ -63,6 +64,7 @@ func (e *EventDistributer) Start() error {
 		{messages.CanvasExchange, messages.CanvasMemoryUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasMemoryUpdated)},
 		{messages.CanvasExchange, messages.AgentSessionEventRoutingKey, e.createHandler(eventdistributer.HandleAgentSessionEvent)},
 		{messages.CanvasExchange, messages.FactoryWorkOrderUpdatedRoutingKey, e.createHandler(eventdistributer.HandleFactoryWorkOrderUpdated)},
+		{messages.CanvasExchange, messages.UserNotificationRoutingKey, e.createHandler(eventdistributer.HandleUserNotification)},
 	}
 
 	for _, routingKey := range messages.ExecutionRoutingKeys {

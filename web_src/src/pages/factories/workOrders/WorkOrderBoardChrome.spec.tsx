@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "./WorkOrderBoardChrome";
 
@@ -33,16 +33,16 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         keepChildrenWhenEmpty
         testId="lane-ghost"
       >
-        <p data-testid="lane-children">Create work order</p>
+        <p data-testid="lane-children">Create task</p>
       </WorkOrderBoardLane>,
     );
 
-    expect(screen.getByTestId("lane-children")).toHaveTextContent("Create work order");
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lane-children")).toHaveTextContent("Create task");
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("renders custom empty content instead of the dashed copy", () => {
@@ -50,14 +50,14 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         emptyContent={<p data-testid="custom-empty">Tickets land here first.</p>}
         testId="lane-hint"
       />,
     );
 
     expect(screen.getByTestId("custom-empty")).toHaveTextContent("Tickets land here first.");
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("renames the lane title on Enter when canRename is set", async () => {
@@ -67,7 +67,7 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         canRename
         onRename={onRename}
         titleTestId="lane-title"
@@ -83,5 +83,24 @@ describe("WorkOrderKanbanBoard", () => {
     await user.keyboard("{Enter}");
 
     expect(onRename).toHaveBeenCalledWith("Inbox");
+  });
+
+  it("packages the title and subheader as one header above a divider", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={1}
+        emptyDescription="Nothing here."
+        subheader={<p>Listens to GitHub issues</p>}
+        testId="lane-grouped"
+      >
+        <p>Card</p>
+      </WorkOrderBoardLane>,
+    );
+
+    const header = screen.getByTestId("lane-grouped-header");
+    expect(header).toHaveTextContent("Backlog");
+    expect(header).toHaveTextContent("Listens to GitHub issues");
+    expect(header.className).toContain("border-b");
   });
 });

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { defaultOrganizationRoleSortIndex, isDefaultOrganizationRole } from "@/lib/organizationRoles";
 import type { RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
@@ -56,16 +57,10 @@ export function Roles({ organizationId }: RolesProps) {
     }
   };
 
-  const isDefaultRole = (roleName: string | undefined) => {
-    if (!roleName) return false;
-    const defaultRoles = ["org_viewer", "org_admin", "org_owner"];
-    return defaultRoles.includes(roleName);
-  };
+  const isDefaultRole = (roleName: string | undefined) => isDefaultOrganizationRole(roleName);
 
   const filteredAndSortedRoles = useMemo(() => {
     const getSortedData = (data: RolesRole[]) => {
-      const defaultOrder = ["org_admin", "org_owner", "org_viewer"];
-      const defaultOrderIndex = new Map(defaultOrder.map((role, index) => [role, index]));
       const defaultRoles: RolesRole[] = [];
       const customRoles: RolesRole[] = [];
 
@@ -84,9 +79,7 @@ export function Roles({ organizationId }: RolesProps) {
       });
 
       const sortedDefaultRoles = [...defaultRoles].sort((a, b) => {
-        const aIndex = defaultOrderIndex.get(a.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
-        const bIndex = defaultOrderIndex.get(b.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
-        return aIndex - bIndex;
+        return defaultOrganizationRoleSortIndex(a.metadata?.name) - defaultOrganizationRoleSortIndex(b.metadata?.name);
       });
 
       return [...sortedCustomRoles, ...sortedDefaultRoles];

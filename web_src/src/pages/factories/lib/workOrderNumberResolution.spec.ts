@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 import {
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   findWorkOrderByRunId,
   latestDispatchForLine,
+  peekOrderFromNavigationState,
+  resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
   workOrderRouteNeedsCanonicalRedirect,
 } from "./workOrderNumberResolution";
@@ -97,6 +100,65 @@ describe("findWorkOrderByRunId", () => {
     expect(findWorkOrderByRunId([ORDERS[0], withRun], "run-new")?.id).toBe("order-run");
     expect(findWorkOrderByRunId([withRun], "missing")).toBeUndefined();
     expect(findWorkOrderByRunId([withRun], "  ")).toBeUndefined();
+  });
+});
+
+describe("peekOrderFromNavigationState", () => {
+  it("reads a task from navigate state", () => {
+    expect(peekOrderFromNavigationState({ peekOrder: ORDERS[0] })).toBe(ORDERS[0]);
+  });
+
+  it("rejects empty or malformed state", () => {
+    expect(peekOrderFromNavigationState(undefined)).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { title: "no id" } })).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { id: "" } })).toBeUndefined();
+  });
+});
+
+describe("resolvePeekWorkOrder", () => {
+  const notFound = resolveWorkOrderByNumber([], "12", false);
+  const found = resolveWorkOrderByNumber(ORDERS, "42", false);
+  const imported: FactoriesWorkOrder = { id: "wo-imported-12", title: "Handle duplicate refunds" };
+  const numberedImport: FactoriesWorkOrder = { id: "wo-imported-12", number: "12", title: "Handle duplicate refunds" };
+
+  it("prefers the list match over a navigation hint", () => {
+    expect(resolvePeekWorkOrder(found, "42", numberedImport, imported)).toBe(ORDERS[0]);
+  });
+
+  it("uses the navigation hint when the list has not caught up", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", numberedImport, null)).toBe(numberedImport);
+  });
+
+  it("uses the local hint when there is no permalink yet", () => {
+    expect(resolvePeekWorkOrder(notFound, undefined, undefined, imported)).toBe(imported);
+  });
+
+  it("ignores a local hint once a permalink is in the URL", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", undefined, imported)).toBeUndefined();
+  });
+});
+
+describe("displayedBoardLineId", () => {
+  const lines = [{ id: "line-plan" }, { id: "line-hotfix" }];
+  const order: FactoriesWorkOrder = {
+    id: "order-1",
+    lineDispatches: [{ id: "dispatch-hotfix", createdAt: "2026-09-28T00:00:00.000Z", line: { id: "line-hotfix" } }],
+  };
+
+  it("ignores a deleted task URL line and uses the dispatch line", () => {
+    expect(displayedBoardLineId(undefined, "deleted-line", lines, order, "line-plan")).toBe("line-hotfix");
+  });
+
+  it("keeps a task URL line that still exists", () => {
+    expect(displayedBoardLineId(undefined, "line-plan", lines, order, "line-hotfix")).toBe("line-plan");
+  });
+
+  it("prefers the route line over the task URL line", () => {
+    expect(displayedBoardLineId("line-hotfix", "line-plan", lines, order, "line-plan")).toBe("line-hotfix");
+  });
+
+  it("uses the first line when the task has no dispatch", () => {
+    expect(displayedBoardLineId(undefined, "deleted-line", lines, { id: "order-2" }, "line-plan")).toBe("line-plan");
   });
 });
 

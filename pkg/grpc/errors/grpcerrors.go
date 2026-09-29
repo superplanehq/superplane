@@ -155,3 +155,17 @@ func Code(err error) codes.Code {
 
 	return status.Code(err)
 }
+
+// StatusMessage returns the client-visible gRPC message from a handler or
+// status error.
+func StatusMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	if _, message, ok := HandlerStatus(err); ok {
+		return message
+	}
+
+	return status.Convert(err).Message()
+}

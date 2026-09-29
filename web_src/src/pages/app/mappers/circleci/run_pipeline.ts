@@ -7,11 +7,11 @@ import type {
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from "..";
+import { getTriggerRenderer } from "../mapperLookup";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -109,38 +109,25 @@ export const runPipelineMapper: ComponentBaseMapper = {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {};
     const outputs = context.execution.outputs as
       | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
-    const payload =
-      (outputs?.success?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.failed?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.default?.[0]?.data as Record<string, any> | undefined);
+    const payload = asRunPipelineSource(
+      outputs?.success?.[0]?.data || outputs?.failed?.[0]?.data || outputs?.default?.[0]?.data,
+    );
 
-    const payloadData =
-      payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
-        ? payload.data
-        : payload;
+    const nestedData = asRunPipelineSource(payload?.data);
+    const payloadData = nestedData ?? payload;
+    const metadataFallback = payloadData ? undefined : asRunPipelineSource(context.execution.metadata);
+    const sourceData = payloadData ?? metadataFallback;
 
-    const metadataFallback =
-      (!payloadData || typeof payloadData !== "object") && context.execution.metadata
-        ? (context.execution.metadata as Record<string, any>)
-        : undefined;
-
-    const sourceData =
-      payloadData && typeof payloadData === "object"
-        ? payloadData
-        : metadataFallback && typeof metadataFallback === "object"
-          ? metadataFallback
-          : undefined;
-
-    if (!sourceData || typeof sourceData !== "object") {
+    if (!sourceData) {
       return details;
     }
 
-    const pipeline = sourceData.pipeline as Record<string, any> | undefined;
+    const pipeline = sourceData.pipeline;
 
     const addDetail = (key: string, value?: string) => {
       if (value) {
@@ -158,9 +145,28 @@ export const runPipelineMapper: ComponentBaseMapper = {
   },
 };
 
+type RunPipelineInfo = {
+  id?: string;
+  number?: number | string;
+  pipeline_url?: string;
+};
+
+type RunPipelineSource = {
+  data?: unknown;
+  pipeline?: RunPipelineInfo;
+};
+
+function asRunPipelineSource(value: unknown): RunPipelineSource | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  return value as RunPipelineSource;
+}
+
 function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { projectSlug?: string; branch?: string; tag?: string } | undefined;
   const nodeMetadata = node.metadata as
     | {
         projectName?: string;
@@ -189,7 +195,7 @@ function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
 
 function runPipelineSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as { parameters?: unknown } | undefined;
 
   const parameters = configuration?.parameters as Array<{ name: string; value: string }> | undefined;
   if (parameters && parameters.length > 0) {
@@ -225,7 +231,7 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const sections: EventSection[] = [];
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runPipelineStateFunction(execution);
   const subtitleTimestamp =

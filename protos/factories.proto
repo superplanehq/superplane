@@ -6,6 +6,8 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "canvases.proto";
+import "files.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
 
@@ -55,7 +57,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory";
-      description: "Returns a factory by its ID";
+      description: "Returns a factory by ID or workspace key. Workspace names are not accepted: they are not unique and can contain spaces.";
       tags: "Factory";
     };
   }
@@ -80,6 +82,30 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory onboarding";
       description: "Saves workspace onboarding progress and optionally marks setup complete";
+      tags: "Factory";
+    };
+  }
+
+  rpc SwitchFactoryModelSource(SwitchFactoryModelSourceRequest) returns (SwitchFactoryModelSourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/model-source"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Switch factory model source";
+      description: "Saves a provider key, updates the workspace agent harness, and rewrites agent nodes on workspace canvases";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory repository";
+      description: "Updates the repository used by a factory workspace";
       tags: "Factory";
     };
   }
@@ -121,15 +147,62 @@ service Factories {
     };
   }
 
-  // Factory app APIs
+  // Factory automation APIs
 
-  rpc ListFactoryApps(ListFactoryAppsRequest) returns (ListFactoryAppsResponse) {
+  rpc ListFactoryAutomations(ListFactoryAutomationsRequest) returns (ListFactoryAutomationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/apps"
+      get: "/api/v1/factories/{factory_id}/automations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory apps";
+      summary: "List factory automations";
       description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryAutomation(CreateFactoryAutomationRequest) returns (CreateFactoryAutomationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/automations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory automation";
+      description: "Creates a blank factory canvas and optionally attaches it to Verify or Done";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryAutomation(DeleteFactoryAutomationRequest) returns (DeleteFactoryAutomationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/automations/{automation_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory automation";
+      description: "Deletes a factory canvas";
+      tags: "Factory";
+    };
+  }
+
+  rpc MaterializeFactoryAppTemplate(MaterializeFactoryAppTemplateRequest) returns (MaterializeFactoryAppTemplateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize a factory app template";
+      description: "Builds a bundled factory app template with its installation settings";
+      tags: "Factory";
+    };
+  }
+
+  rpc MaterializeFactoryAutomationDefaults(MaterializeFactoryAutomationDefaultsRequest) returns (MaterializeFactoryAutomationDefaultsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/automations/{automation_id}:defaults"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize factory automation defaults";
+      description: "Builds the bundled defaults for an installed factory automation and preserves its connections";
       tags: "Factory";
     };
   }
@@ -193,6 +266,130 @@ service Factories {
     };
   }
 
+  // Factory PR feedback handler APIs
+
+  rpc ListFactoryPRFeedbackHandlers(
+    ListFactoryPRFeedbackHandlersRequest
+  ) returns (ListFactoryPRFeedbackHandlersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory PR feedback handlers";
+      description: "Returns the PR feedback handlers of a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryPRFeedbackHandler(
+    CreateFactoryPRFeedbackHandlerRequest
+  ) returns (CreateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory PR feedback handler";
+      description: "Creates a PR feedback handler and the canvas that runs it";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryPRFeedbackHandler(
+    UpdateFactoryPRFeedbackHandlerRequest
+  ) returns (UpdateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory PR feedback handler";
+      description: "Updates the name and settings of a PR feedback handler";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryPRFeedbackHandler(
+    DeleteFactoryPRFeedbackHandlerRequest
+  ) returns (DeleteFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory PR feedback handler";
+      description: "Deletes a PR feedback handler and its canvas";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryPullRequest(
+    DescribeFactoryPullRequestRequest
+  ) returns (DescribeFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs/{pr_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory pull request";
+      description: "Returns a factory pull request by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryPullRequest(
+    CreateFactoryPullRequestRequest
+  ) returns (CreateFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory pull request";
+      description: "Tracks a pull request on a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryPullRequest(
+    UpdateFactoryPullRequestRequest
+  ) returns (UpdateFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/prs/{pr_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory pull request";
+      description: "Updates a tracked factory pull request";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryPullRequestMergeability(
+    DescribeFactoryPullRequestMergeabilityRequest
+  ) returns (DescribeFactoryPullRequestMergeabilityResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs/{pr_id}/mergeability"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory pull request mergeability";
+      description: "Returns whether a tracked factory pull request can merge from SuperPlane";
+      tags: "Factory";
+    };
+  }
+
+  rpc MergeFactoryPullRequest(
+    MergeFactoryPullRequestRequest
+  ) returns (MergeFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Merge factory pull request";
+      description: "Merges a tracked GitHub pull request with a method the repository allows";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -200,6 +397,17 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Search factory intake items";
       description: "Returns recent or matching items from the intake source";
+      tags: "Factory";
+    };
+  }
+
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
       tags: "Factory";
     };
   }
@@ -216,6 +424,18 @@ service Factories {
     };
   }
 
+  rpc RefreshBacklog(RefreshBacklogRequest) returns (RefreshBacklogResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/backlog/refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Refresh the backlog";
+      description: "Archives backlog work orders whose intake items are closed or no longer available";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -224,7 +444,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List factory work orders";
-      description: "Returns a list of work orders for a factory";
+      description: "Returns one page of work orders for a factory. The default page size is 100. Pass before_id to return orders older than that id.";
       tags: "Factory";
     };
   }
@@ -247,7 +467,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory work order";
-      description: "Returns a work order by its ID";
+      description: "Returns a work order by ID, number, or key";
       tags: "Factory";
     };
   }
@@ -323,6 +543,18 @@ service Factories {
     };
   }
 
+  rpc SendWorkOrderToBacklog(SendWorkOrderToBacklogRequest) returns (SendWorkOrderToBacklogResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/backlog"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send work order to backlog";
+      description: "Moves a closed work order to draft and optionally closes pull requests and clears artifacts";
+      tags: "Factory";
+    };
+  }
+
   rpc AddWorkOrderComment(AddWorkOrderCommentRequest) returns (AddWorkOrderCommentResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/orders/{order_id}/comments"
@@ -369,13 +601,14 @@ service Factories {
     };
   }
 
-  rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
+  rpc SyncFactoryVelocity(SyncFactoryVelocityRequest) returns (SyncFactoryVelocityResponse) {
     option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
+      post: "/api/v1/factories/{factory_id}/velocity/sync"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List work order checks";
-      description: "Returns scored checks reported on a work order";
+      summary: "Sync factory velocity";
+      description: "Starts a repository merge sync for a factory and returns before it finishes";
       tags: "Factory";
     };
   }
@@ -387,6 +620,201 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory LLM spend";
       description: "Returns token and estimated dollar spend for a workspace, grouped by model";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryWorkOrderRunUsage(ListFactoryWorkOrderRunUsageRequest) returns (ListFactoryWorkOrderRunUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage-history"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory work-order run usage";
+      description: "Returns paginated task-run spend for a workspace from the usage ledger";
+      tags: "Factory";
+    };
+  }
+
+  rpc ExportFactoryWorkOrderRunUsage(ExportFactoryWorkOrderRunUsageRequest) returns (ExportFactoryWorkOrderRunUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/usage-history.csv"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Export factory work-order run usage";
+      description: "Returns the full task-run spend ledger for a workspace as CSV, with no date window";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryLLMModels(ListFactoryLLMModelsRequest) returns (ListFactoryLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/llm-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory LLM models";
+      description: "Returns the parent model list and the workspace subset for one provider";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryLineRunnerModels(ListFactoryLineRunnerModelsRequest) returns (ListFactoryLineRunnerModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/line-runner-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List line runner models";
+      description: "Returns the models a draft task can pick for the runner agents on one factory line";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryLLMModels(UpdateFactoryLLMModelsRequest) returns (UpdateFactoryLLMModelsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{factory_id}/llm-models"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory LLM models";
+      description: "Sets the workspace subset of parent models. An empty list inherits the parent list.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryAgentResources(ListFactoryAgentResourcesRequest) returns (ListFactoryAgentResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workspace agent resources";
+      description: "Returns MCP connections for a workspace. Skills are reserved for a later release.";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryAgentResource(CreateFactoryAgentResourceRequest) returns (CreateFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a workspace agent resource";
+      description: "Adds an MCP connection to the workspace catalog.";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryAgentResource(UpdateFactoryAgentResourceRequest) returns (UpdateFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a workspace agent resource";
+      description: "Updates name, enabled state, or MCP configuration.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryAgentResource(DeleteFactoryAgentResourceRequest) returns (DeleteFactoryAgentResourceResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a workspace agent resource";
+      description: "Removes an MCP connection and its OAuth tokens.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartFactoryAgentResourceOAuth(StartFactoryAgentResourceOAuthRequest) returns (StartFactoryAgentResourceOAuthResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:start"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start MCP OAuth";
+      description: "Discovers the MCP authorization server and returns the browser URL.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DisconnectFactoryAgentResourceOAuth(DisconnectFactoryAgentResourceOAuthRequest) returns (DisconnectFactoryAgentResourceOAuthResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/oauth:disconnect"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Disconnect MCP OAuth";
+      description: "Revokes stored tokens when the vendor advertises a revoke endpoint.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryAgentResourceTools(ListFactoryAgentResourceToolsRequest) returns (ListFactoryAgentResourceToolsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/tools"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List MCP tools";
+      description: "Calls tools/list on a connected MCP server. The result is read-only.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe planning session";
+      description: "Returns a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc EndPlanningSession(EndPlanningSessionRequest) returns (EndPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "End planning session";
+      description: "Stops the planning session machine";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendPlanningSessionMessage(SendPlanningSessionMessageRequest) returns (SendPlanningSessionMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send planning session message";
+      description: "Sends a user message in a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc AnswerPlanningSessionSurvey(AnswerPlanningSessionSurveyRequest) returns (AnswerPlanningSessionSurveyResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey-answer"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Answer planning session survey";
+      description: "Sends the user's survey answer to an analysis planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc FindPlanningSessionByWorkOrder(FindPlanningSessionByWorkOrderRequest) returns (FindPlanningSessionByWorkOrderResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Find planning session by work order";
+      description: "Returns the analysis planning session for a draft work order";
       tags: "Factory";
     };
   }
@@ -414,6 +842,8 @@ message CreateFactoryResponse {
 }
 
 message DescribeFactoryRequest {
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string id = 1;
 }
 
@@ -428,6 +858,12 @@ message UpdateFactoryRequest {
   // New workspace key. 2 to 5 uppercase letters, unique per organization.
   // Updating this changes the identifier shown for every work order.
   optional string key = 4;
+  // Hosted spend cap in USD cents. Unset leaves the current cap unchanged.
+  optional int64 hosted_spend_budget_cents = 5;
+  // When true, remove the hosted spend cap. Takes precedence over hosted_spend_budget_cents.
+  bool clear_hosted_spend_budget = 6;
+  // Full replacement of Planning settings. Absent means do not change.
+  optional FactoryPlanning planning = 7;
 }
 
 message UpdateFactoryResponse {
@@ -452,9 +888,36 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // Default branch of the app repository.
+  optional string default_branch = 11;
 }
 
 message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
+message SwitchFactoryModelSourceRequest {
+  string id = 1;
+  // hosted, anthropic, openai, or openrouter.
+  string source = 2;
+  // Provider API key. Required when this organization has no ready integration for the source.
+  string api_key = 3;
+}
+
+message SwitchFactoryModelSourceResponse {
+  Factory factory = 1;
+  string integration_id = 2;
+}
+
+message UpdateFactoryRepositoryRequest {
+  string id = 1;
+  // Repository slug in owner/name form.
+  string repository = 2;
+  // Default branch resolved from the selected repository.
+  string default_branch = 3;
+}
+
+message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
@@ -478,6 +941,7 @@ message FactoryOnboarding {
     AGENT_HARNESS_CLAUDE_CODE = 1;
     AGENT_HARNESS_CURSOR = 2;
     AGENT_HARNESS_CODEX = 3;
+    AGENT_HARNESS_SUPERPLANE = 4;
   }
 
   // Set when workspace setup finished. Null while onboarding is open.
@@ -490,15 +954,22 @@ message FactoryOnboarding {
   AgentHarness agent_harness = 7;
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
+  string default_branch = 10;
+  // True when account onboarding created this workspace.
+  bool initial = 11;
 }
 
 message Factory {
-  message App {
+  message Automation {
     string id = 1;
     string name = 2;
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
+    // Board column this event automation is shown on. Empty when the
+    // automation is not attached to Verify or Done. Allowed values:
+    // "verify", "done".
+    string column_key = 6;
   }
 
   string id = 1;
@@ -508,6 +979,20 @@ message Factory {
   // Workspace key. 2 to 5 uppercase letters, unique per organization.
   string key = 5;
   FactoryOnboarding onboarding = 6;
+  // Hosted spend cap in USD cents. Unset means this workspace has no cap.
+  optional int64 hosted_spend_budget_cents = 7;
+  FactoryPlanning planning = 8;
+}
+
+// Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
+message FactoryPlanning {
+  bool enabled = 1;
+  bool clarity = 2;
+  bool confidence = 3;
+  // True after the post-onboarding Planning wizard or a Planning settings save.
+  bool setup_completed = 4;
+  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message FactoryLine {
@@ -532,6 +1017,10 @@ message FactoryLine {
   google.protobuf.Timestamp updated_at = 5;
   // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
   optional FactoryLineMetrics metrics = 6;
+  // Board column colors, keyed by column key ("backlog", "phase-<step
+  // index>", "verify", "done"). Value is a color id. Missing keys use the
+  // default color.
+  map<string, string> column_colors = 7;
 }
 
 message CreateFactoryLineRequest {
@@ -549,18 +1038,80 @@ message UpdateFactoryLineRequest {
   string line_id = 2;
   optional string name = 3;
   repeated FactoryLine.Step steps = 4;
+  // Full replacement of the board column colors. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, string> column_colors = 5;
 }
 
 message UpdateFactoryLineResponse {
   FactoryLine line = 1;
 }
 
-message ListFactoryAppsRequest {
+message ListFactoryAutomationsRequest {
   string factory_id = 1;
 }
 
-message ListFactoryAppsResponse {
-  repeated Factory.App apps = 1;
+message ListFactoryAutomationsResponse {
+  repeated Factory.Automation automations = 1;
+}
+
+message CreateFactoryAutomationRequest {
+  string factory_id = 1;
+  // Defaults to "Custom automation" when empty.
+  string name = 2;
+  // Attach the canvas to Verify or Done. Empty leaves it off the board.
+  string column_key = 3;
+}
+
+message CreateFactoryAutomationResponse {
+  Factory.Automation automation = 1;
+}
+
+message DeleteFactoryAutomationRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message DeleteFactoryAutomationResponse {}
+
+message FactoryAppTemplateIntegration {
+  string type = 1;
+  string id = 2;
+  string name = 3;
+}
+
+message FactoryAppTemplateAgent {
+  string component = 1;
+  string model = 2;
+  string planning_model = 3;
+  string credential_source = 4;
+  string credential_integration_name = 5;
+}
+
+message MaterializeFactoryAppTemplateRequest {
+  string factory_id = 1;
+  string template_id = 2;
+  string app_id = 3;
+  map<string, string> install_params = 4;
+  repeated FactoryAppTemplateIntegration integrations = 5;
+  FactoryAppTemplateAgent agent = 6;
+}
+
+message MaterializeFactoryAppTemplateResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
+}
+
+message MaterializeFactoryAutomationDefaultsRequest {
+  string factory_id = 1;
+  string automation_id = 2;
+}
+
+message MaterializeFactoryAutomationDefaultsResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
 }
 
 // Factory intakes
@@ -571,6 +1122,29 @@ message FactoryIntake {
     SOURCE_GITHUB_ISSUES = 1;
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
+    SOURCE_PRODUCTIVE_TASKS = 4;
+    SOURCE_JIRA_ISSUES = 5;
+    SOURCE_DEPENDABOT_ALERTS = 6;
+    SOURCE_DATADOG = 7;
+  }
+
+  enum InitialImportStatus {
+    INITIAL_IMPORT_STATUS_UNSPECIFIED = 0;
+    INITIAL_IMPORT_STATUS_PENDING = 1;
+    INITIAL_IMPORT_STATUS_COMPLETED = 2;
+    INITIAL_IMPORT_STATUS_FAILED = 3;
+    INITIAL_IMPORT_STATUS_SKIPPED = 4;
+  }
+
+  // Why healthy is false. HEALTH_OK when the intake can receive items.
+  enum Health {
+    HEALTH_UNSPECIFIED = 0;
+    HEALTH_OK = 1;
+    HEALTH_MISSING_INTEGRATION = 2;
+    HEALTH_INTEGRATION_NOT_READY = 3;
+    HEALTH_WEBHOOK_NOT_READY = 4;
+    HEALTH_GRAPH_BROKEN = 5;
+    HEALTH_WEBHOOK_FAILED = 6;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
@@ -598,6 +1172,51 @@ message FactoryIntake {
     repeated string labels = 2;
     LabelFilterMode label_filter_mode = 3;
     Assignment assignment = 4;
+    // When true, only create a work order for issues opened by someone with
+    // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
+    // GitHub issue intakes only. Off by default.
+    bool authors_with_access = 5;
+    // Listen for opened GitHub issues.
+    optional bool new_issues = 6;
+    // Listen for open GitHub issues when somebody adds the "superplane"
+    // label to them.
+    optional bool superplane_label_added = 7;
+    // Listen for reopened GitHub issues.
+    optional bool reopened_issues = 8;
+    // When true, SuperPlane moves the Jira issue when the task completes.
+    // Jira issue intakes only. On by default.
+    optional bool jira_move_on_complete = 9;
+    // Jira status name to move the issue to. Empty means the project's Done
+    // column. Jira issue intakes only.
+    string jira_completion_column = 10;
+    // Listen for created Sentry issues. Sentry exception intakes only.
+    optional bool sentry_new_issues = 11;
+    // Listen for Sentry issues that become unresolved. Sentry exception
+    // intakes only.
+    optional bool sentry_regressed_issues = 12;
+    // Listen for assigned Sentry issues. Sentry exception intakes only.
+    optional bool sentry_assigned_issues = 13;
+    // Issue levels that still create a task. Empty means every level.
+    // Sentry exception intakes only.
+    repeated string sentry_levels = 14;
+    // When true, skip Productive.io key tasks (milestones). Productive task
+    // intakes only.
+    optional bool exclude_key_tasks = 15;
+    // Task list ids that still create a task. Empty means every task list.
+    // Productive task intakes only.
+    repeated string task_list_ids = 16;
+    // Severities that still create a task. Empty means every severity.
+    // Dependabot alert intakes only. Values: critical, high, medium, low.
+    repeated string dependabot_severities = 17;
+    // Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
+    // On by default. An empty selection still listens for Triggered.
+    optional bool datadog_triggered_alerts = 18;
+    // Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes
+    // only. Off by default.
+    optional bool datadog_retriggered_alerts = 19;
+    // Environments that still create a task. Empty means every environment.
+    // Datadog intakes only.
+    repeated string datadog_environments = 20;
   }
 
   string id = 1;
@@ -613,6 +1232,17 @@ message FactoryIntake {
   bool healthy = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Result of the one-time import that runs when the intake is created.
+  InitialImportStatus initial_import_status = 11;
+  // Set when the initial import completed, including when it found zero items.
+  optional int32 initial_import_item_count = 12;
+  // True when live items are ignored. Hand-picked import still works.
+  bool paused = 13;
+  // Live trigger connection. Empty when the intake is unbound.
+  string integration_id = 14;
+  // Live trigger resource, such as a Jira project key.
+  string resource_id = 15;
+  Health health = 16;
 }
 
 message FactoryIntakeRun {
@@ -655,6 +1285,15 @@ message CreateFactoryIntakeRequest {
   // Defaults to a name derived from the source when empty.
   string name = 3;
   optional int32 confidence_pct = 4;
+  // Optional integration and source resource selected during guided setup.
+  string integration_id = 5;
+  string resource_id = 6;
+  // When true, SuperPlane does not import existing issues. The intake still
+  // listens for new issues.
+  bool skip_initial_import = 7;
+  // Optional intake settings applied when the canvas is created. Used by
+  // the Jira wizard and first-run tickets step to store the completion column.
+  optional FactoryIntake.Settings settings = 8;
 }
 
 message CreateFactoryIntakeResponse {
@@ -666,6 +1305,10 @@ message UpdateFactoryIntakeRequest {
   string intake_id = 2;
   optional string name = 3;
   optional FactoryIntake.Settings settings = 4;
+  optional bool paused = 5;
+  // Rebind the live trigger. Set both fields together.
+  optional string integration_id = 6;
+  optional string resource_id = 7;
 }
 
 message UpdateFactoryIntakeResponse {
@@ -692,6 +1335,253 @@ message ListFactoryIntakeRunsResponse {
   google.protobuf.Timestamp last_timestamp = 2;
 }
 
+// Factory PR feedback handlers
+
+message FactoryPRFeedbackHandler {
+  // Object this handler can change.
+  enum Subject {
+    SUBJECT_UNSPECIFIED = 0;
+    SUBJECT_GITHUB_PULL_REQUEST = 1;
+  }
+
+  // Signal that starts a run.
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_PULL_REQUEST_DISCUSSION = 1;
+    SOURCE_PULL_REQUEST_CHECKS = 2;
+  }
+
+  message SubjectSettings {
+    string repository = 1;
+  }
+
+  message DiscussionSettings {
+    string mention = 1;
+    bool ignore_bots = 2;
+    // GitHub usernames of bots to react to even without the mention.
+    repeated string allowed_bots = 3;
+  }
+
+  message CheckSettings {
+    repeated string names = 1;
+    optional int32 maximum_attempts = 2;
+    repeated string runner_integration_ids = 3;
+  }
+
+  // Settings stored in the canvas graph. This block is a read/write facade
+  // over that graph.
+  message Settings {
+    SubjectSettings subject = 1;
+    DiscussionSettings discussion = 2;
+    CheckSettings checks = 3;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  string canvas_id = 3;
+  string name = 4;
+  string description = 5;
+  // Unspecified defaults to a GitHub pull request.
+  Subject subject = 6;
+  // Unspecified defaults to pull request discussion.
+  Source source = 7;
+  Settings settings = 8;
+  // False when the canvas can no longer receive a mention and address it.
+  // The handler stays listed so the user can repair it.
+  bool healthy = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message ListFactoryPRFeedbackHandlersRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryPRFeedbackHandlersResponse {
+  repeated FactoryPRFeedbackHandler handlers = 1;
+}
+
+message CreateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryPRFeedbackHandler.Subject subject = 3;
+  FactoryPRFeedbackHandler.Source source = 4;
+  FactoryPRFeedbackHandler.Settings settings = 5;
+}
+
+message CreateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message UpdateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+  optional string name = 3;
+  optional FactoryPRFeedbackHandler.Settings settings = 4;
+}
+
+message UpdateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message DeleteFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+}
+
+message DeleteFactoryPRFeedbackHandlerResponse {}
+
+message FactoryPullRequestRun {
+  string title = 1;
+  string description = 2;
+  int64 total_tokens = 3;
+  int64 cost_cents = 4;
+  Superplane.Canvases.CanvasRunRef run = 5;
+}
+
+message FactoryPullRequestRevision {
+  string id = 1;
+  string sha = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message FactoryPullRequestActivity {
+  Superplane.Canvases.CanvasRunRef run = 1;
+  string title = 2;
+  string description = 3;
+  optional FactoryPullRequestRevision revision = 4;
+  string access = 5;
+  string state = 6;
+  optional int32 attempt = 7;
+  optional int32 attempt_limit = 8;
+  int64 total_tokens = 9;
+  int64 cost_cents = 10;
+}
+
+message FactoryPullRequest {
+  enum Provider {
+    PROVIDER_UNSPECIFIED = 0;
+    PROVIDER_GITHUB = 1;
+    PROVIDER_BITBUCKET = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_OPEN = 1;
+    STATE_DRAFT = 2;
+    STATE_CLOSED = 3;
+    STATE_MERGED = 4;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  string work_order_id = 3;
+  int64 work_order_number = 4;
+  Provider provider = 5;
+  string external_id = 6;
+  string repository = 7;
+  int64 number = 8;
+  string url = 9;
+  string title = 10;
+  State state = 11;
+  google.protobuf.Timestamp merged_at = 12;
+  google.protobuf.Timestamp closed_at = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  repeated FactoryPullRequestRun runs = 16;
+  optional FactoryPullRequestRevision current_revision = 17;
+  repeated FactoryPullRequestActivity activities = 18;
+  bool mergeable = 19;
+}
+
+message DescribeFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message DescribeFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message CreateFactoryPullRequestRequest {
+  string factory_id = 1;
+  string work_order_id = 2;
+  FactoryPullRequest.Provider provider = 3;
+  string external_id = 4;
+  string repository = 5;
+  int64 number = 6;
+  string url = 7;
+  string title = 8;
+  FactoryPullRequest.State state = 9;
+  google.protobuf.Timestamp merged_at = 10;
+  google.protobuf.Timestamp closed_at = 11;
+}
+
+message CreateFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message UpdateFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  optional string external_id = 3;
+  optional string repository = 4;
+  optional string url = 5;
+  optional string title = 6;
+  optional FactoryPullRequest.State state = 7;
+  google.protobuf.Timestamp merged_at = 8;
+  google.protobuf.Timestamp closed_at = 9;
+}
+
+message UpdateFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message FactoryPullRequestMergeability {
+  enum BlockedReason {
+    BLOCKED_REASON_UNSPECIFIED = 0;
+    BLOCKED_REASON_ACTIVE_RUN = 1;
+    BLOCKED_REASON_CHECKS_UNFINISHED = 2;
+    BLOCKED_REASON_CHECK_FAILED = 3;
+    BLOCKED_REASON_DRAFT = 4;
+    BLOCKED_REASON_CONFLICTING = 5;
+    BLOCKED_REASON_MISSING_INTEGRATION = 6;
+  }
+
+  enum MergeMethod {
+    MERGE_METHOD_UNSPECIFIED = 0;
+    MERGE_METHOD_SQUASH = 1;
+    MERGE_METHOD_MERGE = 2;
+    MERGE_METHOD_REBASE = 3;
+  }
+
+  bool can_merge = 1;
+  BlockedReason blocked_reason = 2;
+  string message = 3;
+  repeated MergeMethod allowed_methods = 4;
+  string head_sha = 5;
+}
+
+message DescribeFactoryPullRequestMergeabilityRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message DescribeFactoryPullRequestMergeabilityResponse {
+  FactoryPullRequestMergeability mergeability = 1;
+}
+
+message MergeFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  FactoryPullRequestMergeability.MergeMethod merge_method = 3;
+  string expected_head_sha = 4;
+}
+
+message MergeFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
 message FactoryIntakeItem {
   string id = 1;
   string key = 2;
@@ -705,6 +1595,12 @@ message SearchFactoryIntakeItemsRequest {
   string intake_id = 2;
   string query = 3;
   int32 limit = 4;
+}
+
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
 }
 
 message SearchFactoryIntakeItemsResponse {
@@ -721,18 +1617,36 @@ message ImportFactoryIntakeItemResponse {
   WorkOrder order = 1;
 }
 
+message RefreshBacklogRequest {
+  string factory_id = 1;
+}
+
+message RefreshBacklogResponse {
+  int32 archived_count = 1;
+  int32 failed_item_count = 2;
+  int32 failed_source_count = 3;
+}
+
 // Work orders
 
 message ListWorkOrdersRequest {
   string factory_id = 1;
-  repeated string assignee_ids = 2;
-  repeated WorkOrder.State states = 3;
-  repeated WorkOrder.Result results = 4;
-  optional bool unassigned = 5;
+  repeated WorkOrder.State states = 2;
+  repeated WorkOrder.Result results = 3;
+  optional bool unassigned = 4;
+  // Returns orders assigned to this user or created by them.
+  optional string user_id = 5;
+  // Page size. Zero or omitted uses 100.
+  uint32 limit = 6;
+  // Return orders older than this id in updated_at DESC, id DESC order.
+  string before_id = 7;
+  // When set, return orders that ran on this line, plus orders with no line.
+  string line_id = 8;
 }
 
 message ListWorkOrdersResponse {
-  repeated WorkOrder orders = 1;
+  repeated WorkOrderSummary orders = 1;
+  bool has_next_page = 2;
 }
 
 message CreateWorkOrderRequest {
@@ -803,6 +1717,65 @@ message WorkOrder {
   repeated WorkOrderStatusNote status_notes = 15;
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
+  // Ready files for this task. Present on DescribeWorkOrder only.
+  // The stored description uses sp-file:// refs, not download URLs.
+  repeated Superplane.Files.File files = 18;
+  // Canvas run that created this task, when Create Task produced it.
+  // Empty for tasks opened in the UI or imported without a source run.
+  string source_run_id = 19;
+  // Model spend for this task, one row per model. UI hides empty rows.
+  repeated UsageByModel usage_by_model = 20;
+  // Runner machine time for this task, one row per machine type.
+  // UI hides empty rows and may collapse them into one machine-time line.
+  repeated UsageByMachineType usage_by_machine_type = 21;
+  // Full check rows, including summary and analysis.
+  repeated WorkOrderCheck checks = 22;
+  // Board fields for the analysis session. The opened card loads the full session.
+  PlanningSessionSummary planning_session = 23;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 24;
+  // Set after an auto-start attempt that did not start the task.
+  // Empty before the attempt, and empty again after a successful start.
+  string auto_start_line_id = 25;
+}
+
+// WorkOrderSummary is the list row for a work order.
+// DescribeWorkOrder returns WorkOrder, which adds files, the usage
+// breakdown, the source run, and the full checks. Both carry
+// PlanningSessionSummary.
+message WorkOrderSummary {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  WorkOrder.State state = 4;
+  WorkOrder.Result result = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  repeated UserRef assignees = 8;
+  WorkOrderCreator created_by = 9;
+  int64 total_tokens = 10;
+  int64 total_cost_cents = 11;
+  int64 number = 12;
+  string key = 13;
+  repeated WorkOrderLineDispatch line_dispatches = 14;
+  repeated WorkOrderStatusNote status_notes = 15;
+  WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
+  repeated WorkOrderCheckScore check_scores = 18;
+  // Analysis session fields the board needs. The opened card loads the full session.
+  PlanningSessionSummary planning_session = 19;
+  // Pull requests tracked on this task.
+  repeated FactoryPullRequest pull_requests = 20;
+}
+
+// WorkOrderCheckScore is the board-card view of a check.
+// It carries the score only, not the analysis text.
+message WorkOrderCheckScore {
+  string key = 1;
+  string name = 2;
+  double score = 3;
+  double max_score = 4;
 }
 
 message WorkOrderOrigin {
@@ -884,6 +1857,12 @@ message WorkOrderLineDispatch {
   // its maxParallelism. A dispatch waits at no more than one step at a
   // time; no run or step execution exists for a queued step yet.
   optional WorkOrderQueueItem queue_item = 9;
+  // Model chosen at Start. Empty means Auto: each runner keeps the model
+  // stored on the live automation canvas.
+  string model = 10;
+  // Thinking chosen at Start. Empty means Auto: each runner keeps the
+  // thinking level stored on the live automation canvas.
+  string thinking_level = 11;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -943,6 +1922,10 @@ message WorkOrderExecution {
   int64 cost_cents = 10;
   // When the execution finished (set for finished executions only).
   google.protobuf.Timestamp finished_at = 11;
+  int64 duration_seconds = 12;
+  // Models that recorded spend on this step. Distinct ledger model ids,
+  // oldest first. UI prefers these over the Start override.
+  repeated string models = 13;
 }
 
 message WorkOrderExecutionStep {
@@ -951,7 +1934,10 @@ message WorkOrderExecutionStep {
 }
 
 message DescribeWorkOrderRequest {
+  // Factory UUID or workspace key. Workspace names are not accepted:
+  // they are not unique and can contain spaces.
   string factory_id = 1;
+  // Work order UUID, sequence number, or display key (for example `SP-42`).
   string order_id = 2;
 }
 
@@ -986,6 +1972,10 @@ message DispatchWorkOrderRequest {
   string line_name = 3;
   int32 start_step_index = 4;
   bool replace_active = 5;
+  // Optional model override for this start. Empty means Auto.
+  string model = 6;
+  // Optional thinking override for this start. Empty means Auto.
+  string thinking_level = 7;
 }
 
 message DispatchWorkOrderResponse {
@@ -1022,6 +2012,17 @@ message UpdateWorkOrderStatusRequest {
 }
 
 message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message SendWorkOrderToBacklogRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  bool close_pull_requests = 3;
+  bool clear_artifacts = 4;
+}
+
+message SendWorkOrderToBacklogResponse {
   WorkOrder order = 1;
 }
 
@@ -1088,10 +2089,10 @@ message CreateWorkOrderArtifactResponse {
 message WorkOrderArtifact {
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_PR = 1;
-    TYPE_MARKDOWN = 2;
-    TYPE_BRANCH = 3;
-    TYPE_LINK = 4;
+    TYPE_MARKDOWN = 1;
+    TYPE_BRANCH = 2;
+    TYPE_LINK = 3;
+    TYPE_FILE = 4;
   }
 
   string id = 1;
@@ -1099,15 +2100,6 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-message ListWorkOrderChecksRequest {
-  string factory_id = 1;
-  string order_id = 2;
-}
-
-message ListWorkOrderChecksResponse {
-  repeated WorkOrderCheck checks = 1;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work
@@ -1160,18 +2152,71 @@ message FactoryWorkOrderUpdatedMessage {
   google.protobuf.Timestamp timestamp = 4;
 }
 
+// Internal AMQP message that asks the velocity sync worker to read a workspace
+// now. The API process does not run the worker, so a user asking for a fresh
+// report hands the work over instead of doing it on the request path.
+message FactoryVelocitySyncRequestedMessage {
+  string factory_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
 // Velocity
 
-message DescribeFactoryVelocityRequest {
+// SyncFactoryVelocityRequest asks for a fresh read of the repository merges of
+// a workspace. The report is served from stored rows a background sync collects,
+// so a user who just merged something needs a way to ask for it now instead of
+// waiting for the next scheduled run.
+message SyncFactoryVelocityRequest {
   string factory_id = 1;
-  // Period window in days. Only 7 and 30 are supported by the UI today; any
+}
+
+message SyncFactoryVelocityResponse {
+  // False when the workspace has no repository to sync, so the UI can explain
+  // that instead of showing progress that never finishes.
+  bool started = 1;
+}
+
+message DescribeFactoryVelocityRequest {
+  // How the People table is ordered. Values name the column the table sorts
+  // on; the UI's sort keys map to these one-to-one.
+  enum PeopleSort {
+    // Same as PEOPLE_SORT_TOTAL.
+    PEOPLE_SORT_UNSPECIFIED = 0;
+    // authored_merged + factory_merged.
+    PEOPLE_SORT_TOTAL = 1;
+    PEOPLE_SORT_FACTORY_MERGED = 2;
+    PEOPLE_SORT_AUTHORED_MERGED = 3;
+    PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
+    // Sorts on cost_cents.
+    PEOPLE_SORT_COST_USD = 5;
+    // SuperPlane tasks this person opened that closed without a merge.
+    PEOPLE_SORT_FACTORY_WASTE = 6;
+  }
+
+  enum SortDirection {
+    // Same as SORT_DIRECTION_DESC.
+    SORT_DIRECTION_UNSPECIFIED = 0;
+    SORT_DIRECTION_ASC = 1;
+    SORT_DIRECTION_DESC = 2;
+  }
+
+  string factory_id = 1;
+  // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
   int32 period_days = 2;
-  // Optional GitHub integration and `owner/repo` to include the People cohort.
-  // When either is empty the response returns SuperPlane data only and sets
-  // `has_people_cohort = false` so the UI can hide the People series.
-  string integration_id = 3;
-  string repository = 4;
+  // Optional `owner/repo` the report is limited to. When it is empty the
+  // response returns SuperPlane data only and sets `has_people_cohort = false`
+  // so the UI can hide the People series.
+  string repository = 3;
+  // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
+  PeopleSort people_sort = 4;
+  // Defaults to SORT_DIRECTION_DESC.
+  SortDirection people_sort_direction = 5;
+  // Rows per page of the People table. Defaults to 5, and is capped
+  // server-side so a client cannot request the whole table in one call.
+  int32 people_page_size = 6;
+  // 0-based row offset into the sorted People table, for "Load more" paging.
+  int32 people_offset = 7;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1181,11 +2226,39 @@ message DescribeFactoryVelocityResponse {
   // Repository the People cohort was computed for (`owner/repo`), or empty when
   // no repository was selected.
   string repository = 4;
-  // True when GitHub search succeeded for the selected repository.
+  // True when the repository merges of the workspace are stored, so the People
+  // series is comparable with SuperPlane output.
   bool has_people_cohort = 5;
-  // True when a repository was selected and GitHub search failed.
-  // SuperPlane counts are still present; the People series is omitted.
-  bool people_search_failed = 6;
+  // When the background sync last stored repository merges. Unset when the
+  // workspace has never completed a sync.
+  google.protobuf.Timestamp people_synced_at = 6;
+  // Totals for the window of equal length that ends where the reported window
+  // starts. The UI shows deltas against these numbers.
+  DescribeFactoryVelocityTotals previous_totals = 7;
+  // True when the previous window holds output, so its totals are comparable.
+  // A workspace younger than two windows reports false and the UI drops the
+  // comparison instead of showing growth from an empty baseline.
+  bool has_previous_window = 8;
+  // Intake sources that produced merged SuperPlane pull requests in the
+  // window, ordered by merge count. These are the series of the intake
+  // breakdown; `points[].intake` holds their per-day counts.
+  repeated DescribeFactoryVelocityIntakeSource intake_sources = 9;
+  // One row per person with merged pull requests or SuperPlane work in the
+  // window, ordered by total merged pull requests.
+  repeated DescribeFactoryVelocityPerson people = 10;
+  // True when a repository is selected but its first sync has not stored any
+  // merges yet. SuperPlane counts are still present; the People series is
+  // omitted until the sync finishes.
+  bool people_sync_pending = 11;
+  // Total people with activity in the window, before `people_offset` and
+  // `people_page_size` are applied. Drives the "N people with activity" count.
+  int32 people_total = 12;
+  // True when `people_offset + len(people) < people_total`, so the UI knows
+  // whether to show "Load more".
+  bool people_has_more = 13;
+  // One row per automation of the workspace that ran in the window, ordered by
+  // run count. Empty when no automation ran.
+  repeated DescribeFactoryVelocityAutomation automations = 14;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1196,6 +2269,79 @@ message DescribeFactoryVelocityDay {
   int32 people_merged = 4;
   // Waste = SuperPlane PRs closed without merging on that day.
   int32 waste = 5;
+  // Merged SuperPlane pull requests grouped by intake source.
+  repeated DescribeFactoryVelocityIntakeCount intake = 6;
+  // Tracked spend of the work orders that closed on this day. A work order
+  // counts on the day its pull request merged, or on the day its last pull
+  // request closed when none merged.
+  int64 cost_cents = 7;
+  int64 tokens = 8;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 9;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 10;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 11;
+  // Median model spend of one work order reported on this day. Medians of the
+  // two bands do not add up to the median of the total, so these two describe
+  // one typical work order per band rather than one typical total.
+  int64 median_task_model_cost_cents = 12;
+  // Median runner compute spend of one work order reported on this day.
+  int64 median_task_compute_cost_cents = 13;
+}
+
+// DescribeFactoryVelocityIntakeSource names one intake series and its total.
+message DescribeFactoryVelocityIntakeSource {
+  // Stable key that `DescribeFactoryVelocityIntakeCount.key` refers to.
+  string key = 1;
+  // Display label, for example "GitHub issue".
+  string label = 2;
+  int32 merged = 3;
+}
+
+message DescribeFactoryVelocityIntakeCount {
+  string key = 1;
+  int32 merged = 2;
+}
+
+// DescribeFactoryVelocityPerson is one row of the People table: what a person
+// merged directly and what the SuperPlane work orders they opened produced.
+message DescribeFactoryVelocityPerson {
+  // SuperPlane user id for a member, or `github:<login>` for a repository
+  // author who is not a member of the organization.
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string avatar_url = 4;
+  // Merged pull requests the person authored outside SuperPlane.
+  int32 authored_merged = 5;
+  // Merged pull requests from SuperPlane work orders this person opened.
+  int32 factory_merged = 6;
+  // Work orders this person opened whose pull requests closed without a merge.
+  int32 factory_waste = 7;
+  // Tracked model spend of the work orders this person opened.
+  int64 cost_cents = 8;
+  // Median hours from first execution to close for those work orders. Zero
+  // when none of them closed inside the window.
+  double median_cycle_hours = 9;
+}
+
+// DescribeFactoryVelocityAutomation is one row of the Automations table: how
+// often an automation ran, how often it failed, and what those runs cost.
+message DescribeFactoryVelocityAutomation {
+  // Canvas id of the automation.
+  string id = 1;
+  string name = 2;
+  // Runs that started in the window.
+  int32 runs = 3;
+  // Part of `runs` that ended with a failure.
+  int32 failed = 4;
+  // Tracked model spend of those runs.
+  int64 cost_cents = 5;
+  // Mean hours from start to finish, over the runs that finished. Zero when
+  // none of them finished yet.
+  double average_duration_hours = 6;
 }
 
 message DescribeFactoryVelocityYesterday {
@@ -1213,6 +2359,22 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+  // Tracked spend of the work orders that closed in the window.
+  int64 cost_cents = 6;
+  int64 tokens = 7;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 8;
+  // Work orders (tasks) that closed in the window. A work order counts once,
+  // even when it opened several pull requests, which is why this differs from
+  // the pull request counts above.
+  int32 tasks_closed = 9;
+  // Part of `tasks_closed` whose pull requests all closed without a merge.
+  int32 tasks_waste = 10;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 11;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 12;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
@@ -1240,7 +2402,7 @@ message FactoryLineMetrics {
   repeated int32 throughput_trend = 11;
 }
 
-// LLM spend
+// Factory workspace usage (LLM tokens and runner-fleet VM time)
 
 message DescribeFactoryUsageRequest {
   string factory_id = 1;
@@ -1257,6 +2419,227 @@ message DescribeFactoryUsageResponse {
   int64 grant_total_cents = 6;
   int64 hosted_billed_cents = 7;
   bool remaining_credit_warning = 8;
+  optional int64 hosted_spend_budget_cents = 9;
+  int64 factory_hosted_billed_cents = 10;
+  int64 factory_remaining_credit_cents = 11;
+  bool factory_remaining_credit_warning = 12;
+  int64 total_duration_seconds = 13;
+  repeated UsageByMachineType by_machine_type = 14;
+}
+
+message ListFactoryWorkOrderRunUsageRequest {
+  string factory_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  uint32 limit = 4;
+  uint32 offset = 5;
+}
+
+message WorkOrderRunUsageRow {
+  string work_order_execution_id = 1;
+  string work_order_id = 2;
+  int64 work_order_number = 3;
+  string work_order_key = 4;
+  string title = 5;
+  google.protobuf.Timestamp last_occurred_at = 6;
+  string user_id = 7;
+  string user_name = 8;
+  string user_email = 9;
+  int64 total_tokens = 10;
+  int64 duration_seconds = 11;
+  int64 cost_cents = 12;
+  int64 hosted_cost_cents = 13;
+  int64 byok_cost_cents = 14;
+  repeated string models = 15;
+  repeated string byok_models = 16;
+  repeated string machine_types = 17;
+  // Ledger totals in millionths of a dollar. Whole-cent fields above truncate
+  // these, so a short VM run can be $0.00 in cents and still have micros.
+  int64 cost_micros = 18;
+  int64 hosted_cost_micros = 19;
+  int64 byok_cost_micros = 20;
+}
+
+message ListFactoryWorkOrderRunUsageResponse {
+  repeated WorkOrderRunUsageRow rows = 1;
+  uint32 total_count = 2;
+}
+
+message ExportFactoryWorkOrderRunUsageRequest {
+  string factory_id = 1;
+}
+
+message ExportFactoryWorkOrderRunUsageResponse {
+  string csv = 1;
+  string filename = 2;
+}
+
+message ListFactoryLineRunnerModelsRequest {
+  string factory_id = 1;
+  string line_name = 2;
+}
+
+message ListFactoryLineRunnerModelsResponse {
+  repeated FactoryLLMModel models = 1;
+}
+
+message ListFactoryLLMModelsRequest {
+  string factory_id = 1;
+  string provider = 2;
+  string funding_source = 3;
+}
+
+message FactoryLLMModel {
+  string id = 1;
+  string name = 2;
+}
+
+message ListFactoryLLMModelsResponse {
+  repeated FactoryLLMModel parent = 1;
+  repeated FactoryLLMModel selected = 2;
+  bool inherit_parent = 3;
+}
+
+message UpdateFactoryLLMModelsRequest {
+  string factory_id = 1;
+  string provider = 2;
+  string funding_source = 3;
+  repeated string allowed_models = 4;
+}
+
+message UpdateFactoryLLMModelsResponse {
+  repeated FactoryLLMModel selected = 1;
+  bool inherit_parent = 2;
+}
+
+message FactoryAgentResource {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_MCP_SERVER = 1;
+    KIND_SKILL = 2;
+  }
+
+  enum Auth {
+    AUTH_UNSPECIFIED = 0;
+    AUTH_HEADERS = 1;
+    AUTH_OAUTH = 2;
+  }
+
+  enum OAuthStatus {
+    OAUTH_STATUS_UNSPECIFIED = 0;
+    OAUTH_STATUS_NOT_CONNECTED = 1;
+    OAUTH_STATUS_CONNECTED = 2;
+    OAUTH_STATUS_NEEDS_RECONNECT = 3;
+    OAUTH_STATUS_VENDOR_REJECTED = 4;
+  }
+
+  message Header {
+    string name = 1;
+    string secret_name = 2;
+    string secret_key = 3;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  Kind kind = 3;
+  string name = 4;
+  bool enabled = 5;
+  string url = 6;
+  Auth auth = 7;
+  repeated Header headers = 8;
+  OAuthStatus oauth_status = 9;
+  string oauth_error = 10;
+  string oauth_connected_by_user_id = 11;
+  google.protobuf.Timestamp oauth_connected_at = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  string repository = 15;
+  string ref = 16;
+  string path = 17;
+  string markdown = 18;
+  repeated string disabled_tools = 19;
+}
+
+message ListFactoryAgentResourcesRequest {
+  string factory_id = 1;
+  FactoryAgentResource.Kind kind = 2;
+}
+
+message ListFactoryAgentResourcesResponse {
+  repeated FactoryAgentResource resources = 1;
+}
+
+message CreateFactoryAgentResourceRequest {
+  string factory_id = 1;
+  FactoryAgentResource.Kind kind = 2;
+  string name = 3;
+  bool enabled = 4;
+  string url = 5;
+  FactoryAgentResource.Auth auth = 6;
+  repeated FactoryAgentResource.Header headers = 7;
+  string markdown = 8;
+}
+
+message CreateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message UpdateFactoryAgentResourceRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+  optional string name = 3;
+  optional bool enabled = 4;
+  optional string url = 5;
+  optional FactoryAgentResource.Auth auth = 6;
+  repeated FactoryAgentResource.Header headers = 7;
+  optional string markdown = 8;
+  repeated string disabled_tools = 9;
+  optional bool replace_disabled_tools = 10;
+}
+
+message UpdateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message DeleteFactoryAgentResourceRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message DeleteFactoryAgentResourceResponse {}
+
+message StartFactoryAgentResourceOAuthRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message StartFactoryAgentResourceOAuthResponse {
+  string authorization_url = 1;
+  FactoryAgentResource resource = 2;
+}
+
+message DisconnectFactoryAgentResourceOAuthRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message DisconnectFactoryAgentResourceOAuthResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message FactoryAgentResourceTool {
+  string name = 1;
+  string description = 2;
+  bool read_only = 3;
+}
+
+message ListFactoryAgentResourceToolsRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message ListFactoryAgentResourceToolsResponse {
+  repeated FactoryAgentResourceTool tools = 1;
 }
 
 message UsageByModel {
@@ -1264,4 +2647,161 @@ message UsageByModel {
   string model = 2;
   int64 total_tokens = 3;
   int64 cost_cents = 4;
+}
+
+message UsageByMachineType {
+  string machine_type = 1;
+  int64 duration_seconds = 2;
+  int64 cost_cents = 3;
+}
+
+message PlanningSessionDraft {
+  string title = 1;
+  string description = 2;
+  string work_order_id = 3;
+}
+
+message PlanningSessionCreatedOrder {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  string description = 4;
+  // Factory-scoped sequence number, used to build the task permalink.
+  int64 number = 5;
+}
+
+message PlanningSessionMessage {
+  string id = 1;
+  string role = 2;
+  string text = 3;
+  google.protobuf.Timestamp created_at = 4;
+  string user_id = 5;
+  string activity_id = 6;
+}
+
+message PlanningSessionActivityOutput {
+  string stream = 1;
+  string text = 2;
+}
+
+message PlanningSessionActivityItem {
+  string type = 1;
+  string id = 2;
+  string kind = 3;
+  string text = 4;
+  string name = 5;
+  string input = 6;
+  string output = 7;
+  repeated PlanningSessionActivityOutput output_streams = 8;
+  string status = 9;
+  string code = 10;
+  google.protobuf.Timestamp started_at = 11;
+  int64 duration_ms = 12;
+  optional int32 exit_code = 13;
+  string signal = 14;
+  bool truncated = 15;
+}
+
+message PlanningSessionActivity {
+  string id = 1;
+  int32 schema_version = 2;
+  string provider = 3;
+  string status = 4;
+  int64 last_sequence = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  repeated PlanningSessionActivityItem items = 8;
+  bool truncated = 9;
+  int32 turn = 10;
+}
+
+message PlanningSessionSurveyQuestion {
+  string prompt = 1;
+  repeated string options = 2;
+}
+
+message PlanningSessionSurvey {
+  string id = 1;
+  repeated PlanningSessionSurveyQuestion questions = 2;
+}
+
+// PlanningSessionSummary is the lines-board view of an analysis session.
+// It omits messages, activities, and the draft body.
+message PlanningSessionSummary {
+  string id = 1;
+  string state = 2;
+  string wait_state = 3;
+  string execution_id = 4;
+  PlanningSessionSurvey survey = 5;
+}
+
+message PlanningSession {
+  string id = 1;
+  string factory_id = 2;
+  string repository = 3;
+  string state = 4;
+  string canvas_id = 5;
+  string canvas_run_id = 6;
+  repeated PlanningSessionMessage messages = 7;
+  PlanningSessionDraft draft = 8;
+  repeated PlanningSessionCreatedOrder created = 9;
+  string wait_state = 10;
+  string execution_id = 11;
+  PlanningSessionSurvey survey = 12;
+  string selectable_model_key = 13;
+  PlanningSessionKind kind = 14;
+  repeated PlanningSessionActivity activities = 15;
+}
+
+enum PlanningSessionKind {
+  PLANNING_SESSION_KIND_UNSPECIFIED = 0;
+  PLANNING_SESSION_KIND_TASK_CREATION = 1;
+  PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS = 2;
+}
+
+message DescribePlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message DescribePlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message EndPlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message EndPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message SendPlanningSessionMessageRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string text = 3;
+}
+
+message SendPlanningSessionMessageResponse {
+  PlanningSession session = 1;
+}
+
+message AnswerPlanningSessionSurveyRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string text = 3;
+}
+
+message AnswerPlanningSessionSurveyResponse {
+  PlanningSession session = 1;
+}
+
+message FindPlanningSessionByWorkOrderRequest {
+  string factory_id = 1;
+  string work_order_id = 2;
+}
+
+message FindPlanningSessionByWorkOrderResponse {
+  PlanningSession session = 1;
 }

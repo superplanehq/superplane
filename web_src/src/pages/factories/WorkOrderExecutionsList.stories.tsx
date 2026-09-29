@@ -41,7 +41,7 @@ export const Default: Story = {
   },
 };
 
-/** Compact variant used in the work order card row. */
+/** Compact variant used in the task card row. */
 export const Compact: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,

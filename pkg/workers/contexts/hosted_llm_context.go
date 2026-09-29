@@ -3,6 +3,7 @@ package contexts
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -14,21 +15,21 @@ import (
 )
 
 // HostedLLMContext resolves installation-hosted provider credentials.
-// Credit holds use a committed connection, not the node-executor transaction,
-// so the settings row lock does not span the broker CreateTask HTTP call.
+// Credit checks use a committed connection so remaining credit includes
+// billed spend from other runs.
 type HostedLLMContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
-	executionID    uuid.UUID
+	factoryID      *uuid.UUID
 }
 
-func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID, executionID uuid.UUID) *HostedLLMContext {
+func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID uuid.UUID, factoryID *uuid.UUID) *HostedLLMContext {
 	return &HostedLLMContext{
 		tx:             tx,
 		encryptor:      encryptor,
 		organizationID: organizationID,
-		executionID:    executionID,
+		factoryID:      factoryID,
 	}
 }
 
@@ -43,16 +44,59 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 		return core.HostedLLMAccess{}, err
 	}
 
+	managementKey, err := decryptHostedManagementKey(c.encryptor, row)
+	if err != nil {
+		return core.HostedLLMAccess{}, err
+	}
+
+	allowed, err := models.ResolveSelectableLLMModels(c.tx, c.organizationID, c.factoryID, provider, models.UsageFundingSourceHosted)
+	if err != nil {
+		return core.HostedLLMAccess{}, err
+	}
+
 	return core.HostedLLMAccess{
 		APIKey:        apiKey,
+		ManagementKey: managementKey,
 		BaseURL:       row.BaseURL,
-		AllowedModels: append([]string{}, row.AllowedModels...),
+		AllowedModels: allowed,
 	}, nil
 }
 
-func (c *HostedLLMContext) AssertCreditAvailable() error {
-	if c.organizationID == uuid.Nil {
-		return fmt.Errorf("organization is required for hosted LLM credit")
+func decryptHostedManagementKey(encryptor crypto.Encryptor, row *models.HostedLLMProvider) (string, error) {
+	if row.Provider != models.UsageProviderOpenRouter {
+		return "", nil
 	}
-	return models.ReserveHostedCredit(database.Conn(), c.organizationID, c.executionID)
+	if !row.HasManagementKey() {
+		return "", fmt.Errorf("%w: %s", models.ErrHostedLLMProviderNoManagementKey, row.Provider)
+	}
+	return llm.DecryptManagementKey(context.Background(), encryptor, row.Provider, row.ManagementKey)
+}
+
+func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("model is required")
+	}
+	allowed, err := models.ModelIsSelectable(c.tx, c.organizationID, c.factoryID, provider, fundingSource, model)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return fmt.Errorf("model %s is not on the selected-model list", model)
+	}
+	return nil
+}
+
+func (c *HostedLLMContext) AssertCreditAvailable() error {
+	return models.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(c.tx)
+	if err != nil {
+		return core.DefaultHostedLLMModel{}, err
+	}
+	return core.DefaultHostedLLMModel{
+		Provider: defaultModel.Provider,
+		Model:    defaultModel.Model,
+	}, nil
 }

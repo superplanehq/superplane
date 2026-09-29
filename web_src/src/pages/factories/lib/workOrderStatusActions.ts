@@ -1,14 +1,14 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 
-import type { WorkOrderDisplayStatus } from "./workOrderProgress";
+import { SEND_WORK_ORDER_TO_BACKLOG_COPY } from "./sendWorkOrderToBacklog";
+import { isWorkOrderRecoveryStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
-export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "back-to-draft" | "reopen";
+export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen" | "send-to-backlog";
 
 export interface WorkOrderStatusAction {
   kind: WorkOrderStatusActionKind;
   label: string;
   disabled: boolean;
-  separatorBefore?: boolean;
 }
 
 export interface WorkOrderStatusActionInput {
@@ -36,20 +36,18 @@ export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): 
     );
   }
 
-  if (input.isOpen && input.displayStatus !== "running") {
-    actions.push({
-      kind: "back-to-draft",
-      label: "Back to draft",
-      disabled: manageDisabled,
-      separatorBefore: true,
-    });
-  }
-
   if (isDraft) {
     actions.push({ kind: "reject-draft", label: "Reject", disabled: closeDisabled });
   }
 
   if (input.isClosed) {
+    if (isWorkOrderRecoveryStatus(input.displayStatus)) {
+      actions.push({
+        kind: "send-to-backlog",
+        label: SEND_WORK_ORDER_TO_BACKLOG_COPY.action,
+        disabled: manageDisabled,
+      });
+    }
     actions.push({ kind: "reopen", label: "Reopen", disabled: manageDisabled });
   }
 
@@ -61,6 +59,7 @@ export function applyWorkOrderStatusAction(
   handlers: {
     onClose: (result: FactoriesWorkOrderResult) => void;
     onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+    onSendToBacklog?: () => void;
   },
 ): void {
   switch (kind) {
@@ -71,10 +70,10 @@ export function applyWorkOrderStatusAction(
     case "reject-draft":
       handlers.onClose("RESULT_REJECTED");
       return;
-    case "back-to-draft":
-      void handlers.onStatusChange("STATE_DRAFT");
-      return;
     case "reopen":
       void handlers.onStatusChange("STATE_OPEN");
+      return;
+    case "send-to-backlog":
+      handlers.onSendToBacklog?.();
   }
 }

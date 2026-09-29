@@ -13,12 +13,12 @@ const listUsersPayload = `{
     {
       "metadata": {"id":"user-1","email":"alice@example.com"},
       "spec":     {"displayName":"Alice"},
-      "status":   {"roles":[{"roleName":"org_owner"}]}
+      "status":   {"roles":[{"roleName":"org_admin"}], "isOwner": true}
     },
     {
       "metadata": {"id":"user-2","email":"bob@example.com"},
       "spec":     {"displayName":"Bob"},
-      "status":   {"roles":[{"roleName":"org_viewer"}]}
+      "status":   {"roles":[{"roleName":"org_operator"}]}
     }
   ]
 }`
@@ -55,7 +55,7 @@ func TestListCommandRendersText(t *testing.T) {
 	require.Contains(t, out, "EMAIL")
 	require.Contains(t, out, "ROLES")
 	require.Contains(t, out, "alice@example.com")
-	require.Contains(t, out, "org_owner")
+	require.Contains(t, out, "org_admin")
 	require.Contains(t, out, "bob@example.com")
 }
 

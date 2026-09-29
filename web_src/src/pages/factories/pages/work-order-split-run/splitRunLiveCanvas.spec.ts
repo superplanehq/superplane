@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { simpleFactoryRunCanvasSpec, simpleFactoryRunExecutions } from "../../__fixtures__/simpleFactoryRunCanvas";
@@ -12,6 +12,7 @@ import {
   resolveSplitRunVisual,
   splitRunCanvasFromLive,
   streamFromLiveRun,
+  streamStatusFromNode,
 } from "./splitRunLiveCanvas";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -26,6 +27,13 @@ describe("nodeStatusFromExecution", () => {
     expect(nodeStatusFromExecution({ state: "STATE_STARTED" }, false)).toBe("running");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_PASSED" }, true)).toBe("triggered");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_FAILED" }, false)).toBe("failed");
+    expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }, false)).toBe("cancelled");
+  });
+});
+
+describe("streamStatusFromNode", () => {
+  it("keeps a cancelled node as canceled, not pending", () => {
+    expect(streamStatusFromNode("cancelled")).toBe("cancelled");
   });
 });
 
@@ -173,7 +181,7 @@ describe("resolveSplitRunVisual", () => {
     });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
     expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
   });
 
@@ -220,17 +228,17 @@ describe("resolveSplitRunVisual", () => {
       canvas: { ...yaml, title: "Implementation (live)" },
       stream: [
         {
-          id: "live-create-branch",
-          nodeId: "create-branch",
+          id: "live-implementation-agent",
+          nodeId: "implementation-agent-no-issue",
           at: "00:00:01",
-          componentName: "Create Branch",
+          componentName: "Implement From Task Description",
           status: "passed",
         },
       ],
     });
 
     expect(visual.canvas.title).toBe("Implementation (live)");
-    expect(visual.stream?.some((line) => line.id === "live-create-branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.id === "live-implementation-agent")).toBe(true);
   });
 
   it("replaces the canned implement branch and adds the order pull request", () => {
@@ -242,11 +250,11 @@ describe("resolveSplitRunVisual", () => {
       .map((line) => line.artifact)
       .filter((artifact) => artifact?.type === "TYPE_BRANCH")
       .map((artifact) => artifact?.data?.name);
-    const pullRequests = (visual.stream ?? []).filter((line) => line.artifact?.type === "TYPE_PR");
+    const pullRequests = (visual.stream ?? []).filter((line) => line.pullRequest);
 
     expect(branches).toEqual(["feature/rf-103"]);
     expect(pullRequests).toHaveLength(1);
-    expect(pullRequests[0]?.artifact?.data).toMatchObject({ number: 503 });
+    expect(pullRequests[0]?.pullRequest).toMatchObject({ number: "503" });
   });
 
   it("does not copy demo YAML artifacts onto a live stream", () => {
@@ -278,7 +286,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
   });
 
   it("shows the line automation while the live canvas loads", () => {
@@ -286,7 +294,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: true, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
   });
 
   it("does not keep YAML logs when the live canvas fails", () => {
@@ -328,7 +336,7 @@ describe("resolveSplitRunVisual", () => {
         {
           id: "backlog-created",
           at: "12:24:02",
-          componentName: "Leonardo DiCaprio created this work order manually.",
+          componentName: "Leonardo DiCaprio created this task.",
           status: "passed" as const,
         },
       ],

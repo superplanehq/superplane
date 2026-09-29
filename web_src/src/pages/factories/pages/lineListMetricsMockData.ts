@@ -14,18 +14,18 @@ import {
  */
 export type LineListMetrics = {
   /**
-   * Share of closed work orders on this line that completed or that have a
-   * merged pull request. Numerator is merged work orders. Denominator is
-   * closed work orders (merged + not merged). Omit when the line has no
-   * closed work orders.
+   * Share of closed tasks on this line that completed or that have a
+   * merged pull request. Numerator is merged tasks. Denominator is
+   * closed tasks (merged + not merged). Omit when the line has no
+   * closed tasks.
    */
   successRatePct: number;
-  /** Completed or merged work orders in the window (success-rate numerator). */
+  /** Completed or merged tasks in the window (success-rate numerator). */
   mergedCount: number;
-  /** Closed work orders in the window (success-rate denominator). */
+  /** Closed tasks in the window (success-rate denominator). */
   totalClosedCount: number;
   /**
-   * Median summed execution run time, in minutes, for merged work orders.
+   * Median summed execution run time, in minutes, for merged tasks.
    * Unset when the sum is 0.
    */
   durationMinutes?: number;
@@ -44,8 +44,8 @@ export type LineListMetrics = {
   /** Cost change vs the prior 30 days, in USD. Negative is better. */
   costDeltaUsd?: number;
   /**
-   * Merged work orders per day in the window. Completions, not closed
-   * work orders.
+   * Merged tasks per day in the window. Completions, not closed
+   * tasks.
    */
   throughputPerDay: number;
   /** Daily merged-work-order counts in the window, oldest first. */

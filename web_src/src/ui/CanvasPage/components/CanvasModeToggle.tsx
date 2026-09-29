@@ -6,32 +6,27 @@ import { Link, useParams } from "react-router";
 
 import { DraftChangeDots } from "./DraftChangeDots";
 
-export type CanvasMode = "version-live" | "console" | "memory" | "files";
+export type CanvasMode = "version-live" | "console" | "memory";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectConsole?: () => void;
   onSelectMemory?: () => void;
-  onSelectFiles?: () => void;
   editing?: boolean;
   hasCanvasUncommitted?: boolean;
   hasCanvasCommitted?: boolean;
   hasConsoleUncommitted?: boolean;
   hasConsoleCommitted?: boolean;
-  hasFilesUncommitted?: boolean;
-  hasFilesCommitted?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
-const FILES_TAB = "files";
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
   memory: MEMORY_TAB,
-  files: FILES_TAB,
 };
 
 /** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
@@ -78,19 +73,15 @@ export function CanvasModeToggle({
   onSelectLive,
   onSelectConsole,
   onSelectMemory,
-  onSelectFiles,
   editing = false,
   hasCanvasUncommitted = false,
   hasCanvasCommitted = false,
   hasConsoleUncommitted = false,
   hasConsoleCommitted = false,
-  hasFilesUncommitted = false,
-  hasFilesCommitted = false,
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
   const showMemory = Boolean(onSelectMemory);
-  const showFiles = Boolean(onSelectFiles);
   const selected = modeToTab(mode);
   const baseHref = organizationId && appId ? appPath(organizationId, appId) : "#";
   const tabHref = (view?: string) => (view ? `${baseHref}?view=${view}` : baseHref);
@@ -149,25 +140,6 @@ export function CanvasModeToggle({
           aria-current={selected === MEMORY_TAB ? "page" : undefined}
         >
           Memory
-        </Link>
-      ) : null}
-      {showFiles ? (
-        <Link
-          to={tabHref("files")}
-          onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
-          className={tabClasses(selected, FILES_TAB, editing)}
-          data-testid="canvas-view-mode-files"
-          aria-label="Files"
-          aria-current={selected === FILES_TAB ? "page" : undefined}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            Files
-            <DraftChangeDots
-              uncommitted={hasFilesUncommitted}
-              committed={hasFilesCommitted}
-              testIdPrefix="canvas-view-mode-files"
-            />
-          </span>
         </Link>
       ) : null}
     </nav>

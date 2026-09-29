@@ -1,0 +1,506 @@
+import { describe, expect, it } from "bun:test";
+
+import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
+import {
+  applyPlanningSessionLiveRun,
+  createWithAgentViewFromSession,
+  mergePlanningSessionHistory,
+  draftCardAgentIsWorking,
+  planningSessionHasPendingSurvey,
+  planningSessionIsWaiting,
+  planningSessionIsWorking,
+} from "./planningSessionView";
+
+describe("mergePlanningSessionHistory", () => {
+  it("keeps the full transcript when a new run returns only its latest message", () => {
+    const previous = {
+      id: "session-1",
+      state: "ended",
+      canvasRunId: "run-1",
+      messages: [
+        { id: "user-1", role: "user", text: "Use the current form.", createdAt: "2026-09-03T10:00:00Z" },
+        { id: "agent-1", role: "agent", text: "I updated the plan.", createdAt: "2026-09-03T10:01:00Z" },
+      ],
+    };
+    const restarted = {
+      id: "session-1",
+      state: "running",
+      canvasRunId: "run-2",
+      messages: [{ id: "user-2", role: "user", text: "Also cover errors.", createdAt: "2026-09-03T10:02:00Z" }],
+    };
+
+    expect(mergePlanningSessionHistory(previous, restarted)).toEqual({
+      ...restarted,
+      messages: [...previous.messages, ...restarted.messages],
+    });
+  });
+
+  it("does not merge messages from a different planning session", () => {
+    const previous = { id: "session-1", messages: [{ id: "old", role: "user", text: "Old task" }] };
+    const next = { id: "session-2", messages: [{ id: "new", role: "user", text: "New task" }] };
+
+    expect(mergePlanningSessionHistory(previous, next)).toEqual(next);
+  });
+});
+
+describe("createWithAgentViewFromSession", () => {
+  it("stays starting until the runner execution exists", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+        draft: { title: "Retry refunds", description: "Stop double charges." },
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("starting");
+    expect(view.canvasId).toBe("canvas-1");
+    expect(view.executionId).toBe("");
+    expect(view.right).toEqual({
+      kind: "draft",
+      draft: { title: "Retry refunds", description: "Stop double charges." },
+    });
+  });
+
+  it("marks the machine running when the runner execution exists", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+        draft: { title: "Retry refunds", description: "Stop double charges." },
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("running");
+    expect(view.executionId).toBe("exec-1");
+  });
+
+  it("marks the machine failed when the session has ended", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+    expect(view.canvasRunId).toBe("run-1");
+  });
+
+  it("marks the machine passed when the session ended after a score and plan", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, analysisDelivered: true },
+    );
+
+    expect(view.machineStatus).toBe("passed");
+  });
+
+  it("marks the machine failed before starting when the live run failed", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_FAILED" },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+  });
+
+  it("marks the machine failed when the live run passed and SuperPlane is not waiting", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+  });
+
+  it("marks a cancelled live run passed when a score and plan already exist", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_CANCELLED" },
+      true,
+    );
+
+    expect(view.machineStatus).toBe("passed");
+  });
+
+  it("keeps waiting when the live run is still open", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+          waitState: "pending",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+    );
+
+    expect(view.machineStatus).toBe("waiting");
+  });
+
+  it("marks the machine waiting when SuperPlane holds for the next message", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+        waitState: "pending",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("waiting");
+  });
+
+  it("treats a pending wait as waiting, not working", () => {
+    const waiting = {
+      state: "running",
+      waitState: "pending",
+    };
+    expect(planningSessionIsWaiting(waiting)).toBe(true);
+    expect(planningSessionIsWorking(waiting)).toBe(false);
+  });
+
+  it("treats an open session without a wait as working", () => {
+    const running = { state: "running" };
+    expect(planningSessionIsWaiting(running)).toBe(false);
+    expect(planningSessionIsWorking(running)).toBe(true);
+  });
+
+  it("does not treat an ended session as working", () => {
+    const ended = { state: "ended" };
+    expect(planningSessionIsWaiting(ended)).toBe(false);
+    expect(planningSessionIsWorking(ended)).toBe(false);
+  });
+
+  it("keeps the card thinking while the session machine starts or runs, like the refine strip", () => {
+    const starting = { state: "running" };
+    const running = { state: "running", executionId: "exec-1" };
+    const waiting = { state: "running", executionId: "exec-1", waitState: "pending" };
+    const ended = { state: "ended", executionId: "exec-1" };
+    expect(draftCardAgentIsWorking(starting, false, 4)).toBe(true);
+    expect(draftCardAgentIsWorking(running, false, 4)).toBe(true);
+    expect(draftCardAgentIsWorking(waiting, false)).toBe(false);
+    expect(draftCardAgentIsWorking(ended, false)).toBe(false);
+  });
+
+  it("counts a Backlog analysis only until the first score arrives", () => {
+    const waiting = { state: "running", executionId: "exec-1", waitState: "pending" };
+    expect(draftCardAgentIsWorking(null, true)).toBe(true);
+    expect(draftCardAgentIsWorking(null, true, 3)).toBe(false);
+    expect(draftCardAgentIsWorking(waiting, true)).toBe(true);
+    expect(draftCardAgentIsWorking(waiting, true, 3)).toBe(false);
+    expect(draftCardAgentIsWorking(null, false)).toBe(false);
+  });
+
+  it("exposes a pending survey and keeps it out of the chat messages", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+        survey: {
+          id: "pending-survey",
+          questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+        },
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.survey).toEqual({
+      id: "pending-survey",
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+    });
+    expect(
+      planningSessionHasPendingSurvey({
+        survey: { id: "pending-survey", questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] },
+      }),
+    ).toBe(true);
+    expect(planningSessionHasPendingSurvey({ survey: { questions: [] } })).toBe(false);
+    expect(view.messages).toEqual([
+      { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+    ]);
+  });
+
+  it("clears the survey after a reply so the next poll cannot restore it", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "What is the priority? High" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.survey).toBeUndefined();
+    expect(view.messages).toEqual([
+      { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
+  it("marks the user text after a survey as a survey reply", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "What is the priority? High" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
+  it("passes the sender user id onto user messages", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "note", role: "user", text: "Keep the current form.", userId: "user-ada" },
+          { id: "reply", role: "user", text: "What is the priority? High", userId: "user-alan" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "note", kind: "text", role: "user", text: "Keep the current form.", userId: "user-ada" },
+      {
+        id: "reply",
+        kind: "text",
+        role: "user",
+        text: "What is the priority? High",
+        origin: "survey",
+        userId: "user-alan",
+      },
+    ]);
+  });
+
+  it("keeps the work area empty after create so the session list can sit above it", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        created: [{ id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.created).toEqual([
+      { id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." },
+    ]);
+    expect(view.right).toEqual({ kind: "empty" });
+  });
+
+  it("keeps a read-only task when the user selected it and there is no new draft", () => {
+    const selected = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Retry refunds",
+      description: "Stop double charges.",
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        created: [selected],
+      },
+      { composer: "", right: { kind: "preview", order: selected }, endConfirmOpen: false },
+    );
+
+    expect(view.right).toEqual({ kind: "preview", order: selected });
+  });
+
+  it("carries the server created_at through as a comparable order key", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "Add color to puppies", createdAt: "2026-09-03T10:00:00Z" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      {
+        id: "reply",
+        kind: "text",
+        role: "user",
+        text: "Add color to puppies",
+        createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+      },
+    ]);
+  });
+
+  it("hides Refine protocol notes from the transcript", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        draft: { title: "Retry refunds", description: "Stop double charges.", workOrderId: "wo-1" },
+        messages: [
+          { id: "note", role: "user", text: "Refine NEW-11: Retry refunds." },
+          { id: "ready", role: "agent", text: "I have this task. What do you want to change?" },
+          { id: "plan-1", role: "plan", text: `{"score":4,"summary":"This issue is a good fit for an agent."}` },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.refining).toBe(true);
+    expect(view.messages).toEqual([
+      { id: "ready", kind: "text", role: "agent", text: "I have this task. What do you want to change?" },
+      { id: "plan-1", kind: "plan", role: "plan", score: 4 },
+    ]);
+  });
+
+  it("maps a plan publish to a score banner and keeps the why sentence out of chat", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          {
+            id: "plan-1",
+            role: "plan",
+            text: `{"score":3,"summary":"Start only after you name the uncertainty."}`,
+            createdAt: "2026-09-03T10:00:00Z",
+          },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "plan-1", kind: "plan", role: "plan", score: 3, createdAtMs: Date.parse("2026-09-03T10:00:00Z") },
+    ]);
+    expect(JSON.stringify(view.messages)).not.toContain("uncertainty");
+  });
+
+  it("leaves the order key undefined when the server sends no created_at", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages[0]?.createdAtMs).toBeUndefined();
+  });
+
+  it("carries the selected model key", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        selectableModelKey: "hosted::anthropic::claude-sonnet-4-6",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.selectableModelKey).toBe("hosted::anthropic::claude-sonnet-4-6");
+  });
+
+  it("maps persisted activity and links it to the agent message", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        messages: [{ id: "answer", role: "agent", text: "Ready.", activityId: "activity-1" }],
+        activities: [
+          {
+            id: "activity-1",
+            schemaVersion: 2,
+            provider: "codex",
+            status: "passed",
+            lastSequence: "4",
+            startedAt: "2026-09-15T10:00:00Z",
+            completedAt: "2026-09-15T10:00:02Z",
+            items: [
+              {
+                type: "tool",
+                id: "tool-1",
+                kind: "bash",
+                name: "Bash",
+                input: "rg retry pkg",
+                status: "passed",
+                durationMs: "120",
+              },
+            ],
+          },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages[0]).toMatchObject({ kind: "text", activityId: "activity-1" });
+    expect(view.activities).toMatchObject([
+      {
+        id: "activity-1",
+        provider: "codex",
+        status: "passed",
+        sequence: 4,
+        items: [{ id: "tool-1", input: "rg retry pkg", status: "passed", durationMs: 120 }],
+      },
+    ]);
+  });
+});

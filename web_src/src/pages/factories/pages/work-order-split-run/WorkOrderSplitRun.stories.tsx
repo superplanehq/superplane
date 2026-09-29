@@ -3,18 +3,20 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP } from "../../__fixtures__/factoryOwnedCanvasFixture";
 import {
+  DRAFT_WORK_ORDER,
   LINE_RUN_IMPLEMENT_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
+import { refineChatBoardFixture } from "../../__fixtures__/refineChatBoardFixture";
 
 /**
  * Line board with the work-order popup. Open a card: finished steps stay
  * collapsed and the current step expands into a log.
  */
 const meta = {
-  title: "Factories/Pages/Work Order Split Run",
+  title: "Factories/Pages/Task Split Run",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },
@@ -50,4 +52,20 @@ export const AutomationRun: Story = {
       />
     );
   },
+};
+
+function refineChatOnBoard() {
+  const line = REFUND_FACTORY_LINES[0];
+  return (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${DRAFT_WORK_ORDER.number}?lineId=${line.id}`}
+      factoriesFixture={refineChatBoardFixture()}
+    />
+  );
+}
+
+/** Line board with the refine popup open: agent and user chat, a prior survey answer, and a pending survey. */
+export const RefineChatOnBoard: Story = {
+  name: "Refine chat on the board",
+  render: () => refineChatOnBoard(),
 };

@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderExecution } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/duration";
@@ -14,7 +14,9 @@ import {
 } from "../lib/workOrderTimelineEvents";
 import { formatWorkOrderExecutionUsage } from "../lib/workOrderUsage";
 import { getWorkOrderExecutionRunHref } from "../lib/workOrderExecutions";
+import { overlayLivePullRequest } from "../lib/workOrderPullRequest";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
+import { WorkOrderPullRequestInline } from "../WorkOrderPullRequestInline";
 import { TimelineMarker } from "./TimelineMarker";
 import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassName } from "./timelineStyles";
 
@@ -24,6 +26,7 @@ interface DispatchTimelineItemProps {
   factoryKey: string;
   orderNumber?: string;
   isLatestDispatch: boolean;
+  latestPullRequestById?: Map<string, FactoriesFactoryPullRequest>;
 }
 
 export function DispatchTimelineItem({
@@ -32,6 +35,7 @@ export function DispatchTimelineItem({
   factoryKey,
   orderNumber,
   isLatestDispatch,
+  latestPullRequestById,
 }: DispatchTimelineItemProps) {
   const [isExpanded, setIsExpanded] = useState(isLatestDispatch);
   const steps = event.steps ?? [];
@@ -91,6 +95,7 @@ export function DispatchTimelineItem({
                   factoryKey={factoryKey}
                   orderNumber={orderNumber}
                   step={step}
+                  latestPullRequestById={latestPullRequestById}
                 />
               ))}
             </ul>
@@ -106,11 +111,13 @@ function DispatchStepRow({
   factoryKey,
   orderNumber,
   step,
+  latestPullRequestById,
 }: {
   organizationId: string;
   factoryKey: string;
   orderNumber?: string;
   step: WorkOrderTimelineStep;
+  latestPullRequestById?: Map<string, FactoriesFactoryPullRequest>;
 }) {
   const runHref = getWorkOrderExecutionRunHref(organizationId, factoryKey, step.execution, { orderNumber });
   const duration = formatStepExecutionDuration(step);
@@ -131,6 +138,15 @@ function DispatchStepRow({
         {step.artifacts?.map((artifact, index) => (
           <span className="inline-flex min-w-0 max-w-full" key={artifact.id ?? `${artifact.type}-${index}`}>
             <WorkOrderArtifactInline artifact={artifact} />
+          </span>
+        ))}
+        {step.pullRequests?.map((pullRequest, index) => (
+          <span className="inline-flex min-w-0 max-w-full" key={pullRequest.id ?? `${pullRequest.url}-${index}`}>
+            <WorkOrderPullRequestInline
+              pullRequest={
+                latestPullRequestById ? overlayLivePullRequest(pullRequest, latestPullRequestById) : pullRequest
+              }
+            />
           </span>
         ))}
       </div>
