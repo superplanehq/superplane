@@ -62,7 +62,7 @@ Connect Datadog in SuperPlane. SuperPlane creates a webhook named ` + "`superpla
 
 Select a service to keep alerts of that service. Set the Error Tracking monitor query to ` + "`service:<name>`" + `.
 
-Select the alert transitions to keep. Empty keeps Triggered. A Re-Triggered alert can create a second task for the same issue.
+Select the alert transitions to keep. When unset, Triggered is the default. Deselect both to listen for no transitions. A Re-Triggered alert can create a second task for the same issue.
 
 ## Event Data
 
@@ -111,7 +111,7 @@ func (t *OnErrorTrackingAlert) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeMultiSelect,
 			Required:    false,
 			Default:     []string{AlertTransitionTriggered},
-			Description: "Listen for these Error Tracking monitor transitions. Empty keeps Triggered.",
+			Description: "Listen for these Error Tracking monitor transitions. When unset, Triggered is the default. Deselect both to listen for no transitions.",
 			TypeOptions: &configuration.TypeOptions{
 				MultiSelect: &configuration.MultiSelectTypeOptions{
 					Options: []configuration.FieldOption{
