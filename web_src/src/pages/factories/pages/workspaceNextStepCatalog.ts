@@ -27,6 +27,8 @@ export interface WorkspaceNextStepContext {
   takenPRFeedbackSources: readonly PRFeedbackSourceId[];
   /** Stay hidden until PR feedback handlers have loaded. Also hide when the query fails without cached data. */
   prFeedbackHandlersReady: boolean;
+  /** Suppress the comments step while SuperPlane auto-creates its comments handler. */
+  commentsCreatePending?: boolean;
 }
 
 export interface WorkspaceNextStepBanner {
@@ -101,10 +103,11 @@ export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNext
   if (!ctx.onboardingComplete || !ctx.canConfigure || !ctx.prFeedbackHandlersReady) {
     return [];
   }
-  const steps = WORKSPACE_NEXT_STEPS.map(({ isDone, ...step }) => ({
-    ...step,
-    done: isDone(ctx),
-  }));
+  const steps = WORKSPACE_NEXT_STEPS.filter((step) => step.id !== "pr-comments-handler" || !ctx.commentsCreatePending)
+    .map(({ isDone, ...step }) => ({
+      ...step,
+      done: isDone(ctx),
+    }));
   if (steps.every((step) => step.done)) {
     return [];
   }
