@@ -239,11 +239,15 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			assert.Equal(t, "repo", runnerStep(t, runner, "Resolve Addressed Threads")["workingDirectory"])
 
 			command := runnerStepCommand(t, runner, "Resolve Addressed Threads")
+			listAt := strings.Index(command, "reviewThreads")
 			replyAt := strings.Index(command, "addPullRequestReviewThreadReply")
 			resolveAt := strings.Index(command, "resolveReviewThread")
+			require.GreaterOrEqual(t, listAt, 0)
 			require.GreaterOrEqual(t, replyAt, 0)
 			require.GreaterOrEqual(t, resolveAt, 0)
+			assert.Less(t, listAt, replyAt)
 			assert.Less(t, replyAt, resolveAt)
+			assert.Contains(t, command, `grep -Fxq -- "$id"`)
 		}
 	})
 
