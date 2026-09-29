@@ -36,6 +36,9 @@ vi.mock("@/hooks/useCanvasId", () => ({
   useCanvasId: () => undefined,
 }));
 
+const liveLogSession = { organizationId: "organization-1", canvasId: "canvas-1" };
+const sessionNotReadyError = new Error("Logs are not available for this execution yet. Check again shortly.");
+
 beforeEach(() => {
   captureExceptionMock.mockReset();
   pumpMock.mockReset();
@@ -265,6 +268,25 @@ describe("useLiveLogStream", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not report a not-ready session as an error after the run finishes", async () => {
+    pumpMock.mockRejectedValue(sessionNotReadyError);
+    const { result } = renderHook(() => useLiveLogStream("execution-1", false, "passed", null, liveLogSession));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(pumpMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects while in flight when the session is not ready yet", async () => {
+    pumpMock.mockRejectedValue(sessionNotReadyError);
+    const { result } = renderHook(() => useLiveLogStream("execution-1", true, null, null, liveLogSession));
+
+    await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2), { timeout: 5000 });
     expect(result.current.error).toBeNull();
     expect(captureExceptionMock).not.toHaveBeenCalled();
   });

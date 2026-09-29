@@ -126,18 +126,15 @@ function withClearedError(state: LogState): LogState {
   return { ...state, error: null };
 }
 
-// CloudWatch Logs raises ResourceNotFoundException for GetLogEvents when the
-// runner hasn't created its log stream yet (e.g. right after an execution
-// starts, or during the brief window between reconnect attempts). The
-// broker relays that as a stream error, but it's an expected, self-healing
-// condition rather than an application bug: the live log session already
-// reconnects automatically, and the log stream appears as soon as the
-// runner starts writing to it. Surfacing it as a failure (in the UI or in
-// Sentry) would just be noise, so it's ignored.
-const BENIGN_BROKER_ERROR_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
+// Opening live logs can race the runner. The session 404s until a task id
+// exists, and CloudWatch GetLogEvents raises ResourceNotFoundException until
+// the log stream exists. Both are expected waits: the session reconnects
+// while the run is in flight. Do not report them as failures.
+const SESSION_NOT_READY_MESSAGE = "Logs are not available for this execution yet. Check again shortly.";
+const BENIGN_LOG_STREAM_NOT_FOUND_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
 
-function isBenignBrokerError(message: string): boolean {
-  return BENIGN_BROKER_ERROR_PATTERN.test(message);
+function isBenignLiveLogWait(message: string): boolean {
+  return message === SESSION_NOT_READY_MESSAGE || BENIGN_LOG_STREAM_NOT_FOUND_PATTERN.test(message);
 }
 
 type StreamHandlerContext = {
@@ -193,7 +190,7 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
     },
     onStreamError: (message) => {
-      if (isBenignBrokerError(message)) {
+      if (isBenignLiveLogWait(message)) {
         return;
       }
       onFailure(message);
@@ -392,7 +389,7 @@ async function pumpLiveLogConnection(
     if (streamError.name === "AbortError") {
       return "aborted";
     }
-    if (!sessionAbort.signal.aborted) {
+    if (!sessionAbort.signal.aborted && !isBenignLiveLogWait(streamError.message)) {
       reportFailure("request", streamError);
       setState((prev) => applyStreamFailure(prev, streamError.message));
     }
