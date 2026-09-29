@@ -21,13 +21,16 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: mocks.showSuccessToast,
 }));
 
-function renderDialog(overrides: { githubIntegrationId?: string; onCreated?: () => void } = {}) {
+function renderDialog(
+  overrides: { githubIntegrationId?: string; githubInstallationName?: string; onCreated?: () => void } = {},
+) {
   const onCreated = overrides.onCreated ?? vi.fn();
   render(
     <RiskScoreSetupDialog
       organizationId="org-1"
       factoryId="factory-1"
       githubIntegrationId={overrides.githubIntegrationId ?? "github-1"}
+      githubInstallationName={overrides.githubInstallationName ?? "github-superplanehq"}
       appRepository="acme/app"
       backlogRepository="acme/app"
       defaultBranch="main"
@@ -70,6 +73,7 @@ describe("RiskScoreSetupDialog", () => {
       expect.objectContaining({
         factoryId: "risk-score",
         workspaceFactoryId: "factory-1",
+        integrations: { github: { id: "github-1", name: "github-superplanehq", ready: true } },
         installParams: {
           appRepository: "acme/app",
           backlogRepository: "acme/app",
@@ -81,9 +85,16 @@ describe("RiskScoreSetupDialog", () => {
     expect(mocks.showSuccessToast).toHaveBeenCalledWith(RISK_SCORE_SETUP_COPY.created);
   });
 
+  it("waits for the GitHub installation name before it installs", () => {
+    renderDialog({ githubInstallationName: "" });
+
+    expect(screen.getByTestId("risk-score-setup-finish")).toBeDisabled();
+    expect(mocks.installFactory).not.toHaveBeenCalled();
+  });
+
   it("asks for GitHub before it installs", async () => {
     const user = userEvent.setup();
-    const { onCreated } = renderDialog({ githubIntegrationId: "" });
+    const { onCreated } = renderDialog({ githubIntegrationId: "", githubInstallationName: "" });
 
     await user.click(screen.getByTestId("risk-score-setup-finish"));
 
