@@ -64,6 +64,36 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	assert.Equal(t, dispatch.Id, active.ID.String())
 }
 
+func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Ship it", "", &r.User, nil, nil, &line.ID)
+	require.NoError(t, err)
+	require.NotNil(t, order.AutoStartLineID)
+
+	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Order.GetAutoStartLineId())
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Nil(t, reloaded.AutoStartLineID)
+}
+
 func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

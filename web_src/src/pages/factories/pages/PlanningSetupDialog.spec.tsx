@@ -76,7 +76,7 @@ describe("PlanningSetupDialog", () => {
     await user.click(screen.getByTestId("planning-setup-finish"));
 
     expect(mocks.updateFactory).toHaveBeenCalledWith({
-      planning: { enabled: false, clarity: false, confidence: true, setupCompleted: true },
+      planning: { enabled: false, clarity: false, confidence: true, autoStartLineId: "", setupCompleted: true },
     });
     expect(onFinished).toHaveBeenCalledOnce();
   });
@@ -154,7 +154,7 @@ describe("PlanningSetupDialog", () => {
     await user.click(screen.getByTestId("planning-setup-finish"));
 
     expect(mocks.updateFactory).toHaveBeenCalledWith({
-      planning: { enabled: true, clarity: true, confidence: true, setupCompleted: true },
+      planning: { enabled: true, clarity: true, confidence: true, autoStartLineId: "", setupCompleted: true },
     });
     expect(onFinished).toHaveBeenCalledOnce();
   });
