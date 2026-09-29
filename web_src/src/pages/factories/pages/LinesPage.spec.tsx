@@ -2134,3 +2134,277 @@ describe("LinesPage Implement phase window", () => {
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(1760);
   });
 });
+
+function phaseCard(input: {
+  id: string;
+  title: string;
+  stepIndex: number;
+  appId: string;
+  createdAt: string;
+  updatedAt: string;
+  confidence?: number;
+  originUrl?: string;
+}): FactoriesWorkOrder {
+  return {
+    id: input.id,
+    title: input.title,
+    state: "STATE_OPEN",
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    origin: input.originUrl ? { url: input.originUrl } : undefined,
+    checkScores:
+      input.confidence == null
+        ? []
+        : [{ name: "Confidence score", key: "confidence", score: input.confidence, maxScore: 5 }],
+    lineDispatches: [
+      planLineActiveDispatch(input.id, [
+        {
+          id: `exec-${input.id}`,
+          stepIndex: input.stepIndex,
+          state: "STATE_STARTED",
+          createdAt: input.updatedAt,
+          updatedAt: input.updatedAt,
+          run: { id: `run-${input.id}`, appId: input.appId, appName: "Phase" },
+        },
+      ]),
+    ],
+  };
+}
+
+function closedCard(id: string, title: string, createdAt: string): FactoriesWorkOrder {
+  return {
+    id,
+    title,
+    state: "STATE_CLOSED",
+    result: "RESULT_COMPLETED",
+    createdAt,
+    updatedAt: createdAt,
+    lineDispatches: [{ id: `dispatch-${id}`, line: { id: REFUND_LINE_PLAN_ID } }],
+  };
+}
+
+function boardPages(input: {
+  orders: FactoriesWorkOrder[];
+  open?: ReturnType<typeof idleBoardPage> & { isFetchNextPageError?: boolean };
+  done?: ReturnType<typeof idleBoardPage> & { isFetchNextPageError?: boolean };
+}) {
+  return {
+    workOrders: input.orders,
+    isLoading: false,
+    isPlaceholderData: false,
+    backlog: idleBoardPage(),
+    open: input.open ?? idleBoardPage(),
+    done: input.done ?? idleBoardPage(),
+  };
+}
+
+describe("LinesPage column view", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("sorts a phase column with a card from a later open page and leaves the other column", async () => {
+    const early = phaseCard({
+      id: "wo-early",
+      title: "Early phase task",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      updatedAt: "2026-09-28T00:00:00.000Z",
+      confidence: 1,
+    });
+    const later = phaseCard({
+      id: "wo-later",
+      title: "Later page task",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:00.000Z",
+      confidence: 5,
+    });
+    const other = phaseCard({
+      id: "wo-other",
+      title: "Other column task",
+      stepIndex: 1,
+      appId: "app-refund-verifier",
+      createdAt: "2026-09-28T00:00:00.000Z",
+      updatedAt: "2026-09-28T00:00:00.000Z",
+      confidence: 5,
+    });
+    const fetchNextOpen = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: [early, other] });
+    useFactoryBoardWorkOrders.mockReturnValue(
+      boardPages({
+        orders: [early, other],
+        open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+      }),
+    );
+    const view = renderLinesBoard();
+    const user = userEvent.setup();
+
+    expect(within(screen.getByTestId("lines-phase-column-0")).getByText("Early phase task")).toBeInTheDocument();
+    expect(screen.queryByText("Later page task")).not.toBeInTheDocument();
+    expect(fetchNextOpen).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("lines-phase-view-0"));
+    await user.click(screen.getByTestId("lines-phase-view-0-sort-confidence"));
+
+    await waitFor(() => expect(fetchNextOpen).toHaveBeenCalled());
+    expect(screen.getByTestId("lines-phase-column-scroll-0")).toHaveAttribute("aria-label", "Loading tasks");
+    expect(within(screen.getByTestId("lines-phase-column-0")).queryByText("Early phase task")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("lines-phase-column-1")).getByText("Other column task")).toBeInTheDocument();
+
+    useFactoryWorkOrders.mockReturnValue({ data: [early, other, later] });
+    useFactoryBoardWorkOrders.mockReturnValue(boardPages({ orders: [early, other, later] }));
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    const phase = screen.getByTestId("lines-phase-column-0");
+    const titles = within(phase)
+      .getAllByRole("button", { name: /^Open / })
+      .map((button) => button.getAttribute("aria-label"));
+    expect(titles[0]).toContain("Later page task");
+    expect(titles[1]).toContain("Early phase task");
+    expect(within(phase).queryByText("Other column task")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("lines-phase-column-1")).getByText("Other column task")).toBeInTheDocument();
+  });
+
+  it("keeps the phase choice and the default order when a later page fails", async () => {
+    const early = phaseCard({
+      id: "wo-early",
+      title: "Early phase task",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      updatedAt: "2026-09-28T00:00:00.000Z",
+      confidence: 1,
+    });
+    const fetchNextOpen = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: [early] });
+    useFactoryBoardWorkOrders.mockReturnValue(
+      boardPages({
+        orders: [early],
+        open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+      }),
+    );
+    const view = renderLinesBoard();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("lines-phase-view-0"));
+    await user.click(screen.getByTestId("lines-phase-view-0-sort-confidence"));
+    await waitFor(() => expect(fetchNextOpen).toHaveBeenCalled());
+
+    useFactoryBoardWorkOrders.mockReturnValue(
+      boardPages({
+        orders: [early],
+        open: {
+          hasNextPage: true,
+          isFetchingNextPage: false,
+          isFetchNextPageError: true,
+          fetchNextPage: fetchNextOpen,
+        },
+      }),
+    );
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    expect(screen.getByTestId("lines-phase-view-0")).toHaveAttribute("data-active");
+    expect(within(screen.getByTestId("lines-phase-column-0")).getByText("Early phase task")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-phase-column-scroll-0")).not.toHaveAttribute("aria-label", "Loading tasks");
+  });
+
+  it("sorts Done with a card from a later closed page", async () => {
+    const recent = closedCard("wo-done-new", "Recent done task", "2026-09-28T00:00:00.000Z");
+    const older = closedCard("wo-done-old", "Older done task", "2026-01-01T00:00:00.000Z");
+    const fetchNextOpen = vi.fn();
+    const fetchNextDone = vi.fn();
+    useFactoryWorkOrders.mockReturnValue({ data: [recent] });
+    useFactoryBoardWorkOrders.mockReturnValue(
+      boardPages({
+        orders: [recent],
+        open: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextOpen },
+        done: { hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchNextDone },
+      }),
+    );
+    const view = renderLinesBoard();
+    const user = userEvent.setup();
+
+    expect(within(screen.getByTestId("lines-done-column")).getByText("Recent done task")).toBeInTheDocument();
+    expect(fetchNextDone).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("lines-done-view"));
+    await user.click(screen.getByTestId("lines-done-view-sort-age"));
+
+    await waitFor(() => {
+      expect(fetchNextOpen).toHaveBeenCalled();
+      expect(fetchNextDone).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId("lines-done-column-scroll")).toHaveAttribute("aria-label", "Loading tasks");
+    expect(within(screen.getByTestId("lines-done-column")).queryByText("Recent done task")).not.toBeInTheDocument();
+
+    useFactoryWorkOrders.mockReturnValue({ data: [recent, older] });
+    useFactoryBoardWorkOrders.mockReturnValue(boardPages({ orders: [recent, older] }));
+    view.rerender(
+      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+    );
+
+    const titles = within(screen.getByTestId("lines-done-column"))
+      .getAllByRole("button", { name: /^Open / })
+      .map((button) => button.getAttribute("aria-label"));
+    expect(titles[0]).toContain("Older done task");
+    expect(titles[1]).toContain("Recent done task");
+  });
+
+  it("keeps a board source filter and drops the column choice on reload", async () => {
+    const manual = phaseCard({
+      id: "wo-manual",
+      title: "Manual phase task",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: "2026-09-01T00:00:00.000Z",
+      confidence: 5,
+    });
+    const github = phaseCard({
+      id: "wo-github",
+      title: "GitHub phase task",
+      stepIndex: 0,
+      appId: "app-refund-implementer",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      updatedAt: "2026-09-28T00:00:00.000Z",
+      confidence: 1,
+      originUrl: "https://github.com/acme/app/issues/9",
+    });
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryWorkOrders.mockReturnValue({ data: [manual, github] });
+    const view = renderLinesBoard();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-sourceIds"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-sourceIds-github-issues"));
+
+    expect(screen.queryByText("Manual phase task")).not.toBeInTheDocument();
+    expect(screen.getByText("GitHub phase task")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("lines-phase-view-0"));
+    await user.click(screen.getByTestId("lines-phase-view-0-sort-confidence"));
+
+    expect(screen.queryByText("Manual phase task")).not.toBeInTheDocument();
+    expect(screen.getByText("GitHub phase task")).toBeInTheDocument();
+    expect(window.localStorage.getItem(`sp:work-orders:filters:${PRIMARY_FACTORY_ID}`) ?? "").not.toContain("sortKey");
+
+    window.localStorage.removeItem(`sp:work-orders:filters:${PRIMARY_FACTORY_ID}`);
+    view.unmount();
+    renderLinesBoard();
+
+    const titles = within(screen.getByTestId("lines-phase-column-0"))
+      .getAllByRole("button", { name: /^Open / })
+      .map((button) => button.getAttribute("aria-label"));
+    expect(titles[0]).toContain("GitHub phase task");
+    expect(titles[1]).toContain("Manual phase task");
+  });
+});
