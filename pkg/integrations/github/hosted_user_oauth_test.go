@@ -28,6 +28,7 @@ type hostedUserOAuthStub struct {
 	exchangedCode string
 	recorded      []hostedInstallationSnapshot
 	memberSaves   []string
+	linked        []string
 }
 
 func stubHostedUserOAuth(t *testing.T, stub *hostedUserOAuthStub) {
@@ -42,12 +43,16 @@ func stubHostedUserOAuth(t *testing.T, stub *hostedUserOAuthStub) {
 		stub.exchangedCode = code
 		return "user-token", nil
 	}
-	listUserInstallations = func(token string) (string, []hostedInstallationSnapshot, error) {
+	listUserInstallations = func(token string) (hostedUserIdentity, []hostedInstallationSnapshot, error) {
 		require.Equal(t, "user-token", token)
 		if stub.listErr != nil {
-			return "", nil, stub.listErr
+			return hostedUserIdentity{}, nil, stub.listErr
 		}
-		return stub.login, stub.installations, nil
+		return hostedUserIdentity{Login: stub.login, ProviderID: "9001"}, stub.installations, nil
+	}
+	linkGitHubAccountForUser = func(userID string, identity hostedUserIdentity) error {
+		stub.linked = append(stub.linked, userID+"/"+identity.Login+"/"+identity.ProviderID)
+		return nil
 	}
 	saveReconciledInstallation = func(snapshot hostedInstallationSnapshot) error {
 		stub.recorded = append(stub.recorded, snapshot)
@@ -80,6 +85,7 @@ func Test__afterHostedAppUserOAuth(t *testing.T) {
 			State:           "csrf",
 			HostedApp:       true,
 			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			StartedByUserID: "22222222-2222-2222-2222-222222222222",
 			SetupReturnPath: "/org-1/workspaces/PAY/setup?step=vcs",
 		}
 		ctx, rec := hostedRequestContext(
@@ -101,6 +107,7 @@ func Test__afterHostedAppUserOAuth(t *testing.T) {
 		assert.Equal(t, "member", metadata.StartedByGitHubLogin)
 		assert.Len(t, stub.recorded, 2)
 		assert.Equal(t, []string{"11/member", "12/member"}, stub.memberSaves)
+		assert.Equal(t, []string{"22222222-2222-2222-2222-222222222222/member/9001"}, stub.linked)
 		assertNoPlaintextSecrets(t, integration)
 	})
 

@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -420,6 +421,15 @@ func getPostLogoutRedirectURL(r *http.Request) string {
 	return "/login?redirect=" + url.QueryEscape(redirectURL)
 }
 
+// hostedGitHubAppUserOAuthEnabled reports that the hosted GitHub App can
+// authorize users itself. The frontend then skips the separate identity
+// link flow before a GitHub connect: the app's own OAuth proves the
+// identity in one step.
+func hostedGitHubAppUserOAuthEnabled() bool {
+	app, ok := githubcommon.HostedAppFromEnv()
+	return ok && app.UserOAuthEnabled()
+}
+
 func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
@@ -434,12 +444,14 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		SignupEnabled               bool     `json:"signupEnabled"`
 		SignupsBlockedByEnvironment bool     `json:"signupsBlockedByEnvironment"`
 		MagicCodeEnabled            bool     `json:"magicCodeEnabled"`
+		GitHubAppUserOAuth          bool     `json:"githubAppUserOAuth"`
 	}{
 		Providers:                   providerNames,
 		PasswordLoginEnabled:        a.passwordLoginEnabled,
 		SignupEnabled:               a.SignupsEnabled(),
 		SignupsBlockedByEnvironment: a.SignupsBlockedByEnvironment(),
 		MagicCodeEnabled:            a.magicCodeEnabled,
+		GitHubAppUserOAuth:          hostedGitHubAppUserOAuthEnabled(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

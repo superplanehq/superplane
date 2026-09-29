@@ -12,13 +12,24 @@ import (
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var (
 	exchangeHostedUserOAuthCode = exchangeHostedUserOAuthCodeOnGitHub
 	listUserInstallations       = listUserInstallationsFromGitHub
+	linkGitHubAccountForUser    = linkGitHubAccountForUserInDB
 )
+
+// hostedUserIdentity is the GitHub identity the user OAuth token proves.
+type hostedUserIdentity struct {
+	Login      string
+	ProviderID string
+	Name       string
+	AvatarURL  string
+}
 
 // afterHostedAppUserOAuth finishes the GitHub App user OAuth round trip.
 // GitHub redirects here with a code. The code buys a user access token, and
@@ -57,14 +68,16 @@ func (g *GitHub) afterHostedAppUserOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	login, installations, err := listUserInstallations(token)
+	identity, installations, err := listUserInstallations(token)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list GitHub App installations for the user: %v", err)
 		redirectToIntegrationSettings(ctx)
 		return
 	}
+	login := identity.Login
 
 	g.recordUserInstallations(ctx, login, installations)
+	g.linkProvenIdentity(ctx, metadata.StartedByUserID, identity)
 
 	if login != "" {
 		metadata.StartedByGitHubLogin = login
@@ -99,6 +112,20 @@ func (g *GitHub) afterHostedAppUserOAuth(ctx core.HTTPRequestContext) {
 	// The picker has options now, so a stored install action is stale.
 	ctx.Integration.RemoveBrowserAction()
 	redirectToIntegrationSettings(ctx)
+}
+
+// linkProvenIdentity records the GitHub identity on the member's account.
+// The user OAuth token already proved it, so no separate link flow is
+// needed and later connects skip the identity gate. A link error must not
+// stop the connect: the picker still works without the link.
+func (g *GitHub) linkProvenIdentity(ctx core.HTTPRequestContext, userID string, identity hostedUserIdentity) {
+	if userID == "" || identity.Login == "" {
+		return
+	}
+	err := linkGitHubAccountForUser(userID, identity)
+	if err != nil {
+		ctx.Logger.Errorf("failed to link GitHub identity %s: %v", identity.Login, err)
+	}
 }
 
 // recordUserInstallations stores what the user token proved: the
@@ -161,12 +188,29 @@ func exchangeHostedUserOAuthCodeOnGitHub(app common.HostedApp, code string) (str
 	return body.AccessToken, nil
 }
 
-func listUserInstallationsFromGitHub(token string) (string, []hostedInstallationSnapshot, error) {
+func linkGitHubAccountForUserInDB(userID string, identity hostedUserIdentity) error {
+	return models.LinkGitHubAccountForUser(
+		database.Conn(),
+		userID,
+		identity.ProviderID,
+		identity.Login,
+		identity.Name,
+		identity.AvatarURL,
+	)
+}
+
+func listUserInstallationsFromGitHub(token string) (hostedUserIdentity, []hostedInstallationSnapshot, error) {
 	client := gh.NewClient(nil).WithAuthToken(token)
 
 	user, _, err := client.Users.Get(context.Background(), "")
 	if err != nil {
-		return "", nil, err
+		return hostedUserIdentity{}, nil, err
+	}
+	identity := hostedUserIdentity{
+		Login:      user.GetLogin(),
+		ProviderID: strconv.FormatInt(user.GetID(), 10),
+		Name:       user.GetName(),
+		AvatarURL:  user.GetAvatarURL(),
 	}
 
 	result := []hostedInstallationSnapshot{}
@@ -174,7 +218,7 @@ func listUserInstallationsFromGitHub(token string) (string, []hostedInstallation
 	for {
 		installations, response, err := client.Apps.ListUserInstallations(context.Background(), opts)
 		if err != nil {
-			return "", nil, err
+			return hostedUserIdentity{}, nil, err
 		}
 
 		for _, installation := range installations {
@@ -195,7 +239,7 @@ func listUserInstallationsFromGitHub(token string) (string, []hostedInstallation
 		}
 
 		if response == nil || response.NextPage == 0 {
-			return user.GetLogin(), result, nil
+			return identity, result, nil
 		}
 		opts.Page = response.NextPage
 	}
@@ -204,4 +248,5 @@ func listUserInstallationsFromGitHub(token string) (string, []hostedInstallation
 func resetHostedUserOAuthHooks() {
 	exchangeHostedUserOAuthCode = exchangeHostedUserOAuthCodeOnGitHub
 	listUserInstallations = listUserInstallationsFromGitHub
+	linkGitHubAccountForUser = linkGitHubAccountForUserInDB
 }

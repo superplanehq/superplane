@@ -107,6 +107,13 @@ describe("redirectToGitHubIdentityLink", () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it("skips the gate when the GitHub App authorizes users itself", async () => {
+    stubFetch({ providers: ["github"], githubAppUserOAuth: true }, { linked_accounts: [] });
+
+    expect(await redirectToGitHubIdentityLink("/onboarding")).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
   it("skips the gate when GitHub sign-in is not configured", async () => {
     stubFetch({ providers: ["google"] }, { linked_accounts: [] });
 

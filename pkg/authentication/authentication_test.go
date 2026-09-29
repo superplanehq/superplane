@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -23,6 +24,7 @@ import (
 type authConfigResponse struct {
 	SignupEnabled               bool `json:"signupEnabled"`
 	SignupsBlockedByEnvironment bool `json:"signupsBlockedByEnvironment"`
+	GitHubAppUserOAuth          bool `json:"githubAppUserOAuth"`
 }
 
 func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.ResourceRegistry) {
@@ -124,6 +126,48 @@ func TestHandler_handleAuthConfig(t *testing.T) {
 		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
 		assert.True(t, response.SignupEnabled)
 		assert.False(t, response.SignupsBlockedByEnvironment)
+	})
+
+	t.Run("reports GitHub App user OAuth when the hosted app holds client credentials", func(t *testing.T) {
+		t.Setenv(githubcommon.EnvGitHubAppID, "99")
+		t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+		t.Setenv(githubcommon.EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "whsec")
+		t.Setenv(githubcommon.EnvGitHubAppClientID, "Iv23liClient")
+		t.Setenv(githubcommon.EnvGitHubAppClientSecret, "app-secret")
+
+		handler, _ := setupAuthHandler(t, false)
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/auth/config", nil)
+
+		handler.handleAuthConfig(recorder, request)
+
+		require.Equal(t, http.StatusOK, recorder.Code)
+
+		var response authConfigResponse
+		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+		assert.True(t, response.GitHubAppUserOAuth)
+	})
+
+	t.Run("reports no GitHub App user OAuth without client credentials", func(t *testing.T) {
+		t.Setenv(githubcommon.EnvGitHubAppID, "99")
+		t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+		t.Setenv(githubcommon.EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "whsec")
+		t.Setenv(githubcommon.EnvGitHubAppClientID, "")
+		t.Setenv(githubcommon.EnvGitHubAppClientSecret, "")
+
+		handler, _ := setupAuthHandler(t, false)
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/auth/config", nil)
+
+		handler.handleAuthConfig(recorder, request)
+
+		require.Equal(t, http.StatusOK, recorder.Code)
+
+		var response authConfigResponse
+		require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+		assert.False(t, response.GitHubAppUserOAuth)
 	})
 }
 

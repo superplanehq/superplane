@@ -181,6 +181,31 @@ func FindGitHubLoginForUser(tx *gorm.DB, userID string) (string, error) {
 	return strings.TrimSpace(provider.Username), nil
 }
 
+// LinkGitHubAccountForUser links a GitHub identity to the account behind an
+// organization user. The GitHub App user OAuth callback proves the identity,
+// so no separate link flow is needed. A missing user or account is not an
+// error: the connect continues and only the link is skipped.
+func LinkGitHubAccountForUser(tx *gorm.DB, userID, providerID, username, name, avatarURL string) error {
+	parsedUserID, err := uuid.Parse(strings.TrimSpace(userID))
+	if err != nil {
+		return nil
+	}
+
+	var user User
+	err = tx.Where("id = ?", parsedUserID).First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if user.AccountID == nil {
+		return nil
+	}
+
+	return SaveAccountLinkedAccount(tx, NewAccountLinkedAccount(*user.AccountID, ProviderGitHub, providerID, username, name, avatarURL))
+}
+
 func DeleteAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string) error {
 	return tx.
 		Where("account_id = ? AND provider = ?", accountID, provider).

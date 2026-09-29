@@ -917,6 +917,7 @@ CREATE TABLE public.hosted_app_installation_members (
 
 CREATE TABLE public.hosted_app_installations (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    provider text NOT NULL,
     installation_id text NOT NULL,
     account_login text DEFAULT ''::text NOT NULL,
     account_type text DEFAULT ''::text NOT NULL,
@@ -924,8 +925,7 @@ CREATE TABLE public.hosted_app_installations (
     sender_login text DEFAULT ''::text NOT NULL,
     last_event_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    deleted_at timestamp with time zone,
-    provider text NOT NULL
+    deleted_at timestamp with time zone
 );
 
 

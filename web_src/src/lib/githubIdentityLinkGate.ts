@@ -1,7 +1,7 @@
 const GITHUB_CONNECT_RESUME_PARAM = "githubConnect";
 const GITHUB_CONNECT_RESUME_VALUE = "resume";
 
-type AuthConfigResponse = { providers?: string[] };
+type AuthConfigResponse = { providers?: string[]; githubAppUserOAuth?: boolean };
 
 type AccountIdentityResponse = {
   providers?: Array<{ provider?: string }>;
@@ -84,6 +84,12 @@ async function needsGitHubIdentityLink(): Promise<boolean> {
       fetchJson<AuthConfigResponse>("/auth/config"),
       fetchJson<AccountIdentityResponse>("/account"),
     ]);
+    if (config?.githubAppUserOAuth) {
+      // The GitHub App authorizes the user during the connect and the
+      // callback links the identity, so a separate link flow before the
+      // connect would only add a second GitHub screen.
+      return false;
+    }
     if (!config?.providers?.includes("github")) {
       return false;
     }
