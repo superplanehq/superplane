@@ -2,6 +2,8 @@ package public
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -81,6 +83,7 @@ type publicOrigin struct {
 }
 
 type publicAssignee struct {
+	Key       string `json:"key,omitempty"`
 	Name      string `json:"name"`
 	AvatarURL string `json:"avatarUrl,omitempty"`
 }
@@ -597,7 +600,17 @@ func publicAssigneeFromOrder(order *models.FactoryWorkOrder, avatars map[uuid.UU
 	if name == "" {
 		return nil
 	}
-	return &publicAssignee{Name: name, AvatarURL: strings.TrimSpace(avatars[order.Assignees[0].User.ID])}
+	userID := order.Assignees[0].User.ID
+	return &publicAssignee{
+		Key:       publicAssigneeKey(userID),
+		Name:      name,
+		AvatarURL: strings.TrimSpace(avatars[userID]),
+	}
+}
+
+func publicAssigneeKey(id uuid.UUID) string {
+	sum := sha256.Sum256(id[:])
+	return hex.EncodeToString(sum[:8])
 }
 
 func assigneeAvatarURLs(orders []models.FactoryWorkOrder) map[uuid.UUID]string {

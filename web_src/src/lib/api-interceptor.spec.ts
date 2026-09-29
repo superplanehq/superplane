@@ -123,6 +123,16 @@ describe("api-interceptor", () => {
     expect(locationHref).toBe("/login?redirect=%2Fdemo%2Fworkspaces%2Fnewwo%2Flines%2Ffb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7");
   });
 
+  it("redirects organization list 401 outside a public line", async () => {
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+
+    setupApiInterceptor();
+
+    await expect(globalThis.fetch("/organizations")).rejects.toThrow("Unauthorized");
+    expect(locationHref).toBe("/login?redirect=%2Fdashboard%3Ftab%3Doverview");
+  });
+
   it("does not redirect guest probes on a public line URL", async () => {
     pathname = "/demo/workspaces/newwo/lines/fb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7";
     search = "";

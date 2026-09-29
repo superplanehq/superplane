@@ -1,8 +1,8 @@
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
+import { isPublicFactoryLinePath } from "@/lib/publicFactoryLinePath";
 
 const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations"]);
-/** Guests on a public line receive 401 here. A member API 401 still asks for login. */
-const GUEST_SAFE_UNAUTHORIZED_PATHS = new Set(["/account", "/organizations", "/account/experimental-features"]);
+const PUBLIC_LINE_GUEST_PROBES = new Set(["/organizations", "/account/experimental-features"]);
 
 let interceptorFetch: typeof globalThis.fetch | undefined;
 
@@ -30,7 +30,7 @@ export const setupApiInterceptor = (): void => {
     }
 
     if (response.status === 401) {
-      if (GUEST_SAFE_UNAUTHORIZED_PATHS.has(requestPath(input))) {
+      if (skipUnauthorizedRedirect(input)) {
         return response;
       }
 
@@ -53,6 +53,14 @@ function requestPath(input: RequestInfo | URL): string {
 function isAuthenticatedRequest(input: RequestInfo | URL): boolean {
   const path = requestPath(input);
   return path.includes("/api/") || path.startsWith("/account/") || ACCOUNT_SESSION_PATHS.has(path);
+}
+
+function skipUnauthorizedRedirect(input: RequestInfo | URL): boolean {
+  const path = requestPath(input);
+  if (path === "/account") {
+    return true;
+  }
+  return isPublicFactoryLinePath(window.location.pathname) && PUBLIC_LINE_GUEST_PROBES.has(path);
 }
 
 function isAuthRoute(pathname: string): boolean {

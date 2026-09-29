@@ -119,7 +119,12 @@ export function PublicFactoryBoardPage({
     return <PermissionDeniedPage description="You do not have permission to open this workspace." />;
   }
   if (load.status === "missing" || !board) {
-    return <PublicBoardStatus title="This board is not available." signInHref={guestSignInHref()} />;
+    return (
+      <PublicBoardStatus
+        title="This board is not available."
+        signInHref={signedIn ? undefined : guestSignInHref()}
+      />
+    );
   }
 
   return (

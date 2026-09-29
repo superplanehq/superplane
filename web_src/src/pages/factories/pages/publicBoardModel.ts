@@ -33,7 +33,7 @@ export interface PublicBoardCard {
   failed?: boolean;
   approval?: boolean;
   origin?: { url?: string; label?: string };
-  assignee?: { name?: string; avatarUrl?: string };
+  assignee?: { key?: string; name?: string; avatarUrl?: string };
   confidence?: number;
   clarity?: number;
   pullRequest?: { number: number; state: string; mergeable: boolean; extraCount: number };
@@ -120,7 +120,13 @@ export function publicBoardOrder(card: PublicBoardCard, id: string): FactoriesWo
     updatedAt: card.createdAt,
     origin: card.origin?.url ? { url: card.origin.url, label: card.origin.label } : undefined,
     assignees: card.assignee?.name
-      ? [{ id: publicAssigneeId(card.assignee.name), name: card.assignee.name, avatarUrl: card.assignee.avatarUrl }]
+      ? [
+          {
+            id: publicAssigneeId(card.assignee),
+            name: card.assignee.name,
+            avatarUrl: card.assignee.avatarUrl,
+          },
+        ]
       : [],
     pullRequests: publicPullRequests(card, id),
     lineDispatches: publicLineDispatches(card),
@@ -174,8 +180,12 @@ export function columnEmptyDescription(column: PublicBoardColumn, narrowed: bool
   return "Nothing here.";
 }
 
-function publicAssigneeId(name: string): string {
-  return `public-member:${name.trim().toLowerCase()}`;
+function publicAssigneeId(assignee: { key?: string; name?: string }): string {
+  const key = assignee.key?.trim();
+  if (key) {
+    return `public-member:${key}`;
+  }
+  return `public-member:${assignee.name?.trim().toLowerCase() ?? ""}`;
 }
 
 function cardMatches(card: PublicBoardCard, id: string, filters: WorkOrderFilters, search: string): boolean {

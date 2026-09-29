@@ -208,7 +208,7 @@ function OrganizationMenuHeader({
             </Link>
           </DropdownMenuItem>
         )}
-        {hideActions ? null : <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />}
+        <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
       </div>
       {planLabel ? (
         <p className="px-2 text-[11px] text-muted-foreground" data-testid="factories-sidebar-plan-status">
