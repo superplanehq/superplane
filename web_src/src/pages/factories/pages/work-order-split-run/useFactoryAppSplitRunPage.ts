@@ -3,13 +3,13 @@ import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hoo
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
+import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { lineAppIds } from "../../lib/lineHostedCredit";
-import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { useHostedCreditRunContext } from "../../lib/useHostedCreditEmptyBanner";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
