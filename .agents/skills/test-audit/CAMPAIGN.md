@@ -76,8 +76,9 @@ mistakes this campaign actually found.
 Validate each lane with the smallest owner suite from [SKILL.md](SKILL.md):
 `make test PKG_TEST_PACKAGES=...` for Go, `make check.test.ui FILES=...` for
 UI, `$(MAKE) -C runner test` for runner, and `E2E_TEST_PACKAGES=... make
-test.e2e` (or `FILE=` / `LINE=`) for end-to-end. Then format, run
-`git diff --check`, and run the matching lint and build checks from
+test.e2e` (or `make test.e2e.single FILE=... LINE=...`) for end-to-end.
+Then format, run `git diff --check`, and run the matching lint and
+build checks from
 [pre-pipeline-review](../pre-pipeline-review/SKILL.md).
 
 Done when every lane plan is applied and each lane's keepers pass.

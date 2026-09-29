@@ -150,7 +150,7 @@ the smallest owner suite that covers the change.
    - UI: `make check.test.ui FILES=...` (paths relative to `web_src/`)
    - runner: `$(MAKE) -C runner test`
    - end-to-end: `E2E_TEST_PACKAGES=... make test.e2e` (or
-     `make test.e2e FILE=... LINE=...`)
+     `make test.e2e.single FILE=... LINE=...`)
 2. For removed source greps or plan assertions, run the Make target or
    executable script that owns the real contract.
 3. Run targeted formatting (`make format.go`, `make format.js`, or
