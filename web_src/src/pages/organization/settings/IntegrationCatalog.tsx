@@ -13,15 +13,11 @@ import { Icon } from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import { settingsModalClassName } from "./settingsPageStyles";
 import { GitHubConnectControls } from "./GitHubConnectControls";
+import { CatalogInstanceRow } from "./CatalogInstanceRow";
 import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { useIntegrationCatalog } from "@/hooks/useIntegrationCatalog";
-import { integrationStatusLabel, type IntegrationCatalogItem } from "@/lib/integrationCatalog";
-import {
-  catalogAppearance,
-  instancePlugClass,
-  instanceStatusLabelClass,
-  type CatalogAppearance,
-} from "./integrationCatalogAppearance";
+import { type IntegrationCatalogItem } from "@/lib/integrationCatalog";
+import { catalogAppearance, type CatalogAppearance } from "./integrationCatalogAppearance";
 
 type CatalogState = ReturnType<typeof useIntegrationCatalog>;
 type CatalogStyles = ReturnType<typeof catalogAppearance>;
@@ -207,56 +203,22 @@ function CatalogProviderCard({
             <CatalogInstanceRow
               key={integration.metadata?.id}
               appearance={appearance}
-              catalog={catalog}
               integration={integration}
               styles={styles}
+              canUpdateIntegrations={catalog.canUpdateIntegrations}
+              permissionsLoading={catalog.permissionsLoading}
+              onConfigure={() =>
+                catalog.openInstance(
+                  integration.metadata?.integrationName,
+                  integration.metadata?.id,
+                  Boolean(integration.status?.setupState?.currentStep),
+                )
+              }
             />
           ))}
         </div>
       ) : null}
     </section>
-  );
-}
-
-function CatalogInstanceRow({
-  appearance,
-  catalog,
-  integration,
-  styles,
-}: {
-  appearance: CatalogAppearance;
-  catalog: CatalogState;
-  integration: IntegrationCatalogItem["instances"][number];
-  styles: CatalogStyles;
-}) {
-  const state = integration.status?.state;
-  return (
-    <div className={styles.instanceRow}>
-      <Plug className={`size-4 shrink-0 ${instancePlugClass(state, styles)}`} />
-      <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
-      <p className={styles.instanceName}>{integration.metadata?.name}</p>
-      <div className="ml-auto">
-        <PermissionTooltip
-          allowed={catalog.canUpdateIntegrations || catalog.permissionsLoading}
-          message="You don't have permission to update integrations."
-        >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              catalog.openInstance(
-                integration.metadata?.integrationName,
-                integration.metadata?.id,
-                Boolean(integration.status?.setupState?.currentStep),
-              )
-            }
-            disabled={!catalog.canUpdateIntegrations}
-          >
-            Configure
-          </Button>
-        </PermissionTooltip>
-      </div>
-    </div>
   );
 }
 

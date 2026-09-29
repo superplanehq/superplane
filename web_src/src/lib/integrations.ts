@@ -17,6 +17,17 @@ export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationD
   return definition?.name === "github" && definition.hostedAppInstall === true;
 }
 
+/** Name of the property that stores the hosted GitHub App installation's management URL. */
+export const GITHUB_APP_INSTALLATION_URL_PROPERTY_NAME = "appInstallationURL";
+
+/** Management URL for a connected instance's GitHub App installation, when the backend stored one. */
+export function githubAppInstallationUrl(integration: OrganizationsIntegration): string | undefined {
+  const property = integration.status?.properties?.find(
+    (candidate) => candidate.name === GITHUB_APP_INSTALLATION_URL_PROPERTY_NAME,
+  );
+  return property?.value?.trim() || undefined;
+}
+
 export function usesHostedJiraOAuth(definition?: IntegrationsIntegrationDefinition): boolean {
   return definition?.name === "jira" && definition.hostedAppInstall === true;
 }
