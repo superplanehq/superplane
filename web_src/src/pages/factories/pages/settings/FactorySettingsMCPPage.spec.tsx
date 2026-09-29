@@ -355,9 +355,36 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toHaveTextContent(
       "No MCP clients connected",
     );
-    expect(screen.getByTestId("superplane-mcp-server")).toHaveTextContent("/mcp");
+    expect(screen.getByTestId("superplane-mcp-clients-empty")).toHaveTextContent(
+      "Add this server in your MCP client. Sign in when the client asks.",
+    );
+    expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
+    expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows Claude Code and VS Code setup after the matching tab", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-claudeCode"));
+    expect(screen.getByText("Run this command in a terminal.")).toBeInTheDocument();
+    expect(screen.getByTestId("superplane-mcp-config-copy-claudeCode")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-vscode"));
+    expect(screen.getByText("Open MCP settings in VS Code.")).toBeInTheDocument();
+    expect(screen.getByTestId("superplane-mcp-config-copy-vscode")).toBeInTheDocument();
   }, 10000);
 
   it("lists a connected SuperPlane MCP client and revokes it", async () => {
