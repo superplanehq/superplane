@@ -15,7 +15,6 @@ import {
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -174,14 +173,6 @@ describe("factoryPRFeedbackSetupPath", () => {
   it("maps PR feedback source ids to setup path kinds", () => {
     expect(prFeedbackSetupKindFromSourceId("discussion")).toBe("comments");
     expect(prFeedbackSetupKindFromSourceId("checks")).toBe("checks");
-  });
-});
-
-describe("factoryPlanningSetupPath", () => {
-  it("opens the Planning setup page on the line board", () => {
-    expect(factoryPlanningSetupPath("org-1", "SP", "line-plan")).toBe(
-      "/org-1/workspaces/sp/lines/line-plan/setup/planning",
-    );
   });
 });
 
