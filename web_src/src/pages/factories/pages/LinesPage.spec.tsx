@@ -13,6 +13,7 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
@@ -30,6 +31,7 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryGitHubIntakeSetupPath,
@@ -1196,10 +1198,33 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
+    await user.click(screen.getByTestId("add-intake-template-datadog"));
 
     expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Datadog setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DATADOG_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const datadog = screen.getByTestId("add-intake-template-datadog");
+    expect(datadog).toBeEnabled();
+    expect(datadog).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(datadog);
+
+    expect(screen.getByTestId("datadog-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryDatadogIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("opens guided Sentry setup from the overflow menu", async () => {

@@ -40,6 +40,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"cloudsmith.onSecurityScanCompleted":    "{{ root().data.name }} {{ root().data.version }} - {{ root().data.security_scan_status }}",
 	"dash0.onAlertNotification":             "{{ root().data.issue.summary }}",
 	"dash0.onSyntheticCheckNotification":    "{{ root().data.issue.summary }}",
+	"datadog.onErrorTrackingAlert":          "{{ root().data.title }}",
 	"dockerhub.onImagePush":                 "{{ root().data.repository.repo_name }}:{{ root().data.push_data.tag }}",
 	"elastic.onAlertFires":                  "{{ root().data.ruleName }}",
 	"elastic.onCaseStatusChange":            "{{ root().data.title }}",

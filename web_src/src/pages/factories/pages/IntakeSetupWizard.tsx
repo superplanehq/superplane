@@ -17,6 +17,9 @@ export function IntakeSetupWizard({
   children,
   footer,
   stepAction,
+  showProjectStep = true,
+  resourceStepLabel = "Choose project",
+  resourceStepCaption = "Awaiting project",
 }: {
   testId: string;
   integrationName: string;
@@ -28,16 +31,20 @@ export function IntakeSetupWizard({
   footer: ReactNode;
   /** Rendered on the right of the current step label, e.g. Connect. */
   stepAction?: ReactNode;
+  showProjectStep?: boolean;
+  resourceStepLabel?: string;
+  resourceStepCaption?: string;
 }) {
+  const visibleStep = showProjectStep ? step : "connection";
   return (
     <FirstRunShell
       testId={testId}
       chrome={{
-        stepIndex: step === "connection" ? 0 : 1,
-        stepCount: 2,
+        stepIndex: visibleStep === "connection" ? 0 : 1,
+        stepCount: showProjectStep ? 2 : 1,
         onBack,
       }}
-      sphere={intakeSphere(integrationName, step, `${testId}-sphere`)}
+      sphere={intakeSphere(integrationName, visibleStep, `${testId}-sphere`, resourceStepCaption)}
     >
       <FirstRunHeading headline={title}>
         <p className="text-[15px] leading-6 text-muted-foreground">{helper}</p>
@@ -46,8 +53,10 @@ export function IntakeSetupWizard({
         <IntakeSetupStepper
           testId={`${testId}-stepper`}
           integrationName={integrationName}
-          current={step}
+          current={visibleStep}
           stepAction={stepAction}
+          showProjectStep={showProjectStep}
+          resourceStepLabel={resourceStepLabel}
         >
           {children}
         </IntakeSetupStepper>
@@ -63,16 +72,20 @@ function IntakeSetupStepper({
   current,
   children,
   stepAction,
+  showProjectStep,
+  resourceStepLabel,
 }: {
   testId: string;
   integrationName: string;
   current: IntakeSetupStep;
   children: ReactNode;
   stepAction?: ReactNode;
+  showProjectStep: boolean;
+  resourceStepLabel: string;
 }) {
   const steps: Array<{ id: IntakeSetupStep; label: string }> = [
     { id: "connection", label: `Connect ${integrationName}` },
-    { id: "project", label: "Choose project" },
+    ...(showProjectStep ? [{ id: "project" as const, label: resourceStepLabel }] : []),
   ];
   const currentIndex = steps.findIndex((step) => step.id === current);
 
@@ -116,12 +129,17 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
   );
 }
 
-function intakeSphere(integrationName: string, step: IntakeSetupStep, testId: string): FirstRunSphereProps {
+function intakeSphere(
+  integrationName: string,
+  step: IntakeSetupStep,
+  testId: string,
+  resourceStepCaption: string,
+): FirstRunSphereProps {
   const connectionStep = step === "connection";
   return {
     testId,
     level: connectionStep ? 0.24 : 0.58,
-    caption: connectionStep ? `Awaiting ${integrationName} connection` : "Awaiting project",
+    caption: connectionStep ? `Awaiting ${integrationName} connection` : resourceStepCaption,
     leftChip: {
       label: "Discover",
       value: connectionStep ? "Awaiting backlog" : `${integrationName} issues`,
