@@ -864,6 +864,11 @@ message UpdateFactoryRequest {
   bool clear_hosted_spend_budget = 6;
   // Full replacement of Planning settings. Absent means do not change.
   optional FactoryPlanning planning = 7;
+  // When true, the public badge URL returns an SVG. Absent means do not change.
+  optional bool public_badge_enabled = 8;
+  // When true, Large and Full width badges show cost per merged pull request.
+  // Absent means do not change. A public URL cannot turn this on.
+  optional bool public_badge_show_cost = 9;
 }
 
 message UpdateFactoryResponse {
@@ -982,6 +987,10 @@ message Factory {
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
   FactoryPlanning planning = 8;
+  bool public_badge_enabled = 9;
+  bool public_badge_show_cost = 10;
+  // Unguessable token for the public badge URL. Empty until the badge is turned on once.
+  string public_badge_token = 11;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
