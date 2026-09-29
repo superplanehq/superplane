@@ -22,6 +22,8 @@ interface WorkspaceSwitcherProps {
   canOpenSettings: boolean;
   permissionsLoading: boolean;
   onCreateFactory: () => void;
+  /** Public board shows the workspace name. It does not list other workspaces. */
+  infoOnly?: boolean;
 }
 
 export function WorkspaceSwitcher({
@@ -32,6 +34,7 @@ export function WorkspaceSwitcher({
   canOpenSettings,
   permissionsLoading,
   onCreateFactory,
+  infoOnly = false,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -44,7 +47,7 @@ export function WorkspaceSwitcher({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label={`Switch workspace, ${workspaceName}`}
+            aria-label={infoOnly ? workspaceName : `Switch workspace, ${workspaceName}`}
             title={workspaceName}
             className={cn(
               factoriesRailControlClassName,
@@ -56,15 +59,17 @@ export function WorkspaceSwitcher({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="right" className="w-72">
-          <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
-          {factories.map((entry) => (
-            <WorkspaceSwitcherRow
-              key={entry.id}
+          {infoOnly ? (
+            <WorkspaceInfoName name={workspaceName} />
+          ) : (
+            <WorkspaceSwitcherMenu
               organizationId={organizationId}
-              entry={entry}
-              isCurrent={entry.id === factory.id}
-              currentFactoryKey={currentFactoryKey}
+              factory={factory}
+              factories={factories}
+              canCreateFactory={canCreateFactory}
               canOpenSettings={canOpenSettings}
+              permissionsLoading={permissionsLoading}
+              onCreateFactory={onCreateFactory}
               onSwitch={(next) => {
                 if (!currentFactoryKey || !next.key) {
                   return;
@@ -79,28 +84,64 @@ export function WorkspaceSwitcher({
                 );
               }}
             />
-          ))}
-          <DropdownMenuSeparator />
-          <PermissionTooltip
-            allowed={canCreateFactory || permissionsLoading}
-            message="You don't have permission to create workspaces."
-          >
-            <DropdownMenuItem
-              disabled={!canCreateFactory}
-              onClick={() => {
-                if (canCreateFactory) {
-                  onCreateFactory();
-                }
-              }}
-              data-testid="factories-workspace-create"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-              Create new workspace
-            </DropdownMenuItem>
-          </PermissionTooltip>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+function WorkspaceInfoName({ name }: { name: string }) {
+  return (
+    <div className="px-3 py-2" data-testid="factories-workspace-info">
+      <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+    </div>
+  );
+}
+
+function WorkspaceSwitcherMenu({
+  organizationId,
+  factory,
+  factories,
+  canCreateFactory,
+  canOpenSettings,
+  permissionsLoading,
+  onCreateFactory,
+  onSwitch,
+}: Omit<WorkspaceSwitcherProps, "infoOnly"> & { onSwitch: (next: FactoriesFactory) => void }) {
+  return (
+    <>
+      <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
+      {factories.map((entry) => (
+        <WorkspaceSwitcherRow
+          key={entry.id}
+          organizationId={organizationId}
+          entry={entry}
+          isCurrent={entry.id === factory.id}
+          currentFactoryKey={factory.key}
+          canOpenSettings={canOpenSettings}
+          onSwitch={onSwitch}
+        />
+      ))}
+      <DropdownMenuSeparator />
+      <PermissionTooltip
+        allowed={canCreateFactory || permissionsLoading}
+        message="You don't have permission to create workspaces."
+      >
+        <DropdownMenuItem
+          disabled={!canCreateFactory}
+          onClick={() => {
+            if (canCreateFactory) {
+              onCreateFactory();
+            }
+          }}
+          data-testid="factories-workspace-create"
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+          Create new workspace
+        </DropdownMenuItem>
+      </PermissionTooltip>
+    </>
   );
 }
 
