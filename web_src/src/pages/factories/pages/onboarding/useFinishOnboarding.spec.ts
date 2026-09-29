@@ -69,6 +69,8 @@ describe("provisionWorkspace", () => {
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
       deleteIntake: vi.fn().mockResolvedValue({}),
+      listPRFeedbackHandlers: vi.fn().mockResolvedValue([]),
+      createPRFeedbackHandler: vi.fn().mockResolvedValue({ id: "handler-discussion" }),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
@@ -159,8 +161,57 @@ describe("provisionWorkspace", () => {
     });
   });
 
-  it("does not create a comments handler during workspace setup", async () => {
-    await provisionWorkspace(provisionArgs());
+  it("creates a discussion handler without mention or allowed bots", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+    const createPRFeedbackHandler = vi.fn().mockResolvedValue({ id: "handler-discussion" });
+
+    await provisionWorkspace(provisionArgs({ createIntake, createPRFeedbackHandler }));
+
+    expect(createPRFeedbackHandler).toHaveBeenCalledTimes(1);
+    expect(createPRFeedbackHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
+    expect(createPRFeedbackHandler.mock.calls[0][0]).not.toHaveProperty("settings");
+    expect(createPRFeedbackHandler.mock.calls[0][0]).not.toHaveProperty("mention");
+    expect(createPRFeedbackHandler.mock.calls[0][0]).not.toHaveProperty("allowedBots");
+    expect(createIntake.mock.invocationCallOrder[0]).toBeLessThan(createPRFeedbackHandler.mock.invocationCallOrder[0]);
+  });
+
+  it("does not create a second discussion handler when finish is retried", async () => {
+    const listPRFeedbackHandlers = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION" }]);
+    const createPRFeedbackHandler = vi.fn().mockResolvedValue({ id: "handler-discussion" });
+
+    await provisionWorkspace(provisionArgs({ listPRFeedbackHandlers, createPRFeedbackHandler }));
+    await provisionWorkspace(provisionArgs({ listPRFeedbackHandlers, createPRFeedbackHandler }));
+
+    expect(createPRFeedbackHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes setup when the discussion handler cannot be created", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createPRFeedbackHandler = vi.fn().mockRejectedValue(new Error("failed"));
+
+    const result = await provisionWorkspace(provisionArgs({ updateOnboarding, createPRFeedbackHandler }));
+
+    expect(result).toEqual({ lineId: "line-1" });
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete === true)).toBe(true);
+  });
+
+  it("completes setup when discussion handlers cannot be listed", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const createPRFeedbackHandler = vi.fn();
+
+    await provisionWorkspace(
+      provisionArgs({
+        updateOnboarding,
+        createPRFeedbackHandler,
+        listPRFeedbackHandlers: vi.fn().mockRejectedValue(new Error("failed")),
+      }),
+    );
+
+    expect(createPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete === true)).toBe(true);
   });
 
   it("does not create a GitHub intake when the ticket source is Jira without a project", async () => {
