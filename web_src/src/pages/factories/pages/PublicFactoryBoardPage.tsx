@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
+import { Link } from "@/components/Link/link";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
 import { PublicFactoriesSidebar } from "../layout/FactoriesSidebar";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -24,6 +25,7 @@ import { PublicBoardColumnLane } from "./PublicFactoryBoardLane";
 import {
   boardFilterOptions,
   columnAutomations,
+  legacyAssigneeMigrations,
   loadStateForErrorStatus,
   parseBoardEvent,
   publicBoardSocketPath,
@@ -102,6 +104,7 @@ export function PublicFactoryBoardPage({
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
+  useLegacyAssigneeMigration(board, listState);
   const columns = useMemo(
     () => visibleBoardColumns(board?.columns ?? [], listState.filters, listState.search),
     [board, listState.filters, listState.search],
@@ -311,17 +314,37 @@ function PublicBoardStatus({
     >
       <p>{title}</p>
       {signInHref ? (
-        <a href={signInHref} className="text-foreground underline">
+        <Link href={signInHref} className="text-foreground underline">
           Sign in
-        </a>
+        </Link>
       ) : null}
       {homeHref ? (
-        <a href={homeHref} className="text-foreground underline">
+        <Link href={homeHref} className="text-foreground underline">
           Go to home
-        </a>
+        </Link>
       ) : null}
     </div>
   );
+}
+
+function useLegacyAssigneeMigration(
+  board: PublicBoard | null,
+  listState: ReturnType<typeof useWorkOrderListState>,
+) {
+  const assigneeIds = listState.filters.assigneeIds.join("\0");
+  useEffect(() => {
+    const migrations = legacyAssigneeMigrations(board?.columns ?? []);
+    for (const id of assigneeIds.split("\0").filter(Boolean)) {
+      const next = migrations.get(id);
+      if (!next || next === id) {
+        continue;
+      }
+      listState.removeFilter("assigneeIds", id);
+      if (!assigneeIds.split("\0").includes(next)) {
+        listState.toggleFilter("assigneeIds", next);
+      }
+    }
+  }, [assigneeIds, board, listState]);
 }
 
 function guestSignInHref(): string {

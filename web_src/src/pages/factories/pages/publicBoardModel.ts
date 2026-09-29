@@ -83,6 +83,30 @@ const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
   datadog: { src: datadogIcon, alt: "Datadog" },
 };
 
+export function legacyAssigneeMigrations(columns: PublicBoardColumn[]): Map<string, string> {
+  const keysByName = new Map<string, Set<string>>();
+  for (const column of columns) {
+    for (const card of column.cards) {
+      const name = card.assignee?.name?.trim().toLowerCase();
+      const key = card.assignee?.key?.trim();
+      if (!name || !key) {
+        continue;
+      }
+      const keys = keysByName.get(name) ?? new Set<string>();
+      keys.add(key);
+      keysByName.set(name, keys);
+    }
+  }
+  const migrations = new Map<string, string>();
+  for (const [name, keys] of keysByName) {
+    if (keys.size !== 1) {
+      continue;
+    }
+    migrations.set(`public-member:${name}`, `public-member:${[...keys][0]}`);
+  }
+  return migrations;
+}
+
 export function columnAutomations(column: PublicBoardColumn): ColumnAutomation[] {
   return (column.automations ?? []).map(toColumnAutomation);
 }
