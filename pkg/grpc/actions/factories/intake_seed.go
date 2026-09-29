@@ -712,6 +712,14 @@ func hydrateDatadogSeedIssues(client *datadog.Client, intakeService string, issu
 		})
 		if err != nil || loaded == nil {
 			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
+			if !datadogIssueMatchesService(issue, intakeService, false) {
+				log.Warnf(
+					"skipping Datadog issue %s: search result has no verified service for intake %q",
+					issue.ID,
+					intakeService,
+				)
+				continue
+			}
 			hydrated = append(hydrated, issue)
 			continue
 		}
