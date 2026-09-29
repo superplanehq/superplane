@@ -709,20 +709,36 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		return nil, fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	ID, err := strconv.Atoi(metadata.InstallationID)
+	installationID := metadata.InstallationID
+	appID := metadata.GitHubApp.ID
+	owner := metadata.Owner
+	pem := ""
+	if metadata.HostedApp {
+		hosted, err := ResolveHostedAppBinding(ctx)
+		if err != nil {
+			return nil, err
+		}
+		installationID = strconv.FormatInt(hosted.ID, 10)
+		appID = hosted.App.ID
+		owner = hosted.Installation.AccountLogin
+		pem = hosted.App.PrivateKey
+	} else {
+		var err error
+		pem, err = LegacyAppPrivateKey(ctx, metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find PEM: %v", err)
+		}
+	}
+
+	ID, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := LegacyAppPrivateKey(ctx, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find PEM: %v", err)
-	}
-
 	itr, err := ghinstallation.New(
 		&transport{http: httpCtx},
-		metadata.GitHubApp.ID,
-		int64(ID),
+		appID,
+		ID,
 		[]byte(pem),
 	)
 
@@ -733,7 +749,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 	return &Client{
 		authMethod: AuthMethodApp,
 		ownerType:  determineLegacyOwnerType(ctx),
-		owner:      metadata.Owner,
+		owner:      owner,
 		underlying: github.NewClient(&http.Client{Transport: itr}),
 	}, nil
 }

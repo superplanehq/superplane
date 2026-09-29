@@ -879,6 +879,112 @@ CREATE TABLE public.files (
 
 
 --
+-- Name: github_app_install_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_install_requests (
+    request_id bigint NOT NULL,
+    account_id bigint,
+    account_login text DEFAULT ''::text NOT NULL,
+    account_type text DEFAULT ''::text NOT NULL,
+    requester_id bigint NOT NULL,
+    requester_login text DEFAULT ''::text NOT NULL,
+    requested_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: github_app_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_installations (
+    installation_id bigint NOT NULL,
+    account_id bigint,
+    account_login text DEFAULT ''::text NOT NULL,
+    account_type text DEFAULT ''::text NOT NULL,
+    html_url text DEFAULT ''::text NOT NULL,
+    repository_selection text DEFAULT ''::text NOT NULL,
+    suspended_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: github_app_integration_bindings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_integration_bindings (
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    installation_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: github_app_reconcile_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_reconcile_jobs (
+    id smallint NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT github_app_reconcile_jobs_id_check CHECK ((id = 1))
+);
+
+
+--
+-- Name: github_app_repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_repositories (
+    repository_id bigint NOT NULL,
+    installation_id bigint NOT NULL,
+    full_name text NOT NULL,
+    private boolean DEFAULT false NOT NULL,
+    default_branch text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT github_app_repositories_full_name_present CHECK ((btrim(full_name) <> ''::text))
+);
+
+
+--
+-- Name: github_app_repository_collaborators; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_repository_collaborators (
+    repository_id bigint NOT NULL,
+    github_user_id bigint NOT NULL,
+    github_login text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: github_app_repository_sync_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.github_app_repository_sync_jobs (
+    repository_id bigint NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1952,6 +2058,62 @@ ALTER TABLE ONLY public.files
 
 
 --
+-- Name: github_app_install_requests github_app_install_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_install_requests
+    ADD CONSTRAINT github_app_install_requests_pkey PRIMARY KEY (request_id);
+
+
+--
+-- Name: github_app_installations github_app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_installations
+    ADD CONSTRAINT github_app_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
+-- Name: github_app_integration_bindings github_app_integration_bindings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_integration_bindings
+    ADD CONSTRAINT github_app_integration_bindings_pkey PRIMARY KEY (integration_id);
+
+
+--
+-- Name: github_app_reconcile_jobs github_app_reconcile_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_reconcile_jobs
+    ADD CONSTRAINT github_app_reconcile_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: github_app_repositories github_app_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repositories
+    ADD CONSTRAINT github_app_repositories_pkey PRIMARY KEY (repository_id);
+
+
+--
+-- Name: github_app_repository_collaborators github_app_repository_collaborators_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repository_collaborators
+    ADD CONSTRAINT github_app_repository_collaborators_pkey PRIMARY KEY (repository_id, github_user_id);
+
+
+--
+-- Name: github_app_repository_sync_jobs github_app_repository_sync_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repository_sync_jobs
+    ADD CONSTRAINT github_app_repository_sync_jobs_pkey PRIMARY KEY (repository_id);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2358,6 +2520,62 @@ CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_
 --
 
 CREATE UNIQUE INDEX files_public_id_unique ON public.files USING btree (public_id) WHERE (public_id IS NOT NULL);
+
+
+--
+-- Name: github_app_install_requests_requester_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_install_requests_requester_idx ON public.github_app_install_requests USING btree (requester_id);
+
+
+--
+-- Name: github_app_installations_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX github_app_installations_account_idx ON public.github_app_installations USING btree (account_id) WHERE (account_id IS NOT NULL);
+
+
+--
+-- Name: github_app_integration_bindings_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_integration_bindings_installation_idx ON public.github_app_integration_bindings USING btree (installation_id);
+
+
+--
+-- Name: github_app_integration_bindings_organization_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_integration_bindings_organization_installation_idx ON public.github_app_integration_bindings USING btree (organization_id, installation_id);
+
+
+--
+-- Name: github_app_repositories_full_name_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX github_app_repositories_full_name_idx ON public.github_app_repositories USING btree (lower(full_name));
+
+
+--
+-- Name: github_app_repositories_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_repositories_installation_idx ON public.github_app_repositories USING btree (installation_id);
+
+
+--
+-- Name: github_app_repository_collaborators_user_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_repository_collaborators_user_idx ON public.github_app_repository_collaborators USING btree (github_user_id);
+
+
+--
+-- Name: github_app_repository_sync_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX github_app_repository_sync_jobs_due_idx ON public.github_app_repository_sync_jobs USING btree (run_at) WHERE (locked_at IS NULL);
 
 
 --
@@ -4086,6 +4304,54 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: github_app_integration_bindings github_app_integration_bindings_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_integration_bindings
+    ADD CONSTRAINT github_app_integration_bindings_installation_id_fkey FOREIGN KEY (installation_id) REFERENCES public.github_app_installations(installation_id) ON DELETE CASCADE;
+
+
+--
+-- Name: github_app_integration_bindings github_app_integration_bindings_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_integration_bindings
+    ADD CONSTRAINT github_app_integration_bindings_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: github_app_integration_bindings github_app_integration_bindings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_integration_bindings
+    ADD CONSTRAINT github_app_integration_bindings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: github_app_repositories github_app_repositories_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repositories
+    ADD CONSTRAINT github_app_repositories_installation_id_fkey FOREIGN KEY (installation_id) REFERENCES public.github_app_installations(installation_id) ON DELETE CASCADE;
+
+
+--
+-- Name: github_app_repository_collaborators github_app_repository_collaborators_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repository_collaborators
+    ADD CONSTRAINT github_app_repository_collaborators_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.github_app_repositories(repository_id) ON DELETE CASCADE;
+
+
+--
+-- Name: github_app_repository_sync_jobs github_app_repository_sync_jobs_repository_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.github_app_repository_sync_jobs
+    ADD CONSTRAINT github_app_repository_sync_jobs_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.github_app_repositories(repository_id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4501,7 +4767,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260924170742	f
+20260929030219	f
 \.
 
 

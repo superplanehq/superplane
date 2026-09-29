@@ -80,7 +80,6 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        organizationName="acme"
         chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
         onEditConnection={() => setScreen("connect")}

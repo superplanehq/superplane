@@ -27,7 +27,6 @@ import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import {
   useFirstRunSetupFlow,
-  useFreshConnectionsOnConnectScreen,
   type FirstRunScreen,
   type FirstRunSetupFlow,
   type IntegrationId,
@@ -50,10 +49,7 @@ const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
   tickets: 4,
 };
 
-// The reverse path walks the exact screens in reverse order, back to the
-// welcome screen. The connect screen has two pages (the Connect GitHub page
-// and the account picker), so `backActionFor` in FirstRunSetup handles the
-// connect and choose screens itself.
+// The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
   tickets: "choose",
@@ -176,33 +172,12 @@ function AgentScreen({
   );
 }
 
-/**
- * Back walks the exact screens in reverse order: repository, account picker,
- * Connect GitHub, welcome. The picker is a page of the connect screen, so
- * Back on the picker closes it instead of changing screens.
- */
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  if (target === "connect" && flow.pickerShowing) {
-    return flow.closePicker;
-  }
   if (target === "choose") {
-    return () => flow.goToScreen("connect", "picker");
+    return () => flow.goToScreen("connect");
   }
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
-}
-
-/** Picker data for the connect screen. The Connect GitHub page passes none. */
-function pickerPropsFor(flow: FirstRunSetupFlow) {
-  if (!flow.pickerShowing) {
-    return {};
-  }
-  return {
-    pendingInstallations: flow.accountPicker?.installations,
-    githubState: flow.accountPicker?.state,
-    githubAppSlug: flow.accountPicker?.appSlug,
-    githubLogin: flow.accountPicker?.githubLogin,
-  };
 }
 
 /** Hosted credentials provision from this screen, so it shows finish progress. */
@@ -267,7 +242,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
-  useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -320,17 +294,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        loading={flow.pickerLoading}
-        installRequested={flow.installRequested}
-        githubOrganizations={flow.githubOrganizations}
-        {...pickerPropsFor(flow)}
-        bindingInstallationId={flow.bindingInstallationId}
+        loading={flow.repositoriesLoading}
+        identityConnected={flow.identityConnected}
+        githubLogin={flow.githubLogin}
+        pendingOrganizations={flow.pendingOrganizations}
+        synchronizing={flow.synchronizing}
+        appConfigured={flow.appConfigured}
         connecting={flow.blockingAction === "opening-github"}
+        connectError={flow.connectError}
         chrome={chromeFor("connect")}
-        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", setup.selectedRepo)}
+        sphere={sphereFor("connect", setup.selectedRepo)}
         onConnectGitHub={() => void flow.connectGitHub()}
-        onUseInstallation={flow.useInstallation}
-        onInstallOther={() => void flow.installOnAnotherAccount()}
       />
     );
   }
@@ -338,15 +312,14 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "choose") {
     return (
       <FirstRunChooseScreen
-        repositories={model.repositories}
+        repositories={flow.repositories}
         selectedRepository={setup.selectedRepo}
-        loading={model.repositoriesLoading}
+        loading={flow.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-        organizationName={model.githubOwner}
         onSelectRepository={setup.selectRepo}
-        onEditConnection={() => model.requestConfigure()}
+        onEditConnection={() => void flow.configureGitHubAccess()}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

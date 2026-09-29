@@ -70,6 +70,4 @@ func setHostedAppEnv(t *testing.T) {
 	t.Setenv(common.EnvGitHubAppSlug, "superplane")
 	t.Setenv(common.EnvGitHubAppPrivateKey, "test-pem")
 	t.Setenv(common.EnvGitHubAppWebhookSecret, "whsec")
-	t.Setenv(common.EnvGitHubAppClientID, "")
-	t.Setenv(common.EnvGitHubAppClientSecret, "")
 }

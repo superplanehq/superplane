@@ -119,7 +119,6 @@ describe("FirstRunChooseScreen", () => {
       <FirstRunChooseScreen
         repositories={["puppies-inc/app"]}
         selectedRepository={null}
-        organizationName="puppies-inc"
         onSelectRepository={vi.fn()}
         onEditConnection={vi.fn()}
         onContinue={vi.fn()}
@@ -127,8 +126,8 @@ describe("FirstRunChooseScreen", () => {
     );
 
     expect(screen.getByTestId("first-run-github-stepper")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.stepConnected)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.stepOrganizationDone("puppies-inc"))).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.connectGitHub)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.stepGrantAccess)).toBeInTheDocument();
     expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(2);
     expect(screen.getByRole("option", { name: /puppies-inc\/app/ })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-continue-to-tickets")).toBeInTheDocument();

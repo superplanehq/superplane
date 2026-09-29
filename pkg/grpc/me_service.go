@@ -54,3 +54,19 @@ func (s *MeService) DescribeLastLocation(ctx context.Context, req *pb.DescribeLa
 func (s *MeService) SaveLastLocation(ctx context.Context, req *pb.SaveLastLocationRequest) (*pb.SaveLastLocationResponse, error) {
 	return me.SaveLastLocation(ctx, req)
 }
+
+func (s *MeService) DescribeGitHubOnboarding(ctx context.Context, _ *pb.DescribeGitHubOnboardingRequest) (*pb.DescribeGitHubOnboardingResponse, error) {
+	return me.DescribeGitHubOnboarding(ctx)
+}
+
+func (s *MeService) StartGitHubAppInstallation(ctx context.Context, _ *pb.StartGitHubAppInstallationRequest) (*pb.StartGitHubAppInstallationResponse, error) {
+	return me.StartGitHubAppInstallation(ctx)
+}
+
+func (s *MeService) ConfigureGitHubAppInstallation(ctx context.Context, req *pb.ConfigureGitHubAppInstallationRequest) (*pb.ConfigureGitHubAppInstallationResponse, error) {
+	return me.ConfigureGitHubAppInstallation(ctx, req.GetInstallationId())
+}
+
+func (s *MeService) RefreshGitHubOnboarding(ctx context.Context, req *pb.RefreshGitHubOnboardingRequest) (*pb.RefreshGitHubOnboardingResponse, error) {
+	return me.RefreshGitHubOnboarding(ctx, req.RepositoryId)
+}

@@ -61,6 +61,11 @@ func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.Up
 	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) SelectFactoryGitHubRepository(ctx context.Context, req *pb.SelectFactoryGitHubRepositoryRequest) (*pb.SelectFactoryGitHubRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SelectFactoryGitHubRepository(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)

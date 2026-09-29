@@ -17,7 +17,6 @@ export function FirstRunChooseScreen({
   saving = false,
   chrome,
   sphere,
-  organizationName,
   onSelectRepository,
   onEditConnection,
   onContinue,
@@ -29,8 +28,6 @@ export function FirstRunChooseScreen({
   saving?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** Names the finished organization step, e.g. "Organization: puppies-inc". */
-  organizationName?: string;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
   onContinue: () => void;
@@ -44,7 +41,7 @@ export function FirstRunChooseScreen({
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
-        <FirstRunGithubStepper current="repository" organizationName={organizationName}>
+        <FirstRunGithubStepper current="repository">
           <RepositoryStepBody
             repositories={repositories}
             selectedRepository={selectedRepository}

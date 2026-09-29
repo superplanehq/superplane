@@ -1,4 +1,4 @@
-import type { FactoriesFactoryOnboarding } from "@/api-client";
+import type { FactoriesFactoryOnboarding, MeDescribeGitHubOnboardingResponse } from "@/api-client";
 import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
@@ -10,6 +10,24 @@ const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
 
 /** App repository the setup stories continue with. Served by the resources fixture. */
 export const SETUP_APP_REPOSITORY = "acme/api";
+
+const READY_GITHUB_ONBOARDING: MeDescribeGitHubOnboardingResponse = {
+  appConfigured: true,
+  identity: { userId: "42", login: "forestileao" },
+  repositories: [
+    {
+      repositoryId: "201",
+      installationId: "101",
+      fullName: SETUP_APP_REPOSITORY,
+      defaultBranch: "main",
+      accountLogin: "acme",
+      accountType: "Organization",
+      private: true,
+    },
+  ],
+  pendingRequests: [],
+  synchronizing: false,
+};
 
 function readyConnection(integrationName: string, id: string, name: string): StorybookOrgIntegration {
   return {
@@ -42,28 +60,6 @@ export const CONNECTED_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   readyConnection("claude", CLAUDE_CONNECTION_ID, "acme-claude"),
 ];
 
-/**
- * A GitHub connect the storybook user just authorized on GitHub: still
- * pending, with the account picker data the OAuth callback stored.
- */
-export const PENDING_PICKER_INTEGRATION: StorybookOrgIntegration = {
-  metadata: { id: "storybook-github-pending", name: "github-2", integrationName: "github" },
-  status: {
-    state: "pending",
-    metadata: {
-      startedByUserID: "storybook-user",
-      startedByGitHubLogin: "forestileao",
-      state: "csrf",
-      githubApp: { slug: "superplane" },
-      pendingInstallations: [
-        { id: "11", accountLogin: "forestigamer" },
-        { id: "22", accountLogin: "forestileao" },
-      ],
-    },
-  },
-  spec: { configuration: {} },
-};
-
 const vcsAnswered: FactoriesFactoryOnboarding = { vcsIntegrationId: GITHUB_CONNECTION_ID };
 const repositoryAnswered: FactoriesFactoryOnboarding = { ...vcsAnswered, appRepository: SETUP_APP_REPOSITORY };
 const issuesAnswered: FactoriesFactoryOnboarding = {
@@ -90,16 +86,20 @@ export const SETUP_ANSWERS = {
   agent: agentAnswered,
 } satisfies Record<string, FactoriesFactoryOnboarding>;
 
+export function factoriesFixtureWithGithubAccess(fixture = defaultFactoriesFixture): FactoriesFixture {
+  return { ...fixture, githubOnboarding: READY_GITHUB_ONBOARDING };
+}
+
 /** Default dataset with saved setup answers on the primary workspace. */
 export function factoriesFixtureWithSetupAnswers(
   onboarding: FactoriesFactoryOnboarding,
   options?: { organizationWorkspaceUsage?: StorybookUsageReport },
 ): FactoriesFixture {
+  const fixture = factoriesFixtureWithGithubAccess();
   return {
-    ...defaultFactoriesFixture,
-    organizationWorkspaceUsage:
-      options?.organizationWorkspaceUsage ?? defaultFactoriesFixture.organizationWorkspaceUsage,
-    factories: defaultFactoriesFixture.factories.map((factory) =>
+    ...fixture,
+    organizationWorkspaceUsage: options?.organizationWorkspaceUsage ?? fixture.organizationWorkspaceUsage,
+    factories: fixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),
   };

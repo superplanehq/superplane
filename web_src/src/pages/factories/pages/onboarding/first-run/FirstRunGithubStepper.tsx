@@ -6,15 +6,13 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 
 const copy = FIRST_RUN_COPY.connect;
 
-export type FirstRunGithubStep = "connect" | "organization" | "repository";
+export type FirstRunGithubStep = "connect" | "grant" | "repository";
 
-const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "organization", "repository"];
+const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "grant", "repository"];
 
-function stepLabel(step: FirstRunGithubStep, done: boolean, organizationName?: string): string {
-  if (step === "connect") return done ? copy.stepConnected : copy.connectGitHub;
-  if (step === "organization") {
-    return done && organizationName ? copy.stepOrganizationDone(organizationName) : copy.stepOrganization;
-  }
+function stepLabel(step: FirstRunGithubStep): string {
+  if (step === "connect") return copy.connectGitHub;
+  if (step === "grant") return copy.stepGrantAccess;
   return copy.stepRepository;
 }
 
@@ -44,22 +42,18 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
  */
 export function FirstRunGithubStepper({
   current,
-  organizationName,
   action,
-  organizationStatus,
+  grantStatus,
   children,
 }: {
   current: FirstRunGithubStep;
-  /** Names the finished organization row, e.g. "Organization: puppies-inc". */
-  organizationName?: string;
   /** Control on the active step header, e.g. the Connect button. */
   action?: ReactNode;
   /**
-   * Rows that belong to the organization step on every page, e.g. an install
-   * request that waits for an admin. A pending organization stays visible
-   * under "Choose organization" even while another step is active.
+   * Rows that belong to the access step, such as an installation request that
+   * waits for an organization administrator.
    */
-  organizationStatus?: ReactNode;
+  grantStatus?: ReactNode;
   children?: ReactNode;
 }) {
   const currentIndex = STEP_ORDER.indexOf(current);
@@ -82,13 +76,11 @@ export function FirstRunGithubStepper({
             >
               <span className="flex items-center gap-2.5">
                 <StepBadge number={index + 1} done={done} />
-                {stepLabel(step, done, organizationName)}
+                {stepLabel(step)}
               </span>
               {active ? action : null}
             </div>
-            {step === "organization" && organizationStatus ? (
-              <div className="mt-3 space-y-3">{organizationStatus}</div>
-            ) : null}
+            {step === "grant" && grantStatus ? <div className="mt-3 space-y-3">{grantStatus}</div> : null}
             {active && children ? <div className="mt-3 space-y-3">{children}</div> : null}
           </div>
         );

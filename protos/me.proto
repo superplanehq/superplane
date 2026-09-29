@@ -142,6 +142,53 @@ service Me {
       tags: "Me";
     };
   }
+
+  rpc DescribeGitHubOnboarding(DescribeGitHubOnboardingRequest) returns (DescribeGitHubOnboardingResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/github/onboarding"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe GitHub onboarding";
+      description: "Returns the GitHub identity, accessible repositories, and pending installation requests for the current account";
+      tags: "Me";
+    };
+  }
+
+  rpc StartGitHubAppInstallation(StartGitHubAppInstallationRequest) returns (StartGitHubAppInstallationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/github/installations:start"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start GitHub App installation";
+      description: "Returns the public SuperPlane GitHub App installation URL";
+      tags: "Me";
+    };
+  }
+
+  rpc ConfigureGitHubAppInstallation(ConfigureGitHubAppInstallationRequest) returns (ConfigureGitHubAppInstallationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/github/installations/{installation_id}:configure"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Configure GitHub App installation";
+      description: "Returns the GitHub settings URL for an existing installation";
+      tags: "Me";
+    };
+  }
+
+  rpc RefreshGitHubOnboarding(RefreshGitHubOnboardingRequest) returns (RefreshGitHubOnboardingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/github/repositories:refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Refresh GitHub repositories";
+      description: "Queues GitHub App catalog reconciliation and collaborator synchronization";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -151,6 +198,58 @@ message MeRequest {
 message MeResponse {
   User user = 1;
 }
+
+message DescribeGitHubOnboardingRequest {}
+
+message GitHubIdentity {
+  int64 user_id = 1;
+  string login = 2;
+}
+
+message GitHubOnboardingRepository {
+  int64 repository_id = 1;
+  int64 installation_id = 2;
+  string full_name = 3;
+  bool private = 4;
+  string default_branch = 5;
+  string account_login = 6;
+  string account_type = 7;
+}
+
+message GitHubAppInstallRequest {
+  int64 request_id = 1;
+  string account_login = 2;
+  string account_type = 3;
+  google.protobuf.Timestamp requested_at = 4;
+}
+
+message DescribeGitHubOnboardingResponse {
+  bool app_configured = 1;
+  optional GitHubIdentity identity = 2;
+  repeated GitHubOnboardingRepository repositories = 3;
+  repeated GitHubAppInstallRequest pending_requests = 4;
+  bool synchronizing = 5;
+}
+
+message StartGitHubAppInstallationRequest {}
+
+message StartGitHubAppInstallationResponse {
+  string url = 1;
+}
+
+message ConfigureGitHubAppInstallationRequest {
+  int64 installation_id = 1;
+}
+
+message ConfigureGitHubAppInstallationResponse {
+  string url = 1;
+}
+
+message RefreshGitHubOnboardingRequest {
+  optional int64 repository_id = 1;
+}
+
+message RefreshGitHubOnboardingResponse {}
 
 message BrowserNotificationPreferences {
   bool enabled = 1;

@@ -34,6 +34,27 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	return handler, r
 }
 
+func TestHandler_InitializeProviders_UsesEmailOnlyGitHubScope(t *testing.T) {
+	handler := &Handler{}
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "client-id",
+			Secret:      "client-secret",
+			CallbackURL: "https://app.example/auth/github/callback",
+		},
+	})
+
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "user:email", parsed.Query().Get("scope"))
+}
+
 func TestHandler_handleAuthConfig(t *testing.T) {
 	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)
@@ -519,6 +540,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, account.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
+
+		linked, err := models.FindAccountLinkedAccount(database.Conn(), account.ID, models.ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, githubUser.UserID, linked.ProviderID)
+		assert.Equal(t, githubUser.NickName, linked.Username)
 	})
 
 	t.Run("should issue a session for the account that holds the identity, not an email match", func(t *testing.T) {

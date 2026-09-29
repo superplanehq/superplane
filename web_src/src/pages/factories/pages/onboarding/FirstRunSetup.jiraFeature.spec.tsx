@@ -57,12 +57,20 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
-  useRecheckGitHubInstallRequest: vi.fn(),
-}));
-
-vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+vi.mock("./useGitHubOnboarding", () => ({
+  useGitHubOnboarding: () => ({
+    data: {
+      appConfigured: true,
+      identity: { userId: "42", login: "octocat" },
+      repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
+      pendingRequests: [],
+      synchronizing: false,
+    },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+    configureInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -108,23 +116,11 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
-    refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
-    githubConnectionsLoading: false,
-    requestPrivateGitHubConnect: vi.fn(),
-    offersPrivateGitHubAppSetup: false,
-    createVcsConnection: vi.fn(),
-    selectVcsConnection: vi.fn().mockResolvedValue(true),
-    githubConnections: { name: "github", allInstances: [], readyInstances: [] },
-    selectedVcsConnectionId: "github-1",
-    requestConfigure: vi.fn(),
+    selectCatalogRepository: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
-    repositories: ["acme/payments-service"],
-    repositoriesLoading: false,
-    repositoriesError: null,
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
-    saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,

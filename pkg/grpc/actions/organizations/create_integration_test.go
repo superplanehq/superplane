@@ -269,8 +269,6 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
@@ -294,8 +292,6 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		name := support.RandomName("integration")
 		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
@@ -335,8 +331,6 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
 		require.NoError(t, err)
@@ -360,8 +354,6 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
 		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
-		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
 
 		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
 		require.NoError(t, err)

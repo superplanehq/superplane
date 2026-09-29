@@ -1,10 +1,12 @@
 import type { OrganizationsCreateIntegrationResponse, OrganizationsIntegration } from "@/api-client";
 
+import { followBrowserAction } from "@/lib/browserAction";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { integrationSetupPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
-import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
 
 export const PRIVATE_GITHUB_APP_CONFIG = { privateApp: true } as const;
+const GITHUB_SETUP_RETURN_PATH = "setupReturnPath";
 
 /** Label for the customer GitHub App path beside hosted Connect GitHub. */
 export const CREATE_PRIVATE_GITHUB_APP_LABEL = "Create your own GitHub App";
@@ -50,19 +52,24 @@ export async function connectPrivateGitHubApp(args: {
     return true;
   }
 
-  return startDirectGitHubConnect({
-    organizationId: args.organizationId,
-    returnTo: args.returnTo,
-    integrationsBasePath: args.integrationsBasePath,
-    existingNames: args.existingNames,
-    connected: args.connected,
-    currentUserId: args.currentUserId,
-    forceNew: true,
-    goTo: args.goTo,
-    create: (payload) =>
+  const { result } = await createWithGeneratedName({
+    baseName: "github",
+    takenNames: args.existingNames,
+    create: (name) =>
       args.create({
-        ...payload,
-        configuration: { ...payload.configuration, ...PRIVATE_GITHUB_APP_CONFIG },
+        integrationName: "github",
+        name,
+        configuration: {
+          ...PRIVATE_GITHUB_APP_CONFIG,
+          ...(args.returnTo ? { [GITHUB_SETUP_RETURN_PATH]: args.returnTo } : {}),
+        },
       }),
   });
+
+  rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
+  const action = result.integration?.status?.browserAction;
+  if (!action?.url) {
+    throw new Error("The private GitHub App setup page did not open.");
+  }
+  return followBrowserAction(action);
 }

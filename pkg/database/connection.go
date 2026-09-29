@@ -194,6 +194,8 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			github_app_reconcile_jobs,
+			github_app_installations,
 			secrets,
 			account_magic_codes,
 			account_password_auth,
