@@ -5,6 +5,7 @@ import type {
   OrganizationsCreateIntegrationResponse,
   OrganizationsIntegration,
 } from "@/api-client";
+import { useGitHubConnectResume } from "@/hooks/useGitHubConnectResume";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -298,6 +299,7 @@ function isHostedJira(availableIntegrations: IntegrationsIntegrationDefinition[]
 type QueuedHostedGitHubConnect = {
   forceNew: boolean;
   preferredIntegrationId?: string;
+  skipIdentityGate: boolean;
   result: Promise<boolean>;
   resolve: (navigationStarted: boolean) => void;
 };
@@ -305,7 +307,8 @@ type QueuedHostedGitHubConnect = {
 function queueHostedGitHubConnect(
   pending: RefObject<QueuedHostedGitHubConnect | null>,
   forceNew: boolean,
-  preferredIntegrationId?: string,
+  preferredIntegrationId: string | undefined,
+  skipIdentityGate: boolean,
 ): Promise<boolean> {
   if (pending.current) return pending.current.result;
 
@@ -313,7 +316,7 @@ function queueHostedGitHubConnect(
   const result = new Promise<boolean>((promiseResolve) => {
     resolve = promiseResolve;
   });
-  pending.current = { forceNew, preferredIntegrationId, result, resolve };
+  pending.current = { forceNew, preferredIntegrationId, skipIdentityGate, result, resolve };
   return result;
 }
 
@@ -342,11 +345,11 @@ export function useHostedGitHubConnect({
   const pendingGitHubConnectRef = useRef<QueuedHostedGitHubConnect | null>(null);
 
   const connectGitHubWithoutDialog = useCallback(
-    async (forceNew = false, preferredIntegrationId?: string): Promise<boolean> => {
+    async (forceNew = false, preferredIntegrationId?: string, skipIdentityGate = false): Promise<boolean> => {
       const userGate = hostedGitHubConnectUserGate(currentUserId, currentUserResolved);
       if (userGate !== "run") {
         if (userGate === "queue") {
-          return queueHostedGitHubConnect(pendingGitHubConnectRef, forceNew, preferredIntegrationId);
+          return queueHostedGitHubConnect(pendingGitHubConnectRef, forceNew, preferredIntegrationId, skipIdentityGate);
         } else {
           pendingGitHubConnectRef.current = null;
           showErrorToast("Failed to connect GitHub");
@@ -364,6 +367,7 @@ export function useHostedGitHubConnect({
           currentUserId,
           forceNew,
           preferredIntegrationId,
+          skipIdentityGate,
           goTo: navigate,
           create: async (payload) => {
             const response = await createIntegration(payload);
@@ -396,8 +400,19 @@ export function useHostedGitHubConnect({
     }
 
     pendingGitHubConnectRef.current = null;
-    void connectGitHubWithoutDialog(pending.forceNew, pending.preferredIntegrationId).then(pending.resolve);
+    void connectGitHubWithoutDialog(pending.forceNew, pending.preferredIntegrationId, pending.skipIdentityGate).then(
+      pending.resolve,
+    );
   }, [connectGitHubWithoutDialog, currentUserId, currentUserResolved]);
+
+  // The identity link flow returns to this page; the connect then continues
+  // automatically with the gate skipped, so a failed link still opens the
+  // plain GitHub install flow.
+  useGitHubConnectResume(
+    useCallback(() => {
+      void connectGitHubWithoutDialog(false, undefined, true);
+    }, [connectGitHubWithoutDialog]),
+  );
 
   return connectGitHubWithoutDialog;
 }

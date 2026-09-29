@@ -98,6 +98,45 @@ describe("FirstRunConnectScreen", () => {
     );
   });
 
+  it("offers a switch to a different GitHub account next to the signed-in line", async () => {
+    const user = userEvent.setup();
+    const onSwitchAccount = vi.fn();
+
+    render(
+      <FirstRunConnectScreen
+        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        githubLogin="forestileao"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onSwitchAccount={onSwitchAccount}
+      />,
+    );
+
+    const switchLink = screen.getByTestId("first-run-github-switch-account");
+    expect(switchLink).toHaveTextContent(FIRST_RUN_COPY.connect.switchAccount);
+    // The visible label is terse, so the accessible name carries the action.
+    expect(switchLink).toHaveAttribute("aria-label", FIRST_RUN_COPY.connect.switchAccountLabel);
+    await user.click(switchLink);
+    expect(onSwitchAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the switch link without a switch handler", () => {
+    render(
+      <FirstRunConnectScreen
+        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        githubLogin="forestileao"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("first-run-github-switch-account")).not.toBeInTheDocument();
+  });
+
   it("hides the signed-in line when the picker has no GitHub login", () => {
     render(
       <FirstRunConnectScreen
