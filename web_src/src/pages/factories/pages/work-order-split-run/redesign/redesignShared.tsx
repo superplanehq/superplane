@@ -10,6 +10,22 @@ export function StageStatusGlyph({ status, className }: { status: SplitRunPhaseS
   return <PhaseGlyph kind={status} className={className} />;
 }
 
+/**
+ * Status without motion. A running run reads as a steady dot: the card
+ * header glyph is the one spinner on the console.
+ */
+export function StaticStatusGlyph({ status, className }: { status: SplitRunPhaseStatus; className?: string }) {
+  if (status === "running") {
+    return (
+      <span
+        className={cn("size-2 shrink-0 rounded-full bg-[color:var(--status-running-dot)]", className)}
+        aria-hidden
+      />
+    );
+  }
+  return <StageStatusGlyph status={status} className={className} />;
+}
+
 const TOOL_ICONS: Record<string, LucideIcon> = {
   bash: SquareTerminal,
   command_execution: SquareTerminal,

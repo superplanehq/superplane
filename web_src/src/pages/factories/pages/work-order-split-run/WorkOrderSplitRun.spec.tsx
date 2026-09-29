@@ -458,12 +458,32 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const verify = screen.getByTestId("redesign-console-column-verify");
     expect(within(verify).getAllByText("Address PR feedback")).toHaveLength(1);
-    expect(within(verify).queryByText("Read the requested changes")).not.toBeInTheDocument();
 
-    if (!within(verify).queryByRole("button", { name: "View 2 runs" })) {
+    if (!within(verify).queryByRole("button", { name: "Toggle Address new review comment" })) {
       await user.click(within(verify).getByRole("button", { name: "Toggle Address PR feedback details" }));
     }
-    expect(within(verify).getByRole("button", { name: "View 2 runs" })).toBeInTheDocument();
+    // The runs list is the card's only page, so it renders without a tab bar.
+    expect(within(verify).queryByRole("tab")).not.toBeInTheDocument();
+    expect(within(verify).getByRole("button", { name: "Toggle Address new review comment" })).toBeInTheDocument();
+    expect(within(verify).getByRole("button", { name: "Toggle Read the requested changes" })).toBeInTheDocument();
+    expect(within(verify).queryByRole("button", { name: /View \d+ runs/ })).not.toBeInTheDocument();
+    const header = within(verify).getByTestId(/^redesign-console-card-header-/);
+    expect(within(header).getByText("2 agent runs")).toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: /agent run/ })).not.toBeInTheDocument();
+  });
+
+  it("shows agent run, artifact, and check counts as badges on the card", () => {
+    renderSplitRun();
+
+    const implement = screen
+      .getByRole("button", { name: "Toggle Implementation details" })
+      .closest("[data-testid^='redesign-console-automation-']") as HTMLElement;
+    const header = within(implement).getByTestId(/^redesign-console-card-header-/);
+
+    expect(within(header).getByText("1 agent run")).toBeInTheDocument();
+    expect(within(header).getByText(/\d+ artifacts?/)).toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: /agent run|artifact|check/ })).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "Full log" })).not.toBeInTheDocument();
   });
 
   it("shows the run console on the Automations tab", () => {
@@ -484,7 +504,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(panel).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
   });
 
-  it("lists attached files in the console summary", () => {
+  it("does not list attached files in the console summary", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
@@ -503,7 +523,9 @@ describe("WorkOrderSplitRunPopup", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByTestId("redesign-console-files")).toHaveTextContent("bug.png");
+    const panel = screen.getByTestId("redesign-console-summary");
+    expect(within(panel).queryByText("Files")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("bug.png")).not.toBeInTheDocument();
   });
 
   it("keeps the implement model off the header line while the task is running", () => {
@@ -882,10 +904,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(card as HTMLElement).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
 
     await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
-    // The task text is the description.md document on the Artifacts page.
-    expect(within(card as HTMLElement).getByRole("tab", { name: /Artifacts/ })).toBeInTheDocument();
+    // The task text is the description.md document; Artifacts is the only
+    // page, so there is no tab bar.
+    expect(within(card as HTMLElement).queryByRole("tab")).not.toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole("button", { name: "Download description.md" })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText(/^\d+(\.\d+)? (B|KB|MB|GB)$/)).toBeInTheDocument();
     expect(within(card as HTMLElement).getByTestId("redesign-console-task-description")).toBeInTheDocument();
   });
 
@@ -896,13 +920,14 @@ describe("WorkOrderSplitRunPopup", () => {
     const card = screen
       .getByRole("button", { name: "Toggle Implementation details" })
       .closest("[data-testid^='redesign-console-automation-']") as HTMLElement;
-    const logTab = within(card).getByRole("tab", { name: "Agent log" });
+    const logTab = within(card).getByRole("tab", { name: "Agent runs 1" });
     expect(logTab).toHaveAttribute("aria-selected", "true");
     expect(within(card).queryByRole("link", { name: /feature\/refund-retry/ })).not.toBeInTheDocument();
 
     await user.click(within(card).getByRole("tab", { name: /Artifacts/ }));
 
-    expect(within(card).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "feature/refund-retry" })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Open feature/refund-retry in a new tab" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
   });
 
@@ -961,8 +986,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-phase-checks-verify-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
 
-    // The Checks page lists every score with its summary in view.
-    await user.click(screen.getByRole("tab", { name: /^Checks/ }));
+    // The tab shows the check count. The page lists every score.
+    await user.click(screen.getByRole("tab", { name: "Checks 2" }));
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 
