@@ -116,6 +116,8 @@ describe("FirstRunConnectScreen", () => {
 
     const switchLink = screen.getByTestId("first-run-github-switch-account");
     expect(switchLink).toHaveTextContent(FIRST_RUN_COPY.connect.switchAccount);
+    // The visible label is terse, so the accessible name carries the action.
+    expect(switchLink).toHaveAttribute("aria-label", FIRST_RUN_COPY.connect.switchAccountLabel);
     await user.click(switchLink);
     expect(onSwitchAccount).toHaveBeenCalledTimes(1);
   });

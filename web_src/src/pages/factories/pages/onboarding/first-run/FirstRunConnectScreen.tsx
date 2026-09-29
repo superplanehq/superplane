@@ -18,7 +18,6 @@ function SignedInAsLine({ login, onSwitchAccount }: { login: string; onSwitchAcc
     <p className="text-[15px] leading-6 text-muted-foreground" data-testid="first-run-github-signed-in-as">
       {before}
       <span className="font-medium text-foreground">{login}</span>
-      {after}
       {onSwitchAccount ? (
         <>
           {" "}
@@ -26,12 +25,15 @@ function SignedInAsLine({ login, onSwitchAccount }: { login: string; onSwitchAcc
             type="button"
             data-testid="first-run-github-switch-account"
             onClick={onSwitchAccount}
-            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            aria-label={copy.switchAccountLabel}
+            title={copy.switchAccountLabel}
+            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
             {copy.switchAccount}
           </button>
         </>
       ) : null}
+      {after}
     </p>
   );
 }
