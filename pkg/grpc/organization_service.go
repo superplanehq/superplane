@@ -108,7 +108,7 @@ func (s *OrganizationService) ListSelectableLLMModels(
 	req *pb.ListSelectableLLMModelsRequest,
 ) (*pb.ListSelectableLLMModelsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListSelectableLLMModels(ctx, orgID, req)
+	return organizations.ListSelectableLLMModels(ctx, s.registry, orgID, req)
 }
 
 func (s *OrganizationService) ListBYOKLLMModels(

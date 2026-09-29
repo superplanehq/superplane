@@ -28,7 +28,8 @@ apt-get install -qy \
   fd-find \
   python3 \
   python3-pip \
-  python3-venv
+  python3-venv \
+  ffmpeg
 
 ARCH=$(dpkg --print-architecture)  # amd64 or arm64
 
@@ -67,6 +68,8 @@ command -v wget
 zip -v >/dev/null
 rsync --version >/dev/null
 wget --version >/dev/null
+ffmpeg -version >/dev/null
+ffprobe -version >/dev/null
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -86,7 +89,7 @@ apt-get install -qy nodejs
 
 # Coding agent CLIs (host-mode tasks; binaries land on PATH for ubuntu).
 # Pin versions — bump deliberately when rebuilding AMIs.
-CLAUDE_CODE_VERSION=2.1.212
+CLAUDE_CODE_VERSION=2.1.282
 OPENCODE_VERSION=1.18.31
 CODEX_VERSION=0.144.5
 PLAYWRIGHT_VERSION=1.63.0
@@ -136,6 +139,7 @@ RUNNER_SHELL=/bin/bash
 RUNNER_HEALTH_ADDR=0.0.0.0:9090
 AUTH_TOKEN=
 RUNNER_TERMINATE_AFTER_EACH_TASK=true
+WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin
 ENVEOF
 chmod 644 /etc/default/superplane-runner
 

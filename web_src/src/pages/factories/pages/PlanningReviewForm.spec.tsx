@@ -45,6 +45,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
     has: () => false,
     enabledExperimentalFeatures: [],
     isLoading: false,
+    organizationReady: true,
   })),
 }));
 
@@ -68,6 +69,32 @@ function selectableModel(provider: string, id: string) {
     model: { id, name: id },
     key: `hosted::${provider}::${id}`,
     label: provider === "openrouter" ? id : `${provider}/${id}`,
+  };
+}
+
+function claudeCodeDraft(model: string): PlanningReviewDraft {
+  return {
+    ...PLANNING_REVIEW_DRAFT,
+    components: [
+      {
+        ...PLANNING_REVIEW_DRAFT.components[0],
+        component: "runnerClaudeCode",
+        configuration: {
+          ...PLANNING_REVIEW_DRAFT.components[0].configuration,
+          model,
+        },
+      },
+    ],
+  };
+}
+
+function byokAnthropicModel(id: string) {
+  return {
+    source: { id: "byok", name: "Your keys" },
+    provider: { id: "anthropic", name: "Anthropic" },
+    model: { id, name: id },
+    key: `byok::anthropic::${id}`,
+    label: `anthropic/${id}`,
   };
 }
 
@@ -141,6 +168,7 @@ describe("PlanningReviewForm model options", () => {
       has: () => false,
       enabledExperimentalFeatures: [],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockReturnValue({
       data: [],
@@ -187,6 +215,108 @@ describe("PlanningReviewForm model options", () => {
     expect(screen.queryByTestId("field-model-hosted-model")).not.toBeInTheDocument();
   });
 
+  it("loads the workspace model list when the route has no canvas", () => {
+    vi.mocked(useComponent).mockReturnValue({
+      data: {
+        name: "runnerClaudeCode",
+        configuration: [
+          {
+            name: "model",
+            label: "Model",
+            type: "hosted-model",
+            typeOptions: { hostedModel: { provider: "anthropic" } },
+          },
+        ],
+      },
+    } as ReturnType<typeof useComponent>);
+    vi.mocked(useSelectableLLMModels).mockReturnValue({
+      data: [byokAnthropicModel("claude-sonnet-4-6")],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>);
+
+    vi.mocked(useSelectableLLMModels).mockClear();
+    renderForm(claudeCodeDraft(""), { factoryId: PRIMARY_FACTORY_ID });
+
+    const calls = vi.mocked(useSelectableLLMModels).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [, options] of calls) {
+      expect(options).toEqual(
+        expect.objectContaining({
+          factoryId: PRIMARY_FACTORY_ID,
+          sources: ["byok"],
+          enabled: true,
+        }),
+      );
+    }
+  });
+
+  it("replaces the sonnet alias with a model from the organization key", () => {
+    const onChange = vi.fn();
+    vi.mocked(useComponent).mockReturnValue({
+      data: {
+        name: "runnerClaudeCode",
+        configuration: [
+          {
+            name: "model",
+            label: "Model",
+            type: "hosted-model",
+            typeOptions: { hostedModel: { provider: "anthropic" } },
+          },
+        ],
+      },
+    } as ReturnType<typeof useComponent>);
+    vi.mocked(useSelectableLLMModels).mockReturnValue({
+      data: [
+        byokAnthropicModel("claude-opus-4-6"),
+        byokAnthropicModel("claude-opus-5-5"),
+        byokAnthropicModel("claude-sonnet-4-6"),
+      ],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>);
+
+    renderForm(claudeCodeDraft("sonnet"), { onChange });
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [
+          expect.objectContaining({
+            configuration: expect.objectContaining({ model: "claude-opus-5-5" }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("keeps an explicit model that is not a Claude alias", () => {
+    const onChange = vi.fn();
+    vi.mocked(useComponent).mockReturnValue({
+      data: {
+        name: "runnerClaudeCode",
+        configuration: [
+          {
+            name: "model",
+            label: "Model",
+            type: "hosted-model",
+            typeOptions: { hostedModel: { provider: "anthropic" } },
+          },
+        ],
+      },
+    } as ReturnType<typeof useComponent>);
+    vi.mocked(useSelectableLLMModels).mockReturnValue({
+      data: [byokAnthropicModel("claude-sonnet-4-6")],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>);
+
+    renderForm(claudeCodeDraft("claude-opus-4-7"), { onChange });
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 4-7");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("shows and saves the visual evidence setting when enabled for the automation", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -223,6 +353,7 @@ describe("PlanningReviewForm model options", () => {
       has: (feature: string) => feature === FEATURE_WORKSPACE_MCP || feature === FEATURE_WORKSPACE_SKILLS,
       enabledExperimentalFeatures: [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS],
       isLoading: false,
+      organizationReady: true,
     });
     vi.mocked(useFactoryAgentResources).mockImplementation((_org, _factory, kind) => {
       if (kind === "KIND_SKILL") {

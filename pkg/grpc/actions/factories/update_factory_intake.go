@@ -112,7 +112,8 @@ func intakeSourceSupportsPause(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
-		source == models.FactoryIntakeSourceProductiveTasks
+		source == models.FactoryIntakeSourceProductiveTasks ||
+		source == models.FactoryIntakeSourceDependabotAlerts
 }
 
 func resolveUpdatedIntakeBinding(
@@ -130,7 +131,7 @@ func resolveUpdatedIntakeBinding(
 			"failed to update factory intake",
 		)
 	}
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues || intake.Source == models.FactoryIntakeSourceDependabotAlerts {
 		return nil, factoryErrorToStatus(
 			invalidArgument("GitHub intake connection follows workspace setup"),
 			"failed to update factory intake",
@@ -299,6 +300,9 @@ func applyIntakeSettingsToGraph(
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
+				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceProductiveTasks:
+				configuration["actions"] = intakeProductiveTriggerActions(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)

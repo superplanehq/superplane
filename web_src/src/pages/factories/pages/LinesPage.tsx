@@ -12,7 +12,7 @@ import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
   useFactoryBoardWorkOrders,
-  type FactoryWorkOrdersPageOptions,
+  type FactoryBoardWorkOrdersOptions,
   useUpdateFactoryLine,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -32,7 +32,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -101,6 +101,7 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   peekOrderFromNavigationState,
   resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
@@ -117,7 +118,7 @@ import {
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
@@ -126,6 +127,7 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
+import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -141,8 +143,10 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
@@ -229,13 +233,31 @@ function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
   return scope === "my" ? "my" : "all";
 }
 
-function boardWorkOrdersPageOptions(state: WorkOrderListState, currentUserId?: string): FactoryWorkOrdersPageOptions {
+function boardWorkOrdersPageOptions(
+  state: WorkOrderListState,
+  lineId: string | undefined,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
   const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
   const scope = lineBoardWorkOrderScope(state.scope);
   return {
     userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
     unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
     requireUser: scope === "my" && ownerIds.length !== 1,
+    done: {
+      lineId,
+      results: boardDoneResultsForStatuses(state.filters.statuses),
+    },
+  };
+}
+
+function boardWorkOrdersWhileTaskLineLoads(
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  return {
+    ...boardWorkOrdersPageOptions(state, undefined, currentUserId),
+    done: { enabled: false },
   };
 }
 
@@ -288,6 +310,7 @@ export function LinesPage() {
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -304,6 +327,22 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
+  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
+    organizationId,
+    factoryId,
+    taskLineOrderId,
+  );
+  const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
+  const selectedLineId = displayedBoardLineId(
+    routeLineId,
+    boardLineId,
+    lines,
+    taskForBoardLine,
+    taskLinePending ? undefined : firstFactoryLineId(factory),
+  );
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -311,7 +350,13 @@ export function LinesPage() {
     backlog: backlogPage,
     open: openPage,
     done: donePage,
-  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, currentUserId));
+  } = useFactoryBoardWorkOrders(
+    organizationId,
+    factoryId,
+    taskLinePending
+      ? boardWorkOrdersWhileTaskLineLoads(listState, currentUserId)
+      : boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
+  );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
@@ -322,7 +367,6 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
@@ -359,7 +403,6 @@ export function LinesPage() {
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
-  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
@@ -385,13 +428,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
-  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
-  const selectedLineId =
-    routeLineId ??
-    searchLineId ??
-    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
-    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
@@ -435,9 +471,9 @@ export function LinesPage() {
   }
 
   if (!selectedLine) {
-    if (routeOrderNumber && permalink.status === "loading") {
+    if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
-        <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        <div className="flex h-full min-h-0 min-w-0 w-full">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
@@ -509,9 +545,21 @@ export function LinesPage() {
     if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
       return;
     }
+    if (template.id === "github-issues") {
+      if (selectedLine.id) {
+        navigate(factoryGitHubIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
         navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "dependabot-alerts") {
+      if (selectedLine.id) {
+        navigate(factoryDependabotIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
       }
       return;
     }
@@ -712,11 +760,7 @@ export function LinesPage() {
             onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations && customAutomationsEnabled
-                ? undefined
-                : canAddPRFeedback
-                  ? () => setAddPRFeedbackOpen(true)
-                  : undefined
+              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
@@ -824,6 +868,8 @@ function LineDetailHeader({
   const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
+  const factoryKey = factory?.key ?? "";
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -837,69 +883,87 @@ function LineDetailHeader({
   };
 
   return (
-    <WorkspacePageHeader
-      className={factorySectionHeaderClassName}
-      data-testid="lines-detail-header"
-      title={
-        <ClickToRename
-          value={title}
-          onSave={(name) => void handleRename(name)}
-          canEdit={canUpdate && Boolean(line.id)}
-          busy={updateLine.isPending}
-          testId="lines-board-title"
-          ariaLabel="Line name"
-          inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-        />
-      }
-      leading={
-        nextStepsRestore || hostedCreditHeaderKicker ? (
+    <>
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        data-testid="lines-detail-header"
+        title={
+          <ClickToRename
+            value={title}
+            onSave={(name) => void handleRename(name)}
+            canEdit={canUpdate && Boolean(line.id)}
+            busy={updateLine.isPending}
+            testId="lines-board-title"
+            ariaLabel="Line name"
+            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
+          />
+        }
+        leading={
+          nextStepsRestore || hostedCreditHeaderKicker ? (
+            <>
+              {hostedCreditHeaderKicker}
+              {nextStepsRestore}
+            </>
+          ) : undefined
+        }
+        actions={
           <>
-            {hostedCreditHeaderKicker}
-            {nextStepsRestore}
+            <ScopePills
+              value={lineBoardWorkOrderScope(state.scope)}
+              onChange={state.setScope}
+              options={LINE_BOARD_SCOPES}
+              testIdPrefix="work-orders-scope"
+            />
+            <FilterMenu
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
+            />
+            <SearchField
+              inputRef={searchRef}
+              open={state.searchOpen}
+              value={state.search}
+              onOpen={state.openSearch}
+              onChange={state.setSearch}
+              onClose={state.closeSearch}
+            />
+            <LineBoardViewMenu
+              view={automationView}
+              onViewChange={onAutomationViewChange}
+              colorView={colorView}
+              onColorViewChange={onColorViewChange}
+            />
           </>
-        ) : undefined
-      }
-      actions={
-        <>
-          <ScopePills
-            value={lineBoardWorkOrderScope(state.scope)}
-            onChange={state.setScope}
-            options={LINE_BOARD_SCOPES}
-            testIdPrefix="work-orders-scope"
-          />
-          <FilterMenu
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-          <SearchField
-            inputRef={searchRef}
-            open={state.searchOpen}
-            value={state.search}
-            onOpen={state.openSearch}
-            onChange={state.setSearch}
-            onClose={state.closeSearch}
-          />
-          <LineBoardViewMenu
-            view={automationView}
-            onViewChange={onAutomationViewChange}
-            colorView={colorView}
-            onColorViewChange={onColorViewChange}
-          />
-        </>
-      }
-      belowRow={
-        visibleFilterCount > 0 ? (
-          <FilterChips
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-        ) : undefined
-      }
-    />
+        }
+        belowRow={
+          visibleFilterCount > 0 ? (
+            <FilterChips
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+            />
+          ) : undefined
+        }
+      />
+      {closedStatusDialogOpen ? (
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={line.id}
+          canManage={canUpdate}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialogOpen(false);
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1011,6 +1075,7 @@ function LineDetail({
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
+  const canAddVerifyAutomation = showColumnAutomations && canUpdate;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -1072,7 +1137,7 @@ function LineDetail({
           colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
-          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}

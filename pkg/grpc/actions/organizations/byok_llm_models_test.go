@@ -91,6 +91,59 @@ func Test__ListBYOKLLMModels(t *testing.T) {
 		assert.Equal(t, "GPT 4.1", resp.Selected[0].Name)
 	})
 
+	t.Run("does not overwrite a saved list during default enable", func(t *testing.T) {
+		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("openai"), map[string]any{})
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
+		_, err = models.UpsertOrganizationBYOKModelAllowlist(
+			database.Conn(),
+			r.Organization.ID,
+			models.UsageProviderOpenAI,
+			datatypes.JSONSlice[string]{},
+		)
+		require.NoError(t, err)
+
+		r.Registry.Integrations["openai"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+				return []core.IntegrationResource{{ID: "gpt-4.1"}, {ID: "gpt-4o"}}, nil
+			},
+		})
+
+		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
+			Provider: "openai",
+		})
+		require.NoError(t, err)
+		assert.True(t, resp.Connected)
+		assert.Empty(t, resp.Selected)
+
+		saved, err := models.FindOrganizationBYOKModelAllowlist(database.Conn(), r.Organization.ID, models.UsageProviderOpenAI)
+		require.NoError(t, err)
+		assert.Empty(t, saved.AllowedModels)
+	})
+
+	t.Run("selects every candidate when no list is saved", func(t *testing.T) {
+		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openrouter", support.RandomName("openrouter"), map[string]any{})
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
+		r.Registry.Integrations["openrouter"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+				return []core.IntegrationResource{{ID: "x-ai/grok-4.6"}, {ID: "openai/gpt-5"}}, nil
+			},
+		})
+
+		resp, err := ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
+			Provider: "openrouter",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Selected, 2)
+		assert.Equal(t, "x-ai/grok-4.6", resp.Selected[0].Id)
+		assert.Equal(t, "openai/gpt-5", resp.Selected[1].Id)
+
+		saved, err := models.FindOrganizationBYOKModelAllowlist(database.Conn(), r.Organization.ID, models.UsageProviderOpenRouter)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"x-ai/grok-4.6", "openai/gpt-5"}, []string(saved.AllowedModels))
+	})
+
 	t.Run("candidate list failure", func(t *testing.T) {
 		cases := []struct {
 			name         string

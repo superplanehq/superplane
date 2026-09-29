@@ -76,14 +76,34 @@ type NodeMetadata struct {
 }
 
 // TaskEnvelope wraps a task resource the way every consumer of this trigger
-// reads it: the JSON:API resource under "data", and the change that produced
-// it under "meta". Seeded tasks use the same shape, so nothing downstream can
-// tell a seeded task from a polled one.
-func TaskEnvelope(event string, document map[string]any) map[string]any {
-	return map[string]any{
+// reads it: the JSON:API resource under "data", the change that produced
+// it under "meta", and the Productive.io task page under "url" when the
+// organization id is known. Seeded tasks use the same shape, so nothing
+// downstream can tell a seeded task from a polled one.
+func TaskEnvelope(event string, document map[string]any, organizationID string) map[string]any {
+	envelope := map[string]any{
 		"meta": map[string]any{"event": event},
 		"data": document,
 	}
+	if document == nil {
+		return envelope
+	}
+	taskID, _ := document["id"].(string)
+	if pageURL := TaskURL(organizationID, taskID); pageURL != "" {
+		envelope["url"] = pageURL
+	}
+	return envelope
+}
+
+// TaskURL is the Productive.io page for one task. Work orders store this as
+// origin so a later update of the same task does not create another one.
+func TaskURL(organizationID, taskID string) string {
+	organizationID = strings.TrimSpace(organizationID)
+	taskID = strings.TrimSpace(taskID)
+	if organizationID == "" || taskID == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://app.productive.io/%s/tasks/%s", organizationID, taskID)
 }
 
 // actionForEvent maps the event a webhook delivery reports back to the value

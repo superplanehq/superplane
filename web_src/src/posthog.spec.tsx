@@ -18,6 +18,7 @@ vi.mock("posthog-js", () => ({
 vi.mock("react-router", () => ({
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "default" }),
 }));
 
 vi.mock("@/hooks/useOrganizationData", () => ({

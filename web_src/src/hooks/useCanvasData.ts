@@ -69,12 +69,22 @@ function versionWithSpecFromYaml(
 
 // stageSpecOperations writes canvas.yaml/console.yaml edits to the user's
 // canvas staging layer without creating a new version row.
-async function stageSpecOperations(canvasId: string, operations: CanvasesCanvasRepositoryFileOperation[]) {
+async function stageSpecOperations(
+  canvasId: string,
+  operations: CanvasesCanvasRepositoryFileOperation[],
+  options: { replaceIfStale?: boolean; expectedCanvasYaml?: string } = {},
+) {
   registerLocalStagingWrite(canvasId);
   await canvasesPutCanvasStaging(
     withOrganizationHeader({
       path: { canvasId },
-      body: { operations },
+      body: {
+        operations,
+        ...(options.replaceIfStale ? { replaceIfStale: true } : {}),
+        ...(options.expectedCanvasYaml
+          ? { expectedCanvasYaml: encodeRepositoryFileContent(options.expectedCanvasYaml) }
+          : {}),
+      },
     }),
   );
 }
@@ -635,7 +645,12 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { versionId?: string; canvasYaml: string }) => {
+    mutationFn: async (data: {
+      versionId?: string;
+      canvasYaml: string;
+      replaceIfStale?: boolean;
+      expectedCanvasYaml?: string;
+    }) => {
       if (!data.versionId) {
         throw new Error("version id is required");
       }
@@ -643,16 +658,23 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       // Stage-only: write canvas.yaml to the draft's staging layer. The
       // committed version row is only updated by an explicit Commit
       // (useCommitCanvasStaging).
-      const canvasMatchesCommitted = await matchesCommittedCanvasYaml(canvasId, data.versionId, data.canvasYaml);
-      if (canvasMatchesCommitted) {
-        await discardStagedPaths(canvasId, [CANVAS_YAML_PATH]);
+      const canvasYamlOperation = [
+        {
+          path: CANVAS_YAML_PATH,
+          content: encodeRepositoryFileContent(data.canvasYaml),
+        },
+      ];
+      if (data.replaceIfStale) {
+        await stageSpecOperations(canvasId, canvasYamlOperation, { replaceIfStale: true });
+      } else if (data.expectedCanvasYaml) {
+        await stageSpecOperations(canvasId, canvasYamlOperation, { expectedCanvasYaml: data.expectedCanvasYaml });
       } else {
-        await stageSpecOperations(canvasId, [
-          {
-            path: CANVAS_YAML_PATH,
-            content: encodeRepositoryFileContent(data.canvasYaml),
-          },
-        ]);
+        const canvasMatchesCommitted = await matchesCommittedCanvasYaml(canvasId, data.versionId, data.canvasYaml);
+        if (canvasMatchesCommitted) {
+          await discardStagedPaths(canvasId, [CANVAS_YAML_PATH]);
+        } else {
+          await stageSpecOperations(canvasId, canvasYamlOperation);
+        }
       }
 
       const [canvasYaml, stagingSummary] = await Promise.all([

@@ -1,4 +1,11 @@
-import { compareModelLabels, hostedLLMTechnicalName, parseHostedLLMModelKey } from "./hostedLLMModels";
+import {
+  compareModelLabels,
+  concreteClaudeModelId,
+  hostedLLMTechnicalName,
+  parseHostedLLMModelKey,
+  pickHostedModel,
+  specificModelId,
+} from "./hostedLLMModels";
 
 export const SELECTABLE_LLM_SOURCE_HOSTED = "hosted";
 export const SELECTABLE_LLM_SOURCE_BYOK = "byok";
@@ -73,12 +80,64 @@ export function selectableLLMModelsForProvider(models: SelectableLLMModel[], pro
   return models.filter((model) => model.provider.id === wanted);
 }
 
+const LEGACY_CLAUDE_MODEL_ALIASES = new Set(["haiku", "opus", "sonnet"]);
+const CLAUDE_OPUS_55 = "claude-opus-5-5";
+/** Versioned ids written by the previous Claude default. */
+const PREVIOUS_CLAUDE_DEFAULTS = new Set(["claude-opus-4-6", "claude-sonnet-4-6"]);
+
+function modelLeaf(id: string): string {
+  const trimmed = id.trim().toLowerCase();
+  const slash = trimmed.lastIndexOf("/");
+  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+}
+
+/** Allowlisted model that replaces an empty value, a Claude alias, or the previous Claude default. */
+export function defaultByokRunnerModel(current: string, provider: string, modelIds: string[]): string | undefined {
+  const selected = current.trim();
+  const leaf = modelLeaf(selected);
+  const opus55 = modelIds.find((id) => modelLeaf(id) === CLAUDE_OPUS_55 || modelLeaf(id) === "claude-opus-5.5");
+  const replaceAliasOrEmpty =
+    provider === "anthropic" && Boolean(opus55) && (selected === "" || LEGACY_CLAUDE_MODEL_ALIASES.has(leaf));
+  if (replaceAliasOrEmpty && opus55 && opus55 !== selected) {
+    return opus55;
+  }
+  if (modelIds.includes(selected)) {
+    return undefined;
+  }
+  // A previous default that the key no longer offers can move to Opus 5.5.
+  // An id that is still allowed stays, even when Opus 5.5 is also allowed.
+  if (provider === "anthropic" && opus55 && PREVIOUS_CLAUDE_DEFAULTS.has(leaf) && opus55 !== selected) {
+    return opus55;
+  }
+  if (selected !== "" && !LEGACY_CLAUDE_MODEL_ALIASES.has(leaf)) {
+    return undefined;
+  }
+  const specific = specificModelId(selected, modelIds);
+  if (specific && specific !== selected) {
+    return specific;
+  }
+  if (LEGACY_CLAUDE_MODEL_ALIASES.has(leaf)) {
+    if (provider === "anthropic" && modelIds.length === 0) {
+      return CLAUDE_OPUS_55;
+    }
+    const concrete = concreteClaudeModelId(selected, modelIds);
+    if (concrete !== selected) {
+      return concrete;
+    }
+  }
+  const picked = pickHostedModel(provider, modelIds);
+  if (!picked || picked === selected) {
+    return undefined;
+  }
+  return picked;
+}
+
 export function byokRunnerModelOptions(
   models: SelectableLLMModel[],
   current: string,
 ): Array<{ value: string; label: string }> {
   const options = models.map((model) => ({ value: model.model.id, label: model.label }));
-  const selected = current.trim();
+  const selected = concreteClaudeModelId(current.trim());
   if (selected === "" || options.some((option) => option.value === selected)) {
     return options;
   }

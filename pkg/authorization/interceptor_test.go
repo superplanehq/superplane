@@ -424,8 +424,8 @@ func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
 
 	createWorkspace, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/files"}]
 	require.True(t, ok)
-	assert.Equal(t, "factories", createWorkspace.Resource)
-	assert.Equal(t, "update", createWorkspace.Action)
+	assert.Equal(t, "work_orders", createWorkspace.Resource)
+	assert.Equal(t, "create", createWorkspace.Action)
 	assert.Equal(t, []string{features.FeatureFactories}, createWorkspace.RequiredExperimentalFeatures)
 
 	listWorkspace, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/files"}]

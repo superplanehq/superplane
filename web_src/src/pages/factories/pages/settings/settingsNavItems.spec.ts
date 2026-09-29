@@ -47,7 +47,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Repository",
       "MCP servers",
       "Skills",
-      "Models",
       "Usage",
       "General",
       "Members",
@@ -87,7 +86,6 @@ describe("filterFactorySettingsNavGroups", () => {
       "workspace-repository",
       "workspace-mcp",
       "workspace-skills",
-      "workspace-models",
       "workspace-usage",
     ]);
   });

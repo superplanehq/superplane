@@ -13,8 +13,10 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_RISK_SCORE,
   FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -28,13 +30,16 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryDependabotIntakeSetupPath,
   factoryHomePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factoryRiskScoreSetupPath,
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
@@ -48,17 +53,14 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import {
-  BOARD_DONE_REJECTED_ORDER,
-  BOARD_IMPLEMENT_FAILED_ORDER,
-  BOARD_IMPLEMENT_NOTIFY_ORDER,
-} from "../__fixtures__/lineMetricsBoardOrders";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
@@ -197,6 +199,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -262,6 +273,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
+const canvasStagingRefetch = vi.hoisted(() => vi.fn());
+const discardCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useCanvasData", () => {
   const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
@@ -269,8 +282,14 @@ vi.mock("@/hooks/useCanvasData", () => {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
       useCanvasMock(organizationId, canvasId, options),
+    useCanvasStaging: () => ({
+      data: { hasStaging: false, stale: false },
+      isPending: false,
+      refetch: canvasStagingRefetch,
+    }),
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
+    useDiscardCanvasStaging: () => ({ mutateAsync: discardCanvasStagingMutateAsync, isPending: false }),
   };
 });
 
@@ -316,6 +335,8 @@ async function resetLinesBoardMocks() {
   });
   updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
   commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+  canvasStagingRefetch.mockReset().mockResolvedValue({ data: { hasStaging: false, stale: false } });
+  discardCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
 
 describe("LinesPage board", () => {
@@ -413,12 +434,12 @@ describe("LinesPage board", () => {
   it("shows a score on a draft card and hides it on other columns", () => {
     const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
+      data: [draft, { ...BOARD_IMPLEMENT_NOTIFY_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toBeInTheDocument();
-    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-notify")).not.toBeInTheDocument();
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
@@ -433,7 +454,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -988,35 +1009,59 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
-  it("hides Add automation when custom automations are off", async () => {
+  it("shows Add automation on Verify when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Verify plus when custom automations are off", async () => {
+  it("opens the Verify catalog when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
+  });
+
+  it("opens the risk score setup page from the Verify catalog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-risk-score"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
       isPending: false,
+    });
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1086,22 +1131,18 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
   });
 
-  it("creates an intake from the picker and opens its canvas", async () => {
-    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+  it("opens GitHub intake setup from the picker", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true, columnAutomations: false });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
 
-    await waitFor(() => {
-      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-new`,
-      );
-    });
+    expect(screen.getByTestId("github-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryGitHubIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("offers Add intake from the overflow menu", async () => {
@@ -1182,6 +1223,22 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Dependabot setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DEPENDABOT_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-dependabot-alerts"));
+
+    expect(screen.getByTestId("dependabot-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1335,14 +1392,14 @@ describe("LinesPage board pull request", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...BOARD_IMPLEMENT_NOTIFY_ORDER,
           pullRequests: [
             {
-              id: "pr-106",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              id: "pr-114",
+              workOrderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+              number: "114",
+              url: "https://github.com/acme/payments/pull/114",
+              title: "Notify on status change after a reopen",
               state: "STATE_CLOSED",
             },
           ],
@@ -1351,10 +1408,10 @@ describe("LinesPage board pull request", () => {
     });
     renderLinesBoard();
 
-    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
-    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
-    expect(pill).toHaveTextContent("Closed #106");
-    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
+    const card = screen.getByTestId("work-order-card-wo-board-implement-notify");
+    const pill = within(card).getByRole("link", { name: "Closed pull request #114." });
+    expect(pill).toHaveTextContent("Closed #114");
+    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/114");
   });
 });
 
@@ -1647,6 +1704,21 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
+  it("opens closed tasks from the Status filter", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-statuses"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
+
+    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+  });
+
   it("treats a leftover Active scope as All and keeps every card", () => {
     window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "active");
     useFactoryWorkOrders.mockReturnValue({
@@ -1677,11 +1749,11 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1690,7 +1762,7 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
@@ -1699,14 +1771,14 @@ describe("LinesPage board editing", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!),
           pullRequests: [
             {
               id: "pr-review",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              workOrderId: OPEN_WORK_ORDER.id,
+              number: "101",
+              url: "https://github.com/acme/payments/pull/101",
+              title: "Reconcile duplicate refunds in ledger",
               state: "STATE_OPEN",
             },
           ],
@@ -1716,7 +1788,7 @@ describe("LinesPage board editing", () => {
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1725,25 +1797,25 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Label is Review")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-search-trigger"));
-    await user.type(screen.getByTestId("work-orders-search-input"), "timeout");
+    await user.type(screen.getByTestId("work-orders-search-input"), "reconcile");
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("does not show a line overflow Edit menu", () => {

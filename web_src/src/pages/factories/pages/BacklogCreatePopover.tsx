@@ -216,7 +216,7 @@ function CreateMenuSources({
               data-testid={`lines-backlog-create-tab-${source.intakeId}`}
             >
               <IntakeSourceIcon source={source} />
-              {source.iconAlt}
+              {source.tabLabel}
             </TabsTrigger>
           ))}
         </TabsList>

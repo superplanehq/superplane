@@ -29,6 +29,40 @@ func ListBYOKLLMModels(
 		return nil, err
 	}
 
+	integration, err := models.FindReadyBYOKIntegration(tx, scope.OrganizationID, scope.Provider)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
+	}
+
+	if integration == nil {
+		selected, err := resolveBYOKSelectedModels(tx, scope)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.ListBYOKLLMModelsResponse{Selected: serializeHostedLLMModels(selected)}, nil
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+	if err := enableAllBYOKModelsByDefault(tx, scope.OrganizationID, scope.Provider, candidates); err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list byok models")
+	}
+	selected, err := resolveBYOKSelectedModels(tx, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.ListBYOKLLMModelsResponse{
+		Connected:     true,
+		IntegrationId: integration.ID.String(),
+		Candidates:    candidates,
+		Selected:      namedHostedLLMModels(selected, candidates),
+	}, nil
+}
+
+func resolveBYOKSelectedModels(tx *gorm.DB, scope llmModelListScope) ([]string, error) {
 	selected, err := models.ResolveSelectableLLMModels(
 		tx,
 		scope.OrganizationID,
@@ -39,28 +73,7 @@ func ListBYOKLLMModels(
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list byok models")
 	}
-
-	integration, err := models.FindReadyBYOKIntegration(tx, scope.OrganizationID, scope.Provider)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list byok models")
-	}
-
-	resp := &pb.ListBYOKLLMModelsResponse{
-		Selected: serializeHostedLLMModels(selected),
-	}
-	if integration == nil {
-		return resp, nil
-	}
-
-	resp.Connected = true
-	resp.IntegrationId = integration.ID.String()
-	candidates, err := listBYOKCandidateModels(tx, reg, integration)
-	if err != nil {
-		return nil, classifyBYOKListError(err)
-	}
-	resp.Candidates = candidates
-	resp.Selected = namedHostedLLMModels(selected, candidates)
-	return resp, nil
+	return selected, nil
 }
 
 func UpdateBYOKLLMModels(
@@ -143,6 +156,28 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 		out = append(out, &pb.HostedLLMModel{Id: id, Name: name})
 	}
 	return out, nil
+}
+
+// ListConnectedBYOKModelIDs returns the model ids that the integration key can use.
+func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration *models.Integration) ([]string, error) {
+	if integration == nil {
+		return nil, grpcerrors.Internal(fmt.Errorf("integration is required"), "failed to list byok models")
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		id := strings.TrimSpace(candidate.GetId())
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 // classifyBYOKListError maps a failure from listBYOKCandidateModels to a

@@ -20,12 +20,26 @@ func Test__OrganizationBYOKModelAllowlist(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, empty.AllowedModels)
 
+	exists, err := models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
+	require.NoError(t, err)
+	assert.False(t, exists)
+
 	saved, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
 		"claude-sonnet-4-6",
 		"claude-opus-4-6",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-sonnet-4-6", "claude-opus-4-6"}, []string(saved.AllowedModels))
+
+	exists, err = models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+	require.NoError(t, err)
+	exists, err = models.OrganizationBYOKModelAllowlistExists(db, r.Organization.ID, models.UsageProviderAnthropic)
+	require.NoError(t, err)
+	assert.True(t, exists)
 
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
 		"claude-sonnet-4-6",

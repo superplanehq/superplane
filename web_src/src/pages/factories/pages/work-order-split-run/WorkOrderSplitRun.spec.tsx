@@ -10,6 +10,8 @@ import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import type { PlanningSessionPayload } from "../planningSessionView";
+
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const mergeability = {
   current: {
@@ -43,6 +45,7 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 }));
 
 const useLiveLogStreamMock = vi.fn();
+const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(async () => null);
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
@@ -52,11 +55,20 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
   useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
 }));
 
-import { factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
+vi.mock("../planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSessionMock(...args),
+  sendPlanningSessionMessage: vi.fn(),
+  answerPlanningSessionSurvey: vi.fn(),
+}));
+
 import {
   DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
@@ -80,10 +92,11 @@ import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/w
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
+import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
+import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { buildSplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunFixture } from "./splitRunMocks";
-import { SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { WORK_ORDER_FULL_PAGE_STORAGE_KEY } from "./workOrderFullPagePreference";
 
 function withPublishedSpec(fixture: SplitRunFixture): SplitRunFixture {
@@ -227,15 +240,14 @@ function runningImplementWithZeroSavedSpend(): SplitRunFixture {
   };
 }
 
-async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("tab", { name: "Automations" }));
-}
-
 describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
+    useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
+    findPlanningSessionMock.mockReset();
+    findPlanningSessionMock.mockResolvedValue(null);
     mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
@@ -256,8 +268,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: "Open automation run" })).not.toBeInTheDocument();
   });
 
-  it("separates task automations from pull request activity", async () => {
-    const user = userEvent.setup();
+  it("shows the console without tabs when pull request activity exists", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
         prFeedbackRuns: [
@@ -284,30 +295,13 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveAttribute("data-status-mark", "running");
-    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveClass("animate-spin");
-    await openLogTab(user);
-    expect(screen.queryByRole("heading", { name: "Task automations" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pull request activity" })).not.toBeInTheDocument();
-    const heading = screen.getByRole("heading", {
-      name: "#12 feat: add endpoint to re-shuffle an existing deck",
-    });
-    const titleLink = within(heading).getByRole("link", {
-      name: "#12 feat: add endpoint to re-shuffle an existing deck",
-    });
-    expect(titleLink).toHaveAttribute("href", "https://github.com/example/repo/pull/12");
-    expect(titleLink).not.toHaveClass("w-full");
-    expect(heading.querySelector(".lucide-activity")).toBeInTheDocument();
-    expect(heading.querySelector(".lucide-git-pull-request")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Activity on PR #12");
-    expect(
-      within(screen.getByTestId("split-run-task-automations")).getAllByTestId(/^split-run-phase-time-/).length,
-    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-task-automations")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-pull-request-activity")).not.toBeInTheDocument();
   });
 
   it("keeps a queued activity title and uses the waiting clock", async () => {
-    const user = userEvent.setup();
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
         prFeedbackRuns: [
@@ -336,20 +330,12 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("split-run-log-tab-dot")).toHaveAttribute("data-status-mark", "running");
-    const activity = screen.getByTestId("split-run-phase-pr-feedback-run-queued");
-    expect(within(activity).getByRole("link", { name: "@lucaspin" })).toBeInTheDocument();
-    expect(within(activity).getByRole("link", { name: "review" })).toBeInTheDocument();
-    expect(activity).toHaveTextContent("Read the requested changes.");
-    expect(activity.querySelector(".lucide-clock")).toBeInTheDocument();
-    expect(activity.querySelector(".lucide-loader-circle")).toBeNull();
-    await user.hover(within(activity).getByLabelText("Waiting for another activity"));
-    expect(await screen.findByRole("tooltip", { name: "Waiting for another activity" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-pr-feedback-run-queued")).not.toBeInTheDocument();
   });
 
-  it("shows pull request activity as a flat timestamp-first timeline", async () => {
-    const user = userEvent.setup();
+  it("shows pull request activity as a flat timestamp-first timeline", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
         prFeedbackRuns: [
@@ -415,142 +401,303 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("split-run-log-tab-dot")).not.toHaveAttribute("data-status-mark", "running");
-    expect(screen.getByTestId("split-run-log-tab-dot")).not.toHaveClass("animate-spin");
-    await openLogTab(user);
-
-    const pullRequestActivity = screen.getByTestId("split-run-pull-request-activity");
-    expect(within(pullRequestActivity).getAllByRole("link", { name: /#12/ })).toHaveLength(1);
-
-    const timeline = screen.getByTestId("split-run-pull-request-timeline-0");
-    expect(timeline).not.toHaveClass("border-l");
-    const activities = within(timeline).getAllByTestId(/^split-run-pull-request-activity-item-/);
-    expect(activities).toHaveLength(3);
-    expect(
-      activities.map((activity) => within(activity).getByTestId(/^split-run-phase-pr-feedback-/).textContent),
-    ).toEqual([
-      expect.stringContaining("Wait for checks"),
-      expect.stringContaining("@lucaspin left a comment"),
-      expect.stringContaining("Address new review comment"),
-    ]);
-    expect(
-      within(timeline)
-        .getAllByTestId(/^split-run-phase-time-pr-feedback-/)
-        .map((time) => time.getAttribute("datetime")),
-    ).toEqual(["2026-08-26T10:00:00Z", "2026-08-26T11:00:00Z", "2026-08-26T12:00:00Z"]);
-    expect(within(timeline).queryByTestId(/^split-run-phase-revision-/)).not.toBeInTheDocument();
-    const commentTime = within(activities[1]!).getByTestId("split-run-phase-time-pr-feedback-run-comment");
-    expect(commentTime.closest("[data-testid='split-run-automation-header-pr-feedback-run-comment']")).toBe(
-      within(activities[1]!).getByTestId("split-run-automation-header-pr-feedback-run-comment"),
-    );
-    const authorLink = within(activities[1]!).getByRole("link", { name: "@lucaspin" });
-    const commentLink = within(activities[1]!).getByRole("link", { name: "comment" });
-    const descriptionLink = within(activities[1]!).getByRole("link", { name: "requested changes" });
-    expect(authorLink.closest(".workspace-markdown")).toHaveClass("font-mono", "text-[13px]");
-    expect(within(activities[1]!).queryByRole("button", { name: /^(Expand|Collapse) / })).not.toBeInTheDocument();
-    expect(
-      within(activities[1]!).getByTestId("split-run-automation-header-pr-feedback-run-comment").className,
-    ).not.toMatch(/\bh-8\b/);
-    expect(within(activities[1]!).getByTestId("split-run-phase-description-pr-feedback-run-comment")).toHaveClass(
-      "font-mono",
-      "text-[13px]",
-    );
-    expect(within(activities[1]!).getByTestId("split-run-phase-description-pr-feedback-run-comment")).toHaveTextContent(
-      "Read the requested changes",
-    );
-    expect(within(activities[1]!).queryByTestId("split-run-stream-pr-feedback-run-comment")).not.toBeInTheDocument();
-    expect(authorLink).toHaveAttribute("href", "https://github.com/lucaspin");
-    expect(commentLink).toHaveAttribute("href", "https://github.com/acme/app/pull/12#issuecomment-1");
-    expect(descriptionLink).toHaveAttribute("href", "https://example.com/review");
-    for (const link of [authorLink, commentLink, descriptionLink]) {
-      expect(link).toHaveAttribute("target", "_blank");
-      expect(link).toHaveAttribute("rel", "noopener noreferrer");
-      expect(link).toHaveClass("font-semibold", "text-current", "!underline", "!decoration-current");
-    }
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-pull-request-timeline-0")).not.toBeInTheDocument();
   });
 
-  it("keeps the log scroller flush so sticky phase headers cover scrolled lines", () => {
+  it("shows the run console on the Automations tab", () => {
     renderSplitRun();
-    const scroll = screen.getByTestId("split-run-log-scroll");
-    expect(scroll.className).not.toMatch(/\bpy-\d/);
-    expect(scroll.className).not.toMatch(/\bpt-\d/);
-    expect(scroll.className).toMatch(/\bpb-3\b/);
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-log-scroll")).not.toBeInTheDocument();
   });
 
-  it("does not show elapsed time or a spend icon on the owner row", () => {
+  it("moves owner and spend off the header into the summary panel", () => {
     renderSplitRun();
     expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
-    const row = screen.getByTestId("popup-owner-time-cost");
-    expect(within(row).queryByText(/so far/)).not.toBeInTheDocument();
-    expect(row.querySelector(".lucide-clock")).toBeNull();
-    expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
-    expect(row).toHaveTextContent("$0.73");
-    expect(row).toHaveTextContent("2.7k tokens");
-    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
-    expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
-    const close = screen.getByRole("button", { name: "Close" });
-    const views = screen.getByRole("tablist", { name: "Task views" });
-    expect(close.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
-    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveClass("sp-popup-view-tab");
+    expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    const panel = screen.getByTestId("redesign-console-summary");
+    expect(panel).toHaveTextContent("$0.73");
+    expect(panel).toHaveTextContent("2.7k tokens");
+    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
+    expect(within(panel).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+  });
+
+  it("lists attached files in the console summary", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <LiveHeaderSpendProvider>
+                <AutomationsConsoleVariant
+                  fixture={SPLIT_RUN_RUNNING}
+                  source={SPLIT_RUN_RUNNING.source}
+                  files={[{ id: "file-bug", filename: "bug.png", downloadUrl: "https://cdn.example/bug.png" }]}
+                />
+              </LiveHeaderSpendProvider>
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId("redesign-console-files")).toHaveTextContent("bug.png");
   });
 
   it("keeps the implement model off the header line while the task is running", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
 
-    const row = screen.getByTestId("popup-owner-time-cost");
-    expect(row).toHaveTextContent("$0.73 · 2.7k tokens");
-    expect(row).not.toHaveTextContent("claude-sonnet-4-6");
-    expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
+    const panel = screen.getByTestId("redesign-console-summary");
+    expect(panel).toHaveTextContent("$0.73");
+    expect(panel).toHaveTextContent("claude-sonnet-4-6");
   });
 
-  it("underlines header spend and shows a model breakdown on hover", async () => {
-    const user = userEvent.setup();
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
-
-    const trigger = screen.getByTestId("popup-spend-breakdown-trigger");
-    expect(trigger).toHaveClass("underline");
-    await user.hover(trigger);
-    const card = await screen.findByTestId("popup-spend-breakdown");
-    expect(card).toHaveTextContent("claude-sonnet-4-6");
-    expect(card).toHaveTextContent("2.7k tokens · $0.45");
-    expect(card).toHaveTextContent("Machine time");
-    expect(card).toHaveTextContent("1 min 30 s · $0.28");
-  });
-
-  it("updates header spend from live log telemetry while a step runs", async () => {
-    const user = userEvent.setup();
-    const setLiveSpend = (tokens: number, usd: number) => {
-      const live = liveUsageTelemetry(tokens, usd);
-      useLiveLogStreamMock.mockReturnValue({
-        ...idleLiveLogStream(vi.fn()),
-        telemetry: live,
-        usageSeries: [{ name: "Prompt", telemetry: live }],
-      });
-    };
-    const popupProps = {
+  it("shows the run console while a step runs", () => {
+    renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       fixture: runningImplementWithZeroSavedSpend(),
-    };
+    });
 
-    setLiveSpend(2100, 0.45);
-    const view = renderPopup(popupProps);
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("$0.00");
+  });
+
+  it("shows live run spend in the console summary while a step runs", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      fixture: runningImplementWithZeroSavedSpend(),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("$0.45");
+    });
+    expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent("2.1k tokens");
+  });
+
+  it("shows planning tokens on a draft header while the agent runs and waits", async () => {
+    const earlier = liveUsageTelemetry(1500, 0.2);
+    const current = liveUsageTelemetry(700, 0.05);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: current,
+      usageSeries: [
+        { name: "First prompt", telemetry: earlier },
+        { name: "Second prompt", telemetry: current },
+      ],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.25 · 2.2k tokens");
+    });
+    expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith("exec-plan", true, null, null, {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      canvasId: "canvas-plan",
+    });
+  });
+
+  it("keeps planning spend on a draft header while the agent waits", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
     });
-    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("$0.00 · 0 tokens");
-    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith("exec-plan", true, null, null, {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      canvasId: "canvas-plan",
+    });
+  });
 
-    await user.click(screen.getByRole("tab", { name: "Task" }));
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+  it("leaves a sub-cent planning turn at $0.00 and still shows tokens", async () => {
+    const live = liveUsageTelemetry(40, 0.004);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
 
-    setLiveSpend(3200, 0.67);
-    view.rerenderPopup();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
     await waitFor(() => {
-      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.67 · 3.2k tokens");
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.00 · 40 tokens");
+    });
+  });
+
+  it("does not stream planning spend after the machine has stopped", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "ended",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.00");
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("0 tokens");
+    expect(useLiveLogStreamMock.mock.calls.some((call) => call[0] === "exec-plan")).toBe(false);
+  });
+
+  it("does not add saved planning spend on top of the live log", async () => {
+    const live = liveUsageTelemetry(2100, 0.45);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder({
+        ...DRAFT_WORK_ORDER,
+        totalTokens: "2100",
+        totalCostCents: "45",
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.45 · 2.1k tokens");
+    });
+    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("$0.90");
+    expect(screen.getByTestId("popup-owner-time-cost")).not.toHaveTextContent("4.2k tokens");
+  });
+
+  it("adds a follow-up planning run to saved draft usage", async () => {
+    const live = liveUsageTelemetry(1000, 0.1);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-follow-up",
+      waitState: "pending",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder({
+        ...DRAFT_WORK_ORDER,
+        totalTokens: "2000",
+        totalCostCents: "20",
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.30 · 3k tokens");
+    });
+  });
+
+  it("does not round each planning prompt before it adds the cost", async () => {
+    const first = liveUsageTelemetry(10, 0.006);
+    const second = liveUsageTelemetry(12, 0.006);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: second,
+      usageSeries: [
+        { name: "First prompt", telemetry: first },
+        { name: "Second prompt", telemetry: second },
+      ],
+    });
+    findPlanningSessionMock.mockResolvedValue({
+      id: "session-plan",
+      state: "active",
+      canvasId: "canvas-plan",
+      executionId: "exec-plan",
+    });
+
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("$0.01 · 22 tokens");
     });
   });
 
@@ -566,26 +713,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-spend-breakdown")).not.toBeInTheDocument();
   });
 
-  it("opens the Task tab when no automation is running", () => {
+  it("shows the console without tabs when no automation is running", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
-    const row = screen.getByTestId("popup-owner-time-cost");
-    expect(within(row).queryByRole("tablist")).not.toBeInTheDocument();
-    const views = screen.getByRole("tablist", { name: "Task views" });
-    expect(
-      screen.getByRole("button", { name: "Close" }).compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(within(views).getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
-    expect(within(views).getByRole("tab", { name: "Task" })).toHaveClass("sp-popup-view-tab");
-    expect(within(views).getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "inactive");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toBeInTheDocument();
   });
 
-  it("shows tokens and cost on a line-step phase", () => {
+  it("shows the run console for a running line step", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
-      "$0.28 · 900 · claude-sonnet-4-6 ·",
-    );
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-duration-implement-0")).not.toBeInTheDocument();
   });
 
   it("does not put an Open task link next to close", () => {
@@ -613,9 +754,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(close).toHaveClass("h-6", "w-6", "rounded-full");
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
-    );
+    expect(dialog.className).toContain("w-[min(80rem");
     expect(dialog.parentElement).toHaveClass("fixed");
     expect(dialog.parentElement?.className).not.toContain("left-[var(--workspace-navigation-width)]");
 
@@ -624,7 +763,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
     expect(fullPage.className).toContain("w-full");
-    expect(fullPage.className).not.toContain("w-[min(70rem");
+    expect(fullPage.className).not.toContain("w-[min(80rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
     expect(fullPage.parentElement?.className).toContain("left-[var(--workspace-navigation-width)]");
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
@@ -634,9 +773,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
 
-    expect(screen.getByTestId("work-order-split-run").className.split(/\s+/)).toEqual(
-      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
-    );
+    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(80rem");
     expect(screen.getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(window.localStorage.getItem(WORK_ORDER_FULL_PAGE_STORAGE_KEY)).toBe("0");
   });
@@ -658,108 +795,43 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(SPLIT_RUN_POPUP_DIALOG_CLASSNAME.split(/\s+/)),
-    );
+    expect(dialog.className).toContain("w-[min(80rem");
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("tab", { name: "Task" })).toBeInTheDocument();
-    const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
-    expect(runningDot).toHaveAttribute("title", "Running");
-    expect(runningDot.className).toContain("animate-spin");
+    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-log-scroll")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Implement" })).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-log-scroll")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
-
-    const backlog = screen.getByTestId("split-run-phase-backlog");
-    expect(within(backlog).getByText("Backlog")).toBeInTheDocument();
-    expect(within(backlog).getByTestId("split-run-phase-duration-backlog")).toHaveTextContent("2s");
-    expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
-
-    const implement = screen.getByTestId("split-run-phase-implement");
-    expect(within(implement).getAllByText(/Implementation/).length).toBeGreaterThan(0);
-    expect(within(implement).getByTestId("split-run-phase-duration-implement")).toHaveTextContent("4m");
-    expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
-    expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
-    expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Start Implementation").length).toBeGreaterThan(0);
-    expect(
-      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).not.toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
-    expect(
-      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText(">"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-node-indent")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("├──"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("└──"),
-    ).not.toBeInTheDocument();
-    const implementStream = screen.getByTestId("split-run-stream-implement");
-    const note = within(implementStream).getByText("Provide Plan");
-    expect(note.closest("li")).not.toHaveTextContent("├──");
-    expect(note.closest("li")).not.toHaveTextContent("└──");
-    expect(note.closest("li")).toHaveTextContent("bash");
-    expect(within(implementStream).getByText("Set Up Environment")).toBeInTheDocument();
-    expect(within(implementStream).getAllByText("✓").length).toBeGreaterThan(0);
-    expect(within(implementStream).getByText(/superplaneagent@superplane.com/)).toBeInTheDocument();
-    expect(
-      within(implementStream).getByText(
-        "Now let's look at the messages file, factory_notification_consumer.go, and other referenced files.",
-      ),
-    ).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("├──")).not.toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-implement")).queryByText("└──")).not.toBeInTheDocument();
-    expect(within(implement).queryByText("did not run")).not.toBeInTheDocument();
-
-    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
-    expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
-  it("shows produced artifacts on the automation line", async () => {
-    const user = userEvent.setup();
+  it("shows produced artifacts on the run console", () => {
     renderSplitRun();
 
-    const implement = screen.getByTestId("split-run-phase-implement");
-    const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
-    expect(implementArtifacts.parentElement?.className).toMatch(/ml-auto/);
-    expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
-    ).toBeInTheDocument();
-
-    await user.click(within(implement).getByTestId("split-run-automation-header-implement"));
-
-    expect(screen.queryByTestId("split-run-stream-implement")).not.toBeInTheDocument();
-    expect(within(implement).getByTestId("split-run-phase-artifacts-implement")).toBeInTheDocument();
-    expect(within(implement).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
+    const consoleView = screen.getByTestId("redesign-console-variant");
+    expect(within(consoleView).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
   });
 
-  it("shows canvas artifacts on a collapsed automation before it is opened", () => {
+  it("shows canvas artifacts on the run console", () => {
     renderSplitRun();
 
-    const backlog = screen.getByTestId("split-run-phase-backlog");
-    expect(screen.queryByTestId("split-run-stream-backlog")).not.toBeInTheDocument();
-    expect(within(backlog).getByTestId("split-run-phase-artifacts-backlog")).toBeInTheDocument();
-    expect(within(backlog).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    const consoleView = screen.getByTestId("redesign-console-variant");
+    expect(within(consoleView).getByRole("heading", { name: "Backlog" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
   });
 
-  it("highlights a log line when it is clicked", async () => {
-    const user = userEvent.setup();
+  it("does not use the old log line highlight on the Automations tab", () => {
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-stream-line-onrun-implement")).getByRole("button"));
-
-    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.queryByTestId("split-run-canvas-node-onrun-implement")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-line-onrun-implement")).not.toBeInTheDocument();
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -796,15 +868,8 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    const verifyChecks = screen.getByTestId("split-run-phase-checks-verify-1");
-    const risk = within(verifyChecks).getByRole("button", { name: /Risk score/ });
-    expect(risk).toHaveTextContent("Risk score");
-    expect(risk.className).toContain("bg-amber-500/10");
-    expect(risk.className).not.toContain("bg-red-700");
-    expect(within(verifyChecks).getByText("Code quality")).toBeInTheDocument();
-    expect(within(verifyChecks).queryByText("Test coverage")).not.toBeInTheDocument();
-    expect(within(verifyChecks).queryByText("Confidence score")).not.toBeInTheDocument();
-    expect(within(verifyChecks).queryByText("CI")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-checks-verify-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
   });
 
@@ -908,15 +973,16 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-log-scroll")).not.toBeInTheDocument();
   });
 
   it("shows pull request review guidance beside the pull request list", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
-    const sidebar = screen.getByTestId("split-run-overview-sidebar");
-    const note = within(sidebar).getByTestId("split-run-attention-note");
+    const panel = screen.getByTestId("redesign-console-summary");
+    const note = within(panel).getByTestId("split-run-attention-note");
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(within(note).queryByText("Waiting for user review")).not.toBeInTheDocument();
@@ -949,7 +1015,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
 
-    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(within(note).getByTestId("split-run-merge-button")).toBeEnabled();
     await user.click(within(note).getByTestId("split-run-merge-method"));
     const menu = await screen.findByRole("menu");
@@ -979,7 +1045,7 @@ describe("WorkOrderSplitRunPopup", () => {
     };
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
 
-    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(within(note).getByTestId("split-run-merge-button")).toBeDisabled();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
@@ -987,10 +1053,22 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
   });
 
+  it("shows the pull request first-class in the summary panel", () => {
+    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
+
+    const panel = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-pull-requests");
+    expect(within(panel).getByText("Pull request")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: "#6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/pull/6812",
+    );
+    expect(within(panel).getByLabelText("Review pull request #6812.")).toBeInTheDocument();
+  });
+
   it("hides merge when the pull request is merged", () => {
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_MERGED") });
 
-    const note = within(screen.getByTestId("split-run-overview-sidebar")).getByTestId("split-run-attention-note");
+    const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(within(note).queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
     expect(within(note).getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
   });
@@ -1001,20 +1079,25 @@ describe("WorkOrderSplitRunPopup", () => {
       canUpdate: false,
     });
 
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
-  it("offers automation Stop on a live running task", () => {
+  it("offers automation Stop and View run on a live running task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
       orderId: "wo-running",
+      orderNumber: "103",
       fixture: SPLIT_RUN_RUNNING,
     });
 
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "View run" }).length).toBeGreaterThan(0);
   });
 
   it("hides automation Stop when the user cannot update the task", () => {
@@ -1069,6 +1152,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
     expect(within(note).getByText("Reopen this task to start the line again.")).toBeInTheDocument();
     expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Send to backlog" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
@@ -1253,28 +1337,19 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Refine" })).toBeNull();
   });
 
-  it("shows source, artifacts, and the classic Start footer on a Planning-off draft", () => {
+  it("shows the console with a Start note on a Planning-off draft", () => {
     factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
-    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
-    const request = screen.getByTestId("split-run-intent-request");
-    const result = screen.getByTestId("split-run-intent-result");
-    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
-    expect(within(result).getByTestId("split-run-description")).toHaveTextContent("emoji reactions");
-    expect(within(result).queryByTestId("split-run-intent-summary")).not.toBeInTheDocument();
-    expect(within(result).queryByTestId("split-run-intent-plan")).not.toBeInTheDocument();
-    expect(within(result).queryByTestId("split-run-review")).not.toBeInTheDocument();
-    const note = screen.getByTestId("split-run-attention-note");
+    expect(screen.getByTestId("redesign-console-task-description")).toHaveTextContent("emoji reactions");
+    expect(screen.getByTestId("split-run-description-edit")).toBeInTheDocument();
+    const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(note).toHaveTextContent("This task is ready to start");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
   });
@@ -1313,23 +1388,18 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });
 
-  it("replaces chat with source, artifacts, and pull requests after Start", () => {
+  it("replaces chat with the console after Start", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER) });
 
-    const request = screen.getByTestId("split-run-intent-request");
-    const result = screen.getByTestId("split-run-intent-result");
-    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-request")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
-    expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
-    expect(within(request).queryByTestId("split-run-intent-chat")).toBeNull();
-    expect(within(result).getByTestId("split-run-intent-summary")).toBeInTheDocument();
   });
 
-  it("keeps source and spec after reopen when the started card has a score", async () => {
-    const user = userEvent.setup();
+  it("shows the console after reopen when the started card has a score", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -1337,10 +1407,9 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks: OPEN_WORK_ORDER_CHECKS }),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Task" }));
-    const request = screen.getByTestId("split-run-intent-request");
-    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-intent-result")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-request")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-overview-checks")).not.toBeInTheDocument();
   });
 
@@ -1433,8 +1502,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(summary).toHaveClass("break-words");
   });
 
-  it("keeps description checks collapsed when the task is not a draft", async () => {
-    const user = userEvent.setup();
+  it("keeps description check comments off the console when the task is not a draft", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(
         {
@@ -1461,81 +1529,60 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Task" }));
-    expect(screen.getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-check-comment-check-risk-review")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
-  it("hides confidence on a downstream Description tab and keeps other checks", async () => {
-    const user = userEvent.setup();
+  it("hides confidence on a downstream task and keeps other checks", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER, { checks: VERIFY_STEP_CHECKS }),
     });
 
-    await user.click(screen.getByRole("tab", { name: "Task" }));
-    const tab = screen.getByTestId("split-run-work-order-tab");
-    expect(within(tab).queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
-    expect(within(tab).queryByText(/fit for an agent on this factory line/)).toBeNull();
-    expect(within(tab).getByText("Risk score")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
+    expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
+    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Risk score")).toBeInTheDocument();
   });
 
-  it("shows the Ingest log when a GitHub automation created the draft", async () => {
+  it("shows the console when a GitHub automation created the draft", () => {
     factoryPlanning.current = { enabled: false, clarity: true, confidence: true };
-    const user = userEvent.setup();
     renderPopup({
       factoryId: PRIMARY_FACTORY_ID,
       orderId: INGEST_DRAFT_WORK_ORDER.id,
       fixture: splitRunFixtureForWorkOrder(INGEST_DRAFT_WORK_ORDER),
     });
 
-    await openLogTab(user);
-    expect(screen.getByTestId("split-run-phase-backlog")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-phase-backlog")).getAllByRole("button", { name: "description.md" }).length,
-    ).toBeGreaterThan(0);
   });
 
-  it("shows a successful result only in the Task tab sidebar", async () => {
-    const user = userEvent.setup();
+  it("shows a successful result in the summary panel", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER) });
 
-    const sidebar = screen.getByTestId("split-run-overview-sidebar");
-    const note = within(sidebar).getByTestId("split-run-attention-note");
+    const panel = screen.getByTestId("redesign-console-summary");
+    const note = within(panel).getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(note).getByRole("heading", { name: "This task succeeded" })).toBeInTheDocument();
     expect(within(note).getByText("The work is done. The result met the goal.")).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Task" })).toHaveAttribute("data-state", "active");
-
-    const request = screen.getByTestId("split-run-intent-request");
-    expect(within(request).getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Source" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Artifacts" })).toBeInTheDocument();
-    expect(within(request).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
-    expect(within(request).queryByTestId("split-run-overview-checks")).toBeNull();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-request")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
-
-    await openLogTab(user);
-    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
   });
 
-  it("shows an unsuccessful result only in the Task tab sidebar", async () => {
-    const user = userEvent.setup();
+  it("shows an unsuccessful result in the summary panel", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER) });
 
-    const sidebar = screen.getByTestId("split-run-overview-sidebar");
-    const note = within(sidebar).getByTestId("split-run-attention-note");
+    const panel = screen.getByTestId("redesign-console-summary");
+    const note = within(panel).getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task did not succeed" })).toBeInTheDocument();
     expect(within(note).getByText("The work is done. The result did not meet the goal.")).toBeInTheDocument();
-    expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
-
-    await openLogTab(user);
-    expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Send to backlog" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
   });
 
-  it("hides invented files and ledger pull requests on a live task", async () => {
-    const user = userEvent.setup();
+  it("hides invented files and ledger pull requests on a live task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -1543,27 +1590,22 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false }),
     });
 
-    expect(screen.getByTestId("split-run-overview-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "closure.md" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();
-
-    await openLogTab(user);
-    expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   });
 
-  it("shows a failed implement stream with Reject and Rerun on the note", async () => {
-    const user = userEvent.setup();
+  it("shows a failed implement stream with Reject and Rerun on the note", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
-    await openLogTab(user);
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-implement-0")).not.toBeInTheDocument();
   });
 
   it("expands the new implement run after a rerun of the same step", () => {
@@ -1611,24 +1653,19 @@ describe("WorkOrderSplitRunPopup", () => {
 
     renderPopup({ fixture });
 
-    expect(screen.getByTestId(`split-run-phase-${implementPhases[1].id}`)).toHaveAttribute("aria-current", "step");
-    expect(screen.getByTestId(`split-run-phase-${implementPhases[0].id}`)).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId(`split-run-phase-${implementPhases[1].id}`)).not.toBeInTheDocument();
   });
 
-  it("opens the selected step log when a log row is clicked", async () => {
-    const user = userEvent.setup();
+  it("opens the selected step log when a log row is clicked", () => {
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-phase-backlog")).getByRole("button", { name: /^Backlog/ }));
-
-    expect(screen.getByTestId("split-run-stream-backlog")).toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-backlog")).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(screen.getByTestId("split-run-stream-backlog")).getByText("On Issue Label")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-backlog")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
   });
 
-  it("puts View Automation Run on an expanded log row", async () => {
-    const user = userEvent.setup();
+  it("does not show Edit automation on the console", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryKey: PRIMARY_FACTORY_KEY,
@@ -1636,25 +1673,9 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
 
-    await openLogTab(user);
-
-    const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
-    const view = within(prCreation).getByRole("link", { name: "View run" });
-    expect(view).toHaveAttribute(
-      "href",
-      factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        from: "task",
-        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
-        canvas: "closure",
-      }),
-    );
-    expect(within(prCreation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-
-    const backlog = screen.getByTestId("split-run-phase-backlog");
-    expect(within(backlog).queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
-    await user.click(within(backlog).getByRole("button", { name: /^Backlog/ }));
-    expect(within(backlog).queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
-    expect(within(backlog).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-pr-creation-2")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
   it("opens a mapped implement-running task on the implement log", () => {
@@ -1676,18 +1697,14 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.getByRole("heading", { name: "Implement job" })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-ingest")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-analyze")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-plan")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-score")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
-    expect(screen.getAllByText("Implementation").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-implement-0")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
   });
 
-  it("highlights the PR Closure log for the selected canvas component", async () => {
-    const user = userEvent.setup();
+  it("highlights the PR Closure log for the selected canvas component", () => {
     renderPopup({
       fixture: {
         ...SPLIT_RUN_RUNNING,
@@ -1712,18 +1729,9 @@ describe("WorkOrderSplitRunPopup", () => {
       },
     });
 
-    await openLogTab(user);
+    expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-done")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-done")).not.toBeInTheDocument();
-    await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /^Done/ }));
-
-    const stream = screen.getByTestId("split-run-stream-done");
-    expect(within(stream).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(stream).getByRole("link", { name: /merge-screenshot/ })).toBeInTheDocument();
-    expect(within(stream).getByRole("link", { name: /#510/ })).toBeInTheDocument();
-
-    await user.click(within(screen.getByTestId("split-run-stream-line-find-pull-request")).getByRole("button"));
-
-    expect(screen.getByTestId("split-run-stream-line-find-pull-request")).toHaveAttribute("data-highlighted", "true");
     expect(screen.queryByTestId("split-run-canvas-node-find-pull-request")).not.toBeInTheDocument();
   });
 

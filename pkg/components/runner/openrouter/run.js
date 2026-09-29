@@ -407,6 +407,10 @@ function buildOpenCodeConfig({
   const modelEntries = {};
   for (const id of modelIds) {
     modelEntries[id] = {
+      attachment: true,
+      modalities: {
+        input: ["text", "image"],
+      },
       options: {
         provider: {
           allow_fallbacks: false,

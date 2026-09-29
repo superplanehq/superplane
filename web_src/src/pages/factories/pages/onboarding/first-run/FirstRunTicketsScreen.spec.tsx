@@ -4,19 +4,6 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
-import { JIRA_COMPLETION_COLUMN_COPY } from "../../jiraCompletionColumnCopy";
-
-vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: [
-      { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
-      { id: "done", name: "Done" },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
-}));
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -68,6 +55,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        jiraAvailable
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={onConnectJira}
@@ -79,7 +67,105 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
+  });
+
+  it("shows Jira and Linear as coming soon when Jira is unavailable", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+        onConnectJira={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
+  });
+
+  it("does not mark Jira as coming soon while the feature lookup is loading", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        jiraFeatureLoading
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+        onConnectJira={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
+  });
+
+  it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraChoiceBlock="lookup-failed"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupFailed,
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("github-issues");
+  });
+
+  it("explains a saved Jira choice while the feature lookup is still loading", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="jira"
+        jiraFeatureLoading
+        jiraChoiceBlock="loading"
+        jiraConnected
+        jiraProjectId="PAY"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
+      FIRST_RUN_COPY.tickets.jiraLookupLoading,
+    );
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
@@ -90,6 +176,7 @@ describe("FirstRunTicketsScreen", () => {
     const { rerender } = render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onConnectJira={vi.fn()}
@@ -103,11 +190,10 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -123,11 +209,10 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -163,14 +248,13 @@ describe("FirstRunTicketsScreen", () => {
       <FirstRunTicketsScreen
         ticketSource="jira"
         saving
+        jiraAvailable
         jiraConnected
         jiraProjects={[
           { id: "PAY", name: "Payments" },
           { id: "CORE", name: "Core" },
         ]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
         onSelectJiraProject={onSelectJiraProject}
@@ -194,31 +278,20 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("shows the completion column after a Jira project is chosen", async () => {
-    const user = userEvent.setup();
-    const onJiraCompletionChange = vi.fn();
-
+  it("does not show the completion column setting after a Jira project is selected", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraAvailable
         jiraConnected
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
-        onJiraCompletionChange={onJiraCompletionChange}
       />,
     );
 
-    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
-    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
-    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
-    await user.click(screen.getByTestId("jira-move-on-complete"));
-    expect(onJiraCompletionChange).toHaveBeenCalledWith({
-      jiraMoveOnComplete: false,
-      jiraCompletionColumn: "",
-    });
+    expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
+    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
   });
 });

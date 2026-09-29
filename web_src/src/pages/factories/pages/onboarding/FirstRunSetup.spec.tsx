@@ -15,6 +15,10 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 let factory: FactoriesFactory;
 let factories: FactoriesFactory[];
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: () => true, isLoading: false }),
+}));
+
 vi.mock("../../layout/factoriesLayoutContext", () => ({
   useFactoriesLayout: () => ({
     organizationId: "org-1",
@@ -39,7 +43,6 @@ vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: () => ({
     data: [
       { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
       { id: "done", name: "Done" },
     ],
     isLoading: false,
@@ -86,6 +89,12 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    hostedModelsAvailable: false,
+    hostedModelsAvailableLoading: false,
+    bringYourOwnKey: false,
+    bringYourOwnKeyLoading: false,
+    agentCredentialChoice: null,
+    setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
@@ -115,7 +124,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectId: "",
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    setJiraCompletion: vi.fn(),
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,
@@ -166,7 +174,7 @@ describe("FirstRunSetup", () => {
       factories = [factory, ...otherFactories];
       accountOrganizations = [{ id: "org-1", name: "Acme" }, ...otherOrganizations];
       const user = userEvent.setup();
-      const model = pageModel({ hostedAgentReady: true });
+      const model = pageModel({ hostedAgentReady: true, hostedModelsAvailable: true });
 
       renderSetup(model);
 
@@ -188,7 +196,7 @@ describe("FirstRunSetup", () => {
   // ones without issues.
   it("passes the just-selected issues choice to finish instead of stale setup state", async () => {
     const user = userEvent.setup();
-    const model = pageModel({ hostedAgentReady: true });
+    const model = pageModel({ hostedAgentReady: true, hostedModelsAvailable: true });
 
     renderSetup(model);
 
@@ -455,13 +463,13 @@ describe("FirstRunSetup", () => {
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
-    renderSetup(pageModel({ hostedAgentReady: true }));
+    renderSetup(pageModel({ hostedAgentReady: true, hostedModelsAvailable: true }));
 
     expect(screen.getByRole("navigation", { name: FIRST_RUN_COPY.chrome.stepLabel(4, 4) })).toBeInTheDocument();
   });
 
   it("shows setup progress on the ticket screen while it provisions the workspace", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, saving: true }));
+    renderSetup(pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, saving: true }));
 
     const finish = screen.getByTestId("first-run-analyze-tickets");
     expect(finish).toHaveTextContent(FIRST_RUN_COPY.finish.saving);
@@ -470,7 +478,7 @@ describe("FirstRunSetup", () => {
 
   it("opens the agent screen when local setup has no hosted agent", async () => {
     const user = userEvent.setup();
-    const model = pageModel({ hostedAgentReady: false });
+    const model = pageModel({ hostedAgentReady: false, hostedModelsAvailable: false });
 
     renderSetup(model);
 
@@ -483,7 +491,11 @@ describe("FirstRunSetup", () => {
 
   it("connects Jira from the ticket screen", async () => {
     const user = userEvent.setup();
-    const model = pageModel({ hostedAgentReady: true, requestConnect: vi.fn().mockResolvedValue(true) });
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      requestConnect: vi.fn().mockResolvedValue(true),
+    });
 
     renderSetup(model);
 
@@ -504,6 +516,7 @@ describe("FirstRunSetup", () => {
     );
     const model = pageModel({
       hostedAgentReady: true,
+      hostedModelsAvailable: true,
       setup: result.current,
       jiraIntegrationId: "jira-1",
       jiraProjectId: "PAY",
@@ -523,14 +536,20 @@ describe("FirstRunSetup", () => {
   // returns to the screen that carries the action, not to a screen with no
   // question left to answer.
   it("resumes on the ticket screen when hosted credentials cover the agent", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
+    renderSetup(
+      pageModel({ hostedAgentReady: true, hostedModelsAvailable: true, openSection: "agent" }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
   it("resumes on the agent screen when the agent still needs a connected provider", () => {
-    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
+    renderSetup(
+      pageModel({ hostedAgentReady: false, hostedModelsAvailable: false, openSection: "agent" }),
+      "/org-1/workspaces/PAY/setup?step=agent",
+    );
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
@@ -547,6 +566,7 @@ describe("FirstRunSetup", () => {
     renderSetup(
       pageModel({
         hostedAgentReady: false,
+        hostedModelsAvailable: false,
         openSection: "agent",
         setup: result.current,
         jiraProjectId: "",
@@ -570,6 +590,7 @@ describe("FirstRunSetup", () => {
     renderSetup(
       pageModel({
         hostedAgentReady: false,
+        hostedModelsAvailable: false,
         openSection: "agent",
         setup: result.current,
         jiraProjectId: "PAY",

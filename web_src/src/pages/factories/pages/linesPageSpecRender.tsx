@@ -77,8 +77,16 @@ export function LinesBoardSpecHarness({
                     element={<div data-testid="planning-setup">Planning setup page</div>}
                   />
                   <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/github"
+                    element={<div data-testid="github-intake-setup">GitHub setup page</div>}
+                  />
+                  <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/dependabot"
+                    element={<div data-testid="dependabot-intake-setup">Dependabot setup page</div>}
                   />
                   <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/jira"

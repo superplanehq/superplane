@@ -77,7 +77,8 @@ describe("useCreateWorkOrderDialogState", () => {
       result.current.completeCreateWorkOrder("102");
     });
 
-    expect(result.current.href).toBe(workOrderDetailPath(ORGANIZATION_ID, FACTORY_KEY, "102", "line-hotfix"));
+    expect(result.current.createWorkOrderOpen).toBe(false);
+    expect(result.current.href).toBe(factoryLineDetailPath(ORGANIZATION_ID, FACTORY_KEY, "line-hotfix"));
   });
 
   it("does not open from New Task when create is not allowed", () => {

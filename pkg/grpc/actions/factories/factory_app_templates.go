@@ -24,6 +24,9 @@ const (
 
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
 
+// defaultRiskScoreRules matches the setup page defaults. One line, so it stays inside the prompt block.
+const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2 (low). User interface changes = 2 (low). Additive database changes = 3 (medium). Dependency updates = 3 (medium). API behavior changes = 3 (medium). Authorization changes = 4 (high). Authentication changes = 4 (high). Data deletion or migration = 4 (high). Infrastructure changes = 4 (high). Billing and payment changes = 5 (critical). Secrets and credentials = 5 (critical)."
+
 //go:embed templates/*.yaml
 var factoryTemplateFiles embed.FS
 
@@ -33,6 +36,8 @@ type factoryAppTemplate struct {
 	canvasFile            string
 	consoleFile           string
 	componentIntegrations map[string]string
+	// columnKey attaches the canvas to Verify or Done when the template is installed.
+	columnKey string
 }
 
 var factoryAppTemplates = map[string]factoryAppTemplate{
@@ -68,6 +73,16 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 			"github.onIssue": "github",
 		},
 	},
+	"risk-score": {
+		id:               "risk-score",
+		entrypointNodeID: "on-pr-risk",
+		canvasFile:       "templates/risk-score.canvas.yaml",
+		consoleFile:      "templates/risk-score.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.onPullRequest": "github",
+		},
+	},
 }
 
 type factoryTemplateInput struct {
@@ -96,6 +111,17 @@ type materializedFactoryTemplate struct {
 	templateID  string
 	canvasYAML  string
 	consoleYAML string
+}
+
+func attachFactoryTemplateColumn(tx *gorm.DB, canvas *models.Canvas, templateID string) error {
+	template, ok := factoryAppTemplates[templateID]
+	if !ok || template.columnKey == "" || canvas == nil {
+		return nil
+	}
+	if canvas.ColumnKey != nil && *canvas.ColumnKey == template.columnKey {
+		return nil
+	}
+	return canvas.SetColumnKey(tx, template.columnKey)
 }
 
 func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (*materializedFactoryTemplate, error) {
@@ -145,6 +171,9 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	}
 	if strings.TrimSpace(normalized["defaultBranch"]) == "" {
 		normalized["defaultBranch"] = "main"
+	}
+	if strings.TrimSpace(normalized["riskRules"]) == "" {
+		normalized["riskRules"] = defaultRiskScoreRules
 	}
 	repository := strings.TrimSpace(normalized["repository"])
 	if repository == "" {
@@ -252,7 +281,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 	if node.ID == "planning-agent" && agent.planningModel != "" {
 		model = agent.planningModel
 	}
-	node.Configuration["model"] = model
+	node.Configuration["model"] = models.ConcreteClaudeModelID(model, nil)
 }
 
 func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {

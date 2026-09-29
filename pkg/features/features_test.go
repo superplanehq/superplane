@@ -31,12 +31,20 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory dependabot intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryDependabotIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryDependabotIntake, f.ID)
+		assert.Equal(t, "Factory Dependabot Intake", f.Label)
+		assert.Equal(t, "Add Dependabot alert intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryProductiveIntake)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
-		assert.Equal(t, "Factory Productive.io Intake", f.Label)
-		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+		assert.Equal(t, "Factory Productive Intake", f.Label)
+		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
@@ -80,6 +88,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
+	t.Run("known id returns factory risk score feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryRiskScore)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
+		assert.Equal(t, "Factory Risk Score", f.Label)
+		assert.Equal(t, "Add a risk score automation to the Verify column", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryPullRequestMerge)
 		assert.True(t, ok)
@@ -107,12 +124,14 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactorySentryIntake))
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
+	assert.True(t, Exists(FeatureFactoryDependabotIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
+	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))

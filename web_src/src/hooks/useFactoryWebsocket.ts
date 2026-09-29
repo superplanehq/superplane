@@ -2,12 +2,17 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { factoriesDescribeWorkOrder } from "@/api-client";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { isNotFoundError } from "@/pages/app/workflowPageHelpers";
+import { factoryWorkOrdersPagePrefix } from "@/pages/factories/lib/workOrderListPagination";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
-import { factoryWorkOrdersPagePrefix } from "@/pages/factories/lib/workOrderListPagination";
 import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
-import { applyWorkOrderToListCaches, cachedWorkOrderIdsFromLists } from "./workOrderListCache";
+import {
+  applyWorkOrderToListCaches,
+  cachedWorkOrderIdsFromLists,
+  removeWorkOrderFromListCaches,
+} from "./workOrderListCache";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/factories/`;
 
@@ -141,6 +146,23 @@ function invalidateTaskActivity(
   }
 }
 
+function isMissingWorkOrderError(error: unknown): boolean {
+  return isNotFoundError(error) || (error instanceof Error && /404|not found/i.test(error.message));
+}
+
+function dropMissingWorkOrder(
+  queryClient: WorkOrderQueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+) {
+  removeWorkOrderFromListCaches(queryClient, organizationId, factoryId, orderId);
+  queryClient.removeQueries({
+    queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+    exact: true,
+  });
+}
+
 async function refreshUpdatedWorkOrder(
   queryClient: WorkOrderQueryClient,
   organizationId: string,
@@ -222,14 +244,16 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       }
       const version = (refreshVersion.current.get(orderId) ?? 0) + 1;
       refreshVersion.current.set(orderId, version);
-      void refreshUpdatedWorkOrder(
-        queryClient,
-        organizationId,
-        factoryId,
-        orderId,
-        () => refreshVersion.current.get(orderId) === version,
-      ).catch((error) => {
-        console.warn("factory ws: failed to refresh work order", error);
+      const isCurrent = () => refreshVersion.current.get(orderId) === version;
+      void refreshUpdatedWorkOrder(queryClient, organizationId, factoryId, orderId, isCurrent).catch((error) => {
+        if (!isMissingWorkOrderError(error)) {
+          console.warn("factory ws: failed to refresh work order", error);
+          return;
+        }
+        if (!isCurrent()) {
+          return;
+        }
+        dropMissingWorkOrder(queryClient, organizationId, factoryId, orderId);
       });
     },
     [queryClient, organizationId, factoryId],

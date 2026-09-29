@@ -21,6 +21,7 @@ const (
 
 var velocityIntakeLabels = map[string]string{
 	models.FactoryIntakeSourceGitHubIssues:       "GitHub issue",
+	models.FactoryIntakeSourceDependabotAlerts:   "Dependabot alert",
 	models.FactoryIntakeSourceSentryExceptions:   "Sentry exception",
 	models.FactoryIntakeSourcePagerDutyIncidents: "PagerDuty incident",
 	velocityIntakeKeyImported:                    "Imported ticket",
@@ -32,6 +33,7 @@ var velocityIntakeLabels = map[string]string{
 // keeps its position keeps its color when its count changes between requests.
 var velocityIntakeSeriesOrder = []string{
 	models.FactoryIntakeSourceGitHubIssues,
+	models.FactoryIntakeSourceDependabotAlerts,
 	models.FactoryIntakeSourceSentryExceptions,
 	models.FactoryIntakeSourcePagerDutyIncidents,
 	velocityIntakeKeyImported,
@@ -352,6 +354,7 @@ const (
 	velocitySortAuthoredMerged
 	velocitySortMedianCycleHours
 	velocitySortCostUsd
+	velocitySortFactoryWaste
 )
 
 // velocitySortDirection is ascending or descending, applied to the primary
@@ -395,6 +398,8 @@ func (b *velocityPeopleBuilder) rowsSorted(key velocityPeopleSortKey, direction 
 			return medians[row]
 		case velocitySortCostUsd:
 			return float64(row.costCents)
+		case velocitySortFactoryWaste:
+			return float64(row.factoryWaste)
 		default:
 			return float64(row.totalMerged())
 		}

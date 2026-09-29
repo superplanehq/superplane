@@ -13,13 +13,15 @@ const GITHUB_SOURCE: BacklogIntakeSource = {
   name: "GitHub issues",
   iconSrc: githubIcon,
   iconAlt: "GitHub",
+  tabLabel: "GitHub",
 };
 
 const PRODUCTIVE_SOURCE: BacklogIntakeSource = {
   intakeId: "intake-productive",
-  name: "Productive.io tasks",
+  name: "Productive tasks",
   iconSrc: productiveIcon,
-  iconAlt: "Productive.io",
+  iconAlt: "Productive",
+  tabLabel: "Productive",
 };
 
 const GITHUB_ITEMS: BacklogIntakeItem[] = [

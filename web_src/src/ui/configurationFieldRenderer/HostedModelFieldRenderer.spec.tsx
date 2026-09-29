@@ -157,8 +157,26 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.getByTestId("field-model-hosted-thinking")).toHaveTextContent("Thinking");
     expect(screen.queryByRole("menuitem", { name: "openai/gpt-5" })).not.toBeInTheDocument();
 
-    await selectFlyoutOption(user, "field-model-hosted-model-list", "anthropic/claude-sonnet-4-6");
+    await selectFlyoutOption(user, "field-model-hosted-model-list", "sonnet 4-6");
     expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
+  });
+
+  it("shows the allowlisted Claude model for an alias without saving it", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer field={createField()} value="opus" onChange={onChange} organizationId="org-1" />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    expect(onChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "opus 5-5" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "opus" })).not.toBeInTheDocument();
   });
 
   it("explains when organization BYOK models cannot load", () => {
@@ -194,6 +212,28 @@ describe("HostedModelFieldRenderer", () => {
       factoryId: undefined,
       sources: ["byok"],
       enabled: false,
+    });
+  });
+
+  it("uses an explicit factory when the route has no canvas", () => {
+    useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        organizationId="org-1"
+        factoryId="factory-9"
+      />,
+      "/org-1/apps/canvas-1",
+    );
+
+    expect(screen.queryByText("Loading models...")).not.toBeInTheDocument();
+    expect(useSelectableLLMModels).toHaveBeenCalledWith("org-1", {
+      factoryId: "factory-9",
+      sources: ["byok"],
+      enabled: true,
     });
   });
 
@@ -289,6 +329,49 @@ describe("HostedModelFieldRenderer", () => {
     expect(screen.getByTestId("field-model-hosted-model-list")).toBeInTheDocument();
   });
 
+  it("saves the displayed model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([selectableModel("byok", "anthropic", "claude-opus-5-5")]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="opus"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "opus" }}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("opus 5-5");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-opus-5-5", thinkingLevel: "high" });
+  });
+
+  it("keeps an empty BYOK model when only thinking changes", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{}}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
   it("writes thinkingLevel next to the model", async () => {
     const user = userEvent.setup();
     const onValuesChange = vi.fn();
@@ -304,7 +387,7 @@ describe("HostedModelFieldRenderer", () => {
       />,
     );
 
-    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("sonnet 4-6");
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: "high" });

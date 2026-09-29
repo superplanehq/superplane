@@ -1,9 +1,11 @@
 import { Avatar } from "@/components/Avatar/avatar";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
 import { useAccount } from "@/contexts/useAccount";
 import { useTheme } from "@/contexts/useTheme";
 import { isThemePreference } from "@/lib/themePreference";
 import type { ThemePreference } from "@/lib/themePreference";
+import type { FeedbackCategory } from "@/lib/submitFeedback";
 import { cn } from "@/lib/utils";
 import { posthog } from "@/posthog";
 import {
@@ -19,7 +21,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
+import { ArrowRightLeft, Bug, LogOut, MessageSquare, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -63,6 +66,13 @@ export function SidebarUserMenu({
     ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
   const triggerLabel = `${userName}, ${organizationName}`;
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory | undefined>();
+
+  const openFeedback = (category: FeedbackCategory) => {
+    setFeedbackCategory(category);
+    setIsFeedbackOpen(true);
+  };
 
   const handleSignOut = () => {
     posthog.reset();
@@ -122,6 +132,22 @@ export function SidebarUserMenu({
             </DropdownMenuItem>
           ) : null}
           <AppearanceMenuItem />
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            data-testid="factories-sidebar-report-issue"
+            onClick={() => openFeedback("bug")}
+          >
+            <Bug aria-hidden />
+            Report issue
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            data-testid="factories-sidebar-send-feedback"
+            onClick={() => openFeedback("other")}
+          >
+            <MessageSquare aria-hidden />
+            Send feedback
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={handleSignOut}>
             <LogOut aria-hidden />
@@ -129,6 +155,12 @@ export function SidebarUserMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <FeedbackDialog
+        open={isFeedbackOpen}
+        onOpenChange={setIsFeedbackOpen}
+        organizationId={organizationId}
+        initialCategory={feedbackCategory}
+      />
     </div>
   );
 }
