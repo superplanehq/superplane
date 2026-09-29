@@ -120,6 +120,8 @@ var factoryLineColumnColorIDs = map[string]bool{
 	"slate":   true,
 	"emerald": true,
 	"rose":    true,
+	"pink":    true,
+	"indigo":  true,
 }
 
 const (
