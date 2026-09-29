@@ -1,13 +1,17 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useFactory } from "@/hooks/useFactoryData";
+import { useFactory, useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
@@ -189,6 +193,27 @@ function AnalysisWorkOrderPopup({
       ? review
       : undefined;
 
+  const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const navigate = useNavigate();
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
+
+  const handleDuplicate = async () => {
+    setDuplicateBusy(true);
+    try {
+      const newOrder = await createWorkOrder.mutateAsync({
+        title: edits.title,
+        description: edits.description,
+      });
+      if (newOrder?.number) {
+        navigate(workOrderDetailPath(organizationId, factoryKey, newOrder.number, lineId));
+      }
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to duplicate task"));
+    } finally {
+      setDuplicateBusy(false);
+    }
+  };
+
   return (
     <PopupShell
       testId="work-order-split-run"
@@ -219,22 +244,24 @@ function AnalysisWorkOrderPopup({
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
           panelReview={panelReview}
-          header={analysisPopupHeader({
-            edits,
-            fixture,
-            organizationId,
-            factoryKey,
-            orderNumber,
-            lineId,
-            onClose,
-            fullPage,
-            toggleFullPage,
-            mutations,
-            footerBusy: footerActions.busy,
-            reviewActions,
-            showOwnerRow: !unified,
-            planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
-          })}
+           header={analysisPopupHeader({
+             edits,
+             fixture,
+             organizationId,
+             factoryKey,
+             orderNumber,
+             lineId,
+             onClose,
+             fullPage,
+             toggleFullPage,
+             mutations,
+             footerBusy: footerActions.busy,
+             reviewActions,
+             showOwnerRow: !unified,
+             planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
+             onDuplicate: handleDuplicate,
+             duplicateBusy,
+           })}
         />
         {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
@@ -296,6 +323,8 @@ function analysisPopupHeader(args: {
     savedTokens: number;
     savedCostCents: number;
   };
+  onDuplicate?: () => void | Promise<void>;
+  duplicateBusy?: boolean;
 }) {
   return (views: ReactNode) => (
     <PopupHeader
@@ -312,6 +341,8 @@ function analysisPopupHeader(args: {
           onArchive={showsArchive(args.fixture.footer) ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
           taskActions={args.reviewActions}
+          onDuplicate={args.onDuplicate}
+          duplicateBusy={args.duplicateBusy}
         />
       }
       accessory={views}
