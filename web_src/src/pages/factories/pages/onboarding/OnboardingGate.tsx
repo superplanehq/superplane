@@ -1,5 +1,5 @@
 import type { FactoriesFactory } from "@/api-client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -30,7 +30,7 @@ function pathAfterSetup(organizationId: string, factoryKey: string, factory: Fac
  * Keeps incomplete workspaces on setup while other workspaces stay browsable.
  * Storybook can override the server-backed state with its setup context.
  */
-export function OnboardingGate() {
+export function OnboardingGate({ children }: { children?: ReactNode }) {
   const onboarding = useOnboardingStorybook();
   const location = useLocation();
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
@@ -42,6 +42,7 @@ export function OnboardingGate() {
   // FirstRunSetup stores the analysis destination. Hold this visit on setup
   // so that write cannot unmount the analysis screen. A later open of setup
   // still leaves for the board.
+  const outlet = children ?? <Outlet />;
   const startedIncompleteFactoryId = useRef(isIncomplete ? factoryId : null);
   useEffect(() => {
     if (isIncomplete) {
@@ -55,12 +56,12 @@ export function OnboardingGate() {
 
   if (!isIncomplete) {
     if (holdSetupAfterThisVisitCompletes(startedIncompleteFactoryId.current === factoryId, isSetupRoute)) {
-      return <Outlet />;
+      return outlet;
     }
     if (isSetupRoute) {
       return <Navigate to={pathAfterSetup(organizationId, factoryKey, factory)} replace />;
     }
-    return <Outlet />;
+    return outlet;
   }
 
   if (!onboarding && factory?.onboarding?.initial === true) {
@@ -68,7 +69,7 @@ export function OnboardingGate() {
   }
 
   if (isSetupRoute) {
-    return <Outlet />;
+    return outlet;
   }
 
   return <Navigate to={factorySetupPath(organizationId, factoryKey)} replace />;

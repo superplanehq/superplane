@@ -88,6 +88,10 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   selected?: boolean;
   /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
+  /**
+   * False on the public board. The card is static text: no link, no dialog.
+   */
+  interactive?: boolean;
 }
 
 /**
@@ -124,9 +128,12 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  interactive = true,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
+  const destination = interactive
+    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
+    : "";
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
@@ -148,14 +155,15 @@ export function WorkOrderCard({
   return (
     <article
       className={cn(
-        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow",
-        WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
+        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm",
+        interactive && "transition hover:border-foreground/20 hover:shadow",
+        interactive && WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
         className,
       )}
       data-testid={`work-order-card-${entry.id}`}
       data-selected={selected || undefined}
     >
-      <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
+      {interactive ? <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} /> : null}
 
       <div className="relative z-10 pointer-events-none">
         <WorkOrderCardTitleRow
@@ -402,4 +410,95 @@ function CardScores({
       testId={`work-order-card-score-${entryId}`}
     />
   );
+}
+
+export interface PublicBoardCardModel {
+  title: string;
+  createdAt: string;
+  assigneeName?: string;
+  confidence?: number;
+  clarity?: number;
+  pullRequest?: { number: number; state: string; mergeable: boolean; extraCount: number };
+  status?: string;
+  agentQuestion?: boolean;
+}
+
+/**
+ * Read-only task card for a public line. It paints the same chips as the
+ * member board and does not fetch organization data or open a task.
+ */
+export function PublicBoardCard({
+  card,
+  showClarity = false,
+  showConfidence = false,
+}: {
+  card: PublicBoardCardModel;
+  showClarity?: boolean;
+  showConfidence?: boolean;
+}) {
+  const createdAt = card.createdAt ? new Date(card.createdAt) : null;
+  const createdLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? formatRelative(createdAt) : "—";
+  const reason = publicBoardStatusReason(card.status);
+  const pullRequest: FactoriesFactoryPullRequest | undefined = card.pullRequest
+    ? {
+        number: String(card.pullRequest.number),
+        state: card.pullRequest.state as FactoriesFactoryPullRequest["state"],
+        mergeable: card.pullRequest.mergeable,
+      }
+    : undefined;
+  const showMergeable = Boolean(pullRequest?.mergeable) && pullRequestStateSafe(pullRequest?.state);
+  const showScores = (showClarity && card.clarity != null) || (showConfidence && card.confidence != null);
+
+  return (
+    <article
+      className="relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm"
+      data-testid="public-board-card"
+    >
+      <h3 className="min-w-0 truncate text-[13px] font-medium leading-snug text-foreground">{card.title}</h3>
+      {reason || pullRequest || card.agentQuestion ? (
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+          {card.agentQuestion ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">
+              <Bot className="size-3 shrink-0" aria-hidden />
+              Agent question
+            </span>
+          ) : null}
+          {pullRequest ? (
+            <>
+              <WorkOrderPullRequestChip pullRequest={pullRequest} extraCount={card.pullRequest?.extraCount ?? 0} />
+              {showMergeable ? <WorkOrderMergeableChip /> : null}
+            </>
+          ) : null}
+          {reason ? <WorkOrderAttentionChip reason={reason} /> : null}
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] leading-4 text-muted-foreground">{createdLabel}</span>
+        <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
+          {card.assigneeName ? (
+            <span className="truncate text-[11px] text-muted-foreground">{card.assigneeName}</span>
+          ) : null}
+          {showScores ? (
+            <CardScoreBadges
+              clarity={card.clarity}
+              confidence={card.confidence}
+              showClarity={showClarity}
+              showConfidence={showConfidence}
+            />
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function publicBoardStatusReason(status: string | undefined): WorkOrderAttentionReason | null {
+  if (status === "failed" || status === "stopped" || status === "approval") {
+    return status;
+  }
+  return null;
+}
+
+function pullRequestStateSafe(state: string | undefined): boolean {
+  return state === "open" || state === "STATE_OPEN" || state === "review";
 }
