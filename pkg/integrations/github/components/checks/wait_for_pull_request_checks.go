@@ -371,9 +371,7 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	metadata.SHA = sha
 	metadata.Fingerprint = evaluation.Fingerprint
 	metadata.Outcome = evaluation.Outcome
-	metadata.Checks = evaluation.Checks
-	metadata.SelectedChecks = evaluation.SelectedChecks
-	metadata.FailedChecks = evaluation.FailedChecks
+	metadata.Checks, metadata.SelectedChecks, metadata.FailedChecks = storedCheckLists(evaluation)
 
 	if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefValue(ctx.Configuration.Repository, sha)); err != nil {
 		return err

@@ -1,6 +1,8 @@
 package checks
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -213,6 +215,75 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		assert.Equal(t, waitChecksOutcomeTimedOut, evaluation.Outcome)
 		assert.True(t, evaluation.AllTerminal)
 	})
+}
+
+func Test__StoredCheckLists_OmitBodiesFromAllChecks(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", 1024)
+	check := PullRequestCheck{Key: "check-run:ci:build", Name: "build", Summary: body}
+	stored, selected, failed := storedCheckLists(waitChecksEvaluation{
+		Checks:         []PullRequestCheck{check, {Key: "status:lint", Name: "lint", Summary: "ok"}},
+		SelectedChecks: []PullRequestCheck{check},
+		FailedChecks:   []PullRequestCheck{check},
+	})
+
+	require.Len(t, stored, 2)
+	assert.Empty(t, stored[0].Summary)
+	assert.Empty(t, stored[1].Summary)
+	require.Len(t, selected, 1)
+	assert.Equal(t, body, selected[0].Summary)
+	require.Len(t, failed, 1)
+	assert.Equal(t, body, failed[0].Summary)
+}
+
+func Test__LimitCheckSummaries_CapsLongBodies(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", maxCheckSummaryBytes+2048)
+	limited := limitCheckSummaries([]PullRequestCheck{{Name: "build", Summary: body}})
+	require.Len(t, limited, 1)
+	assert.LessOrEqual(t, len(limited[0].Summary), maxCheckSummaryBytes)
+	assert.True(t, strings.HasPrefix(limited[0].Summary, "\n\n"))
+	assert.True(t, strings.HasSuffix(limited[0].Summary, "\n..."))
+}
+
+func Test__StoredCheckLists_StayUnderEventPayloadLimit(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", 60*1024)
+	checks := make([]PullRequestCheck, 5)
+	for i := range checks {
+		checks[i] = PullRequestCheck{
+			Key:        fmt.Sprintf("check-run:ci:check-%d", i),
+			Name:       fmt.Sprintf("check-%d", i),
+			Kind:       checkKindCheckRun,
+			Status:     checkStatusCompleted,
+			Conclusion: "failure",
+			Summary:    body,
+		}
+	}
+
+	stored, selected, failed := storedCheckLists(waitChecksEvaluation{
+		Checks:         checks,
+		SelectedChecks: checks,
+		FailedChecks:   checks,
+	})
+	event, err := json.Marshal(map[string]any{
+		"type":      waitChecksPayloadType,
+		"timestamp": time.Now(),
+		"data": WaitForPullRequestChecksOutput{
+			Repository:     "acme/app",
+			SHA:            strings.Repeat("b", 40),
+			Checks:         stored,
+			SelectedChecks: selected,
+			FailedChecks:   failed,
+			StartedAt:      time.Now(),
+			CompletedAt:    time.Now(),
+		},
+	})
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(event), 512*1024)
 }
 
 func Test__NextEvaluateDelay(t *testing.T) {

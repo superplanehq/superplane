@@ -92,6 +92,19 @@ func TestPrFeedbackChecksRepairDescriptionExpression(t *testing.T) {
 	)
 }
 
+func TestPrFeedbackChecksPassedDescriptionExpression_KeepsCommitStatusOnOneLine(t *testing.T) {
+	got := evalWaitChecksExpression(t, prFeedbackChecksPassedDescriptionExpression(), map[string]any{
+		"selectedChecks": []any{
+			map[string]any{
+				"name":       "ci/semaphore",
+				"detailsUrl": "https://example.com/ci",
+				"summary":    "CI passed",
+			},
+		},
+	})
+	assert.Equal(t, "· [ci/semaphore](https://example.com/ci): CI passed", got)
+}
+
 func TestPrFeedbackChecksPassedDescriptionExpression_RendersCheckBodyUnderTheLine(t *testing.T) {
 	previewTable := "<table><tr><td><a href=\"https://preview.pages.dev\">Visit Preview</a></td></tr></table>"
 	got := evalWaitChecksExpression(t, prFeedbackChecksPassedDescriptionExpression(), map[string]any{
