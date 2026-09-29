@@ -74,6 +74,8 @@ interface RequestBody {
   key?: unknown;
   hostedSpendBudgetCents?: unknown;
   clearHostedSpendBudget?: unknown;
+  publicBadgeEnabled?: unknown;
+  publicBadgeShowCost?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -315,6 +317,32 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function applyFactoryPut(factory: FactoriesFactory, body: Record<string, unknown> | null) {
+  const request = (body ?? {}) as RequestBody;
+  if (typeof request.name === "string" && request.name.trim()) {
+    factory.name = request.name.trim();
+  }
+  if (typeof request.description === "string") {
+    factory.description = request.description;
+  }
+  if (request.clearHostedSpendBudget === true) {
+    factory.hostedSpendBudgetCents = undefined;
+  } else if (typeof request.hostedSpendBudgetCents === "number") {
+    factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
+  } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
+    factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
+  }
+  if (typeof request.publicBadgeEnabled === "boolean") {
+    factory.publicBadgeEnabled = request.publicBadgeEnabled;
+    if (request.publicBadgeEnabled && !factory.publicBadgeToken) {
+      factory.publicBadgeToken = "public-badge-token";
+    }
+  }
+  if (typeof request.publicBadgeShowCost === "boolean") {
+    factory.publicBadgeShowCost = request.publicBadgeShowCost;
+  }
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -326,20 +354,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
         if (method === "PUT") {
           if (!factory) return { json: {} };
-          const request = (body ?? {}) as RequestBody;
-          if (typeof request.name === "string" && request.name.trim()) {
-            factory.name = request.name.trim();
-          }
-          if (typeof request.description === "string") {
-            factory.description = request.description;
-          }
-          if (request.clearHostedSpendBudget === true) {
-            factory.hostedSpendBudgetCents = undefined;
-          } else if (typeof request.hostedSpendBudgetCents === "number") {
-            factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
-          } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
-            factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
-          }
+          applyFactoryPut(factory, body);
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 

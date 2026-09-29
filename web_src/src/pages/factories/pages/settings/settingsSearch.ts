@@ -80,6 +80,13 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "danger zone",
     "delete workspace",
   ]),
+  entry("workspace", "general", "Public badge", "factory-settings-public-badge", [
+    "badge",
+    "svg",
+    "readme",
+    "share",
+    "pull requests",
+  ]),
 
   // Workspace · Repository
   entry("workspace", "repository", "Repository", "factory-settings-repository", [
