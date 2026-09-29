@@ -1,6 +1,7 @@
 import { ExternalLink, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { cn } from "@/lib/utils";
 import { githubAppInstallationUrl } from "@/lib/integrations";
 import { integrationStatusLabel, type IntegrationCatalogItem } from "@/lib/integrationCatalog";
 import {
@@ -32,20 +33,17 @@ export function CatalogInstanceRow({
   const installationUrl = githubAppInstallationUrl(integration);
 
   return (
-    <div className={styles.instanceRow}>
+    <div className={cn(styles.instanceRow, "flex-wrap")}>
       <Plug className={`size-4 shrink-0 ${instancePlugClass(state, styles)}`} />
       <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
-      <p className={styles.instanceName}>{integration.metadata?.name}</p>
-      <div className="ml-auto flex items-center gap-2">
+      <p className={cn(styles.instanceName, "min-w-0 flex-1")}>{integration.metadata?.name}</p>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         {installationUrl ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => window.open(installationUrl, "_blank", "noopener,noreferrer")}
-          >
-            Manage installation
-            <ExternalLink className="size-3.5" aria-hidden />
+          <Button asChild variant="ghost" size="sm">
+            <a href={installationUrl} target="_blank" rel="noopener noreferrer">
+              Manage installation
+              <ExternalLink className="size-3.5" aria-hidden />
+            </a>
           </Button>
         ) : null}
         <PermissionTooltip

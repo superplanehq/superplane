@@ -30,23 +30,19 @@ function renderRow(integration: OrganizationsIntegration, onConfigure = vi.fn())
 }
 
 describe("CatalogInstanceRow", () => {
-  it("shows a link to manage the GitHub App installation when the property is present", async () => {
-    const user = userEvent.setup();
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-
+  it("shows a link to manage the GitHub App installation when the property is present", () => {
     renderRow(buildIntegration([{ name: GITHUB_APP_INSTALLATION_URL_PROPERTY_NAME, value: INSTALLATION_URL }]));
 
-    const link = screen.getByRole("button", { name: /manage installation/i });
-    await user.click(link);
-    expect(openSpy).toHaveBeenCalledWith(INSTALLATION_URL, "_blank", "noopener,noreferrer");
-
-    openSpy.mockRestore();
+    const link = screen.getByRole("link", { name: /manage installation/i });
+    expect(link).toHaveAttribute("href", INSTALLATION_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("hides the installation link when the property is absent", () => {
     renderRow(buildIntegration([]));
 
-    expect(screen.queryByRole("button", { name: /manage installation/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /manage installation/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Configure" })).toBeInTheDocument();
   });
 
