@@ -48,7 +48,7 @@ import {
 } from "../lib/lineBoardColumnColorViewPreference";
 import { useHostedCreditChrome, useHostedCreditRunContext } from "../lib/useHostedCreditEmptyBanner";
 import { lineAppIds } from "../lib/lineHostedCredit";
-import { useLineUsesHostedCredit } from "../lib/useLineHostedCredit";
+import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";

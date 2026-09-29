@@ -18,7 +18,7 @@ import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { footerWithoutHostedCreditLock, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { defaultSplitRunPopupTab, refinePopupShowsAutomations } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -31,7 +31,6 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled } from "../planningSettingsModel";
-import { isByokSelectableModel } from "../../lib/workOrderFailureReason";
 import {
   analysisDraftChrome,
   analysisPopupClassName,
@@ -144,11 +143,7 @@ function AnalysisWorkOrderPopup({
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
-  const gatedFixture =
-    fixture.footer.kind === "draft" && isByokSelectableModel(draftModel)
-      ? { ...fixture, footer: footerWithoutHostedCreditLock(fixture.footer) }
-      : fixture;
-  const { sourceOnly, viewFixture } = analysisPopupView(gatedFixture, factory);
+  const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = taskConsole && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,

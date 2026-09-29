@@ -9,7 +9,7 @@ import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { lineAppIds } from "../../lib/lineHostedCredit";
-import { useLineUsesHostedCredit } from "../../lib/useLineHostedCredit";
+import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { useHostedCreditRunContext } from "../../lib/useHostedCreditEmptyBanner";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
@@ -68,11 +68,7 @@ function useSplitRunWorkOrderExtras(
   return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
 }
 
-function useSplitRunHostedCredit(
-  organizationId: string,
-  factoryKey: string,
-  line: FactoriesFactoryLine | undefined,
-) {
+function useSplitRunHostedCredit(organizationId: string, factoryKey: string, line: FactoriesFactoryLine | undefined) {
   const credit = useHostedCreditRunContext(organizationId, factoryKey);
   const detectedHostedRunner = useLineUsesHostedCredit(organizationId, lineAppIds(line));
   return { credit, usesHostedRunner: line ? detectedHostedRunner : undefined };

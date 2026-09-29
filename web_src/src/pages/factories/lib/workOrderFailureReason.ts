@@ -77,26 +77,18 @@ export function isOutOfHostedCredit(credit?: HostedCreditRunContext): boolean {
 
 /**
  * True when Start or Rerun would spend hosted credit and none remains.
- * A BYOK line, or a selected `byok::` model, does not spend hosted credit.
+ * A BYOK-only line does not spend hosted credit. A mixed line still needs
+ * credit when any step uses a hosted runner, even if the draft model is BYOK.
  * Unknown runner funding keeps the credit block so a hosted line does not start early.
  */
 export function hostedCreditBlocksDispatch(
   credit: HostedCreditRunContext | undefined,
   usesHostedRunner: boolean | undefined,
-  selectedModel?: string,
 ): boolean {
-  if (isByokSelectableModel(selectedModel) || usesHostedRunner === false) {
+  if (usesHostedRunner === false) {
     return false;
   }
   return isOutOfHostedCredit(credit);
-}
-
-/** True when the draft model key is a bring-your-own-key model. */
-export function isByokSelectableModel(model: string | undefined): boolean {
-  if (!model) {
-    return false;
-  }
-  return model.trim().startsWith("byok::");
 }
 
 /** Warning or failure copy for a draft or a failed step that cannot run. */

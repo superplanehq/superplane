@@ -31,10 +31,13 @@ describe("hostedCreditBlocksDispatch", () => {
     expect(hostedCreditBlocksDispatch(empty, undefined)).toBe(true);
   });
 
-  it("does not block a BYOK line or a selected BYOK model", () => {
+  it("does not block a BYOK-only line when credit is empty", () => {
     expect(hostedCreditBlocksDispatch(empty, false)).toBe(false);
-    expect(hostedCreditBlocksDispatch(empty, true, "byok::anthropic::claude-sonnet-4-6")).toBe(false);
-    expect(hostedCreditBlocksDispatch(empty, undefined, "auto")).toBe(true);
+  });
+
+  it("still blocks a hosted or mixed line when credit is empty", () => {
+    expect(hostedCreditBlocksDispatch(empty, true)).toBe(true);
+    expect(hostedCreditBlocksDispatch(empty, undefined)).toBe(true);
   });
 });
 

@@ -3,8 +3,7 @@ import { useQueries } from "@tanstack/react-query";
 import { canvasesDescribeCanvas } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-
-import { lineUsesHostedCredit, type LineRunnerNode } from "./lineHostedCredit";
+import { lineUsesHostedCredit, type LineRunnerNode } from "@/pages/factories/lib/lineHostedCredit";
 
 /**
  * Whether the line's agent runners spend hosted credit.
