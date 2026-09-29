@@ -121,6 +121,7 @@ func TestReplaceGitHubNodeIntegration(t *testing.T) {
 	nodes := []models.Node{
 		{ID: "managed", Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
 		{ID: "matching-repository", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/old"}, IntegrationID: &previousID},
+		{ID: "updated-repository", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/new"}, IntegrationID: &previousID},
 		{ID: "custom", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
 		{ID: "other-integration", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &unrelatedID},
 		{ID: "other-provider", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
@@ -133,14 +134,16 @@ func TestReplaceGitHubNodeIntegration(t *testing.T) {
 		"new-integration",
 		"acme/old",
 		"acme/old",
+		"acme/new",
 	)
 
 	assert.True(t, changed)
 	assert.Equal(t, "new-integration", *nodes[0].IntegrationID)
 	assert.Equal(t, "new-integration", *nodes[1].IntegrationID)
-	assert.Equal(t, previousID, *nodes[2].IntegrationID)
-	assert.Equal(t, unrelatedID, *nodes[3].IntegrationID)
-	assert.Equal(t, previousID, *nodes[4].IntegrationID)
+	assert.Equal(t, "new-integration", *nodes[2].IntegrationID)
+	assert.Equal(t, previousID, *nodes[3].IntegrationID)
+	assert.Equal(t, unrelatedID, *nodes[4].IntegrationID)
+	assert.Equal(t, previousID, *nodes[5].IntegrationID)
 }
 
 func TestFactoryDefaultBranchFromNodes(t *testing.T) {

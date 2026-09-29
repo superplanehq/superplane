@@ -318,6 +318,7 @@ func reconcileFactoryRepository(
 			vcsIntegrationID,
 			previousAppRepository,
 			previousBacklogRepository,
+			repository,
 		) || changed
 		if !changed {
 			continue
@@ -378,7 +379,7 @@ func addPRFeedbackGitHubNodeIDs(nodeIDs map[string]bool, graph prFeedbackGraph) 
 func replaceGitHubNodeIntegration(
 	nodes []models.Node,
 	managedNodeIDs map[string]bool,
-	previousIntegrationID, integrationID, previousAppRepository, previousBacklogRepository string,
+	previousIntegrationID, integrationID, previousAppRepository, previousBacklogRepository, repository string,
 ) bool {
 	if previousIntegrationID == "" || previousIntegrationID == integrationID {
 		return false
@@ -396,6 +397,7 @@ func replaceGitHubNodeIntegration(
 			nodes[i].Configuration,
 			previousAppRepository,
 			previousBacklogRepository,
+			repository,
 		) {
 			continue
 		}
