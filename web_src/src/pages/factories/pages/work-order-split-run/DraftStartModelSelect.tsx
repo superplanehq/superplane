@@ -20,7 +20,7 @@ const TRIGGER_VARIANT: Record<Appearance, "default" | "outline" | "ghost"> = {
 const TRIGGER_CLASS: Record<Appearance, string> = {
   icon: "rounded-md rounded-l-none",
   labeled: "!rounded-none h-7 gap-1.5 border-0 bg-background text-xs shadow-none",
-  ghost: "gap-1.5 text-muted-foreground hover:text-foreground",
+  ghost: "max-w-full min-w-[min(100%,8rem)] shrink gap-1.5 text-muted-foreground hover:text-foreground",
 };
 
 const START_THINKING_LEVELS = [
@@ -34,7 +34,8 @@ const START_THINKING_LEVELS = [
 /**
  * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
- * strip settings row. Closed labeled and ghost triggers show the model name.
+ * strip settings row. Closed labeled and ghost triggers show the model name,
+ * then Low, Medium, or High when that level is selected.
  */
 export function DraftStartModelSelect({
   organizationId,
@@ -59,6 +60,7 @@ export function DraftStartModelSelect({
   const selectedName =
     model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
   const showName = appearance !== "icon";
+  const thinkingLabel = showName ? visibleThinkingLabel(thinkingLevel) : undefined;
 
   return (
     <DropdownMenu>
@@ -67,14 +69,12 @@ export function DraftStartModelSelect({
           type="button"
           size={showName ? "sm" : "icon-xs"}
           variant={TRIGGER_VARIANT[appearance]}
-          aria-label={`Model: ${selectedName}`}
+          aria-label={triggerAccessibleName(selectedName, thinkingLabel)}
           data-testid="split-run-draft-model"
           disabled={disabled}
           className={TRIGGER_CLASS[appearance]}
         >
-          {appearance === "ghost" ? <Bot className="size-4" aria-hidden /> : null}
-          {showName ? selectedName : null}
-          <ChevronDown className={showName ? "size-3 opacity-60" : "size-3.5"} aria-hidden />
+          <ClosedModelLabel appearance={appearance} selectedName={selectedName} thinkingLabel={thinkingLabel} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="min-w-44">
@@ -100,4 +100,45 @@ export function DraftStartModelSelect({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function ClosedModelLabel({
+  appearance,
+  selectedName,
+  thinkingLabel,
+}: {
+  appearance: Appearance;
+  selectedName: string;
+  thinkingLabel: string | undefined;
+}) {
+  const showName = appearance !== "icon";
+  return (
+    <>
+      {appearance === "ghost" ? <Bot className="size-4" aria-hidden /> : null}
+      {showName ? (
+        <span
+          className={appearance === "ghost" ? "min-w-0 max-w-40 truncate text-foreground" : "min-w-0 max-w-40 truncate"}
+        >
+          {selectedName}
+        </span>
+      ) : null}
+      {thinkingLabel ? <span className="shrink-0 text-muted-foreground">{thinkingLabel}</span> : null}
+      <ChevronDown className={showName ? "size-3 shrink-0 opacity-60" : "size-3.5"} aria-hidden />
+    </>
+  );
+}
+
+function visibleThinkingLabel(thinkingLevel: string): string | undefined {
+  const match = THINKING_LEVELS.find((level) => level.value === thinkingLevel);
+  if (!match?.value) {
+    return undefined;
+  }
+  return match.label;
+}
+
+function triggerAccessibleName(modelName: string, thinkingLabel: string | undefined) {
+  if (!thinkingLabel) {
+    return `Model: ${modelName}`;
+  }
+  return `Model: ${modelName}, ${thinkingLabel}`;
 }
