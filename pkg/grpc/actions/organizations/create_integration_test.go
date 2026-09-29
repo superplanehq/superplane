@@ -25,6 +25,12 @@ func Test__CreateIntegration(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	baseURL := "http://localhost"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			ctx.Integration.Ready()
+			return nil
+		},
+	})
 
 	t.Run("duplicate integration name -> error", func(t *testing.T) {
 		name := support.RandomName("integration")
@@ -34,7 +40,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create first integration
 		//
-		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)
@@ -43,7 +49,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Try to create second integration with the same name
 		//
-		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.Error(t, err)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -59,7 +65,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create first integration
 		//
-		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		integrationID := response.Integration.Metadata.Id
@@ -96,7 +102,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create a new installation with the same name
 		//
-		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, name, response2.Integration.Metadata.Name)
@@ -125,7 +131,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create integration in first organization
 		//
-		response1, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response1, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response1)
 		assert.Equal(t, name, response1.Integration.Metadata.Name)
@@ -133,7 +139,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create integration with same name in second organization
 		//
-		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org2.ID.String(), "github", name, appConfig)
+		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org2.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, name, response2.Integration.Metadata.Name)
@@ -254,6 +260,11 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("github uses legacy create when new setup flow feature is off", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "")
+
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
 		require.NoError(t, err)
@@ -282,7 +293,7 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 	})
 
-	t.Run("github uses hosted install when factories and app env are set even if new setup flow is on", func(t *testing.T) {
+	t.Run("github requires repository selection when the public app is configured", func(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
@@ -294,13 +305,14 @@ func Test__CreateIntegration(t *testing.T) {
 		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
 
 		name := support.RandomName("integration")
-		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
-		require.NoError(t, err)
-		require.NotNil(t, response.Integration)
-		assert.Nil(t, response.Integration.Status.SetupState)
-		require.NotNil(t, response.Integration.Status.BrowserAction)
-		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
-		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, message, "select a repository")
+		_, findErr := models.FindIntegrationByName(database.Conn(), org.ID, name)
+		assert.ErrorIs(t, findErr, gorm.ErrRecordNotFound)
 	})
 
 	t.Run("sentry uses hosted install when the public app env is set", func(t *testing.T) {

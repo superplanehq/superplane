@@ -1,8 +1,4 @@
-import {
-  GITHUB_INSTALL_REQUEST_NEXT,
-  GITHUB_INSTALL_REQUEST_TITLE,
-  githubInstallRequestBody,
-} from "@/lib/githubInstallRequestCopy";
+import { GITHUB_INSTALL_REQUEST_NEXT, githubInstallRequestBody } from "@/lib/githubInstallRequestCopy";
 
 function ticketCount(count: number) {
   return count === 1 ? "1 ticket" : `${count} tickets`;
@@ -30,27 +26,25 @@ export const FIRST_RUN_COPY = {
     signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     connectGitHub: "Connect GitHub",
     connectAction: "Connect GitHub",
-    stepGrantAccess: "Grant access",
     stepRepository: "Choose repository",
-    grantHeadline: "Grant GitHub access",
-    grantBody: "Choose the repositories that SuperPlane can use.",
-    grantAction: "Grant GitHub access",
-    configureAction: "Configure access",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
-    installRequested: GITHUB_INSTALL_REQUEST_TITLE,
-    installRequestedBody: githubInstallRequestBody,
-    installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
     openingGitHub: "Opening GitHub…",
     loadingAccounts: "Loading GitHub access…",
-    synchronizing: "Synchronizing repositories…",
   },
   choose: {
     headline: "Choose your first repository",
+    switchAccount: "Switch account",
+    connectAnotherAccount: "Connect another GitHub account",
     repositoryLabel: "Repository",
     repositoryHelper: "SuperPlane scores tickets against this codebase and opens pull requests here for review.",
     searchPlaceholder: "Search repositories",
     missingRepository: "Do not see your repository?",
-    editConnection: "Configure access",
+    grantAccess: "Grant access on GitHub",
+    openingGitHub: "Opening GitHub…",
+    synchronizing: "More repositories are syncing…",
+    installRequested: (organization: string) => `Waiting for approval for ${organization}.`,
+    installRequestedBody: githubInstallRequestBody,
+    installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
     continue: "Choose a repository to continue",
     continueReady: "Continue",
     saving: "Saving repository…",

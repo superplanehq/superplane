@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,10 +17,16 @@ const (
 	githubAppReconcileInterval = 5 * time.Minute
 	githubAppJobPollInterval   = time.Second
 	githubAppClaimTimeout      = 5 * time.Minute
+	githubAppJobBatchSize      = 8
 )
 
+type githubAppCatalog interface {
+	Reconcile(context.Context) error
+	SyncRepositoryCollaborators(context.Context, int64) error
+}
+
 type GitHubAppCatalogWorker struct {
-	catalog *githubapp.Catalog
+	catalog githubAppCatalog
 	logger  *log.Entry
 }
 
@@ -46,7 +53,7 @@ func (w *GitHubAppCatalogWorker) Start(ctx context.Context) {
 			w.reconcile(ctx)
 		case <-jobTicker.C:
 			w.processReconcileJob(ctx)
-			w.processJob(ctx)
+			w.processJobs(ctx)
 		}
 	}
 }
@@ -85,18 +92,38 @@ func (w *GitHubAppCatalogWorker) reconcile(ctx context.Context) {
 	}
 }
 
-func (w *GitHubAppCatalogWorker) processJob(ctx context.Context) {
+func (w *GitHubAppCatalogWorker) processJobs(ctx context.Context) {
 	now := time.Now()
-	job, err := models.ClaimGitHubAppRepositorySync(database.Conn(), now, now.Add(-githubAppClaimTimeout))
-	if err != nil {
-		w.logger.WithError(err).Error("failed to claim a GitHub collaborator synchronization job")
-		return
-	}
-	if job == nil {
-		return
+	jobs := make([]*models.GitHubAppRepositorySyncJob, 0, githubAppJobBatchSize)
+	for range githubAppJobBatchSize {
+		job, err := models.ClaimGitHubAppRepositorySync(database.Conn(), now, now.Add(-githubAppClaimTimeout))
+		if err != nil {
+			w.logger.WithError(err).Error("failed to claim a GitHub collaborator synchronization job")
+			break
+		}
+		if job == nil {
+			break
+		}
+		jobs = append(jobs, job)
 	}
 
-	err = w.catalog.SyncRepositoryCollaborators(ctx, job.RepositoryID)
+	var group sync.WaitGroup
+	for _, job := range jobs {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			w.processClaimedJob(ctx, job, now)
+		}()
+	}
+	group.Wait()
+}
+
+func (w *GitHubAppCatalogWorker) processClaimedJob(
+	ctx context.Context,
+	job *models.GitHubAppRepositorySyncJob,
+	claimedAt time.Time,
+) {
+	err := w.catalog.SyncRepositoryCollaborators(ctx, job.RepositoryID)
 	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
 		if completeErr := models.CompleteGitHubAppRepositorySync(database.Conn(), job.RepositoryID); completeErr != nil {
 			w.logger.WithError(completeErr).Error("failed to complete a GitHub collaborator synchronization job")
@@ -107,7 +134,7 @@ func (w *GitHubAppCatalogWorker) processJob(ctx context.Context) {
 	if retryErr := models.RetryGitHubAppRepositorySync(
 		database.Conn(),
 		job.RepositoryID,
-		now.Add(githubAppRetryDelay(job.Attempts)),
+		claimedAt.Add(githubAppRetryDelay(job.Attempts)),
 		err,
 	); retryErr != nil {
 		w.logger.WithError(retryErr).Error("failed to retry a GitHub collaborator synchronization job")

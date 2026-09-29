@@ -59,6 +59,10 @@ func (s *MeService) DescribeGitHubOnboarding(ctx context.Context, _ *pb.Describe
 	return me.DescribeGitHubOnboarding(ctx)
 }
 
+func (s *MeService) SelectGitHubOnboardingIdentity(ctx context.Context, req *pb.SelectGitHubOnboardingIdentityRequest) (*pb.SelectGitHubOnboardingIdentityResponse, error) {
+	return me.SelectGitHubOnboardingIdentity(ctx, req.GetUserId())
+}
+
 func (s *MeService) StartGitHubAppInstallation(ctx context.Context, _ *pb.StartGitHubAppInstallationRequest) (*pb.StartGitHubAppInstallationResponse, error) {
 	return me.StartGitHubAppInstallation(ctx)
 }

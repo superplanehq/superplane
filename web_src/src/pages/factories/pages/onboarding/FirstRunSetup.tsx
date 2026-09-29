@@ -174,7 +174,7 @@ function AgentScreen({
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   if (target === "choose") {
-    return () => flow.goToScreen("connect");
+    return () => flow.goToScreen(flow.identityConnected ? "welcome" : "connect");
   }
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
@@ -295,11 +295,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     return (
       <FirstRunConnectScreen
         loading={flow.repositoriesLoading}
-        identityConnected={flow.identityConnected}
-        githubLogin={flow.githubLogin}
-        pendingOrganizations={flow.pendingOrganizations}
-        synchronizing={flow.synchronizing}
-        appConfigured={flow.appConfigured}
         connecting={flow.blockingAction === "opening-github"}
         connectError={flow.connectError}
         chrome={chromeFor("connect")}
@@ -314,12 +309,22 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunChooseScreen
         repositories={flow.repositories}
         selectedRepository={setup.selectedRepo}
+        githubLogin={flow.githubLogin}
+        githubUserId={flow.githubUserId}
+        githubIdentities={flow.githubIdentities}
         loading={flow.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
+        grantingAccess={flow.blockingAction === "opening-github"}
+        switchingGitHubAccount={flow.blockingAction === "switching-github-account"}
+        synchronizing={flow.synchronizing}
+        pendingOrganizations={flow.pendingOrganizations}
+        appConfigured={flow.appConfigured}
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
         onSelectRepository={setup.selectRepo}
-        onEditConnection={() => void flow.configureGitHubAccess()}
+        onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
+        onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
+        onGrantAccess={() => void flow.grantGitHubAccess()}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

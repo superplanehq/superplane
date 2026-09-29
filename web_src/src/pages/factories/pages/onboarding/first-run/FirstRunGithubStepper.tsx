@@ -6,13 +6,12 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 
 const copy = FIRST_RUN_COPY.connect;
 
-export type FirstRunGithubStep = "connect" | "grant" | "repository";
+export type FirstRunGithubStep = "connect" | "repository";
 
-const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "grant", "repository"];
+const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "repository"];
 
 function stepLabel(step: FirstRunGithubStep): string {
   if (step === "connect") return copy.connectGitHub;
-  if (step === "grant") return copy.stepGrantAccess;
   return copy.stepRepository;
 }
 
@@ -35,7 +34,7 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
 }
 
 /**
- * The three GitHub steps on one card. Finished steps collapse to checkmarked
+ * The GitHub steps on one card. Finished steps collapse to checkmarked
  * rows, upcoming steps stay dim, and the active step holds its content and
  * primary action inside the card. Each connect page renders this card, so
  * the flow reads as one task even though the pages change.
@@ -43,17 +42,11 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
 export function FirstRunGithubStepper({
   current,
   action,
-  grantStatus,
   children,
 }: {
   current: FirstRunGithubStep;
   /** Control on the active step header, e.g. the Connect button. */
   action?: ReactNode;
-  /**
-   * Rows that belong to the access step, such as an installation request that
-   * waits for an organization administrator.
-   */
-  grantStatus?: ReactNode;
   children?: ReactNode;
 }) {
   const currentIndex = STEP_ORDER.indexOf(current);
@@ -73,6 +66,7 @@ export function FirstRunGithubStepper({
                 "flex items-center justify-between gap-3 text-[13px]",
                 active ? "font-medium text-foreground" : "text-muted-foreground",
               )}
+              data-testid={`first-run-step-${step}-header`}
             >
               <span className="flex items-center gap-2.5">
                 <StepBadge number={index + 1} done={done} />
@@ -80,7 +74,6 @@ export function FirstRunGithubStepper({
               </span>
               {active ? action : null}
             </div>
-            {step === "grant" && grantStatus ? <div className="mt-3 space-y-3">{grantStatus}</div> : null}
             {active && children ? <div className="mt-3 space-y-3">{children}</div> : null}
           </div>
         );

@@ -5,7 +5,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
@@ -22,6 +22,7 @@ import {
   type OnboardingAgentGate,
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
+import { onboardingStepPath } from "./onboardingStepPath";
 import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -29,6 +30,7 @@ export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 export type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
 type FirstRunBlockingAction =
   | "opening-github"
+  | "switching-github-account"
   | "saving-repository"
   | "saving-ticket-source"
   | "connecting-jira"
@@ -117,6 +119,7 @@ function useGitHubConnectionState(organizationId: string) {
   return {
     onboarding,
     identity: onboarding.data?.identity,
+    identities: onboarding.data?.identities ?? [],
     repositories,
     pendingOrganizations: (onboarding.data?.pendingRequests ?? [])
       .map((request) => request.accountLogin?.trim())
@@ -161,11 +164,11 @@ function useFirstRunNavigation(
     setOpenedScreen(next);
   };
 
-  const githubAccessRequired =
-    !connection.onboarding.isPending &&
-    openedScreen !== "welcome" &&
-    (!connection.identity || connection.repositories.length === 0);
-  const availableScreen = githubAccessRequired ? "connect" : openedScreen;
+  let availableScreen = openedScreen;
+  if (!connection.onboarding.isPending && openedScreen !== "welcome") {
+    if (!connection.identity) availableScreen = "connect";
+    else if (openedScreen === "connect") availableScreen = "choose";
+  }
 
   return {
     screen: screenWithoutIncompleteJira(
@@ -222,6 +225,7 @@ function useFirstRunCommands(args: {
   jiraAvailable: boolean;
 }) {
   const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
+  const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       const repository = connection.repositories.find((candidate) => candidate.fullName === model.setup.selectedRepo);
@@ -245,11 +249,17 @@ function useFirstRunCommands(args: {
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
-      if (!connection.identity) {
-        const returnPath = `${window.location.pathname}${window.location.search}`;
-        window.location.assign(linkedAccountConnectHref("github", returnPath));
-        return true;
-      }
+      const returnPath = onboardingStepPath(`${location.pathname}${location.search}`, "repo");
+      window.location.assign(linkedAccountConnectHref("github", returnPath));
+      return true;
+    });
+  const selectGitHubIdentity = (userId: string) =>
+    blocking.run("switching-github-account", async () => {
+      await connection.onboarding.selectIdentity.mutateAsync(userId);
+      model.setup.clearRepository();
+    });
+  const grantGitHubAccess = () =>
+    blocking.run("opening-github", async () => {
       const popup = openGitHubWindow();
       try {
         const url = await connection.onboarding.startInstallation.mutateAsync();
@@ -258,7 +268,6 @@ function useFirstRunCommands(args: {
         popup?.close();
         throw error;
       }
-      return false;
     });
   const connectJira = () =>
     blocking.runUntilNavigation("connecting-jira", async () => {
@@ -276,21 +285,6 @@ function useFirstRunCommands(args: {
     if (agentGate === "first") return navigation.goToScreen("tickets");
     return finishSetup();
   };
-  const configureGitHubAccess = () => {
-    const selected = connection.repositories.find((repository) => repository.fullName === model.setup.selectedRepo);
-    const installationId = selected?.installationId ?? connection.repositories[0]?.installationId;
-    if (!installationId) return Promise.resolve();
-    return blocking.run("opening-github", async () => {
-      const popup = openGitHubWindow();
-      try {
-        const url = await connection.onboarding.configureInstallation.mutateAsync(installationId);
-        navigateGitHubWindow(popup, url);
-      } catch (error) {
-        popup?.close();
-        throw error;
-      }
-    });
-  };
   const selectTicketSource = (source: FirstRunTicketSource) => {
     if (source === "jira" && !jiraAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
@@ -302,7 +296,8 @@ function useFirstRunCommands(args: {
     continueFromRepository,
     continueFromTickets,
     continueFromAgent,
-    configureGitHubAccess,
+    grantGitHubAccess,
+    selectGitHubIdentity,
     selectTicketSource,
   };
 }
@@ -357,10 +352,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const navigation = useFirstRunNavigation(model, agentGate, connection);
   const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
   useRepositoryErrorToast(connection.onboarding.error);
-  useEffect(() => {
-    if (navigation.screen !== "connect" || !connection.identity || connection.repositories.length === 0) return;
-    navigation.goToScreen("choose");
-  }, [connection.identity, connection.repositories.length, navigation]);
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms
   // the feature is off. A failed lookup has no organization data and must not
@@ -398,6 +389,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     repositoriesLoading: connection.onboarding.isPending,
     identityConnected: Boolean(connection.identity),
     githubLogin: connection.identity?.login ?? "",
+    githubUserId: connection.identity?.userId ?? "",
+    githubIdentities: connection.identities,
     pendingOrganizations: connection.pendingOrganizations,
     synchronizing: connection.synchronizing,
     appConfigured: connection.appConfigured,

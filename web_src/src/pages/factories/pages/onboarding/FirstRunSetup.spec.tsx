@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -122,6 +123,24 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent("Connect GitHub");
   });
 
+  it("returns from GitHub connection at repository selection", async () => {
+    const user = userEvent.setup();
+    const previousAssign = window.location.assign.bind(window.location);
+    const assign = vi.fn();
+    window.location.assign = assign;
+
+    try {
+      renderSetup(pageModel());
+      await user.click(screen.getByTestId("first-run-connect-github"));
+
+      expect(assign).toHaveBeenCalledWith(
+        "/auth/github?intent=connect&redirect=%2Forg-1%2Fworkspaces%2FPAY%2Fsetup%3Fstep%3Drepo",
+      );
+    } finally {
+      window.location.assign = previousAssign;
+    }
+  });
+
   it("skips installation when cached accessible repositories exist", async () => {
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.repositories = [
@@ -131,9 +150,24 @@ describe("FirstRunSetup GitHub catalog", () => {
     renderSetup(pageModel());
 
     await waitFor(() => expect(screen.getByTestId("first-run-choose")).toBeInTheDocument());
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      "You are signed in to GitHub as octocat.",
+    );
     expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /example\/web/ })).toBeInTheDocument();
     expect(startInstallation).not.toHaveBeenCalled();
+  });
+
+  it("opens repository selection while repositories synchronize", async () => {
+    github.data.identity = { userId: "9", login: "octocat" };
+    github.data.synchronizing = true;
+
+    renderSetup(pageModel());
+
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-repositories-synchronizing")).toHaveTextContent(
+      FIRST_RUN_COPY.choose.synchronizing,
+    );
   });
 
   it("selects the numeric catalog repository before continuing", async () => {

@@ -134,8 +134,8 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	//
 	if a.isDev {
 		log.Info("Registering development authentication routes")
-		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
-		router.HandleFunc("/auth/{provider}", a.handleDevAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
+		router.HandleFunc("/auth/{provider}", a.handleDevelopmentAuth).Methods("GET")
 		return
 	}
 
@@ -144,10 +144,12 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
-	gothUser, err := gothic.CompleteUserAuth(w, r)
-	if err == nil {
-		a.finishProviderAuth(w, r, gothUser)
-		return
+	if !isConnectIntent(r) {
+		gothUser, err := gothic.CompleteUserAuth(w, r)
+		if err == nil {
+			a.finishProviderAuth(w, r, gothUser)
+			return
+		}
 	}
 
 	authState, err := a.authStateForRequest(w, r)
@@ -166,6 +168,19 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gothic.BeginAuthHandler(w, r)
+}
+
+func useRealProviderAuthInDevelopment(r *http.Request) bool {
+	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+}
+
+func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
+	if useRealProviderAuthInDevelopment(r) {
+		a.handleAuth(w, r)
+		return
+	}
+
+	a.handleDevAuth(w, r)
 }
 
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {

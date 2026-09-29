@@ -2,6 +2,7 @@ import {
   meConfigureGitHubAppInstallation,
   meDescribeGitHubOnboarding,
   meRefreshGitHubOnboarding,
+  meSelectGitHubOnboardingIdentity,
   meStartGitHubAppInstallation,
   type MeDescribeGitHubOnboardingResponse,
 } from "@/api-client";
@@ -34,6 +35,12 @@ export function useGitHubOnboarding(organizationId: string) {
       return response.data.url;
     },
   });
+  const selectIdentity = useMutation({
+    mutationFn: async (userId: string) => {
+      await meSelectGitHubOnboardingIdentity(withOrganizationHeader({ organizationId, body: { userId } }));
+    },
+    onSuccess: () => invalidate(),
+  });
   const configureInstallation = useMutation({
     mutationFn: async (installationId: string) => {
       const response = await meConfigureGitHubAppInstallation(
@@ -53,6 +60,7 @@ export function useGitHubOnboarding(organizationId: string) {
   return {
     ...query,
     startInstallation,
+    selectIdentity,
     configureInstallation,
     refresh,
   };

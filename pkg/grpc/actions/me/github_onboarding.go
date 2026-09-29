@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -20,15 +21,27 @@ import (
 func DescribeGitHubOnboarding(ctx context.Context) (*pb.DescribeGitHubOnboardingResponse, error) {
 	cfg := config.LoadGitHubHostedAppConfig()
 	response := &pb.DescribeGitHubOnboardingResponse{AppConfigured: cfg.Enabled()}
-	identity, err := currentGitHubIdentity(ctx)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return response, nil
-	}
+	identities, err := githubIdentities(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if len(identities) == 0 {
+		return response, nil
+	}
 
-	response.Identity = &pb.GitHubIdentity{UserId: identity.userID, Login: identity.login}
+	response.Identities = make([]*pb.GitHubIdentity, 0, len(identities))
+	var identity *githubIdentity
+	for index := range identities {
+		candidate := &identities[index]
+		response.Identities = append(response.Identities, serializeGitHubIdentity(candidate))
+		if candidate.active {
+			identity = candidate
+		}
+	}
+	if identity == nil {
+		return nil, grpcerrors.FailedPrecondition(nil, "linked GitHub accounts have no active identity")
+	}
+	response.Identity = serializeGitHubIdentity(identity)
 	repositories, err := models.ListAccessibleGitHubAppRepositories(database.DB(ctx), identity.userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list accessible GitHub repositories")
@@ -65,6 +78,24 @@ func DescribeGitHubOnboarding(ctx context.Context) (*pb.DescribeGitHubOnboarding
 		return nil, grpcerrors.Internal(err, "failed to inspect GitHub repository synchronization")
 	}
 	return response, nil
+}
+
+func SelectGitHubOnboardingIdentity(ctx context.Context, userID int64) (*pb.SelectGitHubOnboardingIdentityResponse, error) {
+	if userID <= 0 {
+		return nil, grpcerrors.InvalidArgument(nil, "GitHub user id is required")
+	}
+	accountID, err := currentAccountID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = models.SelectAccountLinkedAccount(database.DB(ctx), accountID, models.ProviderGitHub, strconv.FormatInt(userID, 10))
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.PermissionDenied(err, "GitHub account is not linked")
+	}
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to select GitHub account")
+	}
+	return &pb.SelectGitHubOnboardingIdentityResponse{}, nil
 }
 
 func StartGitHubAppInstallation(ctx context.Context) (*pb.StartGitHubAppInstallationResponse, error) {
@@ -154,30 +185,67 @@ func RefreshGitHubOnboarding(ctx context.Context, repositoryID *int64) (*pb.Refr
 type githubIdentity struct {
 	userID int64
 	login  string
+	active bool
 }
 
-func currentGitHubIdentity(ctx context.Context) (*githubIdentity, error) {
+func currentAccountID(ctx context.Context) (uuid.UUID, error) {
 	userID, userSet := authentication.GetUserIdFromMetadata(ctx)
 	organizationID, organizationSet := authentication.GetOrganizationIdFromMetadata(ctx)
 	if !userSet || !organizationSet {
-		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 	user, err := loadUser(ctx, organizationID, userID)
 	if err != nil {
-		return nil, err
+		return uuid.Nil, err
 	}
 	if user.AccountID == nil {
-		return nil, gorm.ErrRecordNotFound
+		return uuid.Nil, gorm.ErrRecordNotFound
 	}
-	linked, err := models.FindAccountLinkedAccount(database.DB(ctx), *user.AccountID, models.ProviderGitHub)
+	return *user.AccountID, nil
+}
+
+func githubIdentities(ctx context.Context) ([]githubIdentity, error) {
+	accountID, err := currentAccountID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	numericID, err := strconv.ParseInt(linked.ProviderID, 10, 64)
-	if err != nil || numericID <= 0 {
-		return nil, grpcerrors.FailedPrecondition(err, "linked GitHub account has an invalid user id")
+	linkedAccounts, err := models.ListAccountLinkedAccounts(database.DB(ctx), accountID)
+	if err != nil {
+		return nil, err
 	}
-	return &githubIdentity{userID: numericID, login: linked.Username}, nil
+	identities := make([]githubIdentity, 0, len(linkedAccounts))
+	for _, linked := range linkedAccounts {
+		if linked.Provider != models.ProviderGitHub {
+			continue
+		}
+		numericID, err := strconv.ParseInt(linked.ProviderID, 10, 64)
+		if err != nil || numericID <= 0 {
+			return nil, grpcerrors.FailedPrecondition(err, "linked GitHub account has an invalid user id")
+		}
+		identities = append(identities, githubIdentity{
+			userID: numericID,
+			login:  linked.Username,
+			active: linked.Active,
+		})
+	}
+	return identities, nil
+}
+
+func currentGitHubIdentity(ctx context.Context) (*githubIdentity, error) {
+	identities, err := githubIdentities(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for index := range identities {
+		if identities[index].active {
+			return &identities[index], nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func serializeGitHubIdentity(identity *githubIdentity) *pb.GitHubIdentity {
+	return &pb.GitHubIdentity{UserId: identity.userID, Login: identity.login}
 }
 
 func githubIdentityError(err error) error {

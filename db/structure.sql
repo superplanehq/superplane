@@ -52,6 +52,7 @@ CREATE TABLE public.account_linked_accounts (
     linked_at timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    active boolean DEFAULT false NOT NULL,
     CONSTRAINT account_linked_accounts_provider_id_present CHECK ((btrim((provider_id)::text) <> ''::text)),
     CONSTRAINT account_linked_accounts_provider_present CHECK ((btrim((provider)::text) <> ''::text)),
     CONSTRAINT account_linked_accounts_username_present CHECK ((btrim((username)::text) <> ''::text))
@@ -2579,10 +2580,17 @@ CREATE INDEX github_app_repository_sync_jobs_due_idx ON public.github_app_reposi
 
 
 --
--- Name: idx_account_linked_accounts_account_provider; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_linked_accounts_account_provider_identity; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.account_linked_accounts USING btree (account_id, provider);
+CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider_identity ON public.account_linked_accounts USING btree (account_id, provider, provider_id);
+
+
+--
+-- Name: idx_account_linked_accounts_active_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_linked_accounts_active_provider ON public.account_linked_accounts USING btree (account_id, provider) WHERE active;
 
 
 --
@@ -4767,7 +4775,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929030219	f
+20260929052612	f
 \.
 
 

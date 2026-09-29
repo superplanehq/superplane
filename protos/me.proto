@@ -149,7 +149,19 @@ service Me {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe GitHub onboarding";
-      description: "Returns the GitHub identity, accessible repositories, and pending installation requests for the current account";
+      description: "Returns the linked GitHub identities, active identity, accessible repositories, and pending installation requests for the current account";
+      tags: "Me";
+    };
+  }
+
+  rpc SelectGitHubOnboardingIdentity(SelectGitHubOnboardingIdentityRequest) returns (SelectGitHubOnboardingIdentityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/github/identity"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a GitHub identity";
+      description: "Selects the linked GitHub identity that supplies repositories during onboarding";
       tags: "Me";
     };
   }
@@ -229,7 +241,14 @@ message DescribeGitHubOnboardingResponse {
   repeated GitHubOnboardingRepository repositories = 3;
   repeated GitHubAppInstallRequest pending_requests = 4;
   bool synchronizing = 5;
+  repeated GitHubIdentity identities = 6;
 }
+
+message SelectGitHubOnboardingIdentityRequest {
+  int64 user_id = 1;
+}
+
+message SelectGitHubOnboardingIdentityResponse {}
 
 message StartGitHubAppInstallationRequest {}
 

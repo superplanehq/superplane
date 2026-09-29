@@ -122,7 +122,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
 }
 
 function withRepository(): OnboardingSetupApi {
-  return { ...setupState(), selectedRepo: "acme/payments-service" };
+  return { ...setupState(), selectedRepo: "acme/api" };
 }
 
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
