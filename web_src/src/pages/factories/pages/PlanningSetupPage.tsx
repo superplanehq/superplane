@@ -5,7 +5,7 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryPlanningPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 
 /** Old Planning setup URLs open Planning settings when the user can update the factory. */
-export function planningSetupRedirectTarget(input: {
+function planningSetupRedirectTarget(input: {
   canUpdate: boolean;
   linePresent: boolean;
   boardHref: string;
