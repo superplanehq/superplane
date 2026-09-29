@@ -29,13 +29,13 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 	}
 
 	for attempt := 0; attempt < maxOrganizationDeletionAttempts; attempt++ {
-		scheduled, err := polar.CancelOrganizationSubscriptionForDeletion(ctx, database.Conn(), organization.ID)
+		scheduled, err := polar.CancelOrganizationSubscriptionForDeletion(ctx, database.DB(ctx), organization.ID)
 		if err != nil {
 			log.Errorf("Error canceling Business plan before deleting organization %s: %v", organization.ID.String(), err)
 			return nil, grpcerrors.Internal(err, "failed to cancel the Business plan. The organization was not deleted.")
 		}
 
-		err = deleteLockedOrganization(authService, organization)
+		err = deleteLockedOrganization(ctx, authService, organization)
 		if err == nil {
 			log.Infof(
 				"Organization %s (%s) soft-deleted by user %s",
@@ -60,8 +60,8 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 	)
 }
 
-func deleteLockedOrganization(authService authorization.Authorization, organization *models.Organization) error {
-	tx := database.Conn().Begin()
+func deleteLockedOrganization(ctx context.Context, authService authorization.Authorization, organization *models.Organization) error {
+	tx := database.DB(ctx).Begin()
 	committed := false
 	defer func() {
 		if !committed {
@@ -98,7 +98,7 @@ func restoreSubscriptionAfterFailedDeletion(ctx context.Context, orgID uuid.UUID
 	if !scheduled {
 		return deleteErr
 	}
-	if resumeErr := polar.ResumeOrganizationSubscription(ctx, database.Conn(), orgID); resumeErr != nil {
+	if resumeErr := polar.ResumeOrganizationSubscription(ctx, database.DB(ctx), orgID); resumeErr != nil {
 		log.Errorf("Error restoring Business plan after failed deletion of organization %s: %v", orgID.String(), resumeErr)
 		return grpcerrors.Internal(resumeErr, "failed to delete the organization. The Business plan is set to end at the period end.")
 	}

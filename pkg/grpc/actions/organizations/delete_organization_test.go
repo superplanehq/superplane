@@ -207,7 +207,7 @@ func Test__DeleteLockedOrganizationRetriesWhenSubscriptionRenews(t *testing.T) {
 	db := database.Conn()
 	activateBusinessPlan(t, db, r.Organization.ID, "sub_race")
 
-	err := deleteLockedOrganization(r.AuthService, r.Organization)
+	err := deleteLockedOrganization(context.Background(), r.AuthService, r.Organization)
 	require.ErrorIs(t, err, polar.ErrSubscriptionChangedDuringDeletion)
 
 	found, err := models.FindOrganizationByID(r.Organization.ID.String())

@@ -21,6 +21,8 @@ var (
 	ErrSubscriptionChangedDuringDeletion = errors.New("subscription changed during organization deletion")
 )
 
+const maxDeletedOrganizationSubscriptionCancels = 3
+
 func ApplySubscriptionEvent(ctx context.Context, tx *gorm.DB, event *SubscriptionWebhookEvent) error {
 	if event == nil {
 		return permanentApplyError("subscription event is required")
@@ -122,14 +124,69 @@ func cancelSubscriptionForDeletedOrganization(ctx context.Context, tx *gorm.DB, 
 		return errors.New("cannot cancel Polar subscription for deleted organization: checkout is not configured")
 	}
 
+	if err := cancelDifferentRenewingSubscription(ctx, tx, orgID, data.ID); err != nil {
+		return err
+	}
+
 	updated, err := NewClientFromEnv().CancelSubscriptionAtPeriodEnd(ctx, data.ID)
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(updated.organizationExternalID()) == "" {
-		updated.ExternalCustomerID = orgID.String()
+	return persistDeletedOrganizationCancellation(ctx, tx, orgID, *updated)
+}
+
+func cancelDifferentRenewingSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, incomingID string) error {
+	incomingID = strings.TrimSpace(incomingID)
+	for attempt := 0; attempt < maxDeletedOrganizationSubscriptionCancels; attempt++ {
+		plan, err := models.FindOrganizationBillingPlan(tx, orgID)
+		if err != nil {
+			return err
+		}
+		currentID := polarSubscriptionID(plan)
+		if currentID == "" || currentID == incomingID || !subscriptionNeedsDeletionCancel(plan) {
+			return nil
+		}
+
+		updated, err := NewClientFromEnv().CancelSubscriptionAtPeriodEnd(ctx, currentID)
+		if err != nil {
+			return err
+		}
+		if err := persistDeletedOrganizationCancellation(ctx, tx, orgID, *updated); err != nil {
+			return err
+		}
 	}
-	return applyOpenOrganizationSubscription(ctx, tx, orgID, *updated)
+
+	plan, err := models.FindOrganizationBillingPlan(tx, orgID)
+	if err != nil {
+		return err
+	}
+	currentID := polarSubscriptionID(plan)
+	if currentID != "" && currentID != incomingID && subscriptionNeedsDeletionCancel(plan) {
+		return errors.New("deleted organization still has a renewing subscription")
+	}
+	return nil
+}
+
+func persistDeletedOrganizationCancellation(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, data SubscriptionData) error {
+	if strings.TrimSpace(data.organizationExternalID()) == "" {
+		data.ExternalCustomerID = orgID.String()
+	}
+
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := models.LockOrganizationIncludingDeleted(inner, orgID); err != nil {
+			return err
+		}
+		plan, err := models.FindOrganizationBillingPlan(inner, orgID)
+		if err != nil {
+			return err
+		}
+		currentID := polarSubscriptionID(plan)
+		incomingID := strings.TrimSpace(data.ID)
+		if currentID != "" && currentID != incomingID {
+			return nil
+		}
+		return applyOpenOrganizationSubscription(ctx, inner, orgID, data)
+	})
 }
 
 func subscriptionDataRenews(data SubscriptionData) bool {
