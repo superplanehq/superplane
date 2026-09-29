@@ -243,7 +243,7 @@ function ArtifactIconLink({
       <a
         href={href}
         download={download}
-        target={download ? undefined : "_blank"}
+        target="_blank"
         rel="noopener noreferrer"
         aria-label={label}
       >
