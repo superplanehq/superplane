@@ -361,7 +361,6 @@ CREATE TABLE public.factories (
     planning_clarity boolean DEFAULT false NOT NULL,
     planning_confidence boolean DEFAULT true NOT NULL,
     planning_setup_completed boolean DEFAULT false NOT NULL,
-    planning_auto_start_line_id uuid,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -847,7 +846,6 @@ CREATE TABLE public.factory_work_orders (
     origin_label text,
     repository text,
     default_branch text,
-    auto_start_line_id uuid,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -1126,27 +1124,6 @@ CREATE TABLE public.sentry_app_install_grants (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     claimed_integration_id text
-);
-
-
---
--- Name: sentry_webhook_receipts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sentry_webhook_receipts (
-    id uuid NOT NULL,
-    received_at timestamp with time zone DEFAULT now() NOT NULL,
-    hook_resource text DEFAULT ''::text NOT NULL,
-    action text DEFAULT ''::text NOT NULL,
-    installation_uuid text DEFAULT ''::text NOT NULL,
-    organization_slug text DEFAULT ''::text NOT NULL,
-    project_slug text DEFAULT ''::text NOT NULL,
-    issue_id text DEFAULT ''::text NOT NULL,
-    issue_short_id text DEFAULT ''::text NOT NULL,
-    http_status integer NOT NULL,
-    outcome text NOT NULL,
-    integration_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2136,14 +2113,6 @@ ALTER TABLE ONLY public.sentry_app_install_grants
 
 
 --
--- Name: sentry_webhook_receipts sentry_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sentry_webhook_receipts
-    ADD CONSTRAINT sentry_webhook_receipts_pkey PRIMARY KEY (id);
-
-
---
 -- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3051,13 +3020,6 @@ CREATE INDEX idx_sentry_app_install_grants_expires_at ON public.sentry_app_insta
 
 
 --
--- Name: idx_sentry_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sentry_webhook_receipts_received_at ON public.sentry_webhook_receipts USING btree (received_at DESC);
-
-
---
 -- Name: idx_user_api_tokens_token_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3565,14 +3527,6 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 
 --
--- Name: factories factories_planning_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factories
-    ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
-
-
---
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4018,14 +3972,6 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
     ADD CONSTRAINT factory_work_order_queue_items_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_orders factory_work_orders_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_orders
-    ADD CONSTRAINT factory_work_orders_auto_start_line_id_fkey FOREIGN KEY (auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
 
 
 --
@@ -4556,7 +4502,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929160002	f
+20260929184133	f
 \.
 
 
