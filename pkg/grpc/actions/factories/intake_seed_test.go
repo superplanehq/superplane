@@ -866,6 +866,37 @@ func Test__DatadogSeedFailsWhenUnverifiedIssueLoadFailsWithoutSummaryService(t *
 	assert.Nil(t, issues)
 }
 
+func Test__DatadogSeedKeepsPartialBatchWhenUnverifiedLoadFails(t *testing.T) {
+	const unverifiedID = "66666666-6666-4666-8666-666666666666"
+	const verifiedID = "77777777-7777-4777-8777-777777777777"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, unverifiedID):
+			http.Error(w, "timeout", http.StatusGatewayTimeout)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, verifiedID):
+			_, _ = w.Write([]byte(`{"data":{"id":"` + verifiedID + `","type":"issue","attributes":{"error_message":"checkout failed","service":"checkout"}}}`))
+		default:
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		}
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{
+		{ID: unverifiedID, URL: "https://app.datadoghq.eu/error-tracking/issue/" + unverifiedID},
+		{ID: verifiedID, Service: "checkout", URL: "https://app.datadoghq.eu/error-tracking/issue/" + verifiedID},
+	})
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+	assert.Equal(t, verifiedID, issues[0].ID)
+}
+
 func Test__DatadogSeedKeepsVerifiedIssuesWhenUnverifiedLoadFails(t *testing.T) {
 	const unverifiedID = "66666666-6666-4666-8666-666666666666"
 	candidates := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize+1)

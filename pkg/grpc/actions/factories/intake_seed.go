@@ -754,8 +754,7 @@ func hydrateDatadogSeedIssues(
 		}
 		hydrated = append(hydrated, *loaded)
 	}
-	target := min(intakeDatadogSeedSize, len(issues))
-	if unverifiedLoadFailures > 0 && len(hydrated) < target {
+	if len(hydrated) == 0 && unverifiedLoadFailures > 0 {
 		return nil, fmt.Errorf(
 			"failed to verify %d Datadog issue(s) for intake service %q",
 			unverifiedLoadFailures,
