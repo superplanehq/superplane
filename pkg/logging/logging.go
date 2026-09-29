@@ -12,6 +12,9 @@ const (
 	// Productive task webhook failure. Filter:
 	// jsonPayload.component="webhook.productive"
 	ComponentWebhookProductive = "webhook.productive"
+	// ComponentWebhookSentry is the Cloud Logging component for a hosted
+	// Sentry webhook. Filter: jsonPayload.component="webhook.sentry"
+	ComponentWebhookSentry = "webhook.sentry"
 
 	productiveWebhookFailureMessage = "error handling webhook"
 	webhookTypeUnknown              = "unknown"
@@ -27,15 +30,15 @@ type WebhookNodeFields struct {
 	WebhookID      string
 }
 
-// standardLogWriter sends Productive webhook JSON to the process logger
-// output. The process formatter stays text.
+// standardLogWriter sends a JSON log line to the process logger output.
+// The process formatter stays text.
 type standardLogWriter struct{}
 
 func (standardLogWriter) Write(p []byte) (int, error) {
 	return log.StandardLogger().Out.Write(p)
 }
 
-func newProductiveWebhookLogger() *log.Logger {
+func newJSONLineLogger() *log.Logger {
 	logger := log.New()
 	logger.SetFormatter(&log.JSONFormatter{})
 	logger.SetOutput(standardLogWriter{})
@@ -43,8 +46,20 @@ func newProductiveWebhookLogger() *log.Logger {
 	return logger
 }
 
+func newProductiveWebhookLogger() *log.Logger {
+	return newJSONLineLogger()
+}
+
 // productiveWebhookLogger writes one JSON object per Productive webhook failure.
 var productiveWebhookLogger = newProductiveWebhookLogger()
+
+// sentryWebhookLogger writes one JSON object per hosted Sentry webhook log.
+var sentryWebhookLogger = newJSONLineLogger()
+
+// SentryWebhookLogger returns the JSON logger used for hosted Sentry webhooks.
+func SentryWebhookLogger() *log.Logger {
+	return sentryWebhookLogger
+}
 
 // ProductiveWebhookLogger returns the JSON logger used for Productive webhook failures.
 func ProductiveWebhookLogger() *log.Logger {
@@ -191,6 +206,34 @@ func LogProductiveWebhookFailure(event string, fields log.Fields, err error) {
 // task webhook that succeeded with less data than expected.
 func LogProductiveWebhookWarning(event string, message string, fields log.Fields, err error) {
 	productiveWebhookEntry(event, fields, err).Warn(message)
+}
+
+// LogSentryWebhookInfo writes one JSON info line for a hosted Sentry webhook.
+func LogSentryWebhookInfo(message string, fields log.Fields) {
+	sentryWebhookEntry(fields, nil).Info(message)
+}
+
+// LogSentryWebhookWarn writes one JSON warning line for a hosted Sentry webhook.
+func LogSentryWebhookWarn(message string, fields log.Fields) {
+	sentryWebhookEntry(fields, nil).Warn(message)
+}
+
+// LogSentryWebhookError writes one JSON error line for a hosted Sentry webhook.
+func LogSentryWebhookError(message string, fields log.Fields, err error) {
+	sentryWebhookEntry(fields, err).Error(message)
+}
+
+func sentryWebhookEntry(fields log.Fields, err error) *log.Entry {
+	sentryWebhookLogger.SetLevel(log.StandardLogger().GetLevel())
+	entry := log.NewEntry(sentryWebhookLogger)
+	if len(fields) > 0 {
+		entry = entry.WithFields(fields)
+	}
+	entry = entry.WithField("component", ComponentWebhookSentry)
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	return entry
 }
 
 func productiveWebhookEntry(event string, fields log.Fields, err error) *log.Entry {

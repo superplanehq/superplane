@@ -1129,6 +1129,27 @@ CREATE TABLE public.sentry_app_install_grants (
 
 
 --
+-- Name: sentry_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sentry_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    hook_resource text DEFAULT ''::text NOT NULL,
+    action text DEFAULT ''::text NOT NULL,
+    installation_uuid text DEFAULT ''::text NOT NULL,
+    organization_slug text DEFAULT ''::text NOT NULL,
+    project_slug text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    issue_short_id text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    integration_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2114,6 +2135,14 @@ ALTER TABLE ONLY public.sentry_app_install_grants
 
 
 --
+-- Name: sentry_webhook_receipts sentry_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sentry_webhook_receipts
+    ADD CONSTRAINT sentry_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3018,6 +3047,13 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 --
 
 CREATE INDEX idx_sentry_app_install_grants_expires_at ON public.sentry_app_install_grants USING btree (expires_at);
+
+
+--
+-- Name: idx_sentry_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sentry_webhook_receipts_received_at ON public.sentry_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -4519,7 +4555,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929151441	f
+20260929160002	f
 \.
 
 

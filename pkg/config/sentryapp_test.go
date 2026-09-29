@@ -10,6 +10,7 @@ func TestLoadSentryHostedAppConfig(t *testing.T) {
 	t.Setenv(EnvSentryAppSlug, "")
 	t.Setenv(EnvSentryAppClientID, "")
 	t.Setenv(EnvSentryAppClientSecret, "")
+	t.Setenv(EnvSentryAppAPIToken, "")
 
 	t.Run("empty env is not enabled", func(t *testing.T) {
 		cfg := LoadSentryHostedAppConfig()
@@ -26,6 +27,18 @@ func TestLoadSentryHostedAppConfig(t *testing.T) {
 		assert.Equal(t, "superplane", cfg.Slug)
 		assert.Equal(t, "sentry-client", cfg.ClientID)
 		assert.Equal(t, "sentry-secret", cfg.ClientSecret)
+		assert.Empty(t, cfg.APIToken)
+	})
+
+	t.Run("owner token is optional", func(t *testing.T) {
+		t.Setenv(EnvSentryAppSlug, "superplane")
+		t.Setenv(EnvSentryAppClientID, "sentry-client")
+		t.Setenv(EnvSentryAppClientSecret, "sentry-secret")
+		t.Setenv(EnvSentryAppAPIToken, " owner-token ")
+
+		cfg := LoadSentryHostedAppConfig()
+		assert.True(t, cfg.Enabled())
+		assert.Equal(t, "owner-token", cfg.APIToken)
 	})
 
 	t.Run("missing secret is not enabled", func(t *testing.T) {

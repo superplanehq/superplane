@@ -85,6 +85,42 @@ func Test__NodeRequestCleanupWorker_RespectsPerTickBudget(t *testing.T) {
 	assert.Equal(t, int64(2), remaining)
 }
 
+func Test__NodeRequestCleanupWorker_DeletesExpiredSentryWebhookReceipts(t *testing.T) {
+	support.Setup(t)
+	now := time.Now().UTC()
+	expiredAt := now.Add(-models.SentryWebhookReceiptRetention - time.Hour)
+
+	expired := createSentryReceiptForCleanup(t, expiredAt)
+	recent := createSentryReceiptForCleanup(t, now.Add(-time.Hour))
+
+	worker := NewNodeRequestCleanupWorker()
+	worker.deleteExpiredSentryWebhookReceipts()
+
+	assert.Equal(t, int64(0), countSentryReceiptsByID(t, expired))
+	assert.Equal(t, int64(1), countSentryReceiptsByID(t, recent))
+}
+
+func createSentryReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {
+	t.Helper()
+
+	id, err := models.CreateSentryWebhookReceipt(database.Conn(), models.SentryWebhookReceipt{
+		ReceivedAt: receivedAt,
+		HTTPStatus: 200,
+		Outcome:    models.SentryWebhookOutcomeAccepted,
+	})
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Where("id = ?", id).Update("received_at", receivedAt).Error)
+	return id
+}
+
+func countSentryReceiptsByID(t *testing.T, id uuid.UUID) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Where("id = ?", id).Count(&count).Error)
+	return count
+}
+
 func createNodeRequestForCleanup(t *testing.T, workflowID uuid.UUID, nodeID, state string, updatedAt time.Time) *models.CanvasNodeRequest {
 	t.Helper()
 
