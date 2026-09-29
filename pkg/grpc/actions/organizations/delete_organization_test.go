@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -148,6 +149,66 @@ func Test__DeleteOrganizationKeepsOrganizationWhenPlanCancelFails(t *testing.T) 
 	assert.True(t, ok)
 	assert.Equal(t, codes.Internal, code)
 	assert.Equal(t, "failed to cancel the Business plan. The organization was not deleted.", msg)
+
+	found, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	assert.False(t, found.DeletedAt.Valid)
+}
+
+func Test__DeleteOrganizationRestoresPlanWhenDeletionFails(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.Conn()
+	activateBusinessPlan(t, db, r.Organization.ID, "sub_restore")
+
+	var cancelCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		cancelAtPeriodEnd, _ := body["cancel_at_period_end"].(bool)
+		if cancelAtPeriodEnd {
+			cancelCalls++
+		}
+		periodEnd := time.Now().UTC().AddDate(0, 1, 0)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_restore",
+			"status":               "active",
+			"cancel_at_period_end": cancelAtPeriodEnd,
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	enablePolar(t, server.URL)
+
+	_, err := DeleteOrganization(ctx, &mockAuthService{
+		Authorization: r.AuthService,
+		Error:         errors.New("ooops"),
+	}, r.Organization.ID.String())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ooops")
+	assert.Equal(t, 1, cancelCalls)
+
+	found, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	assert.False(t, found.DeletedAt.Valid)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.False(t, plan.CancelAtPeriodEnd)
+}
+
+func Test__DeleteLockedOrganizationRetriesWhenSubscriptionRenews(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	activateBusinessPlan(t, db, r.Organization.ID, "sub_race")
+
+	err := deleteLockedOrganization(r.AuthService, r.Organization)
+	require.ErrorIs(t, err, polar.ErrSubscriptionChangedDuringDeletion)
 
 	found, err := models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)

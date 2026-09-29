@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -33,14 +40,29 @@ export function OrganizationDeleteDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onClose={onClose} size="lg" className="text-left">
-      <DialogTitle className="text-gray-800 dark:text-red-100">{`Delete "${organizationName}"?`}</DialogTitle>
-      <DialogDescription className="space-y-2 text-sm text-gray-800 dark:text-gray-400">
-        <p>SuperPlane permanently removes all workspaces, members, and settings in this organization.</p>
-        <p>If this organization has a Business plan, SuperPlane cancels it.</p>
-        <p>The plan stays active until the end of the current billing period.</p>
-      </DialogDescription>
-      <DialogBody>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (isDeleting && !next) {
+          return;
+        }
+        if (!next) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent data-testid="organization-delete-dialog">
+        <DialogHeader>
+          <DialogTitle>{`Delete "${organizationName}"?`}</DialogTitle>
+          <DialogDescription>
+            You lose access now. SuperPlane keeps this organization for at least 30 days, then removes it.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>Removal can take longer when workspaces or integrations remain.</p>
+          <p>If this organization has a Business plan, SuperPlane cancels it.</p>
+          <p>The plan stays active until the end of the current billing period.</p>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="organization-delete-confirmation">{`Type "${organizationName}" to confirm`}</Label>
           <Input
@@ -52,34 +74,34 @@ export function OrganizationDeleteDialog({
             disabled={!canDelete || isDeleting}
           />
         </div>
-      </DialogBody>
-      <DialogActions>
-        <LoadingButton
-          variant="destructive"
-          onClick={() => {
-            if (!nameMatches) return;
-            void (async () => {
-              try {
-                await onConfirm();
-                onClose();
-              } catch {
-                return;
-              }
-            })();
-          }}
-          disabled={!canDelete || !nameMatches}
-          loading={isDeleting}
-          loadingText="Deleting..."
-          className="flex items-center gap-2"
-          data-testid="organization-delete-confirm-button"
-        >
-          <Trash2 size={16} />
-          Delete
-        </LoadingButton>
-        <Button variant="outline" onClick={onClose} disabled={isDeleting}>
-          Cancel
-        </Button>
-      </DialogActions>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isDeleting}>
+            Keep organization
+          </Button>
+          <LoadingButton
+            variant="destructive"
+            onClick={() => {
+              if (!nameMatches) return;
+              void (async () => {
+                try {
+                  await onConfirm();
+                  onClose();
+                } catch {
+                  return;
+                }
+              })();
+            }}
+            disabled={!canDelete || !nameMatches}
+            loading={isDeleting}
+            loadingText="Deleting..."
+            className="flex items-center gap-2"
+            data-testid="organization-delete-confirm-button"
+          >
+            <Trash2 size={16} />
+            Delete
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

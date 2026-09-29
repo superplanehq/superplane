@@ -385,7 +385,9 @@ func Test__CancelOrganizationSubscriptionForDeletionSchedulesPeriodEnd(t *testin
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
 
-	require.NoError(t, CancelOrganizationSubscriptionForDeletion(context.Background(), db, r.Organization.ID))
+	scheduled, err := CancelOrganizationSubscriptionForDeletion(context.Background(), db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.True(t, scheduled)
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -426,12 +428,27 @@ func Test__CancelOrganizationSubscriptionForDeletionSkipsWhenNothingToCancel(t *
 		assertDeletionCancelSkipsPolar(t, db, r.Organization.ID, true)
 	})
 
-	t.Run("disabled checkout", func(t *testing.T) {
+	t.Run("disabled checkout without a polar subscription", func(t *testing.T) {
+		r, db := deletionCancelFixture(t)
+		assertDeletionCancelSkipsPolar(t, db, r.Organization.ID, false)
+	})
+
+	t.Run("disabled checkout with an active subscription", func(t *testing.T) {
 		r, db := deletionCancelFixture(t)
 		periodStart := time.Now().UTC().Truncate(time.Second)
 		periodEnd := periodStart.AddDate(0, 1, 0)
 		require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_disabled", "active", periodStart, periodEnd)))
-		assertDeletionCancelSkipsPolar(t, db, r.Organization.ID, false)
+		t.Setenv("POLAR_ACCESS_TOKEN", "")
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "")
+
+		scheduled, err := CancelOrganizationSubscriptionForDeletion(context.Background(), db, r.Organization.ID)
+		require.ErrorIs(t, err, ErrSubscriptionCheckoutDisabled)
+		assert.False(t, scheduled)
+
+		plan, planErr := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+		require.NoError(t, planErr)
+		assert.False(t, plan.CancelAtPeriodEnd)
+		assert.True(t, plan.IsActiveBusiness())
 	})
 }
 
@@ -450,7 +467,7 @@ func Test__CancelOrganizationSubscriptionForDeletionReturnsPolarFailure(t *testi
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
 
-	err := CancelOrganizationSubscriptionForDeletion(context.Background(), db, r.Organization.ID)
+	_, err := CancelOrganizationSubscriptionForDeletion(context.Background(), db, r.Organization.ID)
 	require.Error(t, err)
 
 	plan, planErr := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -482,8 +499,70 @@ func assertDeletionCancelSkipsPolar(t *testing.T, db *gorm.DB, orgID uuid.UUID, 
 	}
 	t.Setenv("POLAR_API_BASE_URL", server.URL)
 
-	require.NoError(t, CancelOrganizationSubscriptionForDeletion(context.Background(), db, orgID))
+	scheduled, err := CancelOrganizationSubscriptionForDeletion(context.Background(), db, orgID)
+	require.NoError(t, err)
+	assert.False(t, scheduled)
 	assert.False(t, called)
+}
+
+func Test__ApplySubscriptionCancelsRenewingPlanWhenOrganizationIsDeleted(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_late", "active", periodStart, periodEnd)))
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		calls++
+		assert.Equal(t, http.MethodPatch, req.Method)
+		assert.Equal(t, "/subscriptions/sub_late", req.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		assert.Equal(t, true, body["cancel_at_period_end"])
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   "sub_late",
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	renewal := subscriptionEvent(r.Organization.ID, "sub_late", "active", periodStart, periodEnd)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, renewal))
+	assert.Equal(t, 1, calls)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.True(t, plan.CancelAtPeriodEnd)
+}
+
+func Test__SubscriptionChangedSinceDeletionCancel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	changed, err := SubscriptionChangedSinceDeletionCancel(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.False(t, changed)
+
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, subscriptionEvent(r.Organization.ID, "sub_race", "active", periodStart, periodEnd)))
+
+	changed, err = SubscriptionChangedSinceDeletionCancel(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.True(t, changed)
 }
 
 func Test__ApplySubscriptionIncludedGrantIsIdempotentWithoutPeriodStart(t *testing.T) {
