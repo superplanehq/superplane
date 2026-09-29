@@ -97,10 +97,10 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * to the title, with the intake source icon on the right. Optional
  * pills sit on a middle row: an attached pull request, then
  * attention such as Waiting on status checks. The
- * footer shows when the task was created on the left, and the owner
- * given name plus avatar on the right (except on drafts). Reviewed
- * drafts show Clarity and Confidence scores. The owner is display-only
- * on the card.
+ * footer shows when the task was created on the left, and on the
+ * right its spend once it has any, then the owner given name plus
+ * avatar (except on drafts). Reviewed drafts show Clarity and
+ * Confidence scores. The owner is display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -334,8 +334,17 @@ function WorkOrderCardMetaRow({
       >
         {createdLabel}
       </span>
-      {ownerMark || showActions ? (
+      {ownerMark || showActions || entry.usageLabel ? (
         <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
+          {entry.usageLabel ? (
+            <span
+              className="shrink-0 text-[11px] tabular-nums text-muted-foreground"
+              title={entry.usageTooltip ?? undefined}
+              data-testid={`work-order-card-usage-${entry.id}`}
+            >
+              {entry.usageLabel}
+            </span>
+          ) : null}
           {ownerMark}
           {showActions ? (
             <CardScores
