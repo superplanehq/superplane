@@ -115,18 +115,22 @@ func (VCSProviderIntegrationBinding) TableName() string {
 	return "vcs_provider_integration_bindings"
 }
 
+type VCSProviderIntegrationRepository struct {
+	IntegrationID uuid.UUID `gorm:"primaryKey"`
+	Provider      string    `gorm:"primaryKey"`
+	RepositoryID  int64     `gorm:"primaryKey"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (VCSProviderIntegrationRepository) TableName() string {
+	return "vcs_provider_integration_repositories"
+}
+
 type AccessibleVCSProviderRepository struct {
 	VCSProviderRepository
 	AccountLogin string
 	AccountType  string
-}
-
-func normalizeVCSProvider(provider string) (string, error) {
-	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider == "" {
-		return "", errors.New("VCS provider is required")
-	}
-	return provider, nil
 }
 
 func UpsertVCSProviderInstallation(tx *gorm.DB, installation *VCSProviderInstallation) error {
@@ -313,13 +317,17 @@ func EnqueueVCSProviderReconciliation(tx *gorm.DB, provider string, runAt time.T
 		return err
 	}
 	job := VCSProviderReconcileJob{Provider: provider, RunAt: runAt}
+	updatedAt := time.Now()
 	return tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "provider"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"run_at":     runAt,
-			"locked_at":  nil,
 			"last_error": "",
-			"updated_at": time.Now(),
+			"updated_at": gorm.Expr(
+				"GREATEST(?, COALESCE(vcs_provider_reconcile_jobs.locked_at + INTERVAL '1 microsecond', ?))",
+				updatedAt,
+				updatedAt,
+			),
 		}),
 	}).Create(&job).Error
 }
@@ -360,21 +368,37 @@ func ClaimVCSProviderReconciliation(
 	return claimed, err
 }
 
-func CompleteVCSProviderReconciliation(tx *gorm.DB, provider string) error {
-	return tx.Where("provider = ?", provider).Delete(&VCSProviderReconcileJob{}).Error
+func CompleteVCSProviderReconciliation(tx *gorm.DB, provider string, claimedAt time.Time) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		result := tx.
+			Where("provider = ? AND locked_at = ? AND updated_at <= ?", provider, claimedAt, claimedAt).
+			Delete(&VCSProviderReconcileJob{})
+		if result.Error != nil || result.RowsAffected > 0 {
+			return result.Error
+		}
+		return tx.Model(&VCSProviderReconcileJob{}).
+			Where("provider = ? AND locked_at = ?", provider, claimedAt).
+			Update("locked_at", nil).
+			Error
+	})
 }
 
-func RetryVCSProviderReconciliation(tx *gorm.DB, provider string, runAt time.Time, reconcileError error) error {
+func RetryVCSProviderReconciliation(
+	tx *gorm.DB,
+	provider string,
+	claimedAt, runAt time.Time,
+	reconcileError error,
+) error {
 	message := ""
 	if reconcileError != nil {
 		message = reconcileError.Error()
 	}
 	return tx.Model(&VCSProviderReconcileJob{}).
-		Where("provider = ?", provider).
+		Where("provider = ? AND locked_at = ?", provider, claimedAt).
 		Updates(map[string]any{
-			"run_at":     runAt,
+			"run_at":     gorm.Expr("CASE WHEN updated_at > ? THEN run_at ELSE ? END", claimedAt, runAt),
 			"locked_at":  nil,
-			"last_error": message,
+			"last_error": gorm.Expr("CASE WHEN updated_at > ? THEN last_error ELSE ? END", claimedAt, message),
 			"updated_at": time.Now(),
 		}).
 		Error
@@ -509,13 +533,17 @@ func EnqueueVCSProviderRepositorySync(tx *gorm.DB, provider string, repositoryID
 		return err
 	}
 	job := VCSProviderRepositorySyncJob{Provider: provider, RepositoryID: repositoryID, RunAt: runAt}
+	updatedAt := time.Now()
 	return tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "provider"}, {Name: "repository_id"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"run_at":     runAt,
-			"locked_at":  nil,
 			"last_error": "",
-			"updated_at": time.Now(),
+			"updated_at": gorm.Expr(
+				"GREATEST(?, COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', ?))",
+				updatedAt,
+				updatedAt,
+			),
 		}),
 	}).Create(&job).Error
 }
@@ -558,18 +586,37 @@ func ClaimVCSProviderRepositorySync(
 	return claimed, err
 }
 
-func CompleteVCSProviderRepositorySync(tx *gorm.DB, provider string, repositoryID int64) error {
-	return tx.
-		Where("provider = ? AND repository_id = ?", provider, repositoryID).
-		Delete(&VCSProviderRepositorySyncJob{}).
-		Error
+func CompleteVCSProviderRepositorySync(
+	tx *gorm.DB,
+	provider string,
+	repositoryID int64,
+	claimedAt time.Time,
+) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		result := tx.
+			Where(
+				"provider = ? AND repository_id = ? AND locked_at = ? AND updated_at <= ?",
+				provider,
+				repositoryID,
+				claimedAt,
+				claimedAt,
+			).
+			Delete(&VCSProviderRepositorySyncJob{})
+		if result.Error != nil || result.RowsAffected > 0 {
+			return result.Error
+		}
+		return tx.Model(&VCSProviderRepositorySyncJob{}).
+			Where("provider = ? AND repository_id = ? AND locked_at = ?", provider, repositoryID, claimedAt).
+			Update("locked_at", nil).
+			Error
+	})
 }
 
 func RetryVCSProviderRepositorySync(
 	tx *gorm.DB,
 	provider string,
 	repositoryID int64,
-	runAt time.Time,
+	claimedAt, runAt time.Time,
 	syncError error,
 ) error {
 	message := ""
@@ -577,14 +624,60 @@ func RetryVCSProviderRepositorySync(
 		message = syncError.Error()
 	}
 	return tx.Model(&VCSProviderRepositorySyncJob{}).
-		Where("provider = ? AND repository_id = ?", provider, repositoryID).
+		Where("provider = ? AND repository_id = ? AND locked_at = ?", provider, repositoryID, claimedAt).
 		Updates(map[string]any{
-			"run_at":     runAt,
+			"run_at":     gorm.Expr("CASE WHEN updated_at > ? THEN run_at ELSE ? END", claimedAt, runAt),
 			"locked_at":  nil,
-			"last_error": message,
+			"last_error": gorm.Expr("CASE WHEN updated_at > ? THEN last_error ELSE ? END", claimedAt, message),
 			"updated_at": time.Now(),
 		}).
 		Error
+}
+
+func GrantVCSProviderBindingRepository(
+	tx *gorm.DB,
+	integrationID uuid.UUID,
+	provider string,
+	repositoryID int64,
+) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	binding, err := FindVCSProviderIntegrationBinding(tx, integrationID)
+	if err != nil {
+		return err
+	}
+	if binding.Provider != provider {
+		return fmt.Errorf("VCS provider binding uses provider %q", binding.Provider)
+	}
+	repository, err := FindVCSProviderRepository(tx, provider, repositoryID)
+	if err != nil {
+		return err
+	}
+	if repository.InstallationID != binding.InstallationID {
+		return errors.New("VCS provider repository is not part of the bound installation")
+	}
+
+	grant := VCSProviderIntegrationRepository{
+		IntegrationID: integrationID,
+		Provider:      provider,
+		RepositoryID:  repositoryID,
+	}
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&grant).Error
+}
+
+func ListVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) ([]VCSProviderRepository, error) {
+	var repositories []VCSProviderRepository
+	err := tx.
+		Table("vcs_provider_repositories AS repository").
+		Select("repository.*").
+		Joins("JOIN vcs_provider_integration_repositories AS access ON access.provider = repository.provider AND access.repository_id = repository.repository_id").
+		Where("access.integration_id = ?", integrationID).
+		Order("LOWER(repository.full_name) ASC").
+		Find(&repositories).
+		Error
+	return repositories, err
 }
 
 func FindOrCreateVCSProviderBinding(
@@ -657,30 +750,6 @@ func FindOrCreateVCSProviderBinding(
 	return integration, err
 }
 
-func findVCSProviderBinding(
-	tx *gorm.DB,
-	organizationID uuid.UUID,
-	provider string,
-	installationID int64,
-) (*Integration, error) {
-	var integration Integration
-	err := tx.
-		Table("app_installations AS integration").
-		Select("integration.*").
-		Joins("JOIN vcs_provider_integration_bindings AS binding ON binding.integration_id = integration.id").
-		Where("binding.organization_id = ?", organizationID).
-		Where("binding.provider = ?", provider).
-		Where("binding.installation_id = ?", installationID).
-		Where("integration.deleted_at IS NULL").
-		Order("binding.created_at ASC").
-		First(&integration).
-		Error
-	if err != nil {
-		return nil, err
-	}
-	return &integration, nil
-}
-
 func FindVCSProviderIntegrationBinding(tx *gorm.DB, integrationID uuid.UUID) (*VCSProviderIntegrationBinding, error) {
 	var binding VCSProviderIntegrationBinding
 	if err := tx.Where("integration_id = ?", integrationID).First(&binding).Error; err != nil {
@@ -715,4 +784,36 @@ func ListVCSProviderBoundIntegrations(tx *gorm.DB, provider string, installation
 		Find(&integrations).
 		Error
 	return integrations, err
+}
+
+func normalizeVCSProvider(provider string) (string, error) {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return "", errors.New("VCS provider is required")
+	}
+	return provider, nil
+}
+
+func findVCSProviderBinding(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	provider string,
+	installationID int64,
+) (*Integration, error) {
+	var integration Integration
+	err := tx.
+		Table("app_installations AS integration").
+		Select("integration.*").
+		Joins("JOIN vcs_provider_integration_bindings AS binding ON binding.integration_id = integration.id").
+		Where("binding.organization_id = ?", organizationID).
+		Where("binding.provider = ?", provider).
+		Where("binding.installation_id = ?", installationID).
+		Where("integration.deleted_at IS NULL").
+		Order("binding.created_at ASC").
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
 }

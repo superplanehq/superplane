@@ -134,6 +134,33 @@ func TestVCSProviderBindingReferencesGlobalInstallation(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestVCSProviderBindingListsOnlyGrantedRepositories(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+		{RepositoryID: 202, FullName: "acme/private"},
+	}))
+	organization, err := CreateOrganization("Binding "+uuid.NewString(), "")
+	require.NoError(t, err)
+	integration, err := FindOrCreateVCSProviderBinding(db, organization.ID, ProviderGitHub, 101, "acme")
+	require.NoError(t, err)
+
+	require.NoError(t, GrantVCSProviderBindingRepository(db, integration.ID, ProviderGitHub, 201))
+	require.NoError(t, GrantVCSProviderBindingRepository(db, integration.ID, ProviderGitHub, 201))
+
+	repositories, err := ListVCSProviderBindingRepositories(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, repositories, 1)
+	assert.Equal(t, int64(201), repositories[0].RepositoryID)
+}
+
 func TestSuspendedVCSProviderInstallationHidesEveryRepository(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
@@ -175,7 +202,33 @@ func TestVCSProviderRepositorySyncJobClaim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, none)
 
-	require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, 201))
+	require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, 201, *job.LockedAt))
+}
+
+func TestVCSProviderRepositorySyncKeepsRefreshEnqueuedDuringClaim(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now.Add(-time.Second)))
+
+	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NotNil(t, job.LockedAt)
+
+	refreshAt := now.Add(time.Second)
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, refreshAt))
+	require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, 201, *job.LockedAt))
+
+	var queued VCSProviderRepositorySyncJob
+	require.NoError(t, db.Where("provider = ? AND repository_id = ?", ProviderGitHub, 201).First(&queued).Error)
+	assert.Nil(t, queued.LockedAt)
+	assert.WithinDuration(t, refreshAt, queued.RunAt, time.Millisecond)
 }
 
 func TestVCSProviderReconciliationJobClaim(t *testing.T) {
@@ -192,7 +245,7 @@ func TestVCSProviderReconciliationJobClaim(t *testing.T) {
 	none, err := ClaimVCSProviderReconciliation(db, ProviderGitHub, now, now.Add(-time.Minute))
 	require.NoError(t, err)
 	assert.Nil(t, none)
-	require.NoError(t, CompleteVCSProviderReconciliation(db, ProviderGitHub))
+	require.NoError(t, CompleteVCSProviderReconciliation(db, ProviderGitHub, *job.LockedAt))
 }
 
 func int64Pointer(value int64) *int64 {

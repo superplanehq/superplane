@@ -75,7 +75,7 @@ func (w *VCSProviderCatalogWorker) processReconcileJob(ctx context.Context) {
 
 	err = w.catalog.Reconcile(ctx)
 	if err == nil {
-		if completeErr := models.CompleteVCSProviderReconciliation(database.Conn(), w.provider); completeErr != nil {
+		if completeErr := models.CompleteVCSProviderReconciliation(database.Conn(), w.provider, *job.LockedAt); completeErr != nil {
 			w.logger.WithError(completeErr).Error("failed to complete a VCS provider reconciliation job")
 		}
 		return
@@ -84,6 +84,7 @@ func (w *VCSProviderCatalogWorker) processReconcileJob(ctx context.Context) {
 	if retryErr := models.RetryVCSProviderReconciliation(
 		database.Conn(),
 		w.provider,
+		*job.LockedAt,
 		now.Add(vcsProviderRetryDelay(job.Attempts)),
 		err,
 	); retryErr != nil {
@@ -130,7 +131,12 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 ) {
 	err := w.catalog.SyncRepositoryCollaborators(ctx, job.RepositoryID)
 	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
-		if completeErr := models.CompleteVCSProviderRepositorySync(database.Conn(), w.provider, job.RepositoryID); completeErr != nil {
+		if completeErr := models.CompleteVCSProviderRepositorySync(
+			database.Conn(),
+			w.provider,
+			job.RepositoryID,
+			*job.LockedAt,
+		); completeErr != nil {
 			w.logger.WithError(completeErr).Error("failed to complete a VCS collaborator synchronization job")
 		}
 		return
@@ -140,6 +146,7 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 		database.Conn(),
 		w.provider,
 		job.RepositoryID,
+		*job.LockedAt,
 		claimedAt.Add(vcsProviderRetryDelay(job.Attempts)),
 		err,
 	); retryErr != nil {

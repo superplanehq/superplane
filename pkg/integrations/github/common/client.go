@@ -713,6 +713,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 	appID := metadata.GitHubApp.ID
 	owner := metadata.Owner
 	pem := ""
+	var repositoryIDs []int64
 	if metadata.HostedApp {
 		hosted, err := ResolveHostedAppBinding(ctx)
 		if err != nil {
@@ -722,6 +723,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		appID = hosted.App.ID
 		owner = hosted.Installation.AccountLogin
 		pem = hosted.App.PrivateKey
+		repositoryIDs = hosted.RepositoryIDs
 	} else {
 		var err error
 		pem, err = LegacyAppPrivateKey(ctx, metadata)
@@ -744,6 +746,11 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create apps transport: %v", err)
+	}
+	if metadata.HostedApp {
+		if err := RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
+			return nil, err
+		}
 	}
 
 	return &Client{

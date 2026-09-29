@@ -172,6 +172,13 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	if metadata.HostedApp {
+		if _, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID()); err != nil {
+			return fmt.Errorf("failed to resolve hosted GitHub App binding: %w", err)
+		}
+		return nil
+	}
+
 	//
 	// App is already installed - do not do anything.
 	//
@@ -313,28 +320,40 @@ func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error)
 }
 
 func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, event *github.InstallationEvent) {
-	installationID := ""
+	receivedInstallationID := ""
 	if event.GetInstallation().GetID() > 0 {
-		installationID = strconv.FormatInt(event.GetInstallation().GetID(), 10)
-	} else {
-		var err error
-		installationID, err = g.findInstallationID(ctx)
-		if err != nil {
-			ctx.Logger.Errorf("failed to find installation ID: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
+		receivedInstallationID = strconv.FormatInt(event.GetInstallation().GetID(), 10)
 	}
 
-	switch *event.Action {
-
+	action := event.GetAction()
+	switch action {
 	//
 	// This is handled by the setup_url, so no need to do anything here.
 	//
 	case "created":
-		ctx.Logger.Infof("installation %s created", installationID)
+		ctx.Logger.Infof("installation %s created", receivedInstallationID)
 		return
+	}
 
+	installationID, err := g.findInstallationID(ctx)
+	if err != nil {
+		ctx.Logger.Errorf("failed to find installation ID: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if installationID == "" {
+		ctx.Logger.Warn("ignoring installation event for an integration with no bound installation")
+		return
+	}
+	if receivedInstallationID != "" && receivedInstallationID != installationID {
+		ctx.Logger.
+			WithField("bound_installation_id", installationID).
+			WithField("event_installation_id", receivedInstallationID).
+			Warn("ignoring installation event for another installation")
+		return
+	}
+
+	switch action {
 	case "suspend":
 		ctx.Logger.Infof("installation %s suspended", installationID)
 		ctx.Integration.Error("app installation was suspended")

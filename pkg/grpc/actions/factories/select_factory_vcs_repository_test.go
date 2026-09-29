@@ -87,6 +87,11 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, bindings, 1)
 		assert.Equal(t, firstOnboarding.VcsIntegrationId, bindings[0].IntegrationID.String())
+
+		granted, err := models.ListVCSProviderBindingRepositories(db, bindings[0].IntegrationID)
+		require.NoError(t, err)
+		require.Len(t, granted, 1)
+		assert.Equal(t, repositoryID, granted[0].RepositoryID)
 	})
 
 	t.Run("rejects a repository without cached push access", func(t *testing.T) {

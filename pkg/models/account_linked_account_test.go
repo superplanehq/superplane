@@ -68,6 +68,34 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.Equal(t, "first-login", active.Username)
 	})
 
+	t.Run("refreshes a sign-in identity without changing the selection", func(t *testing.T) {
+		account, err := CreateAccount("Sign In", "sign-in@example.com")
+		require.NoError(t, err)
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "31", "first-login", "", ""),
+		))
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "32", "selected-login", "", ""),
+		))
+
+		refreshed := NewAccountLinkedAccount(account.ID, ProviderGitHub, "31", "renamed-login", "", "")
+		require.NoError(t, RefreshAccountLinkedAccount(database.Conn(), refreshed))
+
+		active, err := FindAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, "32", active.ProviderID)
+
+		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
+		require.NoError(t, err)
+		require.Len(t, linked, 2)
+		assert.Equal(t, "31", linked[1].ProviderID)
+		assert.Equal(t, "renamed-login", linked[1].Username)
+		assert.False(t, linked[1].Active)
+	})
+
 	t.Run("allows the same identity on accounts that share no organization", func(t *testing.T) {
 		owner, err := CreateAccount("Owner", "owner-shared@example.com")
 		require.NoError(t, err)

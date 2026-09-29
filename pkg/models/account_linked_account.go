@@ -100,11 +100,19 @@ func accountLinkedIdentityConflictsInSharedOrganization(tx *gorm.DB, ownerAccoun
 // active identity for its provider. Other identities for the provider remain
 // linked so activity from all of them can be attributed to the account.
 func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
+	return saveAccountLinkedAccount(tx, linked, true)
+}
+
+// RefreshAccountLinkedAccount updates an identity observed during sign-in. It
+// preserves the member's explicit provider selection and activates the
+// identity only when the account does not have an active identity yet.
+func RefreshAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
+	return saveAccountLinkedAccount(tx, linked, false)
+}
+
+func saveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount, activate bool) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
 		if err := validateLinkedAccountOwnership(tx, linked); err != nil {
-			return err
-		}
-		if err := deactivateLinkedAccounts(tx, linked.AccountID, linked.Provider); err != nil {
 			return err
 		}
 
@@ -120,11 +128,16 @@ func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 			Error
 		if err == nil {
 			linked.ID = existing.ID
+			if activate {
+				if err := deactivateLinkedAccounts(tx, linked.AccountID, linked.Provider); err != nil {
+					return err
+				}
+			}
 			return tx.Model(&existing).Updates(map[string]any{
 				"username":   linked.Username,
 				"name":       linked.Name,
 				"avatar_url": linked.AvatarURL,
-				"active":     true,
+				"active":     activate || existing.Active,
 				"linked_at":  linked.LinkedAt,
 			}).Error
 		}
@@ -132,6 +145,21 @@ func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 			return err
 		}
 
+		if activate {
+			if err := deactivateLinkedAccounts(tx, linked.AccountID, linked.Provider); err != nil {
+				return err
+			}
+			linked.Active = true
+		} else {
+			var activeCount int64
+			if err := tx.Model(&AccountLinkedAccount{}).
+				Where("account_id = ? AND provider = ? AND active = TRUE", linked.AccountID, linked.Provider).
+				Count(&activeCount).
+				Error; err != nil {
+				return err
+			}
+			linked.Active = activeCount == 0
+		}
 		return tx.Create(linked).Error
 	})
 }

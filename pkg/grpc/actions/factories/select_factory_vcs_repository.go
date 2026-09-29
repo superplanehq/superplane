@@ -71,6 +71,9 @@ func SelectFactoryVCSProviderRepository(
 		if bindErr != nil {
 			return bindErr
 		}
+		if grantErr := models.GrantVCSProviderBindingRepository(tx, integration.ID, provider, repository.RepositoryID); grantErr != nil {
+			return grantErr
+		}
 
 		integrationID := integration.ID.String()
 		repositoryID := repository.RepositoryID

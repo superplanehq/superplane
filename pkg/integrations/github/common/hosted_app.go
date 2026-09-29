@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	githubauth "github.com/google/go-github/v75/github"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -27,9 +29,10 @@ type HostedApp struct {
 }
 
 type HostedAppBinding struct {
-	App          HostedApp
-	Installation *models.VCSProviderInstallation
-	ID           int64
+	App           HostedApp
+	Installation  *models.VCSProviderInstallation
+	ID            int64
+	RepositoryIDs []int64
 }
 
 func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, error) {
@@ -47,11 +50,40 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	if installation.SuspendedAt != nil {
 		return nil, fmt.Errorf("global GitHub App installation is suspended")
 	}
+	repositories, err := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list repositories granted to the GitHub App binding: %w", err)
+	}
+	if len(repositories) == 0 {
+		return nil, fmt.Errorf("hosted GitHub integration has no granted repositories")
+	}
+	repositoryIDs := make([]int64, 0, len(repositories))
+	for _, repository := range repositories {
+		repositoryIDs = append(repositoryIDs, repository.RepositoryID)
+	}
 	app, ok := HostedAppFromEnv()
 	if !ok {
 		return nil, fmt.Errorf("hosted GitHub App is not configured")
 	}
-	return &HostedAppBinding{App: app, Installation: installation, ID: binding.InstallationID}, nil
+	return &HostedAppBinding{
+		App:           app,
+		Installation:  installation,
+		ID:            binding.InstallationID,
+		RepositoryIDs: repositoryIDs,
+	}, nil
+}
+
+func RestrictHostedAppTransport(transport *ghinstallation.Transport, repositoryIDs []int64) error {
+	if transport == nil {
+		return fmt.Errorf("GitHub App transport is required")
+	}
+	if len(repositoryIDs) == 0 {
+		return fmt.Errorf("hosted GitHub integration has no granted repositories")
+	}
+	transport.InstallationTokenOptions = &githubauth.InstallationTokenOptions{
+		RepositoryIDs: append([]int64(nil), repositoryIDs...),
+	}
+	return nil
 }
 
 // HostedAppFromEnv returns the public GitHub App when Cloud holds complete

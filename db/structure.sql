@@ -1295,6 +1295,19 @@ CREATE TABLE public.vcs_provider_integration_bindings (
 
 
 --
+-- Name: vcs_provider_integration_repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_integration_repositories (
+    integration_id uuid NOT NULL,
+    provider text NOT NULL,
+    repository_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_reconcile_jobs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2333,6 +2346,14 @@ ALTER TABLE ONLY public.vcs_provider_installations
 
 ALTER TABLE ONLY public.vcs_provider_integration_bindings
     ADD CONSTRAINT vcs_provider_integration_bindings_pkey PRIMARY KEY (integration_id);
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_pkey PRIMARY KEY (integration_id, provider, repository_id);
 
 
 --
@@ -3579,6 +3600,13 @@ CREATE INDEX vcs_provider_integration_bindings_installation_idx ON public.vcs_pr
 
 
 --
+-- Name: vcs_provider_integration_repositories_repository_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_integration_repositories_repository_idx ON public.vcs_provider_integration_repositories USING btree (provider, repository_id);
+
+
+--
 -- Name: vcs_provider_repositories_full_name_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4458,6 +4486,22 @@ ALTER TABLE ONLY public.vcs_provider_integration_bindings
 
 ALTER TABLE ONLY public.vcs_provider_integration_bindings
     ADD CONSTRAINT vcs_provider_integration_bindings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_binding_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_binding_fkey FOREIGN KEY (integration_id) REFERENCES public.vcs_provider_integration_bindings(integration_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_repository_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_repository_fkey FOREIGN KEY (provider, repository_id) REFERENCES public.vcs_provider_repositories(provider, repository_id) ON DELETE CASCADE;
 
 
 --

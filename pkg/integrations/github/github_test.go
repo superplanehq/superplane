@@ -10,10 +10,13 @@ import (
 	"testing"
 
 	gh "github.com/google/go-github/v84/github"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -44,6 +47,54 @@ func TestGitHubSyncDoesNotInstallTheHostedApp(t *testing.T) {
 		Integration:    &contexts.IntegrationContext{},
 	})
 	require.EqualError(t, err, "select a repository from the global GitHub App catalog")
+}
+
+func TestGitHubSyncKeepsHostedBindingReady(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("Hosted sync", "")
+	require.NoError(t, err)
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
+	}))
+	integration, err := models.FindOrCreateVCSProviderBinding(
+		database.Conn(),
+		organization.ID,
+		models.ProviderGitHub,
+		501,
+		"acme",
+	)
+	require.NoError(t, err)
+
+	ctx := &contexts.IntegrationContext{
+		IntegrationID: integration.ID.String(),
+		Metadata:      common.Metadata{HostedApp: true},
+	}
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{Integration: ctx}))
+	assert.Nil(t, ctx.BrowserAction)
+}
+
+func TestGitHubInstallationEventIgnoresAnotherPrivateAppInstallation(t *testing.T) {
+	integration := &contexts.IntegrationContext{
+		Metadata: common.Metadata{InstallationID: "42"},
+		State:    "ready",
+	}
+	request := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).handleInstallationEvent(core.HTTPRequestContext{
+		Request:     request,
+		Response:    response,
+		Integration: integration,
+		Logger:      log.New().WithField("test", t.Name()),
+	}, &gh.InstallationEvent{
+		Action:       gh.Ptr("deleted"),
+		Installation: &gh.Installation{ID: gh.Ptr(int64(99))},
+	})
+
+	assert.Equal(t, "ready", integration.State)
+	assert.Empty(t, integration.StateDescription)
 }
 
 func TestGitHubHandleRequestRejectsHostedIntegrationCallbacks(t *testing.T) {

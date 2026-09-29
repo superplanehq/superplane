@@ -1,6 +1,7 @@
 package github
 
 import (
+	"io"
 	"net/http"
 	"testing"
 
@@ -62,6 +63,11 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	}))
 	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
 	require.NoError(t, err)
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 501, []models.VCSProviderRepository{
+		{RepositoryID: 601, FullName: "acme/api"},
+		{RepositoryID: 602, FullName: "acme/web"},
+	}))
+	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_installation","expires_at":"2030-01-01T00:00:00Z"}`),
@@ -81,4 +87,7 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 	assert.Equal(t, "/app/installations/501/access_tokens", httpCtx.Requests[0].URL.Path)
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
 }

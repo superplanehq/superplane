@@ -1262,7 +1262,7 @@ func saveConnectedProviderIdentity(tx *gorm.DB, account *models.Account, gothUse
 		gothUser.Name,
 		gothUser.AvatarURL,
 	)
-	return models.SaveAccountLinkedAccount(tx, linked)
+	return models.RefreshAccountLinkedAccount(tx, linked)
 }
 
 func getRedirectURL(r *http.Request) string {

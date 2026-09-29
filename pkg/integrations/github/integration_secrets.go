@@ -78,6 +78,7 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 	installationID := 0
 	appID := metadata.GitHubApp.ID
 	pem := ""
+	var repositoryIDs []int64
 	if metadata.HostedApp {
 		hosted, err := common.ResolveHostedAppBinding(integrationCtx)
 		if err != nil {
@@ -86,6 +87,7 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		installationID = int(hosted.ID)
 		appID = hosted.App.ID
 		pem = hosted.App.PrivateKey
+		repositoryIDs = hosted.RepositoryIDs
 	} else {
 		var err error
 		installationID, err = strconv.Atoi(metadata.InstallationID)
@@ -106,6 +108,11 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
+	}
+	if metadata.HostedApp {
+		if err := common.RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
+			return "", err
+		}
 	}
 
 	token, err := itr.Token(context.Background())

@@ -26,7 +26,7 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 			if binding.Provider != models.ProviderGitHub {
 				return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
 			}
-			repositories, listErr := models.ListVCSProviderRepositories(database.Conn(), binding.Provider, binding.InstallationID)
+			repositories, listErr := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.Integration.ID())
 			if listErr != nil {
 				return nil, fmt.Errorf("failed to list cached repositories: %w", listErr)
 			}

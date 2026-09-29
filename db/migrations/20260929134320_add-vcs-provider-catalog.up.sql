@@ -124,6 +124,27 @@ CREATE INDEX vcs_provider_integration_bindings_installation_idx
 CREATE INDEX vcs_provider_bindings_organization_installation_idx
   ON vcs_provider_integration_bindings (organization_id, provider, installation_id);
 
+CREATE TABLE vcs_provider_integration_repositories (
+  integration_id UUID NOT NULL,
+  provider TEXT NOT NULL,
+  repository_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT vcs_provider_integration_repositories_pkey
+    PRIMARY KEY (integration_id, provider, repository_id),
+  CONSTRAINT vcs_provider_integration_repositories_binding_fkey
+    FOREIGN KEY (integration_id)
+    REFERENCES vcs_provider_integration_bindings(integration_id)
+    ON DELETE CASCADE,
+  CONSTRAINT vcs_provider_integration_repositories_repository_fkey
+    FOREIGN KEY (provider, repository_id)
+    REFERENCES vcs_provider_repositories(provider, repository_id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX vcs_provider_integration_repositories_repository_idx
+  ON vcs_provider_integration_repositories (provider, repository_id);
+
 INSERT INTO vcs_provider_installations (
   provider,
   installation_id,
@@ -143,6 +164,55 @@ WHERE app_name = 'github'
   AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND metadata->>'installationId' ~ '^[0-9]+$'
 ON CONFLICT (provider, installation_id) DO NOTHING;
+
+INSERT INTO vcs_provider_repositories (
+  provider,
+  repository_id,
+  installation_id,
+  full_name,
+  created_at,
+  updated_at
+)
+SELECT DISTINCT ON ((repository->>'id')::BIGINT)
+  'github',
+  (repository->>'id')::BIGINT,
+  (integration.metadata->>'installationId')::BIGINT,
+  CASE
+    WHEN BTRIM(COALESCE(repository->>'url', '')) <> '' THEN
+      REGEXP_REPLACE(
+        REGEXP_REPLACE(BTRIM(repository->>'url'), '^https://github.com/', '', 'i'),
+        '/+$',
+        ''
+      )
+    ELSE BTRIM(integration.metadata->>'owner') || '/' || BTRIM(repository->>'name')
+  END,
+  COALESCE(integration.created_at, NOW()),
+  COALESCE(integration.updated_at, NOW())
+FROM app_installations AS integration
+CROSS JOIN LATERAL jsonb_array_elements(
+  CASE
+    WHEN jsonb_typeof(integration.metadata->'repositories') = 'array' THEN integration.metadata->'repositories'
+    ELSE '[]'::JSONB
+  END
+) AS repository
+WHERE integration.app_name = 'github'
+  AND integration.state = 'ready'
+  AND COALESCE((integration.metadata->>'hostedApp')::BOOLEAN, FALSE)
+  AND integration.metadata->>'installationId' ~ '^[0-9]+$'
+  AND jsonb_typeof(integration.metadata->'repositories') = 'array'
+  AND repository->>'id' ~ '^[0-9]+$'
+  AND (
+    BTRIM(COALESCE(repository->>'url', '')) <> ''
+    OR (
+      BTRIM(COALESCE(integration.metadata->>'owner', '')) <> ''
+      AND BTRIM(COALESCE(repository->>'name', '')) <> ''
+    )
+  )
+ORDER BY (repository->>'id')::BIGINT, integration.updated_at DESC NULLS LAST
+ON CONFLICT (provider, repository_id) DO UPDATE SET
+  installation_id = EXCLUDED.installation_id,
+  full_name = EXCLUDED.full_name,
+  updated_at = EXCLUDED.updated_at;
 
 INSERT INTO vcs_provider_integration_bindings (
   integration_id,
@@ -164,6 +234,37 @@ WHERE app_name = 'github'
   AND state = 'ready'
   AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND metadata->>'installationId' ~ '^[0-9]+$';
+
+INSERT INTO vcs_provider_integration_repositories (
+  integration_id,
+  provider,
+  repository_id,
+  created_at,
+  updated_at
+)
+SELECT DISTINCT
+  integration.id,
+  'github',
+  (repository->>'id')::BIGINT,
+  COALESCE(integration.created_at, NOW()),
+  COALESCE(integration.updated_at, NOW())
+FROM app_installations AS integration
+CROSS JOIN LATERAL jsonb_array_elements(
+  CASE
+    WHEN jsonb_typeof(integration.metadata->'repositories') = 'array' THEN integration.metadata->'repositories'
+    ELSE '[]'::JSONB
+  END
+) AS repository
+INNER JOIN vcs_provider_repositories AS catalog_repository
+  ON catalog_repository.provider = 'github'
+  AND catalog_repository.repository_id = (repository->>'id')::BIGINT
+WHERE integration.app_name = 'github'
+  AND integration.state = 'ready'
+  AND COALESCE((integration.metadata->>'hostedApp')::BOOLEAN, FALSE)
+  AND integration.metadata->>'installationId' ~ '^[0-9]+$'
+  AND jsonb_typeof(integration.metadata->'repositories') = 'array'
+  AND repository->>'id' ~ '^[0-9]+$'
+ON CONFLICT (integration_id, provider, repository_id) DO NOTHING;
 
 DELETE FROM app_installations
 WHERE app_name = 'github'
