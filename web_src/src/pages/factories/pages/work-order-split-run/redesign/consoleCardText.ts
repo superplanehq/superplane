@@ -69,11 +69,6 @@ function runTitle(stage: AutomationStage): string | undefined {
   return stage.pullRequestActivity ? stage.name : undefined;
 }
 
-/** The open card shows the description. The header row shows output counts. */
-export function showDescriptionInBody(stage: AutomationStage): boolean {
-  return Boolean(stage.description?.trim());
-}
-
 export interface StepOutputSummary {
   artifactCount: number;
   artifactLabels: string[];
