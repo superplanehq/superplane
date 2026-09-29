@@ -28,10 +28,14 @@ type FactoryVelocityDayPoint struct {
 // FactoryVelocityWindows is the current window, the previous window of the
 // same length, and the daily merged counts. It does not include people,
 // automations, or intake.
+//
+// HasPeople is true only after repository merges are stored. Until then the
+// People count is unknown, and a share must stay unset.
 type FactoryVelocityWindows struct {
 	Current     FactoryVelocityWindowTotals
 	Previous    FactoryVelocityWindowTotals
 	HasPrevious bool
+	HasPeople   bool
 	Days        []FactoryVelocityDayPoint
 }
 
@@ -128,6 +132,7 @@ func summarizeVelocityWindows(data *velocityWindowData) FactoryVelocityWindows {
 		Current:     windowTotalsFromProto(current),
 		Previous:    windowTotalsFromProto(previous),
 		HasPrevious: hasVelocityOutput(previous),
+		HasPeople:   data.cohort.hasPeople,
 		Days:        days,
 	}
 }

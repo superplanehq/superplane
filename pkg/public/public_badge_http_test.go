@@ -37,7 +37,7 @@ func TestPublicBadge_ReturnsVelocitySVG(t *testing.T) {
 	body := getBadge(t, server, token, "period=30&size=large")
 	assert.Equal(t, http.StatusOK, body.status)
 	assert.Contains(t, body.contentType, "image/svg+xml")
-	assert.Equal(t, "public, max-age=3600", body.cacheControl)
+	assert.Equal(t, badgeCacheControl, body.cacheControl)
 	assert.NotContains(t, body.svg, "Quinlan")
 	assert.NotContains(t, body.svg, "987654321")
 
@@ -92,6 +92,65 @@ func TestPublicBadge_HidesCostUnlessTheSwitchIsOn(t *testing.T) {
 	assert.NotContains(t, small.svg, "per merged PR")
 }
 
+func TestPublicBadge_OmitsShareWhilePeopleSyncIsPending(t *testing.T) {
+	r := support.Setup(t)
+	server := newPublicTestServer(t, r)
+	factoryModel := newBadgeFactory(t, r, "example/repo")
+	require.NoError(t, factoryModel.UpdatePublicBadgeEnabled(database.DB(t.Context()), true))
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
+	seedBadgePullRequest(t, factoryModel, 1, models.FactoryPullRequestStateMerged, today, 0, 0)
+	seedBadgePullRequest(t, factoryModel, 2, models.FactoryPullRequestStateClosed, today, 0, 0)
+
+	velocity := describeVelocity(t, r, factoryModel, 30, "example/repo")
+	assert.False(t, velocity.HasPeopleCohort)
+	assert.Equal(t, int32(0), velocity.Totals.GetSuperplaneSharePct())
+	assert.Greater(t, velocity.Totals.GetSuperplaneMerged(), int32(0))
+
+	token := *factoryModel.PublicBadgeToken
+	for _, size := range []string{"small", "large", "wide"} {
+		body := getBadge(t, server, token, "size="+size)
+		assert.NotContains(t, body.svg, ">100%<", size)
+		assert.NotContains(t, body.svg, "100% of merged PRs", size)
+		assert.NotContains(t, body.svg, "100% PRs", size)
+		assert.NotContains(t, body.svg, "Manual work", size)
+	}
+	small := getBadge(t, server, token, "size=small")
+	assert.Contains(t, small.svg, "1 PRs · 30d")
+	assert.NotContains(t, small.svg, "%")
+}
+
+func TestPublicBadge_ShowsFullShareAfterSyncWithNoManualMerges(t *testing.T) {
+	r := support.Setup(t)
+	server := newPublicTestServer(t, r)
+	factoryModel := newBadgeFactory(t, r, "example/repo")
+	require.NoError(t, factoryModel.UpdatePublicBadgeEnabled(database.DB(t.Context()), true))
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
+	seedBadgePullRequest(t, factoryModel, 1, models.FactoryPullRequestStateMerged, today, 0, 0)
+	markBadgePeopleSyncComplete(t, factoryModel, "example/repo")
+
+	velocity := describeVelocity(t, r, factoryModel, 30, "example/repo")
+	require.True(t, velocity.HasPeopleCohort)
+	require.Equal(t, int32(100), velocity.Totals.GetSuperplaneSharePct())
+
+	body := getBadge(t, server, *factoryModel.PublicBadgeToken, "size=large")
+	assert.Contains(t, body.svg, "100%")
+}
+
+func markBadgePeopleSyncComplete(t *testing.T, factoryModel *models.Factory, repo string) {
+	t.Helper()
+	db := database.DB(t.Context())
+	from := time.Now().AddDate(0, 0, -90)
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryModel.ID, from, time.Now().Add(time.Hour), nil))
+	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, sync)
+	require.NoError(t, sync.RecordSuccess(db, repo, time.Now(), from))
+}
+
 func TestPublicBadge_NotFoundWhenDisabledOrUnknown(t *testing.T) {
 	r := support.Setup(t)
 	server := newPublicTestServer(t, r)
@@ -100,9 +159,10 @@ func TestPublicBadge_NotFoundWhenDisabledOrUnknown(t *testing.T) {
 	token := *factoryModel.PublicBadgeToken
 	require.NoError(t, factoryModel.UpdatePublicBadgeEnabled(database.DB(t.Context()), false))
 
-	disabled := getBadgeStatus(t, server, token, "")
-	assert.Equal(t, http.StatusNotFound, disabled)
-	assert.NotContains(t, disabledBody(t, server, token), factoryModel.Name)
+	disabledRec := doBadge(t, server, token, "")
+	assert.Equal(t, http.StatusNotFound, disabledRec.Code)
+	assert.Equal(t, badgeCacheControl, disabledRec.Header().Get("Cache-Control"))
+	assert.NotContains(t, disabledRec.Body.String(), factoryModel.Name)
 
 	unknown := getBadgeStatus(t, server, "not-a-real-token", "")
 	assert.Equal(t, http.StatusNotFound, unknown)
@@ -245,11 +305,6 @@ func getBadge(t *testing.T, server *Server, token, query string) badgeResponse {
 func getBadgeStatus(t *testing.T, server *Server, token, query string) int {
 	t.Helper()
 	return doBadge(t, server, token, query).Code
-}
-
-func disabledBody(t *testing.T, server *Server, token string) string {
-	t.Helper()
-	return doBadge(t, server, token, "").Body.String()
 }
 
 func doBadge(t *testing.T, server *Server, token, query string) *httptest.ResponseRecorder {

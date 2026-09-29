@@ -50,6 +50,7 @@ func TestComputeFactoryVelocityWindows_MatchesDescribeFactoryVelocity(t *testing
 	assertWindowTotals(t, windows.Current, resp.Totals)
 	assertWindowTotals(t, windows.Previous, resp.PreviousTotals)
 	assert.Equal(t, resp.HasPreviousWindow, windows.HasPrevious)
+	assert.Equal(t, resp.HasPeopleCohort, windows.HasPeople)
 
 	var superplane, people int
 	for _, day := range windows.Days {

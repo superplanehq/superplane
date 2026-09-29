@@ -2,6 +2,7 @@ package badges
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -66,6 +67,7 @@ func TestRender_ZeroMergesHasNoBarsTrendMergeRateOrCost(t *testing.T) {
 		PeriodDays:               14,
 		CostCents:                &cost,
 		HasPrevious:              true,
+		ShareKnown:               true,
 		PreviousSuperplaneMerged: 10,
 		PreviousPeopleMerged:     10,
 		Updated:                  time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC),
@@ -152,6 +154,63 @@ func TestRender_HidesCostWhenNilOrZeroAndSmallNeverShowsExtras(t *testing.T) {
 	assert.NotContains(t, svg, "per merged PR")
 }
 
+func TestRender_OmitsShareWhenPeopleMergesAreUnknown(t *testing.T) {
+	in := exampleInput()
+	in.ShareKnown = false
+	for _, size := range []Size{SizeSmall, SizeLarge, SizeWide} {
+		in.Size = size
+		svg := mustRender(t, in)
+		parseSVG(t, svg)
+		assert.NotContains(t, svg, "46%")
+		assert.NotContains(t, svg, ">100%<")
+		assert.NotContains(t, svg, "100% of merged PRs")
+		assert.NotContains(t, svg, "100% PRs")
+		assert.NotContains(t, svg, "▲")
+		assert.NotContains(t, svg, "of merged PRs via SuperPlane")
+		assert.NotContains(t, svg, "Manual work")
+	}
+
+	in.Size = SizeSmall
+	assert.Contains(t, mustRender(t, in), "35 PRs · 14d")
+	in.Size = SizeLarge
+	assert.Contains(t, mustRender(t, in), "35 PRs merged via SuperPlane · last 14 days")
+	in.Size = SizeWide
+	assert.Contains(t, mustRender(t, in), "Automated via SuperPlane")
+}
+
+func TestRender_WideKeepsLongCostInsideViewBox(t *testing.T) {
+	in := exampleInput()
+	in.Size = SizeWide
+	cost := int64(350_000_000_000)
+	in.CostCents = &cost
+	label := formatCostPerMerged(cost, in.SuperplaneMerged)
+	svg := mustRender(t, in)
+	parseSVG(t, svg)
+	assert.Contains(t, svg, label)
+	assert.NotContains(t, svg, "of merged PRs via SuperPlane")
+	assert.LessOrEqual(t, textRightEdge(t, svg, label), 780)
+}
+
+func textRightEdge(t *testing.T, svg, label string) int {
+	t.Helper()
+	needle := ">" + label + "</text>"
+	index := strings.Index(svg, needle)
+	require.NotEqual(t, -1, index)
+	start := strings.LastIndex(svg[:index], "<text ")
+	require.NotEqual(t, -1, start)
+	tag := svg[start:index]
+	x := regexp.MustCompile(`x="(\d+)"`).FindStringSubmatch(tag)
+	size := regexp.MustCompile(`font-size="(\d+)"`).FindStringSubmatch(tag)
+	require.Len(t, x, 2)
+	require.Len(t, size, 2)
+	var origin, fontSize int
+	_, err := fmt.Sscanf(x[1], "%d", &origin)
+	require.NoError(t, err)
+	_, err = fmt.Sscanf(size[1], "%d", &fontSize)
+	require.NoError(t, err)
+	return origin + textWidth(label, float64(fontSize), true)
+}
+
 func TestRender_ThousandsSeparator(t *testing.T) {
 	cost := int64(3500000)
 	in := exampleInput()
@@ -171,6 +230,7 @@ func exampleInput() Input {
 		PreviousSuperplaneMerged: 19,
 		PreviousPeopleMerged:     31,
 		HasPrevious:              true,
+		ShareKnown:               true,
 		CostCents:                &cost,
 		Updated:                  time.Date(2026, 9, 29, 15, 0, 0, 0, time.UTC),
 		Days:                     daysFor(14, 2, 1),

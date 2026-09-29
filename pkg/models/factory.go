@@ -458,9 +458,9 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	return nil
 }
 
-// UpdatePublicBadgeEnabled turns the public badge on or off. The first time
-// it is turned on, a random URL-safe token is stored. Later toggles keep that
-// token so an existing README link works again.
+// UpdatePublicBadgeEnabled turns the public badge on or off. The first enable
+// stores a random URL-safe token. A later enable keeps that token, including
+// when two first enables run together, so a README link stays valid.
 func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
 	now := time.Now()
 	updates := map[string]any{
@@ -468,14 +468,13 @@ func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
 		"updated_at":           now,
 	}
 	columns := []string{"public_badge_enabled", "updated_at"}
-	if enabled && (f.PublicBadgeToken == nil || *f.PublicBadgeToken == "") {
+	if enabled {
 		token, err := newPublicBadgeToken()
 		if err != nil {
 			return err
 		}
-		updates["public_badge_token"] = token
+		updates["public_badge_token"] = gorm.Expr("COALESCE(NULLIF(public_badge_token, ''), ?)", token)
 		columns = append(columns, "public_badge_token")
-		f.PublicBadgeToken = &token
 	}
 
 	err := tx.Model(f).
@@ -484,6 +483,16 @@ func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
 		Updates(updates).Error
 	if err != nil {
 		return err
+	}
+	if enabled {
+		var stored Factory
+		err = tx.Select("public_badge_token").
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			First(&stored).Error
+		if err != nil {
+			return err
+		}
+		f.PublicBadgeToken = stored.PublicBadgeToken
 	}
 	f.PublicBadgeEnabled = enabled
 	f.UpdatedAt = now

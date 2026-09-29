@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -196,5 +197,43 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.True(t, reloaded.PublicBadgeShowCost)
 		require.NotNil(t, reloaded.PublicBadgeToken)
 		assert.Equal(t, token, *reloaded.PublicBadgeToken)
+	})
+
+	t.Run("concurrent first enables keep one token", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		const attempts = 8
+		enabled := true
+		tokens := make([]string, attempts)
+		errs := make([]error, attempts)
+		var wg sync.WaitGroup
+		wg.Add(attempts)
+		for i := range attempts {
+			go func() {
+				defer wg.Done()
+				response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+					Id:                 factory.ID.String(),
+					PublicBadgeEnabled: &enabled,
+				})
+				errs[i] = err
+				if err == nil && response.Factory != nil {
+					tokens[i] = response.Factory.PublicBadgeToken
+				}
+			}()
+		}
+		wg.Wait()
+
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+		require.NotEmpty(t, tokens[0])
+		for _, token := range tokens[1:] {
+			assert.Equal(t, tokens[0], token)
+		}
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		assert.Equal(t, tokens[0], *reloaded.PublicBadgeToken)
 	})
 }

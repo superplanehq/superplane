@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"math"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -57,6 +58,7 @@ type Input struct {
 	PreviousSuperplaneMerged int
 	PreviousPeopleMerged     int
 	HasPrevious              bool
+	ShareKnown               bool
 	CostCents                *int64
 	Days                     []DayPoint
 	Updated                  time.Time
@@ -66,6 +68,7 @@ type Input struct {
 type metrics struct {
 	share       int
 	manualShare int
+	showShare   bool
 	merged      int
 	trend       string
 	showTrend   bool
@@ -83,6 +86,7 @@ type placedText struct {
 	Fill   string
 	Anchor string
 	Text   string
+	Width  int
 }
 
 type dayBar struct {
@@ -108,6 +112,13 @@ func Render(in Input) (string, error) {
 	if in.Updated.IsZero() {
 		in.Updated = time.Now()
 	}
+	if !in.ShareKnown {
+		in.PeopleMerged = 0
+		in.PreviousPeopleMerged = 0
+		for i := range in.Days {
+			in.Days[i].PeopleMerged = 0
+		}
+	}
 	switch in.Size {
 	case SizeLarge:
 		return execute(largeTemplate, layoutLarge(in))
@@ -128,25 +139,25 @@ func execute(tmpl *template.Template, data any) (string, error) {
 
 func derive(in Input) metrics {
 	merged := in.SuperplaneMerged + in.PeopleMerged
-	share := 0
-	manual := 0
-	if merged > 0 {
-		share = in.SuperplaneMerged * 100 / merged
-		manual = 100 - share
+	out := metrics{
+		showShare: in.ShareKnown,
+		merged:    merged,
+	}
+	if in.ShareKnown && merged > 0 {
+		out.share = in.SuperplaneMerged * 100 / merged
+		out.manualShare = 100 - out.share
+	}
+	if !in.ShareKnown {
+		out.merged = 0
 	}
 
-	out := metrics{
-		share:       share,
-		manualShare: manual,
-		merged:      merged,
-	}
-	if in.HasPrevious && merged > 0 {
+	if out.showShare && in.HasPrevious && merged > 0 {
 		previousShare := 0
 		previousMerged := in.PreviousSuperplaneMerged + in.PreviousPeopleMerged
 		if previousMerged > 0 {
 			previousShare = in.PreviousSuperplaneMerged * 100 / previousMerged
 		}
-		delta := share - previousShare
+		delta := out.share - previousShare
 		switch {
 		case delta > 0:
 			out.trend = fmt.Sprintf("▲ %d pts", delta)
@@ -281,11 +292,15 @@ type smallModel struct {
 func layoutSmall(in Input) smallModel {
 	m := derive(in)
 	left := "SuperPlane"
-	right := fmt.Sprintf("%d%% PRs · %dd", m.share, in.PeriodDays)
+	right := fmt.Sprintf("%d PRs · %dd", in.SuperplaneMerged, in.PeriodDays)
+	title := fmt.Sprintf("SuperPlane · %d PRs · %dd", in.SuperplaneMerged, in.PeriodDays)
+	if m.showShare {
+		right = fmt.Sprintf("%d%% PRs · %dd", m.share, in.PeriodDays)
+		title = fmt.Sprintf("SuperPlane %d%% · %d PRs · %dd", m.share, in.SuperplaneMerged, in.PeriodDays)
+	}
 	pad := 8
 	leftWidth := textWidth(left, 11, true) + pad*2
 	rightWidth := textWidth(right, 11, true) + pad*2
-	title := fmt.Sprintf("SuperPlane %d%% · %d PRs · %dd", m.share, in.SuperplaneMerged, in.PeriodDays)
 	return smallModel{
 		Font:       fontFamily,
 		Width:      leftWidth + rightWidth,
@@ -326,21 +341,24 @@ func layoutLarge(in Input) largeModel {
 	texts := []placedText{
 		{X: pad, Y: 26, Size: 13, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane")},
 	}
-	shareText := fmt.Sprintf("%d%%", m.share)
-	texts = append(texts, placedText{X: pad, Y: 62, Size: 32, Weight: "700", Fill: colorSuperplane, Text: escapeXML(shareText)})
-	if m.showTrend {
-		texts = append(texts, placedText{
-			X:      pad + textWidth(shareText, 32, true) + 10,
-			Y:      54,
-			Size:   12,
-			Weight: "600",
-			Fill:   colorManual,
-			Text:   escapeXML(m.trend),
-		})
+	y := 48
+	if m.showShare {
+		shareText := fmt.Sprintf("%d%%", m.share)
+		texts = append(texts, placedText{X: pad, Y: 62, Size: 32, Weight: "700", Fill: colorSuperplane, Text: escapeXML(shareText)})
+		if m.showTrend {
+			texts = append(texts, placedText{
+				X:      pad + textWidth(shareText, 32, true) + 10,
+				Y:      54,
+				Size:   12,
+				Weight: "600",
+				Fill:   colorManual,
+				Text:   escapeXML(m.trend),
+			})
+		}
+		y = 84
+		texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "400", Fill: colorSubtle, Text: escapeXML("of merged PRs via SuperPlane")})
+		y += 18
 	}
-	y := 84
-	texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "400", Fill: colorSubtle, Text: escapeXML("of merged PRs via SuperPlane")})
-	y += 18
 	texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "500", Fill: colorText, Text: escapeXML(countLine(in.SuperplaneMerged, in.PeriodDays, false))})
 	if m.showMerge {
 		y += 18
@@ -355,26 +373,33 @@ func layoutLarge(in Input) largeModel {
 	}
 	barY := y + 12
 	barH := 8
-	height := barY + barH + 16
+	height := y + 16
 	barW := width - pad*2
 	greenW := 0
 	slateW := 0
-	if m.merged > 0 {
-		greenW = barW * m.share / 100
-		slateW = barW - greenW
-		if m.share > 0 && greenW < 2 {
-			greenW = 2
+	if m.showShare {
+		height = barY + barH + 16
+		if m.merged > 0 {
+			greenW = barW * m.share / 100
+			slateW = barW - greenW
+			if m.share > 0 && greenW < 2 {
+				greenW = 2
+			}
+			if m.manualShare > 0 && slateW < 2 && barW > greenW+2 {
+				slateW = 2
+				greenW = barW - slateW
+			}
 		}
-		if m.manualShare > 0 && slateW < 2 && barW > greenW+2 {
-			slateW = 2
-			greenW = barW - slateW
-		}
+	}
+	title := fmt.Sprintf("%d PRs merged via SuperPlane · last %d days", in.SuperplaneMerged, in.PeriodDays)
+	if m.showShare {
+		title = fmt.Sprintf("%d%% of merged PRs via SuperPlane vs previous %d days", m.share, in.PeriodDays)
 	}
 	return largeModel{
 		Font:      fontFamily,
 		Height:    height,
 		InnerH:    height - 1,
-		Title:     escapeXML(fmt.Sprintf("%d%% of merged PRs via SuperPlane vs previous %d days", m.share, in.PeriodDays)),
+		Title:     escapeXML(title),
 		ClipID:    clipID(),
 		Texts:     texts,
 		BarX:      pad,
@@ -384,7 +409,7 @@ func layoutLarge(in Input) largeModel {
 		GreenW:    greenW,
 		SlateX:    pad + greenW,
 		SlateW:    slateW,
-		ShowTrack: true,
+		ShowTrack: m.showShare,
 	}
 }
 
@@ -407,35 +432,42 @@ func layoutWide(in Input) wideModel {
 	)
 	items := []headerItem{
 		{text: "SuperPlane", size: 14, weight: "700", fill: colorText},
-		{text: fmt.Sprintf("%d%%", m.share), size: 18, weight: "700", fill: colorSuperplane},
 	}
-	if m.showTrend {
+	if m.showShare {
 		items = append(items, headerItem{
-			text:   m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
-			size:   12,
-			weight: "600",
-			fill:   colorManual,
+			text: fmt.Sprintf("%d%%", m.share), size: 18, weight: "700", fill: colorSuperplane, dropRank: dropShare,
+		})
+		if m.showTrend {
+			items = append(items, headerItem{
+				text:     m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
+				size:     12,
+				weight:   "600",
+				fill:     colorManual,
+				dropRank: dropTrend,
+			})
+		}
+		items = append(items, headerItem{
+			text:     "of merged PRs via SuperPlane",
+			size:     12,
+			weight:   "400",
+			fill:     colorSubtle,
+			dropRank: dropPhrase,
 		})
 	}
 	items = append(items, headerItem{
-		text:     "of merged PRs via SuperPlane",
+		text:     countLine(in.SuperplaneMerged, in.PeriodDays, true),
 		size:     12,
-		weight:   "400",
-		fill:     colorSubtle,
-		optional: true,
-	})
-	items = append(items, headerItem{
-		text:   countLine(in.SuperplaneMerged, in.PeriodDays, true),
-		size:   12,
-		weight: "500",
-		fill:   colorText,
+		weight:   "500",
+		fill:     colorText,
+		dropRank: dropCount,
 	})
 	if m.showMerge {
 		items = append(items, headerItem{
-			text:   fmt.Sprintf("%d%% merge rate", m.mergeRate),
-			size:   12,
-			weight: "400",
-			fill:   colorManual,
+			text:     fmt.Sprintf("%d%% merge rate", m.mergeRate),
+			size:     12,
+			weight:   "400",
+			fill:     colorManual,
+			dropRank: dropRate,
 		})
 	}
 	if m.showCost {
@@ -445,10 +477,14 @@ func layoutWide(in Input) wideModel {
 
 	chart := layoutChart(in.Days, 24, 56, 752, 118)
 	legend, squares := layoutLegend(m, in.Updated, 24, 214, 776)
+	title := fmt.Sprintf("SuperPlane · %d PRs merged · last %d days", in.SuperplaneMerged, in.PeriodDays)
+	if m.showShare {
+		title = fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
+	}
 	return wideModel{
 		Font:    fontFamily,
 		Height:  height,
-		Title:   escapeXML(fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)),
+		Title:   escapeXML(title),
 		Texts:   texts,
 		Days:    chart,
 		Legend:  legend,
@@ -456,33 +492,54 @@ func layoutWide(in Input) wideModel {
 	}
 }
 
+const (
+	dropShare  = 1
+	dropCount  = 2
+	dropRate   = 3
+	dropTrend  = 4
+	dropPhrase = 5
+)
+
 type headerItem struct {
 	text     string
 	size     float64
 	weight   string
 	fill     string
-	optional bool
+	dropRank int
 }
 
 func placeHeader(items []headerItem, startX, y, maxX int) []placedText {
-	placed := placeHeaderPass(items, startX, y, maxX, true)
-	if headerOverflows(placed, maxX) {
-		placed = placeHeaderPass(items, startX, y, maxX, false)
+	kept := append([]headerItem(nil), items...)
+	for {
+		placed := placeHeaderPass(kept, startX, y)
+		if !headerOverflows(placed, maxX) {
+			return placed
+		}
+		index := highestDropRank(kept)
+		if index < 0 {
+			return placed
+		}
+		kept = slices.Delete(kept, index, index+1)
 	}
-	return placed
 }
 
-func placeHeaderPass(items []headerItem, startX, y, maxX int, keepOptional bool) []placedText {
+func highestDropRank(items []headerItem) int {
+	best := -1
+	bestRank := 0
+	for i, item := range items {
+		if item.dropRank > bestRank {
+			best = i
+			bestRank = item.dropRank
+		}
+	}
+	return best
+}
+
+func placeHeaderPass(items []headerItem, startX, y int) []placedText {
 	x := startX
 	out := make([]placedText, 0, len(items))
 	for _, item := range items {
-		if item.optional && !keepOptional {
-			continue
-		}
 		width := textWidth(item.text, item.size, item.weight == "700" || item.weight == "600")
-		if item.optional && x+width > maxX {
-			continue
-		}
 		out = append(out, placedText{
 			X:      x,
 			Y:      y,
@@ -490,6 +547,7 @@ func placeHeaderPass(items []headerItem, startX, y, maxX int, keepOptional bool)
 			Weight: item.weight,
 			Fill:   item.fill,
 			Text:   escapeXML(item.text),
+			Width:  width,
 		})
 		x += width + 14
 	}
@@ -501,7 +559,7 @@ func headerOverflows(items []placedText, maxX int) bool {
 		return false
 	}
 	last := items[len(items)-1]
-	return last.X+textWidth(last.Text, float64(last.Size), true) > maxX+8
+	return last.X+last.Width > maxX
 }
 
 func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
@@ -615,9 +673,19 @@ func labelIndexes(n int) []int {
 }
 
 func layoutLegend(m metrics, updated time.Time, x, y, right int) ([]placedText, []barRect) {
+	updatedLabel := "Updated " + updated.Format("Jan 2")
+	if !m.showShare {
+		texts := []placedText{
+			{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML("Automated via SuperPlane")},
+			{X: right, Y: y, Size: 11, Weight: "400", Fill: colorManual, Anchor: "end", Text: escapeXML(updatedLabel)},
+		}
+		squares := []barRect{
+			{X: x, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorSuperplane},
+		}
+		return texts, squares
+	}
 	auto := fmt.Sprintf("Automated via SuperPlane (%d%%)", m.share)
 	manual := fmt.Sprintf("Manual work (%d%%)", m.manualShare)
-	updatedLabel := "Updated " + updated.Format("Jan 2")
 	texts := []placedText{
 		{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(auto)},
 		{X: x + 14 + textWidth(auto, 11, false) + 28, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(manual)},
@@ -654,12 +722,12 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
   <title>{{.Title}}</title>
   <rect x="0.5" y="0.5" width="319" height="{{.InnerH}}" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
   {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}">{{.Text}}</text>
-  {{end}}<clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="4"/></clipPath>
+  {{end}}{{if .ShowTrack}}<clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="4"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
     <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="#e2e8f0"/>
     {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="#10b981"/>{{end}}
     {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="#64748b"/>{{end}}
-  </g>
+  </g>{{end}}
 </svg>
 `
 

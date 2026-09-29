@@ -21,7 +21,7 @@ func (s *Server) handlePublicBadge(w http.ResponseWriter, r *http.Request) {
 		if err != nil && !errors.Is(err, models.ErrFactoryNotFound) {
 			log.Errorf("Failed to load public badge: %v", err)
 		}
-		http.NotFound(w, r)
+		writeBadgeNotFound(w, r)
 		return
 	}
 
@@ -49,10 +49,17 @@ func (s *Server) handlePublicBadge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("Cache-Control", badgeCacheControl)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))
+}
+
+const badgeCacheControl = "private, no-store"
+
+func writeBadgeNotFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", badgeCacheControl)
+	http.NotFound(w, r)
 }
 
 func badgeInput(
@@ -78,6 +85,7 @@ func badgeInput(
 		PreviousSuperplaneMerged: windows.Previous.SuperplaneMerged,
 		PreviousPeopleMerged:     windows.Previous.PeopleMerged,
 		HasPrevious:              windows.HasPrevious,
+		ShareKnown:               windows.HasPeople,
 		Days:                     days,
 		Updated:                  now,
 		Size:                     size,
