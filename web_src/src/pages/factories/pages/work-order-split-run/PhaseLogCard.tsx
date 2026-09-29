@@ -151,11 +151,56 @@ function StreamLineTitle({
  * Full bash command or prompt text. It is clamped to two lines so a long
  * prompt does not fill the sticky step header. A subtle toggle shows the rest
  * and hides it again when the text does not fit in two lines.
+ * Expanded text scrolls inside a cap: 40% of the log pane, and not more than 16rem.
  */
+const EXPANDED_STREAM_TITLE = "block max-h-[min(40%,16rem)] min-h-0 overflow-y-auto";
+const EXPANDED_TITLE_CAP_REM = 16;
+const EXPANDED_TITLE_PANE_RATIO = 0.4;
+
+function nearestScrollPane(element: HTMLElement): HTMLElement | null {
+  let node = element.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function expandedTitleMaxPx(paneHeight: number | null): number {
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const remPx = Number.isFinite(rootPx) && rootPx > 0 ? rootPx : 16;
+  const capPx = EXPANDED_TITLE_CAP_REM * remPx;
+  if (paneHeight == null || paneHeight <= 0) {
+    return capPx;
+  }
+  return Math.min(paneHeight * EXPANDED_TITLE_PANE_RATIO, capPx);
+}
+
 function CollapsibleStreamTitle({ text }: { text: string }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
+  const [expandedMaxHeight, setExpandedMaxHeight] = useState<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || !expanded) {
+      setExpandedMaxHeight(undefined);
+      return;
+    }
+    const pane = nearestScrollPane(el);
+    const applyCap = () => setExpandedMaxHeight(expandedTitleMaxPx(pane?.clientHeight ?? null));
+    applyCap();
+    if (!pane || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(applyCap);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [text, expanded]);
 
   useLayoutEffect(() => {
     if (expanded) {
@@ -179,7 +224,11 @@ function CollapsibleStreamTitle({ text }: { text: string }) {
     <span className="flex min-w-0 flex-1 flex-col items-start">
       <span
         ref={textRef}
-        className={cn("w-full whitespace-pre-wrap break-words text-muted-foreground", !expanded && "line-clamp-2")}
+        style={expanded ? { maxHeight: expandedMaxHeight } : undefined}
+        className={cn(
+          "w-full whitespace-pre-wrap break-words text-muted-foreground",
+          expanded ? EXPANDED_STREAM_TITLE : "line-clamp-2",
+        )}
       >
         {text}
       </span>

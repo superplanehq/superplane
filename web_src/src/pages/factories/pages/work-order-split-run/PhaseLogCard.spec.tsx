@@ -167,14 +167,16 @@ describe("PhaseLogCard collapsed stream", () => {
     try {
       const user = userEvent.setup();
       const longTitle = "line one\nline two\nline three\nline four";
+      const logLine = "still visible in the log";
       const stream: SplitRunStreamLine[] = [
         line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
         line({
           id: "step-long",
           note: true,
           componentName: longTitle,
-          componentType: "bash",
+          componentType: "prompt",
           status: "passed",
+          detail: logLine,
         }),
       ];
 
@@ -192,9 +194,18 @@ describe("PhaseLogCard collapsed stream", () => {
 
       await user.click(toggle);
 
-      expect(titleEl()).not.toHaveClass("line-clamp-2");
+      const expandedTitle = titleEl();
+      expect(expandedTitle).not.toHaveClass("line-clamp-2");
+      expect(expandedTitle).toHaveClass("max-h-[min(40%,16rem)]", "overflow-y-auto");
+      expect(screen.getByText(logLine)).toBeInTheDocument();
       expect(screen.getByTestId("split-run-title-toggle")).toHaveTextContent("Show less");
       expect(screen.getByTestId("split-run-title-toggle")).toHaveAttribute("aria-expanded", "true");
+
+      await user.click(screen.getByTestId("split-run-title-toggle"));
+
+      expect(titleEl()).toHaveClass("line-clamp-2");
+      expect(titleEl()).not.toHaveClass("max-h-[min(40%,16rem)]", "overflow-y-auto");
+      expect(screen.getByText(logLine)).toBeInTheDocument();
     } finally {
       restoreHeights();
     }
