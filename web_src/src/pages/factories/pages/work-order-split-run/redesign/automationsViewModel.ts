@@ -4,13 +4,7 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
-import {
-  groupClaudeSteps,
-  groupSplitRunStream,
-  toolCallSummary,
-  type ClaudeStepGroup,
-  type StreamNodeGroup,
-} from "../phaseLogStream";
+import { groupClaudeSteps, groupSplitRunStream, type ClaudeStepGroup, type StreamNodeGroup } from "../phaseLogStream";
 import {
   SPLIT_RUN_CLOSURE_PHASE_ID,
   splitRunStatusLabel,
@@ -71,7 +65,7 @@ export interface AgentStep {
   iconSlug?: string;
 }
 
-/** One automation with every run it made for this task, newest first. */
+/** One automation with every run it made for this task, oldest first. */
 export interface ConsoleAutomation {
   id: string;
   name: string;
@@ -218,16 +212,17 @@ export function automationsFromStages(stages: AutomationStage[]): ConsoleAutomat
     byKey.set(key, runs);
   }
   return [...byKey.entries()].map(([key, runs]) => {
-    const newestFirst = [...runs].sort(
-      (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
+    const oldestFirst = [...runs].sort(
+      (left, right) => Date.parse(left.startedAt ?? "") - Date.parse(right.startedAt ?? ""),
     );
-    const name = newestFirst[0]?.componentName || key;
-    const latest = newestFirst.find((run) => run.status === "running") ?? newestFirst[0];
+    const newest = oldestFirst.at(-1);
+    const name = newest?.componentName || key;
+    const latest = oldestFirst.find((run) => run.status === "running") ?? newest;
     return {
       id: consoleAutomationDomId(name, key),
       name,
-      latest,
-      runs: newestFirst,
+      latest: latest ?? oldestFirst[0],
+      runs: oldestFirst,
     };
   });
 }
@@ -348,7 +343,7 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     type: group.line.componentType === "bash" ? "bash" : "prompt",
     status: group.line.status,
     duration: group.line.duration,
-    summary: tools.length > 0 ? toolCallSummary(tools) : "",
+    summary: "",
     toolCount: tools.length,
     output: group.line.detail?.trim() || undefined,
     events: group.events.map((event) =>
