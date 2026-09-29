@@ -39,6 +39,8 @@ export type WorkOrderSplitRunPopupProps = Omit<WorkOrderSplitRunBodyProps, "foot
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  /** Gates the header duplicate action. Defaults to allowed for callers that do not track this permission. */
+  canCreateWorkOrder?: boolean;
 };
 
 type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;

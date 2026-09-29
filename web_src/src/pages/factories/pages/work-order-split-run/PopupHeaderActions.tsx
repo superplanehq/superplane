@@ -1,8 +1,9 @@
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PermissionTooltip } from "@/components/PermissionGate";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
 
@@ -13,17 +14,28 @@ export function PopupHeaderActions({
   copyUrl,
   onArchive,
   archiveBusy = false,
+  onDuplicate,
+  duplicateBusy = false,
+  canDuplicate = true,
   taskActions,
 }: {
   copyUrl?: string;
   onArchive?: () => void | Promise<void>;
   archiveBusy?: boolean;
+  onDuplicate?: () => void | Promise<void>;
+  duplicateBusy?: boolean;
+  /** Whether the current user may create tasks. Callers that do not track
+   * this permission default to allowed. */
+  canDuplicate?: boolean;
   taskActions?: ReactNode;
 }) {
   return (
     <>
       {taskActions}
       {onArchive ? <PopupArchiveButton onArchive={onArchive} busy={archiveBusy} /> : null}
+      {onDuplicate ? (
+        <PopupDuplicateButton onDuplicate={onDuplicate} busy={duplicateBusy} canCreate={canDuplicate} />
+      ) : null}
       <CopyLinkButton
         url={copyUrl}
         className={HEADER_ICON_BUTTON}
@@ -55,5 +67,45 @@ function PopupArchiveButton({ onArchive, busy }: { onArchive: () => void | Promi
       </TooltipTrigger>
       <TooltipContent side="bottom">Archive</TooltipContent>
     </Tooltip>
+  );
+}
+
+function PopupDuplicateButton({
+  onDuplicate,
+  busy,
+  canCreate,
+}: {
+  onDuplicate: () => void | Promise<void>;
+  busy: boolean;
+  canCreate: boolean;
+}) {
+  const permissionDeniedMessage = "You do not have permission to create tasks.";
+
+  const button = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void onDuplicate()}
+            disabled={busy || !canCreate}
+            className={HEADER_ICON_BUTTON}
+            aria-label="Duplicate"
+            data-testid="popup-work-order-duplicate-button"
+          >
+            <Copy className="h-4 w-4" aria-hidden />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Duplicate</TooltipContent>
+    </Tooltip>
+  );
+
+  return (
+    <PermissionTooltip allowed={canCreate} message={permissionDeniedMessage}>
+      {button}
+    </PermissionTooltip>
   );
 }
