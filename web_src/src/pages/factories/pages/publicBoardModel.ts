@@ -8,7 +8,11 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder } from "@/api-client";
 import { ANALYSIS_ENTRY, PR_CLOSURE_ENTRY, prFeedbackSentence } from "../lib/columnAutomationCatalog";
 import type { ColumnAutomation, ColumnAutomationKind } from "../lib/columnAutomations";
-import { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
+import {
+  buildAssigneeFilterOptions,
+  buildSourceFilterOptions,
+  type WorkOrderFilterOption,
+} from "../lib/workOrderFilterOptions";
 import { applyWorkOrderFilters, applyWorkOrderSearch, buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import type { WorkOrderFilters } from "../lib/workOrderListModel";
 import { lineIntakeSourceById } from "./lineIntakeModel";
@@ -83,28 +87,18 @@ const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
   datadog: { src: datadogIcon, alt: "Datadog" },
 };
 
-export function legacyAssigneeMigrations(columns: PublicBoardColumn[]): Map<string, string> {
-  const keysByName = new Map<string, Set<string>>();
-  for (const column of columns) {
-    for (const card of column.cards) {
-      const name = card.assignee?.name?.trim().toLowerCase();
-      const key = card.assignee?.key?.trim();
-      if (!name || !key) {
-        continue;
-      }
-      const keys = keysByName.get(name) ?? new Set<string>();
-      keys.add(key);
-      keysByName.set(name, keys);
+const ASSIGNEE_KEY = /^[0-9a-f]{16}$/;
+
+/** Labels for a saved name filter. Does not change the saved id. */
+export function legacyAssigneeChipOptions(columns: PublicBoardColumn[], savedIds: string[]): WorkOrderFilterOption[] {
+  const displayNames = assigneeDisplayNames(columns);
+  return savedIds.flatMap((id) => {
+    const name = legacyAssigneeName(id);
+    if (!name) {
+      return [];
     }
-  }
-  const migrations = new Map<string, string>();
-  for (const [name, keys] of keysByName) {
-    if (keys.size !== 1) {
-      continue;
-    }
-    migrations.set(`public-member:${name}`, `public-member:${[...keys][0]}`);
-  }
-  return migrations;
+    return [{ value: id, label: displayNames.get(name) ?? name }];
+  });
 }
 
 export function columnAutomations(column: PublicBoardColumn): ColumnAutomation[] {
@@ -204,6 +198,33 @@ export function columnEmptyDescription(column: PublicBoardColumn, narrowed: bool
   return "Nothing here.";
 }
 
+function assigneeDisplayNames(columns: PublicBoardColumn[]): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const column of columns) {
+    for (const card of column.cards) {
+      const name = card.assignee?.name?.trim();
+      const key = name?.toLowerCase();
+      if (!name || !key || names.has(key)) {
+        continue;
+      }
+      names.set(key, name);
+    }
+  }
+  return names;
+}
+
+function legacyAssigneeName(id: string): string | undefined {
+  const prefix = "public-member:";
+  if (!id.startsWith(prefix)) {
+    return undefined;
+  }
+  const name = id.slice(prefix.length);
+  if (!name || ASSIGNEE_KEY.test(name)) {
+    return undefined;
+  }
+  return name;
+}
+
 function publicAssigneeId(assignee: { key?: string; name?: string }): string {
   const key = assignee.key?.trim();
   if (key) {
@@ -222,7 +243,12 @@ function withLegacyAssignee(filters: WorkOrderFilters, order: FactoriesWorkOrder
   const assignee = order.assignees?.[0];
   const name = assignee?.name?.trim().toLowerCase();
   const legacyId = name ? `public-member:${name}` : "";
-  if (!legacyId || !assignee?.id || !filters.assigneeIds.includes(legacyId) || filters.assigneeIds.includes(assignee.id)) {
+  if (
+    !legacyId ||
+    !assignee?.id ||
+    !filters.assigneeIds.includes(legacyId) ||
+    filters.assigneeIds.includes(assignee.id)
+  ) {
     return filters;
   }
   return { ...filters, assigneeIds: [...filters.assigneeIds, assignee.id] };

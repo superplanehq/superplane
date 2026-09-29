@@ -25,7 +25,7 @@ import { PublicBoardColumnLane } from "./PublicFactoryBoardLane";
 import {
   boardFilterOptions,
   columnAutomations,
-  legacyAssigneeMigrations,
+  legacyAssigneeChipOptions,
   loadStateForErrorStatus,
   parseBoardEvent,
   publicBoardSocketPath,
@@ -104,7 +104,6 @@ export function PublicFactoryBoardPage({
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
-  useLegacyAssigneeMigration(board, listState);
   const columns = useMemo(
     () => visibleBoardColumns(board?.columns ?? [], listState.filters, listState.search),
     [board, listState.filters, listState.search],
@@ -143,6 +142,10 @@ export function PublicFactoryBoardPage({
       listState={listState}
       sourceOptions={filterOptions.sources}
       assigneeOptions={filterOptions.assignees}
+      chipAssigneeOptions={[
+        ...filterOptions.assignees,
+        ...legacyAssigneeChipOptions(board.columns, listState.filters.assigneeIds),
+      ]}
       narrowed={listState.search.trim().length > 0 || listState.filterCount > 0}
     />
   );
@@ -209,6 +212,7 @@ function PublicBoardView({
   listState,
   sourceOptions,
   assigneeOptions,
+  chipAssigneeOptions,
   narrowed,
 }: {
   organizationId: string;
@@ -221,6 +225,7 @@ function PublicBoardView({
   listState: ReturnType<typeof useWorkOrderListState>;
   sourceOptions: ReturnType<typeof buildSourceFilterOptions>;
   assigneeOptions: ReturnType<typeof buildAssigneeFilterOptions>;
+  chipAssigneeOptions: ReturnType<typeof buildAssigneeFilterOptions>;
   narrowed: boolean;
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -255,7 +260,9 @@ function PublicBoardView({
                 />
               </>
             }
-            belowRow={<FilterChips state={listState} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />}
+            belowRow={
+              <FilterChips state={listState} sourceOptions={sourceOptions} assigneeOptions={chipAssigneeOptions} />
+            }
           />
           <div className={factoryWorkOrdersBodyClassName}>
             <WorkOrderKanbanBoard testId="public-board-columns">
@@ -298,15 +305,7 @@ function PublicViewBadge() {
   );
 }
 
-function PublicBoardStatus({
-  title,
-  signInHref,
-  homeHref,
-}: {
-  title: string;
-  signInHref?: string;
-  homeHref?: string;
-}) {
+function PublicBoardStatus({ title, signInHref, homeHref }: { title: string; signInHref?: string; homeHref?: string }) {
   return (
     <div
       className="flex h-screen flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground"
@@ -325,26 +324,6 @@ function PublicBoardStatus({
       ) : null}
     </div>
   );
-}
-
-function useLegacyAssigneeMigration(
-  board: PublicBoard | null,
-  listState: ReturnType<typeof useWorkOrderListState>,
-) {
-  const assigneeIds = listState.filters.assigneeIds.join("\0");
-  useEffect(() => {
-    const migrations = legacyAssigneeMigrations(board?.columns ?? []);
-    for (const id of assigneeIds.split("\0").filter(Boolean)) {
-      const next = migrations.get(id);
-      if (!next || next === id) {
-        continue;
-      }
-      listState.removeFilter("assigneeIds", id);
-      if (!assigneeIds.split("\0").includes(next)) {
-        listState.toggleFilter("assigneeIds", next);
-      }
-    }
-  }, [assigneeIds, board, listState]);
 }
 
 function guestSignInHref(): string {
