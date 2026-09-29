@@ -2,8 +2,7 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunScreen } from "../useFirstRunSetupFlow";
 
-/** The account picker is a page of the connect screen with its own state. */
-export type FirstRunSphereScreen = FirstRunScreen | "organization";
+export type FirstRunSphereScreen = FirstRunScreen;
 
 /**
  * The Discover chip keeps the latest confirmed context: the organization
@@ -44,13 +43,6 @@ export function sphereFor(
     return {
       level: 0.24,
       caption: copy.captionConnect,
-      leftChip: discoverChip(null),
-    };
-  }
-  if (screen === "organization") {
-    return {
-      level: 0.42,
-      caption: copy.captionOrganization,
       leftChip: discoverChip(null),
     };
   }

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,8 +134,8 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	//
 	if a.isDev {
 		log.Info("Registering development authentication routes")
-		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
-		router.HandleFunc("/auth/{provider}", a.handleDevAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
+		router.HandleFunc("/auth/{provider}", a.handleDevelopmentAuth).Methods("GET")
 		return
 	}
 
@@ -143,10 +144,12 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
-	gothUser, err := gothic.CompleteUserAuth(w, r)
-	if err == nil {
-		a.finishProviderAuth(w, r, gothUser)
-		return
+	if !isConnectIntent(r) {
+		gothUser, err := gothic.CompleteUserAuth(w, r)
+		if err == nil {
+			a.finishProviderAuth(w, r, gothUser)
+			return
+		}
 	}
 
 	authState, err := a.authStateForRequest(w, r)
@@ -167,6 +170,19 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothic.BeginAuthHandler(w, r)
 }
 
+func useRealProviderAuthInDevelopment(r *http.Request) bool {
+	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+}
+
+func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
+	if useRealProviderAuthInDevelopment(r) {
+		a.handleAuth(w, r)
+		return
+	}
+
+	a.handleDevAuth(w, r)
+}
+
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	if !a.isDev {
 		http.Error(w, "Not available in production", http.StatusForbidden)
@@ -175,8 +191,12 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
+	providerUserID := "dev-user-123"
+	if provider == models.ProviderGitHub {
+		providerUserID = "123456789"
+	}
 	mockUser := goth.User{
-		UserID:      "dev-user-123",
+		UserID:      providerUserID,
 		Email:       "dev@superplane.local",
 		Name:        "Dev User",
 		NickName:    "devuser",
@@ -287,6 +307,12 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 	err = updateAccountProviders(a.encryptor, account, gothUser)
 	if err != nil {
 		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := saveConnectedProviderIdentity(database.DB(r.Context()), account, gothUser); err != nil {
+		log.Errorf("Error saving connected identity for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -1211,6 +1237,32 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	}
 
 	return database.Conn().Create(accountProvider).Error
+}
+
+func saveConnectedProviderIdentity(tx *gorm.DB, account *models.Account, gothUser goth.User) error {
+	if !strings.EqualFold(gothUser.Provider, models.ProviderGitHub) {
+		return nil
+	}
+
+	username := strings.TrimSpace(gothUser.NickName)
+	if username == "" {
+		return errors.New("GitHub returned no username")
+	}
+	providerID := strings.TrimSpace(gothUser.UserID)
+	numericID, err := strconv.ParseInt(providerID, 10, 64)
+	if err != nil || numericID <= 0 {
+		return errors.New("GitHub returned an invalid numeric user id")
+	}
+
+	linked := models.NewAccountLinkedAccount(
+		account.ID,
+		models.ProviderGitHub,
+		providerID,
+		username,
+		gothUser.Name,
+		gothUser.AvatarURL,
+	)
+	return models.RefreshAccountLinkedAccount(tx, linked)
 }
 
 func getRedirectURL(r *http.Request) string {
