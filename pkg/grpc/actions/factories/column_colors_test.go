@@ -7,6 +7,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test__ParseLineColumnColors__AcceptsGreenFuchsiaCyanAndIndigo(t *testing.T) {
+	colors, err := parseLineColumnColors(map[string]string{
+		"backlog": "green",
+		"phase-0": "fuchsia",
+		"verify":  "cyan",
+		"done":    "indigo",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"backlog": "green",
+		"phase-0": "fuchsia",
+		"verify":  "cyan",
+		"done":    "indigo",
+	}, colors)
+}
+
 func Test__ParseLineColumnColors__AcceptsEmeraldAndBlue(t *testing.T) {
 	colors, err := parseLineColumnColors(map[string]string{
 		"backlog": "emerald",

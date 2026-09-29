@@ -10,17 +10,21 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists ten colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(10);
+  it("lists fourteen colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(14);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).toEqual([
       "emerald",
+      "green",
       "lime",
       "yellow",
       "orange",
       "rose",
+      "fuchsia",
       "teal",
+      "cyan",
       "sky",
       "blue",
+      "indigo",
       "purple",
       "slate",
     ]);
@@ -47,6 +51,33 @@ describe("lineBoardColumnColors", () => {
     expect(rose?.borderClassName).toBe("border-rose-400 dark:border-rose-800/45");
   });
 
+  it("resolves green, fuchsia, cyan, and indigo to a wash, a vivid fill, and a border", () => {
+    const green = lineBoardColumnColorById("green");
+    const fuchsia = lineBoardColumnColorById("fuchsia");
+    const cyan = lineBoardColumnColorById("cyan");
+    const indigo = lineBoardColumnColorById("indigo");
+
+    expect(green?.label).toBe("Green");
+    expect(green?.laneClassName).toBe("bg-green-100 dark:bg-green-950/40");
+    expect(green?.className).toBe("bg-green-300 dark:bg-green-800");
+    expect(green?.borderClassName).toBe("border-green-400 dark:border-green-800/45");
+
+    expect(fuchsia?.label).toBe("Fuchsia");
+    expect(fuchsia?.laneClassName).toBe("bg-fuchsia-100 dark:bg-fuchsia-950/40");
+    expect(fuchsia?.className).toBe("bg-fuchsia-300 dark:bg-fuchsia-800");
+    expect(fuchsia?.borderClassName).toBe("border-fuchsia-400 dark:border-fuchsia-800/45");
+
+    expect(cyan?.label).toBe("Cyan");
+    expect(cyan?.laneClassName).toBe("bg-cyan-100 dark:bg-cyan-950/40");
+    expect(cyan?.className).toBe("bg-cyan-300 dark:bg-cyan-800");
+    expect(cyan?.borderClassName).toBe("border-cyan-400 dark:border-cyan-800/45");
+
+    expect(indigo?.label).toBe("Indigo");
+    expect(indigo?.laneClassName).toBe("bg-indigo-100 dark:bg-indigo-950/40");
+    expect(indigo?.className).toBe("bg-indigo-300 dark:bg-indigo-800");
+    expect(indigo?.borderClassName).toBe("border-indigo-400 dark:border-indigo-800/45");
+  });
+
   it("resolves emerald and blue to a wash, a vivid fill, and a border", () => {
     const emerald = lineBoardColumnColorById("emerald");
     const blue = lineBoardColumnColorById("blue");
@@ -71,6 +102,10 @@ describe("lineBoardColumnColors", () => {
     expect(lineBoardColumnLaneClassName("orange")).toContain("bg-orange-100");
     expect(lineBoardColumnLaneClassName("emerald")).toContain("bg-emerald-100");
     expect(lineBoardColumnLaneClassName("blue")).toContain("bg-blue-100");
+    expect(lineBoardColumnLaneClassName("green")).toContain("bg-green-100");
+    expect(lineBoardColumnLaneClassName("fuchsia")).toContain("bg-fuchsia-100");
+    expect(lineBoardColumnLaneClassName("cyan")).toContain("bg-cyan-100");
+    expect(lineBoardColumnLaneClassName("indigo")).toContain("bg-indigo-100");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
   });
 

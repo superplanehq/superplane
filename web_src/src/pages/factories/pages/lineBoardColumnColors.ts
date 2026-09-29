@@ -10,13 +10,17 @@ import {
 
 export type LineBoardColumnColorId =
   | "emerald"
+  | "green"
   | "lime"
   | "yellow"
   | "orange"
   | "rose"
+  | "fuchsia"
   | "teal"
+  | "cyan"
   | "sky"
   | "blue"
+  | "indigo"
   | "purple"
   | "slate";
 
@@ -39,6 +43,13 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     className: "bg-emerald-300 dark:bg-emerald-800",
     laneClassName: "bg-emerald-100 dark:bg-emerald-950/40",
     borderClassName: "border-emerald-400 dark:border-emerald-800/45",
+  },
+  {
+    id: "green",
+    label: "Green",
+    className: "bg-green-300 dark:bg-green-800",
+    laneClassName: "bg-green-100 dark:bg-green-950/40",
+    borderClassName: "border-green-400 dark:border-green-800/45",
   },
   {
     id: "lime",
@@ -69,11 +80,25 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     borderClassName: "border-rose-400 dark:border-rose-800/45",
   },
   {
+    id: "fuchsia",
+    label: "Fuchsia",
+    className: "bg-fuchsia-300 dark:bg-fuchsia-800",
+    laneClassName: "bg-fuchsia-100 dark:bg-fuchsia-950/40",
+    borderClassName: "border-fuchsia-400 dark:border-fuchsia-800/45",
+  },
+  {
     id: "teal",
     label: "Teal",
     className: "bg-teal-300 dark:bg-teal-800",
     laneClassName: "bg-teal-100 dark:bg-teal-950/40",
     borderClassName: "border-teal-400 dark:border-teal-800/45",
+  },
+  {
+    id: "cyan",
+    label: "Cyan",
+    className: "bg-cyan-300 dark:bg-cyan-800",
+    laneClassName: "bg-cyan-100 dark:bg-cyan-950/40",
+    borderClassName: "border-cyan-400 dark:border-cyan-800/45",
   },
   {
     id: "sky",
@@ -88,6 +113,13 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     className: "bg-blue-300 dark:bg-blue-800",
     laneClassName: "bg-blue-100 dark:bg-blue-950/40",
     borderClassName: "border-blue-400 dark:border-blue-800/45",
+  },
+  {
+    id: "indigo",
+    label: "Indigo",
+    className: "bg-indigo-300 dark:bg-indigo-800",
+    laneClassName: "bg-indigo-100 dark:bg-indigo-950/40",
+    borderClassName: "border-indigo-400 dark:border-indigo-800/45",
   },
   {
     id: "purple",

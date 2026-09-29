@@ -113,13 +113,17 @@ func parseLineStep(
 // web_src/src/pages/factories/pages/lineBoardColumnColors.ts.
 var factoryLineColumnColorIDs = map[string]bool{
 	"emerald": true,
+	"green":   true,
 	"lime":    true,
 	"yellow":  true,
 	"orange":  true,
 	"rose":    true,
+	"fuchsia": true,
 	"teal":    true,
+	"cyan":    true,
 	"sky":     true,
 	"blue":    true,
+	"indigo":  true,
 	"purple":  true,
 	"slate":   true,
 }
