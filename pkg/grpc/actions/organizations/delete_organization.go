@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -21,6 +22,12 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "organization not found")
+	}
+
+	err = polar.CancelOrganizationSubscriptionForDeletion(ctx, database.Conn(), organization.ID)
+	if err != nil {
+		log.Errorf("Error canceling Business plan before deleting organization %s: %v", organization.ID.String(), err)
+		return nil, grpcerrors.Internal(err, "failed to cancel the Business plan. The organization was not deleted.")
 	}
 
 	tx := database.Conn().Begin()

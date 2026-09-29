@@ -143,6 +143,21 @@ func CancelOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid
 	return setOrganizationSubscriptionCancelAtPeriodEnd(ctx, tx, orgID, true)
 }
 
+func CancelOrganizationSubscriptionForDeletion(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
+	err := CancelOrganizationSubscription(ctx, tx, orgID)
+	if err == nil || subscriptionCancelCanBeSkipped(err) {
+		return nil
+	}
+	return err
+}
+
+func subscriptionCancelCanBeSkipped(err error) bool {
+	return errors.Is(err, ErrSubscriptionCheckoutDisabled) ||
+		errors.Is(err, ErrSubscriptionNotCancelable) ||
+		errors.Is(err, ErrSubscriptionAlreadyCanceling) ||
+		errors.Is(err, ErrAdminPlanCannotCancel)
+}
+
 func ResumeOrganizationSubscription(ctx context.Context, tx *gorm.DB, orgID uuid.UUID) error {
 	return setOrganizationSubscriptionCancelAtPeriodEnd(ctx, tx, orgID, false)
 }
