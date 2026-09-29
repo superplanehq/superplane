@@ -137,4 +137,33 @@ describe("SplitRunReview draft model select", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
   });
+
+  it("keeps the model chevron enabled when only credit disables Start", () => {
+    const footer = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      credit: { remainingCreditCents: 0 },
+    }).footer;
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <TooltipProvider>
+          <SplitRunReview
+            footer={footer}
+            onStart={vi.fn()}
+            modelSelect={
+              <DraftStartModelSelect
+                organizationId="org-1"
+                factoryId="factory-1"
+                lineName="ship"
+                model={DRAFT_START_MODEL_AUTO}
+                thinkingLevel={DRAFT_START_THINKING_AUTO}
+                onChange={vi.fn()}
+              />
+            }
+          />
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeEnabled();
+  });
 });

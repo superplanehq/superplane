@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
-import { EyeOff, FileText } from "lucide-react";
+import { CircleX, EyeOff, FileText, TriangleAlert } from "lucide-react";
 
+import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { liveDraftReadiness, type DraftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
+import type { HostedCreditBlockNotice } from "../../lib/workOrderFailureReason";
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
 import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
@@ -40,6 +42,7 @@ export function ComposerPlanStack({
   onToggle,
   actions,
   modelSelect,
+  creditNotice,
 }: {
   open: boolean;
   clarity?: ComposerScore;
@@ -52,6 +55,7 @@ export function ComposerPlanStack({
   onToggle?: () => void;
   actions?: ReactNode;
   modelSelect?: ReactNode;
+  creditNotice?: HostedCreditBlockNotice;
 }) {
   const readiness = liveDraftReadiness({
     clarity: showClarity ? clarity?.score : undefined,
@@ -62,7 +66,7 @@ export function ComposerPlanStack({
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FramePanel fit className="flex flex-col gap-1.5 px-3 py-2" data-testid="split-run-intent-plan-updated">
-        <Verdict readiness={readiness} />
+        {creditNotice ? <CreditVerdict notice={creditNotice} /> : <Verdict readiness={readiness} />}
         <div className="flex min-w-0 items-center gap-2" data-testid="split-run-intent-composer-chips">
           <ScoreEvidenceRow
             clarity={clarity}
@@ -101,6 +105,44 @@ function Verdict({ readiness }: { readiness: DraftReadiness }) {
         <p className="text-[13px] leading-5 font-medium text-foreground">{readiness.headline}</p>
         {showText ? <p className="text-[12px] leading-4 text-muted-foreground">{readiness.text}</p> : null}
       </div>
+    </div>
+  );
+}
+
+function CreditVerdict({ notice }: { notice: HostedCreditBlockNotice }) {
+  const warning = notice.warning;
+  const Icon = warning ? TriangleAlert : CircleX;
+  return (
+    <div
+      className="-mx-3 -mt-2 flex min-w-0 items-center gap-3 border-b border-border px-3 py-2"
+      data-testid="split-run-intent-verdict"
+      data-tone={warning ? "warning" : "failed"}
+    >
+      <span
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-full",
+          warning ? "bg-[color:var(--status-waiting-dot)]/15" : "bg-[color:var(--status-failed-dot)]/15",
+        )}
+      >
+        <Icon
+          aria-hidden
+          className={cn(
+            "size-3.5",
+            warning ? "text-[color:var(--status-waiting-fg)]" : "text-[color:var(--status-failed-fg)]",
+          )}
+        />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] leading-5 font-medium text-foreground">{notice.headline}</p>
+        <p className="truncate text-[12px] leading-4 text-muted-foreground">{notice.text}</p>
+      </div>
+      {notice.href ? (
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <Link href={notice.href} data-testid="split-run-intent-credit-billing">
+            {notice.actionLabel}
+          </Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

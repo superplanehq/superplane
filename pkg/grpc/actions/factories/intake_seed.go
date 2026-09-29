@@ -698,10 +698,10 @@ func seedDatadogIssues(
 	}
 
 	client.SetRequestDeadline(time.Now().Add(intakeDatadogSeedBudget))
-	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, issues))
+	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, service, issues))
 }
 
-func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
+func hydrateDatadogSeedIssues(client *datadog.Client, intakeService string, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
 	hydrated := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize)
 	for _, issue := range issues {
 		if len(hydrated) >= intakeDatadogSeedSize {
@@ -712,7 +712,24 @@ func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrac
 		})
 		if err != nil || loaded == nil {
 			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
+			if !datadogIssueMatchesService(issue, intakeService, false) {
+				log.Warnf(
+					"skipping Datadog issue %s: search result has no verified service for intake %q",
+					issue.ID,
+					intakeService,
+				)
+				continue
+			}
 			hydrated = append(hydrated, issue)
+			continue
+		}
+		if !datadogIssueMatchesService(*loaded, intakeService, false) {
+			log.Warnf(
+				"skipping Datadog issue %s: details report service %q outside intake service %q",
+				issue.ID,
+				loaded.Service,
+				intakeService,
+			)
 			continue
 		}
 		if !datadogDetailMatchesService(issue.Service, loaded.Service) {
@@ -731,11 +748,15 @@ func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrac
 }
 
 func datadogDetailMatchesService(expected, actual string) bool {
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		return true
+	}
 	actual = strings.TrimSpace(actual)
 	if actual == "" {
 		return true
 	}
-	return strings.EqualFold(strings.TrimSpace(expected), actual)
+	return strings.EqualFold(expected, actual)
 }
 
 func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.ErrorTrackingIssue, error) {
@@ -752,7 +773,7 @@ func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.
 	matched := make([]datadog.ErrorTrackingIssue, 0, len(issues))
 	boundary := datadogIntakeItemSource{service: service}
 	for _, issue := range issues {
-		if strings.TrimSpace(issue.ID) == "" || !boundary.ownsIssue(issue) {
+		if strings.TrimSpace(issue.ID) == "" || !boundary.ownsSearchResult(issue) {
 			continue
 		}
 		issue.URL = client.IssueURL(issue.ID)
