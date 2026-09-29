@@ -70,6 +70,7 @@ import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { ADD_INTAKE_COPY } from "./lineIntakeModel";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
+import { resetDiscussionHandlerProvisionAttempts } from "./useAutoProvisionDiscussionHandler";
 
 function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrderSummary[] {
   return orders.map((order) => {
@@ -301,6 +302,7 @@ vi.mock("@/lib/toast", () => ({
 async function resetLinesBoardMocks() {
   window.localStorage.clear();
   resetFactoryBoardLaneScrollPositions();
+  resetDiscussionHandlerProvisionAttempts();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
@@ -828,7 +830,8 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
     );
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledTimes(1);
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
   });
 
   it("opens the comments setup page instead of creating the handler immediately", async () => {
@@ -842,7 +845,8 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
     );
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledTimes(1);
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
   });
 });
 
@@ -851,18 +855,20 @@ describe("LinesPage next steps", () => {
     await resetLinesBoardMocks();
   });
 
-  it("shows comments as open after onboarding", () => {
+  it("creates comment handling and hides the comments question", async () => {
+    createFactoryPRFeedbackHandler.mockResolvedValue({
+      id: "handler-discussion",
+      source: "SOURCE_PULL_REQUEST_DISCUSSION",
+    });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "How should pull request comments be handled?",
-    );
-    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("2/4");
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "SuperPlane can implement tasks and open pull requests, but pull request reviews are not handled yet.",
-    );
-    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure");
-    expect(screen.queryByTestId("workspace-next-step-later")).not.toBeInTheDocument();
+    expect(screen.queryByText("How should pull request comments be handled?")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(createFactoryPRFeedbackHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
+    expect(screen.queryByText("How should pull request comments be handled?")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-next-step-cta-pr-comments-handler")).not.toBeInTheDocument();
   });
 
   it("shows status checks after the comments handler is configured", () => {
@@ -878,6 +884,7 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("3/4");
     expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent("Configure");
     expect(screen.getByTestId("workspace-next-step-later")).toHaveTextContent("Later");
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("moves the status-checks banner into a header badge when the user chooses Later", async () => {
@@ -931,6 +938,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("keeps next steps hidden when PR feedback handlers fail to load", () => {
@@ -939,6 +947,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
     expect(screen.queryByTestId("workspace-next-steps-restore")).not.toBeInTheDocument();
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("hides next steps when both handlers are configured", () => {
@@ -953,9 +962,18 @@ describe("LinesPage next steps", () => {
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
   });
 
-  it("opens the comments setup page from the next-step CTA", async () => {
+  it("shows the comments question when automatic setup fails", async () => {
+    createFactoryPRFeedbackHandler.mockRejectedValueOnce(new Error("failed"));
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+        "How should pull request comments be handled?",
+      );
+    });
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledTimes(1);
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
 
     await user.click(screen.getByTestId("workspace-next-step-cta-pr-comments-handler"));
 
@@ -963,7 +981,7 @@ describe("LinesPage next steps", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
     );
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledTimes(1);
   });
 
   it("opens the status-checks setup page from the next-step CTA", async () => {
