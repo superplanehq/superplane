@@ -27,8 +27,7 @@ import {
 } from "./consolePages";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
-const ARTIFACT_ROW_MAIN =
-  "group flex min-w-0 flex-1 items-center gap-1.5 py-1 text-[12px] font-medium text-foreground";
+const ARTIFACT_ROW_MAIN = "group flex min-w-0 flex-1 items-center gap-1.5 py-1 text-[12px] font-medium text-foreground";
 
 /**
  * Everything the run produced, on one page. Same flat list as Agent
@@ -77,9 +76,7 @@ function ArtifactRow({
         name={name}
         icon={<Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
         defaultOpen={defaultOpen}
-        action={
-          <ArtifactMeta size={size}>{expandableArtifactAction(kind, name, artifact, href)}</ArtifactMeta>
-        }
+        action={<ArtifactMeta size={size}>{expandableArtifactAction(kind, name, artifact, href)}</ArtifactMeta>}
       >
         {expandableArtifactBody(kind, name, artifact, href, body)}
       </ExpandableArtifactRow>
@@ -240,13 +237,7 @@ function ArtifactIconLink({
 }) {
   return (
     <Button type="button" size="icon-xs" variant="ghost" className="size-7 shrink-0" asChild>
-      <a
-        href={href}
-        download={download}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={label}
-      >
+      <a href={href} download={download} target="_blank" rel="noopener noreferrer" aria-label={label}>
         {children}
       </a>
     </Button>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { checkTickBar } from "./consoleCheckRows";
+import { checkTickBar } from "./checkTickBar";
 
 describe("checkTickBar", () => {
   it("draws one box per point on a five-point score", () => {
