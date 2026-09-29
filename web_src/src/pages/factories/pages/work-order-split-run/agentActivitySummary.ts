@@ -79,7 +79,10 @@ export function completedActivitySummaryLabel(tools: AgentToolItem[]): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
+export function groupToolRuns(
+  entries: AgentActivityItem[],
+  options?: { leaveCommandsOpen?: boolean },
+): ActivityEntry[] {
   const grouped: ActivityEntry[] = [];
   let index = 0;
 
@@ -90,11 +93,20 @@ export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
       index += 1;
       continue;
     }
+    if (options?.leaveCommandsOpen && isCommandTool(entry)) {
+      grouped.push(entry);
+      index += 1;
+      continue;
+    }
 
     const tools: AgentToolItem[] = [entry];
     let nextIndex = index + 1;
     while (nextIndex < entries.length && entries[nextIndex].type === "tool") {
-      tools.push(entries[nextIndex] as AgentToolItem);
+      const next = entries[nextIndex] as AgentToolItem;
+      if (options?.leaveCommandsOpen && isCommandTool(next)) {
+        break;
+      }
+      tools.push(next);
       nextIndex += 1;
     }
 
