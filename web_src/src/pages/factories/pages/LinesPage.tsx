@@ -20,6 +20,7 @@ import {
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useAutoConfigurePRComments } from "./useAutoConfigurePRComments";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -443,11 +444,25 @@ export function LinesPage() {
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const autoConfigurePRComments = useAutoConfigurePRComments({
+    organizationId,
+    factoryId,
+    githubIntegrationId,
+    repository: appRepository,
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    handlersLoaded: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+    hasDiscussionHandler: takenPRFeedbackSources.includes("discussion"),
+    refetchHandlers: () => {
+      void prFeedbackHandlersQuery.refetch();
+    },
+  });
   const nextSteps = workspaceNextSteps({
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
     takenPRFeedbackSources,
     prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+    commentsCreatePending: autoConfigurePRComments.pending,
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);

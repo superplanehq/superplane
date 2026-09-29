@@ -2,11 +2,13 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -48,6 +50,19 @@ func CreateFactoryPRFeedbackHandler(
 	source, err := parseFactoryPRFeedbackHandlerSource(req.GetSource())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+		hasDiscussion, err := factory.HasPRFeedbackHandlerSource(db, source)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+		}
+		if hasDiscussion {
+			return nil, grpcerrors.AlreadyExists(
+				errors.New("factory already has a pull request discussion handler"),
+				"factory already has a pull request discussion handler",
+			)
+		}
 	}
 
 	settings := parsePRFeedbackSettings(defaultPRFeedbackSettings(), req.GetSettings())

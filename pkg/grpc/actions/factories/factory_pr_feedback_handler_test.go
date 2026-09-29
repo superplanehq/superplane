@@ -95,6 +95,22 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
+	t.Run("creation rejects a second discussion handler for the same factory", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+
+		_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.AlreadyExists, code)
+	})
+
 	t.Run("the handler listens with the workspace connection", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
