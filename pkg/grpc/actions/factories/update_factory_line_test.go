@@ -96,6 +96,54 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 		assert.Empty(t, updated.ColumnColorsValue())
 	})
 
+	t.Run("accepts emerald", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"review": "emerald"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"review": "emerald"}, response.Line.ColumnColors)
+	})
+
+	t.Run("accepts rose", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"review": "rose"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"review": "rose"}, response.Line.ColumnColors)
+	})
+
+	t.Run("accepts pink", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"review": "pink"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"review": "pink"}, response.Line.ColumnColors)
+	})
+
+	t.Run("accepts indigo", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"review": "indigo"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"review": "indigo"}, response.Line.ColumnColors)
+	})
+
 	t.Run("unknown color id -> error", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
