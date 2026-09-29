@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -204,6 +207,40 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Equal(t, datadog.ErrorTrackingForbiddenMessage, message)
+	})
+
+	assertSearch := func(t *testing.T, sourceErr error) (codes.Code, string) {
+		t.Helper()
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, sourceErr), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		return code, message
+	}
+
+	for _, source := range liveIntakeClientErrors() {
+		t.Run(source.name+" 403 from search is a failed precondition", func(t *testing.T) {
+			code, message := assertSearch(t, source.statusError(http.StatusForbidden))
+			assert.Equal(t, codes.FailedPrecondition, code)
+			assert.Equal(t, intakeConnectFirstMessage, message)
+		})
+	}
+
+	t.Run("a non-auth 4xx from search is a failed precondition", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusUnprocessableEntity})
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, intakeCouldNotLoadItemsMessage, message)
+	})
+
+	t.Run("a 5xx from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, sentry.StatusError(http.StatusBadGateway))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
 	})
 
 	t.Run("integration error description is returned instead of unsupported search", func(t *testing.T) {
