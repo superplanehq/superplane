@@ -17,7 +17,7 @@ import {
   useWorkOrder,
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
-import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -52,6 +52,7 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
+import { useAutoProvisionDiscussionHandler } from "./useAutoProvisionDiscussionHandler";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -362,6 +363,7 @@ export function LinesPage() {
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
   const prFeedbackHandlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
+  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
@@ -443,11 +445,31 @@ export function LinesPage() {
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const handlersReady = isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery);
+  const shouldProvisionDiscussion =
+    Boolean(factoryId) &&
+    isFactoryOnboardingComplete(factory) &&
+    canUpdate &&
+    handlersReady &&
+    !takenPRFeedbackSources.includes("discussion");
+  const discussionProvision = useAutoProvisionDiscussionHandler({
+    factoryId,
+    enabled: shouldProvisionDiscussion,
+    listHandlers: async () => {
+      const listed = await prFeedbackHandlersQuery.refetch();
+      if (listed.error) {
+        throw listed.error;
+      }
+      return listed.data ?? [];
+    },
+    createHandler: createPRFeedbackHandler.mutateAsync,
+  });
+  const hideCommentsNextStep = shouldProvisionDiscussion && !discussionProvision.failed;
   const nextSteps = workspaceNextSteps({
     onboardingComplete: isFactoryOnboardingComplete(factory),
     canConfigure: canUpdate,
     takenPRFeedbackSources,
-    prFeedbackHandlersReady: isWorkspaceNextStepsQueryReady(prFeedbackHandlersQuery),
+    prFeedbackHandlersReady: handlersReady,
   });
   const nextStepBanner = workspaceNextStepBanner(nextSteps);
   const nextStepDeferral = useWorkspaceNextStepDeferral(factoryId);
@@ -731,7 +753,7 @@ export function LinesPage() {
             onColorViewChange={setColumnColorView}
           />
           <NextStepsPanel
-            steps={nextSteps}
+            steps={hideCommentsNextStep ? [] : nextSteps}
             collapsed={nextStepsCollapsed}
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
