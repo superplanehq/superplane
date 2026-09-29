@@ -179,6 +179,54 @@ describe("LiveAgentSteps", () => {
     expect(screen.getByText("Inspecting the retry path.")).toBeInTheDocument();
   });
 
+  it("does not put another runner transcript under the open step", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      stream: [
+        { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
+        RUNNING_RUNNER,
+      ],
+    });
+    const other: AgentActivity = {
+      id: "activity-other",
+      provider: "opencode",
+      status: "passed",
+      sequence: 1,
+      truncated: false,
+      items: [
+        {
+          type: "content",
+          id: "note-other",
+          kind: "assistant",
+          text: "Clone finished on the other runner.",
+          status: "passed",
+          truncated: false,
+        },
+      ],
+    };
+    vi.mocked(useLiveLogStream).mockImplementation((executionId: string) => {
+      if (executionId === "exec-other") {
+        return idleStream({
+          isStreaming: false,
+          activityState: { activities: [other], seenEventIds: new Set() },
+        });
+      }
+      return idleStream({
+        activityState: { activities: [LIVE_ACTIVITY], seenEventIds: new Set() },
+      });
+    });
+
+    render(<LiveAgentSteps stage={implementStage()} phase={implementPhase()} organizationId="org-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Inspecting the retry path.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Clone finished on the other runner.")).not.toBeInTheDocument();
+  });
+
   it("maps OpenCode section events into the live chat when activity records are absent", async () => {
     vi.mocked(useLiveLogStream).mockReturnValue(
       idleStream({

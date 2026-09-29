@@ -66,8 +66,9 @@ export function LiveAgentSteps({
     return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : note;
   }
 
-  const running = runners.some((line) => line.status === "running" && Boolean(line.executionId));
-  const liveActivity = activityFromTranscript(runners.flatMap((line) => liveByLine[line.id]?.activities ?? []));
+  const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
+  const running = Boolean(runningRunner);
+  const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
 
   return (
     <>
