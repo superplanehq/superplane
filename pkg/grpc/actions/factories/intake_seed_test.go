@@ -729,6 +729,33 @@ func Test__DatadogSeedLoadsIssueDetails(t *testing.T) {
 	assert.Contains(t, payload.Description, "main.Charge")
 }
 
+func Test__DatadogSeedKeepsIssueWhenSearchSummaryHasNoService(t *testing.T) {
+	const issueID = "44444444-4444-4444-8444-444444444444"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/error-tracking/issues/") {
+			_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_message":"checkout failed","service":"checkout"}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues := hydrateDatadogSeedIssues(client, []datadog.ErrorTrackingIssue{{
+		ID:  issueID,
+		URL: "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+	}})
+	require.Len(t, issues, 1)
+	assert.Equal(t, "checkout", issues[0].Service)
+	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
+}
+
 func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherService(t *testing.T) {
 	const issueID = "22222222-2222-4222-8222-222222222222"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

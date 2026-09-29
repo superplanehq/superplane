@@ -310,8 +310,8 @@ func TestDatadogIntakeItemSource_StaysInsideItsService(t *testing.T) {
 	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "checkout"}))
 	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "Checkout"}))
 	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "billing"}))
-	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: ""}))
-	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{}))
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: ""}))
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{}))
 }
 
 func TestDatadogServiceSearchQuery(t *testing.T) {
