@@ -19,6 +19,7 @@ export function FirstRunShell({
   chrome,
   busy = false,
   width = "narrow",
+  contentSpacing = "default",
   sphere,
 }: {
   children: ReactNode;
@@ -26,6 +27,7 @@ export function FirstRunShell({
   chrome?: FirstRunChrome;
   busy?: boolean;
   width?: "narrow" | "wide";
+  contentSpacing?: "default" | "compact";
   sphere?: FirstRunSphereProps;
 }) {
   useFactoriesThemeClass();
@@ -41,7 +43,13 @@ export function FirstRunShell({
 
       {sphere ? (
         <div className="flex h-full">
-          <div className="flex flex-1 items-center overflow-y-auto px-8 py-24 lg:px-12">
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 items-center overflow-y-auto px-8 lg:px-12",
+              contentSpacing === "compact" ? "py-16" : "py-24",
+            )}
+            data-testid="first-run-content"
+          >
             <div className="w-full max-w-lg text-left">
               {children}
               <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
@@ -50,7 +58,13 @@ export function FirstRunShell({
           <FirstRunSpherePane {...sphere} />
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
+        <div
+          className={cn(
+            "flex h-full min-h-0 items-center justify-center overflow-y-auto px-6",
+            contentSpacing === "compact" ? "py-16" : "py-24",
+          )}
+          data-testid="first-run-content"
+        >
           <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>
             {children}
             <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />

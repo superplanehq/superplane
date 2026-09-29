@@ -100,17 +100,17 @@ above if you still need to expose `localhost:8000`.
 1. Open GitHub, then **Settings**, then **Developer settings**, then **GitHub Apps**.
 2. Click **New GitHub App**.
 3. Set the homepage URL to your tunnel URL.
-4. Set these callback and webhook URLs. Replace `{BASE_URL}` and
+4. Set these setup and webhook URLs. Replace `{BASE_URL}` and
    `{WEBHOOKS_BASE_URL}` with the same tunnel URL.
-
    - Setup URL: `{BASE_URL}/api/v1/github/app/setup`
-   - User authorization callback URL: `{BASE_URL}/api/v1/github/app/oauth/callback`
    - Redirect on update: enabled
    - Webhook URL: `{WEBHOOKS_BASE_URL}/api/v1/github/app/webhook`
    - Webhook secret: a random string. Copy it for `.env`.
 
-5. Grant repository permissions that match the private-app manifest:
+   Disable **Request user authorization (OAuth) during installation**. The
+   public GitHub App does not authorize users.
 
+5. Grant repository permissions that match the private-app manifest:
    - Issues: Read and write
    - Actions: Read and write
    - Checks: Read-only
@@ -121,24 +121,39 @@ above if you still need to expose `localhost:8000`.
    - Deployments: Read and write
    - Organization administration: Read-only
 
+   Subscribe the app to the **Member** event. SuperPlane uses this event to
+   refresh cached push access after repository membership changes.
+
 6. Create the app.
 7. Make the app **public**. GitHub creates it as private. Open the app
    settings and change the visibility. Factory onboarding cannot install a
    private app on other accounts.
 8. Generate a private key and download the PEM file.
-9. Copy the App ID, slug, Client ID, and Client secret from the app page.
+9. Copy the App ID and slug from the app page.
 
-### 3. Set the SuperPlane environment
+### 3. Configure the GitHub OAuth App
+
+GitHub identity is separate from GitHub App installation access. Configure the
+OAuth App that supplies `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` with this
+callback URL:
+
+`{BASE_URL}/auth/github/callback`
+
+SuperPlane requests exactly the `user:email` scope. It stores the GitHub user
+ID and login, but it does not use the OAuth token for repositories,
+collaborators, or automation.
+
+### 4. Set the SuperPlane environment
 
 Add these values to `.env`. Do not commit real secrets.
 
 ```env
+GITHUB_CLIENT_ID=oauth-app-client-id
+GITHUB_CLIENT_SECRET=oauth-app-client-secret
 SUPERPLANE_GITHUB_APP_ID=123123
 SUPERPLANE_GITHUB_APP_SLUG=superplane-myslug
 SUPERPLANE_GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n<pem>\n-----END RSA PRIVATE KEY-----"
 SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET=123123
-SUPERPLANE_GITHUB_APP_CLIENT_ID=123123
-SUPERPLANE_GITHUB_APP_CLIENT_SECRET=123123
 ```
 
 Put the PEM on one line. Replace each newline in the file with `\n`.
@@ -148,7 +163,7 @@ If the catalog still reports no hosted GitHub App, confirm every required
 value is set and that the App ID is a positive integer. Then restart
 `make dev.server`.
 
-### 4. Confirm setup
+### 5. Confirm setup
 
 1. Open `/onboarding` or create a workspace.
 2. SuperPlane must show the workspace wizard, not the GitHub App notice.
@@ -184,13 +199,11 @@ section above. Restart SuperPlane after you change these values.
 3. Set the name to a local name, for example `SuperPlane local`.
 4. Set these callback and webhook URLs. Replace `{BASE_URL}` and
    `{WEBHOOKS_BASE_URL}` with the same tunnel URL.
-
    - Redirect URL: `{BASE_URL}/api/v1/sentry/app/setup`
    - Webhook URL: `{WEBHOOKS_BASE_URL}/api/v1/sentry/app/webhook`
    - Webhook events: `issue`
 
 5. Grant these permissions:
-
    - Issue and Event: Read
    - Project: Read
    - Organization: Read
