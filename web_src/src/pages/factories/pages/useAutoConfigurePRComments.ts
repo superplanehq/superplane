@@ -51,6 +51,8 @@ export function useAutoConfigurePRComments({
   const scanFinished = !needsScan || catalogQuery.data !== undefined || catalogQuery.isError;
   const [creating, setCreating] = useState(false);
   const launchedRef = useRef(false);
+  const identity = `${organizationId}:${factoryId}:${repository.trim()}`;
+  const previousIdentityRef = useRef(identity);
 
   useEffect(() => {
     if (!shouldCreate) {
@@ -59,13 +61,20 @@ export function useAutoConfigurePRComments({
   }, [shouldCreate]);
 
   useEffect(() => {
+    if (previousIdentityRef.current !== identity) {
+      previousIdentityRef.current = identity;
+      launchedRef.current = false;
+    }
+  }, [identity]);
+
+  useEffect(() => {
     if (!shouldCreate || !scanFinished || launchedRef.current) {
       return;
     }
     launchedRef.current = true;
     setCreating(true);
 
-    const catalog = catalogQuery.isError ? [] : catalogQuery.data ?? [];
+    const catalog = catalogQuery.isError ? [] : (catalogQuery.data ?? []);
     const discussion = autoConfigureDiscussionSettings(catalog);
     createHandler
       .mutateAsync({
@@ -84,7 +93,16 @@ export function useAutoConfigurePRComments({
       .finally(() => {
         setCreating(false);
       });
-  }, [shouldCreate, scanFinished, catalogQuery.isError, catalogQuery.data, repository, createHandler, refetchHandlers]);
+  }, [
+    shouldCreate,
+    scanFinished,
+    identity,
+    repository,
+    catalogQuery.isError,
+    catalogQuery.data,
+    createHandler,
+    refetchHandlers,
+  ]);
 
   return {
     pending: creating || (shouldCreate && needsScan && !scanFinished),
