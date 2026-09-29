@@ -80,14 +80,46 @@ func TestPrFeedbackChecksRepairDescriptionExpression(t *testing.T) {
 				"name":        "ci/semaphoreci/push",
 				"description": "CI",
 				"detailsUrl":  "https://example.com/ci",
-				"summary":     "The build failed on Semaphore 2.0.",
+				"summary":     "\n\nThe build failed on Semaphore 2.0.",
 			},
 		},
 	})
 	assert.Equal(
 		t,
 		"Failed checks\n"+
-			"· [ci/semaphoreci/push: CI](https://example.com/ci): The build failed on Semaphore 2.0.",
+			"· [ci/semaphoreci/push: CI](https://example.com/ci)\n\nThe build failed on Semaphore 2.0.",
+		got,
+	)
+}
+
+func TestPrFeedbackChecksPassedDescriptionExpression_KeepsCommitStatusOnOneLine(t *testing.T) {
+	got := evalWaitChecksExpression(t, prFeedbackChecksPassedDescriptionExpression(), map[string]any{
+		"selectedChecks": []any{
+			map[string]any{
+				"name":       "ci/semaphore",
+				"detailsUrl": "https://example.com/ci",
+				"summary":    "CI passed",
+			},
+		},
+	})
+	assert.Equal(t, "· [ci/semaphore](https://example.com/ci): CI passed", got)
+}
+
+func TestPrFeedbackChecksPassedDescriptionExpression_RendersCheckBodyUnderTheLine(t *testing.T) {
+	previewTable := "<table><tr><td><a href=\"https://preview.pages.dev\">Visit Preview</a></td></tr></table>"
+	got := evalWaitChecksExpression(t, prFeedbackChecksPassedDescriptionExpression(), map[string]any{
+		"selectedChecks": []any{
+			map[string]any{
+				"name":        "Cloudflare Pages",
+				"description": "Deploy successful",
+				"detailsUrl":  "https://example.com/pages",
+				"summary":     "\n\n" + previewTable,
+			},
+		},
+	})
+	assert.Equal(
+		t,
+		"· [Cloudflare Pages: Deploy successful](https://example.com/pages)\n\n"+previewTable,
 		got,
 	)
 }

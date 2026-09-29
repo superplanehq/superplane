@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-github/v84/github"
 )
@@ -23,6 +24,9 @@ const (
 	waitChecksOutcomeFailed   = "failed"
 	waitChecksOutcomeTimedOut = "timedOut"
 	waitChecksOutcomePending  = "pending"
+
+	maxCheckSummaryBytes      = 16 * 1024
+	maxTotalCheckSummaryBytes = 96 * 1024
 )
 
 var nonFailingConclusions = map[string]bool{
@@ -85,9 +89,9 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 			}
 			description := ""
 			summary := ""
-			if run.GetOutput() != nil {
-				description = strings.TrimSpace(run.GetOutput().GetTitle())
-				summary = firstLine(run.GetOutput().GetSummary())
+			if output := run.GetOutput(); output != nil {
+				description = strings.TrimSpace(output.GetTitle())
+				summary = checkRunOutputBody(output)
 			}
 			latest[key] = PullRequestCheck{
 				Key:         key,
@@ -257,15 +261,79 @@ func checkFingerprint(checks []PullRequestCheck) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func firstLine(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
+func storedCheckLists(evaluation waitChecksEvaluation) (checks, selected, failed []PullRequestCheck) {
+	return withoutCheckSummaries(evaluation.Checks),
+		limitCheckSummaries(evaluation.SelectedChecks),
+		limitCheckSummaries(evaluation.FailedChecks)
+}
+
+func withoutCheckSummaries(checks []PullRequestCheck) []PullRequestCheck {
+	out := make([]PullRequestCheck, len(checks))
+	for i, check := range checks {
+		check.Summary = ""
+		out[i] = check
+	}
+	return out
+}
+
+func limitCheckSummaries(checks []PullRequestCheck) []PullRequestCheck {
+	out := make([]PullRequestCheck, len(checks))
+	remaining := maxTotalCheckSummaryBytes
+	for i, check := range checks {
+		check.Summary = limitCheckSummary(check.Summary, min(maxCheckSummaryBytes, remaining))
+		remaining -= len(check.Summary)
+		out[i] = check
+	}
+	return out
+}
+
+func checkRunOutputBody(output *github.CheckRunOutput) string {
+	summary := strings.TrimSpace(output.GetSummary())
+	text := strings.TrimSpace(output.GetText())
+	body := joinDistinctCheckOutput(summary, text)
+	if body == "" {
 		return ""
 	}
-	if index := strings.IndexAny(trimmed, "\n\r"); index >= 0 {
-		return strings.TrimSpace(trimmed[:index])
+	return limitCheckSummary("\n\n"+body, maxCheckSummaryBytes)
+}
+
+func limitCheckSummary(summary string, maxBytes int) string {
+	if maxBytes <= 0 || summary == "" {
+		return ""
 	}
-	return trimmed
+	if len(summary) <= maxBytes {
+		return summary
+	}
+
+	ellipsis := "\n..."
+	keep := maxBytes - len(ellipsis)
+	if keep < 1 {
+		return truncateToBytes(summary, maxBytes)
+	}
+	return strings.TrimRight(truncateToBytes(summary, keep), " \t\r\n") + ellipsis
+}
+
+func truncateToBytes(value string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(value) <= maxBytes {
+		return value
+	}
+	for maxBytes > 0 && !utf8.ValidString(value[:maxBytes]) {
+		maxBytes--
+	}
+	return value[:maxBytes]
+}
+
+func joinDistinctCheckOutput(summary, text string) string {
+	if text == "" || strings.Contains(summary, text) {
+		return summary
+	}
+	if summary == "" {
+		return text
+	}
+	return summary + "\n\n" + text
 }
 
 func firstNonEmpty(values ...string) string {
