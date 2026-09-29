@@ -35,6 +35,16 @@ export function confirmSignupAnalyticsPreference(preference: SignupAnalyticsPref
   });
 }
 
+export function hasConfirmedSignupAnalyticsPreference(accountEmail: string) {
+  const preference = readSignupAnalyticsPreference();
+  return Boolean(
+    preference?.confirmed &&
+    !isExpired(preference) &&
+    preference.email &&
+    preference.email.toLowerCase() === accountEmail.toLowerCase(),
+  );
+}
+
 export function clearPendingSignupAnalyticsPreference() {
   localStorage.removeItem(pendingSignupAnalyticsPreferenceKey);
 }
