@@ -10,8 +10,24 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
+  it("lists fourteen colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(14);
+    expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).toEqual([
+      "emerald",
+      "green",
+      "lime",
+      "yellow",
+      "orange",
+      "rose",
+      "fuchsia",
+      "teal",
+      "cyan",
+      "sky",
+      "blue",
+      "indigo",
+      "purple",
+      "slate",
+    ]);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
@@ -20,11 +36,76 @@ describe("lineBoardColumnColors", () => {
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
   });
 
+  it("resolves orange and rose to a wash, a vivid fill, and a border", () => {
+    const orange = lineBoardColumnColorById("orange");
+    const rose = lineBoardColumnColorById("rose");
+
+    expect(orange?.label).toBe("Orange");
+    expect(orange?.laneClassName).toBe("bg-orange-100 dark:bg-orange-950/40");
+    expect(orange?.className).toBe("bg-orange-300 dark:bg-orange-800");
+    expect(orange?.borderClassName).toBe("border-orange-400 dark:border-orange-800/45");
+
+    expect(rose?.label).toBe("Rose");
+    expect(rose?.laneClassName).toBe("bg-rose-100 dark:bg-rose-950/40");
+    expect(rose?.className).toBe("bg-rose-300 dark:bg-rose-800");
+    expect(rose?.borderClassName).toBe("border-rose-400 dark:border-rose-800/45");
+  });
+
+  it("resolves green, fuchsia, cyan, and indigo to a wash, a vivid fill, and a border", () => {
+    const green = lineBoardColumnColorById("green");
+    const fuchsia = lineBoardColumnColorById("fuchsia");
+    const cyan = lineBoardColumnColorById("cyan");
+    const indigo = lineBoardColumnColorById("indigo");
+
+    expect(green?.label).toBe("Green");
+    expect(green?.laneClassName).toBe("bg-green-100 dark:bg-green-950/40");
+    expect(green?.className).toBe("bg-green-300 dark:bg-green-800");
+    expect(green?.borderClassName).toBe("border-green-400 dark:border-green-800/45");
+
+    expect(fuchsia?.label).toBe("Fuchsia");
+    expect(fuchsia?.laneClassName).toBe("bg-fuchsia-100 dark:bg-fuchsia-950/40");
+    expect(fuchsia?.className).toBe("bg-fuchsia-300 dark:bg-fuchsia-800");
+    expect(fuchsia?.borderClassName).toBe("border-fuchsia-400 dark:border-fuchsia-800/45");
+
+    expect(cyan?.label).toBe("Cyan");
+    expect(cyan?.laneClassName).toBe("bg-cyan-100 dark:bg-cyan-950/40");
+    expect(cyan?.className).toBe("bg-cyan-300 dark:bg-cyan-800");
+    expect(cyan?.borderClassName).toBe("border-cyan-400 dark:border-cyan-800/45");
+
+    expect(indigo?.label).toBe("Indigo");
+    expect(indigo?.laneClassName).toBe("bg-indigo-100 dark:bg-indigo-950/40");
+    expect(indigo?.className).toBe("bg-indigo-300 dark:bg-indigo-800");
+    expect(indigo?.borderClassName).toBe("border-indigo-400 dark:border-indigo-800/45");
+  });
+
+  it("resolves emerald and blue to a wash, a vivid fill, and a border", () => {
+    const emerald = lineBoardColumnColorById("emerald");
+    const blue = lineBoardColumnColorById("blue");
+
+    expect(emerald?.label).toBe("Emerald");
+    expect(emerald?.laneClassName).toBe("bg-emerald-100 dark:bg-emerald-950/40");
+    expect(emerald?.className).toBe("bg-emerald-300 dark:bg-emerald-800");
+    expect(emerald?.borderClassName).toBe("border-emerald-400 dark:border-emerald-800/45");
+
+    expect(blue?.label).toBe("Blue");
+    expect(blue?.laneClassName).toBe("bg-blue-100 dark:bg-blue-950/40");
+    expect(blue?.className).toBe("bg-blue-300 dark:bg-blue-800");
+    expect(blue?.borderClassName).toBe("border-blue-400 dark:border-blue-800/45");
+  });
+
   it("resolves a lane class from a colour id", () => {
     expect(lineBoardColumnColorById("lime")?.label).toBe("Lime");
     expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.laneClassName);
     expect(lineBoardColumnLaneClassName("lime")).toContain("bg-lime-100");
     expect(lineBoardColumnLaneClassName("lime")).toContain("dark:bg-lime-950/40");
+    expect(lineBoardColumnLaneClassName("rose")).toContain("bg-rose-100");
+    expect(lineBoardColumnLaneClassName("orange")).toContain("bg-orange-100");
+    expect(lineBoardColumnLaneClassName("emerald")).toContain("bg-emerald-100");
+    expect(lineBoardColumnLaneClassName("blue")).toContain("bg-blue-100");
+    expect(lineBoardColumnLaneClassName("green")).toContain("bg-green-100");
+    expect(lineBoardColumnLaneClassName("fuchsia")).toContain("bg-fuchsia-100");
+    expect(lineBoardColumnLaneClassName("cyan")).toContain("bg-cyan-100");
+    expect(lineBoardColumnLaneClassName("indigo")).toContain("bg-indigo-100");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
   });
 
