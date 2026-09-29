@@ -1,8 +1,7 @@
-import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleStop, History, Maximize2, RotateCw } from "lucide-react";
+import { CircleStop, History, RotateCw } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
 
@@ -26,7 +25,6 @@ export function AutomationCardBody({
   descriptionBusy = false,
   onDescriptionSave,
   files,
-  runHref,
   onStop,
   onRetry,
   actionBusy,
@@ -42,7 +40,6 @@ export function AutomationCardBody({
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
   files?: FilesFile[];
-  runHref?: string;
   onStop?: () => void;
   onRetry?: () => void;
   actionBusy: boolean;
@@ -103,17 +100,6 @@ export function AutomationCardBody({
             <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" onClick={onOpen}>
               <History className="size-3.5" aria-hidden />
               View {runs.length} runs
-            </Button>
-          ) : runHref ? (
-            <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" asChild>
-              <Link href={runHref}>
-                <Maximize2 className="size-3.5" aria-hidden />
-                View run
-              </Link>
-            </Button>
-          ) : latest.appId ? (
-            <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onOpen}>
-              Open run
             </Button>
           ) : null}
           {onRetry ? (

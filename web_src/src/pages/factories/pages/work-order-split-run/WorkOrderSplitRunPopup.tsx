@@ -485,7 +485,7 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSour
     return undefined;
   }
   if (unified) {
-    return "h-[min(52rem,calc(100vh-5rem))] w-[min(80rem,calc(100vw-5rem))]";
+    return "h-[min(52rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]";
   }
   return SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
 }

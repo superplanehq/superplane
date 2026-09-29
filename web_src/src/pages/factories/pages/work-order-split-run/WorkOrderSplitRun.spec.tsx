@@ -406,6 +406,51 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-pull-request-timeline-0")).not.toBeInTheDocument();
   });
 
+  it("shows one Address PR feedback card for each comment run", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-comment-1",
+            handlerName: "Address PR feedback",
+            title: "Read the requested changes",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-comment-1",
+              canvasId: "canvas-comment-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+            },
+          },
+          {
+            canvasId: "canvas-comment-2",
+            handlerName: "Address PR feedback",
+            title: "Address new review comment",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-comment-2",
+              canvasId: "canvas-comment-2",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    const verify = screen.getByTestId("redesign-console-column-verify");
+    expect(within(verify).getAllByText("Address PR feedback")).toHaveLength(1);
+    expect(within(verify).queryByText("Read the requested changes")).not.toBeInTheDocument();
+
+    if (!within(verify).queryByRole("button", { name: "View 2 runs" })) {
+      await user.click(within(verify).getByRole("button", { name: "Toggle Address PR feedback details" }));
+    }
+    expect(within(verify).getByRole("button", { name: "View 2 runs" })).toBeInTheDocument();
+  });
+
   it("shows the run console on the Automations tab", () => {
     renderSplitRun();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
@@ -754,7 +799,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(close).toHaveClass("h-6", "w-6", "rounded-full");
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).toContain("w-[min(80rem");
+    expect(dialog.className).toContain("w-[min(72rem");
     expect(dialog.parentElement).toHaveClass("fixed");
     expect(dialog.parentElement?.className).not.toContain("left-[var(--workspace-navigation-width)]");
 
@@ -763,7 +808,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
     expect(fullPage.className).toContain("w-full");
-    expect(fullPage.className).not.toContain("w-[min(80rem");
+    expect(fullPage.className).not.toContain("w-[min(72rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
     expect(fullPage.parentElement?.className).toContain("left-[var(--workspace-navigation-width)]");
     expect(fullPage.parentElement).not.toHaveClass("bg-black/50");
@@ -773,7 +818,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByRole("button", { name: "Exit full screen" }));
 
-    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(80rem");
+    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(72rem");
     expect(screen.getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(window.localStorage.getItem(WORK_ORDER_FULL_PAGE_STORAGE_KEY)).toBe("0");
   });
@@ -795,7 +840,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const dialog = screen.getByTestId("work-order-split-run");
-    expect(dialog.className).toContain("w-[min(80rem");
+    expect(dialog.className).toContain("w-[min(72rem");
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-log-tab-dot")).not.toBeInTheDocument();
@@ -809,6 +854,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
+  });
+
+  it("expands a console card from the whole summary row", async () => {
+    const user = userEvent.setup();
+    renderSplitRun();
+
+    const backlog = screen.getByTestId("redesign-console-column-backlog");
+    const header = within(backlog).getAllByTestId(/^redesign-console-card-header-/)[0];
+    const card = header.closest("[data-testid^='redesign-console-automation-']");
+    expect(card).not.toBeNull();
+    expect(within(card as HTMLElement).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
+
+    await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
+    expect(within(card as HTMLElement).getByTestId("redesign-console-task-description")).toBeInTheDocument();
   });
 
   it("shows produced artifacts on the run console", () => {
@@ -1085,7 +1144,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
-  it("offers automation Stop and View run on a live running task", () => {
+  it("offers automation Stop on a live running task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -1097,7 +1156,8 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "View run" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open run" })).not.toBeInTheDocument();
   });
 
   it("hides automation Stop when the user cannot update the task", () => {

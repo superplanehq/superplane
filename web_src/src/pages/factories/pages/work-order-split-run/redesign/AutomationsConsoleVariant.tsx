@@ -10,7 +10,6 @@ import {
 } from "@/components/reui/timeline";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { Badge } from "@/components/reui/badge";
-import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ import type { FactoriesFactoryPullRequest, FilesFile } from "@/api-client";
 
 import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
-import { splitRunPhaseRunHref } from "../splitRunPopupModel";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleRunsDrawer } from "./ConsoleRunsDrawer";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
@@ -31,10 +29,10 @@ import { LiveAgentSteps } from "./LiveAgentSteps";
 import { runFooterLine, runMetaLine } from "./consoleCardText";
 import {
   allStages,
+  automationsFromStages,
   outcomeSummary,
   stagesByConsoleColumn,
   stagesFromFixture,
-  type AutomationStage,
   type ConsoleAutomation,
 } from "./automationsViewModel";
 import { HEADER_ICON_BUTTON, META_TEXT_CLASSNAME } from "./redesignFormat";
@@ -55,9 +53,6 @@ export function AutomationsConsoleVariant({
   organizationId,
   factoryId,
   orderId,
-  factoryKey,
-  orderNumber,
-  lineId,
   taskDescription,
   canEditDescription = false,
   descriptionBusy = false,
@@ -111,7 +106,6 @@ export function AutomationsConsoleVariant({
         automation={fullLogAutomation}
         phase={phase}
         organizationId={organizationId}
-        runHref={phase ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase }) : undefined}
         onBack={() => setFullLogAutomation(null)}
       />
     );
@@ -145,9 +139,6 @@ export function AutomationsConsoleVariant({
                       organizationId={organizationId}
                       factoryId={factoryId}
                       orderId={orderId}
-                      factoryKey={factoryKey}
-                      orderNumber={orderNumber}
-                      lineId={lineId}
                       taskDescription={taskDescription}
                       canEditDescription={canEditDescription}
                       descriptionBusy={descriptionBusy}
@@ -183,9 +174,6 @@ export function AutomationsConsoleVariant({
         onOpenChange={(open) => !open && setOpenAutomation(null)}
         fixture={fixture}
         organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        lineId={lineId}
       />
     </div>
   );
@@ -225,42 +213,12 @@ function reachedColumns(columns: ConsoleColumn[]): number {
   return reached + 1;
 }
 
-function automationsFromStages(stages: AutomationStage[]): ConsoleAutomation[] {
-  const byKey = new Map<string, AutomationStage[]>();
-  for (const stage of stages) {
-    const key = stage.appId || stage.componentName;
-    const runs = byKey.get(key) ?? [];
-    runs.push(stage);
-    byKey.set(key, runs);
-  }
-  return [...byKey.entries()].map(([key, runs]) => {
-    const newestFirst = [...runs].sort(
-      (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
-    );
-    const name = newestFirst[0]?.componentName ?? key;
-    return {
-      id: automationDomId(name, key),
-      name,
-      latest: newestFirst[0],
-      runs: newestFirst,
-    };
-  });
-}
-
-function automationDomId(name: string, key: string): string {
-  const slug = `${name}-${key}`.toLowerCase().replace(/\W+/g, "-").replace(/^-|-$/g, "");
-  return slug || "automation";
-}
-
 function ConsoleAutomationCard({
   automation,
   phase,
   organizationId,
   factoryId,
   orderId,
-  factoryKey,
-  orderNumber,
-  lineId,
   taskDescription,
   canEditDescription,
   descriptionBusy,
@@ -279,9 +237,6 @@ function ConsoleAutomationCard({
   organizationId?: string;
   factoryId?: string;
   orderId?: string;
-  factoryKey?: string;
-  orderNumber?: string;
-  lineId?: string;
   taskDescription?: string;
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
@@ -300,9 +255,6 @@ function ConsoleAutomationCard({
   const stopping = useStopRequested(latest.status, actionBusy);
   const shownStatus: SplitRunPhaseStatus = stopping.active && latest.status === "running" ? "cancelled" : latest.status;
   const shownPhase = phase && shownStatus !== phase.status ? { ...phase, status: shownStatus } : phase;
-  const runHref = shownPhase
-    ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: shownPhase })
-    : undefined;
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
       ? () => {
@@ -324,27 +276,29 @@ function ConsoleAutomationCard({
       data-testid={`redesign-console-automation-${automation.id}`}
     >
       <Collapsible defaultOpen={defaultOpen || shownStatus === "running"} className="group/collapsible">
-        <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
+        <FrameHeader
+          className="relative flex min-w-0 flex-row items-center gap-2 py-2"
+          data-testid={`redesign-console-card-header-${automation.id}`}
+        >
           <CollapsibleTrigger
-            className="flex min-w-0 shrink-0 items-center gap-2"
+            className="absolute inset-0 z-10 cursor-pointer rounded-[inherit]"
             aria-label={`Toggle ${automation.name} details`}
-          >
-            <StageStatusGlyph status={shownStatus} />
-            <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
-          </CollapsibleTrigger>
-          <StepOutputCounts stage={latest} />
+          />
+          <StageStatusGlyph status={shownStatus} />
+          <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
+          <div className="relative z-20">
+            <StepOutputCounts stage={latest} />
+          </div>
           <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
-          {latest.appId ? <FullLogButton onFullLog={onFullLog} /> : null}
-          <CollapsibleTrigger
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            tabIndex={-1}
+          {latest.appId ? (
+            <div className="relative z-20">
+              <FullLogButton onFullLog={onFullLog} />
+            </div>
+          ) : null}
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
             aria-hidden
-          >
-            <ChevronRight
-              className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-              aria-hidden
-            />
-          </CollapsibleTrigger>
+          />
         </FrameHeader>
         <CollapsibleContent>
           <FramePanel className="space-y-3">
@@ -359,7 +313,6 @@ function ConsoleAutomationCard({
               descriptionBusy={descriptionBusy}
               onDescriptionSave={onDescriptionSave}
               files={files}
-              runHref={runHref}
               onStop={stopRun}
               onRetry={rerunStep}
               actionBusy={actionBusy}
@@ -407,20 +360,18 @@ function FullLogButton({ onFullLog }: { onFullLog: () => void }) {
 }
 
 /**
- * The stage stream on the whole popup: a sticky bar with the way back and
- * the run page link, then every step open for reading.
+ * The stage stream on the whole popup: a sticky bar with the way back,
+ * then every step open for reading.
  */
 function ConsoleFullLog({
   automation,
   phase,
   organizationId,
-  runHref,
   onBack,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   organizationId?: string;
-  runHref?: string;
   onBack: () => void;
 }) {
   const { latest } = automation;
@@ -451,14 +402,6 @@ function ConsoleFullLog({
       <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} expandSteps />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
         <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(latest)}</span>
-        {runHref ? (
-          <Button size="sm" variant="outline" className="ms-auto shrink-0 gap-1.5" asChild>
-            <Link href={runHref}>
-              <Maximize2 className="size-3.5" aria-hidden />
-              View run
-            </Link>
-          </Button>
-        ) : null}
       </div>
     </div>
   );
