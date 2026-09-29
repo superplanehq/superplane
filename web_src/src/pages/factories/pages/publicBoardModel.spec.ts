@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { EMPTY_WORK_ORDER_FILTERS } from "../lib/workOrderListModel";
 import {
   legacyAssigneeChipOptions,
+  ownerMenuAssigneeIds,
+  ownerMenuAssigneeIdsAfterToggle,
   visibleBoardColumns,
   type PublicBoardCard,
   type PublicBoardColumn,
@@ -34,5 +36,23 @@ describe("legacy owner filters", () => {
     );
 
     expect(options).toEqual([{ value: savedId, label: "Ada Lovelace" }]);
+  });
+
+  it("checks the one person who still uses the saved name", () => {
+    const columns = [column([card("Ada Lovelace", "aaaaaaaaaaaaaaaa"), card("Grace Hopper", "bbbbbbbbbbbbbbbb")])];
+    const savedId = "public-member:ada lovelace";
+
+    expect(ownerMenuAssigneeIds(columns, [savedId])).toEqual(["public-member:aaaaaaaaaaaaaaaa"]);
+    expect(ownerMenuAssigneeIdsAfterToggle(columns, [savedId], "public-member:aaaaaaaaaaaaaaaa")).toEqual([]);
+    expect(ownerMenuAssigneeIdsAfterToggle(columns, [savedId], "public-member:bbbbbbbbbbbbbbbb")).toEqual([
+      savedId,
+      "public-member:bbbbbbbbbbbbbbbb",
+    ]);
+  });
+
+  it("does not check a person when two people share the saved name", () => {
+    const columns = [column([card("Ada Lovelace", "aaaaaaaaaaaaaaaa"), card("Ada Lovelace", "bbbbbbbbbbbbbbbb")])];
+
+    expect(ownerMenuAssigneeIds(columns, ["public-member:ada lovelace"])).toEqual(["public-member:ada lovelace"]);
   });
 });

@@ -26,6 +26,8 @@ import {
   boardFilterOptions,
   columnAutomations,
   legacyAssigneeChipOptions,
+  ownerMenuAssigneeIds,
+  ownerMenuAssigneeIdsAfterToggle,
   loadStateForErrorStatus,
   parseBoardEvent,
   publicBoardSocketPath,
@@ -249,7 +251,11 @@ function PublicBoardView({
             leading={<PublicViewBadge />}
             actions={
               <>
-                <FilterMenu state={listState} sourceOptions={sourceOptions} assigneeOptions={assigneeOptions} />
+                <FilterMenu
+                  state={ownerFilterMenuState(listState, board.columns)}
+                  sourceOptions={sourceOptions}
+                  assigneeOptions={assigneeOptions}
+                />
                 <SearchField
                   inputRef={searchRef}
                   open={listState.searchOpen}
@@ -324,6 +330,36 @@ function PublicBoardStatus({ title, signInHref, homeHref }: { title: string; sig
       ) : null}
     </div>
   );
+}
+
+function ownerFilterMenuState(
+  listState: ReturnType<typeof useWorkOrderListState>,
+  columns: PublicBoardColumn[],
+): ReturnType<typeof useWorkOrderListState> {
+  return {
+    ...listState,
+    filters: {
+      ...listState.filters,
+      assigneeIds: ownerMenuAssigneeIds(columns, listState.filters.assigneeIds),
+    },
+    toggleFilter: (dimension, value) => {
+      if (dimension !== "assigneeIds") {
+        listState.toggleFilter(dimension, value);
+        return;
+      }
+      const next = ownerMenuAssigneeIdsAfterToggle(columns, listState.filters.assigneeIds, value);
+      for (const id of listState.filters.assigneeIds) {
+        if (!next.includes(id)) {
+          listState.removeFilter("assigneeIds", id);
+        }
+      }
+      for (const id of next) {
+        if (!listState.filters.assigneeIds.includes(id)) {
+          listState.toggleFilter("assigneeIds", id);
+        }
+      }
+    },
+  };
 }
 
 function guestSignInHref(): string {

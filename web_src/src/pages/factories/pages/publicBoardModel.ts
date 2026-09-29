@@ -101,6 +101,31 @@ export function legacyAssigneeChipOptions(columns: PublicBoardColumn[], savedIds
   });
 }
 
+/** Owner menu ids. A saved name checks the one person who still uses that name. */
+export function ownerMenuAssigneeIds(columns: PublicBoardColumn[], savedIds: string[]): string[] {
+  const shown = new Set<string>();
+  for (const id of savedIds) {
+    const key = uniqueAssigneeKey(columns, id);
+    shown.add(key ? `public-member:${key}` : id);
+  }
+  return [...shown];
+}
+
+/** Next saved ids after an Owner menu click. A name id is removed only when that person is turned off. */
+export function ownerMenuAssigneeIdsAfterToggle(
+  columns: PublicBoardColumn[],
+  savedIds: string[],
+  value: string,
+): string[] {
+  const selected = new Set(ownerMenuAssigneeIds(columns, savedIds));
+  if (!selected.has(value)) {
+    return savedIds.includes(value) ? savedIds : [...savedIds, value];
+  }
+  return savedIds.filter(
+    (id) => id !== value && uniqueAssigneeKey(columns, id) !== value.slice("public-member:".length),
+  );
+}
+
 export function columnAutomations(column: PublicBoardColumn): ColumnAutomation[] {
   return (column.automations ?? []).map(toColumnAutomation);
 }
@@ -211,6 +236,27 @@ function assigneeDisplayNames(columns: PublicBoardColumn[]): Map<string, string>
     }
   }
   return names;
+}
+
+function uniqueAssigneeKey(columns: PublicBoardColumn[], id: string): string | undefined {
+  const name = legacyAssigneeName(id);
+  if (!name) {
+    return undefined;
+  }
+  const keys = new Set<string>();
+  for (const column of columns) {
+    for (const card of column.cards) {
+      const cardName = card.assignee?.name?.trim().toLowerCase();
+      const key = card.assignee?.key?.trim();
+      if (cardName === name && key) {
+        keys.add(key);
+      }
+    }
+  }
+  if (keys.size !== 1) {
+    return undefined;
+  }
+  return [...keys][0];
 }
 
 function legacyAssigneeName(id: string): string | undefined {
