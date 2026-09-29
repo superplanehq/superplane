@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -93,6 +94,66 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("creation rejects a second discussion handler for the same factory", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+
+		_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.AlreadyExists, code)
+	})
+
+	t.Run("concurrent creates leave one discussion handler", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+
+		const workers = 4
+		results := make([]error, workers)
+		var started sync.WaitGroup
+		started.Add(workers)
+		var wg sync.WaitGroup
+		wg.Add(workers)
+		for i := 0; i < workers; i++ {
+			go func(i int) {
+				defer wg.Done()
+				started.Done()
+				started.Wait()
+				_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+					FactoryId: factory.ID.String(),
+				})
+				results[i] = err
+			}(i)
+		}
+		wg.Wait()
+
+		var created int
+		for _, err := range results {
+			if err == nil {
+				created++
+				continue
+			}
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.AlreadyExists, code)
+		}
+		assert.Equal(t, 1, created)
+
+		handlers, err := factory.ListPRFeedbackHandlers(database.DB(t.Context()))
+		require.NoError(t, err)
+		require.Len(t, handlers, 1)
+		assert.Equal(t, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, handlers[0].Source)
 	})
 
 	t.Run("the handler listens with the workspace connection", func(t *testing.T) {

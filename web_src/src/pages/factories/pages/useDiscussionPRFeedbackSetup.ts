@@ -52,6 +52,24 @@ export function discussionBotSettings(
   return { ignoreBots: true, allowedBots: [] };
 }
 
+/**
+ * Default discussion settings for the handler SuperPlane creates on its own
+ * after onboarding. The mention is required and bots found on recent pull
+ * requests are allowed. An empty catalog still yields an empty allowed list,
+ * in which case bots do not start a run.
+ */
+export function autoConfigureDiscussionSettings(catalog: Array<{ id?: string; name?: string }>): {
+  mention: string;
+  ignoreBots: boolean;
+  allowedBots: string[];
+} {
+  return {
+    mention: DISCUSSION_MENTION,
+    ignoreBots: true,
+    allowedBots: catalogReviewBots(catalog).map((bot) => bot.login),
+  };
+}
+
 export function useDiscussionPRFeedbackSetup(
   organizationId: string,
   factoryId: string,

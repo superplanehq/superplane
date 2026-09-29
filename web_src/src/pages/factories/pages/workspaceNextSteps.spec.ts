@@ -58,6 +58,19 @@ describe("workspaceNextSteps", () => {
       expect.objectContaining({ id: "pr-checks-handler", done: false }),
     ]);
   });
+
+  it("hides the comments step while its handler auto-creates", () => {
+    expect(workspaceNextSteps({ ...ready, commentsCreatePending: true })).toEqual([
+      expect.objectContaining({ id: "pr-checks-handler", done: false }),
+    ]);
+  });
+
+  it("does not suppress the comments step once the auto-create settles", () => {
+    expect(workspaceNextSteps({ ...ready, commentsCreatePending: false })).toEqual([
+      expect.objectContaining({ id: "pr-comments-handler", done: false }),
+      expect.objectContaining({ id: "pr-checks-handler", done: false }),
+    ]);
+  });
 });
 
 describe("isWorkspaceNextStepsQueryReady", () => {
