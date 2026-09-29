@@ -54,4 +54,27 @@ describe("lineBoardColumnColors", () => {
     });
     expect(lineBoardColumnLaneProps(null, "dim", { mutedFallback: true })).toEqual({ className: "bg-muted" });
   });
+
+  it("keeps rose and indigo through save and view modes", () => {
+    expect(normalizeColumnColors({ plan: "rose", review: "indigo", weird: "not-a-color" })).toEqual({
+      plan: "rose",
+      review: "indigo",
+    });
+    expect(serializeColumnColors({ plan: "rose", review: "indigo", done: null })).toEqual({
+      plan: "rose",
+      review: "indigo",
+    });
+
+    for (const id of ["rose", "indigo"] as const) {
+      expect(lineBoardColumnLaneProps(id, "dim")).toEqual({
+        surfaceClassName: `bg-${id}-100 dark:bg-${id}-950/40`,
+      });
+      expect(lineBoardColumnLaneProps(id, "vivid")).toEqual({
+        surfaceClassName: `bg-${id}-300 dark:bg-${id}-800`,
+      });
+      expect(lineBoardColumnLaneProps(id, "borders", { mutedFallback: true })).toEqual({
+        className: `bg-muted border-${id}-400 dark:border-${id}-800/45`,
+      });
+    }
+  });
 });
