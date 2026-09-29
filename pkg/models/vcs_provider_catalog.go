@@ -478,6 +478,30 @@ func FindAccessibleVCSProviderRepository(
 	return &repository, nil
 }
 
+func FindAccessibleVCSProviderRepositoryByName(
+	tx *gorm.DB,
+	provider string,
+	providerUserID int64,
+	fullName string,
+) (*AccessibleVCSProviderRepository, error) {
+	var repository AccessibleVCSProviderRepository
+	err := tx.
+		Table("vcs_provider_repositories AS repository").
+		Select("repository.*, installation.account_login, installation.account_type").
+		Joins("JOIN vcs_provider_repository_collaborators AS collaborator ON collaborator.provider = repository.provider AND collaborator.repository_id = repository.repository_id").
+		Joins("JOIN vcs_provider_installations AS installation ON installation.provider = repository.provider AND installation.installation_id = repository.installation_id").
+		Where("repository.provider = ?", provider).
+		Where("collaborator.provider_user_id = ?", providerUserID).
+		Where("LOWER(repository.full_name) = LOWER(?)", strings.TrimSpace(fullName)).
+		Where("installation.suspended_at IS NULL").
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &repository, nil
+}
+
 func ReplaceVCSProviderInstallRequests(tx *gorm.DB, provider string, requests []VCSProviderInstallRequest) error {
 	provider, err := normalizeVCSProvider(provider)
 	if err != nil {
@@ -678,6 +702,83 @@ func ListVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) ([
 		Find(&repositories).
 		Error
 	return repositories, err
+}
+
+// SyncVCSProviderBindingRepositories limits a binding to repositories selected
+// by its active Factory workspaces. The transaction lock prevents concurrent
+// workspace updates from replacing each other's grants.
+func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, provider string) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	binding, err := FindVCSProviderIntegrationBinding(tx, integrationID)
+	if err != nil {
+		return err
+	}
+	if binding.Provider != provider {
+		return fmt.Errorf("VCS provider binding uses provider %q", binding.Provider)
+	}
+
+	return tx.Transaction(func(tx *gorm.DB) error {
+		lockKey := fmt.Sprintf("vcs-provider-binding-repositories:%s", integrationID)
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
+		}
+
+		var factories []Factory
+		if err := tx.
+			Select("onboarding_config").
+			Where("deleted_at IS NULL").
+			Where("onboarding_config ->> 'vcs_integration_id' = ?", integrationID.String()).
+			Find(&factories).
+			Error; err != nil {
+			return err
+		}
+
+		selected := map[int64]struct{}{}
+		for i := range factories {
+			config := factories[i].OnboardingConfigValue()
+			if config.AppRepositoryID > 0 {
+				selected[config.AppRepositoryID] = struct{}{}
+			}
+			if config.BacklogRepositoryID > 0 {
+				selected[config.BacklogRepositoryID] = struct{}{}
+			}
+		}
+
+		if err := tx.Where("integration_id = ?", integrationID).Delete(&VCSProviderIntegrationRepository{}).Error; err != nil {
+			return err
+		}
+		if len(selected) == 0 {
+			return nil
+		}
+
+		repositoryIDs := make([]int64, 0, len(selected))
+		for repositoryID := range selected {
+			repositoryIDs = append(repositoryIDs, repositoryID)
+		}
+		var repositories []VCSProviderRepository
+		if err := tx.
+			Where("provider = ? AND installation_id = ? AND repository_id IN ?", provider, binding.InstallationID, repositoryIDs).
+			Find(&repositories).
+			Error; err != nil {
+			return err
+		}
+
+		grants := make([]VCSProviderIntegrationRepository, 0, len(repositories))
+		for _, repository := range repositories {
+			grants = append(grants, VCSProviderIntegrationRepository{
+				IntegrationID: integrationID,
+				Provider:      provider,
+				RepositoryID:  repository.RepositoryID,
+			})
+		}
+		if len(grants) == 0 {
+			return nil
+		}
+		return tx.Create(&grants).Error
+	})
 }
 
 func FindOrCreateVCSProviderBinding(

@@ -1250,6 +1250,7 @@ CREATE TABLE public.users (
 --
 
 CREATE TABLE public.vcs_provider_install_requests (
+    provider text NOT NULL,
     request_id bigint NOT NULL,
     account_id bigint,
     account_login text DEFAULT ''::text NOT NULL,
@@ -1257,8 +1258,7 @@ CREATE TABLE public.vcs_provider_install_requests (
     requester_id bigint NOT NULL,
     requester_login text DEFAULT ''::text NOT NULL,
     requested_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1267,6 +1267,7 @@ CREATE TABLE public.vcs_provider_install_requests (
 --
 
 CREATE TABLE public.vcs_provider_installations (
+    provider text NOT NULL,
     installation_id bigint NOT NULL,
     account_id bigint,
     account_login text DEFAULT ''::text NOT NULL,
@@ -1275,8 +1276,7 @@ CREATE TABLE public.vcs_provider_installations (
     repository_selection text DEFAULT ''::text NOT NULL,
     suspended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1287,10 +1287,10 @@ CREATE TABLE public.vcs_provider_installations (
 CREATE TABLE public.vcs_provider_integration_bindings (
     integration_id uuid NOT NULL,
     organization_id uuid NOT NULL,
+    provider text NOT NULL,
     installation_id bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1312,13 +1312,13 @@ CREATE TABLE public.vcs_provider_integration_repositories (
 --
 
 CREATE TABLE public.vcs_provider_reconcile_jobs (
+    provider text NOT NULL,
     run_at timestamp with time zone NOT NULL,
     attempts integer DEFAULT 0 NOT NULL,
     locked_at timestamp with time zone,
     last_error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1327,6 +1327,7 @@ CREATE TABLE public.vcs_provider_reconcile_jobs (
 --
 
 CREATE TABLE public.vcs_provider_repositories (
+    provider text NOT NULL,
     repository_id bigint NOT NULL,
     installation_id bigint NOT NULL,
     full_name text NOT NULL,
@@ -1334,7 +1335,6 @@ CREATE TABLE public.vcs_provider_repositories (
     default_branch text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL,
     CONSTRAINT vcs_provider_repositories_full_name_present CHECK ((btrim(full_name) <> ''::text))
 );
 
@@ -1344,12 +1344,12 @@ CREATE TABLE public.vcs_provider_repositories (
 --
 
 CREATE TABLE public.vcs_provider_repository_collaborators (
+    provider text NOT NULL,
     repository_id bigint NOT NULL,
     provider_user_id bigint NOT NULL,
     provider_login text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1358,14 +1358,14 @@ CREATE TABLE public.vcs_provider_repository_collaborators (
 --
 
 CREATE TABLE public.vcs_provider_repository_sync_jobs (
+    provider text NOT NULL,
     repository_id bigint NOT NULL,
     run_at timestamp with time zone NOT NULL,
     attempts integer DEFAULT 0 NOT NULL,
     locked_at timestamp with time zone,
     last_error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider text NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 

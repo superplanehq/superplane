@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -71,20 +72,21 @@ func SelectFactoryVCSProviderRepository(
 		if bindErr != nil {
 			return bindErr
 		}
-		if grantErr := models.GrantVCSProviderBindingRepository(tx, integration.ID, provider, repository.RepositoryID); grantErr != nil {
-			return grantErr
-		}
 
+		previousIntegrationID := factory.OnboardingConfigValue().VCSIntegrationID
 		integrationID := integration.ID.String()
 		repositoryID := repository.RepositoryID
-		return factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
+		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			AppRepository:       &repository.FullName,
 			AppRepositoryID:     &repositoryID,
 			BacklogRepository:   &repository.FullName,
 			BacklogRepositoryID: &repositoryID,
 			DefaultBranch:       &repository.DefaultBranch,
-		})
+		}); updateErr != nil {
+			return updateErr
+		}
+		return syncFactoryVCSProviderBindings(tx, provider, previousIntegrationID, integration.ID)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
@@ -125,4 +127,35 @@ func factoryVCSProviderUserID(ctx context.Context, db *gorm.DB, organizationID, 
 		return 0, grpcerrors.FailedPrecondition(err, "linked VCS provider account has an invalid user id")
 	}
 	return numericID, nil
+}
+
+func syncFactoryVCSProviderBindings(
+	tx *gorm.DB,
+	provider, previousIntegrationID string,
+	currentIntegrationID uuid.UUID,
+) error {
+	integrationIDs := []uuid.UUID{currentIntegrationID}
+	if strings.TrimSpace(previousIntegrationID) == "" || previousIntegrationID == currentIntegrationID.String() {
+		return models.SyncVCSProviderBindingRepositories(tx, currentIntegrationID, provider)
+	}
+
+	previousID, err := uuid.Parse(previousIntegrationID)
+	if err != nil {
+		return err
+	}
+	if _, err := models.FindVCSProviderIntegrationBinding(tx, previousID); errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.SyncVCSProviderBindingRepositories(tx, currentIntegrationID, provider)
+	} else if err != nil {
+		return err
+	}
+	integrationIDs = append(integrationIDs, previousID)
+	if integrationIDs[1].String() < integrationIDs[0].String() {
+		integrationIDs[0], integrationIDs[1] = integrationIDs[1], integrationIDs[0]
+	}
+	for _, integrationID := range integrationIDs {
+		if err := models.SyncVCSProviderBindingRepositories(tx, integrationID, provider); err != nil {
+			return err
+		}
+	}
+	return nil
 }

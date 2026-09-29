@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 const githubOnboardingKey = (organizationId: string) => ["me", organizationId, "github-onboarding"] as const;
 const githubProvider = "github";
 
-export function useGitHubOnboarding(organizationId: string) {
+export function useGitHubOnboarding(organizationId: string, options: { poll?: boolean } = {}) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: githubOnboardingKey(organizationId),
@@ -25,6 +25,7 @@ export function useGitHubOnboarding(organizationId: string) {
     enabled: Boolean(organizationId),
     staleTime: 0,
     refetchInterval: (current) => {
+      if (options.poll === false) return false;
       const data = current.state.data;
       return data?.identity ? 3_000 : false;
     },

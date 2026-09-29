@@ -27,6 +27,7 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 	const githubUserID = int64(42)
 	const installationID = int64(101)
 	const repositoryID = int64(201)
+	const secondRepositoryID = int64(202)
 
 	require.NoError(t, models.SaveAccountLinkedAccount(db, models.NewAccountLinkedAccount(
 		r.Account.ID,
@@ -42,13 +43,25 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		AccountLogin:   "acme",
 		AccountType:    "Organization",
 	}))
-	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
-		RepositoryID:  repositoryID,
-		FullName:      "acme/api",
-		Private:       true,
-		DefaultBranch: "main",
-	}}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{
+		{
+			RepositoryID:  repositoryID,
+			FullName:      "acme/api",
+			Private:       true,
+			DefaultBranch: "main",
+		},
+		{
+			RepositoryID:  secondRepositoryID,
+			FullName:      "acme/web",
+			Private:       true,
+			DefaultBranch: "trunk",
+		},
+	}))
 	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, repositoryID, []models.VCSProviderRepositoryCollaborator{{
+		ProviderUserID: githubUserID,
+		ProviderLogin:  "octocat",
+	}}))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, secondRepositoryID, []models.VCSProviderRepositoryCollaborator{{
 		ProviderUserID: githubUserID,
 		ProviderLogin:  "octocat",
 	}}))
@@ -92,6 +105,27 @@ func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, granted, 1)
 		assert.Equal(t, repositoryID, granted[0].RepositoryID)
+
+		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+			Id:           first.ID.String(),
+			Provider:     models.ProviderGitHub,
+			RepositoryId: secondRepositoryID,
+		})
+		require.NoError(t, err)
+		granted, err = models.ListVCSProviderBindingRepositories(db, bindings[0].IntegrationID)
+		require.NoError(t, err)
+		require.Len(t, granted, 2)
+
+		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+			Id:           second.ID.String(),
+			Provider:     models.ProviderGitHub,
+			RepositoryId: secondRepositoryID,
+		})
+		require.NoError(t, err)
+		granted, err = models.ListVCSProviderBindingRepositories(db, bindings[0].IntegrationID)
+		require.NoError(t, err)
+		require.Len(t, granted, 1)
+		assert.Equal(t, secondRepositoryID, granted[0].RepositoryID)
 	})
 
 	t.Run("rejects a repository without cached push access", func(t *testing.T) {

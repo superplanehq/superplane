@@ -78,24 +78,6 @@ func FindAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string)
 	return &linked, nil
 }
 
-func accountLinkedIdentityConflictsInSharedOrganization(tx *gorm.DB, ownerAccountID, claimantAccountID uuid.UUID) (bool, error) {
-	var exists bool
-	err := tx.Raw(`
-		SELECT EXISTS (
-			SELECT 1
-			FROM users owner_user
-			INNER JOIN users claimant_user ON owner_user.organization_id = claimant_user.organization_id
-			WHERE owner_user.account_id = ?
-				AND claimant_user.account_id = ?
-				AND owner_user.type = ?
-				AND claimant_user.type = ?
-				AND owner_user.deleted_at IS NULL
-				AND claimant_user.deleted_at IS NULL
-		)
-	`, ownerAccountID, claimantAccountID, UserTypeHuman, UserTypeHuman).Scan(&exists).Error
-	return exists, err
-}
-
 // SaveAccountLinkedAccount links the identity to the account and makes it the
 // active identity for its provider. Other identities for the provider remain
 // linked so activity from all of them can be attributed to the account.
@@ -108,6 +90,59 @@ func SaveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 // identity only when the account does not have an active identity yet.
 func RefreshAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount) error {
 	return saveAccountLinkedAccount(tx, linked, false)
+}
+
+func SelectAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider, providerID string) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var linked AccountLinkedAccount
+		err := tx.
+			Where("account_id = ? AND provider = ? AND provider_id = ?", accountID, provider, providerID).
+			First(&linked).
+			Error
+		if err != nil {
+			return err
+		}
+		if linked.Active {
+			return nil
+		}
+		if err := deactivateLinkedAccounts(tx, accountID, provider); err != nil {
+			return err
+		}
+		return tx.Model(&linked).Update("active", true).Error
+	})
+}
+
+func DeleteAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider, providerID string) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var linked AccountLinkedAccount
+		err := tx.
+			Where("account_id = ? AND provider = ? AND provider_id = ?", accountID, provider, providerID).
+			First(&linked).
+			Error
+		if err != nil {
+			return err
+		}
+		if err := tx.Delete(&linked).Error; err != nil {
+			return err
+		}
+		if !linked.Active {
+			return nil
+		}
+
+		var replacement AccountLinkedAccount
+		err = tx.
+			Where("account_id = ? AND provider = ?", accountID, provider).
+			Order("linked_at DESC").
+			First(&replacement).
+			Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return tx.Model(&replacement).Update("active", true).Error
+	})
 }
 
 func saveAccountLinkedAccount(tx *gorm.DB, linked *AccountLinkedAccount, activate bool) error {
@@ -193,55 +228,20 @@ func deactivateLinkedAccounts(tx *gorm.DB, accountID uuid.UUID, provider string)
 		Error
 }
 
-func SelectAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider, providerID string) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
-		var linked AccountLinkedAccount
-		err := tx.
-			Where("account_id = ? AND provider = ? AND provider_id = ?", accountID, provider, providerID).
-			First(&linked).
-			Error
-		if err != nil {
-			return err
-		}
-		if linked.Active {
-			return nil
-		}
-		if err := deactivateLinkedAccounts(tx, accountID, provider); err != nil {
-			return err
-		}
-		return tx.Model(&linked).Update("active", true).Error
-	})
-}
-
-func DeleteAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider, providerID string) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
-		var linked AccountLinkedAccount
-		err := tx.
-			Where("account_id = ? AND provider = ? AND provider_id = ?", accountID, provider, providerID).
-			First(&linked).
-			Error
-		if err != nil {
-			return err
-		}
-		if err := tx.Delete(&linked).Error; err != nil {
-			return err
-		}
-		if !linked.Active {
-			return nil
-		}
-
-		var replacement AccountLinkedAccount
-		err = tx.
-			Where("account_id = ? AND provider = ?", accountID, provider).
-			Order("linked_at DESC").
-			First(&replacement).
-			Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		return tx.Model(&replacement).Update("active", true).Error
-	})
+func accountLinkedIdentityConflictsInSharedOrganization(tx *gorm.DB, ownerAccountID, claimantAccountID uuid.UUID) (bool, error) {
+	var exists bool
+	err := tx.Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM users owner_user
+			INNER JOIN users claimant_user ON owner_user.organization_id = claimant_user.organization_id
+			WHERE owner_user.account_id = ?
+				AND claimant_user.account_id = ?
+				AND owner_user.type = ?
+				AND claimant_user.type = ?
+				AND owner_user.deleted_at IS NULL
+				AND claimant_user.deleted_at IS NULL
+		)
+	`, ownerAccountID, claimantAccountID, UserTypeHuman, UserTypeHuman).Scan(&exists).Error
+	return exists, err
 }
