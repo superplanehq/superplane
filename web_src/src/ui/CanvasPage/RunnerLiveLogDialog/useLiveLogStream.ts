@@ -23,6 +23,7 @@ import {
   startToolOnLatestSection,
   type CommandStart,
 } from "./liveLogSections";
+import { isBenignLiveLogWait } from "./liveLogErrors";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
@@ -124,17 +125,6 @@ function applyStreamFailure(state: LogState, message: string): LogState {
 
 function withClearedError(state: LogState): LogState {
   return { ...state, error: null };
-}
-
-// Opening live logs can race the runner. The session 404s until a task id
-// exists, and CloudWatch GetLogEvents raises ResourceNotFoundException until
-// the log stream exists. Both are expected waits: the session reconnects
-// while the run is in flight. Do not report them as failures.
-const SESSION_NOT_READY_MESSAGE = "Logs are not available for this execution yet. Check again shortly.";
-const BENIGN_LOG_STREAM_NOT_FOUND_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
-
-function isBenignLiveLogWait(message: string): boolean {
-  return message === SESSION_NOT_READY_MESSAGE || BENIGN_LOG_STREAM_NOT_FOUND_PATTERN.test(message);
 }
 
 type StreamHandlerContext = {
@@ -389,7 +379,7 @@ async function pumpLiveLogConnection(
     if (streamError.name === "AbortError") {
       return "aborted";
     }
-    if (!sessionAbort.signal.aborted && !isBenignLiveLogWait(streamError.message)) {
+    if (!sessionAbort.signal.aborted && !isBenignLiveLogWait(streamError)) {
       reportFailure("request", streamError);
       setState((prev) => applyStreamFailure(prev, streamError.message));
     }

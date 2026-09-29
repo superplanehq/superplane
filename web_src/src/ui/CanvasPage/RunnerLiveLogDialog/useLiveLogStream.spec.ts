@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { LIVE_LOG_SESSION_NOT_READY_CODE, LiveLogRequestError } from "./liveLogErrors";
 import type { LogState } from "./types";
 import {
   finalizeRunningCommandSections,
@@ -37,7 +38,10 @@ vi.mock("@/hooks/useCanvasId", () => ({
 }));
 
 const liveLogSession = { organizationId: "organization-1", canvasId: "canvas-1" };
-const sessionNotReadyError = new Error("Logs are not available for this execution yet. Check again shortly.");
+const sessionNotReadyError = new LiveLogRequestError(
+  "Logs are not available for this execution yet. Check again shortly.",
+  LIVE_LOG_SESSION_NOT_READY_CODE,
+);
 
 beforeEach(() => {
   captureExceptionMock.mockReset();
