@@ -270,22 +270,37 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
-	if metadata.InstallationID != "" {
-		ctx.Integration.SetMetadata(metadata)
-		return
-	}
-
-	if len(metadata.PendingInstallations) >= 1 {
+	if metadata.InstallationID != "" || len(metadata.PendingInstallations) >= 1 {
+		// The picker has options (or the connection is bound), so a stored
+		// install action is stale and must not send the browser to GitHub.
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: hostedInstallDescription,
-		URL:         common.HostedAppInstallURL(app.Slug, metadata.State),
+		URL:         hostedConnectActionURL(ctx, app, metadata),
 		Method:      "GET",
 	})
 	ctx.Integration.SetMetadata(metadata)
+}
+
+// hostedConnectActionURL is where Connect sends the browser when the picker
+// has no options yet. With user OAuth configured the flow authorizes the app
+// first: the callback lists the installations the user can already use
+// (Semaphore-style), so an existing installation never asks for a reinstall.
+// GitHub skips the consent screen for an already-authorized user, and a user
+// without installations continues to the install page from the callback.
+func hostedConnectActionURL(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) string {
+	if app.UserOAuthEnabled() {
+		return common.HostedAppAuthorizeURL(
+			app.ClientID,
+			common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+			metadata.State,
+		)
+	}
+	return common.HostedAppInstallURL(app.Slug, metadata.State)
 }
 
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
@@ -295,6 +310,10 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/oauth/callback") {
+		if metadata, ok := decodeHostedMetadata(ctx); ok && metadata.HostedApp {
+			g.afterHostedAppUserOAuth(ctx)
+			return
+		}
 		redirectToIntegrationSettings(ctx)
 		return
 	}
