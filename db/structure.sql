@@ -781,7 +781,8 @@ CREATE TABLE public.factory_work_order_executions (
     total_tokens bigint DEFAULT 0 NOT NULL,
     cost_cents bigint DEFAULT 0 NOT NULL,
     line_dispatch_id uuid NOT NULL,
-    duration_seconds bigint DEFAULT 0 NOT NULL
+    duration_seconds bigint DEFAULT 0 NOT NULL,
+    failure_reason text
 );
 
 

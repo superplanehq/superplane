@@ -6,11 +6,16 @@ import (
 	"log"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -415,4 +420,148 @@ func TestClassifyAttemptFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test__NodeExecutor_RecordsHostedCreditFailureReasonOnFactoryStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	testCases := []struct {
+		name           string
+		err            error
+		expectedReason *string
+		expectedResult string
+	}{
+		{
+			name:           "no hosted credit",
+			err:            models.ErrHostedCreditEmpty,
+			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonNoHostedCredit),
+			expectedResult: models.SuperPlaneRunnerNoCreditMessage,
+		},
+		{
+			name:           "no business subscription",
+			err:            models.ErrHostedSubscriptionRequired,
+			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonHostedSubscriptionRequired),
+			expectedResult: models.SuperPlaneRunnerSubscribeMessage,
+		},
+		{
+			name:           "no workspace budget",
+			err:            models.ErrFactoryHostedBudgetEmpty,
+			expectedReason: stringPointer(models.WorkOrderExecutionFailureReasonWorkspaceBudgetEmpty),
+			expectedResult: models.SuperPlaneRunnerNoFactoryBudgetMessage,
+		},
+		{
+			name:           "generic error",
+			err:            errors.New("boom"),
+			expectedReason: nil,
+			expectedResult: "prepare hosted run: boom",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			step := dispatchFactoryExecutionForUsageTest(t, r)
+			hostedLLM := &testcontexts.HostedLLMContext{CreditErr: tc.err}
+			execution := createFactoryStepNodeExecution(t, r, step, func(ctx core.ExecutionContext) error {
+				if err := hostedLLM.AssertCreditAvailable(); err != nil {
+					return fmt.Errorf("prepare hosted run: %w", err)
+				}
+				return ctx.ExecutionState.Pass()
+			})
+
+			executor := newTestNodeExecutor(t, r)
+			require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+			updatedExecution, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
+			assert.Equal(t, tc.expectedResult, updatedExecution.ResultMessage)
+
+			var updatedStep models.FactoryWorkOrderExecution
+			require.NoError(t, database.Conn().Where("id = ?", step.ID).First(&updatedStep).Error)
+			assert.Equal(t, tc.expectedReason, updatedStep.FailureReason)
+		})
+	}
+}
+
+func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	componentName := "hosted_credit_" + uuid.New().String()
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName,
+		ExecuteFunc: func(ctx core.ExecutionContext) error {
+			return models.ErrHostedCreditEmpty
+		},
+	})
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	executor := newTestNodeExecutor(t, r)
+	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionResultFailed, updatedExecution.Result)
+	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, updatedExecution.ResultMessage)
+}
+
+// createFactoryStepNodeExecution creates a pending node execution that
+// belongs to the run of the given factory step.
+func createFactoryStepNodeExecution(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	step *models.FactoryWorkOrderExecution,
+	execute func(ctx core.ExecutionContext) error,
+) *models.CanvasNodeExecution {
+	t.Helper()
+
+	componentName := "factory_step_" + uuid.New().String()
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:        componentName,
+		ExecuteFunc: execute,
+	})
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+	require.NoError(t, database.Conn().
+		Model(step).
+		Update("run_id", execution.RunID).Error)
+
+	return execution
+}
+
+func stringPointer(value string) *string {
+	return &value
 }
