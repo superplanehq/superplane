@@ -8,6 +8,7 @@ import {
   type AgentPromptUsageSeries,
 } from "@/lib/agentRunTelemetry";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { liveLogRequestErrorFromResponse } from "./liveLogErrors";
 
 export type LiveLogRecordEnvelope = {
   type?: string;
@@ -81,8 +82,7 @@ async function fetchRunnerLiveLogSession(
   );
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+    throw liveLogRequestErrorFromResponse(res, await res.text());
   }
 
   return (await res.json()) as LiveLogSessionResponse;
@@ -101,8 +101,7 @@ async function fetchRunnerLiveLogResponse(url: string, token: string, signal: Ab
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+    throw liveLogRequestErrorFromResponse(res, await res.text());
   }
 
   return res;
