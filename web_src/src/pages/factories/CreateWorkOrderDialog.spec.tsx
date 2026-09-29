@@ -224,6 +224,7 @@ describe("CreateWorkOrderDialog", () => {
       description: "Refunds fail on retry.",
       assigneeIds: [],
     });
+    expect(screen.queryByTestId("create-work-order-auto-start")).not.toBeInTheDocument();
     expect(dispatchMutate).not.toHaveBeenCalled();
   });
 
