@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Risk score
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: About this app
+        body: |
+          > [!SECTION:setup] Pull request risk score
+          >
+          > This app is not a factory line step. It listens for pull request
+          > events on the app repository.
+          >
+          > When a pull request opens or updates on the default branch:
+          > - The app reviews the diff and scores risk from 1 to 5.
+          > - A higher score means more risk.
+          > - The score is stored on the task.
+  layout:
+    - i: about
+      x: 0
+      'y': 0
+      w: 12
+      h: 6
+      minW: 3
+      minH: 5

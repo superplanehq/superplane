@@ -21,6 +21,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
+			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -114,6 +115,27 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
 		assert.Equal(t, "true", filter.Configuration["expression"])
+	})
+
+	t.Run("a Datadog issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDatadog})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()), trigger.Configuration["alertTransitions"])
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "true", filter.Configuration["expression"])
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.title }}", create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
 	})
 
 	t.Run("a Dependabot work order matches the Go copy so later alerts merge in", func(t *testing.T) {

@@ -308,8 +308,10 @@ describe("PhaseLogCard collapsed stream", () => {
 
     expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
     expect(screen.getByText("bash")).toBeInTheDocument();
+    expect(screen.getByText("Set Up Git User")).toBeInTheDocument();
     expect(screen.getByText('echo "Using superplaneagent@superplane.com"')).toBeInTheDocument();
     expect(screen.getByText("prompt")).toBeInTheDocument();
+    expect(screen.getByText("Implementation")).toBeInTheDocument();
     expect(screen.getByText("You are implementing a fix")).toBeInTheDocument();
     expect(screen.getByText("Gathering issue context first.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();

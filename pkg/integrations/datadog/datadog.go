@@ -1,7 +1,13 @@
 package datadog
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -9,13 +15,29 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const ResourceTypeService = "service"
+
 const installationInstructions = `
 To configure Datadog to work with SuperPlane:
 
-1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
-2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
-3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
-4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+1. **Get API Key**: In Datadog, go to Organization Settings > API Keys and copy an API Key. The API key has no scopes.
+2. **Get Application Key**: Go to Organization Settings > Application Keys and create an Application Key.
+3. **Grant the minimum permissions**: If you restrict the application key, grant only these permissions:
+
+- ` + "`create_webhooks`" + ` creates the SuperPlane webhook.
+- ` + "`manage_integrations`" + ` updates and removes that webhook.
+- ` + "`error_tracking_read`" + ` lists Error Tracking issues and reads issue details for an alert.
+
+Grant these optional permissions to add the error sample and related logs to each task:
+
+- ` + "`apm_read`" + ` reads the sample error span: trace, request, user, and environment.
+- ` + "`logs_read_data`" + ` reads log samples and the logs that share the sample trace.
+- ` + "`rum_apps_read`" + ` reads the sample for browser and mobile errors.
+
+An unrestricted application key also works.
+4. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
+5. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+6. **Add the webhook to a monitor**: In an Error Tracking New Issue monitor, add ` + "`@webhook-superplane`" + ` to the notification message
 `
 
 func init() {
@@ -43,7 +65,7 @@ func (d *Datadog) Icon() string {
 }
 
 func (d *Datadog) Description() string {
-	return "Create events in Datadog"
+	return "React to Error Tracking alerts and create events in Datadog"
 }
 
 func (d *Datadog) Instructions() string {
@@ -84,7 +106,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Datadog Application Key for authentication",
+			Description: "A restricted key needs create_webhooks, manage_integrations, and error_tracking_read. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.",
 		},
 	}
 }
@@ -96,10 +118,24 @@ func (d *Datadog) Actions() []core.Action {
 }
 
 func (d *Datadog) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnErrorTrackingAlert{},
+	}
 }
 
 func (d *Datadog) Cleanup(ctx core.IntegrationCleanupContext) error {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to create datadog client during cleanup: %v", err)
+		}
+		return nil
+	}
+
+	if err := deleteWebhook(client); err != nil && ctx.Logger != nil {
+		ctx.Logger.Warnf("failed to delete datadog webhook during cleanup: %v", err)
+	}
+
 	return nil
 }
 
@@ -132,16 +168,151 @@ func (d *Datadog) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("invalid credentials: %v", err)
 	}
 
+	if err := reconcileWebhook(ctx, client); err != nil {
+		return err
+	}
+
 	ctx.Integration.Ready()
 	return nil
 }
 
 func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op - webhooks are handled by triggers
+	if !strings.HasSuffix(ctx.Request.URL.Path, "/events") {
+		ctx.Response.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if ctx.Request.Method != http.MethodPost {
+		ctx.Response.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := verifyWebhookRequest(ctx.Integration, ctx.Request); err != nil {
+		ctx.Logger.Warnf("rejected datadog webhook: %v", err)
+		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		ctx.Logger.Errorf("failed to read datadog webhook body: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		ctx.Logger.Errorf("failed to decode datadog webhook body: %v", err)
+		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !shouldDispatchErrorTrackingAlert(payload) {
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err := d.dispatchWebhookMessage(ctx, payload); err != nil {
+		ctx.Logger.Errorf("failed to dispatch datadog webhook: %v", err)
+		ctx.Response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func shouldDispatchErrorTrackingAlert(payload map[string]any) bool {
+	eventType, _ := payload["event_type"].(string)
+	if !strings.EqualFold(eventType, ErrorTrackingAlertEventType) {
+		return false
+	}
+
+	transition, _ := payload["alert_transition"].(string)
+	return isDispatchableAlertTransition(transition)
+}
+
+func isDispatchableAlertTransition(transition string) bool {
+	transition = strings.TrimSpace(transition)
+	return strings.EqualFold(transition, AlertTransitionTriggered) ||
+		strings.EqualFold(transition, AlertTransitionRetriggered)
+}
+
+func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload map[string]any) error {
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err != nil {
+		return fmt.Errorf("failed to list datadog subscriptions: %w", err)
+	}
+
+	var sendErr error
+	delivered := 0
+	for _, subscription := range subscriptions {
+		if err := subscription.SendMessage(payload); err != nil {
+			ctx.Logger.Errorf("failed to send datadog message to subscription: %v", err)
+			sendErr = errors.Join(sendErr, err)
+			continue
+		}
+		delivered++
+	}
+
+	// A retry repeats the whole webhook. Return an error only when no
+	// subscription accepted the alert, so a later retry cannot duplicate a
+	// delivery that already succeeded.
+	if delivered == 0 && sendErr != nil {
+		return sendErr
+	}
+	return nil
 }
 
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	switch resourceType {
+	case ResourceTypeService, ResourceTypeEnvironment:
+	default:
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err)
+	}
+
+	if resourceType == ResourceTypeEnvironment {
+		names, err := client.ListEnvironments(ctx.Parameters["service"])
+		if err != nil {
+			return nil, err
+		}
+		return environmentResources(names), nil
+	}
+
+	issues, err := client.SearchErrorTrackingIssues("*", maxErrorTrackingSearchLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return serviceResources(issues), nil
+}
+
+func serviceResources(issues []ErrorTrackingIssue) []core.IntegrationResource {
+	seen := map[string]bool{}
+	names := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		name := strings.TrimSpace(issue.Service)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	resources := make([]core.IntegrationResource, 0, len(names))
+	for _, name := range names {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeService,
+			ID:   name,
+			Name: name,
+		})
+	}
+	return resources
 }
 
 func (d *Datadog) Hooks() []core.Hook {

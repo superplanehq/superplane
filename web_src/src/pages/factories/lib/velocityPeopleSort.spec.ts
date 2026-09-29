@@ -5,6 +5,7 @@ import {
   PEOPLE_LOAD_MORE_SIZE,
   nextPeopleOffset,
   peoplePageSizeForOffset,
+  peopleSortParam,
 } from "./velocityPeopleSort";
 
 describe("peoplePageSizeForOffset", () => {
@@ -12,6 +13,12 @@ describe("peoplePageSizeForOffset", () => {
     expect(peoplePageSizeForOffset(0)).toBe(PEOPLE_FIRST_PAGE_SIZE);
     expect(peoplePageSizeForOffset(PEOPLE_FIRST_PAGE_SIZE)).toBe(PEOPLE_LOAD_MORE_SIZE);
     expect(peoplePageSizeForOffset(PEOPLE_FIRST_PAGE_SIZE + PEOPLE_LOAD_MORE_SIZE)).toBe(PEOPLE_LOAD_MORE_SIZE);
+  });
+});
+
+describe("peopleSortParam", () => {
+  it("maps task waste to the factory waste sort", () => {
+    expect(peopleSortParam("factoryWaste")).toBe("PEOPLE_SORT_FACTORY_WASTE");
   });
 });
 

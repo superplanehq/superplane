@@ -294,6 +294,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_JIRA_ISSUES
 	case models.FactoryIntakeSourceDependabotAlerts:
 		return pb.FactoryIntake_SOURCE_DEPENDABOT_ALERTS
+	case models.FactoryIntakeSourceDatadog:
+		return pb.FactoryIntake_SOURCE_DATADOG
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -313,6 +315,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceJiraIssues, nil
 	case pb.FactoryIntake_SOURCE_DEPENDABOT_ALERTS:
 		return models.FactoryIntakeSourceDependabotAlerts, nil
+	case pb.FactoryIntake_SOURCE_DATADOG:
+		return models.FactoryIntakeSourceDatadog, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

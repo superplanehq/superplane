@@ -12,12 +12,14 @@ export type ClaudeCodeLogStep = {
   type: string;
   status: ClaudeCodeLogStatus;
   output?: string;
+  duration?: string;
   commands: ClaudeCodeLogCommand[];
 };
 
-const HIDDEN_STEP_NAMES = new Set(["Prepare Claude Code"]);
+const HIDDEN_STEP_NAMES = new Set(["Prepare Claude Code", "Fetch task attachments", "Set up GitHub"]);
 const COMMAND_DETAIL_MAX = 72;
 const STEP_LINE = /^\$ (.+)$/;
+const DURATION_LINE = /^~ (.+)$/;
 const TOOL_LINE = /^-> \[([^\]]+)\]\s*(.*)$/;
 const RUNNER_NOISE = /^(Claude Code (ready|started)\b|claude=|node=v|cwd=|Thinking$)/;
 const STEP_PASSED = /^✓ /;
@@ -50,11 +52,13 @@ export function parseClaudeCodeLog(
       type: typeForStep(step, configured),
       status: step.status,
       output: step.output,
+      duration: step.duration,
       commands: step.commands,
     }));
 }
 
-function consumeStepLine(current: OpenStep, rawLine: string) {
+/** Tool calls, `~ duration` lines, and blank lines. Returns true when consumed. */
+function consumeStepMetaLine(current: OpenStep, rawLine: string): boolean {
   const tool = rawLine.match(TOOL_LINE);
   if (tool) {
     current.agentStream = true;
@@ -63,10 +67,25 @@ function consumeStepLine(current: OpenStep, rawLine: string) {
       name: cleanCommandDetail(tool[2] ?? "", COMMAND_DETAIL_MAX),
       status: "passed",
     });
+    return true;
+  }
+  const duration = rawLine.match(DURATION_LINE)?.[1]?.trim();
+  if (duration) {
+    current.duration = duration;
+    return true;
+  }
+  return !rawLine.trim();
+}
+
+function consumeStepLine(current: OpenStep, rawLine: string) {
+  if (consumeStepMetaLine(current, rawLine)) {
     return;
   }
-
-  if (!rawLine.trim()) {
+  if (rawLine === "✗ tool failed") {
+    const command = lastCommand(current);
+    if (command && command.type !== "note") {
+      command.status = "failed";
+    }
     return;
   }
   if (STEP_FAILED.test(rawLine)) {
@@ -145,12 +164,19 @@ function stripToolIndent(line: string): string {
   return line.replace(/^ {5}/, "").replace(/^ {4}/, "");
 }
 
+/** Runner checkout roots. Paths under these read as repo-relative. */
+const WORKSPACE_ROOT = /^\/home\/ubuntu\/(?:repo|superplane)\//;
+const HOME_ROOT = /^\/home\/ubuntu\//;
+/** Size the runner appends to a write: `path (2264 chars)`. */
+const WRITE_SIZE_SUFFIX = /\s*\(\d+ (?:chars|bytes)\)$/;
+
 function cleanCommandDetail(text: string, max?: number): string {
   const trimmed = text
     .trim()
     .replace(/\s+/g, " ")
-    .replace(/^\/home\/ubuntu\/superplane\//, "")
-    .replace(/^\/home\/ubuntu\//, "");
+    .replace(WRITE_SIZE_SUFFIX, "")
+    .replace(WORKSPACE_ROOT, "")
+    .replace(HOME_ROOT, "");
   if (max === undefined || trimmed.length <= max) {
     return trimmed;
   }

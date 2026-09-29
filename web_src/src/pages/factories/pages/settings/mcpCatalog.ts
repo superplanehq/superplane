@@ -1,6 +1,8 @@
-import type { FactoryAgentResourceAuth } from "@/api-client";
+import type { FactoriesFactoryAgentResource, FactoryAgentResourceAuth } from "@/api-client";
 
 import { AGENT_RESOURCES_COPY, type AgentResourceInstruction } from "./agentResourceCopy";
+import { DATADOG_MCP_DEFAULT_SITE_ID, DATADOG_MCP_SITES, datadogMCPURL, isDatadogMCPURL } from "./datadogMcpSites";
+import { connectedMCPResourceForURL } from "./mcpServerMatch";
 
 export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
 
@@ -54,17 +56,41 @@ export function catalogEntryForResource(resource?: {
   if (!url) {
     return undefined;
   }
-  return MCP_CATALOG.find((entry) => entry.url === url && entry.auth === resource.auth);
+  const exact = MCP_CATALOG.find((entry) => entry.url === url && entry.auth === resource.auth);
+  if (exact) {
+    return exact;
+  }
+  if (resource.auth === "AUTH_OAUTH" && isDatadogMCPURL(url)) {
+    return MCP_CATALOG.find((entry) => entry.id === "datadog");
+  }
+  return undefined;
 }
 
-export function catalogOAuthResourceForEntry<T extends { url?: string; auth?: FactoryAgentResourceAuth }>(
-  resources: T[],
+export function catalogEntryIsConnected(
+  resources: Array<Pick<FactoriesFactoryAgentResource, "id" | "url" | "auth" | "oauthStatus">>,
   entry: MCPCatalogEntry,
-): T | undefined {
+): boolean {
+  const urls = entry.id === "datadog" ? datadogMCPSiteURLs() : [entry.url];
+  return urls.some((url) => connectedMCPResourceForURL(resources, url) !== undefined);
+}
+
+function datadogMCPSiteURLs(): string[] {
+  return DATADOG_MCP_SITES.map((site) => site.url);
+}
+
+export function catalogOAuthResourceForEntry<
+  T extends { url?: string; auth?: FactoryAgentResourceAuth; name?: string },
+>(resources: T[], entry: MCPCatalogEntry): T | undefined {
   if (entry.auth !== "AUTH_OAUTH") {
     return undefined;
   }
-  return resources.find((resource) => resource.auth === "AUTH_OAUTH" && resource.url?.trim() === entry.url);
+  const exact = resources.find((resource) => resource.auth === "AUTH_OAUTH" && resource.url?.trim() === entry.url);
+  if (exact || entry.id !== "datadog") {
+    return exact;
+  }
+  return resources.find(
+    (resource) => resource.auth === "AUTH_OAUTH" && resource.name === entry.name && isDatadogMCPURL(resource.url),
+  );
 }
 
 export const CUSTOM_MCP_CATALOG_ID = "custom";
@@ -178,5 +204,15 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     url: "https://mcp.sentry.dev/mcp",
     auth: "AUTH_OAUTH",
     instruction: AGENT_RESOURCES_COPY.sentryInstruction,
+  },
+  {
+    id: "datadog",
+    name: "datadog",
+    label: "Datadog",
+    icon: "datadog",
+    category: "observability",
+    url: datadogMCPURL(DATADOG_MCP_DEFAULT_SITE_ID),
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.datadogInstruction,
   },
 ];

@@ -6,7 +6,7 @@ import {
   overlayLivePullRequest,
   pullRequestFromEventPayload,
 } from "../../lib/workOrderPullRequest";
-import type { SplitRunStreamLine } from "./splitRunMocks";
+import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
 
 interface EventRunRef {
   id?: string;
@@ -57,6 +57,8 @@ export interface StreamArtifactIndex {
   byNodeName: Map<string, RunScoped<FactoriesWorkOrderArtifact>>;
   pullRequestsByNodeId: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
   pullRequestsByNodeName: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
+  /** Every artifact a canvas run produced, in the order they were added. */
+  byRunId: Map<string, FactoriesWorkOrderArtifact[]>;
 }
 
 export function streamArtifactIndexFromEvents(
@@ -64,40 +66,132 @@ export function streamArtifactIndexFromEvents(
   liveArtifacts: FactoriesWorkOrderArtifact[] | undefined,
   livePullRequests?: FactoriesFactoryPullRequest[],
 ): StreamArtifactIndex {
-  const byNodeId = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
-  const byNodeName = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
-  const pullRequestsByNodeId = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
-  const pullRequestsByNodeName = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
+  const index: StreamArtifactIndex = {
+    byNodeId: new Map(),
+    byNodeName: new Map(),
+    pullRequestsByNodeId: new Map(),
+    pullRequestsByNodeName: new Map(),
+    byRunId: new Map(),
+  };
   const liveById = liveArtifactsById(liveArtifacts);
   const latestDataById = buildLatestArtifactDataById(liveArtifacts ?? []);
   const livePullRequestsById = indexPullRequestsById(livePullRequests);
 
   for (const event of sortEventsChronologically(events)) {
-    const automation = eventAutomation(event);
-    const nodeId = automation?.nodeId?.trim();
-    const nodeName = automation?.nodeName?.trim();
-    const runId = eventRunId(event);
+    indexStreamEvent(index, event, liveById, latestDataById, livePullRequestsById);
+  }
 
-    const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
-    if (artifact) {
-      if (nodeId) {
-        byNodeId.set(nodeId, { value: artifact, runId });
-      } else if (nodeName) {
-        byNodeName.set(nodeName, { value: artifact, runId });
-      }
-    }
-
-    const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
-    if (pullRequest) {
-      if (nodeId) {
-        pullRequestsByNodeId.set(nodeId, { value: pullRequest, runId });
-      } else if (nodeName) {
-        pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
-      }
+  for (const artifact of liveArtifacts ?? []) {
+    const runId = canvasRunIdFromArtifact(artifact);
+    if (runId) {
+      appendRunArtifact(index.byRunId, runId, artifact);
     }
   }
 
-  return { byNodeId, byNodeName, pullRequestsByNodeId, pullRequestsByNodeName };
+  return index;
+}
+
+function indexStreamEvent(
+  index: StreamArtifactIndex,
+  event: FactoriesWorkOrderEvent,
+  liveById: Map<string, FactoriesWorkOrderArtifact>,
+  latestDataById: Map<string, Record<string, unknown>>,
+  livePullRequestsById: Map<string, FactoriesFactoryPullRequest>,
+): void {
+  const automation = eventAutomation(event);
+  const nodeId = automation?.nodeId?.trim();
+  const nodeName = automation?.nodeName?.trim();
+  const runId = eventRunId(event);
+
+  const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
+  if (artifact) {
+    if (nodeId) {
+      index.byNodeId.set(nodeId, { value: artifact, runId });
+    } else if (nodeName) {
+      index.byNodeName.set(nodeName, { value: artifact, runId });
+    }
+    if (runId) {
+      appendRunArtifact(index.byRunId, runId, artifact);
+    }
+  }
+
+  const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
+  if (pullRequest) {
+    if (nodeId) {
+      index.pullRequestsByNodeId.set(nodeId, { value: pullRequest, runId });
+    } else if (nodeName) {
+      index.pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
+    }
+  }
+}
+
+/**
+ * Puts the artifacts a canvas run produced onto that run's stage. Live
+ * phases do not carry those artifacts themselves; the stage list reads
+ * them from here.
+ */
+export function phasesWithRunArtifacts(phases: SplitRunPhase[], index: StreamArtifactIndex): SplitRunPhase[] {
+  if (index.byRunId.size === 0) {
+    return phases;
+  }
+  let changed = false;
+  const next = phases.map((phase) => {
+    const produced = phase.runId ? index.byRunId.get(phase.runId) : undefined;
+    if (!produced?.length) {
+      return phase;
+    }
+    const artifacts = mergeArtifacts(phase.artifacts, produced);
+    if (sameArtifacts(phase.artifacts, artifacts)) {
+      return phase;
+    }
+    changed = true;
+    return { ...phase, artifacts };
+  });
+  return changed ? next : phases;
+}
+
+function appendRunArtifact(
+  byRunId: Map<string, FactoriesWorkOrderArtifact[]>,
+  runId: string,
+  artifact: FactoriesWorkOrderArtifact,
+) {
+  const list = byRunId.get(runId) ?? [];
+  const index = artifact.id ? list.findIndex((item) => item.id === artifact.id) : -1;
+  if (index >= 0) {
+    list[index] = artifact;
+  } else {
+    list.push(artifact);
+  }
+  byRunId.set(runId, list);
+}
+
+function canvasRunIdFromArtifact(artifact: FactoriesWorkOrderArtifact): string | undefined {
+  const data = artifact.data;
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+  const value = data.canvasRunId;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function mergeArtifacts(
+  existing: FactoriesWorkOrderArtifact[],
+  produced: FactoriesWorkOrderArtifact[],
+): FactoriesWorkOrderArtifact[] {
+  const merged = [...existing];
+  for (const artifact of produced) {
+    const index = artifact.id ? merged.findIndex((item) => item.id === artifact.id) : -1;
+    if (index >= 0) {
+      merged[index] = artifact;
+      continue;
+    }
+    merged.push(artifact);
+  }
+  return merged;
+}
+
+function sameArtifacts(left: FactoriesWorkOrderArtifact[], right: FactoriesWorkOrderArtifact[]): boolean {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
 /**

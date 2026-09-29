@@ -7,6 +7,7 @@ import { MCP_CATALOG } from "./mcpCatalog";
 const github = MCP_CATALOG.find((entry) => entry.id === "github");
 const linear = MCP_CATALOG.find((entry) => entry.id === "linear");
 const sentry = MCP_CATALOG.find((entry) => entry.id === "sentry");
+const datadog = MCP_CATALOG.find((entry) => entry.id === "datadog");
 
 const meta = {
   title: "Factories/Pages/Settings/MCP catalog setup",
@@ -99,4 +100,30 @@ function SentrySetup() {
 
 export const SentrySignIn: Story = {
   render: () => <SentrySetup />,
+};
+
+function DatadogSetup() {
+  const [open, setOpen] = useState(true);
+  return (
+    <MCPCatalogSetupDialog
+      open={open}
+      entry={datadog}
+      isSaving={false}
+      onClose={() => {
+        logAction("close Datadog setup");
+        setOpen(false);
+      }}
+      onSignIn={async (entry) => {
+        logAction("sign in", entry.id, entry.url);
+        setOpen(false);
+      }}
+      onSaveToken={async (entry) => {
+        logAction("save token", entry.id);
+      }}
+    />
+  );
+}
+
+export const DatadogSignIn: Story = {
+  render: () => <DatadogSetup />,
 };

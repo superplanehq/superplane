@@ -14,6 +14,8 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -31,6 +33,7 @@ const (
 
 var (
 	errIntakeNotConnected       = errors.New("intake is not connected")
+	errIntakeConnectionBroken   = errors.New("intake connection failed")
 	errIntakeItemNotFound       = errors.New("intake item not found")
 	errIntakeSearchUnsupported  = errors.New("this intake cannot search items yet")
 	errIntakeRefreshUnsupported = errors.New("no intake supports backlog refresh")
@@ -57,6 +60,7 @@ func init() {
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
+	registerIntakeItemSource("datadog.onErrorTrackingAlert", newDatadogIntakeItemSource)
 }
 
 type gitHubIntakeItemSource struct {
@@ -87,6 +91,11 @@ type productiveIntakeItemSource struct {
 type sentryIntakeItemSource struct {
 	sentry  *sentry.Client
 	project string
+}
+
+type datadogIntakeItemSource struct {
+	datadog *datadog.Client
+	service string
 }
 
 type unsupportedIntakeItemSource struct{}
@@ -388,6 +397,27 @@ func newSentryIntakeItemSource(
 	}
 
 	return &sentryIntakeItemSource{sentry: client, project: project}, nil
+}
+
+func newDatadogIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	service, _ := trigger.Configuration["service"].(string)
+	service = strings.TrimSpace(service)
+	if service == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeDatadogClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &datadogIntakeItemSource{datadog: client, service: service}, nil
 }
 
 func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
@@ -782,6 +812,69 @@ func sentryIssueItem(issue sentry.Issue) IntakeItem {
 	}
 }
 
+func (s *datadogIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
+	issues, err := s.datadog.SearchErrorTrackingIssues(datadogServiceSearchQuery(s.service, query), limit)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(issues))
+	for _, issue := range issues {
+		if !s.ownsIssue(issue) {
+			continue
+		}
+		items = append(items, datadogIssueItem(s.datadog, issue))
+	}
+	return items, nil
+}
+
+func (s *datadogIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
+	issueID := strings.TrimSpace(id)
+	if issueID == "" {
+		return nil, errIntakeItemNotFound
+	}
+
+	issue, err := s.datadog.LoadErrorTrackingIssue(issueID, log.Warnf)
+	if err != nil {
+		return nil, err
+	}
+	if issue == nil || strings.TrimSpace(issue.ID) == "" || !s.ownsIssue(*issue) {
+		return nil, errIntakeItemNotFound
+	}
+
+	item := datadogIssueItem(s.datadog, *issue)
+	item.Body = datadog.DescribeErrorTrackingIssue(*issue, datadog.AlertDetails{})
+	if strings.TrimSpace(item.Body) == "" {
+		item.Body = item.Title
+	}
+	return &item, nil
+}
+
+func (s *datadogIntakeItemSource) ownsIssue(issue datadog.ErrorTrackingIssue) bool {
+	name := strings.TrimSpace(issue.Service)
+	return name != "" && strings.EqualFold(name, s.service)
+}
+
+func datadogServiceSearchQuery(service, query string) string {
+	service = strings.TrimSpace(service)
+	query = strings.TrimSpace(query)
+	scoped := "service:" + service
+	if query == "" {
+		return scoped
+	}
+	return scoped + " " + query
+}
+
+func datadogIssueItem(client *datadog.Client, issue datadog.ErrorTrackingIssue) IntakeItem {
+	return IntakeItem{
+		ID:    issue.ID,
+		Key:   issue.Service,
+		Title: issue.IssueTitle(),
+		Body:  strings.TrimSpace(issue.ErrorMessage),
+		URL:   client.IssueURL(issue.ID),
+	}
+}
+
 func resolveLiveIntakeTrigger(tx *gorm.DB, intake *models.FactoryIntake) (*models.Node, *models.Integration, error) {
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{intake.CanvasID})
 	if err != nil {
@@ -812,6 +905,11 @@ func resolveLiveIntakeTrigger(tx *gorm.DB, intake *models.FactoryIntake) (*model
 		return nil, nil, err
 	}
 	if integration.State != models.IntegrationStateReady {
+		if integration.State == models.IntegrationStateError {
+			if description := strings.TrimSpace(integration.StateDescription); description != "" {
+				return nil, nil, errors.Join(errIntakeConnectionBroken, errors.New(description))
+			}
+		}
 		return nil, nil, errIntakeNotConnected
 	}
 

@@ -12,8 +12,11 @@ import { useElementWidth } from "@/hooks/useElementWidth";
 
 import { formatDurationHours, pickVelocityChartUnit, type FactoryVelocityFlow } from "../lib/factoryVelocityFlow";
 import {
+  roundedShares,
   velocityBreakdownSeries,
+  velocityLegendLabel,
   type VelocityBreakdown,
+  type VelocityBreakdownSeries,
   type VelocityCostMode,
   type VelocityIntakeSeries,
   type VelocityPoint,
@@ -76,17 +79,8 @@ export function DeliveryChart({
   intakeSeries: VelocityIntakeSeries[];
 }) {
   const series = velocityBreakdownSeries(breakdown, intakeSeries);
-  const config = Object.fromEntries(
-    series.map((item) => [item.key, { label: item.label, color: item.color }]),
-  ) satisfies ChartConfig;
-
-  const rows: DeliveryRow[] = points.map((point) => {
-    const row: DeliveryRow = { day: point.day };
-    for (const item of series) {
-      row[item.key] = deliveryValue(point, item.key, breakdown);
-    }
-    return row;
-  });
+  const rows = deliveryRows(points, series, breakdown);
+  const config = deliveryChartConfig(series, legendShares(rows, series));
 
   const { ref, width } = useElementWidth<HTMLDivElement>(760);
   const ticks = pickVelocityAxisTicks(
@@ -121,6 +115,43 @@ export function DeliveryChart({
         </BarChart>
       </ChartContainer>
     </div>
+  );
+}
+
+function deliveryRows(
+  points: VelocityPoint[],
+  series: VelocityBreakdownSeries[],
+  breakdown: VelocityBreakdown,
+): DeliveryRow[] {
+  return points.map((point) => {
+    const row: DeliveryRow = { day: point.day };
+    for (const item of series) {
+      row[item.key] = deliveryValue(point, item.key, breakdown);
+    }
+    return row;
+  });
+}
+
+/** Period totals of the bars on screen. An empty period keeps plain legend names. */
+function legendShares(rows: DeliveryRow[], series: VelocityBreakdownSeries[]): Array<number | undefined> {
+  const totals = series.map((item) =>
+    rows.reduce((sum, row) => {
+      const value = row[item.key];
+      return sum + (typeof value === "number" ? value : 0);
+    }, 0),
+  );
+  if (totals.reduce((sum, total) => sum + total, 0) <= 0) {
+    return series.map(() => undefined);
+  }
+  return roundedShares(totals);
+}
+
+function deliveryChartConfig(series: VelocityBreakdownSeries[], shares: Array<number | undefined>): ChartConfig {
+  return Object.fromEntries(
+    series.map((item, index) => [
+      item.key,
+      { label: velocityLegendLabel(item.label, shares[index]), color: item.color },
+    ]),
   );
 }
 
