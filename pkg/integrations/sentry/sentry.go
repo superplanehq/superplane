@@ -144,6 +144,14 @@ type WebhookInstallation struct {
 	UUID string `json:"uuid" mapstructure:"uuid"`
 }
 
+const (
+	// HeaderWebhookReceipt carries the stored receipt ID from the public
+	// webhook handler into the integration message. It is not a Sentry header.
+	HeaderWebhookReceipt = "X-Superplane-Sentry-Receipt"
+	// SuperplaneReceiptField is the canvas payload key for that receipt ID.
+	SuperplaneReceiptField = "superplaneReceiptId"
+)
+
 type WebhookMessage struct {
 	Resource     string              `json:"resource" mapstructure:"resource"`
 	Action       string              `json:"action" mapstructure:"action"`
@@ -151,6 +159,7 @@ type WebhookMessage struct {
 	Installation WebhookInstallation `json:"installation" mapstructure:"installation"`
 	Data         map[string]any      `json:"data" mapstructure:"data"`
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
+	ReceiptID    string              `json:"superplaneReceiptId,omitempty" mapstructure:"superplaneReceiptId"`
 }
 
 func (s *Sentry) Name() string {
@@ -732,6 +741,7 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		Installation: payload.Installation,
 		Data:         payload.Data,
 		Actor:        payload.Actor,
+		ReceiptID:    strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)),
 	}
 
 	if err := s.dispatchWebhookMessage(ctx, message); err != nil {

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 type OnIssue struct{}
@@ -194,18 +195,18 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	}
 
 	if message.Resource != "issue" {
-		logSkippedIssueEvent(ctx, "resource", message, config)
+		logSkippedIssueEvent("resource", message, config)
 		return nil
 	}
 
 	if !issueActionAllowed(config.Actions, message.Action) {
-		logSkippedIssueEvent(ctx, "action", message, config)
+		logSkippedIssueEvent("action", message, config)
 		return nil
 	}
 
 	projectSlug := issueProjectSlug(message.Data)
 	if config.Project != "" && config.Project != projectSlug {
-		logSkippedIssueEvent(ctx, "project", message, config)
+		logSkippedIssueEvent("project", message, config)
 		return nil
 	}
 
@@ -217,6 +218,9 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
 		"description":  t.issueDescription(ctx, message.Data["issue"]),
+	}
+	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
+		payload[SuperplaneReceiptField] = receiptID
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
@@ -243,17 +247,17 @@ func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func logSkippedIssueEvent(ctx core.IntegrationMessageContext, reason string, message *WebhookMessage, config OnIssueConfiguration) {
-	if ctx.Logger == nil || message == nil {
+func logSkippedIssueEvent(reason string, message *WebhookMessage, config OnIssueConfiguration) {
+	if message == nil {
 		return
 	}
-	ctx.Logger.WithFields(logrus.Fields{
+	logging.LogSentryWebhookInfo("Sentry issue event was not emitted", map[string]any{
 		"reason":             reason,
 		"resource":           message.Resource,
 		"action":             message.Action,
 		"project":            issueProjectSlug(message.Data),
 		"configured_project": config.Project,
-	}).Info("Sentry issue event was not emitted")
+	})
 }
 
 func issueActionAllowed(configured []string, action string) bool {

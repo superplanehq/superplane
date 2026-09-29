@@ -1142,7 +1142,8 @@ CREATE TABLE public.sentry_webhook_receipts (
     issue_short_id text DEFAULT ''::text NOT NULL,
     http_status integer NOT NULL,
     outcome text NOT NULL,
-    integration_count integer DEFAULT 0 NOT NULL
+    integration_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
 );
 
 
@@ -4536,7 +4537,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929134851	f
+20260929150522	f
 \.
 
 

@@ -53,6 +53,7 @@ describe("SentryWebhooks", () => {
               http_status: 200,
               outcome: "accepted",
               integration_count: 1,
+              task_ids: ["6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d"],
             },
           ],
           total: 1,
@@ -69,5 +70,6 @@ describe("SentryWebhooks", () => {
     expect(screen.getByText("Accepted")).toBeInTheDocument();
     expect(screen.getByText("created")).toBeInTheDocument();
     expect(screen.getByText("install-1")).toBeInTheDocument();
+    expect(screen.getByText("6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d")).toBeInTheDocument();
   });
 });

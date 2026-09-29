@@ -16,18 +16,19 @@ const (
 )
 
 type adminSentryWebhookReceipt struct {
-	ID               string `json:"id"`
-	ReceivedAt       string `json:"received_at"`
-	HookResource     string `json:"hook_resource"`
-	Action           string `json:"action"`
-	InstallationUUID string `json:"installation_uuid"`
-	OrganizationSlug string `json:"organization_slug"`
-	ProjectSlug      string `json:"project_slug"`
-	IssueID          string `json:"issue_id"`
-	IssueShortID     string `json:"issue_short_id"`
-	HTTPStatus       int    `json:"http_status"`
-	Outcome          string `json:"outcome"`
-	IntegrationCount int    `json:"integration_count"`
+	ID               string   `json:"id"`
+	ReceivedAt       string   `json:"received_at"`
+	HookResource     string   `json:"hook_resource"`
+	Action           string   `json:"action"`
+	InstallationUUID string   `json:"installation_uuid"`
+	OrganizationSlug string   `json:"organization_slug"`
+	ProjectSlug      string   `json:"project_slug"`
+	IssueID          string   `json:"issue_id"`
+	IssueShortID     string   `json:"issue_short_id"`
+	HTTPStatus       int      `json:"http_status"`
+	Outcome          string   `json:"outcome"`
+	IntegrationCount int      `json:"integration_count"`
+	TaskIDs          []string `json:"task_ids"`
 }
 
 type adminSentryWebhooksResponse struct {
@@ -58,6 +59,10 @@ func (s *Server) adminListSentryWebhooks(w http.ResponseWriter, r *http.Request)
 
 	items := make([]adminSentryWebhookReceipt, 0, len(receipts))
 	for _, receipt := range receipts {
+		taskIDs := receipt.TaskIDList()
+		if taskIDs == nil {
+			taskIDs = []string{}
+		}
 		items = append(items, adminSentryWebhookReceipt{
 			ID:               receipt.ID.String(),
 			ReceivedAt:       receipt.ReceivedAt.UTC().Format(time.RFC3339),
@@ -71,6 +76,7 @@ func (s *Server) adminListSentryWebhooks(w http.ResponseWriter, r *http.Request)
 			HTTPStatus:       receipt.HTTPStatus,
 			Outcome:          receipt.Outcome,
 			IntegrationCount: receipt.IntegrationCount,
+			TaskIDs:          taskIDs,
 		})
 	}
 

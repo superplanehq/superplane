@@ -1,6 +1,6 @@
 export const SENTRY_WEBHOOKS_TITLE = "Sentry Webhooks";
 export const SENTRY_WEBHOOKS_HELP =
-  "Recent calls from Sentry. This list shows the event type, project, and result. It does not show the payload or tokens.";
+  "Recent calls from Sentry. The list shows the event type, project, result, and task ID. It does not show the payload or tokens.";
 export const SENTRY_WEBHOOKS_EMPTY = "No Sentry webhooks have arrived.";
 export const SENTRY_WEBHOOKS_LOAD_ERROR = "SuperPlane could not load Sentry webhooks.";
 export const SENTRY_WEBHOOK_PAGE_SIZE = 50;
@@ -18,6 +18,7 @@ export type SentryWebhookReceipt = {
   http_status: number;
   outcome: string;
   integration_count: number;
+  task_ids?: string[];
 };
 
 export type SentryWebhooksResponse = {

@@ -69,6 +69,21 @@ function SentryWebhooksNotice({ message }: { message: string }) {
   );
 }
 
+function SentryWebhookTaskIDs({ ids }: { ids?: string[] }) {
+  if (!ids || ids.length === 0) {
+    return <>—</>;
+  }
+  return (
+    <div className="space-y-1">
+      {ids.map((id) => (
+        <div key={id} className="break-all">
+          {id}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SentryWebhooksTable({ items }: { items: SentryWebhookReceipt[] }) {
   return (
     <div className="overflow-hidden rounded-md bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
@@ -81,6 +96,7 @@ function SentryWebhooksTable({ items }: { items: SentryWebhookReceipt[] }) {
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Project</th>
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Issue</th>
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Result</th>
+            <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Task</th>
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">HTTP status</th>
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Installation</th>
             <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Connections</th>
@@ -102,6 +118,9 @@ function SentryWebhooksTable({ items }: { items: SentryWebhookReceipt[] }) {
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">{sentryWebhookIssueLabel(item) || "—"}</td>
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">
                 {sentryWebhookOutcomeLabel(item.outcome)}
+              </td>
+              <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100">
+                <SentryWebhookTaskIDs ids={item.task_ids} />
               </td>
               <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">{item.http_status}</td>
               <td className="px-4 py-2.5 font-mono text-xs text-gray-800 dark:text-gray-100">
