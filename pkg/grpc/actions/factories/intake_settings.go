@@ -577,10 +577,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
 		case models.FactoryIntakeSourceDatadog:
-			settings = datadogAlertSettingsFromTransitions(
-				configurationStrings(trigger.Configuration["alertTransitions"]),
-				settings,
-			)
+			settings = datadogAlertSettingsFromGraph(trigger.Configuration["alertTransitions"], settings)
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -783,14 +780,13 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	return updated.normalized()
 }
 
-func datadogAlertSettingsFromTransitions(transitions []string, settings intakeSettings) intakeSettings {
-	if len(transitions) == 0 {
-		settings.DatadogTriggeredAlerts = true
-		settings.DatadogRetriggeredAlerts = false
+func datadogAlertSettingsFromGraph(transitions any, settings intakeSettings) intakeSettings {
+	if transitions == nil {
 		return settings
 	}
-	settings.DatadogTriggeredAlerts = containsAlertTransition(transitions, datadog.AlertTransitionTriggered)
-	settings.DatadogRetriggeredAlerts = containsAlertTransition(transitions, datadog.AlertTransitionRetriggered)
+	parsed := configurationStrings(transitions)
+	settings.DatadogTriggeredAlerts = containsAlertTransition(parsed, datadog.AlertTransitionTriggered)
+	settings.DatadogRetriggeredAlerts = containsAlertTransition(parsed, datadog.AlertTransitionRetriggered)
 	return settings
 }
 

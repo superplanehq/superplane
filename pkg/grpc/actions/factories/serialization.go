@@ -811,6 +811,9 @@ func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecor
 	if execution.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*execution.FinishedAt)
 	}
+	if execution.FailureReason != nil {
+		item.FailureReason = *execution.FailureReason
+	}
 	return item
 }
 

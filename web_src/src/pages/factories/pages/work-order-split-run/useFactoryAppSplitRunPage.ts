@@ -1,13 +1,16 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
 import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
+import { useLineUsesHostedCredit } from "@/hooks/useLineHostedCredit";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { lineAppIds } from "../../lib/lineHostedCredit";
+import { useHostedCreditRunContext } from "../../lib/useHostedCreditEmptyBanner";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
@@ -65,6 +68,12 @@ function useSplitRunWorkOrderExtras(
   return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
 }
 
+function useSplitRunHostedCredit(organizationId: string, factoryKey: string, line: FactoriesFactoryLine | undefined) {
+  const credit = useHostedCreditRunContext(organizationId, factoryKey);
+  const detectedHostedRunner = useLineUsesHostedCredit(organizationId, lineAppIds(line));
+  return { credit, usesHostedRunner: line ? detectedHostedRunner : undefined };
+}
+
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const params = useParams<{ appId?: string; automationId?: string }>();
@@ -80,6 +89,8 @@ export function useFactoryAppSplitRunPage() {
     liveWorkOrder.data,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const line = factory?.lines?.find((entry) => entry.id === query.lineId);
+  const { credit, usesHostedRunner } = useSplitRunHostedCredit(organizationId, factoryKey, line);
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
@@ -88,8 +99,21 @@ export function useFactoryAppSplitRunPage() {
         artifacts,
         isAnalyzing,
         resolveUser,
+        credit,
+        usesHostedRunner,
       }),
-    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [
+      order,
+      orderChecks,
+      artifacts,
+      prFeedbackRuns,
+      analysisRuns,
+      isAnalyzing,
+      query.lineId,
+      resolveUser,
+      credit,
+      usesHostedRunner,
+    ],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
