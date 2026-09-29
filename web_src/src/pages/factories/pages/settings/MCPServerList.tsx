@@ -2,6 +2,7 @@ import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -97,24 +98,40 @@ function MCPServerRow({
       : null;
 
   return (
-    <li className={cn(factoryCardClassName, "relative px-4 py-2")} data-testid={`agent-resource-row-${resource.id}`}>
+    <li
+      className={cn(factoryCardClassName, "relative min-w-0 px-4 py-2")}
+      data-testid={`agent-resource-row-${resource.id}`}
+    >
       <ConnectionStatusDot resource={resource} className="absolute -top-1.5 -left-1.5 z-10" />
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            className="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-not-allowed"
-            onClick={onEdit}
-            disabled={!canUpdate}
-            aria-label={`${AGENT_RESOURCES_COPY.edit} ${name}`}
-            data-testid={`agent-resource-edit-${resource.id}`}
-          >
-            <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{name}</span>
-            <span className="min-w-0 truncate text-[12px] text-muted-foreground">{resource.url}</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-not-allowed"
+                  onClick={onEdit}
+                  disabled={!canUpdate}
+                  aria-label={`${AGENT_RESOURCES_COPY.edit} ${name}`}
+                  data-testid={`agent-resource-edit-${resource.id}`}
+                >
+                  <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{name}</span>
+                  <span className="min-w-0 truncate text-[12px] text-muted-foreground">{resource.url}</span>
+                </button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <span className="block">{name}</span>
+              {resource.url ? <span className="block break-all">{resource.url}</span> : null}
+            </TooltipContent>
+          </Tooltip>
           {resource.oauthError ? <p className="mt-1 text-[12px] text-destructive">{resource.oauthError}</p> : null}
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-3"
+          data-testid={`agent-resource-actions-${resource.id}`}
+        >
           {countLabel ? <span className="text-[12px] tabular-nums text-muted-foreground">{countLabel}</span> : null}
           <Switch
             checked={resource.enabled !== false}

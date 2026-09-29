@@ -184,6 +184,28 @@ describe("FactorySettingsMCPPage", () => {
     expect(within(docsCard).getByTestId("mcp-status-connected")).toBeInTheDocument();
     expect(within(mobbinCard).getByTestId("mcp-status-disconnected")).toBeInTheDocument();
     expect(within(docsCard).getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toBeInTheDocument();
+    expect(within(docsCard).getByTestId(`agent-resource-actions-${HEADER_MCP_RESOURCE.id}`).className).toContain(
+      "flex-wrap",
+    );
+  }, 10000);
+
+  it("shows the full server name and address on hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.hover(await screen.findByTestId(`agent-resource-edit-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("docs");
+    expect(tooltip).toHaveTextContent("https://mcp.example.com/mcp");
   }, 10000);
 
   it("expands tools without showing descriptions", async () => {
