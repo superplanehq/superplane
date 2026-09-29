@@ -440,7 +440,13 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       description?: string;
       key?: string;
       hostedSpendBudgetCents?: number | null;
-      planning?: { enabled: boolean; clarity: boolean; confidence: boolean; setupCompleted?: boolean };
+      planning?: {
+        enabled: boolean;
+        clarity: boolean;
+        confidence: boolean;
+        setupCompleted?: boolean;
+        autoStartLineId?: string;
+      };
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
