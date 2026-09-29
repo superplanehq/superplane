@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { CLOSED_WORK_ORDER, DRAFT_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
+import { CLOSED_WORK_ORDER, DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
   LINE_BOARD_VERIFY_ENUM_ORDER,
@@ -8,6 +8,7 @@ import {
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
 import {
   allStages,
+  automationsFromStages,
   isConsoleTaskStage,
   outcomeSummary,
   settleStoppedSteps,
@@ -173,5 +174,51 @@ describe("console column placement", () => {
     const ids = columnStageIds(fixture);
 
     expect([...ids.backlog, ...ids.implement, ...ids.verify, ...ids.done]).toContain("qa-custom");
+  });
+});
+
+describe("console automation grouping", () => {
+  it("keeps comment replies as runs of one Address PR feedback card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-comment-1",
+          handlerName: "Address PR feedback",
+          title: "Read the requested changes",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-comment-1",
+            canvasId: "canvas-comment-1",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-comment-2",
+          handlerName: "Address PR feedback",
+          title: "Address new review comment",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-comment-2",
+            canvasId: "canvas-comment-2",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    const automations = automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).verify);
+    const address = automations.filter((automation) => automation.name === "Address PR feedback");
+
+    expect(address).toHaveLength(1);
+    expect(address[0]?.runs).toHaveLength(2);
+    expect(address[0]?.runs.map((run) => run.id)).toEqual(["pr-feedback-run-comment-2", "pr-feedback-run-comment-1"]);
+    expect(address[0]?.runs.map((run) => run.name)).toEqual([
+      "Address new review comment",
+      "Read the requested changes",
+    ]);
   });
 });
