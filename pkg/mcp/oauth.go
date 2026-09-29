@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -68,17 +69,33 @@ type Discovery struct {
 }
 
 func NewPKCE() (PKCE, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
+	verifier, err := RandomToken()
+	if err != nil {
 		return PKCE{}, err
 	}
-	verifier := base64.RawURLEncoding.EncodeToString(buf)
-	sum := sha256.Sum256([]byte(verifier))
 	return PKCE{
 		Verifier:        verifier,
-		Challenge:       base64.RawURLEncoding.EncodeToString(sum[:]),
+		Challenge:       S256Challenge(verifier),
 		ChallengeMethod: "S256",
 	}, nil
+}
+
+func RandomToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func S256Challenge(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func VerifyS256(verifier, challenge string) bool {
+	computed := S256Challenge(verifier)
+	return subtle.ConstantTimeCompare([]byte(computed), []byte(challenge)) == 1
 }
 
 func RandomState() (string, error) {
@@ -101,7 +118,7 @@ func Discover(ctx context.Context, httpClient HTTPDoer, mcpURL string) (*Discove
 		return nil, err
 	}
 	var protected ProtectedResourceMetadata
-	if err := getJSON(ctx, httpClient, metadataURL, &protected); err != nil {
+	if err := GetJSON(ctx, httpClient, metadataURL, &protected); err != nil {
 		return nil, fmt.Errorf("load protected resource metadata: %w", err)
 	}
 	if strings.TrimSpace(protected.Resource) == "" {
@@ -364,7 +381,7 @@ func discoverAuthServer(ctx context.Context, httpClient HTTPDoer, issuer string)
 			continue
 		}
 		var meta AuthorizationServerMetadata
-		if err := getJSON(ctx, httpClient, candidate, &meta); err != nil {
+		if err := GetJSON(ctx, httpClient, candidate, &meta); err != nil {
 			lastErr = err
 			continue
 		}
@@ -403,7 +420,7 @@ func postToken(ctx context.Context, httpClient HTTPDoer, tokenEndpoint, clientID
 	return &tokens, nil
 }
 
-func getJSON(ctx context.Context, httpClient HTTPDoer, rawURL string, dest any) error {
+func GetJSON(ctx context.Context, httpClient HTTPDoer, rawURL string, dest any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err

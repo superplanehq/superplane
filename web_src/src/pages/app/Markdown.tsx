@@ -252,7 +252,10 @@ function mentionAwareChildren(people: WorkOrderMentionCandidate[] | undefined, c
   return people?.length ? highlightMentionChildren(children, people) : children;
 }
 
-function markdownHeadingClass(level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES, variant: MarkdownVariant): string {
+function markdownHeadingClass(
+  level: keyof typeof WORKSPACE_MARKDOWN_HEADING_CLASSES,
+  variant: MarkdownVariant,
+): string {
   return variant === "workspace" ? WORKSPACE_MARKDOWN_HEADING_CLASSES[level] : markdownHeadingClassName(level);
 }
 

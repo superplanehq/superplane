@@ -61,6 +61,14 @@ func TestSelectClientIDPrefersCIMDThenDCR(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestS256ChallengeMatchesRFC7636(t *testing.T) {
+	t.Parallel()
+	verifier := "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+	assert.Equal(t, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", S256Challenge(verifier))
+	assert.True(t, VerifyS256(verifier, S256Challenge(verifier)))
+	assert.False(t, VerifyS256(verifier, "other"))
+}
+
 func TestAuthorizationURLIncludesPKCEAndResource(t *testing.T) {
 	t.Parallel()
 	pkce := PKCE{Challenge: "abc", ChallengeMethod: "S256"}

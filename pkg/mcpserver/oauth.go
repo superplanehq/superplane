@@ -1,14 +1,9 @@
 package mcpserver
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -16,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -23,9 +19,8 @@ import (
 )
 
 const (
-	AuthorizationCodeTTL   = 10 * time.Minute
-	RefreshTokenTTL        = 30 * 24 * time.Hour
-	maxClientMetadataBytes = 1 << 20
+	AuthorizationCodeTTL = 10 * time.Minute
+	RefreshTokenTTL      = 30 * 24 * time.Hour
 )
 
 type Client struct {
@@ -101,8 +96,8 @@ func ParseAuthorizeRequest(values url.Values, resource string) (*AuthorizeReques
 	return req, nil
 }
 
-func ResolveClient(tx *gorm.DB, httpClient mcp.HTTPDoer, clientID, redirectURI string) (*Client, *OAuthError) {
-	client, err := lookupClient(tx, httpClient, clientID)
+func ResolveClient(ctx context.Context, tx *gorm.DB, httpClient mcp.HTTPDoer, clientID, redirectURI string) (*Client, *OAuthError) {
+	client, err := lookupClient(ctx, tx, httpClient, clientID)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +107,7 @@ func ResolveClient(tx *gorm.DB, httpClient mcp.HTTPDoer, clientID, redirectURI s
 	return client, nil
 }
 
-func lookupClient(tx *gorm.DB, httpClient mcp.HTTPDoer, clientID string) (*Client, *OAuthError) {
+func lookupClient(ctx context.Context, tx *gorm.DB, httpClient mcp.HTTPDoer, clientID string) (*Client, *OAuthError) {
 	if clientID == LocalClientID {
 		return &Client{ID: LocalClientID, Name: LocalClientName, RedirectURIs: append([]string{}, CursorRedirectURIs...)}, nil
 	}
@@ -122,7 +117,7 @@ func lookupClient(tx *gorm.DB, httpClient mcp.HTTPDoer, clientID string) (*Clien
 		return nil, &OAuthError{Code: "server_error", Description: "failed to load client", Status: http.StatusInternalServerError}
 	}
 	if strings.HasPrefix(clientID, "https://") {
-		return fetchClientMetadata(httpClient, clientID)
+		return fetchClientMetadata(ctx, httpClient, clientID)
 	}
 	return nil, &OAuthError{Code: "invalid_client", Description: "client is not registered", Status: http.StatusBadRequest}
 }
@@ -134,35 +129,17 @@ func redirectAllowed(client *Client, uri string) bool {
 	return slices.Contains(client.RedirectURIs, uri)
 }
 
-func fetchClientMetadata(httpClient mcp.HTTPDoer, metadataURL string) (*Client, *OAuthError) {
+func fetchClientMetadata(ctx context.Context, httpClient mcp.HTTPDoer, metadataURL string) (*Client, *OAuthError) {
 	if err := mcp.ValidatePublicHTTPSURL(metadataURL); err != nil {
 		return nil, &OAuthError{Code: "invalid_client", Description: "client metadata URL is not valid", Status: http.StatusBadRequest}
-	}
-	req, err := http.NewRequest(http.MethodGet, metadataURL, nil)
-	if err != nil {
-		return nil, &OAuthError{Code: "invalid_client", Description: "client metadata URL is not valid", Status: http.StatusBadRequest}
-	}
-	req.Header.Set("Accept", "application/json")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, &OAuthError{Code: "invalid_client", Description: "failed to load client metadata", Status: http.StatusBadRequest}
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, &OAuthError{Code: "invalid_client", Description: "failed to load client metadata", Status: http.StatusBadRequest}
-	}
-	limited := io.LimitReader(resp.Body, maxClientMetadataBytes+1)
-	body, err := io.ReadAll(limited)
-	if err != nil || len(body) > maxClientMetadataBytes {
-		return nil, &OAuthError{Code: "invalid_client", Description: "client metadata is too large", Status: http.StatusBadRequest}
 	}
 	var document struct {
 		ClientID     string   `json:"client_id"`
 		ClientName   string   `json:"client_name"`
 		RedirectURIs []string `json:"redirect_uris"`
 	}
-	if err := json.Unmarshal(body, &document); err != nil {
-		return nil, &OAuthError{Code: "invalid_client", Description: "client metadata is not valid JSON", Status: http.StatusBadRequest}
+	if err := mcp.GetJSON(ctx, httpClient, metadataURL, &document); err != nil {
+		return nil, &OAuthError{Code: "invalid_client", Description: "failed to load client metadata", Status: http.StatusBadRequest}
 	}
 	if document.ClientID != "" && document.ClientID != metadataURL {
 		return nil, &OAuthError{Code: "invalid_client", Description: "client_id does not match the metadata URL", Status: http.StatusBadRequest}
@@ -175,12 +152,12 @@ func fetchClientMetadata(httpClient mcp.HTTPDoer, metadataURL string) (*Client, 
 }
 
 func CreateAuthorizationCode(tx *gorm.DB, req *AuthorizeRequest, userID, orgID, factoryID uuid.UUID) (string, error) {
-	raw, err := randomToken()
+	raw, err := mcp.RandomToken()
 	if err != nil {
 		return "", err
 	}
 	err = models.CreateMCPOAuthCode(tx, &models.MCPOAuthCode{
-		CodeHash:            models.HashMCPOAuthSecret(raw),
+		CodeHash:            crypto.HashToken(raw),
 		ClientID:            req.ClientID,
 		RedirectURI:         req.RedirectURI,
 		Resource:            req.Resource,
@@ -214,15 +191,21 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 		return nil, "", &OAuthError{Code: "invalid_target", Description: "resource does not match this server", Status: http.StatusBadRequest}
 	}
 
-	stored, err := models.ConsumeMCPOAuthCode(tx, models.HashMCPOAuthSecret(code), time.Now())
+	stored, err := models.FindMCPOAuthCode(tx, crypto.HashToken(code), time.Now())
 	if err != nil {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
 	if stored.ClientID != clientID || stored.RedirectURI != redirectURI || stored.Resource != resource {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
-	if stored.CodeChallengeMethod != "S256" || !verifyS256(verifier, stored.CodeChallenge) {
+	if stored.CodeChallengeMethod != "S256" || !mcp.VerifyS256(verifier, stored.CodeChallenge) {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "PKCE verification failed", Status: http.StatusBadRequest}
+	}
+	if err := models.DeleteMCPOAuthCode(tx, stored); err != nil {
+		return nil, "", &OAuthError{Code: "server_error", Description: "failed to issue tokens", Status: http.StatusInternalServerError}
+	}
+	if UserAccountBlocked(tx, stored.UserID) {
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
 
 	refresh, err := storeRefreshToken(tx, TokenIssue{
@@ -260,12 +243,21 @@ func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue
 		return nil, "", &OAuthError{Code: "invalid_target", Description: "resource does not match this server", Status: http.StatusBadRequest}
 	}
 
-	stored, err := models.ConsumeMCPOAuthRefreshToken(tx, models.HashMCPOAuthSecret(raw), time.Now())
+	stored, err := models.FindMCPOAuthRefreshToken(tx, crypto.HashToken(raw), time.Now())
 	if err != nil {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
 	}
 	if stored.ClientID != clientID || stored.Resource != resource {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
+	}
+	if UserAccountBlocked(tx, stored.UserID) {
+		if err := models.DeleteMCPOAuthRefreshToken(tx, stored); err != nil {
+			return nil, "", &OAuthError{Code: "server_error", Description: "failed to rotate refresh token", Status: http.StatusInternalServerError}
+		}
+		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
+	}
+	if err := models.DeleteMCPOAuthRefreshToken(tx, stored); err != nil {
+		return nil, "", &OAuthError{Code: "server_error", Description: "failed to rotate refresh token", Status: http.StatusInternalServerError}
 	}
 	issue := TokenIssue{
 		UserID:    stored.UserID,
@@ -293,7 +285,7 @@ func RegisterClient(tx *gorm.DB, body []byte) (*Client, *OAuthError) {
 	if len(payload.RedirectURIs) == 0 {
 		return nil, &OAuthError{Code: "invalid_client_metadata", Description: "redirect_uris is required", Status: http.StatusBadRequest}
 	}
-	clientID, err := randomToken()
+	clientID, err := mcp.RandomToken()
 	if err != nil {
 		return nil, &OAuthError{Code: "server_error", Description: "failed to create client", Status: http.StatusInternalServerError}
 	}
@@ -315,12 +307,12 @@ func RegisterClient(tx *gorm.DB, body []byte) (*Client, *OAuthError) {
 }
 
 func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
-	raw, err := randomToken()
+	raw, err := mcp.RandomToken()
 	if err != nil {
 		return "", err
 	}
 	err = models.CreateMCPOAuthRefreshToken(tx, &models.MCPOAuthRefreshToken{
-		TokenHash:      models.HashMCPOAuthSecret(raw),
+		TokenHash:      crypto.HashToken(raw),
 		ClientID:       issue.ClientID,
 		UserID:         issue.UserID,
 		OrganizationID: issue.OrgID,
@@ -333,20 +325,6 @@ func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
 		return "", err
 	}
 	return raw, nil
-}
-
-func verifyS256(verifier, challenge string) bool {
-	sum := sha256.Sum256([]byte(verifier))
-	computed := base64.RawURLEncoding.EncodeToString(sum[:])
-	return subtle.ConstantTimeCompare([]byte(computed), []byte(challenge)) == 1
-}
-
-func randomToken() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("failed to create token: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
 func AuthorizationRedirect(redirectURI, code, state string) (string, error) {

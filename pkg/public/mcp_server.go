@@ -44,7 +44,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, oauthErr.Description, oauthErr.Status)
 			return
 		}
-		client, oauthErr := mcpserver.ResolveClient(db, httpClient, req.ClientID, req.RedirectURI)
+		client, oauthErr := mcpserver.ResolveClient(r.Context(), db, httpClient, req.ClientID, req.RedirectURI)
 		if oauthErr != nil {
 			http.Error(w, oauthErr.Description, oauthErr.Status)
 			return
@@ -75,7 +75,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "authorization request expired", http.StatusBadRequest)
 		return
 	}
-	client, oauthErr := mcpserver.ResolveClient(db, httpClient, consent.ClientID, consent.RedirectURI)
+	client, oauthErr := mcpserver.ResolveClient(r.Context(), db, httpClient, consent.ClientID, consent.RedirectURI)
 	if oauthErr != nil {
 		http.Error(w, oauthErr.Description, oauthErr.Status)
 		return
@@ -232,6 +232,11 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	token := bearerToken(r.Header.Get("Authorization"))
 	claims, err := mcpserver.ParseAccessToken(s.jwt, token, resource)
 	if err != nil {
+		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return

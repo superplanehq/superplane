@@ -137,6 +137,8 @@ func workOrderCreatedPayloadWithRefinement(
 	if err != nil {
 		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
 	} else {
+		// Local runner containers cannot fetch localhost file URLs. A remote
+		// broker skips this rewrite; public hosts stay unchanged.
 		_, files = runner.RewriteLoopbackTaskFileURLs("", files)
 		for _, file := range files {
 			filePayloads = append(filePayloads, file.Map())

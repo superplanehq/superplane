@@ -2,8 +2,6 @@ package public
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,9 +13,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,11 +25,6 @@ import (
 )
 
 const mcpTestPKCEVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-
-func mcpTestPKCEChallenge() string {
-	sum := sha256.Sum256([]byte(mcpTestPKCEVerifier))
-	return base64.RawURLEncoding.EncodeToString(sum[:])
-}
 
 func mcpEnabledServer(t *testing.T) (*support.ResourceRegistry, *Server, *jwt.Signer) {
 	t.Helper()
@@ -58,18 +53,18 @@ func TestMCPUnauthenticatedReturns401AndMetadataURL(t *testing.T) {
 }
 
 func TestMCPTokenExchangeFailureCases(t *testing.T) {
-	_, server, _ := mcpEnabledServer(t)
+	r, server, _ := mcpEnabledServer(t)
 	resource := "http://localhost:8000/mcp"
 	code := "one-time-code-" + uuid.NewString()
 	require.NoError(t, models.CreateMCPOAuthCode(database.Conn(), &models.MCPOAuthCode{
-		CodeHash:            models.HashMCPOAuthSecret(code),
+		CodeHash:            crypto.HashToken(code),
 		ClientID:            mcpserver.LocalClientID,
 		RedirectURI:         mcpserver.CursorRedirectURIs[0],
 		Resource:            resource,
-		CodeChallenge:       mcpTestPKCEChallenge(),
+		CodeChallenge:       mcp.S256Challenge(mcpTestPKCEVerifier),
 		CodeChallengeMethod: "S256",
-		UserID:              uuid.New(),
-		OrganizationID:      uuid.New(),
+		UserID:              r.User,
+		OrganizationID:      r.Organization.ID,
 		FactoryID:           uuid.New(),
 		Scopes:              datatypes.NewJSONSlice(mcpserver.GrantedScopes),
 		ExpiresAt:           time.Now().Add(time.Minute),
@@ -199,6 +194,29 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "This task has no agent session.", item["text"])
 	})
+}
+
+func TestMCPBlockedAccountReturns401(t *testing.T) {
+	r, server, signer := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+
+	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
+		UserID:    r.User,
+		OrgID:     r.Organization.ID,
+		FactoryID: uuid.New(),
+		Resource:  "http://localhost:8000/mcp",
+		Scopes:    mcpserver.GrantedScopes,
+	}, time.Hour)
+	require.NoError(t, err)
+	require.NoError(t, r.Account.Block(database.DB(t.Context()), time.Now()))
+
+	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }
 
 func TestMCPAuthenticatedWithoutFeatureFlagReturns404(t *testing.T) {

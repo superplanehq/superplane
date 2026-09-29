@@ -7,10 +7,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
 )
@@ -323,11 +321,7 @@ func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope st
 	if !claims.HasScope(scope) {
 		return ToolError("Not found")
 	}
-	if !OrganizationAllowsPublicMCP(claims.OrgID) {
-		return ToolError("Not found")
-	}
-	enabled, err := models.HasExperimentalFeature(claims.OrgID, features.FeatureFactories)
-	if err != nil || !enabled {
+	if !OrganizationAllowsPublicMCP(claims.OrgID) || !organizationAllowsFactories(claims.OrgID) {
 		return ToolError("Not found")
 	}
 	resource, action, ok := strings.Cut(scope, ":")
@@ -368,31 +362,21 @@ func parseTaskStates(raw any) ([]pb.WorkOrder_State, error) {
 	out := make([]pb.WorkOrder_State, 0, len(items))
 	for _, item := range items {
 		name, _ := item.(string)
-		switch strings.ToLower(strings.TrimSpace(name)) {
-		case "draft":
-			out = append(out, pb.WorkOrder_STATE_DRAFT)
-		case "open":
-			out = append(out, pb.WorkOrder_STATE_OPEN)
-		case "closed":
-			out = append(out, pb.WorkOrder_STATE_CLOSED)
-		default:
+		state := factories.WorkOrderStateToProto(strings.ToLower(strings.TrimSpace(name)))
+		if state == pb.WorkOrder_STATE_UNSPECIFIED {
 			return nil, ToolError("states must be draft, open, or closed")
 		}
+		out = append(out, state)
 	}
 	return out, nil
 }
 
 func protoStateName(state pb.WorkOrder_State) string {
-	switch state {
-	case pb.WorkOrder_STATE_DRAFT:
-		return "draft"
-	case pb.WorkOrder_STATE_OPEN:
-		return "open"
-	case pb.WorkOrder_STATE_CLOSED:
-		return "closed"
-	default:
+	name, ok := factories.WorkOrderStateFromProto(state)
+	if !ok {
 		return "unspecified"
 	}
+	return name
 }
 
 func sessionSummary(session *pb.PlanningSession) map[string]any {

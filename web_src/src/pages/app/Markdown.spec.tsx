@@ -414,6 +414,30 @@ describe("MarkdownContent work order files", () => {
     );
     expect(screen.getByText("This browser cannot play this video.")).toBeInTheDocument();
   });
+
+  it("retries a video after a new download URL when playback failed", () => {
+    const { rerender } = render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    fireEvent.error(document.querySelector("video")!);
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Download video" })).toBeInTheDocument();
+
+    rerender(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip-2.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip-2.mp4");
+  });
 });
 
 describe("MarkdownContent images", () => {

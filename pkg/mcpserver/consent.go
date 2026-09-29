@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type WorkspaceOption struct {
@@ -227,6 +228,23 @@ func OrganizationAllowsPublicMCP(orgID uuid.UUID) bool {
 	return err == nil && enabled
 }
 
+func organizationAllowsFactories(orgID uuid.UUID) bool {
+	enabled, err := models.HasExperimentalFeature(orgID, features.FeatureFactories)
+	return err == nil && enabled
+}
+
+func UserAccountBlocked(tx *gorm.DB, userID uuid.UUID) bool {
+	user, err := models.FindActiveUserByIDAnyOrg(tx, userID)
+	if err != nil || user.AccountID == nil {
+		return true
+	}
+	var account models.Account
+	if err := tx.Where("id = ?", *user.AccountID).First(&account).Error; err != nil {
+		return true
+	}
+	return account.IsBlocked()
+}
+
 func ListConsentWorkspaces(ctx context.Context, account *models.Account) ([]WorkspaceOption, error) {
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
 	if err != nil {
@@ -242,8 +260,7 @@ func ListConsentWorkspaces(ctx context.Context, account *models.Account) ([]Work
 		if !OrganizationAllowsPublicMCP(organization.ID) {
 			continue
 		}
-		enabled, err := models.HasExperimentalFeature(organization.ID, features.FeatureFactories)
-		if err != nil || !enabled {
+		if !organizationAllowsFactories(organization.ID) {
 			continue
 		}
 		listed, err := models.ListFactories(db, organization.ID)
@@ -269,7 +286,7 @@ func ResolveConsentWorkspace(ctx context.Context, account *models.Account, facto
 	if err != nil {
 		return uuid.Nil, uuid.Nil, uuid.Nil, err
 	}
-	if !OrganizationAllowsPublicMCP(factoryModel.OrganizationID) {
+	if !OrganizationAllowsPublicMCP(factoryModel.OrganizationID) || !organizationAllowsFactories(factoryModel.OrganizationID) {
 		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("workspace is required")
 	}
 	user, err := models.FindActiveHumanUserByAccountAndOrganization(database.DB(ctx), factoryModel.OrganizationID, account.ID)

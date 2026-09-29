@@ -1,8 +1,6 @@
 package models
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"time"
 
@@ -67,11 +65,6 @@ func (MCPOAuthRefreshToken) TableName() string {
 	return "mcp_oauth_refresh_tokens"
 }
 
-func HashMCPOAuthSecret(raw string) string {
-	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
-}
-
 func CreateMCPOAuthClient(tx *gorm.DB, clientID, clientName string, redirectURIs []string) (*MCPOAuthClient, error) {
 	now := time.Now()
 	client := &MCPOAuthClient{
@@ -109,7 +102,7 @@ func CreateMCPOAuthCode(tx *gorm.DB, code *MCPOAuthCode) error {
 	return tx.Create(code).Error
 }
 
-func ConsumeMCPOAuthCode(tx *gorm.DB, codeHash string, now time.Time) (*MCPOAuthCode, error) {
+func FindMCPOAuthCode(tx *gorm.DB, codeHash string, now time.Time) (*MCPOAuthCode, error) {
 	var code MCPOAuthCode
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("code_hash = ? AND expires_at > ?", codeHash, now).
@@ -120,10 +113,11 @@ func ConsumeMCPOAuthCode(tx *gorm.DB, codeHash string, now time.Time) (*MCPOAuth
 	if err != nil {
 		return nil, err
 	}
-	if err := tx.Delete(&code).Error; err != nil {
-		return nil, err
-	}
 	return &code, nil
+}
+
+func DeleteMCPOAuthCode(tx *gorm.DB, code *MCPOAuthCode) error {
+	return tx.Delete(code).Error
 }
 
 func CreateMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error {
@@ -136,7 +130,7 @@ func CreateMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error 
 	return tx.Create(token).Error
 }
 
-func ConsumeMCPOAuthRefreshToken(tx *gorm.DB, tokenHash string, now time.Time) (*MCPOAuthRefreshToken, error) {
+func FindMCPOAuthRefreshToken(tx *gorm.DB, tokenHash string, now time.Time) (*MCPOAuthRefreshToken, error) {
 	var token MCPOAuthRefreshToken
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("token_hash = ? AND expires_at > ?", tokenHash, now).
@@ -147,8 +141,9 @@ func ConsumeMCPOAuthRefreshToken(tx *gorm.DB, tokenHash string, now time.Time) (
 	if err != nil {
 		return nil, err
 	}
-	if err := tx.Delete(&token).Error; err != nil {
-		return nil, err
-	}
 	return &token, nil
+}
+
+func DeleteMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error {
+	return tx.Delete(token).Error
 }
