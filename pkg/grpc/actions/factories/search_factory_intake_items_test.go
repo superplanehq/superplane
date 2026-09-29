@@ -5,17 +5,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
+
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__ProductiveTaskItem(t *testing.T) {
@@ -185,6 +189,60 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Contains(t, message, "This intake cannot search items yet.")
+	})
+
+	t.Run("Datadog 403 from search is a failed precondition the UI can show", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, datadog.ErrErrorTrackingForbidden), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, datadog.ErrorTrackingForbiddenMessage, message)
+	})
+
+	t.Run("integration error description is returned instead of unsupported search", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		created, err := CreateFactoryIntake(ctx, IntakeDependencies{
+			Registry:       r.Registry,
+			Encryptor:      r.Encryptor,
+			AuthService:    r.AuthService,
+			WebhookBaseURL: "http://localhost:8000",
+		}, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, database.DB(t.Context()).Model(&models.Integration{}).
+			Where("id = ?", uuid.MustParse(integrationID)).
+			Updates(map[string]any{
+				"state":             models.IntegrationStateError,
+				"state_description": "invalid credentials: Forbidden",
+			}).Error)
+
+		_, err = SearchFactoryIntakeItems(ctx, IntakeDependencies{
+			Registry:  r.Registry,
+			Encryptor: r.Encryptor,
+		}, orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  created.GetIntake().GetId(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "invalid credentials: Forbidden", message)
+		assert.NotContains(t, message, "This intake cannot search items yet.")
+		assert.NotContains(t, message, "Connect this intake first.")
 	})
 }
 

@@ -14,6 +14,7 @@ const intakeGitHubAppName = "github"
 const intakeJiraAppName = "jira"
 const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
+const intakeDatadogAppName = "datadog"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -68,6 +69,9 @@ func resolveIntakeBinding(
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return resolveDatadogIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
@@ -177,6 +181,47 @@ func resolveProductiveIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"project": projectID},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveDatadogIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	serviceName string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	serviceName = strings.TrimSpace(serviceName)
+	if integrationID == "" && serviceName == "" {
+		return nil, nil
+	}
+	if integrationID == "" || serviceName == "" {
+		return nil, invalidArgument("Datadog integration and service are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Datadog integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Datadog integration was not found")
+	}
+	if integration.AppName != intakeDatadogAppName {
+		return nil, invalidArgument("selected integration is not Datadog")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Datadog integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"service": serviceName},
 		Installation:  integration,
 	}, nil
 }

@@ -18,9 +18,14 @@ import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import { catalogEntryForResource, catalogOAuthResourceForEntry, type MCPCatalogEntry } from "./mcpCatalog";
+import {
+  catalogEntryForResource,
+  catalogEntryIsConnected,
+  catalogOAuthResourceForEntry,
+  type MCPCatalogEntry,
+} from "./mcpCatalog";
 import { bearerAuthorizationValue, catalogHeaderSecretName, MCP_HEADER_SECRET_KEY } from "./mcpHeaderAuth";
-import { connectedMCPResourceForURL } from "./mcpServerMatch";
+import { canonicalMCPServerURL, connectedMCPResourceForURL } from "./mcpServerMatch";
 
 function useMCPAddDialog() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -102,7 +107,7 @@ export function useMCPPage() {
         setConnectionOpen(true);
         return;
       }
-      if (connectedMCPResourceForURL(connections.data ?? [], entry.url)) {
+      if (catalogEntryIsConnected(connections.data ?? [], entry)) {
         showInfoToast(AGENT_RESOURCES_COPY.urlTaken);
         return;
       }
@@ -195,6 +200,16 @@ async function startCatalogOAuth(
       callbacks.rememberResource(resource);
     }
     if (!resource?.id) {
+      return;
+    }
+    if (canonicalMCPServerURL(resource.url ?? "") !== canonicalMCPServerURL(entry.url)) {
+      resource = await mutations.updateResource.mutateAsync({
+        resourceId: resource.id,
+        url: entry.url,
+      });
+      callbacks.rememberResource(resource);
+    }
+    if (!resource.id) {
       return;
     }
     const result = await mutations.startOAuth.mutateAsync(resource.id);

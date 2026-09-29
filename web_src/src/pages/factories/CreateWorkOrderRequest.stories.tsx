@@ -56,7 +56,7 @@ function RequestDialogPlayground({
     <CreateWorkOrderRequestDialog
       open
       description={description}
-      maxLength={5000}
+      maxLength={20000}
       fileUrls={fileUrls}
       onClose={() => {
         console.log("close");

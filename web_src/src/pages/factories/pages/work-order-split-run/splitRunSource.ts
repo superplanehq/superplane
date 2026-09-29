@@ -1,4 +1,5 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -24,6 +25,7 @@ export type SplitRunIntakeKind =
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
+  | "datadog"
   | "slack";
 
 export type SplitRunSource =
@@ -57,6 +59,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
   "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
+  datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
@@ -67,6 +70,7 @@ const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = 
   { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
+  { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
 ];
 
 export function sourceTicketLabel(url: string): string {

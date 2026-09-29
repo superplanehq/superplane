@@ -157,6 +157,60 @@ describe("FactorySettingsMCPPage catalog", () => {
     expect(screen.getByTestId("mcp-catalog-setup-sign-in").querySelector("svg")).not.toBeNull();
   }, 10000);
 
+  it("creates a Datadog server for the selected site", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${mcpPath}?dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-datadog"));
+
+    expect(await screen.findByTestId("mcp-catalog-setup-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-setup-instruction")).toHaveTextContent("Sign in with Datadog.");
+    expect(screen.getByTestId("mcp-catalog-setup-site")).toHaveTextContent("US1 (datadoghq.com)");
+    expect(screen.getByText("Choose the site from your Datadog URL.")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("mcp-catalog-setup-site"));
+    await user.click(screen.getByRole("option", { name: "EU (datadoghq.eu)" }));
+    await user.click(screen.getByTestId("mcp-catalog-setup-sign-in"));
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith("https://auth.example.com/authorize?client_id=storybook");
+    });
+    expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("https://mcp.datadoghq.eu/v1/mcp");
+    vi.unstubAllGlobals();
+  }, 10000);
+
+  it("opens a saved Datadog server on its site", async () => {
+    const user = userEvent.setup();
+    const datadogResource = {
+      ...OAUTH_NOT_CONNECTED_RESOURCE,
+      id: "resource-datadog",
+      name: "datadog",
+      url: "https://mcp.us5.datadoghq.com/v1/mcp",
+    };
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [datadogResource] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.click(await screen.findByTestId(`agent-resource-edit-${datadogResource.id}`, {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("mcp-catalog-setup-site")).toHaveTextContent("US5 (us5.datadoghq.com)");
+  }, 10000);
+
   it("opens Sentry from the catalog with Sign in", async () => {
     const user = userEvent.setup();
     render(
