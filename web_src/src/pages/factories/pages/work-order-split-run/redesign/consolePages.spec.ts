@@ -4,9 +4,11 @@ import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
 import { stagesFromFixture, type AutomationStage } from "./automationsViewModel";
 import {
+  artifactOpenHref,
   artifactsPageCount,
   consoleArtifactKind,
   consolePages,
+  isExpandableArtifact,
   isTaskDocument,
   type StageArtifact,
 } from "./consolePages";
@@ -29,15 +31,22 @@ function runningStage(id: string): AutomationStage {
 }
 
 describe("consolePages", () => {
-  it("gives the Backlog creation card an Artifacts page and no Agent log", () => {
+  it("gives the Backlog creation card an Artifacts page and no Agent runs", () => {
     expect(consolePages(runningStage("backlog"))).toEqual(["artifacts"]);
   });
 
-  it("starts a running canvas card on the agent log", () => {
+  it("starts a running canvas card on Agent runs", () => {
     const pages = consolePages(runningStage("implement"));
 
     expect(pages[0]).toBe("agent");
     expect(pages).toContain("artifacts");
+  });
+
+  it("keeps Agent runs when any grouped run has a log", () => {
+    const implement = runningStage("implement");
+    const older: AutomationStage = { ...implement, id: "implement-old", agentSteps: [] };
+
+    expect(consolePages(implement, undefined, [implement, older])).toContain("agent");
   });
 
   it("keeps the agent page on a finished canvas run without stored steps", () => {
@@ -95,6 +104,21 @@ describe("consolePages", () => {
     expect(consoleArtifactKind({ type: "TYPE_MARKDOWN", data: { body: "x" } })).toBe("markdown");
     expect(consoleArtifactKind({ type: "TYPE_FILE", data: { contentType: "image/png" } })).toBe("image");
     expect(consoleArtifactKind({ type: "TYPE_FILE", data: { contentType: "video/mp4" } })).toBe("video");
-    expect(consoleArtifactKind({ type: "TYPE_BRANCH", data: { name: "feature/x" } })).toBe("other");
+    expect(consoleArtifactKind({ type: "TYPE_BRANCH", data: { name: "feature/x" } })).toBe("branch");
+    expect(consoleArtifactKind({ type: "TYPE_LINK", data: { url: "https://example.com" } })).toBe("link");
+    expect(consoleArtifactKind({ type: "TYPE_FILE", data: { filename: "notes.pdf" } })).toBe("file");
+  });
+
+  it("expands documents and media, and opens links and other files", () => {
+    expect(isExpandableArtifact("markdown")).toBe(true);
+    expect(isExpandableArtifact("image")).toBe(true);
+    expect(isExpandableArtifact("video")).toBe(true);
+    expect(isExpandableArtifact("link")).toBe(false);
+    expect(isExpandableArtifact("branch")).toBe(false);
+    expect(isExpandableArtifact("file")).toBe(false);
+    expect(artifactOpenHref({ type: "TYPE_LINK", data: { url: "https://example.com" } })).toBe("https://example.com");
+    expect(artifactOpenHref({ type: "TYPE_BRANCH", data: { name: "feature/x", repository: "acme/app" } })).toBe(
+      "https://github.com/acme/app/tree/feature/x",
+    );
   });
 });

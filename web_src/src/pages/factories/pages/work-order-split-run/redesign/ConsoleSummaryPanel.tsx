@@ -4,7 +4,7 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
@@ -13,14 +13,14 @@ import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
-import { SplitRunCheckPills } from "../SplitRunReview";
+import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunLinkedArtifacts } from "../splitRunPopupModel";
 import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
-import { StageStatusGlyph } from "./redesignShared";
+import { StaticStatusGlyph } from "./redesignShared";
 
 /**
  * Reads top to bottom by priority: the decision, then what the run
@@ -33,7 +33,6 @@ export function ConsoleSummaryPanel({
   pullRequests,
   panelReview,
   source,
-  files,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -41,7 +40,6 @@ export function ConsoleSummaryPanel({
   pullRequests?: FactoriesFactoryPullRequest[];
   panelReview?: ReactNode;
   source?: SplitRunSource;
-  files?: FilesFile[];
 }) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
@@ -55,7 +53,6 @@ export function ConsoleSummaryPanel({
     ...new Map(stages.flatMap((stage) => stage.outputs.artifacts).map((artifact) => [artifact.id, artifact])).values(),
   ]).filter((artifact) => !(hasPullRequest && isBranchArtifact(artifact)));
   const checks = stages.flatMap((stage) => stage.checks);
-  const attachedFiles = (files ?? []).filter((file) => file.id);
   // Placeholder values such as "Waiting" mirror the status; only a real time reads as a duration.
   const duration = /\d/.test(outcome.duration) ? outcome.duration : undefined;
   const spendRows = (fixture.usageByModel ?? []).map((row) => ({
@@ -67,7 +64,7 @@ export function ConsoleSummaryPanel({
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
         <FrameHeader>
           <FrameTitle className="flex items-center gap-2">
-            <StageStatusGlyph status={outcome.status} />
+            <StaticStatusGlyph status={outcome.status} />
             {outcome.statusLabel}
           </FrameTitle>
           {panelReview ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
@@ -86,7 +83,7 @@ export function ConsoleSummaryPanel({
         {checks.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3">
             <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
-            <SplitRunCheckPills checks={checks} testId="redesign-console-checks" />
+            <ConsoleCheckRows checks={checks} />
           </FramePanel>
         ) : null}
         {artifacts.length > 0 ? (
@@ -105,16 +102,6 @@ export function ConsoleSummaryPanel({
             <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
           </SummaryRow>
           <PanelSource source={source} owner={outcome.owner.id} />
-          {attachedFiles.length > 0 ? (
-            <div>
-              <span className="text-[12px] font-medium text-muted-foreground">Files</span>
-              <ul className="mt-2 flex flex-col gap-1.5" data-testid="redesign-console-files">
-                {attachedFiles.map((file) => (
-                  <AttachedFileRow key={file.id} file={file} />
-                ))}
-              </ul>
-            </div>
-          ) : null}
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {duration ? <SummaryRow label="Duration">{duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -200,22 +187,6 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
         {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>
-  );
-}
-
-function AttachedFileRow({ file }: { file: FilesFile }) {
-  const name = file.filename?.trim() || "File";
-  const href = safeExternalUrl(file.downloadUrl);
-  return (
-    <li className="min-w-0 text-[13px]">
-      {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="truncate text-foreground hover:underline">
-          {name}
-        </a>
-      ) : (
-        <span className="truncate text-foreground">{name}</span>
-      )}
-    </li>
   );
 }
 

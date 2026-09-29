@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 import type { CreateWithAgentMachineStatus } from "../createWithAgentTypes";
 import { AgentActivityView } from "./AgentActivityView";
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
@@ -26,15 +28,54 @@ export function AnalysisLiveWork({
   executionId?: string;
   activities?: AgentActivity[];
 }) {
-  const active = machineStatus === "starting" || machineStatus === "running";
+  return (
+    <AgentLiveActivity
+      active={machineStatus === "starting" || machineStatus === "running"}
+      organizationId={organizationId}
+      canvasId={canvasId}
+      executionId={executionId}
+      activities={activities}
+      startingLabel="Starting analysis…"
+      className="mt-3"
+      testId="split-run-intent-live-work"
+    />
+  );
+}
+
+/**
+ * The agent's work as it streams: the current activity's reasoning and
+ * tool rows, then a shimmer line naming what the agent does right now.
+ * The refinement chat and the run console share this block.
+ */
+export function AgentLiveActivity({
+  active,
+  organizationId,
+  canvasId,
+  executionId,
+  activities,
+  startingLabel,
+  className,
+  testId = "agent-live-activity",
+}: {
+  active: boolean;
+  organizationId?: string;
+  canvasId?: string;
+  executionId?: string;
+  /** Persisted activities to merge under the live stream. */
+  activities?: AgentActivity[];
+  /** Shimmer text before the first activity arrives. */
+  startingLabel: string;
+  className?: string;
+  testId?: string;
+}) {
   const stream = useAgentActivityStream({ organizationId, canvasId, executionId, active });
   const activity = currentLiveActivity(activities, stream.activities);
   const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
-  const status = liveStatus(activity, elapsedMs, stream.hasConnectedOnce ? stream.error : undefined);
+  const status = liveStatus(activity, elapsedMs, startingLabel, stream.hasConnectedOnce ? stream.error : undefined);
 
   if (!active) return null;
   return (
-    <div className="mt-3" data-testid="split-run-intent-live-work">
+    <div className={cn(className)} data-testid={testId}>
       {activity ? <AgentActivityView activity={activity} live /> : null}
       {status ? (
         <p
@@ -64,12 +105,17 @@ function useActivityElapsed(sequence: number, active: boolean): number {
   return elapsedMs;
 }
 
-function liveStatus(activity: AgentActivity | undefined, elapsedMs: number, error?: string): LiveStatus | undefined {
+function liveStatus(
+  activity: AgentActivity | undefined,
+  elapsedMs: number,
+  startingLabel: string,
+  error?: string,
+): LiveStatus | undefined {
   if (error) return { label: "Live activity disconnected. Reconnecting…" };
   if (elapsedMs >= STALE_ACTIVITY_MS) {
     return { label: "Still working", elapsedSeconds: Math.floor(elapsedMs / 1000) };
   }
-  if (!activity || activity.items.length === 0) return { label: "Starting analysis…" };
+  if (!activity || activity.items.length === 0) return { label: startingLabel };
 
   const latestRunningItem = findLatestRunningItem(activity.items);
   if (latestRunningItem?.type === "content") {
