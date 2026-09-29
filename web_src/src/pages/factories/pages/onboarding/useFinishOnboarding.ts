@@ -21,14 +21,17 @@ import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
+  provisionDiscussionHandler,
   provisionEventApps,
   provisionOnboardingIntake,
   provisionLine,
+  type CreateDiscussionHandler,
   type CreateFactoryIntake,
   type DeleteFactoryIntake,
   type InstallOnboardingApp,
   type ListFactoryApps,
   type ListFactoryIntakes,
+  type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
@@ -129,6 +132,8 @@ export async function provisionWorkspace(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateDiscussionHandler;
   listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
@@ -193,6 +198,10 @@ export async function provisionWorkspace(args: {
     issuesChoice: args.issuesChoice,
     jira: args.jira,
   });
+  await provisionDiscussionHandler({
+    listHandlers: args.listPRFeedbackHandlers,
+    createHandler: args.createPRFeedbackHandler,
+  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
@@ -235,6 +244,8 @@ export function useFinishOnboarding(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateDiscussionHandler;
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];

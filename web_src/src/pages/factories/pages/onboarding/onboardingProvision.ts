@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryIntakeSettings,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandlerSource,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryAutomation,
   FactoryLineStep,
@@ -27,6 +28,8 @@ export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
+export const PULL_REQUEST_DISCUSSION_SOURCE =
+  "SOURCE_PULL_REQUEST_DISCUSSION" as const satisfies FactoriesFactoryPrFeedbackHandlerSource;
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -274,6 +277,33 @@ export async function provisionOnboardingIntake(args: {
     resourceId: args.jira.projectId,
     settings: args.jira.settings,
   });
+}
+
+export type ListFactoryPRFeedbackHandlers = () => Promise<Array<{ source?: FactoriesFactoryPrFeedbackHandlerSource }>>;
+
+export type DiscussionHandlerCreateInput = {
+  source: typeof PULL_REQUEST_DISCUSSION_SOURCE;
+};
+
+export type CreateDiscussionHandler = (input: DiscussionHandlerCreateInput) => Promise<unknown>;
+
+export function discussionHandlerCreateInput(): DiscussionHandlerCreateInput {
+  return { source: PULL_REQUEST_DISCUSSION_SOURCE };
+}
+
+function isDiscussionHandler(handler: { source?: FactoriesFactoryPrFeedbackHandlerSource }): boolean {
+  return handler.source === PULL_REQUEST_DISCUSSION_SOURCE;
+}
+
+export async function provisionDiscussionHandler(args: {
+  listHandlers: ListFactoryPRFeedbackHandlers;
+  createHandler: CreateDiscussionHandler;
+}): Promise<void> {
+  const handlers = await args.listHandlers();
+  if (handlers.some(isDiscussionHandler)) {
+    return;
+  }
+  await args.createHandler(discussionHandlerCreateInput());
 }
 
 export async function provisionLine(args: {
