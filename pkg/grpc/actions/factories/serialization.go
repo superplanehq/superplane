@@ -24,6 +24,7 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
 	}
 	serialized.Planning = serializeFactoryPlanning(factory.Planning())
+	serialized.Public = factory.Public
 	return serialized
 }
 

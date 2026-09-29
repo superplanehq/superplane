@@ -363,6 +363,7 @@ CREATE TABLE public.factories (
     planning_confidence boolean DEFAULT true NOT NULL,
     planning_setup_completed boolean DEFAULT false NOT NULL,
     planning_auto_start_line_id uuid,
+    public boolean DEFAULT false NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -4975,7 +4976,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929173132	f
+20260929200316	f
 \.
 
 

@@ -60,5 +60,39 @@ func BroadcastFactoryWorkOrderUpdated(wsHub *ws.Hub, msg *pb.FactoryWorkOrderUpd
 	topic := FactoryWebsocketTopic(msg.FactoryId)
 	wsHub.BroadcastToWorkflow(topic, payload)
 	log.Debugf("Broadcasted work_order_updated to factory %s (order %s, reason %s)", msg.FactoryId, msg.OrderId, msg.Reason)
+	NotifyPublicBoard(msg.FactoryId)
 	return nil
+}
+
+const PublicBoardChangedEvent = "board_changed"
+
+// PublicLineTopic is the hub key for guests watching one public line.
+// It is not the member factory topic.
+func PublicLineTopic(lineID string) string {
+	return "public-line:" + lineID
+}
+
+// PublicBoardChangedMessage is the only payload a public line socket sends.
+func PublicBoardChangedMessage() []byte {
+	return []byte(`{"event":"board_changed"}`)
+}
+
+var (
+	publicBoardHub         *ws.Hub
+	publicBoardBroadcaster func(hub *ws.Hub, factoryID string)
+)
+
+// SetPublicBoardBroadcaster registers the guest-board fan-out. The member
+// socket still receives factory id, order id, and reason.
+func SetPublicBoardBroadcaster(hub *ws.Hub, broadcast func(hub *ws.Hub, factoryID string)) {
+	publicBoardHub = hub
+	publicBoardBroadcaster = broadcast
+}
+
+// NotifyPublicBoard tells public line sockets to refetch. It sends no card data.
+func NotifyPublicBoard(factoryID string) {
+	if publicBoardHub == nil || publicBoardBroadcaster == nil || factoryID == "" {
+		return
+	}
+	publicBoardBroadcaster(publicBoardHub, factoryID)
 }

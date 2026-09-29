@@ -35,6 +35,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory not found")
 	case errors.Is(err, models.ErrFactoryHostedSpendBudgetNegative):
 		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
+	case errors.Is(err, models.ErrFactoryOnboardingNotComplete):
+		return grpcerrors.FailedPrecondition(err, "finish workspace setup before you change visibility")
 	case errors.Is(err, models.ErrModelNotInParentList):
 		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
