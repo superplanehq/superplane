@@ -4,9 +4,45 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("resources-"+uuid.NewString(), "")
+	require.NoError(t, err)
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 501, []models.VCSProviderRepository{
+		{RepositoryID: 601, FullName: "acme/api"},
+		{RepositoryID: 602, FullName: "acme/private"},
+	}))
+	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
+	require.NoError(t, err)
+	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, 601))
+
+	resources, err := (&GitHub{}).ListResources("repository", core.ListResourcesContext{
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: integration.ID.String(),
+			Metadata:      common.Metadata{HostedApp: true},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "acme/api", resources[0].Name)
+	assert.Equal(t, "601", resources[0].ID)
+}
 
 func Test__toIntegrationResources__usesFullName(t *testing.T) {
 	fullName := "acme/web"

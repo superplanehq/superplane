@@ -1,6 +1,7 @@
 package public
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 // linkableProviders lists the services a member can link. A linked account
@@ -20,10 +22,12 @@ func accountLinkedAccountResponses(linked []models.AccountLinkedAccount) []Accou
 	responses := make([]AccountLinkedAccountResponse, 0, len(linked))
 	for _, account := range linked {
 		responses = append(responses, AccountLinkedAccountResponse{
-			Provider:  account.Provider,
-			Username:  account.Username,
-			Name:      account.Name,
-			AvatarURL: account.AvatarURL,
+			Provider:   account.Provider,
+			ProviderID: account.ProviderID,
+			Username:   account.Username,
+			Name:       account.Name,
+			AvatarURL:  account.AvatarURL,
+			Active:     account.Active,
 		})
 	}
 	return responses
@@ -45,8 +49,17 @@ func (s *Server) disconnectLinkedAccount(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Unknown linked account", http.StatusBadRequest)
 		return
 	}
+	providerID := mux.Vars(r)["providerID"]
+	if providerID == "" {
+		http.Error(w, "Linked account id is required", http.StatusBadRequest)
+		return
+	}
 
-	err := models.DeleteAccountLinkedAccount(database.DB(r.Context()), account.ID, provider)
+	err := models.DeleteAccountLinkedAccount(database.DB(r.Context()), account.ID, provider, providerID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		http.Error(w, "Linked account not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
 		log.Errorf("Error removing linked %s account for %s: %v", provider, account.ID, err)
 		http.Error(w, "Failed to remove linked account", http.StatusInternalServerError)
