@@ -4,7 +4,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-import { planningAutoStartHelper } from "./planningSettingsCopy";
 import {
   PLANNING_SETTINGS_COPY,
   type PlanningAutoStartLine,
@@ -102,14 +101,13 @@ function AutoStartSection({
   const unavailable = !draft.enabled || !draft.confidence || lines.length === 0;
   const selected = lines.find((line) => line.id === draft.autoStartLineId);
   const checked = Boolean(selected);
-  const named = selected ?? (lines.length === 1 ? lines[0] : undefined);
   const showLineSelect = lines.length > 1 && checked;
 
   return (
     <div data-testid="planning-settings-auto-start">
       <PlanningToggleRow
         title={PLANNING_SETTINGS_COPY.autoStartLabel}
-        description={autoStartDescription(draft, lines, named)}
+        description={autoStartDescription(draft, lines)}
         checked={checked}
         disabled={unavailable}
         onCheckedChange={(next) => {
@@ -124,7 +122,7 @@ function AutoStartSection({
       {showLineSelect ? (
         <div className="max-w-xs pb-1">
           <Label htmlFor="planning-settings-auto-start-line" className="sr-only">
-            {PLANNING_SETTINGS_COPY.autoStartLineLabel}
+            {PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
           </Label>
           <Select
             value={draft.autoStartLineId}
@@ -134,7 +132,7 @@ function AutoStartSection({
             <SelectTrigger
               id="planning-settings-auto-start-line"
               className="h-8"
-              aria-label={PLANNING_SETTINGS_COPY.autoStartLineLabel}
+              aria-label={PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
               data-testid="planning-settings-auto-start-line"
             >
               <SelectValue />
@@ -153,11 +151,7 @@ function AutoStartSection({
   );
 }
 
-function autoStartDescription(
-  draft: PlanningDraftSettings,
-  lines: PlanningAutoStartLine[],
-  named: PlanningAutoStartLine | undefined,
-): string {
+function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoStartLine[]): string {
   if (!draft.enabled) {
     return PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper;
   }
@@ -165,12 +159,9 @@ function autoStartDescription(
     return PLANNING_SETTINGS_COPY.autoStartConfidenceOffHelper;
   }
   if (lines.length === 0) {
-    return PLANNING_SETTINGS_COPY.autoStartNoLineHelper;
+    return PLANNING_SETTINGS_COPY.autoStartNoBoardHelper;
   }
-  if (!named) {
-    return PLANNING_SETTINGS_COPY.autoStartChooseHelper;
-  }
-  return planningAutoStartHelper(named.name);
+  return PLANNING_SETTINGS_COPY.autoStartHelper;
 }
 
 function PlanningToggleRow({

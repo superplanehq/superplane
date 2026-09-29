@@ -14,7 +14,7 @@ import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import { PLANNING_SETTINGS_COPY, planningAutoStartHelper } from "./planningSettingsCopy";
+import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import {
   DEFAULT_PLANNING_SETTINGS,
@@ -159,9 +159,9 @@ describe("PlanningSettingsPopup", () => {
     ];
     const { onSave } = renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { lines });
 
-    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartChooseHelper)).toBeInTheDocument();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
     await user.click(within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch"));
-    expect(screen.getByText(planningAutoStartHelper("implement"))).toBeInTheDocument();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
     await user.click(screen.getByTestId("planning-settings-auto-start-line"));
     await user.click(screen.getByRole("option", { name: "hotfix" }));
     await user.click(screen.getByTestId("planning-settings-save"));
