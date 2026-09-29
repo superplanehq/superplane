@@ -99,27 +99,29 @@ function AgentRunRow({
   const title = plainRunTitle(run.name);
   const clock = formatClock(run.startedAt);
   return (
-    <Collapsible defaultOpen={defaultOpen} className="py-1.5 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-1.5">
-        <CollapsibleTrigger
-          className="group flex shrink-0 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-[12px] font-medium text-foreground"
-          aria-label={`Toggle ${title}`}
-        >
-          <ChevronRight
-            className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-            aria-hidden
-          />
-          {clock ? <span className={cn(META_TEXT_CLASSNAME, "shrink-0 tabular-nums")}>{clock}</span> : null}
+    <Collapsible defaultOpen={defaultOpen} className="group py-1.5 first:pt-0 last:pb-0">
+      <div className="relative flex items-center gap-1.5 py-1">
+        <CollapsibleTrigger className="absolute inset-0 z-0 cursor-pointer" aria-label={`Toggle ${title}`} />
+        <ChevronRight
+          className="relative z-10 size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+          aria-hidden
+        />
+        {clock ? (
+          <span className={cn(META_TEXT_CLASSNAME, "relative z-10 shrink-0 tabular-nums")}>{clock}</span>
+        ) : null}
+        <span className="relative z-10">
           <StaticStatusGlyph status={run.status} />
-        </CollapsibleTrigger>
+        </span>
         <MarkdownContent
           content={run.name}
           variant="workspace"
           openLinksInNewTab
-          linkClassName={RUN_LINK}
-          className={cn(RUN_TITLE_MARKDOWN, "flex-1")}
+          linkClassName={cn(RUN_LINK, "relative z-10")}
+          className={cn(RUN_TITLE_MARKDOWN, "pointer-events-none relative z-10 flex-1 [&_a]:pointer-events-auto")}
         />
-        {run.duration ? <span className={cn(META_TEXT_CLASSNAME, "shrink-0 tabular-nums")}>{run.duration}</span> : null}
+        {run.duration ? (
+          <span className={cn(META_TEXT_CLASSNAME, "relative z-10 shrink-0 tabular-nums")}>{run.duration}</span>
+        ) : null}
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
         <RunDescription description={run.description} />
