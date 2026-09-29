@@ -548,6 +548,100 @@ func Test__ApplySubscriptionCancelsRenewingPlanWhenOrganizationIsDeleted(t *test
 	assert.True(t, plan.CancelAtPeriodEnd)
 }
 
+func Test__ApplySubscriptionKeepsNewerSubscriptionWhenDeletedOrganizationReceivesOlderWebhook(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	newer := subscriptionEvent(r.Organization.ID, "sub_new", "active", periodStart, periodEnd)
+	newer.Data.ModifiedAt = polarTime{Time: time.Now().UTC().Add(-time.Hour)}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, newer))
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	var canceled []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, http.MethodPatch, req.Method)
+		id := strings.TrimPrefix(req.URL.Path, "/subscriptions/")
+		canceled = append(canceled, id)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   id,
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"modified_at":          time.Now().UTC().Format(time.RFC3339),
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	stale := subscriptionEvent(r.Organization.ID, "sub_old", "active", periodStart, periodEnd)
+	stale.Data.ModifiedAt = polarTime{Time: time.Now().UTC()}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, stale))
+
+	assert.ElementsMatch(t, []string{"sub_new", "sub_old"}, canceled)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan.PolarSubscriptionID)
+	assert.Equal(t, "sub_new", *plan.PolarSubscriptionID)
+	assert.True(t, plan.CancelAtPeriodEnd)
+}
+
+func Test__ApplySubscriptionDoesNotReplaceEndingSubscriptionWhenDeletedOrganizationReceivesOlderWebhook(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	periodStart := time.Now().UTC().Truncate(time.Second)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+	newer := subscriptionEvent(r.Organization.ID, "sub_new", "active", periodStart, periodEnd)
+	newer.Data.CancelAtPeriodEnd = true
+	newer.Data.ModifiedAt = polarTime{Time: time.Now().UTC().Add(-time.Hour)}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, newer))
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	var canceled []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		id := strings.TrimPrefix(req.URL.Path, "/subscriptions/")
+		canceled = append(canceled, id)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"id":                   id,
+			"status":               "active",
+			"cancel_at_period_end": true,
+			"modified_at":          time.Now().UTC().Format(time.RFC3339),
+			"current_period_start": periodStart.Format(time.RFC3339),
+			"current_period_end":   periodEnd.Format(time.RFC3339),
+			"external_customer_id": r.Organization.ID.String(),
+			"customer": map[string]any{
+				"id":          "cust_polar_1",
+				"external_id": r.Organization.ID.String(),
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+	t.Setenv("POLAR_API_BASE_URL", server.URL)
+
+	stale := subscriptionEvent(r.Organization.ID, "sub_old", "active", periodStart, periodEnd)
+	stale.Data.ModifiedAt = polarTime{Time: time.Now().UTC()}
+	require.NoError(t, ApplySubscriptionEvent(context.Background(), db, stale))
+
+	assert.Equal(t, []string{"sub_old"}, canceled)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan.PolarSubscriptionID)
+	assert.Equal(t, "sub_new", *plan.PolarSubscriptionID)
+	assert.True(t, plan.CancelAtPeriodEnd)
+}
+
 func Test__SubscriptionChangedSinceDeletionCancel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
