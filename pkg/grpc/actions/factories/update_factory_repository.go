@@ -167,6 +167,8 @@ func UpdateFactoryRepository(
 			deps,
 			factory,
 			actorID,
+			previous.VCSIntegrationID,
+			selectedIntegrationID,
 			previous.AppRepository,
 			previous.BacklogRepository,
 			previousBranch,
@@ -235,6 +237,7 @@ func reconcileFactoryRepository(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	actorID uuid.UUID,
+	previousVCSIntegrationID, vcsIntegrationID string,
 	previousAppRepository, previousBacklogRepository, previousDefaultBranch, repository string,
 ) error {
 	canvasesForFactory, err := factory.ListCanvases(tx)
@@ -268,7 +271,7 @@ func reconcileFactoryRepository(
 			return err
 		}
 		nodes := slices.Clone(liveVersion.Nodes)
-		changed := false
+		changed := replaceGitHubNodeIntegration(nodes, previousVCSIntegrationID, vcsIntegrationID)
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
 			switch template.id {
@@ -317,6 +320,25 @@ func reconcileFactoryRepository(
 	}
 
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
+}
+
+func replaceGitHubNodeIntegration(nodes []models.Node, previousIntegrationID, integrationID string) bool {
+	if previousIntegrationID == "" || previousIntegrationID == integrationID {
+		return false
+	}
+
+	changed := false
+	for i := range nodes {
+		if !strings.HasPrefix(nodes[i].ComponentName(), "github.") || nodes[i].IntegrationID == nil {
+			continue
+		}
+		if strings.TrimSpace(*nodes[i].IntegrationID) != previousIntegrationID {
+			continue
+		}
+		nodes[i].IntegrationID = &integrationID
+		changed = true
+	}
+	return changed
 }
 
 func replaceTriggerRepository(nodes []models.Node, component, previousRepository, repository string) bool {

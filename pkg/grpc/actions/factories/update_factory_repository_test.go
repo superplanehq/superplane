@@ -115,6 +115,25 @@ func TestReplaceTriggerRepository(t *testing.T) {
 	assert.Equal(t, "acme/custom", nodes[1].Configuration["repository"])
 }
 
+func TestReplaceGitHubNodeIntegration(t *testing.T) {
+	previousID := "old-integration"
+	unrelatedID := "other-integration"
+	nodes := []models.Node{
+		{Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, IntegrationID: &previousID},
+		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &previousID},
+		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &unrelatedID},
+		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
+	}
+
+	changed := replaceGitHubNodeIntegration(nodes, previousID, "new-integration")
+
+	assert.True(t, changed)
+	assert.Equal(t, "new-integration", *nodes[0].IntegrationID)
+	assert.Equal(t, "new-integration", *nodes[1].IntegrationID)
+	assert.Equal(t, unrelatedID, *nodes[2].IntegrationID)
+	assert.Equal(t, previousID, *nodes[3].IntegrationID)
+}
+
 func TestFactoryDefaultBranchFromNodes(t *testing.T) {
 	nodes := []models.Node{
 		{

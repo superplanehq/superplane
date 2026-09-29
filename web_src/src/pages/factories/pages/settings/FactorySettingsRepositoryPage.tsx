@@ -19,19 +19,16 @@ export function FactorySettingsRepositoryPage() {
   const integrationId = factory.onboarding?.vcsIntegrationId ?? "";
   const resources = useIntegrationResources(organizationId, integrationId, "repository");
   const githubOnboarding = useGitHubOnboarding(organizationId, { poll: false });
+  const usesCatalogRepository = Boolean(factory.onboarding?.appRepositoryId || factory.onboarding?.backlogRepositoryId);
   const catalogRepositories = githubOnboarding.data?.repositories;
   const repositories = useMemo(() => {
-    const names = new Set(
-      (catalogRepositories ?? [])
-        .map((repository) => repository.fullName ?? "")
-        .filter((repository): repository is string => Boolean(repository)),
-    );
-    for (const resource of resources.data ?? []) {
-      const name = resource.name ?? resource.id ?? "";
-      if (name) names.add(name);
-    }
-    return Array.from(names).sort((left, right) => left.localeCompare(right));
-  }, [catalogRepositories, resources.data]);
+    const names = usesCatalogRepository
+      ? (catalogRepositories ?? []).map((repository) => repository.fullName ?? "")
+      : (resources.data ?? []).map((resource) => resource.name ?? resource.id ?? "");
+    return names
+      .filter((repository): repository is string => Boolean(repository))
+      .sort((left, right) => left.localeCompare(right));
+  }, [catalogRepositories, resources.data, usesCatalogRepository]);
   const [repository, setRepository] = useState(factory.onboarding?.appRepository ?? "");
   const [isResolvingDefaultBranch, setIsResolvingDefaultBranch] = useState(false);
   const updateRepository = useFactoryRepository(organizationId, factoryId);
@@ -49,7 +46,9 @@ export function FactorySettingsRepositoryPage() {
     if (!repository || !integrationId || isSaving) return;
     setIsResolvingDefaultBranch(true);
     try {
-      const catalogRepository = catalogRepositories?.find((candidate) => candidate.fullName === repository);
+      const catalogRepository = usesCatalogRepository
+        ? catalogRepositories?.find((candidate) => candidate.fullName === repository)
+        : undefined;
       const defaultBranch =
         catalogRepository?.defaultBranch ??
         (await resolveGithubDefaultBranch(organizationId, integrationId, repository));
@@ -69,7 +68,7 @@ export function FactorySettingsRepositoryPage() {
         Connect GitHub during workspace setup before you select a repository.
       </p>
     );
-  } else if (resources.isLoading && githubOnboarding.isPending && repositories.length === 0) {
+  } else if ((usesCatalogRepository ? githubOnboarding.isPending : resources.isLoading) && repositories.length === 0) {
     repositoryContent = <p className="text-[13px] text-muted-foreground">Loading repositories...</p>;
   } else {
     repositoryContent = (
@@ -84,7 +83,7 @@ export function FactorySettingsRepositoryPage() {
     >
       <FactorySettingsCard title="GitHub repository" data-testid="factory-settings-repository">
         {repositoryContent}
-        {resources.isError && githubOnboarding.isError && repositories.length === 0 ? (
+        {(usesCatalogRepository ? githubOnboarding.isError : resources.isError) && repositories.length === 0 ? (
           <p className="mt-3 text-[13px] text-destructive">We could not load repositories. Try again.</p>
         ) : null}
         <div className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">

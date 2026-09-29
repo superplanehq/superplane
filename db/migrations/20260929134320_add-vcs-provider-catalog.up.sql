@@ -235,6 +235,36 @@ WHERE app_name = 'github'
   AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND metadata->>'installationId' ~ '^[0-9]+$';
 
+WITH factory_repositories AS (
+  SELECT
+    factory.id AS factory_id,
+    app_repository.repository_id AS app_repository_id,
+    backlog_repository.repository_id AS backlog_repository_id
+  FROM factories AS factory
+  INNER JOIN vcs_provider_integration_bindings AS binding
+    ON binding.integration_id::TEXT = factory.onboarding_config->>'vcs_integration_id'
+    AND binding.provider = 'github'
+  LEFT JOIN vcs_provider_repositories AS app_repository
+    ON app_repository.provider = binding.provider
+    AND app_repository.installation_id = binding.installation_id
+    AND LOWER(app_repository.full_name) = LOWER(BTRIM(factory.onboarding_config->>'app_repository'))
+  LEFT JOIN vcs_provider_repositories AS backlog_repository
+    ON backlog_repository.provider = binding.provider
+    AND backlog_repository.installation_id = binding.installation_id
+    AND LOWER(backlog_repository.full_name) = LOWER(BTRIM(factory.onboarding_config->>'backlog_repository'))
+)
+UPDATE factories AS factory
+SET onboarding_config = factory.onboarding_config || JSONB_STRIP_NULLS(JSONB_BUILD_OBJECT(
+  'app_repository_id', selected.app_repository_id,
+  'backlog_repository_id', selected.backlog_repository_id
+))
+FROM factory_repositories AS selected
+WHERE selected.factory_id = factory.id
+  AND (
+    selected.app_repository_id IS NOT NULL
+    OR selected.backlog_repository_id IS NOT NULL
+  );
+
 INSERT INTO vcs_provider_integration_repositories (
   integration_id,
   provider,
