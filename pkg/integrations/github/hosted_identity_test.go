@@ -663,3 +663,42 @@ func Test__reconcileHostedInstallations(t *testing.T) {
 	assert.Len(t, stub.reconciled, 1)
 	assert.Len(t, stub.pruned, 1)
 }
+
+func Test__reconcileHostedInstallations_emptyTableUsesShortTTL(t *testing.T) {
+	setHostedAppEnv(t)
+
+	stub := &hostedIdentityStub{}
+	stubHostedIdentity(t, stub)
+
+	base := time.Now().UTC()
+	now := base
+	hostedIdentityNow = func() time.Time { return now }
+
+	g := &GitHub{}
+	ctx := core.SyncContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Integration: &contexts.IntegrationContext{},
+	}
+	app := common.HostedApp{ID: 99, Slug: "superplane"}
+
+	// Every run calls prune, so the prune count is the run count.
+	g.reconcileHostedInstallations(ctx, app)
+	require.Len(t, stub.pruned, 1)
+
+	// Inside the short empty-table window nothing runs.
+	now = base.Add(10 * time.Second)
+	g.reconcileHostedInstallations(ctx, app)
+	assert.Len(t, stub.pruned, 1)
+
+	// An empty table retries after the short window, long before the
+	// five-minute guard: a wiped database must not starve discovery.
+	now = base.Add(time.Minute)
+	g.reconcileHostedInstallations(ctx, app)
+	assert.Len(t, stub.pruned, 2)
+
+	// With live rows the long guard applies again.
+	stub.rows = []hostedInstallationSnapshot{{ID: "91", AccountLogin: "acme", AccountType: "Organization"}}
+	now = base.Add(2 * time.Minute)
+	g.reconcileHostedInstallations(ctx, app)
+	assert.Len(t, stub.pruned, 2)
+}

@@ -33,6 +33,13 @@ const (
 	// hostedReconcileTTL is the in-process guard between reconciliations of
 	// the installations table against the GitHub list API.
 	hostedReconcileTTL = 5 * time.Minute
+
+	// hostedReconcileEmptyTTL guards reconciliation while the installations
+	// table has no live rows. An empty table means the process knows nothing
+	// about GitHub (for example after a database reset), so the long TTL
+	// must not starve discovery; the short floor still bounds the API calls
+	// when the app truly has no installations.
+	hostedReconcileEmptyTTL = 30 * time.Second
 )
 
 var (
@@ -252,7 +259,7 @@ func (g *GitHub) needsMembershipLookup(row hostedInstallationSnapshot, login str
 // (for example after a lost uninstall webhook) must not waste discovery
 // lookups on every sync.
 func (g *GitHub) reconcileHostedInstallations(ctx core.SyncContext, app common.HostedApp) {
-	if !takeHostedReconcileSlot() {
+	if !takeHostedReconcileSlot(hostedInstallationRowsEmpty()) {
 		return
 	}
 
@@ -277,15 +284,36 @@ func (g *GitHub) reconcileHostedInstallations(ctx core.SyncContext, app common.H
 	}
 }
 
-func takeHostedReconcileSlot() bool {
+func takeHostedReconcileSlot(tableEmpty bool) bool {
 	hostedReconcileMu.Lock()
 	defer hostedReconcileMu.Unlock()
 
+	ttl := hostedReconcileTTL
+	if tableEmpty {
+		ttl = hostedReconcileEmptyTTL
+	}
+
 	now := hostedIdentityNow().UTC()
-	if !hostedReconcileLast.IsZero() && now.Sub(hostedReconcileLast) < hostedReconcileTTL {
+	if !hostedReconcileLast.IsZero() && now.Sub(hostedReconcileLast) < ttl {
 		return false
 	}
 	hostedReconcileLast = now
+	return true
+}
+
+// hostedInstallationRowsEmpty reports whether the installations table has no
+// live rows. A read error counts as not-empty: a failing database must not
+// force reconcile API calls on every sync.
+func hostedInstallationRowsEmpty() bool {
+	rows, err := listHostedInstallationRows()
+	if err != nil {
+		return false
+	}
+	for _, row := range rows {
+		if !row.Deleted {
+			return false
+		}
+	}
 	return true
 }
 
