@@ -119,7 +119,7 @@ export function PublicFactoryBoardPage({
     return <PermissionDeniedPage description="You do not have permission to open this workspace." />;
   }
   if (load.status === "missing" || !board) {
-    return <PublicBoardStatus title="This board is not available." />;
+    return <PublicBoardStatus title="This board is not available." signInHref={guestSignInHref()} />;
   }
 
   return (
@@ -289,13 +289,23 @@ function PublicViewBadge() {
   );
 }
 
-function PublicBoardStatus({ title }: { title: string }) {
+function PublicBoardStatus({ title, signInHref }: { title: string; signInHref?: string }) {
   return (
     <div
-      className="flex h-screen items-center justify-center text-[13px] text-muted-foreground"
+      className="flex h-screen flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground"
       data-testid="public-board-status"
     >
-      {title}
+      <p>{title}</p>
+      {signInHref ? (
+        <a href={signInHref} className="text-foreground underline">
+          Sign in
+        </a>
+      ) : null}
     </div>
   );
+}
+
+function guestSignInHref(): string {
+  const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+  return `/login?redirect=${redirect}`;
 }

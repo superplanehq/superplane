@@ -142,7 +142,7 @@ export function WorkOrderCard({
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
-  const pullRequestMerge = useExperimentalFeature(organizationId);
+  const pullRequestMerge = useExperimentalFeature(organizationId ? organizationId : null);
   const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {

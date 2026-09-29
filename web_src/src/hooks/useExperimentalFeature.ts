@@ -16,14 +16,15 @@ export interface ExperimentalFeatureAccess {
   organizationReady: boolean;
 }
 
-export function useExperimentalFeature(organizationId?: string): ExperimentalFeatureAccess {
+export function useExperimentalFeature(organizationId?: string | null): ExperimentalFeatureAccess {
   const _organizationId = useOrganizationId();
-  const resolvedOrganizationId = organizationId || _organizationId || "";
+  const skipOrganization = organizationId === null;
+  const resolvedOrganizationId = skipOrganization ? "" : organizationId || _organizationId || "";
   const {
     data: organization,
     isLoading: organizationLoading,
     isSuccess: organizationLoaded,
-  } = useOrganization(resolvedOrganizationId);
+  } = useOrganization(resolvedOrganizationId, !skipOrganization);
   const {
     data: features,
     isLoading: registryLoading,

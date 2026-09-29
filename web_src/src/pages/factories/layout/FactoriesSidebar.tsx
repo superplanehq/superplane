@@ -109,11 +109,11 @@ export function PublicFactoriesSidebar({
       <div className="flex-1" />
       {account ? (
         <SidebarUserMenu
+          visitor
           organizationId={organizationId}
-          factoryKey={factoryKey}
           userName={account.name?.trim() || "You"}
           userAvatarUrl={account.avatarUrl}
-          organizationName={organizationId}
+          organizationName={account.name?.trim() || "You"}
         />
       ) : null}
     </aside>

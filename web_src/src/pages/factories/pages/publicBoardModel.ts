@@ -120,7 +120,7 @@ export function publicBoardOrder(card: PublicBoardCard, id: string): FactoriesWo
     updatedAt: card.createdAt,
     origin: card.origin?.url ? { url: card.origin.url, label: card.origin.label } : undefined,
     assignees: card.assignee?.name
-      ? [{ id: `${id}-member`, name: card.assignee.name, avatarUrl: card.assignee.avatarUrl }]
+      ? [{ id: publicAssigneeId(card.assignee.name), name: card.assignee.name, avatarUrl: card.assignee.avatarUrl }]
       : [],
     pullRequests: publicPullRequests(card, id),
     lineDispatches: publicLineDispatches(card),
@@ -172,6 +172,10 @@ export function columnEmptyDescription(column: PublicBoardColumn, narrowed: bool
     return "No tasks in Done.";
   }
   return "Nothing here.";
+}
+
+function publicAssigneeId(name: string): string {
+  return `public-member:${name.trim().toLowerCase()}`;
 }
 
 function cardMatches(card: PublicBoardCard, id: string, filters: WorkOrderFilters, search: string): boolean {
