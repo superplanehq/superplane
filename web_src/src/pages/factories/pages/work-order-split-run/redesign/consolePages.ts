@@ -1,8 +1,10 @@
 import {
+  branchTreeUrl,
   extractArtifactContentType,
   extractArtifactFilename,
   extractArtifactName,
   extractArtifactTitle,
+  extractArtifactUrl,
   toArtifactDataRecord,
 } from "../../../lib/workOrderArtifact";
 import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunPhase } from "../splitRunMocks";
@@ -17,13 +19,17 @@ export type StageArtifact = AutomationStage["outputs"]["artifacts"][number];
 
 /**
  * The pages a card can open. Only pages with content exist: a stage where
- * no agent ran has no Agent log page, and most stages report no checks.
+ * no agent ran has no Agent runs page, and most stages report no checks.
  * The stage description is not a page — it always shows above the tabs.
  * The tab bar renders even for a single page, so every card reads the same.
  */
-export function consolePages(stage: AutomationStage, phase?: SplitRunPhase): ConsolePageId[] {
+export function consolePages(
+  stage: AutomationStage,
+  phase?: SplitRunPhase,
+  runs: AutomationStage[] = [stage],
+): ConsolePageId[] {
   const pages: ConsolePageId[] = [];
-  if (hasAgentLog(stage, phase)) {
+  if (runs.some((run) => hasAgentLog(run, run.id === stage.id ? phase : undefined))) {
     pages.push("agent");
   }
   if (artifactsPageCount(stage) > 0) {
@@ -51,11 +57,19 @@ export function isTaskDocument(stage: AutomationStage, artifact: StageArtifact):
   return stage.id === "backlog" && isWorkOrderDescriptionName(artifactLabel(artifact));
 }
 
-/** How the Artifacts page renders an artifact: markdown reads inline, media plays inline, the rest are chips. */
-export function consoleArtifactKind(artifact: StageArtifact): "markdown" | "image" | "video" | "other" {
+export type ConsoleArtifactKind = "markdown" | "image" | "video" | "link" | "branch" | "file";
+
+/** How the Artifacts page treats an artifact: expand, open, or download. */
+export function consoleArtifactKind(artifact: StageArtifact): ConsoleArtifactKind {
   const type = (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase();
   if (type === "markdown") {
     return "markdown";
+  }
+  if (type === "link") {
+    return "link";
+  }
+  if (type === "branch") {
+    return "branch";
   }
   const contentType = extractArtifactContentType(toArtifactDataRecord(artifact.data));
   if (contentType?.startsWith("image/")) {
@@ -64,7 +78,16 @@ export function consoleArtifactKind(artifact: StageArtifact): "markdown" | "imag
   if (contentType?.startsWith("video/")) {
     return "video";
   }
-  return "other";
+  return "file";
+}
+
+export function artifactOpenHref(artifact: StageArtifact): string | undefined {
+  const data = toArtifactDataRecord(artifact.data);
+  return extractArtifactUrl(data) ?? (consoleArtifactKind(artifact) === "branch" ? branchTreeUrl(data) : undefined);
+}
+
+export function isExpandableArtifact(kind: ConsoleArtifactKind): boolean {
+  return kind === "markdown" || kind === "image" || kind === "video";
 }
 
 export function artifactLabel(artifact: StageArtifact): string {
