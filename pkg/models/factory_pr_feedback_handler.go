@@ -146,6 +146,22 @@ func (f *Factory) ListPRFeedbackHandlers(tx *gorm.DB) ([]FactoryPRFeedbackHandle
 	return handlers, nil
 }
 
+// HasPRFeedbackHandlerSource reports whether the factory already has a live
+// PR feedback handler for the given source. A factory accepts at most one
+// handler per source.
+func (f *Factory) HasPRFeedbackHandlerSource(tx *gorm.DB, source string) (bool, error) {
+	var count int64
+	err := liveCanvasPRFeedbackHandlers(tx).
+		Where("factory_pr_feedback_handlers.organization_id = ? AND factory_pr_feedback_handlers.factory_id = ? AND factory_pr_feedback_handlers.source = ?", f.OrganizationID, f.ID, source).
+		Count(&count).
+		Error
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func (h *FactoryPRFeedbackHandler) Delete(tx *gorm.DB) error {
 	return tx.Where("id = ?", h.ID).Delete(&FactoryPRFeedbackHandler{}).Error
 }
