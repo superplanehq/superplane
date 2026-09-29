@@ -30,20 +30,17 @@ function ownerGivenName(fullName: string): string {
  */
 export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
-  if (entry.displayStatus === "draft") {
-    return null;
-  }
-
-  const owner = entry.order.assignees?.[0];
+  const owner = entry.order.assignees?.[0] as { id?: string; name?: string; avatarUrl?: string } | undefined;
   if (!owner) {
     return null;
   }
 
   const display = resolveUser(owner.id, owner.name);
   const ownerName = display?.name ?? owner.name;
-  if (!ownerName) {
+  if (!ownerName || !display) {
     return null;
   }
+  const shown = owner.avatarUrl && !display.avatarUrl ? { ...display, avatarUrl: owner.avatarUrl } : display;
 
   return (
     <span
@@ -53,7 +50,7 @@ export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
     >
       <span className="truncate text-[11px] leading-4 text-muted-foreground">{ownerGivenName(ownerName)}</span>
       <span className="inline-flex size-5 shrink-0 items-center justify-center">
-        <OrgUserReference display={display} size="xs" showName={false} className="rounded-full leading-none" />
+        <OrgUserReference display={shown} size="xs" showName={false} className="rounded-full leading-none" />
       </span>
     </span>
   );

@@ -88,6 +88,12 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   selected?: boolean;
   /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
+  /**
+   * False on the public board. The card is static text: no link, no dialog.
+   */
+  interactive?: boolean;
+  /** Public board shows the member on a draft. Member boards hide that owner. */
+  showOwner?: boolean;
 }
 
 /**
@@ -124,9 +130,13 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  interactive = true,
+  showOwner = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
+  const destination = interactive
+    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
+    : "";
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
@@ -148,14 +158,15 @@ export function WorkOrderCard({
   return (
     <article
       className={cn(
-        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow",
-        WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
+        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm",
+        interactive && "transition hover:border-foreground/20 hover:shadow",
+        interactive && WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
         className,
       )}
       data-testid={`work-order-card-${entry.id}`}
       data-selected={selected || undefined}
     >
-      <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
+      {interactive ? <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} /> : null}
 
       <div className="relative z-10 pointer-events-none">
         <WorkOrderCardTitleRow
@@ -185,6 +196,7 @@ export function WorkOrderCard({
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
           isAnalyzing={agentWorking}
+          showOwner={showOwner}
         />
       </div>
     </article>
@@ -310,6 +322,7 @@ function WorkOrderCardMetaRow({
   showClarity = true,
   showConfidenceScore = true,
   isAnalyzing,
+  showOwner,
 }: {
   entry: WorkOrderListEntry;
   organizationId: string;
@@ -320,11 +333,12 @@ function WorkOrderCardMetaRow({
   showClarity?: boolean;
   showConfidenceScore?: boolean;
   isAnalyzing: boolean;
+  showOwner: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
   const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
   const showActions = hasScore || isAnalyzing;
-  const ownerMark = isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />;
+  const ownerMark = showOwner || !isDraft ? <CardOwnerMark entry={entry} organizationId={organizationId} /> : null;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">

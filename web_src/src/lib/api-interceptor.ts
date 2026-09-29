@@ -1,4 +1,5 @@
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
+import { isPublicFactoryLinePath } from "@/lib/publicFactoryLinePath";
 
 const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations"]);
 
@@ -14,6 +15,10 @@ export const setupApiInterceptor = (): void => {
   const nextFetch: typeof globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const response = await originalFetch(input, init);
 
+    if (requestPath(input).includes("/api/v1/public/")) {
+      return response;
+    }
+
     if (!isAuthenticatedRequest(input)) {
       return response;
     }
@@ -24,7 +29,7 @@ export const setupApiInterceptor = (): void => {
     }
 
     if (response.status === 401) {
-      if (isAccountSessionProbe(input)) {
+      if (isAccountSessionProbe(input) || isPublicFactoryLinePath(window.location.pathname)) {
         return response;
       }
 

@@ -17,6 +17,7 @@ import {
   factoriesListWorkOrders,
   factoriesSendWorkOrderToBacklog,
   factoriesSelectFactoryVcsProviderRepository,
+  factoriesSetFactoryVisibility,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -468,6 +469,31 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
       );
       if (!response.data?.factory) {
         throw new Error("Failed to update factory");
+      }
+      return response.data.factory;
+    },
+    onSuccess: (factory) => {
+      queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useSetFactoryVisibility(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (isPublic: boolean) => {
+      const response = await factoriesSetFactoryVisibility(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+          body: { public: isPublic },
+        }),
+      );
+      if (!response.data?.factory) {
+        throw new Error("Failed to update workspace visibility");
       }
       return response.data.factory;
     },
