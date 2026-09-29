@@ -15,14 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryJiraIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
-		assert.Equal(t, "Factory Jira Intake", f.Label)
-		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
-	})
-
 	t.Run("known id returns factory dependabot intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryDependabotIntake)
 		assert.True(t, ok)
@@ -122,12 +114,17 @@ func Test__Get(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, Feature{}, feature)
 	})
+
+	t.Run("retired jira intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_jira_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
 }
 
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDependabotIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
