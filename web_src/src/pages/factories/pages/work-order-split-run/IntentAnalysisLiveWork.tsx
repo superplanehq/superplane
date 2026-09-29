@@ -189,7 +189,9 @@ function liveStatus(
   return { label: "Planning next step…" };
 }
 
-function lastActionItem(items: AgentActivityItem[]): AgentActivityItem | undefined {
+function lastActionItem(
+  items: AgentActivityItem[],
+): Exclude<AgentActivityItem, { type: "notice" }> | undefined {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
     if (item.type !== "notice") return item;
