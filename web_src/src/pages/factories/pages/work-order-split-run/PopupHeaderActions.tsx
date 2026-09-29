@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/usePermissions";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
 
@@ -17,6 +16,7 @@ export function PopupHeaderActions({
   archiveBusy = false,
   onDuplicate,
   duplicateBusy = false,
+  canDuplicate = true,
   taskActions,
 }: {
   copyUrl?: string;
@@ -24,17 +24,17 @@ export function PopupHeaderActions({
   archiveBusy?: boolean;
   onDuplicate?: () => void | Promise<void>;
   duplicateBusy?: boolean;
+  /** Whether the current user may create tasks. Callers that do not track
+   * this permission default to allowed. */
+  canDuplicate?: boolean;
   taskActions?: ReactNode;
 }) {
-  const { canAct } = usePermissions();
-  const canCreateWorkOrder = canAct("work_orders", "create");
-
   return (
     <>
       {taskActions}
       {onArchive ? <PopupArchiveButton onArchive={onArchive} busy={archiveBusy} /> : null}
       {onDuplicate ? (
-        <PopupDuplicateButton onDuplicate={onDuplicate} busy={duplicateBusy} canCreate={canCreateWorkOrder} />
+        <PopupDuplicateButton onDuplicate={onDuplicate} busy={duplicateBusy} canCreate={canDuplicate} />
       ) : null}
       <CopyLinkButton
         url={copyUrl}

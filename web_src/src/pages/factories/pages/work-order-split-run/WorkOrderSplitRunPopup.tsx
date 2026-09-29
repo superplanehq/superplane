@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
@@ -7,10 +8,12 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
+import { stripWorkOrderFileRefs } from "@/lib/workOrderFiles";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
@@ -119,6 +122,7 @@ function AnalysisWorkOrderPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  canCreateWorkOrder = true,
   analysis,
   popupData,
 }: WorkOrderSplitRunPopupProps & {
@@ -128,6 +132,7 @@ function AnalysisWorkOrderPopup({
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const navigate = useNavigate();
   const [duplicateBusy, setDuplicateBusy] = useState(false);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
@@ -195,13 +200,18 @@ function AnalysisWorkOrderPopup({
       : undefined;
 
   const handleDuplicate = async () => {
+    if (!canCreateWorkOrder) {
+      return;
+    }
+    setDuplicateBusy(true);
     try {
-      setDuplicateBusy(true);
-      await createWorkOrder.mutateAsync({
+      const newOrder = await createWorkOrder.mutateAsync({
         title: edits.title,
-        description: popupData.sourceDescription,
+        description: stripWorkOrderFileRefs(edits.description),
       });
-      showSuccessToast("Task duplicated to backlog.");
+      if (newOrder?.number) {
+        navigate(workOrderDetailPath(organizationId, factoryKey, newOrder.number, lineId));
+      }
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to duplicate task."));
     } finally {
@@ -250,11 +260,14 @@ function AnalysisWorkOrderPopup({
             onClose,
             fullPage,
             toggleFullPage,
-            mutations: { ...mutations, onDuplicate: handleDuplicate },
-            footerBusy: footerActions.busy || duplicateBusy,
+            mutations,
+            footerBusy: footerActions.busy,
             reviewActions,
             showOwnerRow: !unified,
             planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
+            onDuplicate: handleDuplicate,
+            duplicateBusy,
+            canDuplicate: canCreateWorkOrder,
           })}
         />
         {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
@@ -318,6 +331,9 @@ function analysisPopupHeader(args: {
     savedTokens: number;
     savedCostCents: number;
   };
+  onDuplicate?: () => void | Promise<void>;
+  duplicateBusy?: boolean;
+  canDuplicate?: boolean;
 }) {
   return (views: ReactNode) => (
     <PopupHeader
@@ -333,8 +349,9 @@ function analysisPopupHeader(args: {
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
           onArchive={showsArchive(args.fixture.footer) ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
-          onDuplicate={args.mutations.onDuplicate}
-          duplicateBusy={args.footerBusy}
+          onDuplicate={args.onDuplicate}
+          duplicateBusy={args.duplicateBusy}
+          canDuplicate={args.canDuplicate}
           taskActions={args.reviewActions}
         />
       }
