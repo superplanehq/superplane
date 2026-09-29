@@ -1,4 +1,3 @@
-import { formatCheckScore } from "../../../lib/workOrderChecks";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
@@ -54,10 +53,15 @@ function liveAgentLine(stage: AutomationStage): string {
   return last?.summary || last?.title || "";
 }
 
-/** Spend and duration of the latest run for the collapsed row. */
+/**
+ * Duration of the latest run for the collapsed row. Spend stays out of
+ * the card: the summary panel carries the one spend breakdown.
+ */
 export function runMetaLine(stage: AutomationStage): string {
-  const duration = stage.status === "running" && stage.duration ? `${stage.duration} so far` : stage.duration;
-  return [stage.cost, stage.tokens, duration].filter(Boolean).join(" · ");
+  if (stage.status === "running" && stage.duration) {
+    return `${stage.duration} so far`;
+  }
+  return stage.duration ?? "";
 }
 
 /**
@@ -70,25 +74,17 @@ function runTitle(stage: AutomationStage): string | undefined {
 }
 
 export interface StepOutputSummary {
+  runCount: number;
   artifactCount: number;
-  artifactLabels: string[];
   checkCount: number;
-  checkLines: string[];
 }
 
-/** Artifact and check counts for one step, plus the hover-card lines. */
-export function stepOutputSummary(stage: AutomationStage): StepOutputSummary {
-  const artifactLabels = stage.outputs.artifacts.map(artifactLabel).filter(Boolean);
-  const checkLines = stage.checks.map((check) => {
-    const score = formatCheckScore(check);
-    const value = `${score.value}${score.scale}`;
-    return value ? `${check.name} ${value}` : check.name;
-  });
+/** Counts for the collapsed card badges. */
+export function stepOutputSummary(stage: AutomationStage, runCount = 0): StepOutputSummary {
   return {
+    runCount,
     artifactCount: stage.outputs.artifacts.length,
-    artifactLabels,
     checkCount: stage.checks.length,
-    checkLines,
   };
 }
 
