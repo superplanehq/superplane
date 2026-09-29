@@ -158,6 +158,17 @@ func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	telemetry.RecordWebSocketBroadcast(context.Background(), kind, recipients)
 }
 
+// CloseTopic drops every client on a topic. The write pump closes the socket.
+func (h *Hub) CloseTopic(topic string) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	clients := h.workflowSubscriptions[topic]
+	for client := range clients {
+		h.unregisterClientLocked(client)
+	}
+}
+
 func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()

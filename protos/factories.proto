@@ -74,6 +74,18 @@ service Factories {
     };
   }
 
+  rpc SetFactoryVisibility(SetFactoryVisibilityRequest) returns (SetFactoryVisibilityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}/visibility"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set factory visibility";
+      description: "Makes a workspace board public or private. Requires factories publish permission.";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryOnboarding(UpdateFactoryOnboardingRequest) returns (UpdateFactoryOnboardingResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/onboarding"
@@ -882,6 +894,16 @@ message UpdateFactoryResponse {
   Factory factory = 1;
 }
 
+message SetFactoryVisibilityRequest {
+  string id = 1;
+  // True when anyone with the line URL can view the board.
+  bool public = 2;
+}
+
+message SetFactoryVisibilityResponse {
+  Factory factory = 1;
+}
+
 message UpdateFactoryOnboardingRequest {
   string id = 1;
   // Organization integration used for version control.
@@ -1006,6 +1028,8 @@ message Factory {
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
   FactoryPlanning planning = 8;
+  // True when anyone with the line URL can view the board.
+  bool public = 9;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.

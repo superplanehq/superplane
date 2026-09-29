@@ -11,6 +11,9 @@ import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
+const factoriesSidebarClassName =
+  "sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground";
+
 interface FactoriesSidebarProps {
   organizationId: string;
   factoryKey: string;
@@ -38,10 +41,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   });
 
   return (
-    <aside
-      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-      data-testid="factories-sidebar"
-    >
+    <aside className={factoriesSidebarClassName} data-testid="factories-sidebar">
       <WorkspaceSwitcher
         organizationId={organizationId}
         factory={factory}
@@ -65,6 +65,57 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         organizationName={organization?.metadata?.name || "Organization"}
         planLabel={planLabel}
       />
+    </aside>
+  );
+}
+
+/**
+ * Same rail as the member workspace. The initials open workspace info only.
+ * Velocity stays hidden. A signed-in visitor still gets the user menu.
+ */
+export function PublicFactoriesSidebar({
+  organizationId,
+  factoryKey,
+  lineId,
+  workspaceName,
+  account,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  lineId: string;
+  workspaceName: string;
+  account: { name?: string; avatarUrl?: string | null } | null;
+}) {
+  const factory = { id: factoryKey, key: factoryKey, name: workspaceName } as FactoriesFactory;
+
+  return (
+    <aside className={factoriesSidebarClassName} data-testid="factories-sidebar">
+      <WorkspaceSwitcher
+        infoOnly
+        organizationId={organizationId}
+        factory={factory}
+        factories={[factory]}
+        canCreateFactory={false}
+        canOpenSettings={false}
+        permissionsLoading={false}
+        onCreateFactory={() => undefined}
+      />
+      <FactoriesSidebarNav
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        lineId={lineId}
+        showVelocity={false}
+      />
+      <div className="flex-1" />
+      {account ? (
+        <SidebarUserMenu
+          visitor
+          organizationId={organizationId}
+          userName={account.name?.trim() || "You"}
+          userAvatarUrl={account.avatarUrl}
+          organizationName={account.name?.trim() || "You"}
+        />
+      ) : null}
     </aside>
   );
 }
