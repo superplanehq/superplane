@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
 import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
@@ -68,6 +68,16 @@ function useSplitRunWorkOrderExtras(
   return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
 }
 
+function useSplitRunHostedCredit(
+  organizationId: string,
+  factoryKey: string,
+  line: FactoriesFactoryLine | undefined,
+) {
+  const credit = useHostedCreditRunContext(organizationId, factoryKey);
+  const detectedHostedRunner = useLineUsesHostedCredit(organizationId, lineAppIds(line));
+  return { credit, usesHostedRunner: line ? detectedHostedRunner : undefined };
+}
+
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const params = useParams<{ appId?: string; automationId?: string }>();
@@ -83,10 +93,8 @@ export function useFactoryAppSplitRunPage() {
     liveWorkOrder.data,
   );
   const { resolveUser } = useOrgUserLookup(organizationId);
-  const credit = useHostedCreditRunContext(organizationId, factoryKey);
   const line = factory?.lines?.find((entry) => entry.id === query.lineId);
-  const detectedHostedRunner = useLineUsesHostedCredit(organizationId, lineAppIds(line));
-  const usesHostedRunner = line ? detectedHostedRunner : undefined;
+  const { credit, usesHostedRunner } = useSplitRunHostedCredit(organizationId, factoryKey, line);
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {

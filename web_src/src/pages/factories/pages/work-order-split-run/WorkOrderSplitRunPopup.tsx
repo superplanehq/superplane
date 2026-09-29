@@ -426,17 +426,14 @@ function analysisDraftChrome(args: {
   });
   return {
     footerModelSelect: modelSelects.footer,
-    stripAnalysis: draftStripAnalysis(
-      args.fixture.footer.kind,
-      args.analysis,
-      modelSelects.strip,
-      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
-      {
+    stripAnalysis: draftStripAnalysis(args.fixture.footer.kind, args.analysis, modelSelects.strip, {
+      taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+      scores: {
         showClarity: factoryShowsClarity(args.factory),
         showConfidence: factoryShowsConfidence(args.factory),
       },
-      args.fixture.footer.creditNotice,
-    ),
+      creditNotice: args.fixture.footer.creditNotice,
+    }),
   };
 }
 
@@ -481,14 +478,16 @@ function draftStripAnalysis(
   footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
   analysis: ReturnType<typeof useAnalysisPlanningSession>,
   modelSelect: ReactNode | undefined,
-  taskHref: CreatedTaskHref,
-  scores: { showClarity: boolean; showConfidence: boolean },
-  creditNotice: WorkOrderSplitRunPopupProps["fixture"]["footer"]["creditNotice"],
+  extras: {
+    taskHref: CreatedTaskHref;
+    scores: { showClarity: boolean; showConfidence: boolean };
+    creditNotice: WorkOrderSplitRunPopupProps["fixture"]["footer"]["creditNotice"];
+  },
 ) {
   if (footerKind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores, creditNotice };
+  return { ...analysis, modelSelect, ...extras.scores, taskHref: extras.taskHref, creditNotice: extras.creditNotice };
 }
 
 /**

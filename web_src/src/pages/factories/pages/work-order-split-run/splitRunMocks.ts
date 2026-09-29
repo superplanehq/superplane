@@ -510,7 +510,11 @@ function reviewSurfaces(
     return failedReviewSurface(current, displayStatus, checks, input.credit, input.usesHostedRunner);
   }
   if (current?.result === "RESULT_CANCELLED") {
-    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy, input.credit, input.usesHostedRunner);
+    return stoppedReviewSurface(current, displayStatus, checks, {
+      stoppedBy: input.stoppedBy,
+      credit: input.credit,
+      usesHostedRunner: input.usesHostedRunner,
+    });
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
     return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
@@ -543,17 +547,19 @@ function stoppedReviewSurface(
   current: FactoriesWorkOrderExecution | undefined,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
-  stoppedBy?: OrgUserDisplay,
-  credit?: HostedCreditRunContext,
-  usesHostedRunner?: boolean,
+  options?: {
+    stoppedBy?: OrgUserDisplay;
+    credit?: HostedCreditRunContext;
+    usesHostedRunner?: boolean;
+  },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   return surfaces(
     buildSplitRunFooter({
       kind: "stopped",
-      actor: stoppedBy,
+      actor: options?.stoppedBy,
       run: footerRun(current),
       status: displayStatus,
-      outOfCredit: hostedCreditBlocksDispatch(credit, usesHostedRunner),
+      outOfCredit: hostedCreditBlocksDispatch(options?.credit, options?.usesHostedRunner),
     }),
     [],
     checks,
