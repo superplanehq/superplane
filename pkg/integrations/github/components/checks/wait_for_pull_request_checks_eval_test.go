@@ -248,6 +248,36 @@ func Test__LimitCheckSummaries_CapsLongBodies(t *testing.T) {
 	assert.True(t, strings.HasSuffix(limited[0].Summary, "\n..."))
 }
 
+func Test__LimitCheckSummaries_KeepsHTMLTableWhenBodyExceedsCap(t *testing.T) {
+	t.Parallel()
+
+	table := strings.Join([]string{
+		"<table>",
+		"<tr><td><strong>Preview URL:</strong></td>",
+		`<td><a href="https://preview.pages.dev">Visit Preview</a></td></tr>`,
+		"</table>",
+	}, "\n")
+	body := "\n\n" + strings.Repeat("log line\n", 2500) + table
+	require.Greater(t, len(body), maxCheckSummaryBytes)
+
+	limited := limitCheckSummaries([]PullRequestCheck{{Name: "Cloudflare Pages", Summary: body}})
+	require.Len(t, limited, 1)
+	assert.LessOrEqual(t, len(limited[0].Summary), maxCheckSummaryBytes)
+	assert.Contains(t, limited[0].Summary, table)
+	assert.Contains(t, limited[0].Summary, "https://preview.pages.dev")
+	assert.True(t, strings.HasSuffix(limited[0].Summary, "\n..."))
+}
+
+func Test__LimitCheckSummary_DoesNotSplitHTMLTags(t *testing.T) {
+	t.Parallel()
+
+	body := "\n\n" + strings.Repeat("a", maxCheckSummaryBytes-8) + "<p>hello</p>"
+	limited := limitCheckSummary(body, maxCheckSummaryBytes)
+	assert.LessOrEqual(t, len(limited), maxCheckSummaryBytes)
+	assert.NotRegexp(t, `<[^>]*$`, strings.TrimSuffix(limited, "\n..."))
+	assert.NotContains(t, limited, "<p")
+}
+
 func Test__StoredCheckLists_StayUnderEventPayloadLimit(t *testing.T) {
 	t.Parallel()
 
