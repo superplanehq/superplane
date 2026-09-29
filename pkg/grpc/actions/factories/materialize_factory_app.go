@@ -41,9 +41,6 @@ func MaterializeFactoryAppTemplate(
 	}
 
 	input := factoryTemplateInputFromRequest(req)
-	if err := installIntegrationNames(db, orgID, input.integrations); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
-	}
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name
 	result, err := materializeFactoryTemplate(req.GetTemplateId(), input)

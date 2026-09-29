@@ -2,7 +2,6 @@ package factories
 
 import (
 	"embed"
-	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -316,35 +315,6 @@ func materializeFactoryConsole(template factoryAppTemplate, appID, appName strin
 		return "", fmt.Errorf("encode factory app console template: %w", err)
 	}
 	return string(encoded), nil
-}
-
-// installIntegrationNames replaces client-supplied names with the installation
-// name stored for each integration id. Runner environmentFrom looks up secrets
-// by that name. A provider label such as "GitHub" does not match.
-func installIntegrationNames(tx *gorm.DB, orgID uuid.UUID, integrations map[string]factoryTemplateIntegration) error {
-	for integrationType, integration := range integrations {
-		idText := strings.TrimSpace(integration.id)
-		if idText == "" {
-			continue
-		}
-		integrationID, err := uuid.Parse(idText)
-		if err != nil {
-			return invalidArgument("integration id is invalid")
-		}
-		found, err := models.FindIntegrationInTransaction(tx, orgID, integrationID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return invalidArgument("integration was not found")
-			}
-			return err
-		}
-		if found.AppName != integrationType {
-			return invalidArgument("integration does not match the template")
-		}
-		integration.name = found.InstallationName
-		integrations[integrationType] = integration
-	}
-	return nil
 }
 
 func factoryTemplateInputFromRequest(req *pb.MaterializeFactoryAppTemplateRequest) factoryTemplateInput {
