@@ -106,7 +106,7 @@ func Test__RepositoryMergeRows__ExcludesSuperPlanePullRequests(t *testing.T) {
 	people := models.FactoryVelocityMergeSourcePeople
 
 	rows := repositoryMergeRows(target, []repositoryMerge{
-		{repository: "example/repo", number: 1, source: people, authorLogin: "octocat", mergedAt: now},
+		{repository: "example/repo", number: 1, source: people, authorLogin: "octocat", authorEmail: "octocat@example.com", mergedAt: now},
 		{repository: "example/repo", number: 2, source: people, authorLogin: "superplane[bot]", mergedAt: now},
 		{repository: "example/repo", number: 3, source: people, authorLogin: "hubber", mergedAt: now},
 	}, []int64{2})
@@ -114,6 +114,7 @@ func Test__RepositoryMergeRows__ExcludesSuperPlanePullRequests(t *testing.T) {
 	require.Len(t, rows, 2, "a pull request this instance opened is already known")
 	assert.Equal(t, int64(1), rows[0].Number)
 	assert.Equal(t, "octocat", rows[0].AuthorLogin)
+	assert.Equal(t, "octocat@example.com", rows[0].AuthorEmail)
 	assert.Equal(t, int64(3), rows[1].Number)
 	assert.Equal(t, target.FactoryID, rows[0].FactoryID)
 	assert.Equal(t, target.OrganizationID, rows[0].OrganizationID)
@@ -146,11 +147,12 @@ func Test__ToRepositoryMerge__KeepsOnlyMergesInsideTheWindow(t *testing.T) {
 	merge, ok := toRepositoryMerge(&github.PullRequest{
 		Number:   github.Ptr(12),
 		MergedAt: &github.Timestamp{Time: mergedAt},
-		User:     &github.User{Login: github.Ptr("octocat"), Name: github.Ptr("Octo Cat")},
+		User:     &github.User{Login: github.Ptr("octocat"), Name: github.Ptr("Octo Cat"), Email: github.Ptr("Octo@Example.com")},
 	}, "example/repo", nil, from, to)
 	require.True(t, ok)
 	assert.Equal(t, int64(12), merge.number)
 	assert.Equal(t, "octocat", merge.authorLogin)
+	assert.Equal(t, "Octo@Example.com", merge.authorEmail, "the raw public email is kept; normalizing it is the report's job")
 	assert.Equal(t, models.FactoryVelocityMergeSourcePeople, merge.source)
 	assert.True(t, merge.mergedAt.Equal(mergedAt), "the merge instant comes from merged_at, not closed_at")
 

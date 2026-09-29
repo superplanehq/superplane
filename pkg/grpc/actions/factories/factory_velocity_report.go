@@ -230,11 +230,14 @@ func (r *velocityPersonRow) totalMerged() int {
 
 // velocityPeopleBuilder joins two identities of the same person: the GitHub
 // author of a merged pull request, and the SuperPlane member credited for a
-// work order. A member with a connected GitHub account is one row.
+// work order. A member with a connected GitHub account is one row. A member
+// who never connected one still joins as long as the pull request author's
+// public GitHub email matches the member's SuperPlane email.
 type velocityPeopleBuilder struct {
 	rows        map[string]*velocityPersonRow
 	byUserID    map[uuid.UUID]*models.FactoryVelocityMember
 	byGitHubKey map[string]*models.FactoryVelocityMember
+	byEmail     map[string]*models.FactoryVelocityMember
 }
 
 func newVelocityPeopleBuilder(members []models.FactoryVelocityMember) *velocityPeopleBuilder {
@@ -242,6 +245,7 @@ func newVelocityPeopleBuilder(members []models.FactoryVelocityMember) *velocityP
 		rows:        make(map[string]*velocityPersonRow),
 		byUserID:    make(map[uuid.UUID]*models.FactoryVelocityMember, len(members)),
 		byGitHubKey: make(map[string]*models.FactoryVelocityMember, len(members)),
+		byEmail:     make(map[string]*models.FactoryVelocityMember, len(members)),
 	}
 
 	for i := range members {
@@ -250,12 +254,21 @@ func newVelocityPeopleBuilder(members []models.FactoryVelocityMember) *velocityP
 		if login := normalizeGitHubLogin(member.GitHubLogin); login != "" {
 			builder.byGitHubKey[login] = member
 		}
+		if email := normalizeVelocityEmail(member.Email); email != "" {
+			builder.byEmail[email] = member
+		}
 	}
 	return builder
 }
 
 func normalizeGitHubLogin(login string) string {
 	return strings.ToLower(strings.TrimSpace(login))
+}
+
+// normalizeVelocityEmail matches how the People table compares an author's
+// public GitHub email to a member's SuperPlane email.
+func normalizeVelocityEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func (b *velocityPeopleBuilder) memberRow(member *models.FactoryVelocityMember) *velocityPersonRow {
@@ -275,8 +288,10 @@ func (b *velocityPeopleBuilder) memberRow(member *models.FactoryVelocityMember) 
 	return row
 }
 
-// addAuthoredMerge credits a merged pull request to its GitHub author. Authors
-// outside the organization still get a row, because they are part of what the
+// addAuthoredMerge credits a merged pull request to its GitHub author. A
+// member who never linked a GitHub account still resolves to one row when the
+// author's public GitHub email matches the member's SuperPlane email. Authors
+// who resolve neither way still get a row, because they are part of what the
 // repository shipped.
 func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRepositoryMerge) {
 	login := normalizeGitHubLogin(merge.AuthorLogin)
@@ -291,6 +306,17 @@ func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRe
 		}
 		row.authoredMerged++
 		return
+	}
+
+	if email := normalizeVelocityEmail(merge.AuthorEmail); email != "" {
+		if member, ok := b.byEmail[email]; ok {
+			row := b.memberRow(member)
+			if row.avatarURL == "" {
+				row.avatarURL = merge.AuthorAvatarURL
+			}
+			row.authoredMerged++
+			return
+		}
 	}
 
 	id := "github:" + login

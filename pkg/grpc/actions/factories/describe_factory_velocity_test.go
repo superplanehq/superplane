@@ -359,6 +359,40 @@ func TestDescribeFactoryVelocity_JoinsLinkedGitHubAccount(t *testing.T) {
 		"the author must not keep a second row after linking")
 }
 
+// TestDescribeFactoryVelocity_JoinsAuthorByEmail covers a member whose GitHub
+// login (linked or from sign-in) does not match the pull request author's
+// login at all: the People table can still join the merge to the member when
+// the author's public GitHub email matches the member's SuperPlane email.
+func TestDescribeFactoryVelocity_JoinsAuthorByEmail(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	now := time.Now()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	// The fixture signs in with the GitHub login "testuser", which the author
+	// login "mancinux" does not match. Their public GitHub email does match the
+	// member's SuperPlane email.
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		repositoryMergeSeed{number: 80, login: "mancinux", email: r.Account.Email, mergedAt: now.Add(-1 * time.Hour)},
+	)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+
+	member := findVelocityPersonByID(resp.People, r.User.String())
+	require.NotNil(t, member, "the shared email makes the author the member")
+	assert.Equal(t, int32(1), member.AuthoredMerged)
+	assert.Nil(t, findVelocityPerson(resp.People, "mancinux"),
+		"the author must not keep a second row when the email already resolved them")
+}
+
 func findVelocityPerson(people []*pb.DescribeFactoryVelocityPerson, name string) *pb.DescribeFactoryVelocityPerson {
 	for _, person := range people {
 		if person.Name == name {
@@ -381,6 +415,7 @@ type repositoryMergeSeed struct {
 	number int64
 	login  string
 	name   string
+	email  string
 	// agent seeds a merge the SuperPlane agent wrote, which the sync recognizes
 	// by its co-author trailer. An empty value seeds a person's merge.
 	agent    bool
@@ -410,6 +445,7 @@ func seedSyncedRepositoryMerges(
 		merge := models.NewFactoryVelocityRepositoryMerge(orgID, factoryID, repository, seed.number, seed.source(), seed.mergedAt)
 		merge.AuthorLogin = seed.login
 		merge.AuthorName = seed.name
+		merge.AuthorEmail = seed.email
 		merges = append(merges, merge)
 	}
 

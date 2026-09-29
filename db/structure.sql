@@ -643,6 +643,7 @@ CREATE TABLE public.factory_velocity_repository_merges (
     merged_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    author_email text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
 );
@@ -4878,7 +4879,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929173132	f
+20260929180000	f
 \.
 
 
