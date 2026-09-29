@@ -618,6 +618,92 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	return state, nil
 }
 
+func WorkOrderReadyForAutoStart(
+	tx *gorm.DB,
+	factoryModel *Factory,
+	order *FactoryWorkOrder,
+	session *FactoryPlanningSession,
+) (bool, error) {
+	if factoryModel == nil || order == nil || session == nil {
+		return false, nil
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return false, nil
+	}
+	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {
+		return false, nil
+	}
+	if len(session.CurrentSurvey().Questions) > 0 {
+		return false, nil
+	}
+	checks, err := order.ListChecks(tx)
+	if err != nil {
+		return false, err
+	}
+	turn, err := currentPlanningTurn(tx, session)
+	if err != nil {
+		return false, err
+	}
+	if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	spec, err := planningSpecBody(tx, order)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(spec) != "", nil
+}
+
+type planningTurn struct {
+	runID        uuid.UUID
+	latestUserAt time.Time
+	hasUser      bool
+}
+
+func currentPlanningTurn(tx *gorm.DB, session *FactoryPlanningSession) (planningTurn, error) {
+	var turn planningTurn
+	if session.CanvasRunID == nil || *session.CanvasRunID == uuid.Nil {
+		return turn, nil
+	}
+	turn.runID = *session.CanvasRunID
+	var message PlanningSessionMessage
+	err := tx.
+		Where("session_id = ? AND role = ?", session.ID, PlanningSessionMessageRoleUser).
+		Order("created_at DESC, id DESC").
+		First(&message).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return turn, nil
+	}
+	if err != nil {
+		return planningTurn{}, err
+	}
+	turn.latestUserAt = message.CreatedAt
+	turn.hasUser = true
+	return turn, nil
+}
+
+func (turn planningTurn) reportedScore(checks []FactoryWorkOrderCheck, key string, score float64) bool {
+	if turn.runID == uuid.Nil {
+		return false
+	}
+	for i := range checks {
+		if checks[i].Key != key {
+			continue
+		}
+		if checks[i].Score != score || checks[i].RunID == nil || *checks[i].RunID != turn.runID {
+			return false
+		}
+		if turn.hasUser && !checks[i].UpdatedAt.After(turn.latestUserAt) {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
 func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
 	artifacts, err := order.ListArtifacts(tx)
 	if err != nil {

@@ -1,16 +1,24 @@
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-import { PLANNING_SETTINGS_COPY, type PlanningDraftSettings } from "./planningSettingsModel";
+import {
+  PLANNING_SETTINGS_COPY,
+  type PlanningAutoStartLine,
+  type PlanningDraftSettings,
+} from "./planningSettingsModel";
 
 type PlanningUpdate = <K extends keyof PlanningDraftSettings>(key: K, value: PlanningDraftSettings[K]) => void;
 
 export function PlanningSettingsFields({
   draft,
+  lines,
   onUpdate,
 }: {
   draft: PlanningDraftSettings;
+  lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
 }) {
   return (
@@ -23,6 +31,7 @@ export function PlanningSettingsFields({
         testId="planning-settings-enabled"
       />
       <PlanningChecksSection draft={draft} onUpdate={onUpdate} />
+      <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} />
     </>
   );
 }
@@ -78,6 +87,81 @@ export function PlanningHealthSection({ enabled }: { enabled: boolean }) {
       </p>
     </section>
   );
+}
+
+function AutoStartSection({
+  draft,
+  lines,
+  onUpdate,
+}: {
+  draft: PlanningDraftSettings;
+  lines: PlanningAutoStartLine[];
+  onUpdate: PlanningUpdate;
+}) {
+  const unavailable = !draft.enabled || !draft.confidence || lines.length === 0;
+  const selected = lines.find((line) => line.id === draft.autoStartLineId);
+  const checked = Boolean(selected);
+  const showLineSelect = lines.length > 1 && checked;
+
+  return (
+    <div data-testid="planning-settings-auto-start">
+      <PlanningToggleRow
+        title={PLANNING_SETTINGS_COPY.autoStartLabel}
+        description={autoStartDescription(draft, lines)}
+        checked={checked}
+        disabled={unavailable}
+        onCheckedChange={(next) => {
+          if (!next) {
+            onUpdate("autoStartLineId", "");
+            return;
+          }
+          onUpdate("autoStartLineId", selected?.id ?? lines[0]?.id ?? "");
+        }}
+        testId="planning-settings-auto-start-toggle"
+      />
+      {showLineSelect ? (
+        <div className="max-w-xs pb-1">
+          <Label htmlFor="planning-settings-auto-start-line" className="sr-only">
+            {PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
+          </Label>
+          <Select
+            value={draft.autoStartLineId}
+            disabled={unavailable}
+            onValueChange={(lineId) => onUpdate("autoStartLineId", lineId)}
+          >
+            <SelectTrigger
+              id="planning-settings-auto-start-line"
+              className="h-8"
+              aria-label={PLANNING_SETTINGS_COPY.autoStartStartOnLabel}
+              data-testid="planning-settings-auto-start-line"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {lines.map((line) => (
+                <SelectItem key={line.id} value={line.id}>
+                  {line.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoStartLine[]): string {
+  if (!draft.enabled) {
+    return PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper;
+  }
+  if (!draft.confidence) {
+    return PLANNING_SETTINGS_COPY.autoStartConfidenceOffHelper;
+  }
+  if (lines.length === 0) {
+    return PLANNING_SETTINGS_COPY.autoStartNoBoardHelper;
+  }
+  return PLANNING_SETTINGS_COPY.autoStartHelper;
 }
 
 function PlanningToggleRow({
