@@ -12,6 +12,7 @@ import {
   getWorkOrderExecutionDisplayMeta,
   getWorkOrderExecutionRunHref,
 } from "./lib/workOrderExecutions";
+import { WorkOrderCreditFailureNotice } from "./WorkOrderCreditFailureNotice";
 
 interface WorkOrderExecutionsListProps {
   organizationId: string;
@@ -217,6 +218,12 @@ function ExecutionRow({
         stepClassName="text-gray-900 dark:text-gray-100"
       />
       {appName ? <p className="mt-1 pl-6 text-xs text-gray-500 dark:text-gray-400">{appName}</p> : null}
+      <WorkOrderCreditFailureNotice
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        execution={execution}
+        className="mt-1 pl-6"
+      />
     </li>
   );
 }

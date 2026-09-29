@@ -239,7 +239,7 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 	switch {
 	case errors.Is(err, ErrHostedSubscriptionRequired):
 		return SuperPlaneRunnerSubscribeMessage
-	case errors.Is(err, ErrSuperPlaneRunnerNoCredit):
+	case errors.Is(err, ErrSuperPlaneRunnerNoCredit), errors.Is(err, ErrHostedCreditEmpty):
 		return SuperPlaneRunnerNoCreditMessage
 	case errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget), errors.Is(err, ErrFactoryHostedBudgetEmpty):
 		return SuperPlaneRunnerNoFactoryBudgetMessage

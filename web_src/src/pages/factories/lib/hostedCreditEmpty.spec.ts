@@ -124,7 +124,7 @@ describe("hostedCreditBannerKind", () => {
     ).toBe("trial");
   });
 
-  it("keeps the trial kind when welcome credit is spent before expiry", () => {
+  it("warns when welcome credit is spent before the trial ends", () => {
     expect(
       hostedCreditBannerKind({
         remainingCreditCents: "0",
@@ -134,7 +134,7 @@ describe("hostedCreditBannerKind", () => {
         welcomeCreditExpiresAt: inFourteenDays,
         now,
       }),
-    ).toBe("trial");
+    ).toBe("trial-empty");
   });
 
   it("shows trial-expired when welcome credit expires", () => {
@@ -223,6 +223,7 @@ describe("hostedCreditBannerKind", () => {
 describe("isHostedCreditHeaderKickerKind", () => {
   it("uses the title chip for every credit state", () => {
     expect(isHostedCreditHeaderKickerKind("trial")).toBe(true);
+    expect(isHostedCreditHeaderKickerKind("trial-empty")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("trial-expired")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("lapsed")).toBe(true);
     expect(isHostedCreditHeaderKickerKind("low")).toBe(true);
@@ -233,6 +234,7 @@ describe("isHostedCreditHeaderKickerKind", () => {
 describe("hostedCreditHeaderKickerLabel", () => {
   it("names the chip for each header kind", () => {
     expect(hostedCreditHeaderKickerLabel("trial")).toBe("Trial");
+    expect(hostedCreditHeaderKickerLabel("trial-empty")).toBe("No credit");
     expect(hostedCreditHeaderKickerLabel("trial-expired")).toBe("Trial ended");
     expect(hostedCreditHeaderKickerLabel("lapsed")).toBe("No plan");
     expect(hostedCreditHeaderKickerLabel("low")).toBe("Credit low");
@@ -244,6 +246,7 @@ describe("hostedCreditHeaderKickerActionLabel", () => {
   it("opens billing for low and empty credit", () => {
     expect(hostedCreditHeaderKickerActionLabel("low")).toBe("Add credits");
     expect(hostedCreditHeaderKickerActionLabel("empty")).toBe("Add credits");
+    expect(hostedCreditHeaderKickerActionLabel("trial-empty")).toBe("Open billing");
   });
 
   it("keeps Subscribe for trial and no-plan states", () => {
