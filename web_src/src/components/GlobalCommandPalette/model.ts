@@ -14,6 +14,7 @@ import { getRouteContext } from "./route";
 import type { CanvasCommandListProps, CommandPage, PaletteAction } from "./types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { isPublicFactoryLinePath } from "@/lib/publicFactoryLinePath";
 import { useLocation, useNavigate } from "react-router";
 import type { NavigateFunction } from "react-router";
 
@@ -41,7 +42,11 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const { account, loading } = useAccount();
   const location = useLocation();
   const navigate = useNavigate();
-  const route = useMemo(() => getRouteContext(location.pathname), [location.pathname]);
+  const guestLine = isPublicFactoryLinePath(location.pathname) && !account;
+  const route = useMemo(
+    () => getRouteContext(guestLine ? "" : location.pathname),
+    [guestLine, location.pathname],
+  );
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<CommandPage>("root");
   const [search, setSearch] = useState("");

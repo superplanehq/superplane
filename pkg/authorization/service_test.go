@@ -61,6 +61,10 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, orgPath, "delete")
 		require.NoError(t, err)
 		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, "factories", "publish")
+		require.NoError(t, err)
+		assert.True(t, allowed)
 	})
 
 	t.Run("org maintainer can edit automations but not members or org settings", func(t *testing.T) {
@@ -82,6 +86,10 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), maintainerID, orgID, "factories", "update")
 		require.NoError(t, err)
 		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), maintainerID, orgID, "factories", "publish")
+		require.NoError(t, err)
+		assert.False(t, allowed)
 
 		allowed, err = r.AuthService.CheckOrganizationPermission(context.Background(), maintainerID, orgID, memberPath, "create")
 		require.NoError(t, err)
