@@ -116,7 +116,9 @@ var factoryLineColumnColorIDs = map[string]bool{
 	"yellow": true,
 	"teal":   true,
 	"sky":    true,
+	"indigo": true,
 	"purple": true,
+	"rose":   true,
 	"slate":  true,
 }
 
