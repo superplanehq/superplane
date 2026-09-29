@@ -381,3 +381,13 @@ func (s *FactoryService) ListFactoryAgentResourceTools(ctx context.Context, req 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryAgentResourceTools(ctx, s.intakeDeps, organizationID, req)
 }
+
+func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.ListFactoryMCPClientsRequest) (*pb.ListFactoryMCPClientsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryMCPClients(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
+}

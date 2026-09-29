@@ -258,6 +258,18 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	return &factory, nil
 }
 
+func FindFactoryByID(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.Where("id = ?", factoryID).First(&factory).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &factory, nil
+}
+
 func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
 	normalized := NormalizeFactoryKey(key)
 	if err := ValidateFactoryKey(normalized); err != nil {
