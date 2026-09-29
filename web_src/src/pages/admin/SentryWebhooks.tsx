@@ -1,5 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
+import { Button } from "@/components/ui/button";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 import AdminPagination from "./AdminPagination";
@@ -53,13 +54,14 @@ function SentryWebhooksBody({ pageState }: { pageState: ReturnType<typeof useSen
       <div className="space-y-4">
         <SentryWebhooksNotice message={SENTRY_WEBHOOKS_PAGE_EMPTY} />
         <div className="flex justify-end">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={() => pageState.setOffset(Math.max(0, pageState.offset - SENTRY_WEBHOOK_PAGE_SIZE))}
-            className="px-3 py-1 rounded border border-slate-200 bg-white text-xs hover:bg-slate-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             Previous
-          </button>
+          </Button>
         </div>
       </div>
     );
