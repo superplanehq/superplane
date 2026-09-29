@@ -34,6 +34,47 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	return handler, r
 }
 
+func TestHandler_InitializeProviders_UsesEmailOnlyGitHubScope(t *testing.T) {
+	handler := &Handler{}
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "client-id",
+			Secret:      "client-secret",
+			CallbackURL: "https://app.example/auth/github/callback",
+		},
+	})
+
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "user:email", parsed.Query().Get("scope"))
+}
+
+func TestUseRealProviderAuthInDevelopment(t *testing.T) {
+	t.Run("uses GitHub OAuth for an explicit account connection", func(t *testing.T) {
+		request := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect", nil),
+			map[string]string{"provider": models.ProviderGitHub},
+		)
+
+		assert.True(t, useRealProviderAuthInDevelopment(request))
+	})
+
+	t.Run("keeps automatic development sign-in", func(t *testing.T) {
+		request := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
+			map[string]string{"provider": models.ProviderGitHub},
+		)
+
+		assert.False(t, useRealProviderAuthInDevelopment(request))
+	})
+}
+
 func TestHandler_handleAuthConfig(t *testing.T) {
 	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)
@@ -499,10 +540,10 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		account, err := models.CreateAccount("Solo GitHub", "solo-github@example.com")
 		require.NoError(t, err)
-		attachGitHubIdentity(t, account, "solo-github-id")
+		attachGitHubIdentity(t, account, "10001")
 
 		githubUser := goth.User{
-			UserID:      "solo-github-id",
+			UserID:      "10001",
 			Email:       account.Email,
 			Name:        account.Name,
 			NickName:    "solo",
@@ -519,6 +560,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, account.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
+
+		linked, err := models.FindAccountLinkedAccount(database.Conn(), account.ID, models.ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, githubUser.UserID, linked.ProviderID)
+		assert.Equal(t, githubUser.NickName, linked.Username)
 	})
 
 	t.Run("should issue a session for the account that holds the identity, not an email match", func(t *testing.T) {
@@ -528,10 +574,10 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		emailAccount, err := models.CreateAccount("Email Account", "shared-login-email@example.com")
 		require.NoError(t, err)
 		require.NotEmpty(t, emailAccount.ID)
-		attachGitHubIdentity(t, identityAccount, "email-mismatch-github-id")
+		attachGitHubIdentity(t, identityAccount, "10002")
 
 		githubUser := goth.User{
-			UserID:      "email-mismatch-github-id",
+			UserID:      "10002",
 			Email:       identityAccount.Email,
 			Name:        identityAccount.Name,
 			NickName:    "identity",

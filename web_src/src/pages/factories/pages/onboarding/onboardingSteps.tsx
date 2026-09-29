@@ -162,6 +162,7 @@ export function RepositoryPicker({
   title,
   description,
   disabled,
+  listClassName,
 }: {
   host: VcsHostId;
   repos: string[];
@@ -171,6 +172,7 @@ export function RepositoryPicker({
   title?: string;
   description?: string;
   disabled?: boolean;
+  listClassName?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -200,7 +202,7 @@ export function RepositoryPicker({
         />
       </div>
       <div
-        className="max-h-56 overflow-y-auto rounded-lg border border-border"
+        className={cn(listClassName ?? "max-h-56", "overflow-y-auto rounded-lg border border-border")}
         role="listbox"
         aria-label="Repositories"
       >

@@ -11,32 +11,14 @@ import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } 
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
-import {
-  GITHUB_INSTALL_REQUEST_NEXT,
-  githubInstallRequestBody,
-  githubInstallRequestSettingsTitle,
-} from "@/lib/githubInstallRequestCopy";
-import {
-  hostedGitHubAppSlug,
-  hostedGitHubInstallRequested,
-  hostedGitHubInstallRequestedAccount,
-  hostedGitHubState,
-  pendingGitHubInstallations,
-} from "@/lib/hostedGitHubInstall";
-import {
-  GITHUB_SETUP_ORG_PARAM,
-  GITHUB_SETUP_REQUEST_PARAM,
-  GITHUB_SETUP_REQUEST_VALUE,
-} from "@/lib/integrationSetupReturn";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { cn } from "@/lib/utils";
-import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { CircleX, Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DeleteModal } from "../CapabilityBasedIntegrationDetails/DeleteModal";
 import { Header } from "../CapabilityBasedIntegrationDetails/Header";
@@ -83,7 +65,6 @@ function TabButton({
 
 export function LegacyIntegrationDetails({ organizationId, integration }: LegacyIntegrationDetailsProps) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const integrationsHref = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [activeTab, setActiveTab] = useState<LegacyIntegrationTab>("configuration");
@@ -121,16 +102,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     () => groupNodeRefsByCanvas(integration.status?.usedIn || []),
     [integration.status?.usedIn],
   );
-  const pendingInstallations = pendingGitHubInstallations(integration.status?.metadata);
-  const pendingInstallState = hostedGitHubState(integration.status?.metadata);
-  const installRequested =
-    searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
-    hostedGitHubInstallRequested(integration.status?.metadata);
-  const installRequestedOrganization =
-    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
-    hostedGitHubInstallRequestedAccount(integration.status?.metadata);
-  const showInstallPicker =
-    pendingInstallations.length >= 1 && pendingInstallState !== "" && integration.status?.state !== "ready";
   const browserAction = integration.status?.browserAction;
   const instructions = integrationDef?.instructions?.trim();
   const hasChanges =
@@ -181,16 +152,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       />
 
       <div className="space-y-6">
-        {installRequested && integration.status?.state !== "ready" ? (
-          <Alert data-testid="github-install-requested">
-            <AlertTitle>{githubInstallRequestSettingsTitle(installRequestedOrganization)}</AlertTitle>
-            <AlertDescription>
-              <p>{githubInstallRequestBody(installRequestedOrganization)}</p>
-              <p>{GITHUB_INSTALL_REQUEST_NEXT}</p>
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
         {integration.status?.state === "error" && integration.status.stateDescription ? (
           <Alert className="border-destructive/40 bg-destructive/10 text-destructive [&>svg+div]:translate-y-0 [&>svg]:top-[14px] [&>svg]:text-destructive">
             <CircleX className="size-4" />
@@ -199,13 +160,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
           </Alert>
         ) : null}
 
-        {showInstallPicker ? (
-          <HostedGitHubInstallPicker
-            installations={pendingInstallations}
-            state={pendingInstallState}
-            appSlug={hostedGitHubAppSlug(integration.status?.metadata)}
-          />
-        ) : browserAction ? (
+        {browserAction ? (
           <IntegrationInstructions
             description={browserAction.description}
             tone="settings"
