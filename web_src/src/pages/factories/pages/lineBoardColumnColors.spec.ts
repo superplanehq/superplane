@@ -10,14 +10,16 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
+  it("lists eight colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(8);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:border-\S+\/\d+/.test(color.borderClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
+    expect(lineBoardColumnColorById("rose")?.label).toBe("Rose");
+    expect(lineBoardColumnColorById("indigo")?.label).toBe("Indigo");
   });
 
   it("resolves a lane class from a colour id", () => {
