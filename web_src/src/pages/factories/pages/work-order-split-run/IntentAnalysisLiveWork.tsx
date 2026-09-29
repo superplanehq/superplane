@@ -181,7 +181,7 @@ function liveStatus(
       return undefined;
     }
     if (latest.text.trim()) {
-      return collapseReasoning ? undefined : { label: "Planning next step…" };
+      return collapseReasoning ? undefined : { label: "Writing response…" };
     }
     return { label: "Writing response…" };
   }

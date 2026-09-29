@@ -7,10 +7,8 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { AgentActivity } from "../agentActivity";
-import { AgentActivityView } from "../AgentActivityView";
-import { AgentLiveStatus } from "../IntentAnalysisLiveWork";
-import { activityFromAgentStep } from "./activityFromAgentStep";
-import { JumpToLatestPill } from "../JumpToLatestPill";
+import { activityFollowTick, activityFromAgentStep } from "./activityFromAgentStep";
+import { StepMarkerDetail } from "./AgentStepMarkerBody";
 import { useFollowLogScroll } from "../useFollowLogScroll";
 import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
@@ -201,7 +199,7 @@ function AgentStepMarker({
   const activity = liveActivity && liveActivity.items.length > 0 ? liveActivity : activityFromAgentStep(step);
   const follow = useFollowLogScroll<HTMLDivElement>(
     running ? step.id : null,
-    liveActive ? (activity?.items.length ?? 0) : step.events.length,
+    liveActive ? activityFollowTick(activity) : step.events.length,
   );
   const row = (
     <Marker className={cn("min-w-0 py-1", running && "bg-muted")}>
@@ -246,54 +244,18 @@ function AgentStepMarker({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="min-w-0">
-        {running ? (
-          <div className="relative min-w-0" data-testid={liveActive ? liveTestId : undefined}>
-            <div
-              ref={follow.scrollRef}
-              onScroll={follow.onScroll}
-              className={cn("min-w-0 overflow-y-auto py-0.5", defaultOpen ? "max-h-[60vh]" : "max-h-80")}
-              data-testid={`redesign-step-log-${step.id}`}
-            >
-              <StepActivity activity={activity} live={liveActive} />
-            </div>
-            {liveActive ? (
-              <AgentLiveStatus
-                active
-                activity={liveActivity ?? activity}
-                startingLabel="Starting agent…"
-                collapseReasoning={false}
-              />
-            ) : null}
-            {follow.showJumpToLatest ? (
-              <JumpToLatestPill
-                onJumpToLatest={() => follow.setFollowing(true)}
-                testId={`redesign-step-older-${step.id}`}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <div className="min-w-0 py-0.5">
-            <StepActivity activity={activity} live={false} />
-          </div>
-        )}
+        <StepMarkerDetail
+          step={step}
+          activity={activity}
+          running={running}
+          liveActive={liveActive}
+          liveActivity={liveActivity}
+          liveTestId={liveTestId}
+          defaultOpen={defaultOpen}
+          follow={follow}
+        />
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-function StepActivity({ activity, live }: { activity?: AgentActivity; live: boolean }) {
-  if (!activity) {
-    return null;
-  }
-  return (
-    <AgentActivityView
-      activity={activity}
-      live={live}
-      collapseCompleted={false}
-      collapseReasoning={false}
-      expandableCommands
-      tone="log"
-    />
   );
 }
 

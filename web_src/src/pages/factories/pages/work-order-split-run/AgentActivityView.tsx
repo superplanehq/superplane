@@ -229,10 +229,24 @@ function ToolLine({
   tone: "chat" | "log";
   expandableCommands: boolean;
 }) {
-  if (isCommandTool(tool)) {
-    return <CommandLine tool={tool} expandable={expandableCommands} />;
+  const line = isCommandTool(tool) ? (
+    <CommandLine tool={tool} expandable={expandableCommands} />
+  ) : (
+    <ToolLabel tool={tool} tone={tone} />
+  );
+  const output = tone === "log" ? tool.output.trim() : "";
+  if (!output) {
+    return line;
   }
+  return (
+    <div>
+      {line}
+      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{output}</pre>
+    </div>
+  );
+}
 
+function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }) {
   const label = agentToolDisplayText(tool);
   return (
     <div

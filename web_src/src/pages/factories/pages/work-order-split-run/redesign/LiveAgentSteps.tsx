@@ -8,6 +8,7 @@ import { useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 import { activitiesFromLiveLogSections, isRunnerComponent, notesForLiveStream } from "../streamNotesFromLiveLog";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
+import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
@@ -66,8 +67,7 @@ export function LiveAgentSteps({
   }
 
   const running = runners.some((line) => line.status === "running" && Boolean(line.executionId));
-  const transcript = runners.flatMap((line) => liveByLine[line.id]?.activities ?? []);
-  const lastActivity = [...transcript].reverse().find((activity) => activity.items.length > 0) ?? transcript.at(-1);
+  const liveActivity = activityFromTranscript(runners.flatMap((line) => liveByLine[line.id]?.activities ?? []));
 
   return (
     <>
@@ -85,12 +85,12 @@ export function LiveAgentSteps({
         <AgentStepMarkers
           stage={shown}
           expandSteps={expandSteps}
-          liveActivity={running ? lastActivity : undefined}
+          liveActivity={running ? liveActivity : undefined}
           liveActive={running}
         />
       ) : running ? (
         <div data-testid={`redesign-live-activity-${stage.id}`}>
-          <AgentLiveStatus active activity={lastActivity} startingLabel="Starting agent…" />
+          <AgentLiveStatus active activity={liveActivity} startingLabel="Starting agent…" />
         </div>
       ) : (
         note

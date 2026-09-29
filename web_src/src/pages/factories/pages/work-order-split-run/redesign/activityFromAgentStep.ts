@@ -7,7 +7,7 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
   const items: AgentActivityItem[] = [];
   const status = activityStatus(step.status);
 
-  if (step.output?.trim() && step.events.length === 0) {
+  if (step.output?.trim()) {
     items.push({
       type: "tool",
       id: `${step.id}-output`,
@@ -61,6 +61,33 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
     sequence: items.length,
     items,
     truncated: false,
+  };
+}
+
+/** Scroll follow tick so a growing last paragraph still pins the log. */
+export function activityFollowTick(activity?: AgentActivity): string {
+  const last = activity?.items.at(-1);
+  const growing =
+    last?.type === "content" ? last.text.length : last?.type === "tool" ? last.input.length + last.output.length : 0;
+  return `${activity?.items.length ?? 0}:${growing}`;
+}
+
+/** Joins every live turn so the open step keeps earlier activity. */
+export function activityFromTranscript(activities: AgentActivity[]): AgentActivity | undefined {
+  const withItems = activities.filter((activity) => activity.items.length > 0);
+  if (withItems.length === 0) {
+    return undefined;
+  }
+  const last = withItems[withItems.length - 1];
+  if (withItems.length === 1) {
+    return last;
+  }
+  return {
+    ...last,
+    id: "live-transcript",
+    items: withItems.flatMap((activity) => activity.items),
+    sequence: last.sequence,
+    status: withItems.some((activity) => activity.status === "running") ? "running" : last.status,
   };
 }
 

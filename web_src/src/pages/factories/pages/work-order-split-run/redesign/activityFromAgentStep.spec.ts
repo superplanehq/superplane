@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { activityFromAgentStep } from "./activityFromAgentStep";
+import { activityFromAgentStep, activityFromTranscript } from "./activityFromAgentStep";
 import type { AgentStep } from "./automationsViewModel";
 
 function step(overrides: Partial<AgentStep>): AgentStep {
@@ -64,6 +64,46 @@ describe("activityFromAgentStep", () => {
     expect(activity?.status).toBe("running");
     expect(activity?.items).toEqual([
       expect.objectContaining({ type: "content", status: "passed", text: "Let me read the factory handler." }),
+    ]);
+  });
+
+  it("keeps the command detail when the step also has child events", () => {
+    const activity = activityFromAgentStep(
+      step({
+        title: "Clone Repo",
+        output: "git clone https://example.com/repo.git",
+        events: [{ kind: "note", id: "n1", text: "Cloned the repository." }],
+      }),
+    );
+
+    expect(activity?.items).toEqual([
+      expect.objectContaining({ type: "tool", input: "git clone https://example.com/repo.git" }),
+      expect.objectContaining({ type: "content", text: "Cloned the repository." }),
+    ]);
+  });
+
+  it("joins earlier turns into the open transcript", () => {
+    const first = activityFromAgentStep(
+      step({
+        id: "turn-1",
+        events: [{ kind: "note", id: "n1", text: "First I inspect the host." }],
+      }),
+    );
+    const second = activityFromAgentStep(
+      step({
+        id: "turn-2",
+        status: "running",
+        events: [{ kind: "note", id: "n2", text: "Then I install bun." }],
+      }),
+    );
+
+    const activity = activityFromTranscript([first!, second!]);
+
+    expect(activity?.id).toBe("live-transcript");
+    expect(activity?.status).toBe("running");
+    expect(activity?.items.map((item) => ("text" in item ? item.text : ""))).toEqual([
+      "First I inspect the host.",
+      "Then I install bun.",
     ]);
   });
 });

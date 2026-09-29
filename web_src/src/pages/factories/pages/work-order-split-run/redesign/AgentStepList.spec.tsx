@@ -137,4 +137,40 @@ describe("AgentStepMarkers", () => {
     expect(screen.getByRole("status", { name: "Thinking" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Thinking");
   });
+
+  it("names a streaming assistant reply Writing response", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep({
+          id: "implementation",
+          title: "Implementation",
+          type: "prompt",
+          status: "running",
+          summary: "",
+          toolCount: 0,
+          events: [],
+        })}
+        liveActive
+        liveActivity={{
+          id: "live-1",
+          provider: "runner",
+          status: "running",
+          sequence: 2,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "note-1",
+              kind: "assistant",
+              text: "Bun is not installed on the host.",
+              status: "running",
+              truncated: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Writing response…" })).toBeInTheDocument();
+  });
 });

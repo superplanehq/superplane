@@ -132,6 +132,53 @@ describe("LiveAgentSteps", () => {
     expect(screen.queryByText("<path>")).not.toBeInTheDocument();
   });
 
+  it("keeps earlier recorded turns in the open running step", async () => {
+    const prior: AgentActivity = {
+      id: "activity-0",
+      provider: "opencode",
+      status: "passed",
+      sequence: 2,
+      truncated: false,
+      items: [
+        {
+          type: "content",
+          id: "note-0",
+          kind: "assistant",
+          text: "First I inspect the host.",
+          status: "passed",
+          truncated: false,
+        },
+      ],
+    };
+    vi.mocked(useLiveLogStream).mockReturnValue(
+      idleStream({
+        sections: [
+          {
+            index: 1,
+            text: "Implementation",
+            kind: "prompt",
+            preview: "",
+            lines: [],
+            events: [],
+            activities: [prior, LIVE_ACTIVITY],
+            status: "running",
+            duration_ms: null,
+            started_at: 1,
+            collapsed: false,
+          },
+        ],
+        activityState: { activities: [prior, LIVE_ACTIVITY], seenEventIds: new Set() },
+      }),
+    );
+
+    render(<LiveAgentSteps stage={implementStage()} phase={implementPhase()} organizationId="org-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("First I inspect the host.")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Inspecting the retry path.")).toBeInTheDocument();
+  });
+
   it("maps OpenCode section events into the live chat when activity records are absent", async () => {
     vi.mocked(useLiveLogStream).mockReturnValue(
       idleStream({

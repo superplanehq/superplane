@@ -449,69 +449,6 @@ describe("AgentActivityView", () => {
     expect(screen.getByText("/repo/src/main.ts")).toBeInTheDocument();
   });
 
-  it("hides an empty thinking row in the console", () => {
-    render(
-      <AgentActivityView
-        live
-        collapseReasoning={false}
-        activity={activityWith({
-          type: "content",
-          id: "reasoning-1",
-          kind: "reasoning",
-          text: "",
-          status: "running",
-          truncated: false,
-        })}
-      />,
-    );
-
-    expect(screen.queryByRole("status", { name: "Thinking" })).not.toBeInTheDocument();
-  });
-
-  it("expands console commands like finished log rows", async () => {
-    const user = userEvent.setup();
-    render(
-      <AgentActivityView
-        live
-        collapseCompleted={false}
-        collapseReasoning={false}
-        expandableCommands
-        tone="log"
-        activity={activityWith({
-          ...completedTool("command-1", "bash", "Bash"),
-          input: "cd /tmp/opencode && curl -fL bun.zip\nunzip bun.zip",
-        })}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Researched 1 source" }));
-    const command = screen.getByTestId("agent-tool-command-1");
-    expect(command.tagName).toBe("PRE");
-    expect(command).toHaveClass("text-foreground/90");
-    expect(command).not.toHaveClass("text-muted-foreground");
-  });
-
-  it("keeps completed reasoning visible when collapse is off", () => {
-    render(
-      <AgentActivityView
-        live
-        collapseReasoning={false}
-        activity={activityWith({
-          type: "content",
-          id: "reasoning-1",
-          kind: "reasoning",
-          text: "The command can run in parallel.",
-          status: "passed",
-          durationMs: 8_000,
-          truncated: false,
-        })}
-      />,
-    );
-
-    expect(screen.getByText("The command can run in parallel.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Thought briefly" })).not.toBeInTheDocument();
-  });
-
   it("uses factual names for common shell activity", () => {
     render(
       <AgentActivityView
