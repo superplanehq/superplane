@@ -126,6 +126,44 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 	})
 
+	t.Run("risk score runner secrets use the GitHub installation name", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+		factoryModel := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+		installationName := support.RandomName("github")
+		integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", installationName, map[string]any{})
+		require.NoError(t, err)
+
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "risk-score",
+			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
+			Integrations: []*pb.FactoryAppTemplateIntegration{{
+				Type: "github",
+				Id:   integration.ID.String(),
+				Name: "GitHub",
+			}},
+			Agent: &pb.FactoryAppTemplateAgent{
+				Component:        models.SuperPlaneRunnerComponent,
+				CredentialSource: "hosted",
+			},
+		})
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		entrypoint := findYAMLNode(t, materialized, "on-pr-risk")
+		assert.Equal(t, &yaml.IntegrationRef{ID: integration.ID.String(), Name: installationName}, entrypoint.Integration)
+
+		agent := findYAMLNode(t, materialized, "assess-risk")
+		assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+		assert.Equal(t, installationName, integrationNameFromEnvironment(t, agent))
+	})
+
 	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		factoryModel := newFactory(t)
@@ -399,6 +437,20 @@ func assertSuperPlaneRunnerNode(t *testing.T, node *yaml.Node) {
 	assert.Equal(t, models.SuperPlaneRunnerComponent, node.Component)
 	assert.Nil(t, node.Configuration["model"])
 	assert.Nil(t, node.Configuration["credentials"])
+}
+
+func integrationNameFromEnvironment(t *testing.T, node *yaml.Node) string {
+	t.Helper()
+	entries, ok := node.Configuration["environmentFrom"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, entries)
+	entry, ok := entries[0].(map[string]any)
+	require.True(t, ok)
+	ref, ok := entry["integration"].(map[string]any)
+	require.True(t, ok)
+	name, ok := ref["name"].(string)
+	require.True(t, ok)
+	return name
 }
 
 func assertNoRunnerNode(t *testing.T, canvas *yaml.Canvas) {
