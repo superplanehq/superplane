@@ -14,6 +14,9 @@ import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
 const taskConsoleEnabled = { current: true };
+const { closeMutateAsync } = vi.hoisted(() => ({
+  closeMutateAsync: vi.fn(),
+}));
 const mergeability = {
   current: {
     canMerge: true,
@@ -37,8 +40,14 @@ vi.mock("@/hooks/useFactoryData", () => {
       data: { id: "factory-1", planning: factoryPlanning.current },
       isPending: false,
     }),
+    useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
   };
 });
+
+vi.mock("@/lib/toast", () => ({
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+}));
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
@@ -69,6 +78,8 @@ vi.mock("../planningSessionClient", () => ({
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
 }));
+
+import { showSuccessToast } from "@/lib/toast";
 
 import {
   DRAFT_WORK_ORDER,
@@ -250,6 +261,8 @@ describe("WorkOrderSplitRunPopup", () => {
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     findPlanningSessionMock.mockReset();
     findPlanningSessionMock.mockResolvedValue(null);
+    closeMutateAsync.mockReset().mockResolvedValue({});
+    vi.mocked(showSuccessToast).mockReset();
     mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
@@ -1382,6 +1395,55 @@ describe("WorkOrderSplitRunPopup", () => {
     const share = screen.getByTestId("popup-work-order-copy-link-button");
     expect(archive).toHaveAttribute("aria-label", "Archive");
     expect(archive.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
+  });
+
+  it("archives a started open task as rejected and closes the popup", async () => {
+    taskConsoleEnabled.current = false;
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: OPEN_WORK_ORDER.id,
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
+      onClose,
+    });
+
+    await user.click(screen.getByTestId("popup-work-order-archive-button"));
+
+    await waitFor(() => {
+      expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: OPEN_WORK_ORDER.id, result: "RESULT_REJECTED" });
+    });
+    expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Archive while an Implement run is pending", () => {
+    const fixture = splitRunFixtureForWorkOrder({
+      ...OPEN_WORK_ORDER,
+      lineDispatches: [
+        {
+          id: "dispatch-pending-implement",
+          line: { id: "line-1", name: "plan-and-implement" },
+          state: "STATE_ACTIVE",
+          stepExecutions: [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_PENDING",
+              result: "RESULT_UNKNOWN",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(fixture.footer.kind).toBe("waiting");
+    expect(fixture.footer.status).toBe("running");
+    renderPopup({ fixture });
+
+    expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
   it("hides Archive in the header of a closed popup", () => {

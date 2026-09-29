@@ -329,6 +329,7 @@ describe("showsArchive", () => {
 
   it("hides Archive while the task is running or closed", () => {
     expect(showsArchive({ kind: "running", status: "running" })).toBe(false);
+    expect(showsArchive({ kind: "waiting", status: "running" })).toBe(false);
     expect(showsArchive({ kind: "done", status: "completed" })).toBe(false);
     expect(showsArchive({ kind: "done", status: "rejected" })).toBe(false);
   });

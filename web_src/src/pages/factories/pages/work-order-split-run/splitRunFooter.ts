@@ -89,7 +89,7 @@ export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus):
 }
 
 export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
-  return footer.kind !== "running" && !isClosedWorkOrderDisplayStatus(footer.status);
+  return footer.kind !== "running" && footer.status !== "running" && !isClosedWorkOrderDisplayStatus(footer.status);
 }
 
 export function isSplitRunStopChoiceAvailable(choice: SplitRunStopChoice, status?: WorkOrderDisplayStatus): boolean {
