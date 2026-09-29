@@ -22,7 +22,12 @@ export function usePlanningSetup(
     setError(undefined);
     try {
       await updateFactory.mutateAsync({
-        planning: planningSettingsToApi({ enabled, clarity, confidence }),
+        planning: planningSettingsToApi({
+          enabled,
+          clarity,
+          confidence,
+          autoStartLineId: initial.autoStartLineId,
+        }),
       });
       return true;
     } catch (cause) {

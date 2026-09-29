@@ -991,6 +991,8 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
+  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message FactoryLine {
@@ -1733,6 +1735,9 @@ message WorkOrder {
   PlanningSessionSummary planning_session = 23;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 24;
+  // Set after an auto-start attempt that did not start the task.
+  // Empty before the attempt, and empty again after a successful start.
+  string auto_start_line_id = 25;
 }
 
 // WorkOrderSummary is the list row for a work order.
