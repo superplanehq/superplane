@@ -22,24 +22,24 @@ func SearchDependabotIntakeSetupItems(
 ) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to search dependabot setup items")
+		return nil, intakeErrorToStatus(err, "failed to search dependabot setup items")
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to search dependabot setup items")
+		return nil, intakeErrorToStatus(err, "failed to search dependabot setup items")
 	}
 
 	severities := normalizeDependabotSeverities(req.GetDependabotSeverities())
 	source, err := newDependabotIntakeItemSourceForFactory(ctx, deps, db, factory, severities)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to search dependabot setup items")
+		return nil, intakeErrorToStatus(err, "failed to search dependabot setup items")
 	}
 
 	items, err := source.Search(ctx, "", intakeItemLimit("", int(req.GetLimit())))
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to search dependabot setup items")
+		return nil, intakeErrorToStatus(err, "failed to search dependabot setup items")
 	}
 
 	serialized := make([]*pb.FactoryIntakeItem, 0, len(items))
