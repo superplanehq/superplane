@@ -1,8 +1,8 @@
 import type { FactoriesFactory } from "@/api-client";
 
-import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
+import { PLANNING_SETTINGS_COPY, planningAutoStartHelper } from "./planningSettingsCopy";
 
-export { PLANNING_SETTINGS_COPY };
+export { PLANNING_SETTINGS_COPY, planningAutoStartHelper };
 
 export type PlanningSettingsTab = "general" | "agent" | "automation";
 

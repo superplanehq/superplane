@@ -101,3 +101,7 @@ export const PLANNING_SETTINGS_COPY = {
   wizardPreviewClarityOff: "The agent plans with the details it has.",
   wizardFinishError: "Could not save Planning settings.",
 } as const;
+
+export function planningAutoStartHelper(lineName: string): string {
+  return `Start each task on ${lineName} when the plan scores 5.`;
+}

@@ -14,7 +14,7 @@ import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
-import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
+import { PLANNING_SETTINGS_COPY, planningAutoStartHelper } from "./planningSettingsCopy";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import {
   DEFAULT_PLANNING_SETTINGS,
@@ -161,9 +161,10 @@ describe("PlanningSettingsPopup", () => {
 
     expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
     await user.click(within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch"));
-    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
+    expect(screen.getByText(planningAutoStartHelper("implement"))).toBeInTheDocument();
     await user.click(screen.getByTestId("planning-settings-auto-start-line"));
     await user.click(screen.getByRole("option", { name: "hotfix" }));
+    expect(screen.getByText(planningAutoStartHelper("hotfix"))).toBeInTheDocument();
     await user.click(screen.getByTestId("planning-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith({
@@ -172,6 +173,13 @@ describe("PlanningSettingsPopup", () => {
       confidence: true,
       autoStartLineId: "line-hotfix",
     });
+  });
+
+  it("names the only line when the selector is hidden", () => {
+    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { lines: [{ id: "line-implement", name: "implement" }] });
+
+    expect(screen.getByText(planningAutoStartHelper("implement"))).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-settings-auto-start-line")).not.toBeInTheDocument();
   });
 
   it("disables Auto-start when Planning is off and keeps the line", () => {

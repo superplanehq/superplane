@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import {
   PLANNING_SETTINGS_COPY,
+  planningAutoStartHelper,
   type PlanningAutoStartLine,
   type PlanningDraftSettings,
 } from "./planningSettingsModel";
@@ -101,13 +102,14 @@ function AutoStartSection({
   const unavailable = !draft.enabled || !draft.confidence || lines.length === 0;
   const selected = lines.find((line) => line.id === draft.autoStartLineId);
   const checked = Boolean(selected);
+  const named = selected ?? (lines.length === 1 ? lines[0] : undefined);
   const showLineSelect = lines.length > 1 && checked;
 
   return (
     <div data-testid="planning-settings-auto-start">
       <PlanningToggleRow
         title={PLANNING_SETTINGS_COPY.autoStartLabel}
-        description={autoStartDescription(draft, lines)}
+        description={autoStartDescription(draft, lines, named)}
         checked={checked}
         disabled={unavailable}
         onCheckedChange={(next) => {
@@ -151,7 +153,11 @@ function AutoStartSection({
   );
 }
 
-function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoStartLine[]): string {
+function autoStartDescription(
+  draft: PlanningDraftSettings,
+  lines: PlanningAutoStartLine[],
+  named: PlanningAutoStartLine | undefined,
+): string {
   if (!draft.enabled) {
     return PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper;
   }
@@ -161,7 +167,10 @@ function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoS
   if (lines.length === 0) {
     return PLANNING_SETTINGS_COPY.autoStartNoBoardHelper;
   }
-  return PLANNING_SETTINGS_COPY.autoStartHelper;
+  if (!named) {
+    return PLANNING_SETTINGS_COPY.autoStartHelper;
+  }
+  return planningAutoStartHelper(named.name);
 }
 
 function PlanningToggleRow({
