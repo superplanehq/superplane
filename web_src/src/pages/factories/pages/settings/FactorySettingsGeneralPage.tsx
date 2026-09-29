@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Switch } from "@/components/ui/switch";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useDeleteFactory, useSetFactoryVisibility, useUpdateFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -51,6 +52,7 @@ export function FactorySettingsGeneralPage() {
 
   const canUpdate = canAct("factories", "update");
   const canDelete = canAct("factories", "delete");
+  const canPublish = canAct("factories", "publish");
   const savedName = factory.name ?? "";
   const savedKey = factory.key ?? "";
   const isDirty = name.trim() !== savedName || key !== savedKey;
@@ -118,6 +120,14 @@ export function FactorySettingsGeneralPage() {
             if (keyError) setKeyError("");
           }}
           onSave={handleSave}
+        />
+
+        <VisibilitySection
+          organizationId={organizationId}
+          factoryId={factoryId}
+          isPublic={Boolean(factory.public)}
+          canPublish={canPublish}
+          permissionsLoading={permissionsLoading}
         />
 
         <DangerZoneSection
@@ -218,6 +228,65 @@ function WorkspaceDetailsSection({
           >
             Save
           </LoadingButton>
+        </PermissionTooltip>
+      </div>
+    </FactorySettingsCard>
+  );
+}
+
+interface VisibilitySectionProps {
+  organizationId: string;
+  factoryId: string;
+  isPublic: boolean;
+  canPublish: boolean;
+  permissionsLoading: boolean;
+}
+
+function VisibilitySection({
+  organizationId,
+  factoryId,
+  isPublic,
+  canPublish,
+  permissionsLoading,
+}: VisibilitySectionProps) {
+  const setVisibility = useSetFactoryVisibility(organizationId, factoryId);
+  const actionLabel = isPublic ? "Change to private" : "Change to public";
+
+  const handleChange = async (nextPublic: boolean) => {
+    if (nextPublic === isPublic) {
+      return;
+    }
+    try {
+      await setVisibility.mutateAsync(nextPublic);
+      showSuccessToast(nextPublic ? "Workspace is public." : "Workspace is private.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update workspace visibility"));
+    }
+  };
+
+  return (
+    <FactorySettingsCard title="Visibility" data-testid="factory-settings-visibility-card">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[13px] font-medium text-foreground">{isPublic ? "Public" : "Private"}</p>
+          <p className="text-[12px] text-muted-foreground">
+            Anyone with the line link can view the board. They cannot open tasks, logs, or settings.
+          </p>
+        </div>
+        <PermissionTooltip
+          allowed={canPublish || permissionsLoading}
+          message="You do not have permission to change workspace visibility."
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-[12px] text-muted-foreground">{actionLabel}</span>
+            <Switch
+              checked={isPublic}
+              disabled={!canPublish || setVisibility.isPending}
+              onCheckedChange={(checked) => void handleChange(checked)}
+              aria-label={actionLabel}
+              data-testid="factory-settings-visibility"
+            />
+          </div>
         </PermissionTooltip>
       </div>
     </FactorySettingsCard>

@@ -43,3 +43,4 @@ p,/roles/org_admin,/org/*,api_keys,update
 p,/roles/org_admin,/org/*,api_keys,delete
 p,/roles/org_admin,/org/*,org,update
 p,/roles/org_admin,/org/*,org,delete
+p,/roles/org_admin,/org/*,factories,publish

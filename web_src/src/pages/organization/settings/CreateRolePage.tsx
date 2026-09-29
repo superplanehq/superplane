@@ -250,6 +250,14 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         resource: "factories",
         action: "delete",
       },
+      {
+        id: "factory.publish",
+        name: "Publish Factories",
+        description: "Make a factory board public or private",
+        category: "Factories",
+        resource: "factories",
+        action: "publish",
+      },
     ],
   },
   {

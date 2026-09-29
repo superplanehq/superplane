@@ -14,6 +14,10 @@ export const setupApiInterceptor = (): void => {
   const nextFetch: typeof globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const response = await originalFetch(input, init);
 
+    if (requestPath(input).includes("/api/v1/public/")) {
+      return response;
+    }
+
     if (!isAuthenticatedRequest(input)) {
       return response;
     }
