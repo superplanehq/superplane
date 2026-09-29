@@ -6,8 +6,9 @@ import { HostedCreditHeaderKicker } from "./HostedCreditHeaderKicker";
 
 /**
  * Compact hosted-credit chip next to the page title. A healthy trial uses the
- * violet palette. Trial ended, no plan, low credit, and empty credit use the
- * amber palette. The action opens Organization Billing.
+ * violet palette. An open trial with no credit, a trial that ended, no plan,
+ * low credit, and empty credit use the amber palette. The action opens
+ * Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditHeaderKicker",
@@ -36,6 +37,16 @@ export const Trial: Story = {
   args: {
     kind: "trial",
     remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** The trial is still open and hosted credit is spent. The amber chip links to billing. */
+export const TrialEmpty: Story = {
+  name: "Trial, no credit",
+  args: {
+    kind: "trial-empty",
+    remainingCreditCents: 0,
     welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
   },
 };

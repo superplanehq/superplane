@@ -1,5 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -75,6 +76,35 @@ describe("WorkOrderIntentDocument score evidence", () => {
     ).toHaveLength(4);
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
+  });
+
+  it("shows the no-credit warning in the verdict instead of ready to start", () => {
+    renderIntentDocument(
+      <MemoryRouter>
+        <WorkOrderIntentDocument
+          {...INTENT_DOC}
+          artifacts={[INTENT]}
+          analysis={analysisChat({
+            view: WAITING_WITH_PLAN,
+            creditNotice: {
+              headline: "No credit",
+              text: "This organization is out of credit.",
+              actionLabel: "Open billing",
+              href: "/demo/organization/billing",
+              warning: true,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "warning");
+    expect(verdict).toHaveTextContent("No credit");
+    expect(verdict).toHaveTextContent("This organization is out of credit.");
+    expect(verdict).not.toHaveTextContent(DRAFT_READINESS_NOTES.ready.headline);
+    expect(screen.getByTestId("split-run-intent-credit-billing")).toHaveAttribute("href", "/demo/organization/billing");
+    expect(screen.getByRole("link", { name: "Open billing" })).toBeInTheDocument();
   });
 
   it("warns in the verdict when Clarity is low and explains what to do", () => {

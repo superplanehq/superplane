@@ -3,7 +3,11 @@ import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
-import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
+import {
+  getWorkOrderAttentionReasons,
+  getWorkOrderFailedAttentionLabel,
+  type WorkOrderAttentionReason,
+} from "../lib/workOrderAttention";
 import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
@@ -171,6 +175,7 @@ export function WorkOrderCard({
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
+          failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}
@@ -235,6 +240,7 @@ function WorkOrderCardStatusRow({
   reasons,
   feedbackLabel,
   checksPassedLabel,
+  failedLabel,
   cardPullRequest,
   hasAgentQuestion,
   showPullRequestMerge,
@@ -243,6 +249,7 @@ function WorkOrderCardStatusRow({
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   checksPassedLabel?: string;
+  failedLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
   showPullRequestMerge?: boolean;
@@ -266,7 +273,7 @@ function WorkOrderCardStatusRow({
         <WorkOrderAttentionChip
           key={reason}
           reason={reason}
-          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+          label={attentionChipLabel(reason, { feedbackLabel, checksPassedLabel, failedLabel })}
         />
       ))}
     </div>
@@ -275,14 +282,16 @@ function WorkOrderCardStatusRow({
 
 function attentionChipLabel(
   reason: WorkOrderAttentionReason,
-  feedbackLabel?: string,
-  checksPassedLabel?: string,
+  labels: { feedbackLabel?: string; checksPassedLabel?: string; failedLabel?: string },
 ): string | undefined {
   if (reason === "feedback") {
-    return feedbackLabel;
+    return labels.feedbackLabel;
   }
   if (reason === "checksPassed") {
-    return checksPassedLabel;
+    return labels.checksPassedLabel;
+  }
+  if (reason === "failed") {
+    return labels.failedLabel;
   }
   return undefined;
 }

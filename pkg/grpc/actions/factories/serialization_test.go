@@ -287,6 +287,27 @@ func TestSerializeWorkOrderExecution_OmitsRunWhenRunIDNil(t *testing.T) {
 	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, out.GetState())
 	assert.Equal(t, pb.WorkOrderExecution_RESULT_PASSED, out.GetResult())
 	assert.Equal(t, "implement", out.GetStep())
+	assert.Empty(t, out.GetFailureReason())
+}
+
+func TestSerializeWorkOrderExecution_IncludesFailureReason(t *testing.T) {
+	now := time.Now()
+	reason := models.WorkOrderExecutionFailureReasonNoHostedCredit
+	out := serializeWorkOrderExecution(models.FactoryWorkOrderExecutionRecord{
+		FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+			ID:            uuid.New(),
+			LineID:        uuid.New(),
+			StepName:      "implement",
+			Status:        models.FactoryWorkOrderExecutionStatusFinished,
+			Result:        models.CanvasRunResultFailed,
+			FailureReason: &reason,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+	}, nil)
+
+	assert.Equal(t, pb.WorkOrderExecution_RESULT_FAILED, out.GetResult())
+	assert.Equal(t, "no_hosted_credit", out.GetFailureReason())
 }
 
 func TestSerializeWorkOrderExecution_IncludesRunWhenRunIDSet(t *testing.T) {
