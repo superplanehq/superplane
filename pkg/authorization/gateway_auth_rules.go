@@ -954,6 +954,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "PUT", Pattern: "/api/v1/factories/{id}/visibility"}: {
+			Resource:                     "factories",
+			Action:                       "publish",
+			DomainType:                   models.DomainTypeOrganization,
+			ResourcePathParams:           []string{IDPathParam},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "PUT", Pattern: "/api/v1/factories/{factory_id}/llm-models"}: {
 			Resource:                     "factories",
 			Action:                       "update",

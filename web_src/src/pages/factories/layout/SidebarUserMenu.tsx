@@ -35,6 +35,8 @@ interface SidebarUserMenuProps {
   organizationName: string;
   defaultOpen?: boolean;
   planLabel?: string;
+  /** Public board visitors do not get links into this workspace. */
+  visitor?: boolean;
 }
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -57,6 +59,7 @@ export function SidebarUserMenu({
   organizationName,
   defaultOpen = false,
   planLabel,
+  visitor = false,
 }: SidebarUserMenuProps) {
   const { account } = useAccount();
   const profileHref = factoryKey
@@ -112,17 +115,20 @@ export function SidebarUserMenu({
         <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
           <OrganizationMenuHeader
             organizationId={organizationId}
-            organizationName={organizationName}
+            organizationName={visitor ? userName : organizationName}
             organizationHref={organizationHref}
-            planLabel={planLabel}
+            planLabel={visitor ? undefined : planLabel}
+            hideActions={visitor}
           />
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild className={MENU_ITEM_CLASS} data-testid="factories-sidebar-profile">
-            <Link to={profileHref}>
-              <UserIcon aria-hidden />
-              Profile
-            </Link>
-          </DropdownMenuItem>
+          {visitor ? null : (
+            <DropdownMenuItem asChild className={MENU_ITEM_CLASS} data-testid="factories-sidebar-profile">
+              <Link to={profileHref}>
+                <UserIcon aria-hidden />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+          )}
           {account?.installation_admin ? (
             <DropdownMenuItem asChild className={MENU_ITEM_CLASS} data-testid="factories-sidebar-installation-admin">
               <Link to="/admin">
@@ -173,11 +179,13 @@ function OrganizationMenuHeader({
   organizationName,
   organizationHref,
   planLabel,
+  hideActions = false,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
   planLabel?: string;
+  hideActions?: boolean;
 }) {
   return (
     <div className="px-1 py-1" data-testid="factories-sidebar-organization">
@@ -188,17 +196,19 @@ function OrganizationMenuHeader({
         >
           {organizationName}
         </p>
-        <DropdownMenuItem
-          asChild
-          aria-label="Organization settings"
-          data-testid="factories-sidebar-organization-settings-link"
-          className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-        >
-          <Link to={organizationHref}>
-            <Settings className="size-3.5" aria-hidden />
-          </Link>
-        </DropdownMenuItem>
-        <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
+        {hideActions ? null : (
+          <DropdownMenuItem
+            asChild
+            aria-label="Organization settings"
+            data-testid="factories-sidebar-organization-settings-link"
+            className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
+          >
+            <Link to={organizationHref}>
+              <Settings className="size-3.5" aria-hidden />
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {hideActions ? null : <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />}
       </div>
       {planLabel ? (
         <p className="px-2 text-[11px] text-muted-foreground" data-testid="factories-sidebar-plan-status">
