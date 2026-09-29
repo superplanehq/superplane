@@ -205,7 +205,9 @@ Further reading:
 
 - Always write clean code: work test-first by default, then keep names clear,
   functions focused, side effects explicit, control flow shallow, and error
-  handling useful.
+  handling useful. Load
+  [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
+  when you write, change, review, or sweep tests.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
 - Go: prefer `any` over `interface{}`.
