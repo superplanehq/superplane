@@ -1130,6 +1130,10 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	assert.Equal(t, line.ID, active.LineID)
 	assert.Empty(t, active.Model)
 	assert.Empty(t, active.ThinkingLevel)
+	assignees, err := reloaded.ListAssignees(db)
+	require.NoError(t, err)
+	require.Len(t, assignees, 1, "auto-started task keeps its creator as owner")
+	assert.Equal(t, order.CreatedByID, &assignees[0].UserID)
 	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
@@ -1139,6 +1143,45 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	activeAgain, err := reloaded.FindActiveLineDispatch(db)
 	require.NoError(t, err)
 	assert.Equal(t, active.ID, activeAgain.ID)
+}
+
+func TestBeginPlanningWaitAndNotify_AutoStartAssignsSessionOwnerWhenOrderHasNone(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", nil, nil, nil)
+	require.NoError(t, err)
+	require.Nil(t, order.CreatedByID, "the bug only shows for tasks without a creator")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(session).Update("created_by_user_id", r.User).Error)
+	session, err = models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.NotNil(t, session.CreatedByUserID)
+
+	line := mustAutoStartLine(t, r, factoryModel, true)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assignees, err := reloaded.ListAssignees(db)
+	require.NoError(t, err)
+	require.Len(t, assignees, 1, "auto-started task without a creator gets the session owner")
+	assert.Equal(t, r.User, assignees[0].UserID)
 }
 
 func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
