@@ -160,7 +160,6 @@ SELECT DISTINCT
   COALESCE(updated_at, NOW())
 FROM app_installations
 WHERE app_name = 'github'
-  AND state = 'ready'
   AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND metadata->>'installationId' ~ '^[0-9]+$'
 ON CONFLICT (provider, installation_id) DO NOTHING;
@@ -196,7 +195,6 @@ CROSS JOIN LATERAL jsonb_array_elements(
   END
 ) AS repository
 WHERE integration.app_name = 'github'
-  AND integration.state = 'ready'
   AND COALESCE((integration.metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND integration.metadata->>'installationId' ~ '^[0-9]+$'
   AND jsonb_typeof(integration.metadata->'repositories') = 'array'
@@ -231,7 +229,6 @@ SELECT
   COALESCE(updated_at, NOW())
 FROM app_installations
 WHERE app_name = 'github'
-  AND state = 'ready'
   AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND metadata->>'installationId' ~ '^[0-9]+$';
 
@@ -289,20 +286,46 @@ INNER JOIN vcs_provider_repositories AS catalog_repository
   ON catalog_repository.provider = 'github'
   AND catalog_repository.repository_id = (repository->>'id')::BIGINT
 WHERE integration.app_name = 'github'
-  AND integration.state = 'ready'
   AND COALESCE((integration.metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND integration.metadata->>'installationId' ~ '^[0-9]+$'
   AND jsonb_typeof(integration.metadata->'repositories') = 'array'
   AND repository->>'id' ~ '^[0-9]+$'
 ON CONFLICT (integration_id, provider, repository_id) DO NOTHING;
 
+-- Remove abandoned setup records only. Referenced error records can contain
+-- workflow configuration even when the legacy setup lost its installation ID.
 DELETE FROM app_installations
-WHERE app_name = 'github'
-  AND COALESCE((metadata->>'hostedApp')::BOOLEAN, FALSE)
+WHERE app_installations.app_name = 'github'
+  AND COALESCE((app_installations.metadata->>'hostedApp')::BOOLEAN, FALSE)
   AND (
-    state <> 'ready'
-    OR metadata->>'installationId' IS NULL
-    OR metadata->>'installationId' !~ '^[0-9]+$'
+    app_installations.state <> 'ready'
+    OR app_installations.metadata->>'installationId' IS NULL
+    OR app_installations.metadata->>'installationId' !~ '^[0-9]+$'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM factories
+    WHERE factories.onboarding_config->>'vcs_integration_id' = app_installations.id::TEXT
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM workflow_nodes
+    WHERE workflow_nodes.app_installation_id = app_installations.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM webhooks
+    WHERE webhooks.app_installation_id = app_installations.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM app_installation_subscriptions
+    WHERE app_installation_subscriptions.installation_id = app_installations.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM app_installation_secrets
+    WHERE app_installation_secrets.installation_id = app_installations.id
   );
 
 UPDATE app_installations
