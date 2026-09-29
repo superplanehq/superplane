@@ -271,9 +271,13 @@ func reconcileFactoryRepository(
 			return err
 		}
 		nodes := slices.Clone(liveVersion.Nodes)
-		changed := replaceGitHubNodeIntegration(nodes, previousVCSIntegrationID, vcsIntegrationID)
+		managedGitHubNodeIDs := map[string]bool{}
+		changed := false
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
+			for _, nodeID := range factoryTemplateGitHubNodeIDs(template.id) {
+				managedGitHubNodeIDs[nodeID] = true
+			}
 			switch template.id {
 			case "line-implementation":
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{
@@ -286,15 +290,35 @@ func reconcileFactoryRepository(
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			case "issue-intake":
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousBacklogRepository, to: repository}}) || changed
+			case "risk-score":
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			}
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
+			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
+				Nodes: nodes,
+				Edges: liveVersion.Edges,
+			})
+			managedGitHubNodeIDs[graph.TriggerNodeID] = true
+			managedGitHubNodeIDs[graph.AuthorPermissionNodeID] = true
 			changed = replaceTriggerRepository(nodes, "github.onIssue", previousBacklogRepository, repository) || changed
 			changed = replaceTriggerRepository(nodes, "github.onDependabotAlert", previousBacklogRepository, repository) || changed
 		}
 		if _, ok := handlerCanvasIDs[canvas.ID]; ok {
+			addPRFeedbackGitHubNodeIDs(managedGitHubNodeIDs, resolvePRFeedbackGraph(models.LiveCanvasSpec{
+				Nodes: nodes,
+				Edges: liveVersion.Edges,
+			}))
 			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
 		}
+		changed = replaceGitHubNodeIntegration(
+			nodes,
+			managedGitHubNodeIDs,
+			previousVCSIntegrationID,
+			vcsIntegrationID,
+			previousAppRepository,
+			previousBacklogRepository,
+		) || changed
 		if !changed {
 			continue
 		}
@@ -322,7 +346,40 @@ func reconcileFactoryRepository(
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
 }
 
-func replaceGitHubNodeIntegration(nodes []models.Node, previousIntegrationID, integrationID string) bool {
+func factoryTemplateGitHubNodeIDs(templateID string) []string {
+	switch templateID {
+	case "line-implementation":
+		return []string{"find-pr", "create-pr", "update-pr", "comment-visual-evidence", "comment-visual-evidence-updated"}
+	case "pr-closure":
+		return []string{"on-pr-closed", "comment-source-issue", "close-source-issue"}
+	case "issue-intake":
+		return []string{"on-issue-labeled", "on-issue-assigned"}
+	case "risk-score":
+		return []string{"on-pr-risk"}
+	default:
+		return nil
+	}
+}
+
+func addPRFeedbackGitHubNodeIDs(nodeIDs map[string]bool, graph prFeedbackGraph) {
+	for _, nodeID := range graph.triggerNodeIDs() {
+		nodeIDs[nodeID] = true
+	}
+	if graph.isChecks() {
+		nodeIDs[graph.WaitChecksNodeID] = true
+		return
+	}
+
+	nodeIDs[prFeedbackAcknowledgeCommentNodeID] = true
+	nodeIDs[prFeedbackAcknowledgeReviewNodeID] = true
+	nodeIDs[prFeedbackAcknowledgeReviewReplyNodeID] = true
+}
+
+func replaceGitHubNodeIntegration(
+	nodes []models.Node,
+	managedNodeIDs map[string]bool,
+	previousIntegrationID, integrationID, previousAppRepository, previousBacklogRepository string,
+) bool {
 	if previousIntegrationID == "" || previousIntegrationID == integrationID {
 		return false
 	}
@@ -335,10 +392,39 @@ func replaceGitHubNodeIntegration(nodes []models.Node, previousIntegrationID, in
 		if strings.TrimSpace(*nodes[i].IntegrationID) != previousIntegrationID {
 			continue
 		}
+		if !managedNodeIDs[nodes[i].ID] && !configurationContainsRepository(
+			nodes[i].Configuration,
+			previousAppRepository,
+			previousBacklogRepository,
+		) {
+			continue
+		}
 		nodes[i].IntegrationID = &integrationID
 		changed = true
 	}
 	return changed
+}
+
+func configurationContainsRepository(value any, repositories ...string) bool {
+	switch current := value.(type) {
+	case map[string]any:
+		for _, child := range current {
+			if configurationContainsRepository(child, repositories...) {
+				return true
+			}
+		}
+		return false
+	case []any:
+		return slices.ContainsFunc(current, func(child any) bool {
+			return configurationContainsRepository(child, repositories...)
+		})
+	case string:
+		return slices.ContainsFunc(repositories, func(repository string) bool {
+			return repository != "" && current == repository
+		})
+	default:
+		return false
+	}
 }
 
 func replaceTriggerRepository(nodes []models.Node, component, previousRepository, repository string) bool {

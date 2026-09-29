@@ -119,19 +119,28 @@ func TestReplaceGitHubNodeIntegration(t *testing.T) {
 	previousID := "old-integration"
 	unrelatedID := "other-integration"
 	nodes := []models.Node{
-		{Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, IntegrationID: &previousID},
-		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &previousID},
-		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &unrelatedID},
-		{Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
+		{ID: "managed", Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
+		{ID: "matching-repository", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/old"}, IntegrationID: &previousID},
+		{ID: "custom", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
+		{ID: "other-integration", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &unrelatedID},
+		{ID: "other-provider", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
 	}
 
-	changed := replaceGitHubNodeIntegration(nodes, previousID, "new-integration")
+	changed := replaceGitHubNodeIntegration(
+		nodes,
+		map[string]bool{"managed": true},
+		previousID,
+		"new-integration",
+		"acme/old",
+		"acme/old",
+	)
 
 	assert.True(t, changed)
 	assert.Equal(t, "new-integration", *nodes[0].IntegrationID)
 	assert.Equal(t, "new-integration", *nodes[1].IntegrationID)
-	assert.Equal(t, unrelatedID, *nodes[2].IntegrationID)
-	assert.Equal(t, previousID, *nodes[3].IntegrationID)
+	assert.Equal(t, previousID, *nodes[2].IntegrationID)
+	assert.Equal(t, unrelatedID, *nodes[3].IntegrationID)
+	assert.Equal(t, previousID, *nodes[4].IntegrationID)
 }
 
 func TestFactoryDefaultBranchFromNodes(t *testing.T) {
