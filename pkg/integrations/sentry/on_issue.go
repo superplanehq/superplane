@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 type OnIssue struct{}
@@ -193,15 +195,18 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	}
 
 	if message.Resource != "issue" {
+		logSkippedIssueEvent("resource", message, config)
 		return nil
 	}
 
 	if !issueActionAllowed(config.Actions, message.Action) {
+		logSkippedIssueEvent("action", message, config)
 		return nil
 	}
 
 	projectSlug := issueProjectSlug(message.Data)
 	if config.Project != "" && config.Project != projectSlug {
+		logSkippedIssueEvent("project", message, config)
 		return nil
 	}
 
@@ -213,6 +218,9 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
 		"description":  t.issueDescription(ctx, message.Data["issue"]),
+	}
+	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
+		payload[SuperplaneReceiptField] = receiptID
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
@@ -237,6 +245,19 @@ func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	// Integration subscriptions are tied to the node lifecycle and are cleaned up by the platform.
 	return nil
+}
+
+func logSkippedIssueEvent(reason string, message *WebhookMessage, config OnIssueConfiguration) {
+	if message == nil {
+		return
+	}
+	logging.LogSentryWebhookInfo("Sentry issue event was not emitted", map[string]any{
+		"reason":             reason,
+		"resource":           message.Resource,
+		"action":             message.Action,
+		"project":            issueProjectSlug(message.Data),
+		"configured_project": config.Project,
+	})
 }
 
 func issueActionAllowed(configured []string, action string) bool {
