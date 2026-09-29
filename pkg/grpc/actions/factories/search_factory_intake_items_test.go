@@ -243,6 +243,18 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		assert.Equal(t, "failed to search factory intake items", message)
 	})
 
+	t.Run("a 429 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusTooManyRequests})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("a 408 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusRequestTimeout})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
 	t.Run("integration error description is returned instead of unsupported search", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")

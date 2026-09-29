@@ -82,9 +82,20 @@ func Test__factoryErrorToStatus(t *testing.T) {
 		assert.Equal(t, ghdependabot.AlertsDisabledMessage, message)
 	})
 
+	t.Run("GitHub 403 on a non-intake action stays Internal", func(t *testing.T) {
+		err := factoryErrorToStatus(githubAPIError(http.StatusForbidden), "failed to merge factory pull request")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to merge factory pull request", message)
+	})
+}
+
+func Test__intakeErrorToStatus(t *testing.T) {
 	for _, source := range liveIntakeClientErrors() {
 		t.Run(source.name+" 403 becomes a failed precondition", func(t *testing.T) {
-			err := factoryErrorToStatus(source.statusError(http.StatusForbidden), "failed to search factory intake items")
+			err := intakeErrorToStatus(source.statusError(http.StatusForbidden), "failed to search factory intake items")
 
 			code, message, ok := grpcerrors.HandlerStatus(err)
 			require.True(t, ok)
@@ -93,7 +104,25 @@ func Test__factoryErrorToStatus(t *testing.T) {
 		})
 
 		t.Run(source.name+" 5xx stays Internal", func(t *testing.T) {
-			err := factoryErrorToStatus(source.statusError(http.StatusBadGateway), "failed to search factory intake items")
+			err := intakeErrorToStatus(source.statusError(http.StatusBadGateway), "failed to search factory intake items")
+
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.Internal, code)
+			assert.Equal(t, "failed to search factory intake items", message)
+		})
+
+		t.Run(source.name+" 429 stays Internal", func(t *testing.T) {
+			err := intakeErrorToStatus(source.statusError(http.StatusTooManyRequests), "failed to search factory intake items")
+
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.Internal, code)
+			assert.Equal(t, "failed to search factory intake items", message)
+		})
+
+		t.Run(source.name+" 408 stays Internal", func(t *testing.T) {
+			err := intakeErrorToStatus(source.statusError(http.StatusRequestTimeout), "failed to search factory intake items")
 
 			code, message, ok := grpcerrors.HandlerStatus(err)
 			require.True(t, ok)
@@ -103,12 +132,26 @@ func Test__factoryErrorToStatus(t *testing.T) {
 	}
 
 	t.Run("a non-auth 4xx becomes a failed precondition", func(t *testing.T) {
-		err := factoryErrorToStatus(&jira.APIError{StatusCode: http.StatusUnprocessableEntity}, "failed to search factory intake items")
+		err := intakeErrorToStatus(&jira.APIError{StatusCode: http.StatusUnprocessableEntity}, "failed to search factory intake items")
 
 		code, message, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Equal(t, intakeCouldNotLoadItemsMessage, message)
+	})
+
+	t.Run("a Jira 401 whose token refresh failed becomes a failed precondition", func(t *testing.T) {
+		sourceErr := errors.Join(
+			&jira.APIError{StatusCode: http.StatusUnauthorized},
+			errors.New("request got 401 and token refresh failed: invalid_grant"),
+		)
+
+		err := intakeErrorToStatus(sourceErr, "failed to search factory intake items")
+
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, intakeConnectFirstMessage, message)
 	})
 }
 

@@ -30,10 +30,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
-	if message, ok := liveIntakeClientRefusalMessage(err); ok {
-		return grpcerrors.FailedPrecondition(err, message)
-	}
-
 	switch {
 	case errors.Is(err, models.ErrFactoryNameAlreadyExists):
 		return grpcerrors.AlreadyExists(err, "factory with the same name already exists")
@@ -245,6 +241,13 @@ var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pu
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")
 var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")
 
+func intakeErrorToStatus(err error, internalMessage string) error {
+	if message, ok := liveIntakeClientRefusalMessage(err); ok {
+		return grpcerrors.FailedPrecondition(err, message)
+	}
+	return factoryErrorToStatus(err, internalMessage)
+}
+
 func liveIntakeClientRefusalMessage(err error) (string, bool) {
 	status, ok := liveIntakeSourceStatus(err)
 	if !ok {
@@ -253,6 +256,8 @@ func liveIntakeClientRefusalMessage(err error) (string, bool) {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
 		return intakeConnectFirstMessage, true
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return "", false
 	}
 	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
 		return intakeCouldNotLoadItemsMessage, true
