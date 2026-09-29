@@ -89,6 +89,10 @@ export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus):
   return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
 }
 
+export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
+  return footer.kind !== "running" && footer.status !== "running" && !isClosedWorkOrderDisplayStatus(footer.status);
+}
+
 export function isSplitRunStopChoiceAvailable(choice: SplitRunStopChoice, status?: WorkOrderDisplayStatus): boolean {
   if (choice === "reopen") {
     return isClosedWorkOrderDisplayStatus(status);

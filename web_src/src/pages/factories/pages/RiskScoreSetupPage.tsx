@@ -1,4 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { useIntegration } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
@@ -18,6 +19,9 @@ export function RiskScoreSetupPage() {
   const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
   const line = factory?.lines?.find((entry) => entry.id === lineId);
   const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
+  const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const githubIntegration = useIntegration(organizationId, githubIntegrationId);
+  const githubInstallationName = githubIntegration.data?.metadata?.name?.trim() ?? "";
 
   if (!canAct("factories", "update") || !lineId || (factory && !line)) {
     return <Navigate to={boardHref} replace />;
@@ -28,7 +32,8 @@ export function RiskScoreSetupPage() {
       <RiskScoreSetupDialog
         organizationId={organizationId}
         factoryId={factoryId}
-        githubIntegrationId={factory?.onboarding?.vcsIntegrationId?.trim() ?? ""}
+        githubIntegrationId={githubIntegrationId}
+        githubInstallationName={githubInstallationName}
         appRepository={factory?.onboarding?.appRepository?.trim() ?? ""}
         backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
         defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}

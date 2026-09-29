@@ -54,7 +54,6 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
-import { factoryPlanningSetupCompleted } from "./planningSettingsModel";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -818,7 +817,6 @@ export function LinesPage() {
             onOpenWorkOrder={openWorkOrder}
             onClosePeek={closePeek}
             planningEnabled={factory?.planning?.enabled !== false}
-            planningSetupCompleted={factoryPlanningSetupCompleted(factory)}
           />
         </div>
       </div>
@@ -1006,7 +1004,6 @@ function LineDetail({
   onOpenWorkOrder,
   onClosePeek,
   planningEnabled,
-  planningSetupCompleted,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1037,7 +1034,6 @@ function LineDetail({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
   planningEnabled: boolean;
-  planningSetupCompleted: boolean;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -1092,7 +1088,6 @@ function LineDetail({
         organizationId,
         factoryKey,
         lineId: line.id,
-        planningSetupCompleted,
       });
       if (href) {
         navigate(href);

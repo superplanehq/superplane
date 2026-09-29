@@ -1,30 +1,15 @@
 import { cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
-import {
-  Bug,
-  CheckCircle2,
-  CircleAlert,
-  CircleX,
-  ExternalLink,
-  FileText,
-  Hourglass,
-  Loader2,
-  Play,
-  RotateCcw,
-  TriangleAlert,
-} from "lucide-react";
+import { CheckCircle2, CircleAlert, CircleX, FileText, Hourglass, RotateCcw, TriangleAlert } from "lucide-react";
 
 import type { FactoriesFactoryPullRequest } from "@/api-client";
-import { Link } from "@/components/Link/link";
-import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { StartEmphasis } from "../../lib/draftReadiness";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
-import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
+import { NoteAction, NoteCta } from "./SplitRunAttentionNoteActions";
 import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
 
 const TONE = {
@@ -111,6 +96,7 @@ export function SplitRunAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   startEmphasis = "filled",
   organizationId,
@@ -129,6 +115,8 @@ export function SplitRunAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  /** Compact note in a narrow column: full-width text, actions below. */
+  stacked?: boolean;
   /** Refine strip: actions only, no note. The strip shows its own verdict. */
   actionsOnly?: boolean;
   /** Weight of Start on the refine strip. The verdict decides it. */
@@ -169,6 +157,7 @@ export function SplitRunAttentionNote({
       startDisabled={startDisabled}
       modelSelect={modelSelect}
       compact={compact}
+      stacked={stacked}
       actionsOnly={actionsOnly}
       startEmphasis={startEmphasis}
       onAction={onAction}
@@ -186,6 +175,7 @@ function StandardAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   startEmphasis = "filled",
   onAction,
@@ -199,6 +189,7 @@ function StandardAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  stacked?: boolean;
   actionsOnly?: boolean;
   startEmphasis?: StartEmphasis;
   onAction?: (action: SplitRunFooterAction) => void;
@@ -226,6 +217,7 @@ function StandardAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        stacked={stacked}
         onAction={onAction}
       />
     );
@@ -273,6 +265,7 @@ function StandardAttentionNote({
   );
 }
 
+/** In a narrow column `stacked` gives the text the full width and moves the actions below it. */
 function CompactAttentionNote({
   note,
   actions,
@@ -281,6 +274,7 @@ function CompactAttentionNote({
   startBusy,
   startDisabled,
   modelSelect,
+  stacked = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -290,10 +284,14 @@ function CompactAttentionNote({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
+  stacked?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+    <div
+      className={cn("flex min-w-0 flex-1 gap-3", stacked ? "flex-col" : "items-center")}
+      data-testid="split-run-attention-note"
+    >
       <div
         key={`${note.headline}-${note.text ?? ""}`}
         className="sp-stream-text min-w-0 flex-1"
@@ -433,92 +431,5 @@ function StripActions({
         />
       ) : null}
     </div>
-  );
-}
-
-function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "bug" }) {
-  const external = href.startsWith("http");
-  const mark = icon === "bug" ? <Bug className="size-3.5" aria-hidden /> : null;
-  return (
-    <Button asChild size="sm" variant="outline">
-      {external ? (
-        <a href={href} target="_blank" rel="noreferrer">
-          {mark}
-          {label}
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
-      ) : (
-        <Link href={href}>
-          {mark}
-          {label}
-        </Link>
-      )}
-    </Button>
-  );
-}
-
-function ActionIcon({ kind, strip }: { kind?: SplitRunFooterAction["kind"]; strip?: boolean }) {
-  if (strip && kind === "start") {
-    return <Play className="size-3.5" aria-hidden />;
-  }
-  return null;
-}
-
-function NoteAction({
-  action,
-  actionBusy,
-  startBusy,
-  startDisabled,
-  grouped = false,
-  strip = false,
-  variant,
-  onClick,
-}: {
-  action: SplitRunFooterAction;
-  actionBusy: boolean;
-  startBusy: boolean;
-  startDisabled: boolean;
-  grouped?: boolean;
-  /** On the refine strip Start carries a play icon. */
-  strip?: boolean;
-  /** Overrides the emphasis from the footer action. */
-  variant?: "default" | "outline" | "ghost";
-  onClick: () => void;
-}) {
-  const primary = action.emphasis === "primary";
-  const busy = action.kind === "start" ? startBusy : actionBusy;
-  const disabled = noteActionDisabled(action.kind, {
-    actionBusy,
-    startBusy,
-    startDisabled,
-    actionDisabled: action.disabled,
-  });
-
-  const button = (
-    <Button
-      type="button"
-      size="sm"
-      variant={variant ?? (primary ? "default" : "outline")}
-      disabled={disabled}
-      onClick={onClick}
-      className={noteActionClassName({ grouped })}
-      data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
-    >
-      {busy ? (
-        <Loader2 className="size-3.5 animate-spin" aria-hidden />
-      ) : (
-        <ActionIcon kind={action.kind} strip={strip} />
-      )}
-      {action.label}
-    </Button>
-  );
-  if (grouped || !action.tooltip) {
-    return button;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{disabled ? <span className="inline-flex">{button}</span> : button}</TooltipTrigger>
-      <TooltipContent>{action.tooltip}</TooltipContent>
-    </Tooltip>
   );
 }

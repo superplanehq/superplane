@@ -141,7 +141,8 @@ export function SplitRunReview({
   actionBusy?: boolean;
   startDisabled?: boolean;
   modelSelect?: ReactNode;
-  compact?: boolean;
+  /** `"stacked"` is the compact note in a narrow column: full-width text, actions below. */
+  compact?: boolean | "stacked";
   actionsOnly?: boolean;
   confirmUnclearStart?: boolean;
   /** Verdict that sets the Start weight on the refine strip. Defaults to the footer scores. */
@@ -194,7 +195,8 @@ export function SplitRunReview({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
-        compact={compact}
+        compact={Boolean(compact)}
+        stacked={compact === "stacked"}
         actionsOnly={actionsOnly}
         startEmphasis={startEmphasis}
         organizationId={organizationId}
