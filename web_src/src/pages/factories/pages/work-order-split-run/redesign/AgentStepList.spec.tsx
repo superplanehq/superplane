@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { render, screen } from "@testing-library/react";
 
+import type { AgentActivity } from "../agentActivity";
 import { AgentStepMarkers } from "./AgentStepList";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
 
@@ -46,5 +47,94 @@ describe("AgentStepMarkers", () => {
     expect(title).toHaveClass("truncate");
     expect(subtitle).toHaveClass("truncate");
     expect(subtitle).not.toHaveClass("break-words");
+  });
+
+  it("keeps Planning next step under a long live transcript", () => {
+    const liveActivity: AgentActivity = {
+      id: "live-1",
+      provider: "runner",
+      status: "running",
+      sequence: 4,
+      truncated: false,
+      items: [
+        {
+          type: "content",
+          id: "note-1",
+          kind: "assistant",
+          text: "Bun is not installed on the host.",
+          status: "passed",
+          truncated: false,
+        },
+        {
+          type: "tool",
+          id: "tool-1",
+          kind: "read",
+          name: "read",
+          input: "README.md",
+          output: "",
+          outputStreams: [],
+          status: "passed",
+          truncated: false,
+        },
+      ],
+    };
+
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep({
+          id: "implementation",
+          title: "Implementation",
+          type: "prompt",
+          status: "running",
+          summary: "",
+          toolCount: 1,
+          events: [],
+        })}
+        liveActive
+        liveActivity={liveActivity}
+      />,
+    );
+
+    const status = screen.getByRole("status", { name: "Planning next step…" });
+    const log = screen.getByTestId("redesign-step-log-implementation");
+    expect(status).toBeInTheDocument();
+    expect(log).not.toContainElement(status);
+  });
+
+  it("shows Thinking when the console hides an empty thought row", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep({
+          id: "implementation",
+          title: "Implementation",
+          type: "prompt",
+          status: "running",
+          summary: "",
+          toolCount: 0,
+          events: [],
+        })}
+        liveActive
+        liveActivity={{
+          id: "live-1",
+          provider: "runner",
+          status: "running",
+          sequence: 2,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "thought-1",
+              kind: "reasoning",
+              text: "",
+              status: "running",
+              truncated: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Thinking" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Thinking");
   });
 });

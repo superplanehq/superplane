@@ -7,7 +7,12 @@ import {
 } from "@/ui/CanvasPage/RunnerLiveLogDialog/liveLogSections";
 import type { CommandSection, LogState } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
-import { mergeLiveStreamNotes, notesForLiveStream, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
+import {
+  activitiesFromLiveLogSections,
+  mergeLiveStreamNotes,
+  notesForLiveStream,
+  notesFromLiveLogSections,
+} from "./streamNotesFromLiveLog";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
 function emptyLiveLogState(): LogState {
@@ -528,5 +533,102 @@ describe("mergeLiveStreamNotes", () => {
     const extra = [talkLine("user", "Add a Size field", "prompt")];
     expect(mergeLiveStreamNotes(undefined, extra)).toEqual(extra);
     expect(mergeLiveStreamNotes([], extra)).toEqual(extra);
+  });
+});
+
+describe("activitiesFromLiveLogSections", () => {
+  it("turns section notes and tools into a live activity without tool output dumps", () => {
+    const activities = activitiesFromLiveLogSections([
+      {
+        index: 1,
+        text: "Implementation",
+        kind: "prompt",
+        preview: "",
+        lines: [],
+        events: [
+          { kind: "note", text: "Let me read the factory handler." },
+          {
+            kind: "tools",
+            id: "tools-1",
+            tools: [
+              {
+                id: "tool-1",
+                kind: "read",
+                text: "/home/node/.superplane/homes/repo/web_src/src/hooks/useFactoryPRFeedbackData.ts",
+                lines: ["<path>/home/node/.superplane/homes/repo/web_src/src/hooks/useFactoryPRFeedbackData.ts</path>"],
+                status: "passed",
+                duration_ms: 12,
+              },
+            ],
+          },
+        ],
+        status: "running",
+        duration_ms: null,
+        started_at: 1,
+        collapsed: false,
+      },
+    ]);
+
+    expect(activities).toHaveLength(1);
+    expect(activities[0]?.status).toBe("running");
+    expect(activities[0]?.items).toEqual([
+      expect.objectContaining({
+        type: "content",
+        kind: "assistant",
+        text: "Let me read the factory handler.",
+        status: "passed",
+      }),
+      expect.objectContaining({ type: "tool", kind: "read", output: "" }),
+    ]);
+  });
+
+  it("drops a bare Thinking note so it does not become a message", () => {
+    const activities = activitiesFromLiveLogSections([
+      {
+        index: 1,
+        text: "Implementation",
+        kind: "prompt",
+        preview: "",
+        lines: [],
+        events: [
+          { kind: "note", text: "Thinking" },
+          { kind: "note", text: "Let me read the factory handler." },
+        ],
+        status: "running",
+        duration_ms: null,
+        started_at: 1,
+        collapsed: false,
+      },
+    ]);
+
+    expect(activities[0]?.items).toEqual([
+      expect.objectContaining({ type: "content", text: "Let me read the factory handler." }),
+    ]);
+  });
+
+  it("leaves bash sections out so they stay collapsible step rows", () => {
+    const activities = activitiesFromLiveLogSections([
+      bashSection(),
+      {
+        index: 2,
+        text: "Implementation",
+        kind: "prompt",
+        preview: "",
+        lines: [],
+        events: [{ kind: "note", text: "Let me start by exploring the codebase." }],
+        status: "running",
+        duration_ms: null,
+        started_at: 2,
+        collapsed: false,
+      },
+    ]);
+
+    expect(activities[0]?.items).toEqual([
+      expect.objectContaining({
+        type: "content",
+        kind: "assistant",
+        text: "Let me start by exploring the codebase.",
+      }),
+    ]);
   });
 });
