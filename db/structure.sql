@@ -1139,6 +1139,7 @@ CREATE TABLE public.runner_task_log_uploads (
     next_chunk_sequence bigint DEFAULT 0 NOT NULL,
     total_bytes bigint DEFAULT 0 NOT NULL,
     finalizing_at timestamp with time zone,
+    processing_until timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT runner_task_log_uploads_values_check CHECK (((next_chunk_sequence >= 0) AND (total_bytes >= 0)))
 );
@@ -1165,6 +1166,8 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    error_message text,
+    completion_hash text,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
@@ -4805,7 +4808,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260926140823	f
+20260927134533	f
 \.
 
 
@@ -4841,7 +4844,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260907234118	f
+20260928151024	f
 \.
 
 

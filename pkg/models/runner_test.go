@@ -139,13 +139,17 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 	require.NoError(t, fleet.Create(db))
 
 	now := time.Now()
+	idempotencyKey := "fleet-manager/linux-amd64/task/task-1"
+	requestHash := "request-hash"
 	runner := &models.Runner{
-		ID:            uuid.New(),
-		FleetID:       fleet.ID,
-		State:         models.RunnerStatePending,
-		RunnerVersion: "0.1.0",
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:                     uuid.New(),
+		FleetID:                fleet.ID,
+		State:                  models.RunnerStatePending,
+		RunnerVersion:          "0.1.0",
+		CreationIdempotencyKey: &idempotencyKey,
+		CreationRequestHash:    &requestHash,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 	require.NoError(t, db.Create(runner).Error)
 
@@ -167,9 +171,23 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 	require.NotNil(t, task.RunnerID)
 	assert.Equal(t, runner.ID, *task.RunnerID)
 
+	require.NoError(t, db.Model(runner).Update("state", models.RunnerStateIdle).Error)
+	runner.State = models.RunnerStateIdle
 	require.NoError(t, runner.Terminate(db, models.RunnerTerminationRequested))
 	assert.Equal(t, models.RunnerStateTerminated, runner.State)
 	require.NotNil(t, runner.TerminatedAt)
+	assert.Nil(t, runner.CreationIdempotencyKey)
+	assert.Nil(t, runner.CreationRequestHash)
+
+	persisted, err := models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Nil(t, persisted.CreationIdempotencyKey)
+	assert.Nil(t, persisted.CreationRequestHash)
+
+	reloadedTask, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateQueued, reloadedTask.State)
+	assert.Nil(t, reloadedTask.RunnerID)
 }
 
 func TestBusyRunnerCannotBeTerminated(t *testing.T) {

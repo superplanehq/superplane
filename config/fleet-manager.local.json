@@ -1,0 +1,60 @@
+{
+  "superplane_url": "http://app:8000",
+  "installation_admin_token": "",
+  "reconcile_interval_seconds": 2,
+  "request_timeout_seconds": 60,
+  "fleets": [
+    {
+      "id": "e1-large-amd64",
+      "provider": "docker",
+      "task_specific": true,
+      "docker": {
+        "image": "superplane-runner-local:dev",
+        "architecture": "amd64",
+        "runner_api_url": "http://app:8000",
+        "network": "superplane_default",
+        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+        "extra_hosts": ["host.docker.internal:host-gateway"]
+      }
+    },
+    {
+      "id": "e1-large-arm64",
+      "provider": "docker",
+      "task_specific": true,
+      "docker": {
+        "image": "superplane-runner-local:dev",
+        "architecture": "arm64",
+        "runner_api_url": "http://app:8000",
+        "network": "superplane_default",
+        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+        "extra_hosts": ["host.docker.internal:host-gateway"]
+      }
+    },
+    {
+      "id": "e1-tiny-amd64",
+      "provider": "docker",
+      "task_specific": true,
+      "docker": {
+        "image": "superplane-runner-local:dev",
+        "architecture": "amd64",
+        "runner_api_url": "http://app:8000",
+        "network": "superplane_default",
+        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+        "extra_hosts": ["host.docker.internal:host-gateway"]
+      }
+    },
+    {
+      "id": "e1-tiny-arm64",
+      "provider": "docker",
+      "task_specific": true,
+      "docker": {
+        "image": "superplane-runner-local:dev",
+        "architecture": "arm64",
+        "runner_api_url": "http://app:8000",
+        "network": "superplane_default",
+        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
+        "extra_hosts": ["host.docker.internal:host-gateway"]
+      }
+    }
+  ]
+}

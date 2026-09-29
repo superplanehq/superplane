@@ -1,0 +1,32 @@
+{
+  "superplane_url": "https://superplane.example",
+  "installation_admin_token": "replace-with-personal-api-token",
+  "artifact_manifest_url_template": "https://github.com/superplanehq/superplane/releases/download/runner%2Fv{version}/manifest.json",
+  "artifact_signing_public_key": "replace-with-base64-ed25519-public-key",
+  "aws_region": "us-east-1",
+  "reconcile_interval_seconds": 15,
+  "request_timeout_seconds": 90,
+  "fleets": [
+    {
+      "id": "linux-amd64",
+      "warm_capacity": 1,
+      "task_specific": true,
+      "aws": {
+        "ami": "ami-00000000000000000",
+        "instance_type": "t3.micro",
+        "architecture": "amd64",
+        "subnet_ids": [
+          "subnet-00000000000000000"
+        ],
+        "security_group_ids": [
+          "sg-00000000000000000"
+        ],
+        "iam_instance_profile": "",
+        "key_name": "",
+        "volume_size_gb": 30,
+        "volume_iops": 0,
+        "volume_throughput_mbps": 0
+      }
+    }
+  ]
+}

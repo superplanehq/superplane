@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
+	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -301,6 +302,7 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to terminate runner")
 	}
+	_ = runnercontrol.Publish(runnercontrol.Notification{RunnerID: runner.ID.String()})
 	return &pb.DeleteRunnerResponse{Runner: serializeRunner(runner, fleet.Slug)}, nil
 }
 
@@ -316,6 +318,12 @@ func (s *Service) createRunner(
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if idempotencyKey != "" {
+			if releaseErr := models.ReleaseTerminatedRunnerCreationIdempotencyKey(
+				tx,
+				idempotencyKey,
+			); releaseErr != nil {
+				return releaseErr
+			}
 			existingRunner, findErr := loadIdempotentRunner(tx, idempotencyKey, requestHash)
 			if findErr == nil {
 				runner = existingRunner

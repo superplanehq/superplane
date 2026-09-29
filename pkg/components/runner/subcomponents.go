@@ -20,8 +20,11 @@ func MachineTypeOptions() []configuration.FieldOption {
 
 func IntPtr(v int) *int { return intPtr(v) }
 
-func AfterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
-	return afterRunnerTaskCreated(ctx, taskID)
+func AfterRunnerTaskCreated(
+	ctx core.ExecutionContext,
+	taskID, backend string,
+) error {
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func PollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {

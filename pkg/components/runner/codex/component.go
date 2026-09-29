@@ -136,9 +136,9 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
@@ -157,7 +157,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
-	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
@@ -170,7 +170,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {

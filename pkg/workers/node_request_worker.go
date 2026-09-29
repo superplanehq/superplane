@@ -465,6 +465,11 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		RunnerTasks: contexts.NewRunnerTaskContext(
+			tx,
+			w.encryptor,
+			workflow.OrganizationID,
+		),
 	}
 
 	if node.AppInstallationID != nil {

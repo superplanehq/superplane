@@ -134,6 +134,7 @@ CREATE TABLE runner_task_log_uploads (
   next_chunk_sequence BIGINT NOT NULL DEFAULT 0,
   total_bytes         BIGINT NOT NULL DEFAULT 0,
   finalizing_at       TIMESTAMPTZ,
+  processing_until    TIMESTAMPTZ,
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   CONSTRAINT runner_task_log_uploads_values_check

@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners doctor-local format.runner profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -12,6 +12,7 @@ export
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
+LOCAL_RUNNER_NETWORK?=superplane_default
 
 # Quiet BuildKit and Compose progress in CI. Use DEBUG=1 for full logs.
 COMPOSE_PROGRESS := auto
@@ -36,15 +37,13 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 # CI does not enable that profile, so it does not build the worker image.
 COMPOSE_FILES := -f docker-compose.dev.yml
 GO_CACHE_DIRS :=
-N ?= 10
-TASK_BROKER_HOST_PORT ?= 8091
 ifneq ($(strip $(CI)),)
 COMPOSE_FILES += -f docker-compose.ci.yml
 GO_CACHE_DIRS := tmp/go tmp/go-build
 endif
 
 COMPOSE=docker compose $(COMPOSE_FILES)
-COMPOSE_RUNNER=$(COMPOSE) --profile local-runner
+COMPOSE_RUNNER=$(COMPOSE) --profile local-runner --profile local-runner-image
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
@@ -138,7 +137,7 @@ dev.up:
 	@echo "Starting development containers..."
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
 ifeq ($(strip $(CI)),)
-	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build task-broker runner
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build runner fleet-manager
 	@echo "Runner images built."
 endif
 	@echo "Development containers are ready."
@@ -152,12 +151,6 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
-ifeq ($(strip $(CI)),)
-	$(MAKE) db.create DB_NAME=broker
-	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) up -d --wait --build task-broker
-	$(COMPOSE_RUNNER) run --rm -T --no-deps task-broker-init
-	@echo "Task broker ready at http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
-endif
 
 dev.setup.npm:
 	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
@@ -179,22 +172,28 @@ dev.setup.no.cache:
 
 dev.server:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-ifeq ($(strip $(CI)),)
-	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
-endif
 	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
 	@bash ./scripts/wait-for-app
 ifeq ($(strip $(CI)),)
-	@echo "Task broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
-	@echo "Runner workers: $(N)"
+	@$(MAKE) dev.runners
 endif
 
 dev.server.fg:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 ifeq ($(strip $(CI)),)
-	$(COMPOSE_RUNNER) up -d --no-build --scale runner=$(N) runner
+	@$(MAKE) dev.runners
 endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
+
+dev.runners:
+ifeq ($(strip $(INSTALLATION_ADMIN_TOKEN)),)
+	@echo "Fleet Manager is not running because INSTALLATION_ADMIN_TOKEN is not set."
+	@echo "Complete owner setup, create a personal API token, add it to .env,"
+	@echo "then run: make dev.runners"
+else
+	$(COMPOSE_RUNNER) up -d --no-build fleet-manager
+	@echo "Fleet Manager is running with ephemeral Docker runners."
+endif
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -211,11 +210,50 @@ dev.logs.app:
 dev.logs.otel:
 	$(COMPOSE) logs -f otel
 
+dev.logs.runners:
+	@seen=" "; \
+	pids=""; \
+	waiting_message_printed=0; \
+	cleanup() { \
+	  if [ -n "$$pids" ]; then kill $$pids 2>/dev/null || true; fi; \
+	}; \
+	trap cleanup EXIT; \
+	trap 'exit 0' INT TERM; \
+	while true; do \
+	  found=0; \
+	  for id in $$(docker ps -q \
+	    --filter label=superplane.managed-runner=true \
+	    --filter network=$(LOCAL_RUNNER_NETWORK)); do \
+	    found=1; \
+	    case "$$seen" in *" $$id "*) continue ;; esac; \
+	    seen="$$seen$$id "; \
+	    name="$$(docker inspect --format '{{.Name}}' "$$id" | tr -d /)"; \
+	    echo "Following logs for $$name"; \
+	    (docker logs --follow "$$id" 2>&1 | while IFS= read -r line; do \
+	      printf '[%s] %s\n' "$$name" "$$line"; \
+	    done) & \
+	    pids="$$pids $$!"; \
+	  done; \
+	  if [ "$$found" -eq 0 ] && [ "$$waiting_message_printed" -eq 0 ]; then \
+	    echo "Waiting for local runner containers. Press Ctrl-C to stop."; \
+	    waiting_message_printed=1; \
+	  fi; \
+	  sleep 1; \
+	done
+
 dev.down:
+	@$(COMPOSE_RUNNER) stop fleet-manager >/dev/null 2>&1 || true
+	@ids="$$(docker ps -aq \
+	  --filter label=superplane.managed-runner=true \
+	  --filter network=$(LOCAL_RUNNER_NETWORK))"; \
+	if [ -n "$$ids" ]; then \
+	  echo "Removing local runner containers..."; \
+	  docker rm -f $$ids; \
+	fi
 	$(COMPOSE_RUNNER) down --remove-orphans
 
 doctor-local:
-	$(COMPOSE_RUNNER) exec runner sh -c '\
+	$(COMPOSE_RUNNER) run --rm -T --no-deps --entrypoint sh runner -c '\
 	  missing=0; \
 	  for cmd in claude codex opencode playwright node git gh jq python3 bash; do \
 	    if ! command -v "$$cmd" >/dev/null 2>&1; then \

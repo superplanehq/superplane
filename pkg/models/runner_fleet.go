@@ -13,6 +13,13 @@ import (
 const (
 	RunnerFleetScopeInstallation = "installation"
 	RunnerFleetScopeOrganization = "organization"
+
+	RunnerFleetE1LargeAMD64 = "e1-large-amd64"
+	RunnerFleetE1LargeARM64 = "e1-large-arm64"
+	RunnerFleetE1TinyAMD64  = "e1-tiny-amd64"
+	RunnerFleetE1TinyARM64  = "e1-tiny-arm64"
+
+	DefaultRunnerVersion = "dev"
 )
 
 var (
@@ -52,6 +59,93 @@ type RunnerFleet struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt
+}
+
+// DefaultInstallationRunnerFleets is the initial fleet catalog for a new
+// installation. Providers decide how to satisfy these specifications.
+func DefaultInstallationRunnerFleets(runnerVersion string) []RunnerFleet {
+	now := time.Now()
+	return []RunnerFleet{
+		defaultInstallationRunnerFleet(
+			RunnerFleetE1LargeAMD64,
+			"amd64",
+			2000,
+			8192,
+			runnerVersion,
+			now,
+		),
+		defaultInstallationRunnerFleet(
+			RunnerFleetE1LargeARM64,
+			"arm64",
+			2000,
+			8192,
+			runnerVersion,
+			now,
+		),
+		defaultInstallationRunnerFleet(
+			RunnerFleetE1TinyAMD64,
+			"amd64",
+			2000,
+			1024,
+			runnerVersion,
+			now,
+		),
+		defaultInstallationRunnerFleet(
+			RunnerFleetE1TinyARM64,
+			"arm64",
+			2000,
+			1024,
+			runnerVersion,
+			now,
+		),
+	}
+}
+
+func defaultInstallationRunnerFleet(
+	slug, architecture string,
+	cpuMillicores, memoryMB int32,
+	runnerVersion string,
+	now time.Time,
+) RunnerFleet {
+	return RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          slug,
+		ScopeType:     RunnerFleetScopeInstallation,
+		Enabled:       true,
+		RunnerVersion: runnerVersion,
+		Spec: datatypes.NewJSONType(RunnerFleetSpec{
+			OperatingSystem:            "linux",
+			Architecture:               architecture,
+			CPUMillicores:              cpuMillicores,
+			MemoryMB:                   memoryMB,
+			DiskGB:                     30,
+			Capabilities:               []string{"docker"},
+			MaxExecutionTimeoutSeconds: 3600,
+		}),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
+
+// CreateDefaultInstallationRunnerFleets inserts missing defaults without
+// changing fleets that an installation administrator already configured.
+func CreateDefaultInstallationRunnerFleets(
+	tx *gorm.DB,
+	runnerVersion string,
+) error {
+	for _, fleet := range DefaultInstallationRunnerFleets(runnerVersion) {
+		existing, err := FindInstallationRunnerFleet(tx, fleet.Slug)
+		if err == nil && existing != nil {
+			continue
+		}
+		if !errors.Is(err, ErrRunnerFleetNotFound) {
+			return err
+		}
+		if err := fleet.Create(tx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 /*
@@ -116,6 +210,18 @@ func FindInstallationRunnerFleet(tx *gorm.DB, slug string) (*RunnerFleet, error)
 		Where("slug = ? AND scope_type = ? AND scope_id IS NULL", slug, RunnerFleetScopeInstallation).
 		First(&fleet).
 		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRunnerFleetNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &fleet, nil
+}
+
+func FindRunnerFleet(tx *gorm.DB, id uuid.UUID) (*RunnerFleet, error) {
+	var fleet RunnerFleet
+	err := tx.First(&fleet, "id = ?", id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrRunnerFleetNotFound
 	}

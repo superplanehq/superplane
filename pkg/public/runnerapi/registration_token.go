@@ -1,6 +1,7 @@
 package runnerapi
 
 import (
+	"errors"
 	"fmt"
 
 	jwtlib "github.com/golang-jwt/jwt/v4"
@@ -10,6 +11,8 @@ import (
 )
 
 const RegistrationAudience = "superplane-runner-registration"
+
+var ErrInvalidRegistrationToken = errors.New("invalid runner registration token")
 
 type RegistrationClaims struct {
 	FleetID string `json:"fleet_id"`
@@ -49,4 +52,32 @@ func MintRegistrationToken(
 		return "", fmt.Errorf("sign runner registration token: %w", err)
 	}
 	return value, nil
+}
+
+func ValidateRegistrationToken(signer *jwt.Signer, value string) (*RegistrationClaims, error) {
+	if signer == nil {
+		return nil, fmt.Errorf("JWT signer is required")
+	}
+
+	claims := &RegistrationClaims{}
+	token, err := jwtlib.ParseWithClaims(value, claims, func(token *jwtlib.Token) (any, error) {
+		if token.Method != jwtlib.SigningMethodHS256 {
+			return nil, ErrInvalidRegistrationToken
+		}
+		return []byte(signer.Secret), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidRegistrationToken, err)
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("%w: token is not valid", ErrInvalidRegistrationToken)
+	}
+	if !claims.VerifyAudience(RegistrationAudience, true) {
+		return nil, fmt.Errorf("%w: audience is not valid", ErrInvalidRegistrationToken)
+	}
+	if claims.Subject == "" || claims.ID == "" || claims.FleetID == "" {
+		return nil, fmt.Errorf("%w: required claims are missing", ErrInvalidRegistrationToken)
+	}
+
+	return claims, nil
 }

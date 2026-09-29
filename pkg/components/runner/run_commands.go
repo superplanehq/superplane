@@ -300,9 +300,9 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	cmds := normalizeCommands(spec.Commands)
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
@@ -317,12 +317,12 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := broker.CreateTask(params)
+	taskID, err := client.CreateTask(params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *Runner) Hooks() []core.Hook {

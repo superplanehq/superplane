@@ -153,9 +153,9 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
@@ -188,7 +188,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       commands,
 		Files:          files,
@@ -204,7 +204,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		}
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *RunSuperPlane) Hooks() []core.Hook {
