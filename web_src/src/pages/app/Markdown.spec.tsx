@@ -387,6 +387,17 @@ describe("MarkdownContent work order files", () => {
     expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
   });
 
+  it("keeps the video element mounted when the chat rerenders", () => {
+    const content = `See ![clip](sp-file://${fileId})`;
+    const files = [{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }];
+    const { rerender } = render(<MarkdownContent content={content} files={files} />);
+    const video = document.querySelector("video");
+
+    rerender(<MarkdownContent content={content} files={[{ ...files[0] }]} />);
+
+    expect(document.querySelector("video")).toBe(video);
+  });
+
   it("shows a download fallback for videos the browser cannot play", () => {
     render(
       <MarkdownContent

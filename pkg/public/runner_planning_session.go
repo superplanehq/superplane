@@ -516,6 +516,7 @@ func mintPlanningWait(ctx context.Context, session *models.FactoryPlanningSessio
 	if err != nil {
 		return "", nil, err
 	}
+	rewritten, files = runneraction.RewriteLoopbackTaskFileURLs(rewritten, files)
 	payload := make([]map[string]any, 0, len(files))
 	for _, file := range files {
 		payload = append(payload, file.Map())
