@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,11 +116,16 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Provider returned no username", http.StatusBadGateway)
 		return
 	}
+	providerID := strings.TrimSpace(gothUser.UserID)
+	if numericID, parseErr := strconv.ParseInt(providerID, 10, 64); parseErr != nil || numericID <= 0 {
+		http.Error(w, "GitHub returned an invalid user ID", http.StatusBadGateway)
+		return
+	}
 
 	linked := models.NewAccountLinkedAccount(
 		sessionAccount.ID,
 		strings.ToLower(gothUser.Provider),
-		gothUser.UserID,
+		providerID,
 		username,
 		gothUser.Name,
 		gothUser.AvatarURL,

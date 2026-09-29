@@ -171,12 +171,10 @@ function CatalogProviderCard({
         </div>
         {usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
           <GitHubConnectControls
-            organizationId={catalog.organizationId}
             definition={item.integrationDef ?? undefined}
             canCreateIntegrations={catalog.canCreateIntegrations}
             permissionsLoading={catalog.permissionsLoading}
             onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
-            onCreatePrivateApp={() => catalog.handlePrivateAppClick(item.integrationDef ?? undefined)}
             allowPrivateApp={appearance !== "factories"}
           />
         ) : (

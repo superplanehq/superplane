@@ -3,22 +3,17 @@ import { describe, expect, it } from "bun:test";
 import { onboardingStepPath } from "./onboardingStepPath";
 
 describe("onboardingStepPath", () => {
-  it("keeps the onboarding attempt when GitHub returns", () => {
-    expect(onboardingStepPath("/onboarding?attempt=attempt-1", "vcs")).toBe(
-      "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
-    );
+  it("keeps the onboarding attempt", () => {
+    expect(onboardingStepPath("/onboarding?attempt=attempt-1", "vcs")).toBe("/onboarding?attempt=attempt-1&step=vcs");
   });
 
-  it("keeps the onboarding route after the organization is named", () => {
-    expect(onboardingStepPath("/onboarding?attempt=attempt-1&step=vcs&pick=newest", "repo")).toBe(
+  it("keeps the onboarding route when the step changes", () => {
+    expect(onboardingStepPath("/onboarding?attempt=attempt-1&step=vcs", "repo")).toBe(
       "/onboarding?attempt=attempt-1&step=repo",
     );
   });
 
-  // githubSetup=request and githubOrg are one-shot return flags for the
-  // waiting connect screen. Carrying them onto step=repo remounts the wizard
-  // on Connect and keeps rechecking a request that is already done.
-  it("drops install-request flags when leaving the vcs step", () => {
+  it("drops parameters from the removed hosted integration flow", () => {
     expect(
       onboardingStepPath(
         "/onboarding?attempt=attempt-1&githubSetup=request&githubOrg=acme&step=vcs&pick=newest",

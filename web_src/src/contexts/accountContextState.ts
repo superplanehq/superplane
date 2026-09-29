@@ -18,9 +18,11 @@ export interface AccountProviderMethod {
  */
 export interface AccountLinkedAccount {
   provider: string;
+  provider_id: string;
   username: string;
   name?: string;
   avatar_url?: string;
+  active: boolean;
 }
 
 export interface AccountOrganizationPendingDeletion {
