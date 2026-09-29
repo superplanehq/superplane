@@ -735,7 +735,11 @@ func datadogDetailMatchesService(expected, actual string) bool {
 	if actual == "" {
 		return true
 	}
-	return strings.EqualFold(strings.TrimSpace(expected), actual)
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		return true
+	}
+	return strings.EqualFold(expected, actual)
 }
 
 func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.ErrorTrackingIssue, error) {

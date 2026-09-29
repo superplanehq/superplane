@@ -852,7 +852,11 @@ func (s *datadogIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem
 
 func (s *datadogIntakeItemSource) ownsIssue(issue datadog.ErrorTrackingIssue) bool {
 	name := strings.TrimSpace(issue.Service)
-	return name != "" && strings.EqualFold(name, s.service)
+	if name == "" {
+		// Search is already scoped to service:<name>. Load verifies the service later.
+		return true
+	}
+	return strings.EqualFold(name, s.service)
 }
 
 func datadogServiceSearchQuery(service, query string) string {
