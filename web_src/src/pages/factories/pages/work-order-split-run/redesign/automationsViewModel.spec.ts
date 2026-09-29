@@ -216,6 +216,9 @@ describe("console automation grouping", () => {
     expect(address).toHaveLength(1);
     expect(address[0]?.runs).toHaveLength(2);
     expect(address[0]?.runs.map((run) => run.id)).toEqual(["pr-feedback-run-comment-2", "pr-feedback-run-comment-1"]);
-    expect(address[0]?.runs.map((run) => run.name)).toEqual(["Address new review comment", "Read the requested changes"]);
+    expect(address[0]?.runs.map((run) => run.name)).toEqual([
+      "Address new review comment",
+      "Read the requested changes",
+    ]);
   });
 });

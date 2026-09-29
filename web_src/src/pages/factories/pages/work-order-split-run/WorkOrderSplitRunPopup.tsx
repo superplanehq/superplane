@@ -179,7 +179,7 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: true }) : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
   const descriptionReview = taskConsole
     ? !unified && !showSidebarNote
@@ -387,7 +387,7 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  compact: boolean;
+  compact: boolean | "stacked";
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
