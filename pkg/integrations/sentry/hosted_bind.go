@@ -159,9 +159,7 @@ func (s *Sentry) bindHostedInstallation(ctx core.SyncContext, pending Metadata, 
 	pending.Projects = install.Projects
 	pending.Teams = install.Teams
 	ctx.Integration.SetMetadata(pending)
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-	return nil
+	return s.markHostedInstallReady(ctx)
 }
 
 func (s *Sentry) adoptKnownHostedInstall(ctx core.SyncContext, pending Metadata, install hostedSentryInstall) error {

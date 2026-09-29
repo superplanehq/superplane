@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -193,15 +194,18 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	}
 
 	if message.Resource != "issue" {
+		logSkippedIssueEvent(ctx, "resource", message, config)
 		return nil
 	}
 
 	if !issueActionAllowed(config.Actions, message.Action) {
+		logSkippedIssueEvent(ctx, "action", message, config)
 		return nil
 	}
 
 	projectSlug := issueProjectSlug(message.Data)
 	if config.Project != "" && config.Project != projectSlug {
+		logSkippedIssueEvent(ctx, "project", message, config)
 		return nil
 	}
 
@@ -237,6 +241,19 @@ func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	// Integration subscriptions are tied to the node lifecycle and are cleaned up by the platform.
 	return nil
+}
+
+func logSkippedIssueEvent(ctx core.IntegrationMessageContext, reason string, message *WebhookMessage, config OnIssueConfiguration) {
+	if ctx.Logger == nil || message == nil {
+		return
+	}
+	ctx.Logger.WithFields(logrus.Fields{
+		"reason":             reason,
+		"resource":           message.Resource,
+		"action":             message.Action,
+		"project":            issueProjectSlug(message.Data),
+		"configured_project": config.Project,
+	}).Info("Sentry issue event was not emitted")
 }
 
 func issueActionAllowed(configured []string, action string) bool {
