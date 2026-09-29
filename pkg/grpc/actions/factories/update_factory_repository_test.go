@@ -122,7 +122,7 @@ func TestReplaceGitHubNodeIntegration(t *testing.T) {
 		{ID: "managed", Ref: models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
 		{ID: "matching-repository", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/old"}, IntegrationID: &previousID},
 		{ID: "updated-repository", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/new"}, IntegrationID: &previousID},
-		{ID: "custom", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/custom"}, IntegrationID: &previousID},
+		{ID: "custom", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, Configuration: map[string]any{"repository": "acme/custom", "title": "acme/new"}, IntegrationID: &previousID},
 		{ID: "other-integration", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssue"}}, IntegrationID: &unrelatedID},
 		{ID: "other-provider", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
 	}

@@ -410,7 +410,15 @@ func replaceGitHubNodeIntegration(
 func configurationContainsRepository(value any, repositories ...string) bool {
 	switch current := value.(type) {
 	case map[string]any:
-		for _, child := range current {
+		for key, child := range current {
+			if key == "repository" {
+				repository, ok := child.(string)
+				if ok && slices.ContainsFunc(repositories, func(candidate string) bool {
+					return candidate != "" && repository == candidate
+				}) {
+					return true
+				}
+			}
 			if configurationContainsRepository(child, repositories...) {
 				return true
 			}
@@ -419,10 +427,6 @@ func configurationContainsRepository(value any, repositories ...string) bool {
 	case []any:
 		return slices.ContainsFunc(current, func(child any) bool {
 			return configurationContainsRepository(child, repositories...)
-		})
-	case string:
-		return slices.ContainsFunc(repositories, func(repository string) bool {
-			return repository != "" && current == repository
 		})
 	default:
 		return false
