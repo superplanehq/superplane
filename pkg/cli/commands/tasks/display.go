@@ -13,6 +13,7 @@ const (
 	eventTypeTaskAssigneesUpdated  = "order.assignees.updated"
 	eventTypeTaskStatusUpdated     = "order.status.updated"
 	eventTypeTaskCommentAdded      = "order.comment.added"
+	eventTypeTaskContentBroadcast  = "order.content.broadcast"
 	eventTypeTaskArtifactAdded     = "order.artifact.added"
 	eventTypeStepExecutionCreated  = "step.execution.created"
 	eventTypeStepExecutionFinished = "step.execution.finished"
@@ -221,6 +222,13 @@ type taskCommentAddedEvent struct {
 	Author *commentAuthorEvent `json:"author,omitempty"`
 }
 
+type taskContentBroadcastEvent struct {
+	Summary    string              `json:"summary"`
+	URL        string              `json:"url,omitempty"`
+	URLLabel   string              `json:"urlLabel,omitempty"`
+	Automation *eventAutomationRef `json:"automation,omitempty"`
+}
+
 type taskArtifactAddedEvent struct {
 	Artifact   *eventArtifactRef   `json:"artifact,omitempty"`
 	User       *eventUserRef       `json:"user,omitempty"`
@@ -313,6 +321,8 @@ func describeEvent(event openapi_client.FactoriesWorkOrderEvent, lookup memberEm
 		return describeAssigneesUpdatedEvent(event, lookup)
 	case eventTypeTaskCommentAdded:
 		return describeCommentAddedEvent(event, lookup)
+	case eventTypeTaskContentBroadcast:
+		return describeContentBroadcastEvent(event)
 	case eventTypeTaskArtifactAdded:
 		return describeArtifactAddedEvent(event)
 	case eventTypeStepExecutionCreated:
@@ -395,6 +405,28 @@ func describeCommentAddedEvent(event openapi_client.FactoriesWorkOrderEvent, loo
 		return describeUnknownEvent(event)
 	}
 	return fmt.Sprintf("%s commented: %s", author, body)
+}
+
+func describeContentBroadcastEvent(event openapi_client.FactoriesWorkOrderEvent) string {
+	data, err := decodeEventPayload[taskContentBroadcastEvent](event.GetEvent())
+	if err != nil || data.Summary == "" {
+		return describeUnknownEvent(event)
+	}
+	return formatContentBroadcast(data)
+}
+
+func formatContentBroadcast(data *taskContentBroadcastEvent) string {
+	line := "Task update: " + data.Summary
+	switch {
+	case data.URL != "" && data.URLLabel != "":
+		line += fmt.Sprintf(" (%s: %s)", data.URLLabel, data.URL)
+	case data.URL != "":
+		line += " (" + data.URL + ")"
+	}
+	if data.Automation != nil {
+		line += " by " + formatAutomationActor(data.Automation)
+	}
+	return line
 }
 
 func artifactTypeName(t string) string {

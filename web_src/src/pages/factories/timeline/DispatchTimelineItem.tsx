@@ -17,6 +17,7 @@ import { getWorkOrderExecutionRunHref } from "../lib/workOrderExecutions";
 import { overlayLivePullRequest } from "../lib/workOrderPullRequest";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../WorkOrderPullRequestInline";
+import { BroadcastContent } from "./BroadcastContent";
 import { TimelineMarker } from "./TimelineMarker";
 import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassName } from "./timelineStyles";
 
@@ -152,6 +153,9 @@ function DispatchStepRow({
       </div>
       {step.comments?.map((comment, index) => (
         <StepDetail key={`comment-${index}`} body={comment.body} />
+      ))}
+      {step.broadcasts?.map((broadcast, index) => (
+        <BroadcastContent key={`broadcast-${index}`} broadcast={broadcast} />
       ))}
     </li>
   );

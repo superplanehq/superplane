@@ -214,7 +214,7 @@ function WorkOrderDetailMainColumn({
       <section className={order.description || hasChecksSection || showStatusNotes ? "mt-10" : undefined}>
         <h2 className="workspace-section-title">Activity</h2>
         <p className="workspace-body-text mt-1 text-muted-foreground">
-          Actions and comments on the task, plus factory line runs.
+          Actions, comments, and updates on the task, plus factory line runs.
         </p>
         <div className="mt-4">
           <WorkOrderActivityTimeline

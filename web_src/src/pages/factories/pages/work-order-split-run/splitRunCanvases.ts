@@ -298,6 +298,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   if: { title: "If", iconSlug: "split" },
   filter: { title: "Filter", iconSlug: "funnel" },
   addWorkOrderArtifact: { title: "Add Task Artifact", iconSlug: "factory" },
+  broadcastWorkOrderContent: { title: "Broadcast Task Content", iconSlug: "factory" },
   addPullRequest: { title: "Add Pull Request", iconSlug: "factory" },
   updatePullRequest: { title: "Update Pull Request", iconSlug: "factory" },
   findPullRequest: { title: "Find Pull Request", iconSlug: "factory" },

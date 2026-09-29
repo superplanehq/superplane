@@ -38,6 +38,23 @@ func TestFormatTaskResult(t *testing.T) {
 	}
 }
 
+func TestFormatContentBroadcast(t *testing.T) {
+	line := formatContentBroadcast(&taskContentBroadcastEvent{
+		Summary:  "Preview environment is ready",
+		URL:      "https://preview.example.com/orders/12",
+		URLLabel: "Preview",
+		Automation: &eventAutomationRef{
+			NodeName: "deploy-preview",
+		},
+	})
+
+	assert.Equal(
+		t,
+		"Task update: Preview environment is ready (Preview: https://preview.example.com/orders/12) by automation (deploy-preview)",
+		line,
+	)
+}
+
 func TestFormatRelativeTimeAt(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 

@@ -101,6 +101,46 @@ export const Draft: Story = {
   },
 };
 
+/** Automation update folded into a line step. Select the summary to expand the preview URL. */
+export const WithBroadcastContent: Story = {
+  name: "With broadcast content",
+  args: {
+    organizationId: FACTORIES_ORGANIZATION_ID,
+    order: OPEN_WORK_ORDER,
+    events: [
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "step.execution.created",
+        event: {
+          stepName: "Deploy preview",
+          line: { id: "line-preview", name: "preview" },
+          app: { id: "app-preview", name: "Deploy preview" },
+          run: { id: "run-preview", state: "started" },
+        },
+      },
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.content.broadcast",
+        event: {
+          summary: "Preview environment is ready",
+          body: "The preview environment is available for this task.",
+          url: "https://preview.example.com/orders/12",
+          urlLabel: "Preview",
+          automation: {
+            lineId: "line-preview",
+            lineName: "preview",
+            stepName: "Deploy preview",
+            appId: "app-preview",
+            appName: "Deploy preview",
+            nodeName: "create-preview",
+          },
+          run: { id: "run-preview" },
+        },
+      },
+    ],
+  },
+};
+
 /** Rich open order — comments (user + LLM) and both artifact kinds inline. */
 export const WithCommentsAndArtifacts: Story = {
   name: "With Comments & Artifacts",

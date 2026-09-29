@@ -35,6 +35,10 @@ type FactoryContext interface {
 	// when `changed` is false so a no-op doesn't leak into the timeline.
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
+	// BroadcastWorkOrderContent appends an expandable update to the task
+	// activity log. Summary is the collapsed line. Body, URL, or both are
+	// the content shown when that line is expanded.
+	BroadcastWorkOrderContent(params BroadcastWorkOrderContentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
 	// ReportWorkOrderCheck upserts a scored check on the work order,
 	// keyed by CheckKey: the first report creates the check, later
@@ -84,6 +88,19 @@ type AddWorkOrderCommentParams struct {
 	// UpdateWorkOrderStatusParams.OrderID.
 	OrderID string
 	Body    string
+}
+
+// BroadcastWorkOrderContentParams carries one activity-log update.
+// Summary is required. Body or URL is required so the line can expand.
+// URL, when set, must be an absolute http(s) URL.
+type BroadcastWorkOrderContentParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID  string
+	Summary  string
+	Body     string
+	URL      string
+	URLLabel string
 }
 
 type AddWorkOrderArtifactParams struct {

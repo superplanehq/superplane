@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -80,5 +80,39 @@ describe("WorkOrderActivityTimeline pull request chip", () => {
 
     const link = screen.getByRole("link");
     expect(link.querySelector("svg")).toHaveClass("text-emerald-600");
+  });
+});
+
+describe("WorkOrderActivityTimeline content broadcast", () => {
+  it("expands a standalone update to show the preview URL", () => {
+    render(
+      <MemoryRouter>
+        <WorkOrderActivityTimeline
+          organizationId="org-1"
+          factoryKey="factory-1"
+          order={ORDER}
+          events={[
+            {
+              type: "order.content.broadcast",
+              timestamp: "2026-08-01T12:00:00.000Z",
+              event: {
+                summary: "Preview environment is ready",
+                url: "https://preview.example.com/orders/12",
+                urlLabel: "Preview",
+                automation: { nodeName: "create-preview", appName: "Preview" },
+              },
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/posted an update/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Preview" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Preview environment is ready" }));
+    expect(screen.getByRole("link", { name: "Preview" })).toHaveAttribute(
+      "href",
+      "https://preview.example.com/orders/12",
+    );
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "./workOrderTimelineFromEvents.helpers";
 import type {
   UserNameLookup,
+  WorkOrderTimelineBroadcast,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
   WorkOrderTimelineStepComment,
@@ -82,6 +83,9 @@ interface EventPayload extends LineStepExecutionPayload {
   fromResult?: string;
   toResult?: string;
   body?: string;
+  summary?: string;
+  url?: string;
+  urlLabel?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
   count?: number;
@@ -101,6 +105,7 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
+  "order.content.broadcast": 44,
   "order.check.reported": 46,
   "order.artifact.added": 47,
   "order.artifacts.cleared": 50,
@@ -172,6 +177,9 @@ function applyApiEventToTimeline(
       return;
     case "order.comment.added":
       appendCommentEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.content.broadcast":
+      appendContentBroadcastEvent(state, index, payload, at);
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
@@ -363,6 +371,42 @@ function appendCommentEvent(
       automation: automationActor,
     },
     title: "commented",
+  });
+}
+
+function appendContentBroadcastEvent(
+  state: TimelineBuildState,
+  index: number,
+  payload: EventPayload,
+  at: string,
+): void {
+  const summary = (payload.summary ?? "").trim();
+  if (!summary) {
+    return;
+  }
+
+  const broadcast: WorkOrderTimelineBroadcast = {
+    summary,
+    body: payload.body?.trim() || undefined,
+    url: payload.url?.trim() || undefined,
+    urlLabel: payload.urlLabel?.trim() || undefined,
+  };
+  const automationActor = toAutomationActor(payload.automation);
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.broadcasts = [...(step.broadcasts ?? []), broadcast];
+    return;
+  }
+
+  state.events.push({
+    id: `broadcast-${index}`,
+    kind: "contentBroadcast",
+    at,
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    broadcast,
+    title: summary,
   });
 }
 

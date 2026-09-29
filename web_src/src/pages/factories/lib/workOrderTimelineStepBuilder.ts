@@ -85,6 +85,7 @@ function buildStepFromExecutionEvent(input: StepFromExecutionEventInput): WorkOr
     startedAt,
     finishedAt,
     comments: existingStep?.comments,
+    broadcasts: existingStep?.broadcasts,
     artifacts: existingStep?.artifacts,
     execution: executionFromStepPayload(payload, startedAt, at, eventType),
   };

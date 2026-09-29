@@ -16,6 +16,10 @@ const (
 	EventTypeOrderStatusUpdated = "order.status.updated"
 	EventTypeOrderCommentAdded  = "order.comment.added"
 	EventTypeOrderArtifactAdded = "order.artifact.added"
+	// EventTypeOrderContentBroadcast records an automation update on the
+	// task activity log. The summary is the collapsed line. Body and URL
+	// are the expandable content, for example a preview environment link.
+	EventTypeOrderContentBroadcast = "order.content.broadcast"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
 	// reason — it does not back a timeline event/struct. Artifact data
 	// updates re-save the row in place and this reason tells the
@@ -153,6 +157,19 @@ type WorkOrderCommentAdded struct {
 	Author         *WorkOrderCommentAuthor `json:"author,omitempty"`
 	Run            *RunRef                 `json:"run,omitempty"`
 	MentionedUsers []UserRef               `json:"mentionedUsers,omitempty"`
+}
+
+// WorkOrderContentBroadcast is an automation announcement on the task
+// activity log. Summary is the collapsed line. Body and URL are shown
+// when the line is expanded. At least one of Body or URL is set.
+type WorkOrderContentBroadcast struct {
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Summary    string         `json:"summary"`
+	Body       string         `json:"body,omitempty"`
+	URL        string         `json:"url,omitempty"`
+	URLLabel   string         `json:"urlLabel,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {

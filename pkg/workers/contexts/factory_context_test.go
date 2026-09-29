@@ -1493,6 +1493,58 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	assert.Equal(t, "component-under-test", payload.Author.Automation.StepName)
 }
 
+func TestFactoryContext_BroadcastWorkOrderContent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Broadcast target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line := linkRunToWorkOrder(t, r, factoryModel, order.ID, run.ID)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+
+	require.NoError(t, ctx.BroadcastWorkOrderContent(core.BroadcastWorkOrderContentParams{
+		OrderID:  order.ID.String(),
+		Summary:  "Preview environment is ready",
+		Body:     "Open the preview environment from the activity log.",
+		URL:      "https://preview.example.com/orders/12",
+		URLLabel: "Preview",
+	}))
+
+	event := findWorkOrderEvent(t, order, "order.content.broadcast")
+	var payload struct {
+		Summary    string `json:"summary"`
+		Body       string `json:"body"`
+		URL        string `json:"url"`
+		URLLabel   string `json:"urlLabel"`
+		Automation struct {
+			NodeID   string `json:"nodeId"`
+			LineName string `json:"lineName"`
+			StepName string `json:"stepName"`
+		} `json:"automation"`
+	}
+	require.NoError(t, json.Unmarshal(event.Data, &payload))
+	assert.Equal(t, "Preview environment is ready", payload.Summary)
+	assert.Equal(t, "Open the preview environment from the activity log.", payload.Body)
+	assert.Equal(t, "https://preview.example.com/orders/12", payload.URL)
+	assert.Equal(t, "Preview", payload.URLLabel)
+	assert.Equal(t, nodeExecution.NodeID, payload.Automation.NodeID)
+	assert.Equal(t, line.Name, payload.Automation.LineName)
+	assert.Equal(t, "component-under-test", payload.Automation.StepName)
+
+	err = ctx.BroadcastWorkOrderContent(core.BroadcastWorkOrderContentParams{
+		OrderID: order.ID.String(),
+		Summary: "Preview environment is ready",
+		URL:     "javascript:alert(1)",
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, models.ErrFactoryWorkOrderBroadcastInvalid)
+}
+
 func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

@@ -45,6 +45,10 @@ type fakeFactoryContext struct {
 	addArtifactResult *core.WorkOrderArtifact
 	addArtifactErr    error
 
+	broadcastCalls  int
+	broadcastParams core.BroadcastWorkOrderContentParams
+	broadcastErr    error
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -84,6 +88,12 @@ func (f *fakeFactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderSt
 
 func (f *fakeFactoryContext) AddWorkOrderComment(_ core.AddWorkOrderCommentParams) error {
 	return nil
+}
+
+func (f *fakeFactoryContext) BroadcastWorkOrderContent(params core.BroadcastWorkOrderContentParams) error {
+	f.broadcastCalls++
+	f.broadcastParams = params
+	return f.broadcastErr
 }
 
 func (f *fakeFactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {

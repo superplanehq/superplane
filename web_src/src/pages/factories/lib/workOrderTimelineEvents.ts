@@ -22,6 +22,7 @@ export type WorkOrderTimelineEventKind =
   | "assigned"
   | "statusChanged"
   | "commented"
+  | "contentBroadcast"
   | "artifactAdded"
   | "artifactsCleared"
   | "pullRequestAdded"
@@ -31,6 +32,17 @@ export type WorkOrderTimelineEventKind =
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
 export type { OrgUserDisplayLookup };
 
+export interface WorkOrderTimelineStepComment {
+  body: string;
+}
+
+export interface WorkOrderTimelineBroadcast {
+  summary: string;
+  body?: string;
+  url?: string;
+  urlLabel?: string;
+}
+
 export interface WorkOrderTimelineStep {
   id: string;
   stepName: string;
@@ -39,13 +51,10 @@ export interface WorkOrderTimelineStep {
   startedAt: string;
   finishedAt?: string;
   comments?: WorkOrderTimelineStepComment[];
+  broadcasts?: WorkOrderTimelineBroadcast[];
   artifacts?: WorkOrderTimelineArtifact[];
   pullRequests?: FactoriesFactoryPullRequest[];
   execution: FactoriesWorkOrderExecution;
-}
-
-export interface WorkOrderTimelineStepComment {
-  body: string;
 }
 
 export interface WorkOrderTimelineAssigneeChange {
@@ -105,6 +114,7 @@ export interface WorkOrderTimelineEvent {
   assigneeChange?: WorkOrderTimelineAssigneeChange;
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
+  broadcast?: WorkOrderTimelineBroadcast;
   artifact?: WorkOrderTimelineArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
   check?: WorkOrderTimelineCheck;
