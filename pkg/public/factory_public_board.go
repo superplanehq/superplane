@@ -82,7 +82,7 @@ func (s *Server) handlePublicFactoryBoard(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handlePublicFactoryBoardWebSocket(w http.ResponseWriter, r *http.Request) {
-	board, err := loadPublicFactoryBoard(r.Context(), mux.Vars(r))
+	_, _, err := authorizePublicFactoryLine(r.Context(), mux.Vars(r))
 	if err != nil {
 		outcome := telemetry.WebSocketConnectionOutcomeAuthError
 		if !errors.Is(err, errPublicBoardNotFound) {
@@ -105,7 +105,6 @@ func (s *Server) handlePublicFactoryBoardWebSocket(w http.ResponseWriter, r *htt
 		return
 	}
 
-	_ = board
 	client := s.wsHub.NewClient(conn, eventdistributer.PublicLineTopic(lineID))
 	<-client.Done
 }
@@ -149,47 +148,55 @@ func broadcastPublicFactoryBoard(hub *ws.Hub, factoryID string) {
 }
 
 func loadPublicFactoryBoard(ctx context.Context, vars map[string]string) (*publicBoard, error) {
+	factory, line, err := authorizePublicFactoryLine(ctx, vars)
+	if err != nil {
+		return nil, err
+	}
+	return buildPublicBoard(database.DB(ctx), factory, line)
+}
+
+func authorizePublicFactoryLine(ctx context.Context, vars map[string]string) (*models.Factory, *models.FactoryLine, error) {
 	db := database.DB(ctx)
 	org, err := models.FindOrganizationByIDOrSlug(db, vars["org"])
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errPublicBoardNotFound
+			return nil, nil, errPublicBoardNotFound
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
 	enabled, err := models.HasExperimentalFeature(org.ID, features.FeatureFactories)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !enabled {
-		return nil, errPublicBoardNotFound
+		return nil, nil, errPublicBoardNotFound
 	}
 
 	factory, err := models.FindFactoryByKey(db, org.ID, models.NormalizeFactoryKey(vars["key"]))
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryNotFound) {
-			return nil, errPublicBoardNotFound
+			return nil, nil, errPublicBoardNotFound
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	if !factory.Public || factory.OnboardingCompletedAt == nil {
-		return nil, errPublicBoardNotFound
+		return nil, nil, errPublicBoardNotFound
 	}
 
 	lineID, err := uuid.Parse(vars["lineId"])
 	if err != nil {
-		return nil, errPublicBoardNotFound
+		return nil, nil, errPublicBoardNotFound
 	}
 	line, err := factory.FindLine(db, lineID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryLineNotFound) {
-			return nil, errPublicBoardNotFound
+			return nil, nil, errPublicBoardNotFound
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
-	return buildPublicBoard(db, factory, line)
+	return factory, line, nil
 }
 
 func buildPublicBoard(db *gorm.DB, factory *models.Factory, line *models.FactoryLine) (*publicBoard, error) {
@@ -235,9 +242,10 @@ func listPublicBoardOrders(db *gorm.DB, factory *models.Factory, lineID uuid.UUI
 	var before *uuid.UUID
 	for page := 0; page < publicBoardMaxPages; page++ {
 		batch, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{
-			LineID:   &lineID,
-			Limit:    publicBoardPageSize,
-			BeforeID: before,
+			LineID:      &lineID,
+			PublicBoard: true,
+			Limit:       publicBoardPageSize,
+			BeforeID:    before,
 		})
 		if err != nil {
 			return nil, err
@@ -330,7 +338,7 @@ func assemblePublicBoard(
 		if column == nil {
 			continue
 		}
-		column.Cards = append(column.Cards, publicCardFromOrder(order, planning, checks[order.ID], pullRequests[order.ID], sessions[order.ID], dispatches[order.ID]))
+		column.Cards = append(column.Cards, publicCardFromOrder(order, planning, checks[order.ID], pullRequests[order.ID], sessions[order.ID], dispatchesForLine(dispatches[order.ID], line.ID)))
 	}
 
 	return &publicBoard{
@@ -341,6 +349,19 @@ func assemblePublicBoard(
 		LineName:       line.Name,
 		Columns:        columns,
 	}
+}
+
+func dispatchesForLine(
+	dispatches []models.FactoryWorkOrderLineDispatchRecord,
+	lineID uuid.UUID,
+) []models.FactoryWorkOrderLineDispatchRecord {
+	matched := make([]models.FactoryWorkOrderLineDispatchRecord, 0, len(dispatches))
+	for _, dispatch := range dispatches {
+		if dispatch.LineID == lineID {
+			matched = append(matched, dispatch)
+		}
+	}
+	return matched
 }
 
 func publicCardColumn(

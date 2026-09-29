@@ -291,6 +291,7 @@ func TestSetFactoryVisibilityRequiresPublish(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "factories", rule.Resource)
 	assert.Equal(t, "publish", rule.Action)
+	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
 }
 

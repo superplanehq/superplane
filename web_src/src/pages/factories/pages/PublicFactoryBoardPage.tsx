@@ -94,32 +94,7 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
     };
   }, [organizationId, factoryKey, lineId]);
 
-  const boardReady = load.status === "ready";
-  useEffect(() => {
-    if (!boardReady) {
-      return;
-    }
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(
-      `${protocol}//${window.location.host}${publicBoardSocketPath(organizationId, factoryKey, lineId)}`,
-    );
-    let closedByPage = false;
-    socket.onmessage = (event) => {
-      const message = parseBoardEvent(event.data);
-      if (message === "board_changed") {
-        void reloadRef.current();
-      }
-    };
-    socket.onclose = () => {
-      if (!closedByPage) {
-        void reloadRef.current();
-      }
-    };
-    return () => {
-      closedByPage = true;
-      socket.close();
-    };
-  }, [boardReady, organizationId, factoryKey, lineId]);
+  usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
   const columns = useMemo(() => filterBoardColumns(board?.columns ?? [], query), [board, query]);
@@ -135,6 +110,51 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
   }
 
   return <PublicBoardView board={board} columns={columns} query={query} onQueryChange={setQuery} />;
+}
+
+function usePublicBoardSocket(
+  boardReady: boolean,
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  reloadRef: { current: () => Promise<void> },
+) {
+  useEffect(() => {
+    if (!boardReady) {
+      return;
+    }
+    let closedByPage = false;
+    let socket: WebSocket | null = null;
+    let retry: number | undefined;
+
+    const connect = () => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(
+        `${protocol}//${window.location.host}${publicBoardSocketPath(organizationId, factoryKey, lineId)}`,
+      );
+      socket.onmessage = (event) => {
+        const message = parseBoardEvent(event.data);
+        if (message === "board_changed") {
+          void reloadRef.current();
+        }
+      };
+      socket.onclose = () => {
+        if (closedByPage) {
+          return;
+        }
+        void reloadRef.current();
+        retry = window.setTimeout(connect, 1000);
+      };
+    };
+    connect();
+    return () => {
+      closedByPage = true;
+      if (retry !== undefined) {
+        window.clearTimeout(retry);
+      }
+      socket?.close();
+    };
+  }, [boardReady, organizationId, factoryKey, lineId, reloadRef]);
 }
 
 function PublicBoardView({

@@ -849,6 +849,10 @@ type ListFactoryWorkOrdersFilters struct {
 	BeforeID *uuid.UUID
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
+	// PublicBoard keeps the orders a public line board can show. Drafts stay
+	// even after a run on another line. Closed rejected orders are omitted
+	// so they do not consume the page.
+	PublicBoard bool
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -873,7 +877,11 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)
-	query = applyWorkOrderLineFilter(query, filters.LineID)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -943,6 +951,37 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 			)
 			OR factory_work_orders.created_by_id = ?
 		)`, *filters.UserID, *filters.UserID)
+}
+
+func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	query = query.Where(`
+		(
+			factory_work_orders.state IN ?
+			OR (
+				factory_work_orders.state = ?
+				AND factory_work_orders.result IN ?
+			)
+		)`,
+		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed,
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+	)
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			factory_work_orders.state = ?
+			OR EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, FactoryWorkOrderStateDraft, *lineID)
 }
 
 func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
