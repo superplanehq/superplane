@@ -54,3 +54,23 @@ func (s *MeService) DescribeLastLocation(ctx context.Context, req *pb.DescribeLa
 func (s *MeService) SaveLastLocation(ctx context.Context, req *pb.SaveLastLocationRequest) (*pb.SaveLastLocationResponse, error) {
 	return me.SaveLastLocation(ctx, req)
 }
+
+func (s *MeService) DescribeVCSProviderOnboarding(ctx context.Context, req *pb.DescribeVCSProviderOnboardingRequest) (*pb.DescribeVCSProviderOnboardingResponse, error) {
+	return me.DescribeVCSProviderOnboarding(ctx, req.GetProvider())
+}
+
+func (s *MeService) SelectVCSProviderOnboardingIdentity(ctx context.Context, req *pb.SelectVCSProviderOnboardingIdentityRequest) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
+	return me.SelectVCSProviderOnboardingIdentity(ctx, req.GetProvider(), req.GetUserId())
+}
+
+func (s *MeService) StartVCSProviderInstallation(ctx context.Context, req *pb.StartVCSProviderInstallationRequest) (*pb.StartVCSProviderInstallationResponse, error) {
+	return me.StartVCSProviderInstallation(ctx, req.GetProvider())
+}
+
+func (s *MeService) ConfigureVCSProviderInstallation(ctx context.Context, req *pb.ConfigureVCSProviderInstallationRequest) (*pb.ConfigureVCSProviderInstallationResponse, error) {
+	return me.ConfigureVCSProviderInstallation(ctx, req.GetProvider(), req.GetInstallationId())
+}
+
+func (s *MeService) RefreshVCSProviderOnboarding(ctx context.Context, req *pb.RefreshVCSProviderOnboardingRequest) (*pb.RefreshVCSProviderOnboardingResponse, error) {
+	return me.RefreshVCSProviderOnboarding(ctx, req.GetProvider(), req.RepositoryId)
+}

@@ -9,7 +9,9 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type GetWorkflowUsage struct{}
@@ -214,18 +216,22 @@ func validateAndCollectRepositories(ctx core.SetupContext, repoNames []string) (
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
 		return nil, fmt.Errorf("failed to decode application metadata: %w", err)
 	}
+	availableRepositories, err := workflowUsageRepositories(ctx, appMetadata)
+	if err != nil {
+		return nil, err
+	}
 
 	var selectedRepos []RepositoryMetadata
 	for _, repoName := range repoNames {
-		repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r common.Repository) bool {
-			return r.Name == repoName
+		repoIndex := slices.IndexFunc(availableRepositories, func(repository common.Repository) bool {
+			return workflowUsageRepositoryMatches(repository, repoName)
 		})
 
 		if repoIndex == -1 {
 			return nil, fmt.Errorf("repository %s is not accessible to app installation", repoName)
 		}
 
-		availableRepo := appMetadata.Repositories[repoIndex]
+		availableRepo := availableRepositories[repoIndex]
 		selectedRepos = append(selectedRepos, RepositoryMetadata{
 			ID:   availableRepo.ID,
 			Name: availableRepo.Name,
@@ -234,6 +240,41 @@ func validateAndCollectRepositories(ctx core.SetupContext, repoNames []string) (
 	}
 
 	return selectedRepos, nil
+}
+
+func workflowUsageRepositories(ctx core.SetupContext, metadata common.Metadata) ([]common.Repository, error) {
+	if !metadata.HostedApp {
+		return metadata.Repositories, nil
+	}
+
+	repositories, err := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.Integration.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list hosted GitHub repositories: %w", err)
+	}
+
+	result := make([]common.Repository, 0, len(repositories))
+	for _, repository := range repositories {
+		fullName := strings.TrimSpace(repository.FullName)
+		name := fullName
+		if _, repositoryName, found := strings.Cut(fullName, "/"); found {
+			name = repositoryName
+		}
+		result = append(result, common.Repository{
+			ID:   repository.RepositoryID,
+			Name: name,
+			URL:  "https://github.com/" + fullName,
+		})
+	}
+	return result, nil
+}
+
+func workflowUsageRepositoryMatches(repository common.Repository, requestedName string) bool {
+	if strings.EqualFold(repository.Name, requestedName) {
+		return true
+	}
+
+	fullName := strings.TrimSuffix(strings.TrimPrefix(repository.URL, "https://github.com/"), "/")
+	return strings.EqualFold(fullName, requestedName)
 }
 
 // aggregateUsageData processes the billing usage report and aggregates usage data.
@@ -253,7 +294,9 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 
 		if len(repositories) > 0 {
 			repoName := item.GetRepositoryName()
-			if !slices.Contains(repositories, repoName) {
+			if !slices.ContainsFunc(repositories, func(repository string) bool {
+				return workflowUsageFilterMatches(repository, repoName)
+			}) {
 				continue
 			}
 		}
@@ -270,6 +313,22 @@ func aggregateUsageData(report *gh.UsageReport, repositories []string) WorkflowU
 	}
 
 	return result
+}
+
+func workflowUsageFilterMatches(configuredName, reportedName string) bool {
+	if strings.EqualFold(configuredName, reportedName) {
+		return true
+	}
+
+	return strings.EqualFold(workflowUsageShortRepositoryName(configuredName), workflowUsageShortRepositoryName(reportedName))
+}
+
+func workflowUsageShortRepositoryName(name string) string {
+	name = strings.Trim(strings.TrimSpace(name), "/")
+	if separator := strings.LastIndex(name, "/"); separator >= 0 {
+		return name[separator+1:]
+	}
+	return name
 }
 
 func (g *GetWorkflowUsage) Hooks() []core.Hook {

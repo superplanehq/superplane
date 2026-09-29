@@ -122,6 +122,18 @@ service Factories {
     };
   }
 
+  rpc SelectFactoryVCSProviderRepository(SelectFactoryVCSProviderRepositoryRequest) returns (SelectFactoryVCSProviderRepositoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/onboarding/vcs-repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a Factory VCS repository";
+      description: "Selects an accessible VCS repository and creates the organization integration reference";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -943,6 +955,16 @@ message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
+message SelectFactoryVCSProviderRepositoryRequest {
+  string id = 1;
+  string provider = 2;
+  int64 repository_id = 3;
+}
+
+message SelectFactoryVCSProviderRepositoryResponse {
+  Factory factory = 1;
+}
+
 message DeleteFactoryRequest {
   string id = 1;
 }
@@ -979,6 +1001,8 @@ message FactoryOnboarding {
   string default_branch = 10;
   // True when account onboarding created this workspace.
   bool initial = 11;
+  int64 app_repository_id = 12;
+  int64 backlog_repository_id = 13;
 }
 
 message Factory {
@@ -1015,6 +1039,8 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
+  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message FactoryLine {
@@ -1757,6 +1783,9 @@ message WorkOrder {
   PlanningSessionSummary planning_session = 23;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 24;
+  // Set after an auto-start attempt that did not start the task.
+  // Empty before the attempt, and empty again after a successful start.
+  string auto_start_line_id = 25;
 }
 
 // WorkOrderSummary is the list row for a work order.

@@ -14,12 +14,6 @@ type Metadata struct {
 	// HostedApp is true when this connection installs SuperPlane's public
 	// GitHub App. Credentials stay on the process, not on the integration.
 	HostedApp bool `mapstructure:"hostedApp" json:"hostedApp"`
-	// StartedByUserID is the SuperPlane user who started this hosted install.
-	// Setup, OAuth, and bind must run as this user when the field is set.
-	StartedByUserID string `mapstructure:"startedByUserID" json:"startedByUserID,omitempty"`
-	// PendingInstallations is the user-scoped allowlist written after GitHub
-	// App user OAuth. Picker bind accepts only these installation ids.
-	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
 	// InstallRequested is true when a non-admin asked a GitHub org admin to
 	// install the app. Setup then returned setup_action=request.
 	InstallRequested bool `mapstructure:"installRequested" json:"installRequested,omitempty"`
@@ -30,24 +24,9 @@ type Metadata struct {
 	// the member who started this connection. The legacy scalar fields above
 	// mirror this collection for compatibility with older clients.
 	InstallRequests []InstallRequest `mapstructure:"installRequests" json:"installRequests,omitempty"`
-	// StartedByGitHubLogin is the GitHub login of the member who authorized
-	// the connect OAuth. The request callback from GitHub does not name the
-	// requested organization, so Sync finds that member's App install request
-	// through this login.
-	StartedByGitHubLogin string `mapstructure:"startedByGitHubLogin" json:"startedByGitHubLogin,omitempty"`
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
-	// AuthorizeURL is the GitHub user OAuth authorize URL for this connect.
-	// The OAuth callback removes the browser action, so the connect screen
-	// uses this URL to ask again which GitHub account to use.
-	AuthorizeURL string `mapstructure:"authorizeURL" json:"authorizeURL,omitempty"`
-}
-
-type PendingInstallation struct {
-	ID           string `mapstructure:"id" json:"id"`
-	AccountLogin string `mapstructure:"accountLogin" json:"accountLogin"`
-	AccountType  string `mapstructure:"accountType" json:"accountType"`
 }
 
 type InstallRequest struct {
@@ -63,24 +42,6 @@ type GitHubAppMetadata struct {
 	ClientID string `mapstructure:"clientId" json:"clientId"`
 }
 
-func (m Metadata) AllowsPendingInstallation(installationID string) bool {
-	if installationID == "" {
-		return false
-	}
-
-	return slices.ContainsFunc(m.PendingInstallations, func(pending PendingInstallation) bool {
-		return pending.ID == installationID
-	})
-}
-
-func (m Metadata) AllowsStartedBy(userID string) bool {
-	if m.StartedByUserID == "" {
-		return true
-	}
-
-	return userID != "" && m.StartedByUserID == userID
-}
-
 func (m Metadata) HasInstallRequests() bool {
 	return len(m.InstallRequests) > 0 || m.InstallRequested
 }
@@ -93,8 +54,7 @@ func (m Metadata) CurrentInstallRequests() []InstallRequest {
 		return nil
 	}
 	return []InstallRequest{{
-		AccountLogin:   strings.TrimSpace(m.InstallRequestedAccount),
-		RequesterLogin: strings.TrimSpace(m.StartedByGitHubLogin),
+		AccountLogin: strings.TrimSpace(m.InstallRequestedAccount),
 	}}
 }
 
@@ -102,21 +62,6 @@ func (m *Metadata) SetInstallRequests(requests []InstallRequest) {
 	m.InstallRequests = uniqueInstallRequests(requests)
 	m.InstallRequested = len(m.InstallRequests) > 0
 	m.InstallRequestedAccount = singleInstallRequestAccount(m.InstallRequests)
-}
-
-func (m *Metadata) SetPendingInstallations(installations []PendingInstallation) {
-	unique := make([]PendingInstallation, 0, len(installations))
-	for _, installation := range installations {
-		installation.ID = strings.TrimSpace(installation.ID)
-		installation.AccountLogin = strings.TrimSpace(installation.AccountLogin)
-		if installation.ID == "" || slices.ContainsFunc(unique, func(existing PendingInstallation) bool {
-			return existing.ID == installation.ID
-		}) {
-			continue
-		}
-		unique = append(unique, installation)
-	}
-	m.PendingInstallations = unique
 }
 
 func uniqueInstallRequests(requests []InstallRequest) []InstallRequest {

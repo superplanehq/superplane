@@ -3,176 +3,71 @@ package public
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
+	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 const githubInstallApprovedPath = "/github/approved"
 
-// HandleGitHubAppSetup finishes a public SuperPlane GitHub App install.
-// GitHub sends every install to this one Setup URL. The CSRF state finds
-// the pending SuperPlane connection.
-func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
-	if path, ok := githubAppSetupRedirectWithoutState(r); ok {
-		http.Redirect(w, r, path, http.StatusFound)
-		return
-	}
-
-	// Owner-approve has no SuperPlane session. A request with CSRF state is
-	// the member who started Connect, so load that account before bind.
-	if s.jwt == nil {
-		s.dispatchGitHubAppByState(w, r)
-		return
-	}
-	middleware.AccountAuthMiddleware(s.jwt)(http.HandlerFunc(s.dispatchGitHubAppByState)).ServeHTTP(w, r)
+var enqueueGitHubAppReconciliation = func(ctx context.Context, availableAt time.Time) error {
+	return models.EnqueueVCSProviderReconciliation(database.DB(ctx), models.ProviderGitHub, availableAt)
 }
 
-// githubAppSetupRedirectWithoutState handles completed setup callbacks that
-// GitHub cannot associate with the original SuperPlane connection. GitHub can
-// omit state after an admin approves an install and after a user updates an
-// existing installation. Do not trust or bind the supplied installation ID;
-// signed webhooks synchronize installation updates independently.
-func githubAppSetupRedirectWithoutState(r *http.Request) (string, bool) {
+// HandleGitHubAppSetup handles only GitHub's installation and repository
+// settings redirect. Signed webhooks are authoritative for catalog state.
+func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	if query.Get("state") != "" {
-		return "", false
+	if query.Get("setup_action") == "request" {
+		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
 	if strings.TrimSpace(query.Get("installation_id")) == "" {
-		return "", false
+		http.Error(w, "missing installation id", http.StatusBadRequest)
+		return
 	}
 
 	switch query.Get("setup_action") {
 	case "install":
-		return githubInstallApprovedPath, true
+		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
 	case "update":
-		return "/", true
+		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
 	default:
-		return "", false
+		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
 }
 
-func (s *Server) HandleGitHubAppOAuthCallback(w http.ResponseWriter, r *http.Request) {
-	s.dispatchGitHubAppByState(w, r)
-}
-
-func (s *Server) HandleGitHubAppBind(w http.ResponseWriter, r *http.Request) {
-	s.dispatchGitHubAppByState(w, r)
-}
-
-func (s *Server) dispatchGitHubAppByState(w http.ResponseWriter, r *http.Request) {
-	state := r.URL.Query().Get("state")
-	if state == "" {
-		http.Error(w, "missing state", http.StatusBadRequest)
-		return
-	}
-
-	integration, err := models.FindGitHubIntegrationByAppState(database.DB(r.Context()), state)
-	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
-		return
-	}
-
-	if !isHostedGitHubApp(integration) {
-		http.Error(w, "integration not found", http.StatusNotFound)
-		return
-	}
-
-	if status := authorizeHostedGitHubAppCallback(r.Context(), integration); status != 0 {
-		writeHostedGitHubAppAuthError(w, status)
-		return
-	}
-
-	s.dispatchIntegrationRequest(w, r, integration)
-}
-
-func hostedGitHubAppBrowserCallbackStatus(ctx context.Context, r *http.Request, integration *models.Integration) int {
-	if !isHostedGitHubAppBrowserCallback(r, integration) {
-		return 0
-	}
-
-	return authorizeHostedGitHubAppCallback(ctx, integration)
-}
-
-func isHostedGitHubAppBrowserCallback(r *http.Request, integration *models.Integration) bool {
-	if r == nil || integration == nil || integration.AppName != "github" {
-		return false
-	}
-
-	path := r.URL.Path
-	if !strings.HasSuffix(path, "/setup") &&
-		!strings.HasSuffix(path, "/oauth/callback") &&
-		!strings.HasSuffix(path, "/bind") {
-		return false
-	}
-
-	return isHostedGitHubApp(integration)
-}
-
-func isHostedGitHubApp(integration *models.Integration) bool {
-	if integration == nil {
-		return false
-	}
-
-	var metadata common.Metadata
-	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
-		return false
-	}
-
-	return metadata.HostedApp
-}
-
-func authorizeHostedGitHubAppCallback(ctx context.Context, integration *models.Integration) int {
-	account, ok := middleware.GetEffectiveAccountFromContext(ctx)
-	if !ok {
-		return http.StatusUnauthorized
-	}
-
-	user, err := models.FindActiveHumanUserByAccountAndOrganization(
-		database.DB(ctx),
-		integration.OrganizationID,
-		account.ID,
-	)
-	if err != nil {
-		return http.StatusForbidden
-	}
-
-	var metadata common.Metadata
-	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
-		return http.StatusForbidden
-	}
-
-	if !metadata.AllowsStartedBy(user.ID.String()) {
-		return http.StatusForbidden
-	}
-
-	return 0
-}
-
-func writeHostedGitHubAppAuthError(w http.ResponseWriter, status int) {
-	switch status {
-	case http.StatusUnauthorized:
-		http.Error(w, "Unauthorized", status)
-	case http.StatusForbidden:
-		http.Error(w, "Forbidden", status)
-	default:
-		http.Error(w, http.StatusText(status), status)
-	}
-}
-
-// HandleGitHubAppWebhook receives installation events for the public
-// SuperPlane GitHub App. One GitHub install can map to more than one
-// SuperPlane connection.
+// HandleGitHubAppWebhook validates the public App signature, updates the
+// global catalog, and fans repository events out to every local binding for
+// the installation.
 func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) {
 	app, ok := common.HostedAppFromEnv()
 	if !ok {
@@ -186,54 +81,229 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	eventType := gh.WebHookType(r)
-	event, err := gh.ParseWebHook(eventType, payload)
+	event, err := gh.ParseWebHook(gh.WebHookType(r), payload)
 	if err != nil {
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 
-	installationID, ok := githubInstallationID(event)
+	installationID, ok := githubInstallationID(payload)
 	if !ok {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	integrations, err := models.ListGitHubIntegrationsByInstallationID(database.DB(r.Context()), installationID)
+	// Load bindings before an uninstall removes the catalog row and its
+	// binding references.
+	integrations, err := models.ListVCSProviderBoundIntegrations(database.DB(r.Context()), models.ProviderGitHub, installationID)
 	if err != nil {
-		log.WithError(err).Error("failed to list GitHub App integrations")
+		log.WithError(err).Error("failed to list GitHub App bindings")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	for i := range integrations {
-		cloned, err := cloneRequestWithBody(r, payload)
-		if err != nil {
-			log.WithError(err).Error("failed to clone GitHub App webhook request")
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
+	if err := applyGitHubCatalogWebhook(database.DB(r.Context()), event, installationID); err != nil {
+		log.WithError(err).Error("failed to update the GitHub App catalog")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if githubAppRepositoryEvent(event) {
+		for i := range integrations {
+			if err := s.dispatchGitHubAppWebhook(r, payload, &integrations[i]); err != nil {
+				log.WithError(err).WithField("integration_id", integrations[i].ID).Error(
+					"failed to dispatch GitHub App webhook",
+				)
+			}
 		}
-		s.dispatchIntegrationRequest(httptest.NewRecorder(), cloned, &integrations[i])
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func githubInstallationID(event any) (string, bool) {
+func githubAppRepositoryEvent(event any) bool {
+	switch event.(type) {
+	case *gh.InstallationEvent, *gh.InstallationRepositoriesEvent, *gh.MemberEvent:
+		return false
+	default:
+		return true
+	}
+}
+
+func (s *Server) dispatchGitHubAppWebhook(r *http.Request, payload []byte, integration *models.Integration) error {
+	webhooks, err := models.ListIntegrationWebhooks(database.DB(r.Context()), integration.ID)
+	if err != nil {
+		return fmt.Errorf("list integration webhooks: %w", err)
+	}
+
+	dispatchErrors := make([]error, 0)
+	for i := range webhooks {
+		if webhooks[i].State != models.WebhookStateReady {
+			continue
+		}
+		if !githubAppWebhookMatches(&webhooks[i], r.Header.Get("X-GitHub-Event"), payload) {
+			continue
+		}
+
+		cloned, err := cloneRequestWithBody(r, payload)
+		if err != nil {
+			dispatchErrors = append(dispatchErrors, fmt.Errorf("clone webhook request for %s: %w", webhooks[i].ID, err))
+			continue
+		}
+		secret, err := s.encryptor.Decrypt(r.Context(), webhooks[i].Secret, []byte(webhooks[i].ID.String()))
+		if err != nil {
+			dispatchErrors = append(dispatchErrors, fmt.Errorf("decrypt webhook secret for %s: %w", webhooks[i].ID, err))
+			continue
+		}
+		cloned.Header.Set("X-Hub-Signature-256", "sha256="+crypto.Sign(secret, payload))
+
+		cloned = mux.SetURLVars(cloned, map[string]string{"webhookID": webhooks[i].ID.String()})
+		response := httptest.NewRecorder()
+		s.HandleWebhook(response, cloned)
+		if response.Code >= http.StatusBadRequest {
+			dispatchErrors = append(dispatchErrors, fmt.Errorf("webhook %s returned status %d", webhooks[i].ID, response.Code))
+		}
+	}
+
+	return errors.Join(dispatchErrors...)
+}
+
+func githubAppWebhookMatches(webhook *models.Webhook, eventType string, payload []byte) bool {
+	var configuration common.WebhookConfiguration
+	if webhook == nil || mapstructure.Decode(webhook.Configuration.Data(), &configuration) != nil {
+		return false
+	}
+
+	eventTypes := configuration.EventTypes
+	if len(eventTypes) == 0 && configuration.EventType != "" {
+		eventTypes = []string{configuration.EventType}
+	}
+	if len(eventTypes) > 0 {
+		matched := false
+		for _, configured := range eventTypes {
+			if configured == eventType {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	configuredRepository := strings.TrimSpace(configuration.Repository)
+	if configuredRepository == "" {
+		return true
+	}
+
+	var envelope struct {
+		Repository struct {
+			ID       int64  `json:"id"`
+			Name     string `json:"name"`
+			FullName string `json:"full_name"`
+		} `json:"repository"`
+	}
+	if json.Unmarshal(payload, &envelope) != nil {
+		return false
+	}
+
+	return strings.EqualFold(configuredRepository, envelope.Repository.FullName) ||
+		strings.EqualFold(configuredRepository, envelope.Repository.Name) ||
+		configuredRepository == strconv.FormatInt(envelope.Repository.ID, 10)
+}
+
+func applyGitHubCatalogWebhook(tx *gorm.DB, event any, installationID int64) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		return applyGitHubCatalogWebhookInTransaction(tx, event, installationID)
+	})
+}
+
+func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installationID int64) error {
 	switch event := event.(type) {
 	case *gh.InstallationEvent:
-		if event.GetInstallation() == nil {
-			return "", false
+		if event.GetAction() == "deleted" {
+			return models.DeleteVCSProviderInstallation(tx, models.ProviderGitHub, installationID)
 		}
-		return strconv.FormatInt(event.GetInstallation().GetID(), 10), true
+		if event.GetInstallation() == nil {
+			return nil
+		}
+		installation := githubInstallationModel(event.GetInstallation())
+		if err := models.UpsertVCSProviderInstallation(tx, &installation); err != nil {
+			return err
+		}
+		if err := models.DeleteVCSProviderInstallRequestsForAccount(tx, models.ProviderGitHub, installation.AccountID, installation.AccountLogin); err != nil {
+			return err
+		}
+		if event.GetAction() != "created" {
+			return nil
+		}
+		repositories := githubRepositoryModels(installationID, event.Repositories)
+		if err := models.ReplaceVCSProviderRepositories(tx, models.ProviderGitHub, installationID, repositories); err != nil {
+			return err
+		}
+		return enqueueWebhookRepositories(tx, repositories)
+
 	case *gh.InstallationRepositoriesEvent:
-		if event.GetInstallation() == nil {
-			return "", false
+		if event.GetInstallation() != nil {
+			installation := githubInstallationModel(event.GetInstallation())
+			installation.RepositorySelection = event.GetRepositorySelection()
+			if err := models.UpsertVCSProviderInstallation(tx, &installation); err != nil {
+				return err
+			}
+			if err := models.DeleteVCSProviderInstallRequestsForAccount(tx, models.ProviderGitHub, installation.AccountID, installation.AccountLogin); err != nil {
+				return err
+			}
 		}
-		return strconv.FormatInt(event.GetInstallation().GetID(), 10), true
-	default:
-		return "", false
+		added := githubRepositoryModels(installationID, event.RepositoriesAdded)
+		if err := models.UpsertVCSProviderRepositories(tx, models.ProviderGitHub, installationID, added); err != nil {
+			return err
+		}
+		removedIDs := make([]int64, 0, len(event.RepositoriesRemoved))
+		for _, repository := range event.RepositoriesRemoved {
+			if repository != nil && repository.GetID() > 0 {
+				removedIDs = append(removedIDs, repository.GetID())
+			}
+		}
+		if err := models.DeleteVCSProviderRepositories(tx, models.ProviderGitHub, installationID, removedIDs); err != nil {
+			return err
+		}
+		return enqueueWebhookRepositories(tx, added)
+
+	case *gh.MemberEvent:
+		if event.GetRepo().GetID() <= 0 {
+			return nil
+		}
+		if _, err := models.FindVCSProviderRepository(tx, models.ProviderGitHub, event.GetRepo().GetID()); errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.EnqueueVCSProviderReconciliation(tx, models.ProviderGitHub, time.Now())
+		} else if err != nil {
+			return err
+		}
+		return models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, event.GetRepo().GetID(), time.Now().Add(10*time.Second))
 	}
+
+	return nil
+}
+
+func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {
+	runAt := time.Now().Add(10 * time.Second)
+	for _, repository := range repositories {
+		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func githubInstallationID(payload []byte) (int64, bool) {
+	var envelope struct {
+		Installation struct {
+			ID int64 `json:"id"`
+		} `json:"installation"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil || envelope.Installation.ID <= 0 {
+		return 0, false
+	}
+	return envelope.Installation.ID, true
 }
 
 func cloneRequestWithBody(r *http.Request, body []byte) (*http.Request, error) {
@@ -241,4 +311,55 @@ func cloneRequestWithBody(r *http.Request, body []byte) (*http.Request, error) {
 	cloned.Body = io.NopCloser(bytes.NewReader(body))
 	cloned.ContentLength = int64(len(body))
 	return cloned, nil
+}
+
+func writeHostedGitHubAppAuthError(w http.ResponseWriter, status int) {
+	switch status {
+	case http.StatusUnauthorized:
+		http.Error(w, "Unauthorized", status)
+	case http.StatusForbidden:
+		http.Error(w, "Forbidden", status)
+	default:
+		http.Error(w, http.StatusText(status), status)
+	}
+}
+
+func githubInstallationModel(installation *gh.Installation) models.VCSProviderInstallation {
+	var accountID *int64
+	if installation.GetAccount().GetID() > 0 {
+		value := installation.GetAccount().GetID()
+		accountID = &value
+	}
+	var suspendedAt *time.Time
+	if installation.SuspendedAt != nil {
+		value := installation.SuspendedAt.Time
+		suspendedAt = &value
+	}
+	return models.VCSProviderInstallation{
+		Provider:            models.ProviderGitHub,
+		InstallationID:      installation.GetID(),
+		AccountID:           accountID,
+		AccountLogin:        installation.GetAccount().GetLogin(),
+		AccountType:         installation.GetTargetType(),
+		HTMLURL:             installation.GetHTMLURL(),
+		RepositorySelection: installation.GetRepositorySelection(),
+		SuspendedAt:         suspendedAt,
+	}
+}
+
+func githubRepositoryModels(installationID int64, repositories []*gh.Repository) []models.VCSProviderRepository {
+	result := make([]models.VCSProviderRepository, 0, len(repositories))
+	for _, repository := range repositories {
+		if repository == nil || repository.GetID() <= 0 || repository.GetFullName() == "" {
+			continue
+		}
+		result = append(result, models.VCSProviderRepository{
+			RepositoryID:   repository.GetID(),
+			InstallationID: installationID,
+			FullName:       repository.GetFullName(),
+			Private:        repository.GetPrivate(),
+			DefaultBranch:  repository.GetDefaultBranch(),
+		})
+	}
+	return result
 }

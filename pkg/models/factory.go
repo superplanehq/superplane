@@ -38,19 +38,20 @@ var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not comp
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                     uuid.UUID
-	OrganizationID         uuid.UUID
-	Name                   string
-	Description            string
-	Key                    string
-	NextWorkOrderNumber    int64
-	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
-	OnboardingCompletedAt  *time.Time
-	HostedSpendBudgetCents *int64
-	PlanningEnabled        bool
-	PlanningClarity        bool
-	PlanningConfidence     bool
-	PlanningSetupCompleted bool
+	ID                      uuid.UUID
+	OrganizationID          uuid.UUID
+	Name                    string
+	Description             string
+	Key                     string
+	NextWorkOrderNumber     int64
+	OnboardingConfig        datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt   *time.Time
+	HostedSpendBudgetCents  *int64
+	PlanningEnabled         bool
+	PlanningClarity         bool
+	PlanningConfidence      bool
+	PlanningSetupCompleted  bool
+	PlanningAutoStartLineID *uuid.UUID
 	// Public lets anyone with the line URL view the board. They cannot open
 	// tasks, logs, or settings.
 	Public    bool
@@ -64,10 +65,11 @@ type Factory struct {
 // estimate on. The Clarity check is opt-in because it makes the agent ask
 // more questions before a task is ready.
 type FactoryPlanning struct {
-	Enabled        bool
-	Clarity        bool
-	Confidence     bool
-	SetupCompleted bool
+	Enabled         bool
+	Clarity         bool
+	Confidence      bool
+	SetupCompleted  bool
+	AutoStartLineID *uuid.UUID
 }
 
 func DefaultFactoryPlanning() FactoryPlanning {
@@ -408,10 +410,11 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 
 func (f *Factory) Planning() FactoryPlanning {
 	return FactoryPlanning{
-		Enabled:        f.PlanningEnabled,
-		Clarity:        f.PlanningClarity,
-		Confidence:     f.PlanningConfidence,
-		SetupCompleted: f.PlanningSetupCompleted,
+		Enabled:         f.PlanningEnabled,
+		Clarity:         f.PlanningClarity,
+		Confidence:      f.PlanningConfidence,
+		SetupCompleted:  f.PlanningSetupCompleted,
+		AutoStartLineID: f.PlanningAutoStartLineID,
 	}
 }
 
@@ -419,13 +422,21 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	now := time.Now()
 	err := tx.Model(f).
 		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
+		Select(
+			"planning_enabled",
+			"planning_clarity",
+			"planning_confidence",
+			"planning_setup_completed",
+			"planning_auto_start_line_id",
+			"updated_at",
+		).
 		Updates(map[string]any{
-			"planning_enabled":         planning.Enabled,
-			"planning_clarity":         planning.Clarity,
-			"planning_confidence":      planning.Confidence,
-			"planning_setup_completed": planning.SetupCompleted,
-			"updated_at":               now,
+			"planning_enabled":            planning.Enabled,
+			"planning_clarity":            planning.Clarity,
+			"planning_confidence":         planning.Confidence,
+			"planning_setup_completed":    planning.SetupCompleted,
+			"planning_auto_start_line_id": planning.AutoStartLineID,
+			"updated_at":                  now,
 		}).Error
 	if err != nil {
 		return err
@@ -434,6 +445,7 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningClarity = planning.Clarity
 	f.PlanningConfidence = planning.Confidence
 	f.PlanningSetupCompleted = planning.SetupCompleted
+	f.PlanningAutoStartLineID = planning.AutoStartLineID
 	f.UpdatedAt = now
 	return nil
 }
@@ -609,7 +621,18 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithAutoStart(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, autoStartLineID)
 }
 
 // SnapshotWorkOrderRepository records the current repository before a
@@ -635,7 +658,7 @@ func (f *Factory) CreateWorkOrderWithOrigin(
 	sourceRunID *uuid.UUID,
 	origin WorkOrderOrigin,
 ) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil)
 }
 
 func (f *Factory) createWorkOrder(
@@ -645,10 +668,16 @@ func (f *Factory) createWorkOrder(
 	assignees []uuid.UUID,
 	sourceRunID *uuid.UUID,
 	origin *WorkOrderOrigin,
+	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+	if autoStartLineID != nil {
+		if _, err := f.FindLine(tx, *autoStartLineID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
@@ -663,18 +692,19 @@ func (f *Factory) createWorkOrder(
 
 	now := time.Now()
 	order := &FactoryWorkOrder{
-		ID:             uuid.New(),
-		OrganizationID: f.OrganizationID,
-		FactoryID:      f.ID,
-		Number:         nextNumber,
-		Title:          title,
-		Description:    description,
-		State:          FactoryWorkOrderStateDraft,
-		Result:         "",
-		CreatedByID:    createdBy,
-		SourceRunID:    sourceRunID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:              uuid.New(),
+		OrganizationID:  f.OrganizationID,
+		FactoryID:       f.ID,
+		Number:          nextNumber,
+		Title:           title,
+		Description:     description,
+		State:           FactoryWorkOrderStateDraft,
+		Result:          "",
+		CreatedByID:     createdBy,
+		SourceRunID:     sourceRunID,
+		AutoStartLineID: autoStartLineID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	config := f.OnboardingConfigValue()
 	if config.AppRepository != "" && config.DefaultBranch != "" {

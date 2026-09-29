@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -129,6 +130,17 @@ func startWorkers(
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
 		panic(err)
+	}
+
+	githubAppConfig := config.LoadGitHubHostedAppConfig()
+	if githubAppConfig.Enabled() {
+		catalog, err := githubapp.NewCatalog(database.Conn(), githubAppConfig)
+		if err != nil {
+			log.WithError(err).Error("Failed to initialize the GitHub App catalog")
+		} else {
+			log.Println("Starting GitHub App Catalog Worker")
+			go workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(context.Background())
+		}
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {

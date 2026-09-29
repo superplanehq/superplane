@@ -9,6 +9,7 @@ const (
 	EnvSentryAppSlug         = "SUPERPLANE_SENTRY_APP_SLUG"
 	EnvSentryAppClientID     = "SUPERPLANE_SENTRY_APP_CLIENT_ID"
 	EnvSentryAppClientSecret = "SUPERPLANE_SENTRY_APP_CLIENT_SECRET"
+	EnvSentryAppAPIToken     = "SUPERPLANE_SENTRY_APP_API_TOKEN"
 )
 
 // SentryHostedAppConfig is SuperPlane Cloud's public Sentry app. The process
@@ -18,6 +19,10 @@ type SentryHostedAppConfig struct {
 	Slug         string
 	ClientID     string
 	ClientSecret string
+	// APIToken is an optional owner token. When set, SuperPlane reads the
+	// public app and refuses a ready connection unless the webhook sends
+	// issue events. It is not required to install the app.
+	APIToken string
 }
 
 // LoadSentryHostedAppConfig reads the public Sentry app from the process
@@ -35,6 +40,7 @@ func LoadSentryHostedAppConfig() SentryHostedAppConfig {
 		Slug:         slug,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
+		APIToken:     strings.TrimSpace(os.Getenv(EnvSentryAppAPIToken)),
 	}
 }
 
