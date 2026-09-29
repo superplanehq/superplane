@@ -2,15 +2,20 @@ package organizations
 
 import (
 	"context"
+	"errors"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 )
+
+const maxOrganizationDeletionAttempts = 3
 
 func DeleteOrganization(ctx context.Context, authService authorization.Authorization, orgID string) (*pb.DeleteOrganizationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
@@ -23,33 +28,79 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
-	tx := database.Conn().Begin()
-	err = models.SoftDeleteOrganizationInTransaction(tx, organization.ID.String())
-	if err != nil {
-		tx.Rollback()
+	for attempt := 0; attempt < maxOrganizationDeletionAttempts; attempt++ {
+		scheduled, err := polar.CancelOrganizationSubscriptionForDeletion(ctx, database.Conn(), organization.ID)
+		if err != nil {
+			log.Errorf("Error canceling Business plan before deleting organization %s: %v", organization.ID.String(), err)
+			return nil, grpcerrors.Internal(err, "failed to cancel the Business plan. The organization was not deleted.")
+		}
+
+		err = deleteLockedOrganization(authService, organization)
+		if err == nil {
+			log.Infof(
+				"Organization %s (%s) soft-deleted by user %s",
+				organization.Name,
+				organization.ID.String(),
+				userID,
+			)
+			return &pb.DeleteOrganizationResponse{}, nil
+		}
+		if errors.Is(err, polar.ErrSubscriptionChangedDuringDeletion) {
+			continue
+		}
+
 		log.Errorf("Error deleting organization %s: %v", orgID, err)
-		return nil, err
+		return nil, restoreSubscriptionAfterFailedDeletion(ctx, organization.ID, scheduled, err)
 	}
 
-	err = authService.DestroyOrganization(tx, organization.ID.String())
-	if err != nil {
-		tx.Rollback()
-		log.Errorf("Error deleting organization roles for %s: %v", orgID, err)
-		return nil, err
-	}
-
-	err = tx.Commit().Error
-	if err != nil {
-		log.Errorf("Error committing transaction for organization %s (%s) deletion: %v", organization.Name, organization.ID.String(), err)
-		return nil, err
-	}
-
-	log.Infof(
-		"Organization %s (%s) soft-deleted by user %s",
-		organization.Name,
-		organization.ID.String(),
-		userID,
+	log.Errorf("Business plan changed during deletion of organization %s", organization.ID.String())
+	return nil, grpcerrors.Internal(
+		polar.ErrSubscriptionChangedDuringDeletion,
+		"the Business plan changed during deletion. The organization was not deleted.",
 	)
+}
 
-	return &pb.DeleteOrganizationResponse{}, nil
+func deleteLockedOrganization(authService authorization.Authorization, organization *models.Organization) error {
+	tx := database.Conn().Begin()
+	committed := false
+	defer func() {
+		if !committed {
+			tx.Rollback()
+		}
+	}()
+
+	if _, err := models.LockOrganization(tx, organization.ID); err != nil {
+		return err
+	}
+
+	changed, err := polar.SubscriptionChangedSinceDeletionCancel(tx, organization.ID)
+	if err != nil {
+		return err
+	}
+	if changed {
+		return polar.ErrSubscriptionChangedDuringDeletion
+	}
+
+	if err := models.SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); err != nil {
+		return err
+	}
+	if err := authService.DestroyOrganization(tx, organization.ID.String()); err != nil {
+		return err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func restoreSubscriptionAfterFailedDeletion(ctx context.Context, orgID uuid.UUID, scheduled bool, deleteErr error) error {
+	if !scheduled {
+		return deleteErr
+	}
+	if resumeErr := polar.ResumeOrganizationSubscription(ctx, database.Conn(), orgID); resumeErr != nil {
+		log.Errorf("Error restoring Business plan after failed deletion of organization %s: %v", orgID.String(), resumeErr)
+		return grpcerrors.Internal(resumeErr, "failed to delete the organization. The Business plan is set to end at the period end.")
+	}
+	return deleteErr
 }
