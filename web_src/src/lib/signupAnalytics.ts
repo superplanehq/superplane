@@ -39,9 +39,9 @@ export function hasConfirmedSignupAnalyticsPreference(accountEmail: string) {
   const preference = readSignupAnalyticsPreference();
   return Boolean(
     preference?.confirmed &&
-    !isExpired(preference) &&
-    preference.email &&
-    preference.email.toLowerCase() === accountEmail.toLowerCase(),
+      !isExpired(preference) &&
+      preference.email &&
+      preference.email.toLowerCase() === accountEmail.toLowerCase(),
   );
 }
 

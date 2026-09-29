@@ -23,10 +23,11 @@ describe("purchase confirmation observer", () => {
     Reflect.deleteProperty(window.location, "hostname");
   });
   it("waits for the matching paid invoice before pushing a conversion", async () => {
+    const pendingInvoice: PurchaseInvoice = { ...paidInvoice, status: "pending" };
     const { rerender } = renderHook(
       ({ invoices }: { invoices: PurchaseInvoice[] }) =>
         useGooglePurchaseTracking({ checkoutID: "hook-checkout", invoices, enabled: true }),
-      { initialProps: { invoices: [{ ...paidInvoice, status: "pending" }] } },
+      { initialProps: { invoices: [pendingInvoice] } },
     );
     expect(window.dataLayer).toBeUndefined();
     rerender({ invoices: [paidInvoice] });

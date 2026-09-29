@@ -66,7 +66,13 @@ describe("shared billing return refresh", () => {
             returnRefreshPending: purchasePending || creditStatus === "refreshing",
           });
         },
-        { initialProps: { invoices: [], grantTotalCents: 100, creditPurchaseAllowed: false } },
+        {
+          initialProps: {
+            invoices: [] as PurchaseInvoice[],
+            grantTotalCents: 100,
+            creditPurchaseAllowed: false,
+          },
+        },
       );
       await act(async () => {});
       await act(async () => {
