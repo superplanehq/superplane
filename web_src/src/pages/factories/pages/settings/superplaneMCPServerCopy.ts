@@ -23,6 +23,7 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
   revoked: "MCP client revoked.",
   revokeFailed: "SuperPlane could not revoke the MCP client.",
   noUpdatePermission: "You do not have permission to update this workspace.",
+  connectTitle: "Connect a client",
   tools: {
     cursor: {
       label: "Cursor",

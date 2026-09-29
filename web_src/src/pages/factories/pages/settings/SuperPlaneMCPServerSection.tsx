@@ -52,17 +52,23 @@ export function SuperPlaneMCPServerSection({
         ) : clients.length === 0 ? (
           <SuperPlaneMCPServerEmptyState />
         ) : (
-          <ul className="divide-y divide-border" data-testid="superplane-mcp-clients-list">
-            {clients.map((client) => (
-              <SuperPlaneMCPClientRow
-                key={client.id}
-                client={client}
-                canUpdate={canUpdate}
-                isRevoking={revokeClient.isPending && pendingRevoke?.id === client.id}
-                onRevoke={() => setPendingRevoke(client)}
-              />
-            ))}
-          </ul>
+          <div>
+            <ul className="divide-y divide-border" data-testid="superplane-mcp-clients-list">
+              {clients.map((client) => (
+                <SuperPlaneMCPClientRow
+                  key={client.id}
+                  client={client}
+                  canUpdate={canUpdate}
+                  isRevoking={revokeClient.isPending && pendingRevoke?.id === client.id}
+                  onRevoke={() => setPendingRevoke(client)}
+                />
+              ))}
+            </ul>
+            <div className="mt-5 border-t border-border pt-5" data-testid="superplane-mcp-client-setup">
+              <p className="mb-3 text-[13px] font-medium text-foreground">{SUPERPLANE_MCP_SERVER_COPY.connectTitle}</p>
+              <SuperPlaneMCPClientSetup origin={window.location.origin} />
+            </div>
+          </div>
         )}
       </FactorySettingsCard>
       <FactoryDeleteDialog
@@ -93,8 +99,6 @@ export function SuperPlaneMCPServerSection({
 }
 
 function SuperPlaneMCPServerEmptyState() {
-  const origin = window.location.origin;
-  const url = workspaceMCPServerURL(origin);
   return (
     <Empty className="border-0 p-6 md:p-10" data-testid="superplane-mcp-clients-empty">
       <EmptyHeader>
@@ -105,10 +109,18 @@ function SuperPlaneMCPServerEmptyState() {
         <EmptyDescription>{SUPERPLANE_MCP_SERVER_COPY.emptyBody}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent className="max-w-full items-stretch text-left">
-        <MCPServerURLRow url={url} />
-        <MCPClientSetupTabs origin={origin} />
+        <SuperPlaneMCPClientSetup origin={window.location.origin} />
       </EmptyContent>
     </Empty>
+  );
+}
+
+function SuperPlaneMCPClientSetup({ origin }: { origin: string }) {
+  return (
+    <div className="space-y-3">
+      <MCPServerURLRow url={workspaceMCPServerURL(origin)} />
+      <MCPClientSetupTabs origin={origin} />
+    </div>
   );
 }
 

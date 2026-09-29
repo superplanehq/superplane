@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -162,7 +163,7 @@ func ListMCPOAuthRefreshTokensForFactory(tx *gorm.DB, organizationID, factoryID 
 
 func FindMCPOAuthRefreshTokenForFactory(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*MCPOAuthRefreshToken, error) {
 	var token MCPOAuthRefreshToken
-	err := tx.
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND organization_id = ? AND factory_id = ?", id, organizationID, factoryID).
 		First(&token).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -172,6 +173,53 @@ func FindMCPOAuthRefreshTokenForFactory(tx *gorm.DB, organizationID, factoryID, 
 		return nil, err
 	}
 	return &token, nil
+}
+
+func HasMCPOAuthRefreshTokenForClient(
+	tx *gorm.DB,
+	organizationID, factoryID, userID uuid.UUID,
+	clientID string,
+	now time.Time,
+) (bool, error) {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return false, nil
+	}
+	var count int64
+	err := tx.Model(&MCPOAuthRefreshToken{}).
+		Where(
+			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ? AND expires_at > ?",
+			organizationID,
+			factoryID,
+			userID,
+			clientID,
+			now,
+		).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func DeleteMCPOAuthRefreshTokensForClient(
+	tx *gorm.DB,
+	organizationID, factoryID, userID uuid.UUID,
+	clientID string,
+) error {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return nil
+	}
+	return tx.
+		Where(
+			"organization_id = ? AND factory_id = ? AND user_id = ? AND client_id = ?",
+			organizationID,
+			factoryID,
+			userID,
+			clientID,
+		).
+		Delete(&MCPOAuthRefreshToken{}).Error
 }
 
 func ListMCPOAuthClientsByClientIDs(tx *gorm.DB, clientIDs []string) ([]MCPOAuthClient, error) {

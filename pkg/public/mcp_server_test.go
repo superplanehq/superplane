@@ -42,6 +42,31 @@ func mcpRequest(method, path string, body string) *http.Request {
 	return req
 }
 
+func mcpAccessClaims(r *support.ResourceRegistry, factoryID uuid.UUID) mcpserver.AccessClaims {
+	return mcpserver.AccessClaims{
+		UserID:    r.User,
+		OrgID:     r.Organization.ID,
+		FactoryID: factoryID,
+		ClientID:  mcpserver.LocalClientID,
+		Resource:  "http://localhost:8000/mcp",
+		Scopes:    mcpserver.GrantedScopes,
+	}
+}
+
+func insertMCPAccessGrant(t *testing.T, claims mcpserver.AccessClaims) {
+	t.Helper()
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.DB(t.Context()), &models.MCPOAuthRefreshToken{
+		TokenHash:      uuid.NewString(),
+		ClientID:       claims.ClientID,
+		UserID:         claims.UserID,
+		OrganizationID: claims.OrgID,
+		FactoryID:      claims.FactoryID,
+		Resource:       claims.Resource,
+		Scopes:         datatypes.NewJSONSlice(claims.Scopes),
+		ExpiresAt:      time.Now().Add(time.Hour),
+	}))
+}
+
 func TestMCPUnauthenticatedReturns401AndMetadataURL(t *testing.T) {
 	_, server, _ := mcpEnabledServer(t)
 	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
@@ -137,14 +162,9 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 	orderA, err := factoryA.CreateWorkOrder(db, "No agent", "", &r.User, nil, nil)
 	require.NoError(t, err)
 
-	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: factoryA.ID,
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    mcpserver.GrantedScopes,
-	}, time.Hour)
+	token, err := mcpserver.MintAccessToken(signer, mcpAccessClaims(r, factoryA.ID), time.Hour)
 	require.NoError(t, err)
+	insertMCPAccessGrant(t, mcpAccessClaims(r, factoryA.ID))
 
 	callTool := func(name string, args map[string]any) *httptest.ResponseRecorder {
 		payload, err := json.Marshal(map[string]any{
@@ -201,13 +221,7 @@ func TestMCPBlockedAccountReturns401(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
 
-	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: uuid.New(),
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    mcpserver.GrantedScopes,
-	}, time.Hour)
+	token, err := mcpserver.MintAccessToken(signer, mcpAccessClaims(r, uuid.New()), time.Hour)
 	require.NoError(t, err)
 	require.NoError(t, r.Account.Block(database.DB(t.Context()), time.Now()))
 
@@ -223,13 +237,7 @@ func TestMCPAuthenticatedWithoutFeatureFlagReturns404(t *testing.T) {
 	r, server, signer := mcpEnabledServer(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
-	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: uuid.New(),
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    mcpserver.GrantedScopes,
-	}, time.Hour)
+	token, err := mcpserver.MintAccessToken(signer, mcpAccessClaims(r, uuid.New()), time.Hour)
 	require.NoError(t, err)
 
 	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
@@ -244,13 +252,9 @@ func TestMCPDiscoveryListsAreEmpty(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
 
-	token, err := mcpserver.MintAccessToken(signer, mcpserver.AccessClaims{
-		UserID:    r.User,
-		OrgID:     r.Organization.ID,
-		FactoryID: uuid.New(),
-		Resource:  "http://localhost:8000/mcp",
-		Scopes:    mcpserver.GrantedScopes,
-	}, time.Hour)
+	claims := mcpAccessClaims(r, uuid.New())
+	insertMCPAccessGrant(t, claims)
+	token, err := mcpserver.MintAccessToken(signer, claims, time.Hour)
 	require.NoError(t, err)
 
 	for _, method := range []string{"resources/list", "prompts/list", "resources/templates/list"} {
@@ -273,6 +277,35 @@ func TestMCPDiscoveryListsAreEmpty(t *testing.T) {
 			assert.Equal(t, []any{}, result["resourceTemplates"])
 		}
 	}
+}
+
+func TestMCPRevokedGrantReturns401(t *testing.T) {
+	r, server, signer := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	claims := mcpAccessClaims(r, factory.ID)
+	insertMCPAccessGrant(t, claims)
+	token, err := mcpserver.MintAccessToken(signer, claims, time.Hour)
+	require.NoError(t, err)
+
+	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(
+		database.DB(t.Context()),
+		claims.OrgID,
+		claims.FactoryID,
+		claims.UserID,
+		claims.ClientID,
+	))
+	rec = httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func TestMCPProtectedResourceMetadataOnResourcePath(t *testing.T) {

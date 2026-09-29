@@ -327,6 +327,21 @@ func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
 	return raw, nil
 }
 
+func AccessGrantIsActive(tx *gorm.DB, claims *AccessClaims, now time.Time) bool {
+	if claims == nil {
+		return false
+	}
+	ok, err := models.HasMCPOAuthRefreshTokenForClient(
+		tx,
+		claims.OrgID,
+		claims.FactoryID,
+		claims.UserID,
+		claims.ClientID,
+		now,
+	)
+	return err == nil && ok
+}
+
 func AuthorizationRedirect(redirectURI, code, state string) (string, error) {
 	parsed, err := url.Parse(redirectURI)
 	if err != nil {

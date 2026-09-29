@@ -187,6 +187,7 @@ func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
 		UserID:    issue.UserID,
 		OrgID:     issue.OrgID,
 		FactoryID: issue.FactoryID,
+		ClientID:  issue.ClientID,
 		Resource:  issue.Resource,
 		Scopes:    issue.Scopes,
 	}, mcpserver.AccessTokenTTL)
@@ -243,6 +244,11 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !mcpserver.OrganizationAllowsPublicMCP(claims.OrgID) {
 		http.NotFound(w, r)
+		return
+	}
+	if !mcpserver.AccessGrantIsActive(database.DB(r.Context()), claims, time.Now()) {
+		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	if r.Method != http.MethodPost {

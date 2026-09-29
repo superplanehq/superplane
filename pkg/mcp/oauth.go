@@ -300,7 +300,7 @@ func loadProtectedResourceMetadata(ctx context.Context, httpClient HTTPDoer, mcp
 	var lastErr error
 	for _, metadataURL := range candidates {
 		var protected ProtectedResourceMetadata
-		if err := getJSON(ctx, httpClient, metadataURL, &protected); err != nil {
+		if err := GetJSON(ctx, httpClient, metadataURL, &protected); err != nil {
 			lastErr = err
 			if explicit {
 				break

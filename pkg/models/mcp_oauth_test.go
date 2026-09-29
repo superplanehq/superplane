@@ -15,7 +15,7 @@ import (
 
 func TestListMCPOAuthRefreshTokensForFactory(t *testing.T) {
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -36,7 +36,7 @@ func TestListMCPOAuthRefreshTokensForFactory(t *testing.T) {
 
 func TestFindMCPOAuthRefreshTokenForFactory(t *testing.T) {
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -57,7 +57,7 @@ func TestFindMCPOAuthRefreshTokenForFactory(t *testing.T) {
 
 func TestListMCPOAuthClientsByClientIDs(t *testing.T) {
 	support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	created, err := models.CreateMCPOAuthClient(db, "cursor-dcr", "Cursor Desktop", []string{"cursor://callback"})
 	require.NoError(t, err)
 
@@ -91,6 +91,41 @@ func insertRefreshToken(
 		ExpiresAt:      expiresAt,
 		CreatedAt:      createdAt,
 	}
-	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.Conn(), token))
+	require.NoError(t, models.CreateMCPOAuthRefreshToken(database.DB(t.Context()), token))
 	return token
+}
+
+func TestHasMCPOAuthRefreshTokenForClient(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now)
+
+	ok, err := models.HasMCPOAuthRefreshTokenForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local", now)
+	require.NoError(t, err)
+	assert.True(t, ok)
+
+	ok, err = models.HasMCPOAuthRefreshTokenForClient(db, r.Organization.ID, factory.ID, r.User, "other-client", now)
+	require.NoError(t, err)
+	assert.False(t, ok)
+}
+
+func TestDeleteMCPOAuthRefreshTokensForClient(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	first := insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now)
+	insertRefreshToken(t, r, factory.ID, "superplane-local", now.Add(time.Hour), now.Add(time.Second))
+	other := insertRefreshToken(t, r, factory.ID, "other-client", now.Add(time.Hour), now)
+
+	require.NoError(t, models.DeleteMCPOAuthRefreshTokensForClient(db, r.Organization.ID, factory.ID, r.User, "superplane-local"))
+	_, err = models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, first.ID)
+	assert.ErrorIs(t, err, models.ErrMCPOAuthRefreshNotFound)
+	found, err := models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, other.ID, found.ID)
 }

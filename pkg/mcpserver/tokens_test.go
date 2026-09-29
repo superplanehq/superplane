@@ -15,6 +15,7 @@ func TestAccessTokenRoundTrip(t *testing.T) {
 		UserID:    uuid.New(),
 		OrgID:     uuid.New(),
 		FactoryID: uuid.New(),
+		ClientID:  "superplane-local",
 		Resource:  "http://localhost:8000/mcp",
 		Scopes:    GrantedScopes,
 	}
@@ -26,6 +27,7 @@ func TestAccessTokenRoundTrip(t *testing.T) {
 	require.Equal(t, claims.UserID, parsed.UserID)
 	require.Equal(t, claims.OrgID, parsed.OrgID)
 	require.Equal(t, claims.FactoryID, parsed.FactoryID)
+	require.Equal(t, claims.ClientID, parsed.ClientID)
 	require.Equal(t, claims.Resource, parsed.Resource)
 	require.Equal(t, GrantedScopes, parsed.Scopes)
 }
@@ -36,12 +38,25 @@ func TestAccessTokenRejectsWrongAudience(t *testing.T) {
 		UserID:    uuid.New(),
 		OrgID:     uuid.New(),
 		FactoryID: uuid.New(),
+		ClientID:  "superplane-local",
 		Resource:  "http://localhost:8000/mcp",
 		Scopes:    GrantedScopes,
 	}, time.Hour)
 	require.NoError(t, err)
 
 	_, err = ParseAccessToken(signer, token, "https://other.example/mcp")
+	require.Error(t, err)
+}
+
+func TestAccessTokenRequiresClientID(t *testing.T) {
+	signer := jwt.NewSigner("test-secret")
+	_, err := MintAccessToken(signer, AccessClaims{
+		UserID:    uuid.New(),
+		OrgID:     uuid.New(),
+		FactoryID: uuid.New(),
+		Resource:  "http://localhost:8000/mcp",
+		Scopes:    GrantedScopes,
+	}, time.Hour)
 	require.Error(t, err)
 }
 
@@ -67,6 +82,7 @@ func TestAccessTokenDoesNotValidateAsScopedToken(t *testing.T) {
 		UserID:    uuid.New(),
 		OrgID:     uuid.New(),
 		FactoryID: uuid.New(),
+		ClientID:  "superplane-local",
 		Resource:  "http://localhost:8000/mcp",
 		Scopes:    GrantedScopes,
 	}, time.Hour)

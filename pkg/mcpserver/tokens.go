@@ -17,6 +17,7 @@ type AccessClaims struct {
 	UserID    uuid.UUID
 	OrgID     uuid.UUID
 	FactoryID uuid.UUID
+	ClientID  string
 	Resource  string
 	Scopes    []string
 }
@@ -27,6 +28,10 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 	}
 	if claims.UserID == uuid.Nil || claims.OrgID == uuid.Nil || claims.FactoryID == uuid.Nil {
 		return "", fmt.Errorf("access token scope is incomplete")
+	}
+	clientID := strings.TrimSpace(claims.ClientID)
+	if clientID == "" {
+		return "", fmt.Errorf("client_id is required")
 	}
 	resource := strings.TrimSpace(claims.Resource)
 	if resource == "" {
@@ -40,6 +45,7 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 		"sub":        claims.UserID.String(),
 		"org_id":     claims.OrgID.String(),
 		"factory_id": claims.FactoryID.String(),
+		"client_id":  clientID,
 		"aud":        resource,
 		"scope":      strings.Join(normalizeScopes(claims.Scopes), " "),
 	})
@@ -73,11 +79,16 @@ func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims
 	if err != nil {
 		return nil, err
 	}
+	clientID := stringClaim(claims, "client_id")
+	if clientID == "" {
+		return nil, fmt.Errorf("invalid client_id")
+	}
 	scope, _ := claims["scope"].(string)
 	return &AccessClaims{
 		UserID:    userID,
 		OrgID:     orgID,
 		FactoryID: factoryID,
+		ClientID:  clientID,
 		Resource:  audience,
 		Scopes:    strings.Fields(scope),
 	}, nil

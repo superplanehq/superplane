@@ -71,11 +71,14 @@ func RevokeFactoryMCPClient(
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")
 	}
 
-	token, err := models.FindMCPOAuthRefreshTokenForFactory(db, orgID, factory.ID, clientID)
+	err = db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.FindMCPOAuthRefreshTokenForFactory(tx, orgID, factory.ID, clientID)
+		if err != nil {
+			return err
+		}
+		return models.DeleteMCPOAuthRefreshTokensForClient(tx, orgID, factory.ID, locked.UserID, locked.ClientID)
+	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")
-	}
-	if err := models.DeleteMCPOAuthRefreshToken(db, token); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")
 	}
 	return &pb.RevokeFactoryMCPClientResponse{}, nil

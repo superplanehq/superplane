@@ -107,6 +107,32 @@ func Test__RevokeFactoryMCPClient(t *testing.T) {
 	assert.Empty(t, listed.GetClients())
 }
 
+func Test__RevokeFactoryMCPClientDeletesRotatedTokens(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	listed := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now)
+	rotated := insertFactoryMCPRefreshToken(t, r, factory.ID, localMCPClientID, now.Add(time.Hour), now.Add(time.Second))
+	other := insertFactoryMCPRefreshToken(t, r, factory.ID, "other-client", now.Add(time.Hour), now)
+
+	_, err = RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
+		FactoryId: factory.ID.String(),
+		ClientId:  listed.ID.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, listed.ID)
+	assert.ErrorIs(t, err, models.ErrMCPOAuthRefreshNotFound)
+	_, err = models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, rotated.ID)
+	assert.ErrorIs(t, err, models.ErrMCPOAuthRefreshNotFound)
+	found, err := models.FindMCPOAuthRefreshTokenForFactory(db, r.Organization.ID, factory.ID, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, other.ID, found.ID)
+}
+
 func Test__RevokeFactoryMCPClientRejectsInvalidID(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))

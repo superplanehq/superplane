@@ -469,6 +469,8 @@ describe("FactorySettingsMCPPage", () => {
     );
 
     expect(await screen.findByTestId("superplane-mcp-clients-list", {}, { timeout: 8000 })).toHaveTextContent("Cursor");
+    expect(screen.getByTestId("superplane-mcp-client-setup")).toHaveTextContent("Connect a client");
+    expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
     expect(screen.getByTestId(`superplane-mcp-client-${clientId}`)).toHaveTextContent(STORYBOOK_ME_USER_NAME);
 
     await user.click(screen.getByTestId(`superplane-mcp-client-revoke-${clientId}`));
