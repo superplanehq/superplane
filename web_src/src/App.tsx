@@ -45,7 +45,6 @@ import {
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
-  LinesPage,
   MissionsPage,
   NewWorkspacePage,
   OnboardingGate,
@@ -67,6 +66,8 @@ import {
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
+import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -166,7 +167,6 @@ function organizationScopedRouteTree() {
             <Route path="lines">
               <Route index element={<FactoryHomeRedirect />} />
               <Route path="new" element={<FactoryLineEditPageGate />} />
-              <Route path=":lineId" element={<LinesPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
@@ -197,6 +197,7 @@ function organizationScopedRouteTree() {
             <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
           </Route>
         </Route>
+        <Route path=":factoryKey/lines/:lineId" element={<FactoryLineAccessGate />} />
         <Route
           path=":factoryKey/settings"
           element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
@@ -305,16 +306,17 @@ function PageObservabilityScope() {
 
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
-  const { account } = useAccount();
+  const { account, loading: accountLoading } = useAccount();
   const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
+  const guestLine = isPublicFactoryLinePath(location.pathname) && (accountLoading || !account);
   // The route param accepts either the org slug or its UID, so resolve it
   // once here and self-correct any UID URL to the slug below. Every other
   // in-app link reuses this same `:organizationId` URL segment, so fixing
   // it at this single boundary keeps the rest of the app slug-only.
-  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -345,6 +347,10 @@ export function OrganizationScope() {
 
   if (uidRedirectPath) {
     return <Navigate to={uidRedirectPath} replace />;
+  }
+
+  if (guestLine) {
+    return <Outlet />;
   }
 
   return (

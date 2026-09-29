@@ -8,7 +8,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
@@ -48,14 +48,18 @@ function shouldHideOnboardingSidebar(args: {
   return !args.hasStorybookOnboarding && args.canConfigure && !isFactoryOnboardingComplete(args.factory);
 }
 
-export function FactoriesLayout() {
+export function FactoriesLayout({ children }: { children?: ReactNode }) {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
 
   if (!organizationId || !factoryKey) {
     return null;
   }
 
-  return <FactoriesLayoutResolver organizationId={organizationId} factoryKey={factoryKey} />;
+  return (
+    <FactoriesLayoutResolver organizationId={organizationId} factoryKey={factoryKey}>
+      {children}
+    </FactoriesLayoutResolver>
+  );
 }
 
 /**
@@ -63,7 +67,15 @@ export function FactoriesLayout() {
  * off to `FactoriesLayoutContent`. Keeps the id/key resolution — and its
  * loading/not-found/redirect states — out of the main layout body.
  */
-function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationId: string; factoryKey: string }) {
+function FactoriesLayoutResolver({
+  organizationId,
+  factoryKey,
+  children,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  children?: ReactNode;
+}) {
   const location = useLocation();
   const {
     data: factories = [],
@@ -94,7 +106,9 @@ function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationI
       factoryId={resolution.factory.id}
       factoryKey={resolution.factory.key ?? factoryKey}
       factories={factories}
-    />
+    >
+      {children}
+    </FactoriesLayoutContent>
   );
 }
 
@@ -103,11 +117,13 @@ function FactoriesLayoutContent({
   factoryId,
   factoryKey,
   factories,
+  children,
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   factories: FactoriesFactory[];
+  children?: ReactNode;
 }) {
   useFactoriesThemeClass();
   const { account } = useAccount();
@@ -194,9 +210,7 @@ function FactoriesLayoutContent({
             factories={factories}
           />
         )}
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
-          <Outlet />
-        </main>
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children ?? <Outlet />}</main>
       </div>
 
       {canCreateWorkOrder ? (

@@ -36,6 +36,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
@@ -206,6 +207,7 @@ func NewServer(
 
 	server.timeoutHandlerTimeout = 15 * time.Second
 	sentry.EnableHostedInstallBind(encryptor)
+	eventdistributer.SetPublicBoardBroadcaster(server.wsHub, broadcastPublicFactoryBoard)
 	server.InitRouter(middlewares...)
 	return server, nil
 }
@@ -577,6 +579,12 @@ func (s *Server) RegisterWebSocketRoutes() {
 			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
 	)
 
+	// Public line board. The message is only board_changed.
+	s.Router.HandleFunc(
+		"/ws/public/organizations/{org}/workspaces/{key}/lines/{lineId}",
+		s.handlePublicFactoryBoardWebSocket,
+	).Methods(http.MethodGet)
+
 	// User notifications WebSocket: live alerts for the authenticated user.
 	s.Router.Handle(
 		"/ws/users/notifications",
@@ -674,6 +682,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
+	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/artifacts/{public_id}/{filename}", s.handlePublicArtifactDownload).Methods(http.MethodGet, http.MethodHead)
 
 	// OIDC discovery endpoints
