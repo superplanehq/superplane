@@ -221,6 +221,8 @@ SUPERPLANE_SENTRY_APP_CLIENT_ID=123123
 SUPERPLANE_SENTRY_APP_CLIENT_SECRET=123123
 ```
 
+`SUPERPLANE_SENTRY_APP_API_TOKEN` is optional. Set an owner API token when you want SuperPlane to read the public app. SuperPlane then marks a connection ready only when the webhook URL and the `issue` event match.
+
 Restart the server after you save `.env`.
 
 ### 4. Confirm setup
