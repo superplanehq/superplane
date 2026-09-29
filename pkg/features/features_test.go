@@ -116,6 +116,12 @@ func Test__Get(t *testing.T) {
 		_, ok := Get("")
 		assert.False(t, ok)
 	})
+
+	t.Run("retired sentry intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_sentry_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
 }
 
 func Test__Exists(t *testing.T) {
@@ -133,8 +139,15 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.False(t, Exists("factory_visual_evidence"))
+	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
+}
+
+func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
+	for _, feature := range All() {
+		assert.NotEqual(t, "factory_sentry_intake", feature.ID)
+	}
 }
 
 func Test__All_isCopy(t *testing.T) {
