@@ -103,12 +103,46 @@ func Test__PRFeedbackResolveAddressedThreadsCommand(t *testing.T) {
 		assert.Equal(t, []string{"reviewThreads"}, run.operations)
 		assert.Contains(t, run.output, "could not list review threads")
 	})
+
+	t.Run("replies then resolves a thread from a later review thread page", func(t *testing.T) {
+		const pagedThread = "PRRT_paged"
+		run := runResolveAddressedThreadsCommand(t, resolveThreadsCommandOptions{
+			jsonl:         `{"id":"` + pagedThread + `","reply":"Paged thread was addressed."}` + "\n",
+			listJSON:      reviewThreadListPageJSON(true, "cursor-1", localThread),
+			listJSONPage2: reviewThreadListPageJSON(false, "cursor-2", pagedThread),
+		})
+
+		require.NoError(t, run.err, run.output)
+		assert.Equal(t, []string{
+			"reviewThreads",
+			"reviewThreads",
+			"addPullRequestReviewThreadReply:" + pagedThread,
+			"resolveReviewThread:" + pagedThread,
+		}, run.operations)
+		assert.Contains(t, run.calls[1], "cursor=cursor-1")
+		assert.Contains(t, strings.Join(run.calls, "\n"), "body=Paged thread was addressed.")
+	})
+
+	t.Run("does not mutate threads when a later review thread page fails", func(t *testing.T) {
+		const pagedThread = "PRRT_paged"
+		run := runResolveAddressedThreadsCommand(t, resolveThreadsCommandOptions{
+			jsonl:         `{"id":"` + pagedThread + `","reply":"Should not apply."}` + "\n",
+			listJSON:      reviewThreadListPageJSON(true, "cursor-1", localThread),
+			listJSONPage2: reviewThreadListPageJSON(false, "cursor-2", pagedThread),
+			extraEnv:      []string{"GH_FAIL_LIST_PAGE2=1"},
+		})
+
+		require.NoError(t, run.err, run.output)
+		assert.Equal(t, []string{"reviewThreads", "reviewThreads"}, run.operations)
+		assert.Contains(t, run.output, "could not list review threads")
+	})
 }
 
 type resolveThreadsCommandOptions struct {
-	jsonl    string
-	listJSON string
-	extraEnv []string
+	jsonl         string
+	listJSON      string
+	listJSONPage2 string
+	extraEnv      []string
 }
 
 type resolveThreadsCommandRun struct {
@@ -133,6 +167,8 @@ func runResolveAddressedThreadsCommand(t *testing.T, options resolveThreadsComma
 
 	listPath := filepath.Join(root, "threads.json")
 	require.NoError(t, os.WriteFile(listPath, []byte(options.listJSON), 0o644))
+	listPage2Path := filepath.Join(root, "threads-page2.json")
+	require.NoError(t, os.WriteFile(listPage2Path, []byte(options.listJSONPage2), 0o644))
 	logPath := filepath.Join(root, "gh-calls.log")
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte(ghResolveThreadsStub), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "jq"), []byte(jqResolveThreadsStub), 0o755))
@@ -146,6 +182,7 @@ func runResolveAddressedThreadsCommand(t *testing.T, options resolveThreadsComma
 		"PR_NUMBER=42",
 		"GH_CALL_LOG=" + logPath,
 		"GH_THREAD_LIST_JSON=" + listPath,
+		"GH_THREAD_LIST_JSON_PAGE2=" + listPage2Path,
 	}, options.extraEnv...), "GITHUB_TOKEN=")
 	output, err := cmd.CombinedOutput()
 
@@ -200,11 +237,19 @@ func graphqlFieldValue(call string, name string) string {
 }
 
 func reviewThreadListJSON(ids ...string) string {
+	return reviewThreadListPageJSON(false, "", ids...)
+}
+
+func reviewThreadListPageJSON(hasNextPage bool, endCursor string, ids ...string) string {
 	nodes := make([]string, 0, len(ids))
 	for _, id := range ids {
 		nodes = append(nodes, `{"id":"`+id+`"}`)
 	}
-	return `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[` + strings.Join(nodes, ",") + `]}}}}}`
+	hasNext := "false"
+	if hasNextPage {
+		hasNext = "true"
+	}
+	return `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[` + strings.Join(nodes, ",") + `],"pageInfo":{"hasNextPage":` + hasNext + `,"endCursor":"` + endCursor + `"}}}}}}`
 }
 
 const ghResolveThreadsStub = `#!/usr/bin/env bash
@@ -220,12 +265,14 @@ log="${GH_CALL_LOG:?}"
 } >> "$log"
 
 id=""
+cursor=""
 prev=""
 for arg in "$@"; do
   case "$prev" in
     -f|-F)
       case "$arg" in
         id=*) id="${arg#id=}" ;;
+        cursor=*) cursor="${arg#cursor=}" ;;
       esac
       ;;
   esac
@@ -237,6 +284,14 @@ if [[ "$joined" == *reviewThreads* ]]; then
   if [ "${GH_FAIL_LIST:-}" = "1" ]; then
     echo "list failed" >&2
     exit 1
+  fi
+  if [ -n "$cursor" ]; then
+    if [ "${GH_FAIL_LIST_PAGE2:-}" = "1" ]; then
+      echo "list page 2 failed" >&2
+      exit 1
+    fi
+    cat "${GH_THREAD_LIST_JSON_PAGE2:?}"
+    exit 0
   fi
   cat "${GH_THREAD_LIST_JSON:?}"
   exit 0
@@ -280,6 +335,16 @@ case "$expr" in
     ;;
   '.data.repository.pullRequest.reviewThreads.nodes // [] | .[].id')
     printf '%s' "$input" | grep -o '"id":"[^"]*"' | cut -d'"' -f4 || true
+    ;;
+  '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
+    if printf '%s' "$input" | grep -q '"hasNextPage":true'; then
+      printf 'true'
+    else
+      printf 'false'
+    fi
+    ;;
+  '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
+    printf '%s' "$input" | sed -n 's/.*"endCursor"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
     ;;
   *)
     echo "unexpected jq expression: $expr" >&2

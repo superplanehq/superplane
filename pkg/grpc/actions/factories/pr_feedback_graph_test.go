@@ -248,6 +248,8 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			assert.Less(t, listAt, replyAt)
 			assert.Less(t, replyAt, resolveAt)
 			assert.Contains(t, command, `grep -Fxq -- "$id"`)
+			assert.Contains(t, command, "pageInfo{hasNextPage endCursor}")
+			assert.Contains(t, command, "after:$cursor")
 		}
 	})
 
