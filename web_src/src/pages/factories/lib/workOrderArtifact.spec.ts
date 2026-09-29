@@ -1,13 +1,16 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  artifactSizeLabel,
   branchTreeUrl,
   buildLatestArtifactDataById,
   extractArtifactMarkdownBody,
   extractArtifactName,
+  extractArtifactSizeBytes,
   extractArtifactTitle,
   extractArtifactUrl,
   extractPrArtifactState,
+  formatArtifactSize,
   formatPrArtifactLabel,
   overlayLiveArtifactData,
   toArtifactDataRecord,
@@ -245,6 +248,20 @@ describe("overlayLiveArtifactData", () => {
   it("keeps the snapshot when the artifact is missing from the live list", () => {
     const snapshot = { id: "art-1", data: { state: "open" } };
     expect(overlayLiveArtifactData(snapshot, new Map())).toBe(snapshot);
+  });
+});
+
+describe("artifactSizeLabel", () => {
+  it("formats sizeBytes and falls back to the markdown body", () => {
+    expect(extractArtifactSizeBytes({ sizeBytes: 348 })).toBe(348);
+    expect(extractArtifactSizeBytes({ size: "2048" })).toBe(2048);
+    expect(formatArtifactSize(348)).toBe("348 B");
+    expect(formatArtifactSize(12_288)).toBe("12 KB");
+    expect(formatArtifactSize(1_228_800)).toBe("1.2 MB");
+    expect(artifactSizeLabel({ sizeBytes: 12_288 })).toBe("12 KB");
+    expect(artifactSizeLabel({ size: "1.4 MB" })).toBe("1.4 MB");
+    expect(artifactSizeLabel({ body: "hello" })).toBe("5 B");
+    expect(artifactSizeLabel({})).toBeUndefined();
   });
 });
 
