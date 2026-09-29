@@ -142,6 +142,7 @@ services:
       POLAR_BUSINESS_PRODUCT_ID: ${POLAR_BUSINESS_PRODUCT_ID:-}
       POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
+      POLAR_API_VERSION: ${POLAR_API_VERSION:-}
 
       #
       # Platform blob storage. Development uses a local directory. Hosted
