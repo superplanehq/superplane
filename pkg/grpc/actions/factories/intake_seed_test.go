@@ -712,11 +712,12 @@ func Test__DatadogSeedLoadsIssueDetails(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:      issueID,
 		Service: "checkout",
 		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
+	require.NoError(t, err)
 	require.Len(t, issues, 1)
 	assert.Equal(t, "inventory timeout", issues[0].ErrorMessage)
 	assert.Contains(t, issues[0].Stack, "main.Charge")
@@ -747,10 +748,11 @@ func Test__DatadogSeedKeepsIssueWhenSearchSummaryHasNoService(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:  issueID,
 		URL: "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
+	require.NoError(t, err)
 	require.Len(t, issues, 1)
 	assert.Equal(t, "checkout", issues[0].Service)
 	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
@@ -774,10 +776,11 @@ func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherServiceWithoutSummarySer
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:  issueID,
 		URL: "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
+	require.NoError(t, err)
 	assert.Empty(t, issues)
 }
 
@@ -799,11 +802,12 @@ func Test__DatadogSeedSkipsIssueWhenDetailsReportAnotherService(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:      issueID,
 		Service: "checkout",
 		URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
+	require.NoError(t, err)
 	assert.Empty(t, issues)
 }
 
@@ -830,16 +834,17 @@ func Test__DatadogSeedFillsFromTheNextIssueWhenDetailsDisagree(t *testing.T) {
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{
 		{ID: droppedID, Service: "checkout"},
 		{ID: keptID, Service: "checkout"},
 	})
+	require.NoError(t, err)
 	require.Len(t, issues, 1)
 	assert.Equal(t, keptID, issues[0].ID)
 	assert.Equal(t, "checkout failed", issues[0].ErrorMessage)
 }
 
-func Test__DatadogSeedSkipsUnverifiedIssueWhenLoadFailsWithoutSummaryService(t *testing.T) {
+func Test__DatadogSeedFailsWhenUnverifiedIssueLoadFailsWithoutSummaryService(t *testing.T) {
 	const issueID = "66666666-6666-4666-8666-666666666666"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -853,11 +858,53 @@ func Test__DatadogSeedSkipsUnverifiedIssueWhenLoadFailsWithoutSummaryService(t *
 	require.NoError(t, err)
 	client.BaseURL = server.URL
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:  issueID,
 		URL: "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
-	assert.Empty(t, issues)
+	assert.ErrorContains(t, err, "failed to verify 1 Datadog issue(s) for intake service \"checkout\"")
+	assert.Nil(t, issues)
+}
+
+func Test__DatadogSeedKeepsVerifiedIssuesWhenUnverifiedLoadFails(t *testing.T) {
+	const unverifiedID = "66666666-6666-4666-8666-666666666666"
+	candidates := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize+1)
+	candidates = append(candidates, datadog.ErrorTrackingIssue{
+		ID:  unverifiedID,
+		URL: "https://app.datadoghq.eu/error-tracking/issue/" + unverifiedID,
+	})
+	for i := range intakeDatadogSeedSize {
+		issueID := fmt.Sprintf("77777777-7777-4777-8777-7777777777%02d", i)
+		candidates = append(candidates, datadog.ErrorTrackingIssue{
+			ID:      issueID,
+			Service: "checkout",
+			URL:     "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+		})
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, unverifiedID):
+			http.Error(w, "timeout", http.StatusGatewayTimeout)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/v2/error-tracking/issues/"):
+			issueID := strings.TrimPrefix(r.URL.Path, "/api/v2/error-tracking/issues/")
+			_, _ = w.Write([]byte(`{"data":{"id":"` + issueID + `","type":"issue","attributes":{"error_message":"checkout failed","service":"checkout"}}}`))
+		default:
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		}
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", candidates)
+	require.NoError(t, err)
+	require.Len(t, issues, intakeDatadogSeedSize)
 }
 
 func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {
@@ -875,12 +922,13 @@ func Test__DatadogSeedKeepsSearchResultWhenTheLoadBudgetIsSpent(t *testing.T) {
 	client.BaseURL = server.URL
 	client.SetRequestDeadline(time.Now().Add(-time.Second))
 
-	issues := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
+	issues, err := hydrateDatadogSeedIssues(client, "checkout", []datadog.ErrorTrackingIssue{{
 		ID:           issueID,
 		Service:      "checkout",
 		ErrorMessage: "search summary",
 		URL:          "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
 	}})
+	require.NoError(t, err)
 	require.Len(t, issues, 1)
 	assert.Equal(t, "search summary", issues[0].ErrorMessage)
 	assert.Equal(t, "checkout", issues[0].Service)
