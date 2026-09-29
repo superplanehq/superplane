@@ -698,11 +698,20 @@ func seedDatadogIssues(
 	}
 
 	client.SetRequestDeadline(time.Now().Add(intakeDatadogSeedBudget))
-	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, service, issues))
+	hydrated, err := hydrateDatadogSeedIssues(client, service, issues)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+	return seedKnownDatadogIssues(tx, canvasID, hydrated)
 }
 
-func hydrateDatadogSeedIssues(client *datadog.Client, intakeService string, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
+func hydrateDatadogSeedIssues(
+	client *datadog.Client,
+	intakeService string,
+	issues []datadog.ErrorTrackingIssue,
+) ([]datadog.ErrorTrackingIssue, error) {
 	hydrated := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize)
+	unverifiedLoadFailures := 0
 	for _, issue := range issues {
 		if len(hydrated) >= intakeDatadogSeedSize {
 			break
@@ -713,6 +722,7 @@ func hydrateDatadogSeedIssues(client *datadog.Client, intakeService string, issu
 		if err != nil || loaded == nil {
 			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
 			if !datadogIssueMatchesService(issue, intakeService, false) {
+				unverifiedLoadFailures++
 				log.Warnf(
 					"skipping Datadog issue %s: search result has no verified service for intake %q",
 					issue.ID,
@@ -744,7 +754,15 @@ func hydrateDatadogSeedIssues(client *datadog.Client, intakeService string, issu
 		}
 		hydrated = append(hydrated, *loaded)
 	}
-	return hydrated
+	target := min(intakeDatadogSeedSize, len(issues))
+	if unverifiedLoadFailures > 0 && len(hydrated) < target {
+		return nil, fmt.Errorf(
+			"failed to verify %d Datadog issue(s) for intake service %q",
+			unverifiedLoadFailures,
+			intakeService,
+		)
+	}
+	return hydrated, nil
 }
 
 func datadogDetailMatchesService(expected, actual string) bool {
