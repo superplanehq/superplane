@@ -10,8 +10,18 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
+  it("lists eight colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(8);
+    expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).toEqual([
+      "lime",
+      "yellow",
+      "teal",
+      "sky",
+      "purple",
+      "slate",
+      "orange",
+      "rose",
+    ]);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
@@ -24,7 +34,8 @@ describe("lineBoardColumnColors", () => {
     expect(lineBoardColumnColorById("lime")?.label).toBe("Lime");
     expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.laneClassName);
     expect(lineBoardColumnLaneClassName("lime")).toContain("bg-lime-100");
-    expect(lineBoardColumnLaneClassName("lime")).toContain("dark:bg-lime-950/40");
+    expect(lineBoardColumnLaneClassName("rose")).toContain("bg-rose-100");
+    expect(lineBoardColumnLaneClassName("orange")).toContain("bg-orange-100");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
   });
 
