@@ -497,11 +497,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      title: string;
-      description: string;
-      assigneeIds?: string[];
-    }) => {
+    mutationFn: async (input: { title: string; description: string; assigneeIds?: string[] }) => {
       const response = await factoriesCreateWorkOrder(
         withOrganizationHeader({
           organizationId,
