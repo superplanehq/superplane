@@ -50,7 +50,9 @@ type FactoryOnboardingConfig struct {
 	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
 	AgentIntegrationID         string `json:"agent_integration_id,omitempty"`
 	AppRepository              string `json:"app_repository,omitempty"`
+	AppRepositoryID            int64  `json:"app_repository_id,omitempty"`
 	BacklogRepository          string `json:"backlog_repository,omitempty"`
+	BacklogRepositoryID        int64  `json:"backlog_repository_id,omitempty"`
 	DefaultBranch              string `json:"default_branch,omitempty"`
 	IssuesSource               string `json:"issues_source,omitempty"`
 	AgentHarness               string `json:"agent_harness,omitempty"`
@@ -63,15 +65,17 @@ type FactoryOnboardingConfig struct {
 // (including clearing when the pointed string is empty, or when an enum is
 // cleared to the empty string).
 type FactoryOnboardingPatch struct {
-	VCSIntegrationID   *string
-	AgentIntegrationID *string
-	AppRepository      *string
-	BacklogRepository  *string
-	DefaultBranch      *string
-	IssuesSource       *string
-	AgentHarness       *string
-	ProvisionedAppID   *string
-	ProvisionedLineID  *string
+	VCSIntegrationID    *string
+	AgentIntegrationID  *string
+	AppRepository       *string
+	AppRepositoryID     *int64
+	BacklogRepository   *string
+	BacklogRepositoryID *int64
+	DefaultBranch       *string
+	IssuesSource        *string
+	AgentHarness        *string
+	ProvisionedAppID    *string
+	ProvisionedLineID   *string
 }
 
 func ValidateFactoryOnboardingIssuesSource(source string) error {
@@ -218,12 +222,18 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 		}
 		next.AppRepository = value
 	}
+	if patch.AppRepositoryID != nil {
+		next.AppRepositoryID = *patch.AppRepositoryID
+	}
 	if patch.BacklogRepository != nil {
 		value := strings.TrimSpace(*patch.BacklogRepository)
 		if err := validateOptionalFactoryRepository(value); err != nil {
 			return FactoryOnboardingConfig{}, err
 		}
 		next.BacklogRepository = value
+	}
+	if patch.BacklogRepositoryID != nil {
+		next.BacklogRepositoryID = *patch.BacklogRepositoryID
 	}
 	if patch.DefaultBranch != nil {
 		next.DefaultBranch = strings.TrimSpace(*patch.DefaultBranch)

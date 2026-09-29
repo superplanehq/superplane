@@ -25,7 +25,7 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.False(t, found.LinkedAt.IsZero())
 	})
 
-	t.Run("replaces the identity the account linked before", func(t *testing.T) {
+	t.Run("keeps multiple identities and activates the most recently linked identity", func(t *testing.T) {
 		account, err := CreateAccount("Relinker", "relinker@example.com")
 		require.NoError(t, err)
 
@@ -37,9 +37,63 @@ func TestAccountLinkedAccount(t *testing.T) {
 
 		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
 		require.NoError(t, err)
-		require.Len(t, linked, 1)
+		require.Len(t, linked, 2)
 		assert.Equal(t, "right-login", linked[0].Username)
 		assert.Equal(t, "2", linked[0].ProviderID)
+		assert.True(t, linked[0].Active)
+		assert.False(t, linked[1].Active)
+
+		active, err := FindAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, "2", active.ProviderID)
+	})
+
+	t.Run("selects a previously linked identity", func(t *testing.T) {
+		account, err := CreateAccount("Switcher", "switcher@example.com")
+		require.NoError(t, err)
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "21", "first-login", "", ""),
+		))
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "22", "second-login", "", ""),
+		))
+
+		require.NoError(t, SelectAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub, "21"))
+
+		active, err := FindAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, "first-login", active.Username)
+	})
+
+	t.Run("refreshes a sign-in identity without changing the selection", func(t *testing.T) {
+		account, err := CreateAccount("Sign In", "sign-in@example.com")
+		require.NoError(t, err)
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "31", "first-login", "", ""),
+		))
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "32", "selected-login", "", ""),
+		))
+
+		refreshed := NewAccountLinkedAccount(account.ID, ProviderGitHub, "31", "renamed-login", "", "")
+		require.NoError(t, RefreshAccountLinkedAccount(database.Conn(), refreshed))
+
+		active, err := FindAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub)
+		require.NoError(t, err)
+		assert.Equal(t, "32", active.ProviderID)
+
+		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
+		require.NoError(t, err)
+		require.Len(t, linked, 2)
+		assert.Equal(t, "31", linked[1].ProviderID)
+		assert.Equal(t, "renamed-login", linked[1].Username)
+		assert.False(t, linked[1].Active)
 	})
 
 	t.Run("allows the same identity on accounts that share no organization", func(t *testing.T) {
@@ -84,19 +138,25 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.ErrorIs(t, err, ErrLinkedAccountInUse)
 	})
 
-	t.Run("removes the link", func(t *testing.T) {
+	t.Run("removes one identity and activates another identity", func(t *testing.T) {
 		account, err := CreateAccount("Unlinker", "unlinker@example.com")
 		require.NoError(t, err)
 
 		require.NoError(t, SaveAccountLinkedAccount(
 			database.Conn(),
-			NewAccountLinkedAccount(account.ID, ProviderGitHub, "77", "gone", "", ""),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "76", "kept", "", ""),
+		))
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "77", "removed", "", ""),
 		))
 
-		require.NoError(t, DeleteAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub))
+		require.NoError(t, DeleteAccountLinkedAccount(database.Conn(), account.ID, ProviderGitHub, "77"))
 
 		linked, err := ListAccountLinkedAccounts(database.Conn(), account.ID)
 		require.NoError(t, err)
-		assert.Empty(t, linked)
+		require.Len(t, linked, 1)
+		assert.Equal(t, "kept", linked[0].Username)
+		assert.True(t, linked[0].Active)
 	})
 }

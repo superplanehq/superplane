@@ -6,15 +6,12 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 
 const copy = FIRST_RUN_COPY.connect;
 
-export type FirstRunGithubStep = "connect" | "organization" | "repository";
+export type FirstRunGithubStep = "connect" | "repository";
 
-const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "organization", "repository"];
+const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "repository"];
 
-function stepLabel(step: FirstRunGithubStep, done: boolean, organizationName?: string): string {
-  if (step === "connect") return done ? copy.stepConnected : copy.connectGitHub;
-  if (step === "organization") {
-    return done && organizationName ? copy.stepOrganizationDone(organizationName) : copy.stepOrganization;
-  }
+function stepLabel(step: FirstRunGithubStep): string {
+  if (step === "connect") return copy.connectGitHub;
   return copy.stepRepository;
 }
 
@@ -37,29 +34,19 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
 }
 
 /**
- * The three GitHub steps on one card. Finished steps collapse to checkmarked
+ * The GitHub steps on one card. Finished steps collapse to checkmarked
  * rows, upcoming steps stay dim, and the active step holds its content and
  * primary action inside the card. Each connect page renders this card, so
  * the flow reads as one task even though the pages change.
  */
 export function FirstRunGithubStepper({
   current,
-  organizationName,
   action,
-  organizationStatus,
   children,
 }: {
   current: FirstRunGithubStep;
-  /** Names the finished organization row, e.g. "Organization: puppies-inc". */
-  organizationName?: string;
   /** Control on the active step header, e.g. the Connect button. */
   action?: ReactNode;
-  /**
-   * Rows that belong to the organization step on every page, e.g. an install
-   * request that waits for an admin. A pending organization stays visible
-   * under "Choose organization" even while another step is active.
-   */
-  organizationStatus?: ReactNode;
   children?: ReactNode;
 }) {
   const currentIndex = STEP_ORDER.indexOf(current);
@@ -79,16 +66,14 @@ export function FirstRunGithubStepper({
                 "flex items-center justify-between gap-3 text-[13px]",
                 active ? "font-medium text-foreground" : "text-muted-foreground",
               )}
+              data-testid={`first-run-step-${step}-header`}
             >
               <span className="flex items-center gap-2.5">
                 <StepBadge number={index + 1} done={done} />
-                {stepLabel(step, done, organizationName)}
+                {stepLabel(step)}
               </span>
               {active ? action : null}
             </div>
-            {step === "organization" && organizationStatus ? (
-              <div className="mt-3 space-y-3">{organizationStatus}</div>
-            ) : null}
             {active && children ? <div className="mt-3 space-y-3">{children}</div> : null}
           </div>
         );
