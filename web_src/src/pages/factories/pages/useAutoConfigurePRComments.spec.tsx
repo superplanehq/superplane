@@ -92,12 +92,16 @@ describe("useAutoConfigurePRComments", () => {
     );
   });
 
-  it("does not clear pending state when a later workspace switch resolves first", async () => {
+  it("keeps pending true until the current workspace's own request finishes", async () => {
     type Resolver = (value: object) => void;
     let resolveFirst: Resolver;
     let resolveSecond: Resolver;
-    const firstDeferred = new Promise<object>((resolve) => { resolveFirst = resolve; });
-    const secondDeferred = new Promise<object>((resolve) => { resolveSecond = resolve; });
+    const firstDeferred = new Promise<object>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondDeferred = new Promise<object>((resolve) => {
+      resolveSecond = resolve;
+    });
 
     createHandler.mockReturnValue(firstDeferred);
 
@@ -114,14 +118,47 @@ describe("useAutoConfigurePRComments", () => {
 
     await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(2));
 
-    resolveSecond!({});
+    // Workspace A's request is the stale, earlier one. Resolving it must not
+    // clear the pending state while workspace B's own request is in flight.
+    resolveFirst!({});
     await waitFor(() => {
       expect(result.current.pending).toBe(true);
     });
 
-    resolveFirst!({});
+    // Workspace B's own request finishing is what clears its pending state.
+    resolveSecond!({});
     await waitFor(() => {
       expect(result.current.pending).toBe(false);
     });
+  });
+
+  it("clears pending state when switching to a workspace that already has a discussion handler", async () => {
+    type Resolver = (value: object) => void;
+    let resolveFirst: Resolver;
+    const firstDeferred = new Promise<object>((resolve) => {
+      resolveFirst = resolve;
+    });
+    createHandler.mockReturnValue(firstDeferred);
+
+    const { rerender, result } = renderHook(
+      (props: { organizationId: string; factoryId: string; hasDiscussionHandler: boolean }) =>
+        useAutoConfigurePRComments({ ...baseProps, ...props }),
+      { initialProps: { organizationId: "org-a", factoryId: "factory-a", hasDiscussionHandler: false } },
+    );
+
+    await waitFor(() => expect(createHandler).toHaveBeenCalledTimes(1));
+    expect(result.current.pending).toBe(true);
+
+    // Workspace B already has a discussion handler, so it needs no create of
+    // its own. Pending must clear right away instead of waiting on A's stale
+    // request, which never resolves in this scenario.
+    rerender({ organizationId: "org-b", factoryId: "factory-b", hasDiscussionHandler: true });
+
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(createHandler).toHaveBeenCalledTimes(1);
+
+    // Workspace A's request finishing afterward must not reintroduce pending.
+    resolveFirst!({});
+    await waitFor(() => expect(result.current.pending).toBe(false));
   });
 });

@@ -18,6 +18,14 @@ export function isDiscussionHandlerConflictError(error: unknown): boolean {
  * review bots and allows them by default. If the scan fails or finds none, the
  * handler is still created with an empty allowed list. The next-step comments
  * banner stays hidden while this is pending and reappears on a real failure.
+ *
+ * The hook keys its launch guard to `organizationId:factoryId:repository`, so
+ * it starts a new create when the workspace changes while the component stays
+ * mounted. Switching away from a workspace immediately clears the pending
+ * state for that workspace: a generation counter stops the completion of a
+ * stale request from clearing the pending state of a newer request, and it
+ * also stops the pending state from getting stuck when the new workspace
+ * needs no create of its own.
  */
 export function useAutoConfigurePRComments({
   organizationId,
@@ -58,6 +66,8 @@ export function useAutoConfigurePRComments({
   useEffect(() => {
     if (!shouldCreate) {
       launchedRef.current = false;
+      launchGenerationRef.current += 1;
+      setCreating(false);
     }
   }, [shouldCreate]);
 
@@ -66,6 +76,7 @@ export function useAutoConfigurePRComments({
       previousIdentityRef.current = identity;
       launchedRef.current = false;
       launchGenerationRef.current += 1;
+      setCreating(false);
     }
   }, [identity]);
 
@@ -74,7 +85,7 @@ export function useAutoConfigurePRComments({
       return;
     }
     launchedRef.current = true;
-    const generation = ++launchGenerationRef.current
+    const generation = ++launchGenerationRef.current;
     setCreating(true);
 
     const catalog = catalogQuery.isError ? [] : (catalogQuery.data ?? []);
