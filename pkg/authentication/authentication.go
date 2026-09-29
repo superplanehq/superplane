@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -164,7 +165,38 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 		r = r2
 	}
 
-	gothic.BeginAuthHandler(w, r)
+	authURL, err := gothic.GetAuthURL(w, r)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(err.Error()))
+		return
+	}
+	if selectAccountRequested(r) {
+		authURL = withSelectAccountPrompt(authURL)
+	}
+	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+}
+
+// selectAccountRequested reports whether the caller asked the provider to
+// show its account chooser, so a member signed in to more than one provider
+// account can pick the one to link.
+func selectAccountRequested(r *http.Request) bool {
+	value := strings.TrimSpace(r.URL.Query().Get("select_account"))
+	return value == "1" || strings.EqualFold(value, "true")
+}
+
+// withSelectAccountPrompt adds prompt=select_account to the provider
+// authorize URL. GitHub then shows its account picker instead of reusing the
+// current browser session silently.
+func withSelectAccountPrompt(authURL string) string {
+	parsed, err := url.Parse(authURL)
+	if err != nil {
+		return authURL
+	}
+	query := parsed.Query()
+	query.Set("prompt", "select_account")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +207,22 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
+
+	// The connect intent proves a real identity on the provider, which a
+	// mock cannot do. With real OAuth credentials configured, development
+	// runs the real connect flow exactly like production. Sign-in stays
+	// mocked, so a login never needs a GitHub round trip.
+	if a.devRealOAuthConfigured(provider) {
+		if isConnectIntent(r) {
+			a.handleAuth(w, r)
+			return
+		}
+		if isConnectCallback(r) {
+			a.handleAuthCallback(w, r)
+			return
+		}
+	}
+
 	mockUser := goth.User{
 		UserID:      "dev-user-123",
 		Email:       "dev@superplane.local",
@@ -214,6 +262,32 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.completeProviderAuth(w, r, mockUser)
+}
+
+// devOAuthPlaceholderCredential is the throwaway value docker-compose.dev.yml
+// sets so the login page shows the provider buttons. It cannot complete a
+// real OAuth flow.
+const devOAuthPlaceholderCredential = "1234567890abcdefghijklmnopqrstuv"
+
+// devRealOAuthConfigured reports whether development has real GitHub OAuth
+// credentials, so the connect flow can prove a real identity instead of
+// returning the mock user.
+func (a *Handler) devRealOAuthConfigured(provider string) bool {
+	if provider != models.ProviderGitHub {
+		return false
+	}
+	key := strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID"))
+	secret := strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET"))
+	if key == "" || secret == "" {
+		return false
+	}
+	return key != devOAuthPlaceholderCredential && secret != devOAuthPlaceholderCredential
+}
+
+// isConnectCallback recognizes the provider callback of a connect flow by its
+// signed state, so the development routes can finish a real connect.
+func isConnectCallback(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Query().Get("state"), authConnectStatePrefix)
 }
 
 func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,12 +55,6 @@ To complete the GitHub app setup:
 
 	hostedInstallDescription = `
 Install the SuperPlane GitHub App on the GitHub account or organization that owns your repositories.
-`
-
-	hostedOAuthDescription = `
-Authorize SuperPlane to list GitHub accounts where the SuperPlane GitHub App is already installed.
-
-If no account has the App, GitHub will ask you to install it.
 `
 )
 
@@ -226,10 +221,14 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
+		// Identity discovery adds every installation the starter's GitHub
+		// login can use to the account picker, and resolves matching install
+		// requests. It is additive-only and never blocks the sync.
+		g.applyHostedIdentityDiscovery(ctx, app, &existing)
 		// A member can request an installation without the request callback
 		// reaching this server, so a known GitHub login is enough to ask
 		// GitHub for that member's open install requests.
-		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
+		if existing.HasInstallRequests() {
 			// Adopt records the requested account it found on GitHub and
 			// moves an approved installation into the account picker;
 			// refreshHostedPendingAction below persists both.
@@ -252,7 +251,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 		startedBy = existing.StartedByUserID
 	}
 
-	g.refreshHostedPendingAction(ctx, app, common.Metadata{
+	metadata := common.Metadata{
 		State:           state,
 		HostedApp:       true,
 		StartedByUserID: startedBy,
@@ -261,42 +260,47 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			ID:   app.ID,
 			Slug: app.Slug,
 		},
-	})
+	}
+	// The initial sync also discovers, so a create response can already carry
+	// picker options when the starter's identity has access to installations.
+	g.applyHostedIdentityDiscovery(ctx, app, &metadata)
+	g.refreshHostedPendingAction(ctx, app, metadata)
 
 	return nil
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
-	// The OAuth callback removes the browser action once installations load,
-	// so the connect screen keeps the authorize URL from metadata to ask
-	// again which GitHub account to use.
-	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
-	if oauthEnabled {
-		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
-	}
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" || len(metadata.PendingInstallations) >= 1 {
+		// The picker has options (or the connection is bound), so a stored
+		// install action is stale and must not send the browser to GitHub.
+		ctx.Integration.RemoveBrowserAction()
 		ctx.Integration.SetMetadata(metadata)
 		return
-	}
-
-	if len(metadata.PendingInstallations) >= 1 {
-		ctx.Integration.SetMetadata(metadata)
-		return
-	}
-
-	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
-	description := hostedInstallDescription
-	if oauthEnabled {
-		actionURL = metadata.AuthorizeURL
-		description = hostedOAuthDescription
 	}
 
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: description,
-		URL:         actionURL,
+		Description: hostedInstallDescription,
+		URL:         hostedConnectActionURL(ctx, app, metadata),
 		Method:      "GET",
 	})
 	ctx.Integration.SetMetadata(metadata)
+}
+
+// hostedConnectActionURL is where Connect sends the browser when the picker
+// has no options yet. With user OAuth configured the flow authorizes the app
+// first: the callback lists the installations the user can already use
+// (Semaphore-style), so an existing installation never asks for a reinstall.
+// GitHub skips the consent screen for an already-authorized user, and a user
+// without installations continues to the install page from the callback.
+func hostedConnectActionURL(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) string {
+	if app.UserOAuthEnabled() {
+		return common.HostedAppAuthorizeURL(
+			app.ClientID,
+			common.HostedAppOAuthCallbackURL(ctx.BaseURL),
+			metadata.State,
+		)
+	}
+	return common.HostedAppInstallURL(app.Slug, metadata.State)
 }
 
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
@@ -306,7 +310,11 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	if strings.HasSuffix(ctx.Request.URL.Path, "/oauth/callback") {
-		g.afterHostedAppOAuth(ctx)
+		if metadata, ok := decodeHostedMetadata(ctx); ok && metadata.HostedApp {
+			g.afterHostedAppUserOAuth(ctx)
+			return
+		}
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
@@ -474,14 +482,8 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 
 		actionURL := common.HostedAppInstallURL(metadata.GitHubApp.Slug, state)
 		actionDescription := appInstallationDescription
-		if app, ok := common.HostedAppFromEnv(); metadata.HostedApp && ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
-			metadata.AuthorizeURL = common.HostedAppAuthorizeURL(
-				app.ClientID,
-				common.HostedAppOAuthCallbackURL(ctx.BaseURL),
-				state,
-			)
-			actionURL = metadata.AuthorizeURL
-			actionDescription = hostedOAuthDescription
+		if metadata.HostedApp {
+			actionDescription = hostedInstallDescription
 		}
 
 		ctx.Integration.SetMetadata(metadata)
@@ -990,19 +992,17 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.HostedApp && !metadata.AllowsPendingInstallation(installationID) {
-		app, ok := common.HostedAppFromEnv()
-		if ok && app.UserOAuthEnabled() && ctx.BaseURL != "" {
-			http.Redirect(
-				ctx.Response,
-				ctx.Request,
-				common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State),
-				http.StatusSeeOther,
-			)
+	if metadata.HostedApp {
+		if err := g.offerHostedInstallation(ctx, metadata, installationID); err != nil {
+			ctx.Logger.Errorf("%v", err)
+			if errors.Is(err, errHostedInstallationNotAllowed) {
+				http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
+				return
+			}
+			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		ctx.Logger.Errorf("installation %s is not in the pending allowlist", installationID)
-		http.Error(ctx.Response, "installation is not allowed", http.StatusBadRequest)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 

@@ -307,8 +307,11 @@ describe("FirstRunSetup", () => {
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    // The switch link renders inline before the closing period, so the line
+    // reads "... as forestileao (switch)." and the plain sentence no longer
+    // matches. FirstRunConnectScreen.spec.tsx covers the link itself.
     expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+      /You are signed in to GitHub as forestileao/,
     );
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
