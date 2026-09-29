@@ -43,10 +43,7 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const location = useLocation();
   const navigate = useNavigate();
   const guestLine = isPublicFactoryLinePath(location.pathname) && !account;
-  const route = useMemo(
-    () => getRouteContext(guestLine ? "" : location.pathname),
-    [guestLine, location.pathname],
-  );
+  const route = useMemo(() => getRouteContext(guestLine ? "" : location.pathname), [guestLine, location.pathname]);
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<CommandPage>("root");
   const [search, setSearch] = useState("");

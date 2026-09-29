@@ -120,7 +120,9 @@ describe("api-interceptor", () => {
     setupApiInterceptor();
 
     await expect(globalThis.fetch("/api/v1/me")).rejects.toThrow("Unauthorized");
-    expect(locationHref).toBe("/login?redirect=%2Fdemo%2Fworkspaces%2Fnewwo%2Flines%2Ffb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7");
+    expect(locationHref).toBe(
+      "/login?redirect=%2Fdemo%2Fworkspaces%2Fnewwo%2Flines%2Ffb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7",
+    );
   });
 
   it("redirects organization list 401 outside a public line", async () => {

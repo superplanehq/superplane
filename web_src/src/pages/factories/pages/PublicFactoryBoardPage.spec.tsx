@@ -50,7 +50,10 @@ describe("PublicFactoryBoardPage", () => {
     renderBoard(false);
 
     expect(await screen.findByText("This board is not available.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", expect.stringContaining("/login?redirect="));
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/login?redirect="),
+    );
     expect(window.location.pathname).not.toContain("/login");
   });
 
