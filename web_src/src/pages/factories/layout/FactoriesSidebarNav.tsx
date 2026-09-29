@@ -9,6 +9,8 @@ interface FactoriesSidebarNavProps {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
+  /** Public board keeps the home icon and hides Velocity. */
+  showVelocity?: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -46,7 +48,12 @@ function RailNavLink({
  * Icon rail under the workspace switcher: the line board and Velocity.
  * Workspace settings open from the workspace switcher.
  */
-export function FactoriesSidebarNav({ organizationId, factoryKey, lineId }: FactoriesSidebarNavProps) {
+export function FactoriesSidebarNav({
+  organizationId,
+  factoryKey,
+  lineId,
+  showVelocity = true,
+}: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
@@ -60,13 +67,15 @@ export function FactoriesSidebarNav({ organizationId, factoryKey, lineId }: Fact
         testId="factories-nav-board"
         isCurrent={isBoardPath(pathname)}
       />
-      <RailNavLink
-        to={velocityHref}
-        label="Velocity"
-        Icon={ChartLine}
-        testId="factories-nav-velocity"
-        isCurrent={isVelocityPath(pathname)}
-      />
+      {showVelocity ? (
+        <RailNavLink
+          to={velocityHref}
+          label="Velocity"
+          Icon={ChartLine}
+          testId="factories-nav-velocity"
+          isCurrent={isVelocityPath(pathname)}
+        />
+      ) : null}
     </nav>
   );
 }
