@@ -221,4 +221,42 @@ describe("console automation grouping", () => {
       "Read the requested changes",
     ]);
   });
+
+  it("keeps the live run on the grouped card when a newer run already finished", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-comment-live",
+          handlerName: "Address PR feedback",
+          title: "Read the requested changes",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-comment-live",
+            canvasId: "canvas-comment-live",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-comment-done",
+          handlerName: "Address PR feedback",
+          title: "Address new review comment",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-comment-done",
+            canvasId: "canvas-comment-done",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    const automations = automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).verify);
+    const address = automations.find((automation) => automation.name === "Address PR feedback");
+
+    expect(address?.latest.status).toBe("running");
+    expect(address?.latest.id).toBe("pr-feedback-run-comment-live");
+  });
 });

@@ -5,7 +5,7 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
-import { ChevronRight, CircleStop, FileText, History, RotateCw } from "lucide-react";
+import { ChevronRight, CircleStop, Download, FileText, History, RotateCw } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
@@ -85,38 +85,10 @@ export function AutomationCardBody({
   const pages = consolePages(latest, phase);
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
-  // The creation card's description.md document row is the task text.
-  const taskDocument =
-    latest.id === "backlog" ? (
-      <div data-testid="redesign-console-task-description">
-        <WorkOrderSplitRunDescription
-          description={taskDescription ?? ""}
-          canEdit={canEditDescription}
-          busy={descriptionBusy}
-          collapsible={false}
-          onSave={onDescriptionSave}
-          files={files}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          orderId={orderId}
-        />
-      </div>
-    ) : undefined;
   return (
     <div className="space-y-3">
       <StageDescription stage={latest} />
-      {pages.length > 0 ? (
-        <Tabs value={active} onValueChange={(next) => setChosen(next as ConsolePageId)}>
-          <TabsList aria-label="Run details" className={PANE_TABS_LIST}>
-            {pages.map((page) => (
-              <TabsTrigger key={page} value={page} className={PANE_TAB}>
-                {PAGE_LABEL[page]}
-                <PageTabDetail page={page} stage={latest} />
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      ) : null}
+      <CardPageTabs pages={pages} active={active} stage={latest} onChange={setChosen} />
       {/* The log stays mounted so live steps and spend keep streaming. */}
       {pages.includes("agent") ? (
         <div className={cn(active !== "agent" && "hidden")}>
@@ -128,36 +100,152 @@ export function AutomationCardBody({
           />
         </div>
       ) : null}
-      {active === "artifacts" ? <ArtifactsPage stage={latest} taskDocument={taskDocument} /> : null}
-      {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
-      {latest.id === "backlog" && source ? (
-        <div data-testid="redesign-console-card-source">
-          <span className="text-[12px] font-medium text-muted-foreground">Source</span>
-          <WorkOrderSplitRunSource source={source} />
-        </div>
+      {active === "artifacts" ? (
+        <ArtifactsPage
+          stage={latest}
+          taskDocument={
+            latest.id === "backlog" ? (
+              <CreationTaskDocument
+                description={taskDescription}
+                canEdit={canEditDescription}
+                busy={descriptionBusy}
+                onSave={onDescriptionSave}
+                files={files}
+                organizationId={organizationId}
+                factoryId={factoryId}
+                orderId={orderId}
+              />
+            ) : undefined
+          }
+        />
       ) : null}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
-        <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(latest)}</span>
-        <div className="ms-auto flex shrink-0 items-center gap-1.5">
-          {runs.length > 1 ? (
-            <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" onClick={onOpen}>
-              <History className="size-3.5" aria-hidden />
-              View {runs.length} runs
-            </Button>
-          ) : null}
-          {onRetry ? (
-            <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
-              <RotateCw className="size-3.5" aria-hidden />
-              Retry
-            </Button>
-          ) : null}
-          {onStop ? (
-            <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
-              <CircleStop className="size-3.5" aria-hidden />
-              Stop
-            </Button>
-          ) : null}
-        </div>
+      {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
+      <CreationSource stageId={latest.id} source={source} />
+      <CardRunFooter
+        stage={latest}
+        runCount={runs.length}
+        actionBusy={actionBusy}
+        onOpen={onOpen}
+        onRetry={onRetry}
+        onStop={onStop}
+      />
+    </div>
+  );
+}
+
+function CardPageTabs({
+  pages,
+  active,
+  stage,
+  onChange,
+}: {
+  pages: ConsolePageId[];
+  active?: ConsolePageId;
+  stage: AutomationStage;
+  onChange: (page: ConsolePageId) => void;
+}) {
+  if (pages.length === 0 || !active) {
+    return null;
+  }
+  return (
+    <Tabs value={active} onValueChange={(next) => onChange(next as ConsolePageId)}>
+      <TabsList aria-label="Run details" className={PANE_TABS_LIST}>
+        {pages.map((page) => (
+          <TabsTrigger key={page} value={page} className={PANE_TAB}>
+            {PAGE_LABEL[page]}
+            <PageTabDetail page={page} stage={stage} />
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}
+
+function CreationTaskDocument({
+  description,
+  canEdit,
+  busy,
+  onSave,
+  files,
+  organizationId,
+  factoryId,
+  orderId,
+}: {
+  description?: string;
+  canEdit: boolean;
+  busy: boolean;
+  onSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+}) {
+  return (
+    <div data-testid="redesign-console-task-description">
+      <WorkOrderSplitRunDescription
+        description={description ?? ""}
+        canEdit={canEdit}
+        busy={busy}
+        collapsible={false}
+        onSave={onSave}
+        files={files}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+      />
+    </div>
+  );
+}
+
+function CreationSource({ stageId, source }: { stageId: string; source?: SplitRunSource }) {
+  if (stageId !== "backlog" || !source) {
+    return null;
+  }
+  return (
+    <div data-testid="redesign-console-card-source">
+      <span className="text-[12px] font-medium text-muted-foreground">Source</span>
+      <WorkOrderSplitRunSource source={source} />
+    </div>
+  );
+}
+
+function CardRunFooter({
+  stage,
+  runCount,
+  actionBusy,
+  onOpen,
+  onRetry,
+  onStop,
+}: {
+  stage: AutomationStage;
+  runCount: number;
+  actionBusy: boolean;
+  onOpen: () => void;
+  onRetry?: () => void;
+  onStop?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
+      <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(stage)}</span>
+      <div className="ms-auto flex shrink-0 items-center gap-1.5">
+        {runCount > 1 ? (
+          <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-[12px]" onClick={onOpen}>
+            <History className="size-3.5" aria-hidden />
+            View {runCount} runs
+          </Button>
+        ) : null}
+        {onRetry ? (
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
+            <RotateCw className="size-3.5" aria-hidden />
+            Retry
+          </Button>
+        ) : null}
+        {onStop ? (
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
+            <CircleStop className="size-3.5" aria-hidden />
+            Stop
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -258,22 +346,45 @@ function DocumentArtifact({
   defaultOpen: boolean;
   children?: ReactNode;
 }) {
+  const name = artifactLabel(artifact);
   const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact.data)) ?? "";
+  const filename = name.endsWith(".md") ? name : `${name}.md`;
   return (
     <Collapsible defaultOpen={defaultOpen} className="rounded-md border">
-      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1.5 px-2 py-1.5 text-[12px] font-medium text-foreground">
-        <ChevronRight
-          className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
-          aria-hidden
-        />
-        <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="truncate">{artifactLabel(artifact)}</span>
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-1 pr-1">
+        <CollapsibleTrigger className="group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 px-2 py-1.5 text-[12px] font-medium text-foreground">
+          <ChevronRight
+            className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+            aria-hidden
+          />
+          <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="truncate">{name}</span>
+        </CollapsibleTrigger>
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          className="size-7 shrink-0"
+          aria-label={`Download ${filename}`}
+          onClick={() => downloadTextFile(filename, body)}
+        >
+          <Download className="size-3.5" aria-hidden />
+        </Button>
+      </div>
       <CollapsibleContent className="border-t px-3 py-2 text-[12.5px] leading-5 text-muted-foreground">
         {children ?? <MarkdownContent content={body} variant="workspace" />}
       </CollapsibleContent>
     </Collapsible>
   );
+}
+
+function downloadTextFile(filename: string, body: string) {
+  const url = URL.createObjectURL(new Blob([body], { type: "text/markdown" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Visual evidence renders in the body: images link out full size, videos play inline. */

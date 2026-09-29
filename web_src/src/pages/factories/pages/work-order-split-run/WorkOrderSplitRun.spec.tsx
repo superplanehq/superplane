@@ -869,7 +869,8 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
     // The task text is the description.md document on the Artifacts page.
     expect(within(card as HTMLElement).getByRole("tab", { name: /Artifacts/ })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("button", { name: /description\.md/ })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: "Download description.md" })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByTestId("redesign-console-task-description")).toBeInTheDocument();
   });
 

@@ -222,10 +222,11 @@ export function automationsFromStages(stages: AutomationStage[]): ConsoleAutomat
       (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
     );
     const name = newestFirst[0]?.componentName || key;
+    const latest = newestFirst.find((run) => run.status === "running") ?? newestFirst[0];
     return {
       id: consoleAutomationDomId(name, key),
       name,
-      latest: newestFirst[0],
+      latest,
       runs: newestFirst,
     };
   });

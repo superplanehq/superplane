@@ -74,15 +74,21 @@ describe("consolePages", () => {
     expect(artifactsPageCount(stage)).toBe(implement.outputs.artifacts.length + 1);
   });
 
-  it("treats description.md as the task text only on the creation card", () => {
-    const artifact: StageArtifact = {
+  it("treats description.md and details.md as the task text only on the creation card", () => {
+    const description: StageArtifact = {
       id: "art-description",
       type: "TYPE_MARKDOWN",
       data: { title: "description.md", body: "x" },
     };
+    const details: StageArtifact = {
+      id: "art-details",
+      type: "TYPE_MARKDOWN",
+      data: { title: "details.md", body: "x" },
+    };
 
-    expect(isTaskDocument(runningStage("backlog"), artifact)).toBe(true);
-    expect(isTaskDocument(runningStage("implement"), artifact)).toBe(false);
+    expect(isTaskDocument(runningStage("backlog"), description)).toBe(true);
+    expect(isTaskDocument(runningStage("backlog"), details)).toBe(true);
+    expect(isTaskDocument(runningStage("implement"), description)).toBe(false);
   });
 
   it("tells documents, media, and other artifacts apart", () => {

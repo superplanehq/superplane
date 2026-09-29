@@ -6,6 +6,7 @@ import {
   toArtifactDataRecord,
 } from "../../../lib/workOrderArtifact";
 import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunPhase } from "../splitRunMocks";
+import { isWorkOrderDescriptionName } from "../splitRunPopupModel";
 import { isRunnerComponent } from "../streamNotesFromLiveLog";
 import type { AutomationStage } from "./automationsViewModel";
 
@@ -43,11 +44,11 @@ export function artifactsPageCount(stage: AutomationStage): number {
 }
 
 /**
- * The creation card's description.md is the task text itself. Its
- * document row renders the editable task description, not a copy.
+ * The creation card's description.md or details.md is the task text.
+ * Its document row renders the editable task description, not a copy.
  */
 export function isTaskDocument(stage: AutomationStage, artifact: StageArtifact): boolean {
-  return stage.id === "backlog" && artifactLabel(artifact) === "description.md";
+  return stage.id === "backlog" && isWorkOrderDescriptionName(artifactLabel(artifact));
 }
 
 /** How the Artifacts page renders an artifact: markdown reads inline, media plays inline, the rest are chips. */
