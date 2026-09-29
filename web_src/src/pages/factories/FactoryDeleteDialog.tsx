@@ -8,6 +8,8 @@ interface FactoryDeleteDialogProps {
   factoryName: string;
   title?: string;
   description?: string;
+  confirmLabel?: string;
+  loadingText?: string;
   canDelete: boolean;
   isDeleting: boolean;
   onClose: () => void;
@@ -19,6 +21,8 @@ export function FactoryDeleteDialog({
   factoryName,
   title,
   description,
+  confirmLabel = "Delete",
+  loadingText = "Deleting...",
   canDelete,
   isDeleting,
   onClose,
@@ -45,12 +49,12 @@ export function FactoryDeleteDialog({
           }}
           disabled={!canDelete}
           loading={isDeleting}
-          loadingText="Deleting..."
+          loadingText={loadingText}
           className="flex items-center gap-2"
           data-testid="factory-delete-confirm-button"
         >
           <Trash2 size={16} />
-          Delete
+          {confirmLabel}
         </LoadingButton>
         <Button variant="outline" onClick={onClose} disabled={isDeleting}>
           Cancel

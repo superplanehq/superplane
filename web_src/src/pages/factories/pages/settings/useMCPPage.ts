@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import {
   useCreateFactoryAgentResource,
   useDeleteFactoryAgentResource,
@@ -11,7 +12,9 @@ import {
   useStartFactoryAgentResourceOAuth,
   useUpdateFactoryAgentResource,
 } from "@/hooks/useFactoryAgentResources";
+import { useFactoryMCPClients } from "@/hooks/useFactoryMCPClients";
 import { useCreateSecret } from "@/hooks/useSecrets";
+import { FEATURE_SUPERPLANE_MCP_SERVER, FEATURE_WORKSPACE_MCP } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
@@ -59,12 +62,16 @@ export function useMCPPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;
+  const { has } = useExperimentalFeature(organizationId);
+  const showAgentMCP = has(FEATURE_WORKSPACE_MCP);
+  const showSuperPlaneMCP = has(FEATURE_SUPERPLANE_MCP_SERVER);
   const { addPickerOpen, setAddPickerOpen } = useMCPAddDialog();
   const [catalogEntry, setCatalogEntry] = useState<MCPCatalogEntry | undefined>();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [editResource, setEditResource] = useState<FactoriesFactoryAgentResource | undefined>();
   const [pendingDelete, setPendingDelete] = useState<FactoriesFactoryAgentResource | undefined>();
-  const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
+  const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER", showAgentMCP);
+  const mcpClients = useFactoryMCPClients(organizationId, factoryId, showSuperPlaneMCP);
   const mutations = useMCPMutations(organizationId, factoryId);
   const closeConnection = () => {
     setEditResource(undefined);
@@ -80,6 +87,8 @@ export function useMCPPage() {
     factoryId,
     factory,
     canUpdate,
+    showAgentMCP,
+    showSuperPlaneMCP,
     addPickerOpen,
     connectionOpen: (connectionOpen || Boolean(editResource)) && !catalogEntry,
     catalogSetupOpen: Boolean(catalogEntry),
@@ -87,6 +96,7 @@ export function useMCPPage() {
     editResource,
     pendingDelete,
     connections,
+    mcpClients,
     isSaving:
       mutations.createResource.isPending ||
       mutations.updateResource.isPending ||

@@ -346,6 +346,22 @@ func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
 	}
 }
 
+func TestMCPClientRoutesRequireSuperPlaneMCPServerFeature(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	required := []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer}
+	listRule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/mcp-clients"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", listRule.Resource)
+	assert.Equal(t, "read", listRule.Action)
+	assert.Equal(t, required, listRule.RequiredExperimentalFeatures)
+
+	revokeRule, ok := rules[HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", revokeRule.Resource)
+	assert.Equal(t, "update", revokeRule.Action)
+	assert.Equal(t, required, revokeRule.RequiredExperimentalFeatures)
+}
+
 func TestMCPToolAndOAuthRoutesRequireWorkspaceMCPFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	required := []string{features.FeatureFactories, features.FeatureWorkspaceMCP}

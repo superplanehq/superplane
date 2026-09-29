@@ -684,6 +684,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc(mcpserver.PathProtectedResource, s.handleMCPProtectedResource).Methods("GET")
 	publicRoute.HandleFunc(mcpserver.PathProtectedResourceMCP, s.handleMCPProtectedResource).Methods("GET")
 	publicRoute.HandleFunc(mcpserver.PathAuthorizationServer, s.handleMCPAuthorizationServer).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathAuthorizationServerMCP, s.handleMCPAuthorizationServer).Methods("GET")
 	publicRoute.HandleFunc(mcpserver.PathToken, s.handleMCPToken).Methods("POST")
 	publicRoute.HandleFunc(mcpserver.PathRegister, s.handleMCPRegister).Methods("POST")
 	publicRoute.HandleFunc(mcpserver.PathMCP, s.handleMCP).Methods("GET", "POST")

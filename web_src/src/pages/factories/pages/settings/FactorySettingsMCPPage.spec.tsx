@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import {
   HEADER_MCP_RESOURCE,
   OAUTH_CONNECTED_RESOURCE,
@@ -14,6 +18,8 @@ import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 
 const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
@@ -309,5 +315,84 @@ describe("FactorySettingsMCPPage", () => {
     await user.click(screen.getByText("Edit"));
     expect(await screen.findByTestId("agent-resource-connection-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("agent-resource-auth")).toHaveTextContent("Header");
+  }, 10000);
+
+  it("shows MCP nav when only SuperPlane MCP Server is on", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-mcp")).toHaveTextContent("MCP servers");
+  }, 10000);
+
+  it("hides SuperPlane MCP Server when the flag is off", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-settings-mcp", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("superplane-mcp-server")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows how to connect when no SuperPlane MCP clients exist", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toHaveTextContent(
+      "No MCP clients connected",
+    );
+    expect(screen.getByTestId("superplane-mcp-server")).toHaveTextContent("/mcp");
+    expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("lists a connected SuperPlane MCP client and revokes it", async () => {
+    const user = userEvent.setup();
+    const clientId = "mcp-client-cursor";
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          mcpClientsByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [
+              {
+                id: clientId,
+                clientName: "Cursor",
+                userId: STORYBOOK_ME_USER_ID,
+                userName: STORYBOOK_ME_USER_NAME,
+                createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+              },
+            ],
+          },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-list", {}, { timeout: 8000 })).toHaveTextContent("Cursor");
+    expect(screen.getByTestId(`superplane-mcp-client-${clientId}`)).toHaveTextContent(STORYBOOK_ME_USER_NAME);
+
+    await user.click(screen.getByTestId(`superplane-mcp-client-revoke-${clientId}`));
+    expect(screen.getByText(`Revoke "Cursor"?`)).toBeInTheDocument();
+    await user.click(screen.getByTestId("factory-delete-confirm-button"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("superplane-mcp-clients-list")).not.toBeInTheDocument();
+    });
+    expect(await screen.findByTestId("superplane-mcp-clients-empty")).toBeInTheDocument();
   }, 10000);
 });

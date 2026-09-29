@@ -7,13 +7,14 @@ import (
 )
 
 const (
-	PathMCP                  = "/mcp"
-	PathAuthorize            = "/oauth/authorize"
-	PathToken                = "/oauth/token"
-	PathRegister             = "/oauth/register"
-	PathProtectedResource    = "/.well-known/oauth-protected-resource"
-	PathProtectedResourceMCP = PathProtectedResource + PathMCP
-	PathAuthorizationServer  = "/.well-known/oauth-authorization-server"
+	PathMCP                    = "/mcp"
+	PathAuthorize              = "/oauth/authorize"
+	PathToken                  = "/oauth/token"
+	PathRegister               = "/oauth/register"
+	PathProtectedResource      = "/.well-known/oauth-protected-resource"
+	PathProtectedResourceMCP   = PathProtectedResource + PathMCP
+	PathAuthorizationServer    = "/.well-known/oauth-authorization-server"
+	PathAuthorizationServerMCP = PathAuthorizationServer + PathMCP
 
 	LocalClientID   = "superplane-local"
 	LocalClientName = "Cursor"

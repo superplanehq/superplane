@@ -62,6 +62,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -359,6 +365,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/mcp-clients"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/line-runner-models"}: {
 			Resource:                     "factories",

@@ -147,3 +147,41 @@ func FindMCPOAuthRefreshToken(tx *gorm.DB, tokenHash string, now time.Time) (*MC
 func DeleteMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error {
 	return tx.Delete(token).Error
 }
+
+func ListMCPOAuthRefreshTokensForFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID, now time.Time) ([]MCPOAuthRefreshToken, error) {
+	var tokens []MCPOAuthRefreshToken
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND expires_at > ?", organizationID, factoryID, now).
+		Order("created_at DESC").
+		Find(&tokens).Error
+	if err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
+
+func FindMCPOAuthRefreshTokenForFactory(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*MCPOAuthRefreshToken, error) {
+	var token MCPOAuthRefreshToken
+	err := tx.
+		Where("id = ? AND organization_id = ? AND factory_id = ?", id, organizationID, factoryID).
+		First(&token).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrMCPOAuthRefreshNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+func ListMCPOAuthClientsByClientIDs(tx *gorm.DB, clientIDs []string) ([]MCPOAuthClient, error) {
+	if len(clientIDs) == 0 {
+		return nil, nil
+	}
+	var clients []MCPOAuthClient
+	err := tx.Where("client_id IN ?", clientIDs).Find(&clients).Error
+	if err != nil {
+		return nil, err
+	}
+	return clients, nil
+}

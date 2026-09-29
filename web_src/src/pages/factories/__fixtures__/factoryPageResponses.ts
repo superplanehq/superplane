@@ -12,6 +12,7 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesFactoryAgentResource,
+  FactoriesFactoryMcpClient,
   FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
@@ -387,6 +388,8 @@ export interface FactoriesFixture {
   intakeItemCatalog?: BacklogIntakeItemCatalog;
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  /** SuperPlane MCP clients connected to a workspace. */
+  mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
   agentResourceToolsById?: Record<string, Array<{ name: string; description?: string; readOnly?: boolean }>>;
 }

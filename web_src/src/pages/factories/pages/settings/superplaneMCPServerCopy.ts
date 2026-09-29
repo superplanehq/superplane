@@ -1,0 +1,21 @@
+/** STE copy for the SuperPlane MCP Server settings section. */
+export const SUPERPLANE_MCP_SERVER_COPY = {
+  title: "SuperPlane MCP Server",
+  helper: "Clients that sign in to this workspace appear here.",
+  emptyTitle: "No MCP clients connected",
+  emptyBody: "Paste this object into mcp.json in Cursor, then click Authenticate.",
+  copyConfig: "Copy MCP configuration",
+  copiedConfig: "Copied MCP configuration",
+  loading: "Loading MCP clients...",
+  loadError: "SuperPlane could not load MCP clients. Try again.",
+  unnamedClient: "MCP client",
+  unnamedUser: "Unknown user",
+  connectedBy: (name: string, when: string) => `Connected by ${name} · ${when}`,
+  revoke: "Revoke",
+  revokeTitle: (name: string) => `Revoke "${name}"?`,
+  revokeDescription: "This disconnects the client from this workspace. The client must sign in again.",
+  revoking: "Revoking...",
+  revoked: "MCP client revoked.",
+  revokeFailed: "SuperPlane could not revoke the MCP client.",
+  noUpdatePermission: "You do not have permission to update this workspace.",
+} as const;

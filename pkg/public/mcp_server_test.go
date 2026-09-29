@@ -286,6 +286,19 @@ func TestMCPProtectedResourceMetadataOnResourcePath(t *testing.T) {
 	assert.Equal(t, "http://localhost:8000/mcp", body["resource"])
 }
 
+func TestMCPAuthorizationServerMetadataOnResourcePath(t *testing.T) {
+	_, server, _ := mcpEnabledServer(t)
+	req := mcpRequest(http.MethodGet, "/.well-known/oauth-authorization-server/mcp", "")
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "http://localhost:8000", body["issuer"])
+	assert.Equal(t, "http://localhost:8000/oauth/authorize", body["authorization_endpoint"])
+	assert.Equal(t, "http://localhost:8000/oauth/register", body["registration_endpoint"])
+}
+
 func TestMCPUnauthenticatedGETReturns401(t *testing.T) {
 	_, server, _ := mcpEnabledServer(t)
 	req := mcpRequest(http.MethodGet, "/mcp", "")

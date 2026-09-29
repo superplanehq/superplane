@@ -23,6 +23,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryAgentResource,
   FactoriesFactoryLine,
+  FactoriesFactoryMcpClient,
   FactoriesFactoryOnboarding,
   FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
@@ -359,6 +360,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryPlanningSessionRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
     ...factoryAgentResourceRoutes(fixture),
+    ...factoryMCPClientRoutes(fixture),
     ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
@@ -621,6 +623,36 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
     factoryAgentResourceOAuthDisconnectRoute(fixture),
     factoryAgentResourceItemRoute(fixture),
     factoryAgentResourceListRoute(fixture),
+  ];
+}
+
+function ensureMCPClients(fixture: FactoriesFixture, factoryId: string): FactoriesFactoryMcpClient[] {
+  fixture.mcpClientsByFactoryId ??= {};
+  fixture.mcpClientsByFactoryId[factoryId] ??= [];
+  return fixture.mcpClientsByFactoryId[factoryId];
+}
+
+function factoryMCPClientRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") return { json: {} };
+        const clients = ensureMCPClients(fixture, match[1]);
+        const index = clients.findIndex((entry) => entry.id === match[2]);
+        if (index >= 0) {
+          clients.splice(index, 1);
+        }
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        return { json: { clients: ensureMCPClients(fixture, match[1]) } };
+      },
+    },
   ];
 }
 
