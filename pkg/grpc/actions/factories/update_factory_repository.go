@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -40,12 +41,8 @@ func UpdateFactoryRepository(
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
 	repository := strings.TrimSpace(req.GetRepository())
-	defaultBranch := strings.TrimSpace(req.GetDefaultBranch())
 	if repository == "" {
 		return nil, factoryErrorToStatus(invalidArgument("repository is required"), "failed to update factory repository")
-	}
-	if defaultBranch == "" {
-		return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
 	}
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -84,6 +81,55 @@ func UpdateFactoryRepository(
 			return invalidArgument("repository settings currently require a GitHub integration")
 		}
 
+		selectedRepository := repository
+		selectedDefaultBranch := strings.TrimSpace(req.GetDefaultBranch())
+		selectedRepositoryID := int64(0)
+		selectedIntegration := integration
+		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
+		if bindingErr == nil {
+			providerUserID, userErr := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
+			if userErr != nil {
+				return userErr
+			}
+			catalogRepository, findErr := models.FindAccessibleVCSProviderRepositoryByName(
+				tx,
+				models.ProviderGitHub,
+				providerUserID,
+				repository,
+			)
+			if errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+			}
+			if findErr != nil {
+				return findErr
+			}
+			installation, findErr := models.FindVCSProviderInstallation(
+				tx,
+				models.ProviderGitHub,
+				catalogRepository.InstallationID,
+			)
+			if findErr != nil {
+				return findErr
+			}
+			selectedIntegration, findErr = models.FindOrCreateVCSProviderBinding(
+				tx,
+				orgID,
+				models.ProviderGitHub,
+				catalogRepository.InstallationID,
+				installation.AccountLogin,
+			)
+			if findErr != nil {
+				return findErr
+			}
+			selectedRepository = catalogRepository.FullName
+			selectedRepositoryID = catalogRepository.RepositoryID
+			selectedDefaultBranch = catalogRepository.DefaultBranch
+		} else if !errors.Is(bindingErr, gorm.ErrRecordNotFound) {
+			return bindingErr
+		} else if selectedDefaultBranch == "" {
+			return invalidArgument("default branch is required")
+		}
+
 		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
 		if err != nil {
 			return err
@@ -92,13 +138,27 @@ func UpdateFactoryRepository(
 			return err
 		}
 
+		selectedIntegrationID := selectedIntegration.ID.String()
 		patch := models.FactoryOnboardingPatch{
-			AppRepository:     &repository,
-			BacklogRepository: &repository,
-			DefaultBranch:     &defaultBranch,
+			VCSIntegrationID:    &selectedIntegrationID,
+			AppRepository:       &selectedRepository,
+			AppRepositoryID:     &selectedRepositoryID,
+			BacklogRepository:   &selectedRepository,
+			BacklogRepositoryID: &selectedRepositoryID,
+			DefaultBranch:       &selectedDefaultBranch,
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
+		}
+		if bindingErr == nil {
+			if err := syncFactoryVCSProviderBindings(
+				tx,
+				models.ProviderGitHub,
+				previous.VCSIntegrationID,
+				selectedIntegration.ID,
+			); err != nil {
+				return err
+			}
 		}
 
 		return reconcileFactoryRepository(
@@ -107,10 +167,12 @@ func UpdateFactoryRepository(
 			deps,
 			factory,
 			actorID,
+			previous.VCSIntegrationID,
+			selectedIntegrationID,
 			previous.AppRepository,
 			previous.BacklogRepository,
 			previousBranch,
-			repository,
+			selectedRepository,
 		)
 	})
 	if err != nil {
@@ -175,6 +237,7 @@ func reconcileFactoryRepository(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	actorID uuid.UUID,
+	previousVCSIntegrationID, vcsIntegrationID string,
 	previousAppRepository, previousBacklogRepository, previousDefaultBranch, repository string,
 ) error {
 	canvasesForFactory, err := factory.ListCanvases(tx)
@@ -208,7 +271,7 @@ func reconcileFactoryRepository(
 			return err
 		}
 		nodes := slices.Clone(liveVersion.Nodes)
-		changed := false
+		changed := replaceGitHubNodeIntegration(nodes, previousVCSIntegrationID, vcsIntegrationID)
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
 			switch template.id {
@@ -257,6 +320,25 @@ func reconcileFactoryRepository(
 	}
 
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
+}
+
+func replaceGitHubNodeIntegration(nodes []models.Node, previousIntegrationID, integrationID string) bool {
+	if previousIntegrationID == "" || previousIntegrationID == integrationID {
+		return false
+	}
+
+	changed := false
+	for i := range nodes {
+		if !strings.HasPrefix(nodes[i].ComponentName(), "github.") || nodes[i].IntegrationID == nil {
+			continue
+		}
+		if strings.TrimSpace(*nodes[i].IntegrationID) != previousIntegrationID {
+			continue
+		}
+		nodes[i].IntegrationID = &integrationID
+		changed = true
+	}
+	return changed
 }
 
 func replaceTriggerRepository(nodes []models.Node, component, previousRepository, repository string) bool {

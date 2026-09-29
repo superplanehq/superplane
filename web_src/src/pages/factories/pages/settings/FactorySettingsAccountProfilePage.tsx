@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { PersonalApiTokenDialogs } from "@/components/PersonalApiTokens";
+import type { AccountLinkedAccount } from "@/contexts/accountContextState";
 import { useAccount } from "@/contexts/useAccount";
 import { meKeys } from "@/hooks/useMe";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
@@ -23,11 +24,10 @@ import { AccountSecurityRedesignPage } from "./account-profile-redesign/AccountS
 import { DeleteAccountDangerZone } from "./DeleteAccountDangerZone";
 import { useAccountSettingsAuthResults } from "./useAccountSettingsAuthResults";
 
-function linkedGithubUsername(
-  linkedAccounts: Array<{ provider: string; username?: string }> | undefined,
-): string | null {
-  const github = linkedAccounts?.find((account) => account.provider === "github");
-  return github?.username?.trim() || null;
+function linkedGitHubAccounts(linkedAccounts: AccountLinkedAccount[] | undefined) {
+  return (linkedAccounts ?? [])
+    .filter((account) => account.provider === "github" && account.provider_id && account.username.trim())
+    .map((account) => ({ providerId: account.provider_id, username: account.username.trim() }));
 }
 
 export function FactorySettingsAccountProfilePage() {
@@ -95,12 +95,12 @@ export function FactorySettingsAccountProfilePage() {
         }}
         associatedAccounts={
           <AccountProfileAssociatedAccountsCard
-            githubUsername={linkedGithubUsername(account.linked_accounts)}
+            githubAccounts={linkedGitHubAccounts(account.linked_accounts)}
             onLinkGithub={() => {
               window.location.assign(linkedAccountConnectHref("github", redirectPath));
             }}
-            onRemoveGithub={() => {
-              void disconnectLinkedAccount("github")
+            onRemoveGithub={(providerId) => {
+              void disconnectLinkedAccount("github", providerId)
                 .then(async () => {
                   await refreshAccount();
                   showSuccessToast("GitHub link removed.");

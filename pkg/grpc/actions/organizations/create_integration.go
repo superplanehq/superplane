@@ -67,6 +67,9 @@ func CreateIntegration(
 	})
 
 	configMap := configurationMap(appConfig)
+	if github.PreferHostedInstall(orgID, integrationName, configMap) {
+		return nil, grpcerrors.FailedPrecondition(nil, "select a repository to connect the public GitHub App")
+	}
 
 	//
 	// If the integration and organization support the new flow, use it.
@@ -109,9 +112,6 @@ func CreateIntegration(
 }
 
 func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
-	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
-		return false
-	}
 	if sentry.PreferHostedInstall(integrationName, config) {
 		return false
 	}

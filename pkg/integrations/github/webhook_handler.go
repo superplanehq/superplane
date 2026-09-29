@@ -75,6 +75,13 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, err
 	}
 
+	if hostedGitHubApp(ctx.Integration) {
+		if !common.HostedAppConfigured() {
+			return nil, fmt.Errorf("hosted GitHub App is not configured")
+		}
+		return &Webhook{WebhookName: "github_app"}, nil
+	}
+
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
@@ -110,6 +117,10 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 }
 
 func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
+	if hostedGitHubApp(ctx.Integration) {
+		return nil
+	}
+
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
@@ -137,4 +148,13 @@ func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	}
 
 	return nil
+}
+
+func hostedGitHubApp(integration core.IntegrationContext) bool {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+
+	return metadata.HostedApp
 }
