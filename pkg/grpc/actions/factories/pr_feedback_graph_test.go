@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -220,6 +221,30 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, prompt, "Summarize the changes in this comment.")
 		assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
 		assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
+		assert.NotContains(t, prompt, "Do not resolve GitHub review threads.")
+		assert.Contains(t, prompt, "addressed-review-threads.jsonl")
+	})
+
+	t.Run("discussion runners reply in and resolve addressed review threads after push", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    prFeedbackDefaultMention,
+			IgnoreBots: true,
+		})
+
+		for _, nodeID := range []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID} {
+			runner := findSpecNode(t, canvas, nodeID)
+			assert.True(t, runnerHasStep(t, runner, "Resolve Addressed Threads"))
+			assert.Equal(t, runnerStepIndex(t, runner, "Commit and Push")+1, runnerStepIndex(t, runner, "Resolve Addressed Threads"))
+			assert.Equal(t, "repo", runnerStep(t, runner, "Resolve Addressed Threads")["workingDirectory"])
+
+			command := runnerStepCommand(t, runner, "Resolve Addressed Threads")
+			replyAt := strings.Index(command, "addPullRequestReviewThreadReply")
+			resolveAt := strings.Index(command, "resolveReviewThread")
+			require.GreaterOrEqual(t, replyAt, 0)
+			require.GreaterOrEqual(t, resolveAt, 0)
+			assert.Less(t, replyAt, resolveAt)
+		}
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -485,7 +510,7 @@ func runnerEnv(t *testing.T, node yaml.Node, name string) string {
 	return ""
 }
 
-func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
+func runnerStep(t *testing.T, node yaml.Node, name string) map[string]any {
 	t.Helper()
 
 	steps, ok := node.Configuration["steps"].([]any)
@@ -494,13 +519,35 @@ func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 		item, ok := step.(map[string]any)
 		require.True(t, ok)
 		if item["name"] == name {
-			command, ok := item["command"].(string)
-			require.True(t, ok, "step %q has no command", name)
-			return command
+			return item
 		}
 	}
 	require.Failf(t, "step not found", "runner has no step %q", name)
-	return ""
+	return nil
+}
+
+func runnerStepIndex(t *testing.T, node yaml.Node, name string) int {
+	t.Helper()
+
+	steps, ok := node.Configuration["steps"].([]any)
+	require.True(t, ok, "runner has no steps")
+	for i, step := range steps {
+		item, ok := step.(map[string]any)
+		require.True(t, ok)
+		if item["name"] == name {
+			return i
+		}
+	}
+	require.Failf(t, "step not found", "runner has no step %q", name)
+	return -1
+}
+
+func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
+	t.Helper()
+
+	command, ok := runnerStep(t, node, name)["command"].(string)
+	require.True(t, ok, "step %q has no command", name)
+	return command
 }
 
 func runnerHasStep(t *testing.T, node yaml.Node, name string) bool {
