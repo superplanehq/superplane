@@ -22,7 +22,7 @@ export function ConnectionStatusDot({
           size="icon"
           aria-label={status}
           className={cn(
-            "size-2 rounded-full p-0 hover:bg-transparent dark:hover:bg-transparent",
+            "size-3 rounded-full p-0 hover:bg-transparent dark:hover:bg-transparent",
             connected ? "bg-emerald-500 hover:bg-emerald-500" : "bg-muted-foreground/40 hover:bg-muted-foreground/40",
             className,
           )}

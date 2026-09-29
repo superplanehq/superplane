@@ -66,20 +66,18 @@ export function FactorySettingsMCPPage() {
             </Empty>
           </FactorySettingsCard>
         ) : (
-          <FactorySettingsCard>
-            <MCPServerList
-              organizationId={page.organizationId}
-              factoryId={page.factoryId}
-              resources={page.connections.data ?? []}
-              canUpdate={page.canUpdate}
-              onEdit={page.setEditResource}
-              onDelete={page.setPendingDelete}
-              onDisconnect={page.disconnectResource}
-              onToggleEnabled={page.toggleEnabled}
-              onToggleTools={page.toggleTools}
-              onConnect={(resource) => void page.startOAuthRedirect(resource)}
-            />
-          </FactorySettingsCard>
+          <MCPServerList
+            organizationId={page.organizationId}
+            factoryId={page.factoryId}
+            resources={page.connections.data ?? []}
+            canUpdate={page.canUpdate}
+            onEdit={page.setEditResource}
+            onDelete={page.setPendingDelete}
+            onDisconnect={page.disconnectResource}
+            onToggleEnabled={page.toggleEnabled}
+            onToggleTools={page.toggleTools}
+            onConnect={(resource) => void page.startOAuthRedirect(resource)}
+          />
         )}
       </div>
       <MCPAddPicker
