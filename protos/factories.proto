@@ -773,6 +773,28 @@ service Factories {
     };
   }
 
+  rpc ListFactoryMCPClients(ListFactoryMCPClientsRequest) returns (ListFactoryMCPClientsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/mcp-clients"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List SuperPlane MCP clients";
+      description: "Returns MCP clients that signed in to this workspace.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RevokeFactoryMCPClient(RevokeFactoryMCPClientRequest) returns (RevokeFactoryMCPClientResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a SuperPlane MCP client";
+      description: "Disconnects an MCP client from this workspace. The client must sign in again.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -2829,3 +2851,27 @@ message FindPlanningSessionByWorkOrderRequest {
 message FindPlanningSessionByWorkOrderResponse {
   PlanningSession session = 1;
 }
+
+message FactoryMCPClient {
+  string id = 1;
+  string client_name = 2;
+  string user_id = 3;
+  string user_name = 4;
+  string user_email = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListFactoryMCPClientsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryMCPClientsResponse {
+  repeated FactoryMCPClient clients = 1;
+}
+
+message RevokeFactoryMCPClientRequest {
+  string factory_id = 1;
+  string client_id = 2;
+}
+
+message RevokeFactoryMCPClientResponse {}

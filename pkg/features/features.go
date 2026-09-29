@@ -72,6 +72,11 @@ const FeatureFactoryRiskScore = "factory_risk_score"
 // timeline with a summary panel instead of the Task and Automations tabs.
 const FeatureFactoryTaskConsole = "factory_task_console"
 
+// FeatureSuperPlaneMCPServer gates the public workspace MCP server.
+// Organizations with this flag can authorize Cursor and other MCP clients
+// against one workspace. Without it, POST /mcp returns 404.
+const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
+
 func released() *bool {
 	v := true
 	return &v
@@ -93,6 +98,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
 	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "SuperPlane MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }
 
 func All() []Feature {

@@ -893,6 +893,10 @@ func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	}
 }
 
+func WorkOrderStateToProto(state string) pb.WorkOrder_State {
+	return serializeWorkOrderState(state)
+}
+
 func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
