@@ -8,18 +8,22 @@ import { isRunnerComponent, notesForLiveStream } from "../streamNotesFromLiveLog
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
+import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
 export function LiveAgentSteps({
   stage,
   phase,
   organizationId,
   expandSteps = false,
+  emptyNote,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
   /** Open every step's detail, for the full-log view. */
   expandSteps?: boolean;
+  /** Shown when a finished run has no transcript to replay. */
+  emptyNote?: string;
 }) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
@@ -45,9 +49,12 @@ export function LiveAgentSteps({
       ? { ...stage, agentSteps: liveSteps }
       : { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
 
+  // A running run shows nothing until its first note streams in; the
+  // note is for finished runs whose transcript never arrives.
+  const note = emptyNote && stage.status !== "running" ? <p className={META_TEXT_CLASSNAME}>{emptyNote}</p> : null;
   if (!organizationId || !phase || runners.length === 0) {
     const settled = { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
-    return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : null;
+    return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : note;
   }
 
   return (
@@ -62,7 +69,7 @@ export function LiveAgentSteps({
           onNotes={reportNotes}
         />
       ))}
-      {shown.agentSteps.length > 0 ? <AgentStepMarkers stage={shown} expandSteps={expandSteps} /> : null}
+      {shown.agentSteps.length > 0 ? <AgentStepMarkers stage={shown} expandSteps={expandSteps} /> : note}
     </>
   );
 }

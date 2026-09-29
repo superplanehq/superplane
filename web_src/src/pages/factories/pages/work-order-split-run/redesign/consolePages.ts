@@ -1,74 +1,72 @@
 import {
+  extractArtifactContentType,
   extractArtifactFilename,
   extractArtifactName,
   extractArtifactTitle,
   toArtifactDataRecord,
 } from "../../../lib/workOrderArtifact";
-import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
-import type { SplitRunPhase } from "../splitRunMocks";
+import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunPhase } from "../splitRunMocks";
 import { isRunnerComponent } from "../streamNotesFromLiveLog";
 import type { AutomationStage } from "./automationsViewModel";
 
-export type ConsolePaneKind = "description" | "log" | "artifact" | "check" | "pullRequest";
+/** The expanded card's fixed pages, in tab order. */
+export type ConsolePageId = "agent" | "artifacts" | "checks";
 
-/** One selectable item in the expanded card's menu. */
-export interface ConsolePane {
-  id: string;
-  kind: ConsolePaneKind;
-  label: string;
-  artifact?: AutomationStage["outputs"]["artifacts"][number];
-  check?: WorkOrderCheckPresentation;
-}
+export type StageArtifact = AutomationStage["outputs"]["artifacts"][number];
 
 /**
- * Everything an expanded card can show, as one menu. The agent log is an
- * item like any artifact or score, and the selected item fills the body.
- * Order: description, agent log, artifacts, scores, pull request.
+ * The pages a card can open. Only pages with content exist: a stage where
+ * no agent ran has no Agent log page, and most stages report no checks.
+ * The stage description is not a page — it always shows above the tabs.
+ * The tab bar renders even for a single page, so every card reads the same.
  */
-export function consolePanes(stage: AutomationStage, phase?: SplitRunPhase): ConsolePane[] {
-  const panes: ConsolePane[] = [];
-  if (stage.id === "backlog" || stage.description?.trim()) {
-    panes.push({ id: "description", kind: "description", label: "Description" });
-  }
+export function consolePages(stage: AutomationStage, phase?: SplitRunPhase): ConsolePageId[] {
+  const pages: ConsolePageId[] = [];
   if (hasAgentLog(stage, phase)) {
-    panes.push({ id: "log", kind: "log", label: "Agent log" });
+    pages.push("agent");
   }
-  for (const artifact of stage.outputs.artifacts) {
-    const label = artifactPaneLabel(artifact);
-    if (stage.id === "backlog" && label === "description.md") {
-      continue; // The Description pane already shows the task text.
-    }
-    panes.push({ id: `artifact-${artifact.id ?? label}`, kind: "artifact", label, artifact });
+  if (artifactsPageCount(stage) > 0) {
+    pages.push("artifacts");
   }
-  for (const check of stage.checks) {
-    panes.push({ id: `check-${check.id}`, kind: "check", label: check.name, check });
+  if (stage.checks.length > 0) {
+    pages.push("checks");
   }
-  if (stage.outputs.pullRequests.length > 0) {
-    panes.push({ id: "pull-request", kind: "pullRequest", label: "Pull request" });
-  }
-  return panes;
-}
-
-/** The agent log starts selected; a card without one starts on its first item. */
-export function defaultConsolePaneId(panes: ConsolePane[]): string | undefined {
-  return (panes.find((pane) => pane.kind === "log") ?? panes[0])?.id;
+  return pages;
 }
 
 /**
- * A transcript exists, or one can still arrive: a running canvas run
- * streams live, and stored runner lines replay for finished runs.
+ * What the Artifacts page lists: artifacts plus the pull requests the run
+ * opened. The count renders on the tab.
  */
-function hasAgentLog(stage: AutomationStage, phase?: SplitRunPhase): boolean {
-  if (stage.agentSteps.length > 0) {
-    return true;
-  }
-  if (stage.status === "running" && Boolean(stage.appId)) {
-    return true;
-  }
-  return (phase?.stream ?? []).some((line) => isRunnerComponent(line.component) && Boolean(line.executionId));
+export function artifactsPageCount(stage: AutomationStage): number {
+  return stage.outputs.artifacts.length + stage.outputs.pullRequests.length;
 }
 
-function artifactPaneLabel(artifact: AutomationStage["outputs"]["artifacts"][number]): string {
+/**
+ * The creation card's description.md is the task text itself. Its
+ * document row renders the editable task description, not a copy.
+ */
+export function isTaskDocument(stage: AutomationStage, artifact: StageArtifact): boolean {
+  return stage.id === "backlog" && artifactLabel(artifact) === "description.md";
+}
+
+/** How the Artifacts page renders an artifact: markdown reads inline, media plays inline, the rest are chips. */
+export function consoleArtifactKind(artifact: StageArtifact): "markdown" | "image" | "video" | "other" {
+  const type = (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase();
+  if (type === "markdown") {
+    return "markdown";
+  }
+  const contentType = extractArtifactContentType(toArtifactDataRecord(artifact.data));
+  if (contentType?.startsWith("image/")) {
+    return "image";
+  }
+  if (contentType?.startsWith("video/")) {
+    return "video";
+  }
+  return "other";
+}
+
+export function artifactLabel(artifact: StageArtifact): string {
   const data = toArtifactDataRecord(artifact.data);
   return (
     extractArtifactFilename(data) ??
@@ -76,6 +74,26 @@ function artifactPaneLabel(artifact: AutomationStage["outputs"]["artifacts"][num
     extractArtifactName(data) ??
     fallbackArtifactLabel(artifact.type)
   );
+}
+
+/**
+ * A transcript exists, or one can still arrive. Any canvas run counts:
+ * a running one streams live, and a finished one replays its stored
+ * runner log once the live canvas loads — even when the static stream
+ * carries no runner lines. The creation and closure rows are plumbing;
+ * no agent runs there.
+ */
+function hasAgentLog(stage: AutomationStage, phase?: SplitRunPhase): boolean {
+  if (stage.agentSteps.length > 0) {
+    return true;
+  }
+  if ((phase?.stream ?? []).some((line) => isRunnerComponent(line.component) && Boolean(line.executionId))) {
+    return true;
+  }
+  if (stage.id === "backlog" || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID) {
+    return false;
+  }
+  return Boolean(stage.appId);
 }
 
 function fallbackArtifactLabel(type?: string): string {

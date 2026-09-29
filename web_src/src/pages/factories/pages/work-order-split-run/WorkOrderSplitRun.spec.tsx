@@ -867,12 +867,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(card as HTMLElement).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
 
     await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
+    // The task text is the description.md document on the Artifacts page.
+    expect(within(card as HTMLElement).getByRole("tab", { name: /Artifacts/ })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: /description\.md/ })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByTestId("redesign-console-task-description")).toBeInTheDocument();
-    // The creation card has only the description, so no menu renders.
-    expect(within(card as HTMLElement).queryByRole("tab")).not.toBeInTheDocument();
   });
 
-  it("lists a produced artifact as a card menu item next to the agent log", async () => {
+  it("opens produced artifacts on the card's Artifacts page", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
@@ -883,7 +884,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(logTab).toHaveAttribute("aria-selected", "true");
     expect(within(card).queryByRole("link", { name: /feature\/refund-retry/ })).not.toBeInTheDocument();
 
-    await user.click(within(card).getByRole("tab", { name: "feature/refund-retry" }));
+    await user.click(within(card).getByRole("tab", { name: /Artifacts/ }));
 
     expect(within(card).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-implement")).not.toBeInTheDocument();
@@ -944,8 +945,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-phase-checks-verify-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
 
-    // Each score is a menu item; selecting one shows its write-up inline.
-    await user.click(screen.getByRole("tab", { name: "Risk score" }));
+    // The Checks page lists every score with its summary in view.
+    await user.click(screen.getByRole("tab", { name: /^Checks/ }));
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 

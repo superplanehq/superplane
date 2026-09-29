@@ -143,6 +143,7 @@ export function AutomationsConsoleVariant({
                       canEditDescription={canEditDescription}
                       descriptionBusy={descriptionBusy}
                       onDescriptionSave={onDescriptionSave}
+                      source={source}
                       files={files}
                       defaultOpen={index + 1 === currentColumn}
                       canStopRun={canStopRun}
@@ -223,6 +224,7 @@ function ConsoleAutomationCard({
   canEditDescription,
   descriptionBusy,
   onDescriptionSave,
+  source,
   files,
   defaultOpen,
   canStopRun,
@@ -241,6 +243,8 @@ function ConsoleAutomationCard({
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
+  /** Where the task came from. The Backlog creation card shows it. */
+  source?: SplitRunSource;
   files?: FilesFile[];
   /** True for cards in the column the task is currently in. */
   defaultOpen: boolean;
@@ -312,6 +316,7 @@ function ConsoleAutomationCard({
               canEditDescription={canEditDescription}
               descriptionBusy={descriptionBusy}
               onDescriptionSave={onDescriptionSave}
+              source={source}
               files={files}
               onStop={stopRun}
               onRetry={rerunStep}
