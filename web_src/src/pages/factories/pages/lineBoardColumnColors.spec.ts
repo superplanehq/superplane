@@ -12,6 +12,16 @@ import {
 describe("lineBoardColumnColors", () => {
   it("lists eight colours and uses a quieter wash than vivid in both themes", () => {
     expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(8);
+    expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id).sort()).toEqual([
+      "emerald",
+      "indigo",
+      "lime",
+      "purple",
+      "sky",
+      "slate",
+      "teal",
+      "yellow",
+    ]);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
