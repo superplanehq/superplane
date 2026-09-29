@@ -69,27 +69,80 @@ export function AgentLiveActivity({
   testId?: string;
 }) {
   const stream = useAgentActivityStream({ organizationId, canvasId, executionId, active });
-  const activity = currentLiveActivity(activities, stream.activities);
-  const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
-  const status = liveStatus(activity, elapsedMs, startingLabel, stream.hasConnectedOnce ? stream.error : undefined);
+  return (
+    <AgentLiveActivityFeed
+      active={active}
+      activity={currentLiveActivity(activities, stream.activities)}
+      startingLabel={startingLabel}
+      error={stream.hasConnectedOnce ? stream.error : undefined}
+      className={className}
+      testId={testId}
+    />
+  );
+}
 
+/** Live activity plus the shimmer line. Analysis and the run console share this. */
+export function AgentLiveActivityFeed({
+  active,
+  activity,
+  startingLabel,
+  error,
+  className,
+  testId = "agent-live-activity",
+  collapseReasoning = true,
+}: {
+  active: boolean;
+  activity?: AgentActivity;
+  startingLabel: string;
+  error?: string;
+  className?: string;
+  testId?: string;
+  collapseReasoning?: boolean;
+}) {
   if (!active) return null;
   return (
     <div className={cn(className)} data-testid={testId}>
-      {activity ? <AgentActivityView activity={activity} live /> : null}
-      {status ? (
-        <p
-          role="status"
-          aria-label={status.label}
-          aria-live="polite"
-          className="px-3 py-0.5 text-[13px] leading-5 text-muted-foreground"
-          data-testid="split-run-intent-thinking"
-        >
-          <AnimatedThinkingState text={status.label} />
-          {status.elapsedSeconds === undefined ? null : <span aria-hidden> · {status.elapsedSeconds}s</span>}
-        </p>
-      ) : null}
+      {activity ? <AgentActivityView activity={activity} live collapseReasoning={collapseReasoning} /> : null}
+      <AgentLiveStatus
+        active
+        activity={activity}
+        startingLabel={startingLabel}
+        error={error}
+        collapseReasoning={collapseReasoning}
+      />
     </div>
+  );
+}
+
+/** Starting / Still working shimmer. The run console mounts this under a shared transcript. */
+export function AgentLiveStatus({
+  active,
+  activity,
+  startingLabel,
+  error,
+  collapseReasoning = true,
+}: {
+  active: boolean;
+  activity?: AgentActivity;
+  startingLabel: string;
+  error?: string;
+  /** Console hides an empty Thinking row, so the shimmer must keep that label. */
+  collapseReasoning?: boolean;
+}) {
+  const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
+  const status = liveStatus(activity, elapsedMs, startingLabel, error, collapseReasoning);
+  if (!active || !status) return null;
+  return (
+    <p
+      role="status"
+      aria-label={status.label}
+      aria-live="polite"
+      className="px-3 py-0.5 text-[13px] leading-5 text-muted-foreground"
+      data-testid="split-run-intent-thinking"
+    >
+      <AnimatedThinkingState text={status.label} />
+      {status.elapsedSeconds === undefined ? null : <span aria-hidden> · {status.elapsedSeconds}s</span>}
+    </p>
   );
 }
 
@@ -110,6 +163,7 @@ function liveStatus(
   elapsedMs: number,
   startingLabel: string,
   error?: string,
+  collapseReasoning = true,
 ): LiveStatus | undefined {
   if (error) return { label: "Live activity disconnected. Reconnecting…" };
   if (elapsedMs >= STALE_ACTIVITY_MS) {
@@ -117,19 +171,30 @@ function liveStatus(
   }
   if (!activity || activity.items.length === 0) return { label: startingLabel };
 
-  const latestRunningItem = findLatestRunningItem(activity.items);
-  if (latestRunningItem?.type === "content") {
-    if (latestRunningItem.kind === "reasoning" || latestRunningItem.text.trim()) return undefined;
+  const latest = lastActionItem(activity.items);
+  if (!latest || latest.status !== "running") {
+    return { label: "Planning next step…" };
+  }
+  if (latest.type === "content") {
+    if (latest.kind === "reasoning") {
+      if (!latest.text.trim() && !collapseReasoning) return { label: "Thinking" };
+      return undefined;
+    }
+    if (latest.text.trim()) {
+      return collapseReasoning ? undefined : { label: "Writing response…" };
+    }
     return { label: "Writing response…" };
   }
-  if (latestRunningItem?.type === "tool") return undefined;
+  if (latest.type === "tool") return undefined;
   return { label: "Planning next step…" };
 }
 
-function findLatestRunningItem(items: AgentActivityItem[]): AgentActivityItem | undefined {
+function lastActionItem(
+  items: AgentActivityItem[],
+): Exclude<AgentActivityItem, { type: "notice" }> | undefined {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    if (item.type !== "notice" && item.status === "running") return item;
+    if (item.type !== "notice") return item;
   }
   return undefined;
 }

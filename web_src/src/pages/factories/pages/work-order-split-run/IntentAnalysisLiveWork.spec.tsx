@@ -358,4 +358,44 @@ describe("AnalysisLiveWork", () => {
 
     expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Planning next step…");
   });
+
+  it("shows Planning next step when earlier notes stay marked running", () => {
+    render(
+      <AnalysisLiveWork
+        machineStatus="running"
+        activities={[
+          {
+            id: "activity-1",
+            provider: "opencode",
+            status: "running",
+            sequence: 6,
+            truncated: false,
+            items: [
+              {
+                type: "content",
+                id: "note-1",
+                kind: "assistant",
+                text: "Bun is not installed on the host.",
+                status: "running",
+                truncated: false,
+              },
+              {
+                type: "tool",
+                id: "tool-1",
+                kind: "read",
+                name: "read",
+                input: "README.md",
+                output: "",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Planning next step…");
+  });
 });
