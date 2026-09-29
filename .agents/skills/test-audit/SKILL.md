@@ -16,9 +16,6 @@ PRs; optimize for confidence, not deletion count. Campaign mode prunes one
 whole subsystem's test surface (every test file a Go package, UI mapper, runner
 area, or other owner owns); before starting one, read [CAMPAIGN.md](CAMPAIGN.md).
 
-Adapted from OpenClaw's [test-audit skill](https://github.com/openclaw/openclaw/blob/main/.agents/skills/test-audit/SKILL.md)
-for SuperPlane test owners, Make targets, and repository layout.
-
 ## Authoring gate
 
 Before adding any test, answer four questions; a missing answer means do not
