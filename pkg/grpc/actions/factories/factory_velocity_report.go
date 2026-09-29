@@ -354,6 +354,7 @@ const (
 	velocitySortAuthoredMerged
 	velocitySortMedianCycleHours
 	velocitySortCostUsd
+	velocitySortFactoryWaste
 )
 
 // velocitySortDirection is ascending or descending, applied to the primary
@@ -397,6 +398,8 @@ func (b *velocityPeopleBuilder) rowsSorted(key velocityPeopleSortKey, direction 
 			return medians[row]
 		case velocitySortCostUsd:
 			return float64(row.costCents)
+		case velocitySortFactoryWaste:
+			return float64(row.factoryWaste)
 		default:
 			return float64(row.totalMerged())
 		}

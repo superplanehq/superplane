@@ -40,6 +40,14 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
+  it("describes a task by number", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${OPEN_WORK_ORDER.number}`,
+    );
+    const body = (await response.json()) as { order?: { id?: string; number?: string } };
+    expect(body.order).toMatchObject({ id: OPEN_WORK_ORDER.id, number: OPEN_WORK_ORDER.number });
+  });
+
   it("filters work orders by user", async () => {
     const unassigned = await fetchFactoryPageFixture(
       `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&unassigned=true`,

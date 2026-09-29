@@ -43,6 +43,68 @@ func TestDiscoverUsesWWWAuthenticate(t *testing.T) {
 	assert.Equal(t, "https://mcp.example.com/token", discovery.AuthServer.TokenEndpoint)
 }
 
+func TestDiscoverUsesPathProtectedResourceWhenChallengeOmitsMetadata(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/mcp", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	mux.HandleFunc("/.well-known/oauth-protected-resource/v1/mcp", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"resource":              "https://mcp.example.com/v1/mcp",
+			"authorization_servers": []string{"https://mcp.example.com/v1/mcp"},
+		})
+	})
+	mux.HandleFunc("/.well-known/oauth-protected-resource", func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("root protected-resource metadata should not be used when the path document exists")
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/.well-known/oauth-authorization-server/v1/mcp", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 "https://mcp.example.com/v1/mcp",
+			"authorization_endpoint": "https://mcp.example.com/authorize",
+			"token_endpoint":         "https://mcp.example.com/token",
+			"registration_endpoint":  "https://mcp.example.com/register",
+		})
+	})
+
+	client := rewriteClient(t, mux)
+	discovery, err := Discover(context.Background(), client, "https://mcp.example.com/v1/mcp")
+	require.NoError(t, err)
+	assert.Equal(t, "https://mcp.example.com/v1/mcp", discovery.Resource)
+	assert.Equal(t, "https://mcp.example.com/authorize", discovery.AuthServer.AuthorizationEndpoint)
+	assert.Equal(t, "https://mcp.example.com/register", discovery.AuthServer.RegistrationEndpoint)
+}
+
+func TestDiscoverFallsBackToRootProtectedResource(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/.well-known/oauth-protected-resource", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"resource":              "https://mcp.example.com/mcp",
+			"authorization_servers": []string{"https://mcp.example.com"},
+		})
+	})
+	mux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 "https://mcp.example.com",
+			"authorization_endpoint": "https://mcp.example.com/authorize",
+			"token_endpoint":         "https://mcp.example.com/token",
+			"registration_endpoint":  "https://mcp.example.com/register",
+		})
+	})
+
+	client := rewriteClient(t, mux)
+	discovery, err := Discover(context.Background(), client, "https://mcp.example.com/mcp")
+	require.NoError(t, err)
+	assert.Equal(t, "https://mcp.example.com/mcp", discovery.Resource)
+	assert.Equal(t, "https://mcp.example.com/token", discovery.AuthServer.TokenEndpoint)
+}
+
 func TestSelectClientIDPrefersCIMDThenDCR(t *testing.T) {
 	t.Parallel()
 	cimd := &Discovery{AuthServer: AuthorizationServerMetadata{ClientIDMetadataDocumentSupported: true}}

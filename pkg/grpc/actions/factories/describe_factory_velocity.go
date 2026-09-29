@@ -182,6 +182,8 @@ func velocityPeopleSortKeyFromProto(sort pb.DescribeFactoryVelocityRequest_Peopl
 		return velocitySortMedianCycleHours
 	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_COST_USD:
 		return velocitySortCostUsd
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_FACTORY_WASTE:
+		return velocitySortFactoryWaste
 	default:
 		return velocitySortTotal
 	}

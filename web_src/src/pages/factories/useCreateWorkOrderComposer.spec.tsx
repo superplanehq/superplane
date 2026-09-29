@@ -227,7 +227,7 @@ describe("useCreateWorkOrderComposer", () => {
     });
   });
 
-  it("keeps the first 5000 characters of a long pasted description", () => {
+  it("keeps the first 20000 characters of a long pasted description", () => {
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
         organizationId: "org-1",
@@ -238,9 +238,9 @@ describe("useCreateWorkOrderComposer", () => {
     );
 
     act(() => {
-      result.current.updateDescription("a".repeat(5200));
+      result.current.updateDescription("a".repeat(20200));
     });
 
-    expect(result.current.description).toHaveLength(5000);
+    expect(result.current.description).toHaveLength(20000);
   });
 });

@@ -37,6 +37,14 @@ vi.mock("@/hooks/useFactoryData", () => {
   };
 });
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => true,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 function renderRunningPopup() {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -61,7 +69,7 @@ describe("WorkOrderSplitRunPopup action busy state", () => {
     cancelRunMock.mockReset().mockReturnValue(new Promise(() => {}));
   });
 
-  it("keeps automation Stop busy while a cancel is in flight", async () => {
+  it("hides automation Stop while a cancel is in flight", async () => {
     const user = userEvent.setup();
     renderRunningPopup();
 
@@ -70,11 +78,8 @@ describe("WorkOrderSplitRunPopup action busy state", () => {
       expect(cancelRunMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Stop" }));
-    expect(cancelRunMock).toHaveBeenCalledTimes(1);
   });
 });

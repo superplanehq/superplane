@@ -135,11 +135,15 @@ func listHostedCreditInvoices(
 	invoices := make([]*pb.HostedCreditInvoice, 0, len(orders))
 	for _, order := range orders {
 		invoices = append(invoices, &pb.HostedCreditInvoice{
-			Id:          order.ID,
-			CreatedAt:   order.CreatedAt,
-			AmountCents: order.AmountCents,
-			Status:      order.Status,
-			ProductName: order.ProductName,
+			Id:             order.ID,
+			CreatedAt:      order.CreatedAt,
+			AmountCents:    order.AmountCents,
+			Status:         order.Status,
+			ProductName:    order.ProductName,
+			CheckoutId:     order.CheckoutID,
+			Currency:       order.Currency,
+			NetAmountCents: order.NetAmountCents,
+			TaxAmountCents: order.TaxAmountCents,
 		})
 	}
 	return invoices

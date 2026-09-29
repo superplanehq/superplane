@@ -65,14 +65,14 @@ describe("CardReadinessMark", () => {
 });
 
 describe("CardScoreBadges", () => {
-  it("shows a name and number badge per score, tinted by band", () => {
+  it("shows a name and score out of 5 per badge, tinted by band", () => {
     render(<CardScoreBadges clarity={5} confidence={2} testId="badges" />);
 
     const clarity = screen.getByTestId("badges-clarity");
     const confidence = screen.getByTestId("badges-confidence");
-    expect(clarity).toHaveTextContent("Clarity5");
+    expect(clarity).toHaveTextContent("Clarity5/5");
     expect(clarity).toHaveClass("text-emerald-700");
-    expect(confidence).toHaveTextContent("Confidence2");
+    expect(confidence).toHaveTextContent("Confidence2/5");
     expect(confidence).toHaveClass("text-red-700");
     expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
     expect(screen.getByTestId("badges")).toHaveAttribute(
@@ -87,6 +87,7 @@ describe("CardScoreBadges", () => {
     const clarity = screen.getByTestId("badges-clarity");
     expect(clarity).toHaveTextContent("Clarity–");
     expect(clarity).toHaveClass("text-muted-foreground");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence4/5");
     expect(screen.getByTestId("badges-confidence")).toHaveClass("text-emerald-700");
   });
 
@@ -94,7 +95,7 @@ describe("CardScoreBadges", () => {
     render(<CardScoreBadges clarity={5} confidence={2} showClarity={false} testId="badges" />);
 
     expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
-    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2/5");
   });
 
   it("keeps the verdict headline in the tooltip", async () => {

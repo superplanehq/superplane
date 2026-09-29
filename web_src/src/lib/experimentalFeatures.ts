@@ -19,6 +19,9 @@ export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 /** Organization experimental feature: Dependabot alert intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DEPENDABOT_INTAKE = "factory_dependabot_intake";
 
+/** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
+export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
+
 /** Organization experimental feature: workspace MCP servers. */
 export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
 
@@ -33,3 +36,9 @@ export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
+
+/** Organization experimental feature: Risk score automation on the Verify column. */
+export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
+
+/** Organization experimental feature: unified task popup with one console timeline instead of tabs. */
+export const FEATURE_FACTORY_TASK_CONSOLE = "factory_task_console";

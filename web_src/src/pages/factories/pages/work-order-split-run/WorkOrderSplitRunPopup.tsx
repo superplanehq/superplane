@@ -2,8 +2,10 @@ import { useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -11,20 +13,13 @@ import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
-import type { CreatedTaskHref } from "./CreatedTaskCard";
-import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import {
-  classicSplitRunFooter,
-  footerWithoutHostedCreditLock,
-  isTaskResultFooter,
-  SPLIT_RUN_ANALYZING_NOTE,
-} from "./splitRunFooter";
-import { defaultSplitRunPopupTab, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
+import { footerWithoutHostedCreditLock, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { defaultSplitRunPopupTab, refinePopupShowsAutomations } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -33,10 +28,18 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
-import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
+import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { isByokSelectableModel } from "../../lib/workOrderFailureReason";
+import {
+  analysisDraftChrome,
+  analysisPopupClassName,
+  analysisPopupView,
+  analysisReviewCompact,
+  analysisShellReview,
+  showsDescriptionReview,
+} from "./workOrderSplitRunPopupPlanning";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -126,11 +129,18 @@ function AnalysisWorkOrderPopup({
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
-  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel, draftThinking);
+  const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
+  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
+  const draftStart = draftStartAction(
+    fixture.footer.kind,
+    onDispatch,
+    taskConsole ? () => {} : () => setTab("log"),
+    draftModel,
+    draftThinking,
+  );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
@@ -139,6 +149,7 @@ function AnalysisWorkOrderPopup({
       ? { ...fixture, footer: footerWithoutHostedCreditLock(fixture.footer) }
       : fixture;
   const { sourceOnly, viewFixture } = analysisPopupView(gatedFixture, factory);
+  const unified = taskConsole && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
     organizationId,
@@ -175,15 +186,22 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: true }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
-  const descriptionReview = showsDescriptionReview(sourceOnly, showSidebarNote, tab) ? review : undefined;
+  const descriptionReview = taskConsole
+    ? !unified && !showSidebarNote
+      ? review
+      : undefined
+    : showsDescriptionReview(sourceOnly, showSidebarNote, tab)
+      ? review
+      : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={analysisPopupClassName(fullPage, sourceOnly)}
+      className={analysisPopupClassName(fullPage, unified, !taskConsole && sourceOnly)}
       onDismiss={onClose}
     >
       <LiveHeaderSpendProvider>
@@ -197,15 +215,17 @@ function AnalysisWorkOrderPopup({
           orderId={orderId}
           orderNumber={orderNumber}
           lineId={lineId}
+          classic={!taskConsole}
           tab={tab}
           onTabChange={setTab}
           canUpdate={canUpdate}
           footerActions={footerActions}
           resultFooter={descriptionReview}
-          sidebarNote={showSidebarNote ? review : undefined}
+          sidebarNote={!unified && showSidebarNote ? review : undefined}
           analysis={stripAnalysis}
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
+          panelReview={panelReview}
           header={analysisPopupHeader({
             edits,
             fixture,
@@ -219,10 +239,11 @@ function AnalysisWorkOrderPopup({
             mutations,
             footerBusy: footerActions.busy,
             reviewActions,
+            showOwnerRow: !unified,
             planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
           })}
         />
-        {analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
+        {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
@@ -275,6 +296,8 @@ function analysisPopupHeader(args: {
   mutations: ReturnType<typeof footerMutationHandlers>;
   footerBusy: boolean;
   reviewActions: ReactNode;
+  /** The unified view moves owner and spend into the summary panel. */
+  showOwnerRow: boolean;
   planningSpend?: {
     view: ReturnType<typeof useAnalysisPlanningSession>["view"];
     savedTokens: number;
@@ -307,12 +330,14 @@ function analysisPopupHeader(args: {
           saved={{ tokens: args.planningSpend.savedTokens, cents: args.planningSpend.savedCostCents }}
         />
       ) : null}
-      <LiveOwnerTimeCostRow
-        fixture={{ ...args.fixture, owner: args.edits.owner }}
-        assigneeIds={args.edits.assigneeIds}
-        usageByModel={args.fixture.usageByModel}
-        usageByMachineType={args.fixture.usageByMachineType}
-      />
+      {args.showOwnerRow ? (
+        <LiveOwnerTimeCostRow
+          fixture={{ ...args.fixture, owner: args.edits.owner }}
+          assigneeIds={args.edits.assigneeIds}
+          usageByModel={args.fixture.usageByModel}
+          usageByMachineType={args.fixture.usageByMachineType}
+        />
+      ) : null}
     </PopupHeader>
   );
 }
@@ -397,119 +422,4 @@ function analysisPopupReview(args: {
       modelSelect={args.modelSelect}
     />
   );
-}
-
-function analysisDraftChrome(args: {
-  factory?: FactoriesFactory;
-  organizationId?: string;
-  factoryId?: string;
-  factoryKey?: string;
-  lineId?: string;
-  fixture: WorkOrderSplitRunPopupProps["fixture"];
-  analysis: ReturnType<typeof useAnalysisPlanningSession>;
-  draftModel: string;
-  draftThinking: string;
-  onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
-  disabled: boolean;
-}) {
-  if (!factoryPlanningEnabled(args.factory)) {
-    return { footerModelSelect: undefined, stripAnalysis: undefined };
-  }
-  const modelSelects = draftModelSelects({
-    organizationId: args.organizationId,
-    factoryId: args.factoryId,
-    fixture: args.fixture,
-    model: args.draftModel,
-    thinkingLevel: args.draftThinking,
-    onChange: args.onDraftStartChange,
-    disabled: args.disabled,
-  });
-  return {
-    footerModelSelect: modelSelects.footer,
-    stripAnalysis: draftStripAnalysis(args.fixture.footer.kind, args.analysis, modelSelects.strip, {
-      taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
-      scores: {
-        showClarity: factoryShowsClarity(args.factory),
-        showConfidence: factoryShowsConfidence(args.factory),
-      },
-      creditNotice: args.fixture.footer.creditNotice,
-    }),
-  };
-}
-
-/** A draft with Planning on uses the compact review; a source-only draft keeps the classic one. */
-function analysisReviewCompact(
-  showSidebarNote: boolean,
-  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
-  sourceOnly: boolean,
-) {
-  return showSidebarNote || (footerKind === "draft" && !sourceOnly);
-}
-
-function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
-  return !sourceOnly && !showSidebarNote && tab === "description";
-}
-
-function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
-  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
-    return review;
-  }
-  return null;
-}
-
-/** The split-run dialog width applies only to the Planning layout in a fixed popup. */
-function analysisPopupClassName(fullPage: boolean, sourceOnly: boolean) {
-  return fullPage || sourceOnly ? undefined : SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
-}
-
-/**
- * The refine strip only shows for a draft. It gets the ghost model select
- * and a permalink builder for tasks the agent splits off this one.
- */
-function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
-  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
-  return {
-    sourceOnly,
-    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
-  };
-}
-
-function draftStripAnalysis(
-  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
-  analysis: ReturnType<typeof useAnalysisPlanningSession>,
-  modelSelect: ReactNode | undefined,
-  extras: {
-    taskHref: CreatedTaskHref;
-    scores: { showClarity: boolean; showConfidence: boolean };
-    creditNotice: WorkOrderSplitRunPopupProps["fixture"]["footer"]["creditNotice"];
-  },
-) {
-  if (footerKind !== "draft") {
-    return undefined;
-  }
-  return { ...analysis, modelSelect, ...extras.scores, taskHref: extras.taskHref, creditNotice: extras.creditNotice };
-}
-
-/**
- * One model select per surface: `labeled` for the footer capsule under the
- * plan, `ghost` for the refine strip settings row. Only a draft with Start
- * gets one.
- */
-function draftModelSelects(args: {
-  organizationId?: string;
-  factoryId?: string;
-  fixture: WorkOrderSplitRunPopupProps["fixture"];
-  model: string;
-  thinkingLevel: string;
-  onChange: (next: { model: string; thinkingLevel: string }) => void;
-  disabled: boolean;
-}): { footer?: ReactNode; strip?: ReactNode } {
-  const { fixture, ...select } = args;
-  if (fixture.footer.kind !== "draft" || !fixture.footer.actions.some((action) => action.kind === "start")) {
-    return {};
-  }
-  return {
-    footer: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="labeled" />,
-    strip: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="ghost" />,
-  };
 }
