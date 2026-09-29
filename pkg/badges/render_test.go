@@ -187,6 +187,7 @@ func TestRender_WideKeepsLongCostInsideViewBox(t *testing.T) {
 	svg := mustRender(t, in)
 	parseSVG(t, svg)
 	assert.Contains(t, svg, label)
+	assert.Contains(t, svg, "▲ 8 pts vs previous 14 days")
 	assert.NotContains(t, svg, "of merged PRs via SuperPlane")
 	assert.LessOrEqual(t, textRightEdge(t, svg, label), 780)
 }

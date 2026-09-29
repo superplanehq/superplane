@@ -439,11 +439,10 @@ func layoutWide(in Input) wideModel {
 		})
 		if m.showTrend {
 			items = append(items, headerItem{
-				text:     m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
-				size:     12,
-				weight:   "600",
-				fill:     colorManual,
-				dropRank: dropTrend,
+				text:   m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
+				size:   12,
+				weight: "600",
+				fill:   colorManual,
 			})
 		}
 		items = append(items, headerItem{
@@ -496,8 +495,7 @@ const (
 	dropShare  = 1
 	dropCount  = 2
 	dropRate   = 3
-	dropTrend  = 4
-	dropPhrase = 5
+	dropPhrase = 4
 )
 
 type headerItem struct {
