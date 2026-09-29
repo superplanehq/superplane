@@ -1163,10 +1163,11 @@ func TestBeginPlanningWaitAndNotify_AutoStartAssignsSessionOwnerWhenOrderHasNone
 		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.Model(session).Update("created_by_user_id", r.User).Error)
+	require.Nil(t, session.CreatedByUserID, "an analysis session has no creator")
+	require.NoError(t, session.SendUserMessage(db, "Make it robust for refunds, please.", r.User))
 	session, err = models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
-	require.NotNil(t, session.CreatedByUserID)
+	require.NotNil(t, session.LastChatUserID())
 
 	line := mustAutoStartLine(t, r, factoryModel, true)
 	mustEnableAutoStart(t, db, factoryModel, line.ID)
@@ -1180,7 +1181,7 @@ func TestBeginPlanningWaitAndNotify_AutoStartAssignsSessionOwnerWhenOrderHasNone
 	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 	assignees, err := reloaded.ListAssignees(db)
 	require.NoError(t, err)
-	require.Len(t, assignees, 1, "auto-started task without a creator gets the session owner")
+	require.Len(t, assignees, 1, "auto-started task without a creator gets a session participant as owner")
 	assert.Equal(t, r.User, assignees[0].UserID)
 }
 
