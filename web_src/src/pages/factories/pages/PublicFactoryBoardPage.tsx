@@ -46,7 +46,12 @@ export function PublicFactoryBoardPage({ signedIn }: { signedIn: boolean }) {
   const reloadRef = useRef<() => Promise<void>>(async () => undefined);
 
   const loadBoard = async () => {
-    const response = await fetch(publicBoardUrl(organizationId, factoryKey, lineId), { credentials: "same-origin" });
+    let response: Response;
+    try {
+      response = await fetch(publicBoardUrl(organizationId, factoryKey, lineId), { credentials: "same-origin" });
+    } catch {
+      return;
+    }
     if (response.status === 404) {
       if (signedInRef.current) {
         setLoad({ status: "denied" });
@@ -126,12 +131,16 @@ function usePublicBoardSocket(
     let closedByPage = false;
     let socket: WebSocket | null = null;
     let retry: number | undefined;
+    let delay = 1000;
 
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(
         `${protocol}//${window.location.host}${publicBoardSocketPath(organizationId, factoryKey, lineId)}`,
       );
+      socket.onopen = () => {
+        delay = 1000;
+      };
       socket.onmessage = (event) => {
         const message = parseBoardEvent(event.data);
         if (message === "board_changed") {
@@ -143,7 +152,8 @@ function usePublicBoardSocket(
           return;
         }
         void reloadRef.current();
-        retry = window.setTimeout(connect, 1000);
+        retry = window.setTimeout(connect, delay);
+        delay = Math.min(delay * 2, 30000);
       };
     };
     connect();
