@@ -397,6 +397,7 @@ describe("IntakeSourceSettingsPopup", () => {
     "jira-issues",
     "productive-tasks",
     "datadog",
+    "linear-issues",
   ] as const)("hides connection, project, and pause controls for a %s intake", (sourceId) => {
     renderPopup({ sourceId });
 
@@ -412,6 +413,7 @@ describe("IntakeSourceSettingsPopup", () => {
     "jira-issues",
     "productive-tasks",
     "datadog",
+    "linear-issues",
   ] as const)("deletes a %s intake after confirmation", async (sourceId) => {
     const onDelete = vi.fn();
     const user = userEvent.setup();

@@ -113,7 +113,8 @@ func intakeSourceSupportsPause(source string) bool {
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
-		source == models.FactoryIntakeSourceDependabotAlerts
+		source == models.FactoryIntakeSourceDependabotAlerts ||
+		source == models.FactoryIntakeSourceLinearIssues
 }
 
 func resolveUpdatedIntakeBinding(
@@ -310,6 +311,11 @@ func applyIntakeSettingsToGraph(
 				nodes[i].Metadata = mergeJiraCompletionMetadata(nodes[i].Metadata, updated)
 			case models.FactoryIntakeSourceDatadog:
 				configuration["alertTransitions"] = intakeDatadogAlertTransitions(updated)
+				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceLinearIssues:
+				configuration["projects"] = updated.LinearProjectIDs
+				configuration["labels"] = linearLabelPredicates(updated.LinearLabels)
+				configuration["actions"] = []any{"create", "update"}
 				nodes[i].Configuration = configuration
 			default:
 				continue

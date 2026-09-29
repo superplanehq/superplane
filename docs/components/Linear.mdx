@@ -50,7 +50,7 @@ change comments that this same connection posted.
 
 **Trigger key:** `linear.onIssue`
 
-The On Issue trigger starts a workflow execution when issue events occur in a Linear team.
+The On Issue trigger starts a workflow execution when issue events occur in a Linear team, or in selected projects.
 
 ### Use Cases
 
@@ -60,7 +60,8 @@ The On Issue trigger starts a workflow execution when issue events occur in a Li
 
 ### Configuration
 
-- **Team** (required): Linear team to monitor
+- **Team** (optional when projects are selected): Linear team to monitor. Required when no projects are selected.
+- **Projects** (optional): Linear projects to monitor. SuperPlane registers one webhook for each team that owns a selected project, then keeps issues whose project is selected. An update creates a run only when the issue moves into a selected project.
 - **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
 - **Labels** (optional): Only trigger for issues carrying specific labels
 

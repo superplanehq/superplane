@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SENTRY_INTAKE,
@@ -31,6 +32,7 @@ describe("lineIntakeModel", () => {
       "pagerduty-incidents",
       "productive-tasks",
       "datadog",
+      "linear-issues",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -363,6 +365,7 @@ describe("lineIntakeModel", () => {
       "sentry-exceptions",
       "productive-tasks",
       "datadog",
+      "linear-issues",
       "notion",
     ]);
     expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
@@ -377,6 +380,7 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
@@ -388,6 +392,7 @@ describe("lineIntakeModel", () => {
         FEATURE_FACTORY_JIRA_INTAKE,
         FEATURE_FACTORY_SENTRY_INTAKE,
         FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+        FEATURE_FACTORY_LINEAR_INTAKE,
       ].includes(featureId),
     );
 
@@ -396,6 +401,7 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
   });
 
   it("maps every intake template id to an API source the picker can create", () => {
@@ -408,5 +414,6 @@ describe("lineIntakeModel", () => {
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
     expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
+    expect(apiIntakeSource("linear-issues")).toBe("SOURCE_LINEAR_ISSUES");
   });
 });

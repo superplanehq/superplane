@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -61,6 +62,7 @@ func init() {
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
 	registerIntakeItemSource("datadog.onErrorTrackingAlert", newDatadogIntakeItemSource)
+	registerIntakeItemSource("linear.onIssue", newLinearIntakeItemSource)
 }
 
 type gitHubIntakeItemSource struct {
@@ -96,6 +98,12 @@ type sentryIntakeItemSource struct {
 type datadogIntakeItemSource struct {
 	datadog *datadog.Client
 	service string
+}
+
+type linearIntakeItemSource struct {
+	linear     *linear.Client
+	projectIDs []string
+	labels     []string
 }
 
 type unsupportedIntakeItemSource struct{}

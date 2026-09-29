@@ -6,6 +6,8 @@ import {
   factoryAppSplitRunPath,
   factoryAppViewPath,
   factoryDatadogIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
+  linearIntakeIntegrationIdFromSearch,
   factoryDependabotIntakeSetupPath,
   factoryDetailPath,
   factoryHomePath,
@@ -206,6 +208,21 @@ describe("factoryDatadogIntakeSetupPath", () => {
     expect(factoryDatadogIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/datadog",
     );
+  });
+});
+
+describe("factoryLinearIntakeSetupPath", () => {
+  it("opens the Linear intake setup page on the line board", () => {
+    expect(factoryLinearIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/linear",
+    );
+  });
+
+  it("keeps the connection id from the Linear callback", () => {
+    expect(factoryLinearIntakeSetupPath("org-1", "SP", "line-plan", { integrationId: "int-new" })).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/linear?linearIntegrationId=int-new",
+    );
+    expect(linearIntakeIntegrationIdFromSearch("?linearIntegrationId=int-new")).toBe("int-new");
   });
 });
 

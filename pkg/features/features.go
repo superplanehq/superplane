@@ -45,6 +45,10 @@ const FeatureFactoryDependabotIntake = "factory_dependabot_intake"
 // Backlog column menu until the flow is generally available.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
+// FeatureFactoryLinearIntake gates Linear issue intake from the Backlog
+// column menu until the flow is generally available.
+const FeatureFactoryLinearIntake = "factory_linear_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -90,6 +94,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDependabotIntake, Label: "Factory Dependabot Intake", Description: "Add Dependabot alert intake from the Backlog column menu"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
+	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},

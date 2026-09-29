@@ -13,6 +13,7 @@ import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
   usesHostedJiraOAuth,
+  usesHostedLinearOAuth,
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
@@ -33,6 +34,7 @@ import {
 } from "./homeIntegrationStatus";
 import { resolveIntegrationHomeHref, useCreateDialogProps } from "./integrationConnectDialogState";
 import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
+import { useHostedLinearConnect } from "./useHostedLinearConnect";
 import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useInstallIntegrationSelections";
 
 export function selectReadyIntegrationInstance(
@@ -174,6 +176,9 @@ export function useIntegrationConnectDialog({
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
       return hostedConnect.jira();
     }
+    if (integrationName === "linear" && isHostedLinear(availableIntegrations)) {
+      return hostedConnect.linear();
+    }
     openConnectDialog(integrationName);
     return false;
   };
@@ -293,6 +298,10 @@ function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefini
 
 function isHostedJira(availableIntegrations: IntegrationsIntegrationDefinition[]) {
   return usesHostedJiraOAuth(availableIntegrations.find((item) => item.name === "jira"));
+}
+
+function isHostedLinear(availableIntegrations: IntegrationsIntegrationDefinition[]) {
+  return usesHostedLinearOAuth(availableIntegrations.find((item) => item.name === "linear"));
 }
 
 type QueuedHostedGitHubConnect = {
@@ -434,6 +443,13 @@ function useHostedProviderConnect({
       createIntegration,
     }),
     jira: useHostedJiraConnect({
+      organizationId,
+      returnTo,
+      connected,
+      existingIntegrationNames,
+      createIntegration,
+    }),
+    linear: useHostedLinearConnect({
       organizationId,
       returnTo,
       connected,

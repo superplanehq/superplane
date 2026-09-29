@@ -46,6 +46,9 @@
         }
       ]
     },
+    "updatedFrom": {
+      "projectId": null
+    },
     "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
     "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
     "webhookTimestamp": 1774553375841,

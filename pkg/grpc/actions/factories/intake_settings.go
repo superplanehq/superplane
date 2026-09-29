@@ -92,6 +92,11 @@ type intakeSettings struct {
 	// Environments that still create a task. Empty means every environment.
 	// Datadog intakes only.
 	DatadogEnvironments []string
+	// Projects that still create a task. Linear issue intakes only.
+	LinearProjectIDs []string
+	// Label names that still create a task. Empty means every label.
+	// Linear issue intakes only.
+	LinearLabels []string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -160,7 +165,8 @@ func intakeSourceHasFilterNode(source string) bool {
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
-		source == models.FactoryIntakeSourceDatadog
+		source == models.FactoryIntakeSourceDatadog ||
+		source == models.FactoryIntakeSourceLinearIssues
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -186,6 +192,8 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
+	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
+	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
 
 	return s
 }
@@ -265,6 +273,8 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeDependabotFilterExpression(settings)
 	case models.FactoryIntakeSourceDatadog:
 		return intakeDatadogFilterExpression(settings)
+	case models.FactoryIntakeSourceLinearIssues:
+		return intakeLinearFilterExpression(settings)
 	default:
 		return "true"
 	}
@@ -478,6 +488,10 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 		return current.DatadogTriggeredAlerts != updated.DatadogTriggeredAlerts ||
 			current.DatadogRetriggeredAlerts != updated.DatadogRetriggeredAlerts
 	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
+			!slices.Equal(current.LinearLabels, updated.LinearLabels)
+	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
 	}
@@ -509,6 +523,12 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 		return true
 	}
 	if !slices.Equal(current.DatadogEnvironments, updated.DatadogEnvironments) {
+		return true
+	}
+	if !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) {
+		return true
+	}
+	if !slices.Equal(current.LinearLabels, updated.LinearLabels) {
 		return true
 	}
 	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
@@ -560,6 +580,8 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultDependabotIntakeSettings()
 	case models.FactoryIntakeSourceDatadog:
 		settings = defaultDatadogIntakeSettings()
+	case models.FactoryIntakeSourceLinearIssues:
+		settings = defaultLinearIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -581,6 +603,9 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 				configurationStrings(trigger.Configuration["alertTransitions"]),
 				settings,
 			)
+		case models.FactoryIntakeSourceLinearIssues:
+			settings.LinearProjectIDs = configurationStrings(trigger.Configuration["projects"])
+			settings.LinearLabels = linearLabelsFromConfiguration(trigger.Configuration["labels"])
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -609,6 +634,10 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 				settings.DependabotSeverities = severities
 			}
 		}
+		return settings.normalized()
+	}
+
+	if source == models.FactoryIntakeSourceLinearIssues {
 		return settings.normalized()
 	}
 
@@ -723,6 +752,10 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.DatadogRetriggeredAlerts = proto.Bool(settings.DatadogRetriggeredAlerts)
 		serialized.DatadogEnvironments = settings.DatadogEnvironments
 	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		serialized.LinearProjectIds = settings.LinearProjectIDs
+		serialized.LinearLabels = settings.LinearLabels
+	}
 	return serialized
 }
 
@@ -779,6 +812,8 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.DatadogRetriggeredAlerts = requested.GetDatadogRetriggeredAlerts()
 	}
 	updated.DatadogEnvironments = requested.GetDatadogEnvironments()
+	updated.LinearProjectIDs = requested.GetLinearProjectIds()
+	updated.LinearLabels = requested.GetLinearLabels()
 
 	return updated.normalized()
 }

@@ -19,6 +19,7 @@ const (
 	FactoryIntakeSourceJiraIssues         = "jira-issues"
 	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
+	FactoryIntakeSourceLinearIssues       = "linear-issues"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
 	FactoryIntakeInitialImportStatusPending     = "pending"
@@ -44,6 +45,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceJiraIssues,
 	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
+	FactoryIntakeSourceLinearIssues,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,

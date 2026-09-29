@@ -222,6 +222,49 @@ Restart the server after you save `.env`.
 If SuperPlane still asks for a personal token, the process has no complete
 `SUPERPLANE_SENTRY_APP_*` set. Check `.env` and restart the server.
 
+## Factory Linear App (local issue intake)
+
+Factory Linear intake can authorize SuperPlane's public Linear OAuth
+application. The process must hold the application credentials. If
+`SUPERPLANE_LINEAR_OAUTH_CLIENT_ID` or `SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET`
+is empty, SuperPlane asks for a Client ID and a Client Secret.
+
+### 1. Start a stable tunnel
+
+Use the same `BASE_URL` value as the GitHub App section above. Restart
+SuperPlane after you change this value.
+
+### 2. Create a public Linear OAuth application
+
+1. Open Linear, then **Settings**, then **Administration**, then **API**.
+2. Under **OAuth applications**, click **Create new**.
+3. Set the application to public.
+4. Set the callback URL to `{BASE_URL}/api/v1/linear/oauth/callback`.
+5. Request the **read**, **write**, and **admin** scopes. Admin lets
+   SuperPlane register webhooks. A workspace admin must authorize the
+   connection, and that person must be a member of each private team.
+6. Create the application.
+7. Copy the **Client ID** and **Client Secret**.
+
+### 3. Set the SuperPlane environment
+
+Add these values to `.env`. Do not commit real secrets.
+
+```env
+SUPERPLANE_LINEAR_OAUTH_CLIENT_ID=
+SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET=
+```
+
+Restart the server after you save `.env`.
+
+### 4. Confirm setup
+
+1. Open a factory line board.
+2. Add a **Linear issues** intake.
+3. When both variables are set, Connect opens Linear's authorize page.
+4. When either variable is empty, Connect asks for a Client ID and a
+   Client Secret.
+
 ## Local hosted OpenRouter
 
 SuperPlane can seed the hosted OpenRouter provider on a local development
