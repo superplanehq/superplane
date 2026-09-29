@@ -123,6 +123,7 @@ export function PublicFactoryBoardPage({
       <PublicBoardStatus
         title="This board is not available."
         signInHref={signedIn ? undefined : guestSignInHref()}
+        homeHref={signedIn ? "/" : undefined}
       />
     );
   }
@@ -294,7 +295,15 @@ function PublicViewBadge() {
   );
 }
 
-function PublicBoardStatus({ title, signInHref }: { title: string; signInHref?: string }) {
+function PublicBoardStatus({
+  title,
+  signInHref,
+  homeHref,
+}: {
+  title: string;
+  signInHref?: string;
+  homeHref?: string;
+}) {
   return (
     <div
       className="flex h-screen flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground"
@@ -304,6 +313,11 @@ function PublicBoardStatus({ title, signInHref }: { title: string; signInHref?: 
       {signInHref ? (
         <a href={signInHref} className="text-foreground underline">
           Sign in
+        </a>
+      ) : null}
+      {homeHref ? (
+        <a href={homeHref} className="text-foreground underline">
+          Go to home
         </a>
       ) : null}
     </div>

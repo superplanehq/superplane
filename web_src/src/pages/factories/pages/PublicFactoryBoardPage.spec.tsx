@@ -162,6 +162,18 @@ describe("PublicFactoryBoardPage", () => {
     renderBoard(true);
 
     expect(await screen.findByText("You do not have permission to open this workspace.")).toBeInTheDocument();
+  });
+
+  it("offers home when a signed-in board request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("error", { status: 500 })),
+    );
+
+    renderBoard(true, "Ada Lovelace");
+
+    expect(await screen.findByRole("link", { name: "Go to home" })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(window.location.pathname).not.toContain("/login");
   });
 });

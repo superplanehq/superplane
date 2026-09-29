@@ -189,8 +189,19 @@ function publicAssigneeId(assignee: { key?: string; name?: string }): string {
 }
 
 function cardMatches(card: PublicBoardCard, id: string, filters: WorkOrderFilters, search: string): boolean {
-  const entry = buildWorkOrderListEntry(publicBoardOrder(card, id), undefined);
-  return applyWorkOrderSearch(applyWorkOrderFilters([entry], filters), search).length > 0;
+  const order = publicBoardOrder(card, id);
+  const entry = buildWorkOrderListEntry(order, undefined);
+  return applyWorkOrderSearch(applyWorkOrderFilters([entry], withLegacyAssignee(filters, order)), search).length > 0;
+}
+
+function withLegacyAssignee(filters: WorkOrderFilters, order: FactoriesWorkOrder): WorkOrderFilters {
+  const assignee = order.assignees?.[0];
+  const name = assignee?.name?.trim().toLowerCase();
+  const legacyId = name ? `public-member:${name}` : "";
+  if (!legacyId || !assignee?.id || !filters.assigneeIds.includes(legacyId) || filters.assigneeIds.includes(assignee.id)) {
+    return filters;
+  }
+  return { ...filters, assigneeIds: [...filters.assigneeIds, assignee.id] };
 }
 
 function toColumnAutomation(item: PublicAutomation): ColumnAutomation {
