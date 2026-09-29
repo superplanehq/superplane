@@ -196,7 +196,7 @@ func (s *FactoryPlanningSession) splitTaskPeople(tx *gorm.DB, parent *FactoryWor
 	for _, assignee := range assignees {
 		owners = append(owners, assignee.UserID)
 	}
-	creator := s.lastChatUser()
+	creator := s.LastChatUserID()
 	if creator == nil {
 		creator = parent.CreatedByID
 	}
@@ -212,10 +212,6 @@ func (s *FactoryPlanningSession) hasUserReply() bool {
 	return slices.ContainsFunc(s.Messages, func(message PlanningSessionMessage) bool {
 		return message.Role == PlanningSessionMessageRoleUser
 	})
-}
-
-func (s *FactoryPlanningSession) lastChatUser() *uuid.UUID {
-	return s.LastChatUserID()
 }
 
 // LastChatUserID returns the ID of the most recent person who wrote in the
