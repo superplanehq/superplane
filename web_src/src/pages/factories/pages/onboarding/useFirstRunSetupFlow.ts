@@ -1,4 +1,4 @@
-import type { MeGitHubOnboardingRepository } from "@/api-client";
+import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -125,7 +125,7 @@ function useGitHubConnectionState(organizationId: string) {
       .map((request) => request.accountLogin?.trim())
       .filter((organization): organization is string => Boolean(organization)),
     synchronizing: Boolean(onboarding.data?.synchronizing),
-    appConfigured: Boolean(onboarding.data?.appConfigured),
+    appConfigured: Boolean(onboarding.data?.providerConfigured),
     initialScreen: initialFirstRunScreen(searchParams),
   };
 }
@@ -385,7 +385,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     jiraFeatureLoading,
     jiraChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
-    repositoryCatalog: connection.repositories as MeGitHubOnboardingRepository[],
+    repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
     identityConnected: Boolean(connection.identity),
     githubLogin: connection.identity?.login ?? "",

@@ -290,9 +290,12 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error) {
 	metadata := common.Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
-		binding, err := models.FindGitHubAppIntegrationBinding(database.DB(ctx.Request.Context()), ctx.Integration.ID())
+		binding, err := models.FindVCSProviderIntegrationBinding(database.DB(ctx.Request.Context()), ctx.Integration.ID())
 		if err != nil {
 			return "", fmt.Errorf("failed to find hosted GitHub App binding: %w", err)
+		}
+		if binding.Provider != models.ProviderGitHub {
+			return "", fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
 		}
 		return strconv.FormatInt(binding.InstallationID, 10), nil
 	}

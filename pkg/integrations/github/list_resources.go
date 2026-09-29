@@ -21,9 +21,12 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 		if decodeErr := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); decodeErr != nil {
 			return nil, fmt.Errorf("failed to decode GitHub integration metadata: %w", decodeErr)
 		}
-		binding, err := models.FindGitHubAppIntegrationBinding(database.Conn(), ctx.Integration.ID())
+		binding, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID())
 		if err == nil {
-			repositories, listErr := models.ListGitHubAppRepositories(database.Conn(), binding.InstallationID)
+			if binding.Provider != models.ProviderGitHub {
+				return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
+			}
+			repositories, listErr := models.ListVCSProviderRepositories(database.Conn(), binding.Provider, binding.InstallationID)
 			if listErr != nil {
 				return nil, fmt.Errorf("failed to list cached repositories: %w", listErr)
 			}

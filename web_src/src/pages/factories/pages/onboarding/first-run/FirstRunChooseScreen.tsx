@@ -1,4 +1,4 @@
-import type { MeGitHubIdentity } from "@/api-client";
+import type { MeVcsProviderIdentity } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -47,7 +47,7 @@ export function FirstRunChooseScreen({
   selectedRepository: string | null;
   githubLogin?: string;
   githubUserId?: string;
-  githubIdentities?: MeGitHubIdentity[];
+  githubIdentities?: MeVcsProviderIdentity[];
   /** True while the repository list loads or refreshes; hides stale entries. */
   loading?: boolean;
   saving?: boolean;
@@ -112,7 +112,7 @@ function SignedInAsLine({
 }: {
   login: string;
   userId: string;
-  identities: MeGitHubIdentity[];
+  identities: MeVcsProviderIdentity[];
   disabled: boolean;
   onSelectIdentity?: (userId: string) => void;
   onConnectAnotherAccount?: () => void;
@@ -146,13 +146,13 @@ function GitHubAccountMenu({
   onConnectAnotherAccount,
 }: {
   userId: string;
-  identities: MeGitHubIdentity[];
+  identities: MeVcsProviderIdentity[];
   disabled: boolean;
   onSelectIdentity: (userId: string) => void;
   onConnectAnotherAccount: () => void;
 }) {
   const linkedIdentities = identities.filter(
-    (identity): identity is MeGitHubIdentity & { userId: string; login: string } =>
+    (identity): identity is MeVcsProviderIdentity & { userId: string; login: string } =>
       Boolean(identity.userId && identity.login),
   );
 

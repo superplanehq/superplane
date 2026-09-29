@@ -1,23 +1,26 @@
 import {
-  meConfigureGitHubAppInstallation,
-  meDescribeGitHubOnboarding,
-  meRefreshGitHubOnboarding,
-  meSelectGitHubOnboardingIdentity,
-  meStartGitHubAppInstallation,
-  type MeDescribeGitHubOnboardingResponse,
+  meConfigureVcsProviderInstallation,
+  meDescribeVcsProviderOnboarding,
+  meRefreshVcsProviderOnboarding,
+  meSelectVcsProviderOnboardingIdentity,
+  meStartVcsProviderInstallation,
+  type MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const githubOnboardingKey = (organizationId: string) => ["me", organizationId, "github-onboarding"] as const;
+const githubProvider = "github";
 
 export function useGitHubOnboarding(organizationId: string) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: githubOnboardingKey(organizationId),
     queryFn: async () => {
-      const response = await meDescribeGitHubOnboarding(withOrganizationHeader({ organizationId }));
-      return response.data ?? ({} as MeDescribeGitHubOnboardingResponse);
+      const response = await meDescribeVcsProviderOnboarding(
+        withOrganizationHeader({ organizationId, path: { provider: githubProvider } }),
+      );
+      return response.data ?? ({} as MeDescribeVcsProviderOnboardingResponse);
     },
     enabled: Boolean(organizationId),
     staleTime: 0,
@@ -30,21 +33,29 @@ export function useGitHubOnboarding(organizationId: string) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: githubOnboardingKey(organizationId) });
   const startInstallation = useMutation({
     mutationFn: async () => {
-      const response = await meStartGitHubAppInstallation(withOrganizationHeader({ organizationId, body: {} }));
+      const response = await meStartVcsProviderInstallation(
+        withOrganizationHeader({ organizationId, path: { provider: githubProvider }, body: {} }),
+      );
       if (!response.data?.url) throw new Error("GitHub did not return an installation URL");
       return response.data.url;
     },
   });
   const selectIdentity = useMutation({
     mutationFn: async (userId: string) => {
-      await meSelectGitHubOnboardingIdentity(withOrganizationHeader({ organizationId, body: { userId } }));
+      await meSelectVcsProviderOnboardingIdentity(
+        withOrganizationHeader({ organizationId, path: { provider: githubProvider }, body: { userId } }),
+      );
     },
     onSuccess: () => invalidate(),
   });
   const configureInstallation = useMutation({
     mutationFn: async (installationId: string) => {
-      const response = await meConfigureGitHubAppInstallation(
-        withOrganizationHeader({ organizationId, path: { installationId }, body: {} }),
+      const response = await meConfigureVcsProviderInstallation(
+        withOrganizationHeader({
+          organizationId,
+          path: { provider: githubProvider, installationId },
+          body: {},
+        }),
       );
       if (!response.data?.url) throw new Error("GitHub did not return an installation settings URL");
       return response.data.url;
@@ -52,7 +63,13 @@ export function useGitHubOnboarding(organizationId: string) {
   });
   const refresh = useMutation({
     mutationFn: async (repositoryId?: string) => {
-      await meRefreshGitHubOnboarding(withOrganizationHeader({ organizationId, body: { repositoryId } }));
+      await meRefreshVcsProviderOnboarding(
+        withOrganizationHeader({
+          organizationId,
+          path: { provider: githubProvider },
+          body: { repositoryId },
+        }),
+      );
     },
     onSuccess: () => void invalidate(),
   });

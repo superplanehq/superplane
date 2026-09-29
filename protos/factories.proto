@@ -98,14 +98,14 @@ service Factories {
     };
   }
 
-  rpc SelectFactoryGitHubRepository(SelectFactoryGitHubRepositoryRequest) returns (SelectFactoryGitHubRepositoryResponse) {
+  rpc SelectFactoryVCSProviderRepository(SelectFactoryVCSProviderRepositoryRequest) returns (SelectFactoryVCSProviderRepositoryResponse) {
     option (google.api.http) = {
-      post: "/api/v1/factories/{id}/onboarding/github-repository"
+      post: "/api/v1/factories/{id}/onboarding/vcs-repository"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Select a Factory GitHub repository";
-      description: "Selects an accessible GitHub repository and creates the organization integration reference";
+      summary: "Select a Factory VCS repository";
+      description: "Selects an accessible VCS repository and creates the organization integration reference";
       tags: "Factory";
     };
   }
@@ -908,12 +908,13 @@ message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
-message SelectFactoryGitHubRepositoryRequest {
+message SelectFactoryVCSProviderRepositoryRequest {
   string id = 1;
-  int64 repository_id = 2;
+  string provider = 2;
+  int64 repository_id = 3;
 }
 
-message SelectFactoryGitHubRepositoryResponse {
+message SelectFactoryVCSProviderRepositoryResponse {
   Factory factory = 1;
 }
 

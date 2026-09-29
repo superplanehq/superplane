@@ -55,22 +55,22 @@ func (s *MeService) SaveLastLocation(ctx context.Context, req *pb.SaveLastLocati
 	return me.SaveLastLocation(ctx, req)
 }
 
-func (s *MeService) DescribeGitHubOnboarding(ctx context.Context, _ *pb.DescribeGitHubOnboardingRequest) (*pb.DescribeGitHubOnboardingResponse, error) {
-	return me.DescribeGitHubOnboarding(ctx)
+func (s *MeService) DescribeVCSProviderOnboarding(ctx context.Context, req *pb.DescribeVCSProviderOnboardingRequest) (*pb.DescribeVCSProviderOnboardingResponse, error) {
+	return me.DescribeVCSProviderOnboarding(ctx, req.GetProvider())
 }
 
-func (s *MeService) SelectGitHubOnboardingIdentity(ctx context.Context, req *pb.SelectGitHubOnboardingIdentityRequest) (*pb.SelectGitHubOnboardingIdentityResponse, error) {
-	return me.SelectGitHubOnboardingIdentity(ctx, req.GetUserId())
+func (s *MeService) SelectVCSProviderOnboardingIdentity(ctx context.Context, req *pb.SelectVCSProviderOnboardingIdentityRequest) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
+	return me.SelectVCSProviderOnboardingIdentity(ctx, req.GetProvider(), req.GetUserId())
 }
 
-func (s *MeService) StartGitHubAppInstallation(ctx context.Context, _ *pb.StartGitHubAppInstallationRequest) (*pb.StartGitHubAppInstallationResponse, error) {
-	return me.StartGitHubAppInstallation(ctx)
+func (s *MeService) StartVCSProviderInstallation(ctx context.Context, req *pb.StartVCSProviderInstallationRequest) (*pb.StartVCSProviderInstallationResponse, error) {
+	return me.StartVCSProviderInstallation(ctx, req.GetProvider())
 }
 
-func (s *MeService) ConfigureGitHubAppInstallation(ctx context.Context, req *pb.ConfigureGitHubAppInstallationRequest) (*pb.ConfigureGitHubAppInstallationResponse, error) {
-	return me.ConfigureGitHubAppInstallation(ctx, req.GetInstallationId())
+func (s *MeService) ConfigureVCSProviderInstallation(ctx context.Context, req *pb.ConfigureVCSProviderInstallationRequest) (*pb.ConfigureVCSProviderInstallationResponse, error) {
+	return me.ConfigureVCSProviderInstallation(ctx, req.GetProvider(), req.GetInstallationId())
 }
 
-func (s *MeService) RefreshGitHubOnboarding(ctx context.Context, req *pb.RefreshGitHubOnboardingRequest) (*pb.RefreshGitHubOnboardingResponse, error) {
-	return me.RefreshGitHubOnboarding(ctx, req.RepositoryId)
+func (s *MeService) RefreshVCSProviderOnboarding(ctx context.Context, req *pb.RefreshVCSProviderOnboardingRequest) (*pb.RefreshVCSProviderOnboardingResponse, error) {
+	return me.RefreshVCSProviderOnboarding(ctx, req.GetProvider(), req.RepositoryId)
 }

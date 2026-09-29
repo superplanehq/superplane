@@ -16,7 +16,7 @@ import {
   factoriesListWorkOrderEvents,
   factoriesListWorkOrders,
   factoriesSendWorkOrderToBacklog,
-  factoriesSelectFactoryGitHubRepository,
+  factoriesSelectFactoryVcsProviderRepository,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -465,19 +465,19 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
   });
 }
 
-export function useSelectFactoryGitHubRepository(organizationId: string, factoryId: string) {
+export function useSelectFactoryVcsProviderRepository(organizationId: string, factoryId: string, provider: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (repositoryId: string) => {
-      const response = await factoriesSelectFactoryGitHubRepository(
+      const response = await factoriesSelectFactoryVcsProviderRepository(
         withOrganizationHeader({
           organizationId,
           path: { id: factoryId },
-          body: { repositoryId },
+          body: { provider, repositoryId },
         }),
       );
-      if (!response.data?.factory) throw new Error("Failed to select the GitHub repository");
+      if (!response.data?.factory) throw new Error("Failed to select the repository");
       return response.data.factory;
     },
     onSuccess: (factory) => {

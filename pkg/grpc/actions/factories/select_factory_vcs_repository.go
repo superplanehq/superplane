@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -14,14 +15,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func SelectFactoryGitHubRepository(
+func SelectFactoryVCSProviderRepository(
 	ctx context.Context,
 	organizationID string,
-	req *pb.SelectFactoryGitHubRepositoryRequest,
-) (*pb.SelectFactoryGitHubRepositoryResponse, error) {
+	req *pb.SelectFactoryVCSProviderRepositoryRequest,
+) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to select GitHub repository")
+		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
+	}
+	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
+	if provider != models.ProviderGitHub {
+		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
 	if req.GetRepositoryId() <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "repository id is required")
@@ -32,7 +37,7 @@ func SelectFactoryGitHubRepository(
 	}
 
 	db := database.DB(ctx)
-	githubUserID, err := factoryGitHubUserID(ctx, db, organizationID)
+	providerUserID, err := factoryVCSProviderUserID(ctx, db, organizationID, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -44,21 +49,22 @@ func SelectFactoryGitHubRepository(
 			return err
 		}
 
-		repository, findErr := models.FindAccessibleGitHubAppRepository(tx, githubUserID, req.GetRepositoryId())
+		repository, findErr := models.FindAccessibleVCSProviderRepository(tx, provider, providerUserID, req.GetRepositoryId())
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
-			return grpcerrors.PermissionDenied(findErr, "GitHub repository is not accessible")
+			return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 		}
 		if findErr != nil {
 			return findErr
 		}
 
-		installation, findErr := models.FindGitHubAppInstallation(tx, repository.InstallationID)
+		installation, findErr := models.FindVCSProviderInstallation(tx, provider, repository.InstallationID)
 		if findErr != nil {
 			return findErr
 		}
-		integration, bindErr := models.FindOrCreateHostedGitHubBinding(
+		integration, bindErr := models.FindOrCreateVCSProviderBinding(
 			tx,
 			orgID,
+			provider,
 			repository.InstallationID,
 			installation.AccountLogin,
 		)
@@ -78,21 +84,21 @@ func SelectFactoryGitHubRepository(
 		})
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to select GitHub repository")
+		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 
 	lines, err := factory.ListLines(db)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to select GitHub repository")
+		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to select GitHub repository")
+		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
-	return &pb.SelectFactoryGitHubRepositoryResponse{Factory: serialized}, nil
+	return &pb.SelectFactoryVCSProviderRepositoryResponse{Factory: serialized}, nil
 }
 
-func factoryGitHubUserID(ctx context.Context, db *gorm.DB, organizationID string) (int64, error) {
+func factoryVCSProviderUserID(ctx context.Context, db *gorm.DB, organizationID, provider string) (int64, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return 0, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -102,18 +108,18 @@ func factoryGitHubUserID(ctx context.Context, db *gorm.DB, organizationID string
 		return 0, factoryErrorToStatus(err, "failed to load user")
 	}
 	if user.AccountID == nil {
-		return 0, grpcerrors.FailedPrecondition(nil, "connect a GitHub account first")
+		return 0, grpcerrors.FailedPrecondition(nil, "connect a VCS provider account first")
 	}
-	linked, err := models.FindAccountLinkedAccount(db, *user.AccountID, models.ProviderGitHub)
+	linked, err := models.FindAccountLinkedAccount(db, *user.AccountID, provider)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, grpcerrors.FailedPrecondition(err, "connect a GitHub account first")
+		return 0, grpcerrors.FailedPrecondition(err, "connect a VCS provider account first")
 	}
 	if err != nil {
-		return 0, grpcerrors.Internal(err, "failed to load linked GitHub account")
+		return 0, grpcerrors.Internal(err, "failed to load linked VCS provider account")
 	}
 	numericID, err := strconv.ParseInt(linked.ProviderID, 10, 64)
 	if err != nil || numericID <= 0 {
-		return 0, grpcerrors.FailedPrecondition(err, "linked GitHub account has an invalid user id")
+		return 0, grpcerrors.FailedPrecondition(err, "linked VCS provider account has an invalid user id")
 	}
 	return numericID, nil
 }

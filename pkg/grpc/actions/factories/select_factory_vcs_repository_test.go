@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func TestSelectFactoryGitHubRepository(t *testing.T) {
+func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppID, "123")
 	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
@@ -36,20 +36,21 @@ func TestSelectFactoryGitHubRepository(t *testing.T) {
 		"The Octocat",
 		"https://github.com/octocat.png",
 	)))
-	require.NoError(t, models.UpsertGitHubAppInstallation(db, &models.GitHubAppInstallation{
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
 		InstallationID: installationID,
 		AccountLogin:   "acme",
 		AccountType:    "Organization",
 	}))
-	require.NoError(t, models.ReplaceGitHubAppRepositories(db, installationID, []models.GitHubAppRepository{{
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
 		RepositoryID:  repositoryID,
 		FullName:      "acme/api",
 		Private:       true,
 		DefaultBranch: "main",
 	}}))
-	require.NoError(t, models.ReplaceGitHubAppRepositoryCollaborators(db, repositoryID, []models.GitHubAppRepositoryCollaborator{{
-		GitHubUserID: githubUserID,
-		GitHubLogin:  "octocat",
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, repositoryID, []models.VCSProviderRepositoryCollaborator{{
+		ProviderUserID: githubUserID,
+		ProviderLogin:  "octocat",
 	}}))
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -60,13 +61,15 @@ func TestSelectFactoryGitHubRepository(t *testing.T) {
 		second, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		firstResponse, err := SelectFactoryGitHubRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryGitHubRepositoryRequest{
+		firstResponse, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           first.ID.String(),
+			Provider:     models.ProviderGitHub,
 			RepositoryId: repositoryID,
 		})
 		require.NoError(t, err)
-		secondResponse, err := SelectFactoryGitHubRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryGitHubRepositoryRequest{
+		secondResponse, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           second.ID.String(),
+			Provider:     models.ProviderGitHub,
 			RepositoryId: repositoryID,
 		})
 		require.NoError(t, err)
@@ -80,7 +83,7 @@ func TestSelectFactoryGitHubRepository(t *testing.T) {
 		assert.Equal(t, "main", firstOnboarding.DefaultBranch)
 		assert.Equal(t, firstOnboarding.VcsIntegrationId, secondOnboarding.VcsIntegrationId)
 
-		bindings, err := models.ListGitHubAppIntegrationBindings(db, installationID)
+		bindings, err := models.ListVCSProviderIntegrationBindings(db, models.ProviderGitHub, installationID)
 		require.NoError(t, err)
 		require.Len(t, bindings, 1)
 		assert.Equal(t, firstOnboarding.VcsIntegrationId, bindings[0].IntegrationID.String())
@@ -90,8 +93,9 @@ func TestSelectFactoryGitHubRepository(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		_, err = SelectFactoryGitHubRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryGitHubRepositoryRequest{
+		_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 			Id:           factory.ID.String(),
+			Provider:     models.ProviderGitHub,
 			RepositoryId: 999,
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)

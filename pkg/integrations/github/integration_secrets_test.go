@@ -55,11 +55,12 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))
 	t.Setenv(common.EnvGitHubAppWebhookSecret, "whsec")
 
-	require.NoError(t, models.UpsertGitHubAppInstallation(database.Conn(), &models.GitHubAppInstallation{
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
 		InstallationID: 501,
 		AccountLogin:   "acme",
 	}))
-	integration, err := models.FindOrCreateHostedGitHubBinding(database.Conn(), organization.ID, 501, "acme")
+	integration, err := models.FindOrCreateVCSProviderBinding(database.Conn(), organization.ID, models.ProviderGitHub, 501, "acme")
 	require.NoError(t, err)
 
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{

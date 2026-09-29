@@ -4,7 +4,7 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import {
   fetchFactoryAutomations,
   useCreateFactoryLine,
-  useSelectFactoryGitHubRepository,
+  useSelectFactoryVcsProviderRepository,
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
@@ -164,7 +164,7 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 function useOnboardingMutations(organizationId: string, factoryId: string) {
   return {
     updateFactory: useUpdateFactory(organizationId, factoryId),
-    selectGitHubRepository: useSelectFactoryGitHubRepository(organizationId, factoryId),
+    selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
     updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),

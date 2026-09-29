@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func TestDescribeGitHubOnboardingListsLinkedIdentities(t *testing.T) {
+func TestDescribeVCSProviderOnboardingListsLinkedIdentities(t *testing.T) {
 	r := support.Setup(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
@@ -25,7 +25,7 @@ func TestDescribeGitHubOnboardingListsLinkedIdentities(t *testing.T) {
 		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "202", "second-user", "", ""),
 	))
 
-	response, err := DescribeGitHubOnboarding(ctx)
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
 	require.NoError(t, err)
 	require.NotNil(t, response.Identity)
 	assert.Equal(t, int64(202), response.Identity.UserId)
@@ -35,7 +35,7 @@ func TestDescribeGitHubOnboardingListsLinkedIdentities(t *testing.T) {
 	assert.Equal(t, "first-user", response.Identities[1].Login)
 }
 
-func TestSelectGitHubOnboardingIdentity(t *testing.T) {
+func TestSelectVCSProviderOnboardingIdentity(t *testing.T) {
 	r := support.Setup(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 	db := database.Conn()
@@ -48,31 +48,32 @@ func TestSelectGitHubOnboardingIdentity(t *testing.T) {
 		db,
 		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "202", "second-user", "", ""),
 	))
-	require.NoError(t, models.UpsertGitHubAppInstallation(db, &models.GitHubAppInstallation{
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
 		InstallationID: 301,
 		AccountLogin:   "acme",
 		AccountType:    "Organization",
 	}))
-	require.NoError(t, models.ReplaceGitHubAppRepositories(db, 301, []models.GitHubAppRepository{
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 301, []models.VCSProviderRepository{
 		{RepositoryID: 401, FullName: "acme/first"},
 		{RepositoryID: 402, FullName: "acme/second"},
 	}))
-	require.NoError(t, models.ReplaceGitHubAppRepositoryCollaborators(db, 401, []models.GitHubAppRepositoryCollaborator{
-		{GitHubUserID: 101, GitHubLogin: "first-user"},
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 401, []models.VCSProviderRepositoryCollaborator{
+		{ProviderUserID: 101, ProviderLogin: "first-user"},
 	}))
-	require.NoError(t, models.ReplaceGitHubAppRepositoryCollaborators(db, 402, []models.GitHubAppRepositoryCollaborator{
-		{GitHubUserID: 202, GitHubLogin: "second-user"},
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 402, []models.VCSProviderRepositoryCollaborator{
+		{ProviderUserID: 202, ProviderLogin: "second-user"},
 	}))
 
-	response, err := DescribeGitHubOnboarding(ctx)
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
 	require.NoError(t, err)
 	require.Len(t, response.Repositories, 1)
 	assert.Equal(t, "acme/second", response.Repositories[0].FullName)
 
-	_, err = SelectGitHubOnboardingIdentity(ctx, 101)
+	_, err = SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 101)
 	require.NoError(t, err)
 
-	response, err = DescribeGitHubOnboarding(ctx)
+	response, err = DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
 	require.NoError(t, err)
 	require.NotNil(t, response.Identity)
 	assert.Equal(t, int64(101), response.Identity.UserId)
@@ -81,11 +82,11 @@ func TestSelectGitHubOnboardingIdentity(t *testing.T) {
 	assert.Equal(t, "acme/first", response.Repositories[0].FullName)
 }
 
-func TestSelectGitHubOnboardingIdentityRejectsUnlinkedIdentity(t *testing.T) {
+func TestSelectVCSProviderOnboardingIdentityRejectsUnlinkedIdentity(t *testing.T) {
 	r := support.Setup(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
-	_, err := SelectGitHubOnboardingIdentity(ctx, 404)
+	_, err := SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 404)
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.PermissionDenied, code)

@@ -209,7 +209,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		// Self-scoped: members read their own notification settings.
 		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*,
-		// /api/v1/me/last-location, /api/v1/me/github/*, and POST
+		// /api/v1/me/last-location, /api/v1/me/vcs/*, and POST
 		// /api/v1/me/feedback have no
 		// entry here on purpose. They only ever act on the calling user's
 		// own record, so GatewayAuthorizer.AuthorizeHTTP's no-rule-found
@@ -563,7 +563,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{id}/onboarding/github-repository"}: {
+		{Method: "POST", Pattern: "/api/v1/factories/{id}/onboarding/vcs-repository"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

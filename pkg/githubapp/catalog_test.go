@@ -85,8 +85,8 @@ func TestCatalogGitHubRequestsFollowOnboardingGuide(t *testing.T) {
 		require.NoError(t, err)
 		models := collaboratorModels(77, collaborators)
 		require.Len(t, models, 1)
-		assert.Equal(t, int64(9), models[0].GitHubUserID)
-		assert.Equal(t, "writer", models[0].GitHubLogin)
+		assert.Equal(t, int64(9), models[0].ProviderUserID)
+		assert.Equal(t, "writer", models[0].ProviderLogin)
 	})
 }
 

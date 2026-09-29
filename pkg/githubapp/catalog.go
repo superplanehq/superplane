@@ -87,7 +87,7 @@ func (c *Catalog) Reconcile(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return models.ReplaceGitHubAppInstallRequests(c.db, installRequestModels(requests, c.now()))
+	return models.ReplaceVCSProviderInstallRequests(c.db, models.ProviderGitHub, installRequestModels(requests, c.now()))
 }
 
 func (c *Catalog) ReconcileInstallation(ctx context.Context, installationID int64) error {
@@ -100,10 +100,10 @@ func (c *Catalog) ReconcileInstallation(ctx context.Context, installationID int6
 
 func (c *Catalog) reconcileInstallation(ctx context.Context, installation *gh.Installation) error {
 	model := installationModel(installation)
-	if err := models.UpsertGitHubAppInstallation(c.db, &model); err != nil {
+	if err := models.UpsertVCSProviderInstallation(c.db, &model); err != nil {
 		return fmt.Errorf("save GitHub App installation %d: %w", model.InstallationID, err)
 	}
-	if err := models.DeleteGitHubAppInstallRequestsForAccount(c.db, model.AccountID, model.AccountLogin); err != nil {
+	if err := models.DeleteVCSProviderInstallRequestsForAccount(c.db, models.ProviderGitHub, model.AccountID, model.AccountLogin); err != nil {
 		return fmt.Errorf("remove approved GitHub App request: %w", err)
 	}
 	if model.SuspendedAt != nil {
@@ -115,14 +115,14 @@ func (c *Catalog) reconcileInstallation(ctx context.Context, installation *gh.In
 		return err
 	}
 	repositoryModels := repositoryModels(model.InstallationID, repositories)
-	if err := models.ReplaceGitHubAppRepositories(c.db, model.InstallationID, repositoryModels); err != nil {
+	if err := models.ReplaceVCSProviderRepositories(c.db, models.ProviderGitHub, model.InstallationID, repositoryModels); err != nil {
 		return fmt.Errorf("save GitHub App repositories: %w", err)
 	}
 	return enqueueRepositories(c.db, repositoryModels, c.now().Add(repositoryDiscoveryDelay))
 }
 
 func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID int64) error {
-	repository, err := models.FindGitHubAppRepository(c.db, repositoryID)
+	repository, err := models.FindVCSProviderRepository(c.db, models.ProviderGitHub, repositoryID)
 	if err != nil {
 		return err
 	}
@@ -140,8 +140,9 @@ func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID 
 	if err != nil {
 		return err
 	}
-	return models.ReplaceGitHubAppRepositoryCollaborators(
+	return models.ReplaceVCSProviderRepositoryCollaborators(
 		c.db,
+		models.ProviderGitHub,
 		repositoryID,
 		collaboratorModels(repositoryID, collaborators),
 	)
@@ -152,7 +153,7 @@ func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID 
 func (c *Catalog) EnqueueRefresh(repositoryIDs []int64) error {
 	runAt := c.now()
 	for _, repositoryID := range repositoryIDs {
-		if err := models.EnqueueGitHubAppRepositorySync(c.db, repositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(c.db, models.ProviderGitHub, repositoryID, runAt); err != nil {
 			return err
 		}
 	}
@@ -228,7 +229,7 @@ func listCollaborators(ctx context.Context, client *gh.Client, owner, name strin
 	}
 }
 
-func installationModel(installation *gh.Installation) models.GitHubAppInstallation {
+func installationModel(installation *gh.Installation) models.VCSProviderInstallation {
 	var accountID *int64
 	if installation.GetAccount().GetID() > 0 {
 		value := installation.GetAccount().GetID()
@@ -239,7 +240,8 @@ func installationModel(installation *gh.Installation) models.GitHubAppInstallati
 		value := installation.SuspendedAt.Time
 		suspendedAt = &value
 	}
-	return models.GitHubAppInstallation{
+	return models.VCSProviderInstallation{
+		Provider:            models.ProviderGitHub,
 		InstallationID:      installation.GetID(),
 		AccountID:           accountID,
 		AccountLogin:        installation.GetAccount().GetLogin(),
@@ -250,13 +252,13 @@ func installationModel(installation *gh.Installation) models.GitHubAppInstallati
 	}
 }
 
-func repositoryModels(installationID int64, repositories []*gh.Repository) []models.GitHubAppRepository {
-	result := make([]models.GitHubAppRepository, 0, len(repositories))
+func repositoryModels(installationID int64, repositories []*gh.Repository) []models.VCSProviderRepository {
+	result := make([]models.VCSProviderRepository, 0, len(repositories))
 	for _, repository := range repositories {
 		if repository == nil || repository.GetID() <= 0 || repository.GetFullName() == "" {
 			continue
 		}
-		result = append(result, models.GitHubAppRepository{
+		result = append(result, models.VCSProviderRepository{
 			RepositoryID:   repository.GetID(),
 			InstallationID: installationID,
 			FullName:       repository.GetFullName(),
@@ -267,23 +269,23 @@ func repositoryModels(installationID int64, repositories []*gh.Repository) []mod
 	return result
 }
 
-func collaboratorModels(repositoryID int64, collaborators []*gh.User) []models.GitHubAppRepositoryCollaborator {
-	result := make([]models.GitHubAppRepositoryCollaborator, 0, len(collaborators))
+func collaboratorModels(repositoryID int64, collaborators []*gh.User) []models.VCSProviderRepositoryCollaborator {
+	result := make([]models.VCSProviderRepositoryCollaborator, 0, len(collaborators))
 	for _, collaborator := range collaborators {
 		if collaborator == nil || collaborator.GetID() <= 0 || !collaborator.GetPermissions().GetPush() {
 			continue
 		}
-		result = append(result, models.GitHubAppRepositoryCollaborator{
-			RepositoryID: repositoryID,
-			GitHubUserID: collaborator.GetID(),
-			GitHubLogin:  collaborator.GetLogin(),
+		result = append(result, models.VCSProviderRepositoryCollaborator{
+			RepositoryID:   repositoryID,
+			ProviderUserID: collaborator.GetID(),
+			ProviderLogin:  collaborator.GetLogin(),
 		})
 	}
 	return result
 }
 
-func installRequestModels(requests []*gh.InstallationRequest, now time.Time) []models.GitHubAppInstallRequest {
-	result := make([]models.GitHubAppInstallRequest, 0, len(requests))
+func installRequestModels(requests []*gh.InstallationRequest, now time.Time) []models.VCSProviderInstallRequest {
+	result := make([]models.VCSProviderInstallRequest, 0, len(requests))
 	for _, request := range requests {
 		if request == nil || request.GetID() <= 0 || request.GetRequester() == nil {
 			continue
@@ -297,7 +299,7 @@ func installRequestModels(requests []*gh.InstallationRequest, now time.Time) []m
 		if request.CreatedAt != nil {
 			requestedAt = request.CreatedAt.Time
 		}
-		result = append(result, models.GitHubAppInstallRequest{
+		result = append(result, models.VCSProviderInstallRequest{
 			RequestID:      request.GetID(),
 			AccountID:      accountID,
 			AccountLogin:   request.GetAccount().GetLogin(),
@@ -310,9 +312,9 @@ func installRequestModels(requests []*gh.InstallationRequest, now time.Time) []m
 	return result
 }
 
-func enqueueRepositories(tx *gorm.DB, repositories []models.GitHubAppRepository, runAt time.Time) error {
+func enqueueRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository, runAt time.Time) error {
 	for _, repository := range repositories {
-		if err := models.EnqueueGitHubAppRepositorySync(tx, repository.RepositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
 			return err
 		}
 	}
@@ -320,15 +322,15 @@ func enqueueRepositories(tx *gorm.DB, repositories []models.GitHubAppRepository,
 }
 
 func (c *Catalog) removeMissingInstallations(seen map[int64]struct{}) error {
-	var current []models.GitHubAppInstallation
-	if err := c.db.Find(&current).Error; err != nil {
+	var current []models.VCSProviderInstallation
+	if err := c.db.Where("provider = ?", models.ProviderGitHub).Find(&current).Error; err != nil {
 		return err
 	}
 	for _, installation := range current {
 		if _, ok := seen[installation.InstallationID]; ok {
 			continue
 		}
-		if err := models.DeleteGitHubAppInstallation(c.db, installation.InstallationID); err != nil {
+		if err := models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installation.InstallationID); err != nil {
 			return err
 		}
 	}

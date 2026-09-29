@@ -7,7 +7,7 @@ import type {
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrderRunUsageRow,
-  MeDescribeGitHubOnboardingResponse,
+  MeDescribeVcsProviderOnboardingResponse,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
@@ -372,7 +372,7 @@ export interface FactoriesFixture {
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /** Global GitHub App catalog state for Factory onboarding. */
-  githubOnboarding?: MeDescribeGitHubOnboardingResponse;
+  githubOnboarding?: MeDescribeVcsProviderOnboardingResponse;
   /**
    * Per-order activity timelines. When an order id is absent, the handlers
    * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.

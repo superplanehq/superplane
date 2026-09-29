@@ -139,7 +139,7 @@ func startWorkers(
 			log.WithError(err).Error("Failed to initialize the GitHub App catalog")
 		} else {
 			log.Println("Starting GitHub App Catalog Worker")
-			go workers.NewGitHubAppCatalogWorker(catalog).Start(context.Background())
+			go workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(context.Background())
 		}
 	}
 

@@ -27,7 +27,7 @@ import (
 const githubInstallApprovedPath = "/github/approved"
 
 var enqueueGitHubAppReconciliation = func(ctx context.Context, availableAt time.Time) error {
-	return models.EnqueueGitHubAppReconciliation(database.DB(ctx), availableAt)
+	return models.EnqueueVCSProviderReconciliation(database.DB(ctx), models.ProviderGitHub, availableAt)
 }
 
 // HandleGitHubAppSetup handles only GitHub's installation and repository
@@ -95,7 +95,7 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 
 	// Load bindings before an uninstall removes the catalog row and its
 	// binding references.
-	integrations, err := models.ListGitHubAppBoundIntegrations(database.DB(r.Context()), installationID)
+	integrations, err := models.ListVCSProviderBoundIntegrations(database.DB(r.Context()), models.ProviderGitHub, installationID)
 	if err != nil {
 		log.WithError(err).Error("failed to list GitHub App bindings")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -222,23 +222,23 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 	switch event := event.(type) {
 	case *gh.InstallationEvent:
 		if event.GetAction() == "deleted" {
-			return models.DeleteGitHubAppInstallation(tx, installationID)
+			return models.DeleteVCSProviderInstallation(tx, models.ProviderGitHub, installationID)
 		}
 		if event.GetInstallation() == nil {
 			return nil
 		}
 		installation := githubInstallationModel(event.GetInstallation())
-		if err := models.UpsertGitHubAppInstallation(tx, &installation); err != nil {
+		if err := models.UpsertVCSProviderInstallation(tx, &installation); err != nil {
 			return err
 		}
-		if err := models.DeleteGitHubAppInstallRequestsForAccount(tx, installation.AccountID, installation.AccountLogin); err != nil {
+		if err := models.DeleteVCSProviderInstallRequestsForAccount(tx, models.ProviderGitHub, installation.AccountID, installation.AccountLogin); err != nil {
 			return err
 		}
 		if event.GetAction() != "created" {
 			return nil
 		}
 		repositories := githubRepositoryModels(installationID, event.Repositories)
-		if err := models.ReplaceGitHubAppRepositories(tx, installationID, repositories); err != nil {
+		if err := models.ReplaceVCSProviderRepositories(tx, models.ProviderGitHub, installationID, repositories); err != nil {
 			return err
 		}
 		return enqueueWebhookRepositories(tx, repositories)
@@ -247,15 +247,15 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		if event.GetInstallation() != nil {
 			installation := githubInstallationModel(event.GetInstallation())
 			installation.RepositorySelection = event.GetRepositorySelection()
-			if err := models.UpsertGitHubAppInstallation(tx, &installation); err != nil {
+			if err := models.UpsertVCSProviderInstallation(tx, &installation); err != nil {
 				return err
 			}
-			if err := models.DeleteGitHubAppInstallRequestsForAccount(tx, installation.AccountID, installation.AccountLogin); err != nil {
+			if err := models.DeleteVCSProviderInstallRequestsForAccount(tx, models.ProviderGitHub, installation.AccountID, installation.AccountLogin); err != nil {
 				return err
 			}
 		}
 		added := githubRepositoryModels(installationID, event.RepositoriesAdded)
-		if err := models.UpsertGitHubAppRepositories(tx, installationID, added); err != nil {
+		if err := models.UpsertVCSProviderRepositories(tx, models.ProviderGitHub, installationID, added); err != nil {
 			return err
 		}
 		removedIDs := make([]int64, 0, len(event.RepositoriesRemoved))
@@ -264,7 +264,7 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 				removedIDs = append(removedIDs, repository.GetID())
 			}
 		}
-		if err := models.DeleteGitHubAppRepositories(tx, installationID, removedIDs); err != nil {
+		if err := models.DeleteVCSProviderRepositories(tx, models.ProviderGitHub, installationID, removedIDs); err != nil {
 			return err
 		}
 		return enqueueWebhookRepositories(tx, added)
@@ -273,21 +273,21 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		if event.GetRepo().GetID() <= 0 {
 			return nil
 		}
-		if _, err := models.FindGitHubAppRepository(tx, event.GetRepo().GetID()); errors.Is(err, gorm.ErrRecordNotFound) {
-			return models.EnqueueGitHubAppReconciliation(tx, time.Now())
+		if _, err := models.FindVCSProviderRepository(tx, models.ProviderGitHub, event.GetRepo().GetID()); errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.EnqueueVCSProviderReconciliation(tx, models.ProviderGitHub, time.Now())
 		} else if err != nil {
 			return err
 		}
-		return models.EnqueueGitHubAppRepositorySync(tx, event.GetRepo().GetID(), time.Now().Add(10*time.Second))
+		return models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, event.GetRepo().GetID(), time.Now().Add(10*time.Second))
 	}
 
 	return nil
 }
 
-func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.GitHubAppRepository) error {
+func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {
 	runAt := time.Now().Add(10 * time.Second)
 	for _, repository := range repositories {
-		if err := models.EnqueueGitHubAppRepositorySync(tx, repository.RepositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
 			return err
 		}
 	}
@@ -324,7 +324,7 @@ func writeHostedGitHubAppAuthError(w http.ResponseWriter, status int) {
 	}
 }
 
-func githubInstallationModel(installation *gh.Installation) models.GitHubAppInstallation {
+func githubInstallationModel(installation *gh.Installation) models.VCSProviderInstallation {
 	var accountID *int64
 	if installation.GetAccount().GetID() > 0 {
 		value := installation.GetAccount().GetID()
@@ -335,7 +335,8 @@ func githubInstallationModel(installation *gh.Installation) models.GitHubAppInst
 		value := installation.SuspendedAt.Time
 		suspendedAt = &value
 	}
-	return models.GitHubAppInstallation{
+	return models.VCSProviderInstallation{
+		Provider:            models.ProviderGitHub,
 		InstallationID:      installation.GetID(),
 		AccountID:           accountID,
 		AccountLogin:        installation.GetAccount().GetLogin(),
@@ -346,13 +347,13 @@ func githubInstallationModel(installation *gh.Installation) models.GitHubAppInst
 	}
 }
 
-func githubRepositoryModels(installationID int64, repositories []*gh.Repository) []models.GitHubAppRepository {
-	result := make([]models.GitHubAppRepository, 0, len(repositories))
+func githubRepositoryModels(installationID int64, repositories []*gh.Repository) []models.VCSProviderRepository {
+	result := make([]models.VCSProviderRepository, 0, len(repositories))
 	for _, repository := range repositories {
 		if repository == nil || repository.GetID() <= 0 || repository.GetFullName() == "" {
 			continue
 		}
-		result = append(result, models.GitHubAppRepository{
+		result = append(result, models.VCSProviderRepository{
 			RepositoryID:   repository.GetID(),
 			InstallationID: installationID,
 			FullName:       repository.GetFullName(),

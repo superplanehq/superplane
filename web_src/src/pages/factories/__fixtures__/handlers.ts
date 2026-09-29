@@ -30,7 +30,7 @@ import type {
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderRunUsageRow,
-  MeDescribeGitHubOnboardingResponse,
+  MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
@@ -702,9 +702,9 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
   };
 }
 
-function factoryGitHubRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
+function factoryVCSProviderRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
-    pattern: re("/api/v1/factories/([^/]+)/onboarding/github-repository"),
+    pattern: re("/api/v1/factories/([^/]+)/onboarding/vcs-repository"),
     resolve: (match, method, body) => {
       if (method !== "POST") return null;
       const factory = fixture.factories.find((entry) => entry.id === match[1]);
@@ -1372,28 +1372,33 @@ function meRoute(organizationId: string): FactoriesRoute {
 }
 
 function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
-  const onboarding = (): MeDescribeGitHubOnboardingResponse =>
-    fixture.githubOnboarding ?? { appConfigured: true, repositories: [], pendingRequests: [], synchronizing: false };
+  const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
+    fixture.githubOnboarding ?? {
+      providerConfigured: true,
+      repositories: [],
+      pendingRequests: [],
+      synchronizing: false,
+    };
 
   return [
     {
-      pattern: re("/api/v1/me/github/onboarding"),
+      pattern: re("/api/v1/me/vcs/github/onboarding"),
       resolve: (_match, method) => (method === "GET" ? { json: onboarding() } : null),
     },
     {
-      pattern: re("/api/v1/me/github/installations:start"),
+      pattern: re("/api/v1/me/vcs/github/installations:start"),
       resolve: (_match, method) =>
         method === "POST"
           ? { json: { url: "https://github.com/apps/superplane/installations/new?state=o_storybook" } }
           : null,
     },
     {
-      pattern: re("/api/v1/me/github/installations/([^/]+):configure"),
+      pattern: re("/api/v1/me/vcs/github/installations/([^/]+):configure"),
       resolve: (_match, method) =>
         method === "POST" ? { json: { url: "https://github.com/settings/installations/101" } } : null,
     },
     {
-      pattern: re("/api/v1/me/github/repositories:refresh"),
+      pattern: re("/api/v1/me/vcs/github/repositories:refresh"),
       resolve: (_match, method) => (method === "POST" ? { json: {} } : null),
     },
   ];
@@ -1422,7 +1427,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     meRoute(fixture.organizationId),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
-    factoryGitHubRepositoryRoute(fixture),
+    factoryVCSProviderRepositoryRoute(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
     ...organizationSecretsRoutes(),

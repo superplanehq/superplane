@@ -1,4 +1,4 @@
-import type { FactoriesFactoryOnboarding, MeDescribeGitHubOnboardingResponse } from "@/api-client";
+import type { FactoriesFactoryOnboarding, MeDescribeVcsProviderOnboardingResponse } from "@/api-client";
 import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
@@ -11,8 +11,8 @@ const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
 /** App repository the setup stories continue with. Served by the resources fixture. */
 export const SETUP_APP_REPOSITORY = "acme/api";
 
-const READY_GITHUB_ONBOARDING: MeDescribeGitHubOnboardingResponse = {
-  appConfigured: true,
+const READY_GITHUB_ONBOARDING: MeDescribeVcsProviderOnboardingResponse = {
+  providerConfigured: true,
   identity: { userId: "42", login: "forestileao" },
   repositories: [
     {

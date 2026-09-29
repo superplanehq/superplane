@@ -143,61 +143,61 @@ service Me {
     };
   }
 
-  rpc DescribeGitHubOnboarding(DescribeGitHubOnboardingRequest) returns (DescribeGitHubOnboardingResponse) {
+  rpc DescribeVCSProviderOnboarding(DescribeVCSProviderOnboardingRequest) returns (DescribeVCSProviderOnboardingResponse) {
     option (google.api.http) = {
-      get: "/api/v1/me/github/onboarding"
+      get: "/api/v1/me/vcs/{provider}/onboarding"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe GitHub onboarding";
-      description: "Returns the linked GitHub identities, active identity, accessible repositories, and pending installation requests for the current account";
+      summary: "Describe VCS provider onboarding";
+      description: "Returns linked identities, the active identity, accessible repositories, and pending installation requests for a VCS provider";
       tags: "Me";
     };
   }
 
-  rpc SelectGitHubOnboardingIdentity(SelectGitHubOnboardingIdentityRequest) returns (SelectGitHubOnboardingIdentityResponse) {
+  rpc SelectVCSProviderOnboardingIdentity(SelectVCSProviderOnboardingIdentityRequest) returns (SelectVCSProviderOnboardingIdentityResponse) {
     option (google.api.http) = {
-      put: "/api/v1/me/github/identity"
+      put: "/api/v1/me/vcs/{provider}/identity"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Select a GitHub identity";
-      description: "Selects the linked GitHub identity that supplies repositories during onboarding";
+      summary: "Select a VCS provider identity";
+      description: "Selects the linked identity that supplies repositories during onboarding";
       tags: "Me";
     };
   }
 
-  rpc StartGitHubAppInstallation(StartGitHubAppInstallationRequest) returns (StartGitHubAppInstallationResponse) {
+  rpc StartVCSProviderInstallation(StartVCSProviderInstallationRequest) returns (StartVCSProviderInstallationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/me/github/installations:start"
+      post: "/api/v1/me/vcs/{provider}/installations:start"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Start GitHub App installation";
-      description: "Returns the public SuperPlane GitHub App installation URL";
+      summary: "Start a VCS provider installation";
+      description: "Returns the installation URL for the selected VCS provider";
       tags: "Me";
     };
   }
 
-  rpc ConfigureGitHubAppInstallation(ConfigureGitHubAppInstallationRequest) returns (ConfigureGitHubAppInstallationResponse) {
+  rpc ConfigureVCSProviderInstallation(ConfigureVCSProviderInstallationRequest) returns (ConfigureVCSProviderInstallationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/me/github/installations/{installation_id}:configure"
+      post: "/api/v1/me/vcs/{provider}/installations/{installation_id}:configure"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Configure GitHub App installation";
-      description: "Returns the GitHub settings URL for an existing installation";
+      summary: "Configure a VCS provider installation";
+      description: "Returns the settings URL for an existing VCS provider installation";
       tags: "Me";
     };
   }
 
-  rpc RefreshGitHubOnboarding(RefreshGitHubOnboardingRequest) returns (RefreshGitHubOnboardingResponse) {
+  rpc RefreshVCSProviderOnboarding(RefreshVCSProviderOnboardingRequest) returns (RefreshVCSProviderOnboardingResponse) {
     option (google.api.http) = {
-      post: "/api/v1/me/github/repositories:refresh"
+      post: "/api/v1/me/vcs/{provider}/repositories:refresh"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Refresh GitHub repositories";
-      description: "Queues GitHub App catalog reconciliation and collaborator synchronization";
+      summary: "Refresh VCS provider repositories";
+      description: "Queues catalog reconciliation and collaborator synchronization for the selected VCS provider";
       tags: "Me";
     };
   }
@@ -211,14 +211,16 @@ message MeResponse {
   User user = 1;
 }
 
-message DescribeGitHubOnboardingRequest {}
+message DescribeVCSProviderOnboardingRequest {
+  string provider = 1;
+}
 
-message GitHubIdentity {
+message VCSProviderIdentity {
   int64 user_id = 1;
   string login = 2;
 }
 
-message GitHubOnboardingRepository {
+message VCSProviderRepository {
   int64 repository_id = 1;
   int64 installation_id = 2;
   string full_name = 3;
@@ -228,47 +230,52 @@ message GitHubOnboardingRepository {
   string account_type = 7;
 }
 
-message GitHubAppInstallRequest {
+message VCSProviderInstallRequest {
   int64 request_id = 1;
   string account_login = 2;
   string account_type = 3;
   google.protobuf.Timestamp requested_at = 4;
 }
 
-message DescribeGitHubOnboardingResponse {
-  bool app_configured = 1;
-  optional GitHubIdentity identity = 2;
-  repeated GitHubOnboardingRepository repositories = 3;
-  repeated GitHubAppInstallRequest pending_requests = 4;
+message DescribeVCSProviderOnboardingResponse {
+  bool provider_configured = 1;
+  optional VCSProviderIdentity identity = 2;
+  repeated VCSProviderRepository repositories = 3;
+  repeated VCSProviderInstallRequest pending_requests = 4;
   bool synchronizing = 5;
-  repeated GitHubIdentity identities = 6;
+  repeated VCSProviderIdentity identities = 6;
 }
 
-message SelectGitHubOnboardingIdentityRequest {
-  int64 user_id = 1;
+message SelectVCSProviderOnboardingIdentityRequest {
+  string provider = 1;
+  int64 user_id = 2;
 }
 
-message SelectGitHubOnboardingIdentityResponse {}
+message SelectVCSProviderOnboardingIdentityResponse {}
 
-message StartGitHubAppInstallationRequest {}
+message StartVCSProviderInstallationRequest {
+  string provider = 1;
+}
 
-message StartGitHubAppInstallationResponse {
+message StartVCSProviderInstallationResponse {
   string url = 1;
 }
 
-message ConfigureGitHubAppInstallationRequest {
-  int64 installation_id = 1;
+message ConfigureVCSProviderInstallationRequest {
+  string provider = 1;
+  int64 installation_id = 2;
 }
 
-message ConfigureGitHubAppInstallationResponse {
+message ConfigureVCSProviderInstallationResponse {
   string url = 1;
 }
 
-message RefreshGitHubOnboardingRequest {
-  optional int64 repository_id = 1;
+message RefreshVCSProviderOnboardingRequest {
+  string provider = 1;
+  optional int64 repository_id = 2;
 }
 
-message RefreshGitHubOnboardingResponse {}
+message RefreshVCSProviderOnboardingResponse {}
 
 message BrowserNotificationPreferences {
   bool enabled = 1;

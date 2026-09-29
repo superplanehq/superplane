@@ -86,7 +86,7 @@ func TestGitHubInstallationID(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestGitHubAppRepositoryEvent(t *testing.T) {
+func TestVCSProviderRepositoryEvent(t *testing.T) {
 	assert.False(t, githubAppRepositoryEvent(&gh.InstallationEvent{}))
 	assert.False(t, githubAppRepositoryEvent(&gh.InstallationRepositoriesEvent{}))
 	assert.False(t, githubAppRepositoryEvent(&gh.MemberEvent{}))
@@ -202,7 +202,7 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	const accountID = int64(301)
 	const requesterID = int64(401)
 
-	require.NoError(t, models.ReplaceGitHubAppInstallRequests(db, []models.GitHubAppInstallRequest{{
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
 		RequestID:      501,
 		AccountID:      gh.Ptr(accountID),
 		AccountLogin:   "acme",
@@ -235,26 +235,26 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	// as soon as the installation becomes authoritative.
 	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
 	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
-	requests, err := models.ListGitHubAppInstallRequests(db, requesterID)
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, requesterID)
 	require.NoError(t, err)
 	assert.Empty(t, requests)
-	stored, err := models.FindGitHubAppRepository(db, repositoryID)
+	stored, err := models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
 	require.NoError(t, err)
 	assert.Equal(t, "acme/api", stored.FullName)
 
 	var jobCount int64
-	require.NoError(t, db.Model(&models.GitHubAppRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
+	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
 	assert.Equal(t, int64(1), jobCount)
 
 	// Member changes enqueue the repository again after the previous job is
 	// complete so cached push access is refreshed.
-	require.NoError(t, models.CompleteGitHubAppRepositorySync(db, repositoryID))
+	require.NoError(t, models.CompleteVCSProviderRepositorySync(db, models.ProviderGitHub, repositoryID))
 	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.MemberEvent{
 		Action:       gh.Ptr("edited"),
 		Repo:         repository,
 		Installation: installation,
 	}, installationID))
-	require.NoError(t, db.Model(&models.GitHubAppRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
+	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
 	assert.Equal(t, int64(1), jobCount)
 
 	// Repository removal revokes catalog access immediately.
@@ -264,19 +264,19 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 		RepositoriesRemoved: []*gh.Repository{repository},
 		RepositorySelection: gh.Ptr("selected"),
 	}, installationID))
-	_, err = models.FindGitHubAppRepository(db, repositoryID)
+	_, err = models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 	// Uninstall removes the global installation and every local binding, but
 	// deleting a binding alone never deletes the global installation.
-	binding, err := models.FindOrCreateHostedGitHubBinding(db, r.Organization.ID, installationID, "acme")
+	binding, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID, "acme")
 	require.NoError(t, err)
 	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.InstallationEvent{
 		Action:       gh.Ptr("deleted"),
 		Installation: installation,
 	}, installationID))
-	_, err = models.FindGitHubAppInstallation(db, installationID)
+	_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
-	_, err = models.FindGitHubAppIntegrationBinding(db, binding.ID)
+	_, err = models.FindVCSProviderIntegrationBinding(db, binding.ID)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }

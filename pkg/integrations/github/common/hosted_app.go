@@ -28,16 +28,19 @@ type HostedApp struct {
 
 type HostedAppBinding struct {
 	App          HostedApp
-	Installation *models.GitHubAppInstallation
+	Installation *models.VCSProviderInstallation
 	ID           int64
 }
 
 func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, error) {
-	binding, err := models.FindGitHubAppIntegrationBinding(database.Conn(), ctx.ID())
+	binding, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.ID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find global GitHub App binding: %w", err)
 	}
-	installation, err := models.FindGitHubAppInstallation(database.Conn(), binding.InstallationID)
+	if binding.Provider != models.ProviderGitHub {
+		return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
+	}
+	installation, err := models.FindVCSProviderInstallation(database.Conn(), binding.Provider, binding.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find global GitHub App installation: %w", err)
 	}
