@@ -83,6 +83,13 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var receipts []models.SentryWebhookReceipt
+		require.NoError(t, database.Conn().Where("installation_uuid = ? AND issue_id = ?", "install-1", "1").Find(&receipts).Error)
+		require.NotEmpty(t, receipts)
+		assert.Equal(t, models.SentryWebhookOutcomeAccepted, receipts[0].Outcome)
+		assert.Equal(t, "issue", receipts[0].HookResource)
+		assert.Equal(t, "created", receipts[0].Action)
 	})
 
 	t.Run("a rejected event is accepted, because Sentry cannot fix it", func(t *testing.T) {

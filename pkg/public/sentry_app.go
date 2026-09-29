@@ -2,7 +2,6 @@ package public
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,11 +93,15 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := sentryintegration.VerifyWebhookSignature(r.Header.Get("Sentry-Hook-Signature"), body, []byte(app.ClientSecret)); err != nil {
+		s.rememberSentryWebhook(r, sentryintegration.WebhookSummary{
+			Resource: r.Header.Get("Sentry-Hook-Resource"),
+		}, http.StatusBadRequest, models.SentryWebhookOutcomeRejected, 0)
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
 
-	installationUUID := sentryInstallationUUID(body)
+	summary := sentryintegration.SummarizeWebhook(r.Header.Get("Sentry-Hook-Resource"), body)
+	installationUUID := summary.InstallationUUID
 	if uuid, ok := sentryintegration.ParseInstallationDeletedUUID(r.Header.Get("Sentry-Hook-Resource"), body); ok {
 		if err := sentryintegration.ForgetKnownHostedInstallation(uuid); err != nil {
 			log.WithError(err).Error("failed to drop the grant of a deleted Sentry app install")
@@ -113,27 +116,41 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			fmt.Errorf("lookup failed for installation %s: %w", installationUUID, err),
 			"installation_uuid", installationUUID,
 		)
+		s.rememberSentryWebhook(r, summary, http.StatusInternalServerError, models.SentryWebhookOutcomeFailed, 0)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	log.WithFields(sentryAppWebhookFields(
+		summary.Resource,
+		summary.Action,
+		installationUUID,
+		integrationIDs(integrations),
+	)).Info("Sentry app webhook received")
+
 	if len(integrations) == 0 {
 		s.claimPendingHostedSentryInstall(r, app, body)
+		s.rememberSentryWebhook(r, summary, http.StatusOK, models.SentryWebhookOutcomeNoConnection, 0)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	dropped := false
+	rejected := false
 	var failedIntegrationIDs []string
 	var failedInnerStatuses []int
 	for i := range integrations {
 		cloned, err := cloneRequestWithBody(r, body)
 		if err != nil {
 			log.WithError(err).Error("failed to clone Sentry app webhook request")
+			s.rememberSentryWebhook(r, summary, http.StatusInternalServerError, models.SentryWebhookOutcomeFailed, len(integrations))
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		finished, integrationID, innerStatus := s.deliverSentryWebhook(cloned, &integrations[i])
+		if innerStatus >= http.StatusBadRequest {
+			rejected = true
+		}
 		if !finished {
 			dropped = true
 			failedIntegrationIDs = append(failedIntegrationIDs, integrationID)
@@ -152,10 +169,16 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			"integration_ids", strings.Join(failedIntegrationIDs, ","),
 			"inner_statuses", joinStatuses(failedInnerStatuses),
 		)
+		s.rememberSentryWebhook(r, summary, http.StatusInternalServerError, models.SentryWebhookOutcomeFailed, len(integrations))
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	outcome := models.SentryWebhookOutcomeAccepted
+	if rejected {
+		outcome = models.SentryWebhookOutcomeRejected
+	}
+	s.rememberSentryWebhook(r, summary, http.StatusOK, outcome, len(integrations))
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -305,16 +328,43 @@ func isHostedSentryApp(integration *models.Integration) bool {
 	return metadata.HostedApp
 }
 
-func sentryInstallationUUID(body []byte) string {
-	var payload struct {
-		Installation struct {
-			UUID string `json:"uuid"`
-		} `json:"installation"`
+func sentryAppWebhookFields(resource, action, installationUUID string, integrationIDs []string) log.Fields {
+	return log.Fields{
+		"hook_resource":     strings.TrimSpace(resource),
+		"action":            action,
+		"installation_uuid": installationUUID,
+		"integration_count": len(integrationIDs),
+		"integration_ids":   strings.Join(integrationIDs, ","),
 	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return ""
+}
+
+func integrationIDs(integrations []models.Integration) []string {
+	ids := make([]string, 0, len(integrations))
+	for i := range integrations {
+		ids = append(ids, integrations[i].ID.String())
 	}
-	return strings.TrimSpace(payload.Installation.UUID)
+	return ids
+}
+
+func (s *Server) rememberSentryWebhook(r *http.Request, summary sentryintegration.WebhookSummary, status int, outcome string, integrationCount int) {
+	if r == nil {
+		return
+	}
+	err := models.CreateSentryWebhookReceipt(database.DB(r.Context()), models.SentryWebhookReceipt{
+		HookResource:     summary.Resource,
+		Action:           summary.Action,
+		InstallationUUID: summary.InstallationUUID,
+		OrganizationSlug: summary.OrganizationSlug,
+		ProjectSlug:      summary.ProjectSlug,
+		IssueID:          summary.IssueID,
+		IssueShortID:     summary.IssueShortID,
+		HTTPStatus:       status,
+		Outcome:          outcome,
+		IntegrationCount: integrationCount,
+	})
+	if err != nil {
+		log.WithError(err).Error("failed to store Sentry webhook receipt")
+	}
 }
 
 func setSentryAppSetupStateCookie(w http.ResponseWriter, state string) {
