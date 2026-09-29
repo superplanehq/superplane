@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.26.2-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.2-bookworm AS build
 
+ARG TARGETOS
+ARG TARGETARCH
 ARG RUNNER_VERSION=dev
 
 WORKDIR /src
@@ -9,9 +11,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/runner ./cmd/runner
 COPY pkg ./pkg
-RUN CGO_ENABLED=0 go build -trimpath \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
   -ldflags="-s -w -X main.Version=${RUNNER_VERSION}" \
   -o /runner ./cmd/runner
+
+FROM scratch AS artifact
+COPY --from=build /runner /runner
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 COPY --from=build /runner /usr/local/bin/runner

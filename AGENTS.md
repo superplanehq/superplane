@@ -95,7 +95,7 @@ Run these three steps once, in order:
 1. `make dev.up` — builds the app and runner images and starts dependency
    containers (app shell, db, rabbitmq). The first run builds the images
    (~3-5 min); later runs reuse them. After you change
-   `cmd/runner/Dockerfile`, run `make dev.up` again.
+   `release/runner/Dockerfile`, run `make dev.up` again.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
    codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
    modules, or frontend deps change. By

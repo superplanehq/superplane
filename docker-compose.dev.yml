@@ -234,7 +234,7 @@ services:
     image: superplane-runner-local:dev
     build:
       context: .
-      dockerfile: cmd/runner/Dockerfile
+      dockerfile: release/runner/Dockerfile
       target: local
     entrypoint: ["/usr/local/bin/runner"]
     command: ["--help"]

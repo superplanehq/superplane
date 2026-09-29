@@ -85,7 +85,7 @@ The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
 `jq` so factory line apps can run locally. Do not install those CLIs on the
 host. Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
-`ANTHROPIC_API_KEY`. After you change `cmd/runner/Dockerfile`, run
+`ANTHROPIC_API_KEY`. After you change `release/runner/Dockerfile`, run
 `make dev.up` again. Check tools with `make doctor-local` after
 `make dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter
 Agent.
