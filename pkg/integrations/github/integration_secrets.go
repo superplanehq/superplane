@@ -75,24 +75,44 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		return "", fmt.Errorf("failed to decode metadata: %v", err)
 	}
 
-	installationID, err := strconv.Atoi(metadata.InstallationID)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse installation ID: %v", err)
-	}
-
-	pem, err := common.LegacyAppPrivateKey(integrationCtx, metadata)
-	if err != nil {
-		return "", fmt.Errorf("failed to find PEM: %v", err)
+	installationID := 0
+	appID := metadata.GitHubApp.ID
+	pem := ""
+	var repositoryIDs []int64
+	if metadata.HostedApp {
+		hosted, err := common.ResolveHostedAppBinding(integrationCtx)
+		if err != nil {
+			return "", err
+		}
+		installationID = int(hosted.ID)
+		appID = hosted.App.ID
+		pem = hosted.App.PrivateKey
+		repositoryIDs = hosted.RepositoryIDs
+	} else {
+		var err error
+		installationID, err = strconv.Atoi(metadata.InstallationID)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse installation ID: %v", err)
+		}
+		pem, err = common.LegacyAppPrivateKey(integrationCtx, metadata)
+		if err != nil {
+			return "", fmt.Errorf("failed to find PEM: %v", err)
+		}
 	}
 
 	itr, err := ghinstallation.New(
 		&httpContextTransport{http: httpCtx},
-		metadata.GitHubApp.ID,
+		appID,
 		int64(installationID),
 		[]byte(pem),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
+	}
+	if metadata.HostedApp {
+		if err := common.RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
+			return "", err
+		}
 	}
 
 	token, err := itr.Token(context.Background())

@@ -110,6 +110,18 @@ service Factories {
     };
   }
 
+  rpc SelectFactoryVCSProviderRepository(SelectFactoryVCSProviderRepositoryRequest) returns (SelectFactoryVCSProviderRepositoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/onboarding/vcs-repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a Factory VCS repository";
+      description: "Selects an accessible VCS repository and creates the organization integration reference";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -921,6 +933,16 @@ message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
+message SelectFactoryVCSProviderRepositoryRequest {
+  string id = 1;
+  string provider = 2;
+  int64 repository_id = 3;
+}
+
+message SelectFactoryVCSProviderRepositoryResponse {
+  Factory factory = 1;
+}
+
 message DeleteFactoryRequest {
   string id = 1;
 }
@@ -957,6 +979,8 @@ message FactoryOnboarding {
   string default_branch = 10;
   // True when account onboarding created this workspace.
   bool initial = 11;
+  int64 app_repository_id = 12;
+  int64 backlog_repository_id = 13;
 }
 
 message Factory {
