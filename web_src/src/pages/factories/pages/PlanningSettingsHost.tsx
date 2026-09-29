@@ -16,6 +16,13 @@ import {
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
 
+function planningAutoStartLines(lines: { name?: string }[] | undefined): { name: string }[] {
+  return (lines ?? []).flatMap((line) => {
+    const name = line.name?.trim() ?? "";
+    return name === "" ? [] : [{ name }];
+  });
+}
+
 const REFINE_TASK_NODE_ID = "refine-task";
 
 interface PlanningSettingsHostProps {
@@ -70,6 +77,7 @@ export function PlanningSettingsHost({
       lineId={lineId}
       canvasId={canvasId}
       settings={planningSettingsFromFactory(factoryQuery.data)}
+      lines={planningAutoStartLines(factoryQuery.data.lines)}
       title={findBacklogAutomationApp(appsQuery.data ?? [])?.name?.trim() || PLANNING_SETTINGS_COPY.title}
       initialTab={initialTab}
       onClose={onClose}
@@ -84,6 +92,7 @@ function PlanningSettingsLoaded({
   lineId,
   canvasId,
   settings,
+  lines,
   title,
   initialTab,
   onClose,
@@ -94,6 +103,7 @@ function PlanningSettingsLoaded({
   lineId?: string;
   canvasId?: string;
   settings: ReturnType<typeof planningSettingsFromFactory>;
+  lines: { name: string }[];
   title: string;
   initialTab?: PlanningSettingsTab;
   onClose: () => void;
@@ -112,6 +122,7 @@ function PlanningSettingsLoaded({
     <PlanningSettingsPopup
       title={title}
       settings={settings}
+      lines={lines}
       automationGraph={automation.graph}
       automationLoading={automation.isLoading}
       automationError={automation.isError}

@@ -991,6 +991,10 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
+  // When true, a draft starts on auto_start_line after planning stops at Confidence 5.
+  bool auto_start = 5;
+  // Line name used when auto_start is true. Empty when automatic start is off.
+  string auto_start_line = 6;
 }
 
 message FactoryLine {

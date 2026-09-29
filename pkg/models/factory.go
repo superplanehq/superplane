@@ -33,6 +33,8 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryPlanningAutoStartLineRequired = errors.New("automatic start needs a line")
+var ErrFactoryPlanningAutoStartLineUnknown = errors.New("automatic start line is not on this workspace")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
@@ -50,6 +52,8 @@ type Factory struct {
 	PlanningClarity        bool
 	PlanningConfidence     bool
 	PlanningSetupCompleted bool
+	PlanningAutoStart      bool
+	PlanningAutoStartLine  string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
@@ -58,12 +62,15 @@ type Factory struct {
 // FactoryPlanning is the workspace toggle for draft chat plus the two
 // optional checks. New workspaces start with Planning and the Confidence
 // estimate on. The Clarity check is opt-in because it makes the agent ask
-// more questions before a task is ready.
+// more questions before a task is ready. Automatic start is off until a
+// workspace turns it on and chooses a line.
 type FactoryPlanning struct {
 	Enabled        bool
 	Clarity        bool
 	Confidence     bool
 	SetupCompleted bool
+	AutoStart      bool
+	AutoStartLine  string
 }
 
 func DefaultFactoryPlanning() FactoryPlanning {
@@ -168,6 +175,8 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		PlanningClarity:        planning.Clarity,
 		PlanningConfidence:     planning.Confidence,
 		PlanningSetupCompleted: planning.SetupCompleted,
+		PlanningAutoStart:      planning.AutoStart,
+		PlanningAutoStartLine:  planning.AutoStartLine,
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
@@ -408,19 +417,36 @@ func (f *Factory) Planning() FactoryPlanning {
 		Clarity:        f.PlanningClarity,
 		Confidence:     f.PlanningConfidence,
 		SetupCompleted: f.PlanningSetupCompleted,
+		AutoStart:      f.PlanningAutoStart,
+		AutoStartLine:  f.PlanningAutoStartLine,
 	}
 }
 
 func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
+	planning = normalizeFactoryPlanning(planning)
+	if err := f.validatePlanningAutoStart(tx, planning); err != nil {
+		return err
+	}
+
 	now := time.Now()
 	err := tx.Model(f).
 		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
+		Select(
+			"planning_enabled",
+			"planning_clarity",
+			"planning_confidence",
+			"planning_setup_completed",
+			"planning_auto_start",
+			"planning_auto_start_line",
+			"updated_at",
+		).
 		Updates(map[string]any{
 			"planning_enabled":         planning.Enabled,
 			"planning_clarity":         planning.Clarity,
 			"planning_confidence":      planning.Confidence,
 			"planning_setup_completed": planning.SetupCompleted,
+			"planning_auto_start":      planning.AutoStart,
+			"planning_auto_start_line": planning.AutoStartLine,
 			"updated_at":               now,
 		}).Error
 	if err != nil {
@@ -430,8 +456,35 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningClarity = planning.Clarity
 	f.PlanningConfidence = planning.Confidence
 	f.PlanningSetupCompleted = planning.SetupCompleted
+	f.PlanningAutoStart = planning.AutoStart
+	f.PlanningAutoStartLine = planning.AutoStartLine
 	f.UpdatedAt = now
 	return nil
+}
+
+func normalizeFactoryPlanning(planning FactoryPlanning) FactoryPlanning {
+	planning.AutoStartLine = strings.TrimSpace(planning.AutoStartLine)
+	if !planning.Confidence {
+		planning.AutoStart = false
+	}
+	return planning
+}
+
+func (f *Factory) validatePlanningAutoStart(tx *gorm.DB, planning FactoryPlanning) error {
+	if !planning.AutoStart {
+		return nil
+	}
+	if planning.AutoStartLine == "" {
+		return ErrFactoryPlanningAutoStartLineRequired
+	}
+	_, err := f.FindLineByName(tx, planning.AutoStartLine)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ErrFactoryLineNotFound) {
+		return ErrFactoryPlanningAutoStartLineUnknown
+	}
+	return err
 }
 
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {

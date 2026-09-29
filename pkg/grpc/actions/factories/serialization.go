@@ -33,6 +33,8 @@ func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanni
 		Clarity:        planning.Clarity,
 		Confidence:     planning.Confidence,
 		SetupCompleted: planning.SetupCompleted,
+		AutoStart:      planning.AutoStart,
+		AutoStartLine:  planning.AutoStartLine,
 	}
 }
 
@@ -45,6 +47,8 @@ func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanni
 		Clarity:        planning.GetClarity(),
 		Confidence:     planning.GetConfidence(),
 		SetupCompleted: planning.GetSetupCompleted(),
+		AutoStart:      planning.GetAutoStart(),
+		AutoStartLine:  planning.GetAutoStartLine(),
 	}
 }
 

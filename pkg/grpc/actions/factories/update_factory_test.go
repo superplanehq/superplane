@@ -115,6 +115,8 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.True(t, response.Factory.Planning.Enabled)
 		assert.False(t, response.Factory.Planning.Clarity)
 		assert.True(t, response.Factory.Planning.Confidence)
+		assert.False(t, response.Factory.Planning.AutoStart)
+		assert.Empty(t, response.Factory.Planning.AutoStartLine)
 	})
 
 	t.Run("updates Planning and keeps score flags when Planning is off", func(t *testing.T) {
@@ -145,5 +147,80 @@ func Test__UpdateFactory(t *testing.T) {
 			Confidence:     false,
 			SetupCompleted: true,
 		}, reloaded.Planning())
+	})
+
+	t.Run("rejects automatic start without a known line", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:    true,
+				Confidence: true,
+				AutoStart:  true,
+			},
+		})
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "Select a line for automatic start.", message)
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:       true,
+				Confidence:    true,
+				AutoStart:     true,
+				AutoStartLine: "missing",
+			},
+		})
+		code, message, ok = grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "The selected line is not on this workspace.", message)
+	})
+
+	t.Run("saves automatic start on a workspace line", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateLine(database.DB(t.Context()), "ship", nil)
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:        true,
+				Confidence:     true,
+				SetupCompleted: true,
+				AutoStart:      true,
+				AutoStartLine:  "ship",
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, response.Factory.Planning.AutoStart)
+		assert.Equal(t, "ship", response.Factory.Planning.AutoStartLine)
+	})
+
+	t.Run("clears automatic start when Confidence is off", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:       true,
+				Confidence:    false,
+				AutoStart:     true,
+				AutoStartLine: "ship",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, response.Factory.Planning.AutoStart)
+		assert.Equal(t, "ship", response.Factory.Planning.AutoStartLine)
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.False(t, reloaded.Planning().AutoStart)
 	})
 }

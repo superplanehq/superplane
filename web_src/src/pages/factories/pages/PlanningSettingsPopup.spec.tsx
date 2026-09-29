@@ -15,7 +15,7 @@ import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factory
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
-import { DEFAULT_PLANNING_SETTINGS, type PlanningDraftSettings } from "./planningSettingsModel";
+import { DEFAULT_PLANNING_SETTINGS, PLANNING_SETTINGS_COPY, type PlanningDraftSettings } from "./planningSettingsModel";
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: vi.fn(() => ({
@@ -44,7 +44,7 @@ function defaultAgentSlot(overrides: Partial<PlanningReviewAgentSlot> = {}): Pla
 function renderPopup(
   onSave = vi.fn(),
   settings: PlanningDraftSettings = DEFAULT_PLANNING_SETTINGS,
-  options: { agent?: boolean | Partial<PlanningReviewAgentSlot> } = {},
+  options: { agent?: boolean | Partial<PlanningReviewAgentSlot>; lines?: { name: string }[] } = {},
 ) {
   const agentSlot = options.agent ? defaultAgentSlot(options.agent === true ? {} : options.agent) : undefined;
   render(
@@ -54,6 +54,7 @@ function renderPopup(
           <TooltipProvider>
             <PlanningSettingsPopup
               settings={settings}
+              lines={options.lines}
               onSave={onSave}
               onClose={vi.fn()}
               fixed={false}
@@ -95,6 +96,8 @@ describe("PlanningSettingsPopup", () => {
       enabled: true,
       clarity: true,
       confidence: true,
+      autoStart: false,
+      autoStartLine: "",
     });
   });
 
@@ -104,6 +107,8 @@ describe("PlanningSettingsPopup", () => {
       enabled: true,
       clarity: true,
       confidence: false,
+      autoStart: false,
+      autoStartLine: "",
     });
 
     await user.click(within(screen.getByTestId("planning-settings-enabled")).getByRole("switch"));
@@ -116,6 +121,8 @@ describe("PlanningSettingsPopup", () => {
       enabled: false,
       clarity: true,
       confidence: false,
+      autoStart: false,
+      autoStartLine: "",
     });
   });
 
@@ -140,6 +147,45 @@ describe("PlanningSettingsPopup", () => {
     rerender(popup({ ...DEFAULT_PLANNING_SETTINGS }));
 
     expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).toBeChecked();
+  });
+
+  it("shows Automatic start outside Planning checks and disables it when Confidence is off", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderPopup(
+      vi.fn(),
+      { ...DEFAULT_PLANNING_SETTINGS, autoStart: true, autoStartLine: "ship" },
+      { lines: [{ name: "ship" }, { name: "hotfix" }] },
+    );
+
+    const checks = screen.getByTestId("planning-settings-checks");
+    const autoStart = screen.getByTestId("planning-settings-auto-start");
+    expect(autoStart).toHaveTextContent(PLANNING_SETTINGS_COPY.autoStartLabel);
+    expect(autoStart).toHaveTextContent(PLANNING_SETTINGS_COPY.autoStartHelper);
+    expect(
+      within(checks).queryByRole("switch", { name: PLANNING_SETTINGS_COPY.autoStartSwitchLabel }),
+    ).not.toBeInTheDocument();
+    expect(within(autoStart).getByRole("switch", { name: PLANNING_SETTINGS_COPY.autoStartSwitchLabel })).toBeEnabled();
+    expect(screen.getByTestId("planning-settings-auto-start-line")).toBeEnabled();
+
+    await user.click(within(screen.getByTestId("planning-settings-confidence")).getByRole("switch"));
+    expect(within(autoStart).getByRole("switch")).toBeDisabled();
+    expect(screen.getByTestId("planning-settings-auto-start-line")).toBeDisabled();
+
+    await user.click(screen.getByTestId("planning-settings-save"));
+    expect(onSave).toHaveBeenCalledWith({
+      ...DEFAULT_PLANNING_SETTINGS,
+      confidence: false,
+      autoStart: true,
+      autoStartLine: "ship",
+    });
+  });
+
+  it("disables Automatic start when Planning is off", () => {
+    renderPopup(vi.fn(), { ...DEFAULT_PLANNING_SETTINGS, enabled: false, autoStart: true, autoStartLine: "ship" });
+
+    const autoStart = screen.getByTestId("planning-settings-auto-start");
+    expect(within(autoStart).getByRole("switch", { name: PLANNING_SETTINGS_COPY.autoStartSwitchLabel })).toBeDisabled();
+    expect(screen.getByTestId("planning-settings-auto-start-line")).toBeDisabled();
   });
 
   it("shows General, Agent, and Automation tabs when an agent exists", () => {
