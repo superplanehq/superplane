@@ -2,9 +2,13 @@ package factories
 
 import (
 	"context"
+	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFactoryRequest) (*pb.UpdateFactoryResponse, error) {
@@ -34,7 +38,14 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 	}
 
 	if req.Planning != nil {
-		if err := factory.UpdatePlanning(db, factoryPlanningFromProto(req.Planning)); err != nil {
+		planning, err := factoryPlanningFromProto(req.Planning, factory.Planning())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+		if err := rejectAutoStartLineOutsideFactory(db, factory, planning.AutoStartLineID); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+		if err := factory.UpdatePlanning(db, planning); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory")
 		}
 	}
@@ -52,4 +63,17 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 	return &pb.UpdateFactoryResponse{
 		Factory: serialized,
 	}, nil
+}
+
+func rejectAutoStartLineOutsideFactory(db *gorm.DB, factory *models.Factory, lineID *uuid.UUID) error {
+	if lineID == nil {
+		return nil
+	}
+	if _, err := factory.FindLine(db, *lineID); err != nil {
+		if errors.Is(err, models.ErrFactoryLineNotFound) {
+			return invalidArgument("auto_start_line_id is not a line in this workspace")
+		}
+		return err
+	}
+	return nil
 }

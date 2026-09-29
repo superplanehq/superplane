@@ -28,24 +28,57 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 }
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
-	return &pb.FactoryPlanning{
+	serialized := &pb.FactoryPlanning{
 		Enabled:        planning.Enabled,
 		Clarity:        planning.Clarity,
 		Confidence:     planning.Confidence,
 		SetupCompleted: planning.SetupCompleted,
 	}
+	if id := serializeOptionalID(planning.AutoStartLineID); id != "" {
+		serialized.AutoStartLineId = &id
+	}
+	return serialized
 }
 
-func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanning {
+func factoryPlanningFromProto(planning *pb.FactoryPlanning, current models.FactoryPlanning) (models.FactoryPlanning, error) {
 	if planning == nil {
-		return models.DefaultFactoryPlanning()
+		return models.DefaultFactoryPlanning(), nil
 	}
-	return models.FactoryPlanning{
-		Enabled:        planning.GetEnabled(),
-		Clarity:        planning.GetClarity(),
-		Confidence:     planning.GetConfidence(),
-		SetupCompleted: planning.GetSetupCompleted(),
+	result := models.FactoryPlanning{
+		Enabled:         planning.GetEnabled(),
+		Clarity:         planning.GetClarity(),
+		Confidence:      planning.GetConfidence(),
+		SetupCompleted:  planning.GetSetupCompleted(),
+		AutoStartLineID: current.AutoStartLineID,
 	}
+	if planning.AutoStartLineId == nil {
+		return result, nil
+	}
+	lineID, err := optionalAutoStartLineID(planning.GetAutoStartLineId())
+	if err != nil {
+		return models.FactoryPlanning{}, err
+	}
+	result.AutoStartLineID = lineID
+	return result, nil
+}
+
+func optionalAutoStartLineID(raw string) (*uuid.UUID, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, invalidArgument("auto_start_line_id must be a UUID")
+	}
+	return &parsed, nil
+}
+
+func serializeOptionalID(id *uuid.UUID) string {
+	if id == nil || *id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }
 
 func serializeFactoryWithLines(
@@ -459,6 +492,7 @@ func serializeWorkOrder(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
+		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
 	}, nil
 }
 

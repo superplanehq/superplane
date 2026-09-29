@@ -13,6 +13,12 @@ export const PLANNING_SETTINGS_COPY = {
   confidenceHelper: "The agent checks if one run can finish the task and offers to split work that is too big.",
   clarityLabel: "Clarity check",
   clarityHelper: "The agent grades how clear the request is and keeps asking until the gaps are closed.",
+  autoStartLabel: "Auto-start",
+  autoStartChooseHelper: "Start each task on a line when the plan scores 5.",
+  autoStartPlanningOffHelper: "Turn Planning on to use Auto-start.",
+  autoStartConfidenceOffHelper: "Turn the Confidence estimate on to use Auto-start.",
+  autoStartNoLineHelper: "Add a line before you turn Auto-start on.",
+  autoStartLineLabel: "Line",
   healthLabel: "Health",
   healthReady: "Ready",
   healthDisabled: "Off",
@@ -95,3 +101,7 @@ export const PLANNING_SETTINGS_COPY = {
   wizardPreviewClarityOff: "The agent plans with the details it has.",
   wizardFinishError: "Could not save Planning settings.",
 } as const;
+
+export function planningAutoStartHelper(lineName: string): string {
+  return `Start each task on ${lineName} when the plan scores 5.`;
+}

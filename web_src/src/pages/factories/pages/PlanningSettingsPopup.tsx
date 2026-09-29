@@ -15,6 +15,7 @@ import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared
 import {
   PLANNING_SETTINGS_COPY,
   planningSettingsTabs,
+  type PlanningAutoStartLine,
   type PlanningDraftSettings,
   type PlanningSettingsTab,
 } from "./planningSettingsModel";
@@ -22,6 +23,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface PlanningSettingsPopupProps {
   settings: PlanningDraftSettings;
+  lines?: PlanningAutoStartLine[];
   title?: string;
   automationGraph?: IntakeAutomationGraph;
   automationLoading?: boolean;
@@ -41,6 +43,7 @@ interface PlanningSettingsPopupProps {
 
 export function PlanningSettingsPopup({
   settings,
+  lines = [],
   title = PLANNING_SETTINGS_COPY.title,
   automationGraph,
   automationLoading = false,
@@ -73,8 +76,13 @@ export function PlanningSettingsPopup({
   // new settings object on every render, and that alone must not erase
   // toggles the user changed before Save.
   useEffect(() => {
-    setDraft({ enabled: settings.enabled, clarity: settings.clarity, confidence: settings.confidence });
-  }, [settings.enabled, settings.clarity, settings.confidence]);
+    setDraft({
+      enabled: settings.enabled,
+      clarity: settings.clarity,
+      confidence: settings.confidence,
+      autoStartLineId: settings.autoStartLineId,
+    });
+  }, [settings.enabled, settings.clarity, settings.confidence, settings.autoStartLineId]);
 
   const update = useCallback(<K extends keyof PlanningDraftSettings>(key: K, value: PlanningDraftSettings[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -132,6 +140,7 @@ export function PlanningSettingsPopup({
       ) : (
         <PlanningGeneralTab
           draft={draft}
+          lines={lines}
           savePending={savePending}
           saveError={saveError}
           onUpdate={update}
@@ -145,6 +154,7 @@ export function PlanningSettingsPopup({
 
 function PlanningGeneralTab({
   draft,
+  lines,
   savePending,
   saveError,
   onUpdate,
@@ -152,6 +162,7 @@ function PlanningGeneralTab({
   onClose,
 }: {
   draft: PlanningDraftSettings;
+  lines: PlanningAutoStartLine[];
   savePending?: boolean;
   saveError?: string;
   onUpdate: <K extends keyof PlanningDraftSettings>(key: K, value: PlanningDraftSettings[K]) => void;
@@ -163,7 +174,7 @@ function PlanningGeneralTab({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           <PlanningHealthSection enabled={draft.enabled} />
-          <PlanningSettingsFields draft={draft} onUpdate={onUpdate} />
+          <PlanningSettingsFields draft={draft} lines={lines} onUpdate={onUpdate} />
         </div>
       </div>
       <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
