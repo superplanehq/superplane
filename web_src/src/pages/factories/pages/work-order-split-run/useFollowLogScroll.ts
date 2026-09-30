@@ -68,13 +68,19 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
         if (!node) {
           return;
         }
-        lastScrollTopRef.current = node.scrollTop;
-        if (!isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight)) {
-          stopFollow();
+        if (followingRef.current) {
+          if (!isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight)) {
+            node.scrollTop = node.scrollHeight;
+          }
+          lastScrollTopRef.current = node.scrollTop;
+          setJumpToLatest(false);
+          return;
         }
+        lastScrollTopRef.current = node.scrollTop;
+        syncJumpToLatest(false, node);
       });
     });
-  }, [stopFollow]);
+  }, [syncJumpToLatest]);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;

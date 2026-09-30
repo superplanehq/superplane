@@ -2,14 +2,21 @@ import { Ellipsis, ExternalLink, GitPullRequest } from "lucide-react";
 
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMerge";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
+  isGitHubPullRequest,
+  isMergedPullRequest,
   PULL_REQUEST_REVIEW_COPY,
   pullRequestForReviewHref,
+  pullRequestReviewCopy,
   pullRequestReviewNote,
+  type PullRequestReviewCopy,
   type PullRequestReviewTarget,
 } from "./splitRunPullRequestReview";
 
@@ -31,6 +38,7 @@ export function SplitRunPullRequestReviewNote({
   orderId,
   canAct = true,
   compact = false,
+  stacked = false,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
@@ -40,7 +48,10 @@ export function SplitRunPullRequestReviewNote({
   orderId?: string;
   canAct?: boolean;
   compact?: boolean;
+  /** In a tinted panel section: no box of its own. */
+  stacked?: boolean;
 }) {
+  const copy = usePullRequestReviewCopy(organizationId, factoryId, trackedPullRequest);
   if (compact) {
     return (
       <CompactPullRequestReviewNote
@@ -51,6 +62,8 @@ export function SplitRunPullRequestReviewNote({
         factoryId={factoryId}
         orderId={orderId}
         canAct={canAct}
+        copy={copy}
+        stacked={stacked}
       />
     );
   }
@@ -67,9 +80,7 @@ export function SplitRunPullRequestReviewNote({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-foreground">
-            {PULL_REQUEST_REVIEW_COPY.headline}
-          </h3>
+          <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-foreground">{copy.headline}</h3>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button
               asChild
@@ -89,12 +100,37 @@ export function SplitRunPullRequestReviewNote({
               pullRequest={trackedPullRequest}
               canAct={canAct}
             />
-            <p className="text-[13px] leading-5 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
+            <p className="text-[13px] leading-5 text-foreground/70">{copy.closing}</p>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * The checks state comes from the merge gate, so the strip can say
+ * "waits for checks" instead of "ready" while checks still run. Without
+ * the merge feature the gate is not fetched and the copy stays generic.
+ */
+function usePullRequestReviewCopy(
+  organizationId: string | undefined,
+  factoryId: string | undefined,
+  pullRequest: FactoriesFactoryPullRequest | undefined,
+): PullRequestReviewCopy {
+  const { has } = useExperimentalFeature(organizationId);
+  const enabled = Boolean(
+    has(FEATURE_FACTORY_PULL_REQUEST_MERGE) &&
+      organizationId &&
+      factoryId &&
+      pullRequest?.id &&
+      isGitHubPullRequest(pullRequest) &&
+      !isMergedPullRequest(pullRequest),
+  );
+  const mergeability = useFactoryPullRequestMergeability(organizationId ?? "", factoryId ?? "", pullRequest?.id ?? "", {
+    enabled,
+  });
+  return pullRequestReviewCopy(enabled ? mergeability.data : undefined);
 }
 
 function CompactPullRequestReviewNote({
@@ -105,6 +141,8 @@ function CompactPullRequestReviewNote({
   factoryId,
   orderId,
   canAct,
+  copy,
+  stacked,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
@@ -113,16 +151,22 @@ function CompactPullRequestReviewNote({
   factoryId?: string;
   orderId?: string;
   canAct: boolean;
+  copy: PullRequestReviewCopy;
+  stacked: boolean;
 }) {
   return (
     <div
-      className="rounded-lg border border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] p-4"
+      className={
+        stacked
+          ? undefined
+          : "rounded-lg border border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] p-4"
+      }
       data-testid="split-run-attention-note"
       data-variant="pull-request"
     >
       <div className="min-w-0">
-        <h3 className="text-[14px] font-semibold leading-5 text-foreground">{PULL_REQUEST_REVIEW_COPY.headline}</h3>
-        <p className="mt-1 text-[12px] leading-4 text-foreground/70">{PULL_REQUEST_REVIEW_COPY.closing}</p>
+        <h3 className="text-[14px] font-semibold leading-5 text-foreground">{copy.headline}</h3>
+        <p className="mt-1 text-[12px] leading-4 text-foreground/70">{copy.closing}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button asChild size="sm" className="bg-emerald-600 font-semibold text-white shadow-sm hover:bg-emerald-700">
             <a href={pullRequest.href} target="_blank" rel="noreferrer" data-testid="split-run-pull-request-cta">
@@ -192,6 +236,7 @@ export function WaitingPullRequestReview({
   actions,
   actionBusy,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   organizationId,
   factoryId,
@@ -205,6 +250,8 @@ export function WaitingPullRequestReview({
   actions: SplitRunFooterAction[];
   actionBusy: boolean;
   compact?: boolean;
+  /** In a tinted panel section: no box of its own. */
+  stacked?: boolean;
   actionsOnly?: boolean;
   organizationId?: string;
   factoryId?: string;
@@ -230,6 +277,7 @@ export function WaitingPullRequestReview({
       orderId={orderId}
       canAct={canAct}
       compact={compact}
+      stacked={stacked}
     />
   );
 }
