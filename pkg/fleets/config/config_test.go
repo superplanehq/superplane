@@ -1,25 +1,17 @@
 package config
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestLoadAppliesAWSDefaultsAndRejectsMutableArtifacts(t *testing.T) {
-	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	body := `{
 		"superplane_url":"https://superplane.example",
 		"installation_admin_token":"personal-token",
-		"artifact_manifest_url_template":"https://downloads.example/runner/v{version}/manifest.json",
-		"artifact_signing_public_key":"` + base64.StdEncoding.EncodeToString(publicKey) + `",
+		"runner_release_base_url":"https://downloads.example/runner/",
 		"aws_region":"us-east-1",
 		"fleets":[{
 			"id":"linux-amd64",
@@ -41,11 +33,14 @@ func TestLoadAppliesAWSDefaultsAndRejectsMutableArtifacts(t *testing.T) {
 		config.Fleets[0].AWS.VolumeSizeGB != 30 {
 		t.Fatalf("defaults were not applied: %#v", config.Fleets[0].AWS)
 	}
+	if config.RunnerReleaseBaseURL != "https://downloads.example/runner" {
+		t.Fatalf("runner release base URL = %q", config.RunnerReleaseBaseURL)
+	}
 
 	mutable := strings.Replace(
 		body,
-		"https://downloads.example/runner/v{version}/manifest.json",
-		"https://downloads.example/runner/latest/{version}/manifest.json",
+		"https://downloads.example/runner/",
+		"https://downloads.example/runner/latest/",
 		1,
 	)
 	if _, err := Load(writeConfig(t, mutable)); err == nil {

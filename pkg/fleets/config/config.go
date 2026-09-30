@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,14 +19,13 @@ const (
 )
 
 type Config struct {
-	SuperPlaneURL               string  `json:"superplane_url"`
-	InstallationAdminToken      string  `json:"installation_admin_token"`
-	ArtifactManifestURLTemplate string  `json:"artifact_manifest_url_template"`
-	ArtifactSigningPublicKey    string  `json:"artifact_signing_public_key"`
-	AWSRegion                   string  `json:"aws_region"`
-	ReconcileIntervalSeconds    int     `json:"reconcile_interval_seconds"`
-	RequestTimeoutSeconds       int     `json:"request_timeout_seconds"`
-	Fleets                      []Fleet `json:"fleets"`
+	SuperPlaneURL            string  `json:"superplane_url"`
+	InstallationAdminToken   string  `json:"installation_admin_token"`
+	RunnerReleaseBaseURL     string  `json:"runner_release_base_url"`
+	AWSRegion                string  `json:"aws_region"`
+	ReconcileIntervalSeconds int     `json:"reconcile_interval_seconds"`
+	RequestTimeoutSeconds    int     `json:"request_timeout_seconds"`
+	Fleets                   []Fleet `json:"fleets"`
 }
 
 type Fleet struct {
@@ -97,6 +95,10 @@ func (c *Config) RequestTimeout() time.Duration {
 }
 
 func (c *Config) applyDefaults() {
+	c.RunnerReleaseBaseURL = strings.TrimRight(
+		strings.TrimSpace(c.RunnerReleaseBaseURL),
+		"/",
+	)
 	if c.ReconcileIntervalSeconds == 0 {
 		c.ReconcileIntervalSeconds = defaultReconcileIntervalSeconds
 	}
@@ -148,23 +150,15 @@ func (c *Config) validate() error {
 	}
 	if c.hasProvider(ProviderAWS) {
 		switch {
-		case !strings.Contains(c.ArtifactManifestURLTemplate, "{version}"):
-			return fmt.Errorf("artifact_manifest_url_template must contain {version}")
+		case c.RunnerReleaseBaseURL == "":
+			return fmt.Errorf("runner_release_base_url is required")
 		case strings.Contains(
-			strings.ToLower(c.ArtifactManifestURLTemplate),
+			strings.ToLower(c.RunnerReleaseBaseURL),
 			"latest",
 		):
-			return fmt.Errorf("artifact_manifest_url_template must not use latest")
+			return fmt.Errorf("runner_release_base_url must not use latest")
 		case strings.TrimSpace(c.AWSRegion) == "":
 			return fmt.Errorf("aws_region is required")
-		}
-		publicKey, err := base64.StdEncoding.DecodeString(
-			strings.TrimSpace(c.ArtifactSigningPublicKey),
-		)
-		if err != nil || len(publicKey) != 32 {
-			return fmt.Errorf(
-				"artifact_signing_public_key must be a base64 Ed25519 public key",
-			)
 		}
 	}
 

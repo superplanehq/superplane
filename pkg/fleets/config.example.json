@@ -1,8 +1,7 @@
 {
   "superplane_url": "https://superplane.example",
   "installation_admin_token": "replace-with-personal-api-token",
-  "artifact_manifest_url_template": "https://github.com/superplanehq/superplane/releases/download/runner%2Fv{version}/manifest.json",
-  "artifact_signing_public_key": "replace-with-base64-ed25519-public-key",
+  "runner_release_base_url": "https://superplanehq-releases.s3.amazonaws.com/runner",
   "aws_region": "us-east-1",
   "reconcile_interval_seconds": 15,
   "request_timeout_seconds": 90,

@@ -2,11 +2,8 @@ package artifact
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -17,11 +14,7 @@ import (
 	"sync"
 )
 
-const (
-	maxManifestBytes        = 1 << 20
-	maxArtifactBytes        = 512 << 20
-	supportedRunnerProtocol = "runner/v1"
-)
+const maxChecksumsBytes = 1 << 20
 
 var exactVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
@@ -31,58 +24,38 @@ type Artifact struct {
 	Architecture    string
 	URL             string
 	SHA256          string
-	Signature       string
-	ProtocolVersion string
-}
-
-type manifest struct {
-	Version          string             `json:"version"`
-	ProtocolVersion  string             `json:"protocol_version"`
-	SourceRepository string             `json:"source_repository,omitempty"`
-	SourceCommit     string             `json:"source_commit,omitempty"`
-	Artifacts        []manifestArtifact `json:"artifacts"`
-}
-
-type manifestArtifact struct {
-	OperatingSystem string `json:"operating_system"`
-	Architecture    string `json:"architecture"`
-	URL             string `json:"url"`
-	SHA256          string `json:"sha256"`
-	Signature       string `json:"signature"`
 }
 
 type Resolver struct {
-	manifestURLTemplate string
-	publicKey           ed25519.PublicKey
-	httpClient          *http.Client
+	baseURL    string
+	httpClient *http.Client
 
 	mu    sync.RWMutex
 	cache map[string]Artifact
 }
 
-func NewResolver(
-	manifestURLTemplate, encodedPublicKey string,
-	httpClient *http.Client,
-) (*Resolver, error) {
-	template := strings.TrimSpace(manifestURLTemplate)
-	if !strings.Contains(template, "{version}") {
-		return nil, fmt.Errorf("runner manifest URL template must contain {version}")
+func NewResolver(baseURL string, httpClient *http.Client) (*Resolver, error) {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if err := validatePublicURL(baseURL); err != nil {
+		return nil, fmt.Errorf("runner release base URL: %w", err)
 	}
-	if strings.Contains(strings.ToLower(template), "latest") {
-		return nil, fmt.Errorf("runner manifest URL template must not use latest")
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("runner release base URL: %w", err)
 	}
-	publicKey, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encodedPublicKey))
-	if err != nil || len(publicKey) != ed25519.PublicKeySize {
-		return nil, fmt.Errorf("runner artifact signing public key must be a base64 Ed25519 public key")
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return nil, fmt.Errorf("runner release base URL must not contain a query or fragment")
+	}
+	if strings.Contains(strings.ToLower(parsed.Path), "latest") {
+		return nil, fmt.Errorf("runner release base URL must not use latest")
 	}
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 	return &Resolver{
-		manifestURLTemplate: template,
-		publicKey:           ed25519.PublicKey(publicKey),
-		httpClient:          httpClient,
-		cache:               map[string]Artifact{},
+		baseURL:    baseURL,
+		httpClient: httpClient,
+		cache:      map[string]Artifact{},
 	}, nil
 }
 
@@ -96,8 +69,9 @@ func (r *Resolver) Resolve(
 	if !exactVersionPattern.MatchString(version) {
 		return Artifact{}, fmt.Errorf("runner version %q is not an exact semantic version", version)
 	}
-	if operatingSystem == "" || architecture == "" {
-		return Artifact{}, fmt.Errorf("runner operating system and architecture are required")
+	filename, err := artifactFilename(operatingSystem, architecture)
+	if err != nil {
+		return Artifact{}, err
 	}
 
 	cacheKey := strings.Join([]string{version, operatingSystem, architecture}, "\x00")
@@ -108,7 +82,7 @@ func (r *Resolver) Resolve(
 		return cached, nil
 	}
 
-	resolved, err := r.resolve(ctx, version, operatingSystem, architecture)
+	resolved, err := r.resolve(ctx, version, operatingSystem, architecture, filename)
 	if err != nil {
 		return Artifact{}, err
 	}
@@ -120,126 +94,65 @@ func (r *Resolver) Resolve(
 
 func (r *Resolver) resolve(
 	ctx context.Context,
-	version, operatingSystem, architecture string,
+	version, operatingSystem, architecture, filename string,
 ) (Artifact, error) {
-	manifestURL := strings.ReplaceAll(r.manifestURLTemplate, "{version}", url.PathEscape(version))
-	var release manifest
-	if err := r.readJSON(ctx, manifestURL, maxManifestBytes, &release); err != nil {
-		return Artifact{}, fmt.Errorf("read runner release manifest: %w", err)
-	}
-	if release.Version != version {
-		return Artifact{}, fmt.Errorf(
-			"runner release manifest version %q does not match requested version %q",
-			release.Version,
-			version,
-		)
-	}
-	if release.ProtocolVersion != supportedRunnerProtocol {
-		return Artifact{}, fmt.Errorf(
-			"runner release %s uses unsupported protocol %q",
-			version,
-			release.ProtocolVersion,
-		)
-	}
-
-	for _, candidate := range release.Artifacts {
-		if strings.EqualFold(candidate.OperatingSystem, operatingSystem) &&
-			strings.EqualFold(candidate.Architecture, architecture) {
-			return r.verify(ctx, release, candidate)
-		}
-	}
-	return Artifact{}, fmt.Errorf(
-		"runner release %s has no artifact for %s/%s",
-		version,
-		operatingSystem,
-		architecture,
+	releaseURL := r.baseURL + "/" + url.PathEscape(version)
+	checksum, err := r.readChecksum(
+		ctx,
+		releaseURL+"/checksums.txt",
+		filename,
 	)
-}
-
-func (r *Resolver) verify(
-	ctx context.Context,
-	release manifest,
-	candidate manifestArtifact,
-) (Artifact, error) {
-	if err := validatePublicURL(candidate.URL); err != nil {
-		return Artifact{}, fmt.Errorf("runner artifact URL: %w", err)
-	}
-	if err := validateVersionedArtifactURL(candidate.URL, release.Version); err != nil {
-		return Artifact{}, err
-	}
-	expectedDigest, err := hex.DecodeString(strings.ToLower(strings.TrimSpace(candidate.SHA256)))
-	if err != nil || len(expectedDigest) != sha256.Size {
-		return Artifact{}, fmt.Errorf("runner artifact SHA-256 is invalid")
-	}
-	signature, err := base64.StdEncoding.DecodeString(strings.TrimSpace(candidate.Signature))
-	if err != nil || len(signature) != ed25519.SignatureSize {
-		return Artifact{}, fmt.Errorf("runner artifact signature is invalid")
-	}
-	if !ed25519.Verify(r.publicKey, expectedDigest, signature) {
-		return Artifact{}, fmt.Errorf("runner artifact signature verification failed")
-	}
-
-	actualDigest, err := r.hashURL(ctx, candidate.URL)
 	if err != nil {
-		return Artifact{}, fmt.Errorf("verify runner artifact: %w", err)
-	}
-	if !equalBytes(actualDigest, expectedDigest) {
-		return Artifact{}, fmt.Errorf("runner artifact SHA-256 does not match release manifest")
+		return Artifact{}, fmt.Errorf(
+			"resolve runner release %s for %s/%s: %w",
+			version,
+			operatingSystem,
+			architecture,
+			err,
+		)
 	}
 
 	return Artifact{
-		Version:         release.Version,
-		OperatingSystem: strings.ToLower(candidate.OperatingSystem),
-		Architecture:    strings.ToLower(candidate.Architecture),
-		URL:             candidate.URL,
-		SHA256:          hex.EncodeToString(expectedDigest),
-		Signature:       candidate.Signature,
-		ProtocolVersion: release.ProtocolVersion,
+		Version:         version,
+		OperatingSystem: operatingSystem,
+		Architecture:    architecture,
+		URL:             releaseURL + "/" + filename,
+		SHA256:          checksum,
 	}, nil
 }
 
-func (r *Resolver) readJSON(ctx context.Context, endpoint string, limit int64, target any) error {
+func (r *Resolver) readChecksum(
+	ctx context.Context,
+	endpoint, filename string,
+) (string, error) {
 	response, err := r.get(ctx, endpoint)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("read checksums: %w", err)
 	}
 	defer response.Body.Close()
 
-	content, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
+	content, err := io.ReadAll(io.LimitReader(response.Body, maxChecksumsBytes+1))
 	if err != nil {
-		return err
+		return "", fmt.Errorf("read checksums: %w", err)
 	}
-	if int64(len(content)) > limit {
-		return fmt.Errorf("response exceeds %d bytes", limit)
+	if len(content) > maxChecksumsBytes {
+		return "", fmt.Errorf("checksums exceed %d bytes", maxChecksumsBytes)
 	}
-	decoder := json.NewDecoder(strings.NewReader(string(content)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return fmt.Errorf("response contains multiple JSON values")
-	}
-	return nil
-}
 
-func (r *Resolver) hashURL(ctx context.Context, endpoint string) ([]byte, error) {
-	response, err := r.get(ctx, endpoint)
-	if err != nil {
-		return nil, err
+	for _, line := range strings.Split(string(content), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 ||
+			strings.TrimPrefix(fields[1], "*") != filename {
+			continue
+		}
+		checksum := strings.ToLower(fields[0])
+		decoded, decodeErr := hex.DecodeString(checksum)
+		if decodeErr != nil || len(decoded) != sha256.Size {
+			return "", fmt.Errorf("checksum for %s is invalid", filename)
+		}
+		return checksum, nil
 	}
-	defer response.Body.Close()
-
-	hasher := sha256.New()
-	written, err := io.Copy(hasher, io.LimitReader(response.Body, maxArtifactBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if written > maxArtifactBytes {
-		return nil, fmt.Errorf("runner artifact exceeds %d bytes", maxArtifactBytes)
-	}
-	return hasher.Sum(nil), nil
+	return "", fmt.Errorf("checksums do not contain %s", filename)
 }
 
 func (r *Resolver) get(ctx context.Context, endpoint string) (*http.Response, error) {
@@ -283,30 +196,23 @@ func validatePublicURL(raw string) error {
 	return fmt.Errorf("must use HTTPS")
 }
 
-func validateVersionedArtifactURL(raw, version string) error {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("runner artifact URL is invalid: %w", err)
+func artifactFilename(operatingSystem, architecture string) (string, error) {
+	switch {
+	case operatingSystem != "linux":
+		return "", fmt.Errorf(
+			"runner release does not support operating system %q",
+			operatingSystem,
+		)
+	case architecture != "amd64" && architecture != "arm64":
+		return "", fmt.Errorf(
+			"runner release does not support architecture %q",
+			architecture,
+		)
+	default:
+		return fmt.Sprintf(
+			"runner-%s-%s.tar.gz",
+			operatingSystem,
+			architecture,
+		), nil
 	}
-	if strings.Contains(strings.ToLower(parsed.Path), "latest") {
-		return fmt.Errorf("runner artifact URL must not use latest")
-	}
-	version = strings.TrimPrefix(version, "v")
-	for _, segment := range strings.Split(strings.Trim(parsed.Path, "/"), "/") {
-		if segment == version || segment == "v"+version {
-			return nil
-		}
-	}
-	return fmt.Errorf("runner artifact URL does not contain exact version %q", version)
-}
-
-func equalBytes(left, right []byte) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	var different byte
-	for i := range left {
-		different |= left[i] ^ right[i]
-	}
-	return different == 0
 }

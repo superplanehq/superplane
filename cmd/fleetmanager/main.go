@@ -54,8 +54,7 @@ func main() {
 	var ec2Client *ec2.Client
 	if usesAWS(config) {
 		awsArtifactResolver, err = artifact.NewResolver(
-			config.ArtifactManifestURLTemplate,
-			config.ArtifactSigningPublicKey,
+			config.RunnerReleaseBaseURL,
 			httpClient,
 		)
 		if err != nil {

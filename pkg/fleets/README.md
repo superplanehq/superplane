@@ -10,30 +10,18 @@ Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
 their short-lived registration token.
 
-AWS fleets require a release manifest URL that contains `{version}`. A
-manifest has this shape:
+AWS fleets require `runner_release_base_url`. Fleet Manager selects a release
+from this layout:
 
-```json
-{
-  "version": "1.2.3",
-  "protocol_version": "runner/v1",
-  "source_repository": "https://github.com/superplanehq/superplane",
-  "source_commit": "<git commit SHA>",
-  "artifacts": [
-    {
-      "operating_system": "linux",
-      "architecture": "amd64",
-      "url": "https://downloads.example/runner/v1.2.3/runner-linux-amd64",
-      "sha256": "<hex SHA-256>",
-      "signature": "<base64 Ed25519 signature of the 32-byte SHA-256 digest>"
-    }
-  ]
-}
+```text
+<runner_release_base_url>/<version>/runner-linux-amd64.tar.gz
+<runner_release_base_url>/<version>/runner-linux-arm64.tar.gz
+<runner_release_base_url>/<version>/checksums.txt
 ```
 
-The trusted Ed25519 public key is a base64-encoded 32-byte key. Fleet Manager
-downloads and verifies each exact artifact once. AWS bootstrap downloads the
-same immutable URL and verifies its SHA-256 before installation.
+Each archive contains the runner binary and `install.sh`. Fleet Manager reads
+the selected archive checksum from `checksums.txt`. AWS bootstrap downloads
+the archive, verifies its SHA-256, extracts it, and runs the bundled installer.
 
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich

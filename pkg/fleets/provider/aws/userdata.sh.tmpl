@@ -1,39 +1,22 @@
 #!/bin/bash
 set -euxo pipefail
 
-install -d -m 0755 /usr/local/bin
-artifact_file=$(mktemp)
-trap 'rm -f "$artifact_file"' EXIT
+bundle_dir=$(mktemp -d)
+trap 'rm -rf "$bundle_dir"' EXIT
 
 curl --fail --location --silent --show-error \
   {{shellQuote .Artifact.URL}} \
-  --output "$artifact_file"
-echo "{{.Artifact.SHA256}}  $artifact_file" | sha256sum --check --strict -
-install -m 0755 "$artifact_file" /usr/local/bin/superplane-runner
+  --output "$bundle_dir/runner.tar.gz"
+echo "{{.Artifact.SHA256}}  $bundle_dir/runner.tar.gz" |
+  sha256sum --check --strict -
 
-install -d -m 0700 /var/lib/superplane-runner
-cat > /etc/default/superplane-runner <<'ENVEOF'
-RUNNER_API_URL={{shellQuote .RunnerAPIURL}}
-RUNNER_REGISTRATION_TOKEN={{shellQuote .RegistrationToken}}
-ENVEOF
-chmod 0600 /etc/default/superplane-runner
+tar \
+  --extract \
+  --gzip \
+  --file "$bundle_dir/runner.tar.gz" \
+  --directory "$bundle_dir"
 
-cat > /etc/systemd/system/superplane-runner.service <<'UNITEOF'
-[Unit]
-Description=SuperPlane Runner
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-EnvironmentFile=/etc/default/superplane-runner
-ExecStart=/usr/local/bin/superplane-runner
-Restart=no
-ExecStopPost=+/bin/sh -c 'sleep 5; /usr/sbin/poweroff'
-
-[Install]
-WantedBy=multi-user.target
-UNITEOF
-
-systemctl daemon-reload
-systemctl enable --now superplane-runner.service
+set +x
+RUNNER_API_URL={{shellQuote .RunnerAPIURL}} \
+RUNNER_REGISTRATION_TOKEN={{shellQuote .RegistrationToken}} \
+  "$bundle_dir/install.sh"

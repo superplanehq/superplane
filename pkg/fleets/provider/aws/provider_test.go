@@ -134,7 +134,7 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 		RunnerAPIURL:      "https://superplane.example",
 		RegistrationToken: "short-lived-registration-token",
 		Artifact: artifact.Artifact{
-			URL:    "https://downloads.example/runner/v1.2.3/runner-linux-amd64",
+			URL:    "https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz",
 			SHA256: strings.Repeat("a", 64),
 		},
 	})
@@ -143,10 +143,14 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 	}
 	body := string(script)
 	for _, expected := range []string{
-		"https://downloads.example/runner/v1.2.3/runner-linux-amd64",
+		"https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz",
 		"sha256sum --check --strict",
-		`RUNNER_API_URL="https://superplane.example"`,
-		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token"`,
+		"--extract",
+		"--gzip",
+		"set +x",
+		`RUNNER_API_URL="https://superplane.example" \`,
+		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token" \`,
+		`"$bundle_dir/install.sh"`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("bootstrap does not contain %q:\n%s", expected, body)
