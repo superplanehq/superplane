@@ -7,7 +7,7 @@ import {
   useIntegrationResources,
 } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   catalogStatusCheckNames,
@@ -16,7 +16,6 @@ import {
   readyChecksHandlerIntegrationIds,
   selectedChecksUseGitHubActions,
   suggestedIntegrationsForChecks,
-  checksHandlerIntegrationRows,
 } from "./checksPRFeedbackSetup";
 import {
   isPRFeedbackMaximumAttemptsValid,
@@ -150,17 +149,24 @@ function useChecksSetupResources(
     setSeeded((current) => ({ ...current, catalog: true }));
   }, [catalog, catalogLoading, seeded.catalog]);
 
+  // Tracks every integration ID ever auto-selected (by the initial seed or by a later
+  // suggestion), so a user's deselection is never overridden by a later effect run.
+  const offeredSuggestionIds = useRef(new Set<string>());
+
   useEffect(() => {
     if (seeded.connected || connectedLoading) {
       return;
     }
     // Start with all ready integrations for checks handler
     const allReadyIds = readyChecksHandlerIntegrationIds(connected);
+    allReadyIds.forEach((id) => offeredSuggestionIds.current.add(id));
     setRunnerIntegrationIds(allReadyIds);
     setSeeded((current) => ({ ...current, connected: true }));
   }, [connected, connectedLoading, seeded.connected]);
 
-  // Auto-select suggested integrations when checks are selected
+  // Auto-select suggested integrations when checks are selected. Each integration is only
+  // offered once: if the user later deselects it, changing checks or refreshing connected
+  // tools must not add it back.
   useEffect(() => {
     if (checkNames.length === 0 || seeded.connected === false || connectedLoading) {
       return;
@@ -169,8 +175,14 @@ function useChecksSetupResources(
     if (suggested.length === 0) {
       return;
     }
-    // Get IDs of suggested integrations that are ready
-    const suggestedIds = getSuggestedIntegrationIds(suggested, connected);
+    // Get IDs of suggested integrations that are ready, excluding ones already offered before.
+    const suggestedIds = getSuggestedIntegrationIds(suggested, connected).filter(
+      (id) => !offeredSuggestionIds.current.has(id),
+    );
+    if (suggestedIds.length === 0) {
+      return;
+    }
+    suggestedIds.forEach((id) => offeredSuggestionIds.current.add(id));
     setRunnerIntegrationIds((current) => {
       const seen = new Set(current);
       suggestedIds.forEach((id) => seen.add(id));

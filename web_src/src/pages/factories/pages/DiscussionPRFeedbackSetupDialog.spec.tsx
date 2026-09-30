@@ -219,6 +219,47 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
   });
 
+  it("keeps an explicit ignore choice after the bot catalog finishes loading", async () => {
+    const user = userEvent.setup();
+    mocks.fetching = true;
+    const { rerender } = render(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await openBotsStep(user);
+    // Touch "Address" first so the following click on "Ignore" fires a real change event
+    // even though "Ignore" is already the pre-catalog default.
+    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    await user.click(screen.getByRole("radio", { name: /Ignore bot comments/ }));
+    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+
+    // The bot catalog now finishes loading.
+    mocks.fetching = false;
+    rerender(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Ignore bot comments/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Address bot comments/ })).not.toBeChecked();
+    expect(screen.queryByTestId("discussion-setup-bots-found")).not.toBeInTheDocument();
+  });
+
   it("shows a step question for human comments and AI comments", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
