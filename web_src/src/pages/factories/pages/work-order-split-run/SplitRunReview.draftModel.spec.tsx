@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
@@ -37,6 +38,29 @@ beforeAll(() => {
 async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, parentTestId: string, optionName: string) {
   await user.hover(screen.getByTestId(parentTestId));
   fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
+}
+
+function StatefulDraftModelSelect({
+  onChange,
+}: {
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
+}) {
+  const [model, setModel] = useState(DRAFT_START_MODEL_AUTO);
+  const [thinkingLevel, setThinkingLevel] = useState(THINKING_LEVEL_MEDIUM);
+  return (
+    <DraftStartModelSelect
+      organizationId="org-1"
+      factoryId="factory-1"
+      lineName="ship"
+      model={model}
+      thinkingLevel={thinkingLevel}
+      onChange={(next) => {
+        setModel(next.model);
+        setThinkingLevel(next.thinkingLevel);
+        onChange(next);
+      }}
+    />
+  );
 }
 
 function renderDraftFooter(
@@ -126,16 +150,22 @@ describe("SplitRunReview draft model select", () => {
     expect(screen.getByTestId("split-run-draft-model-list")).toBeInTheDocument();
   });
 
-  it("keeps the menu open so the user can pick model and thinking", async () => {
+  it("keeps the picked thinking level when the model changes", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <TooltipProvider>
+          <StatefulDraftModelSelect onChange={onChange} />
+        </TooltipProvider>
+      </QueryClientProvider>,
+    );
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
     await selectFlyoutOption(user, "split-run-draft-thinking", "High");
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
     expect(onChange).toHaveBeenNthCalledWith(1, { model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
-    expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: THINKING_LEVEL_MEDIUM });
+    expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: "high" });
   });
 
   it("disables the model chevron when Start is disabled", () => {
