@@ -147,6 +147,8 @@ func TestAdminGetOrganization(t *testing.T) {
 		assert.Equal(t, r.Organization.Description, org.Description)
 		assert.GreaterOrEqual(t, org.MemberCount, int64(0))
 		assert.GreaterOrEqual(t, org.CanvasCount, int64(0))
+		assert.GreaterOrEqual(t, org.TaskCount, int64(0))
+		assert.GreaterOrEqual(t, org.DoneTaskCount, int64(0))
 		require.NotNil(t, org.CreatedAt)
 		require.NotNil(t, org.UpdatedAt)
 	})

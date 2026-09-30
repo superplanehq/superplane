@@ -57,6 +57,8 @@ describe("OrganizationDetail", () => {
             slug: "acme",
             description: "Builds widgets",
             canvas_count: 2,
+            task_count: 4,
+            done_task_count: 6,
             member_count: 3,
             created_at: "2024-01-15T12:00:00Z",
             updated_at: "2024-02-20T12:00:00Z",
@@ -129,6 +131,8 @@ describe("OrganizationDetail", () => {
     expect(within(panel).getByText("Builds widgets")).toBeInTheDocument();
     expect(within(panel).getByText("3")).toBeInTheDocument();
     expect(within(panel).getByText("2")).toBeInTheDocument();
+    expect(within(panel).getByText("4")).toBeInTheDocument();
+    expect(within(panel).getByText("6")).toBeInTheDocument();
     expect(within(panel).getByText("Name")).toBeInTheDocument();
     expect(within(panel).getByText("Slug")).toBeInTheDocument();
     expect(within(panel).getByText("Organization ID")).toBeInTheDocument();
@@ -137,6 +141,8 @@ describe("OrganizationDetail", () => {
     expect(within(panel).getByText("Updated")).toBeInTheDocument();
     expect(within(panel).getByText("Members")).toBeInTheDocument();
     expect(within(panel).getByText("Automations")).toBeInTheDocument();
+    expect(within(panel).getByText("Tasks")).toBeInTheDocument();
+    expect(within(panel).getByText("Done Tasks")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
   });
 
@@ -224,6 +230,8 @@ describe("OrganizationDetail", () => {
       slug: "acme",
       description: "Builds widgets",
       canvas_count: 2,
+      task_count: 4,
+      done_task_count: 6,
       member_count: 3,
       created_at: "2024-01-15T12:00:00Z",
       updated_at: "2024-02-20T12:00:00Z",
