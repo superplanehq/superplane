@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
 import {
@@ -29,7 +31,7 @@ const PUBLIC_BADGE_COPY = {
   costHelper: "Anyone with the link can see the cost per merged pull request on the Large and Full width badges.",
   linkLabel: "Link the badge to the public board",
   linkHelper: "A click on the badge opens the line board.",
-  linkPrivateHelper: "Make the workspace public first. Use the Visibility section above.",
+  linkPrivateHelper: "The workspace is private. Make it public in the Visibility section above.",
   periodLabel: "Time frame",
   sizeLabel: "Size",
   markdownLabel: "Markdown",
@@ -234,9 +236,10 @@ function PublicBadgeDetails({
       />
       <BadgeSwitchRow
         label={PUBLIC_BADGE_COPY.linkLabel}
-        helper={badge.canLinkToBoard ? PUBLIC_BADGE_COPY.linkHelper : PUBLIC_BADGE_COPY.linkPrivateHelper}
+        helper={PUBLIC_BADGE_COPY.linkHelper}
         checked={badge.linkToBoard && badge.canLinkToBoard}
         disabled={locked || !badge.canLinkToBoard}
+        disabledReason={badge.canLinkToBoard ? undefined : PUBLIC_BADGE_COPY.linkPrivateHelper}
         canUpdate={canUpdate}
         permissionsLoading={permissionsLoading}
         testId="factory-settings-public-badge-board-link"
@@ -373,6 +376,7 @@ function BadgeSwitchRow({
   helper,
   checked,
   disabled,
+  disabledReason,
   canUpdate,
   permissionsLoading,
   testId,
@@ -382,14 +386,18 @@ function BadgeSwitchRow({
   helper: string;
   checked: boolean;
   disabled: boolean;
+  /** Why the switch is off limits. It shows on hover and dims the row. */
+  disabledReason?: string;
   canUpdate: boolean;
   permissionsLoading: boolean;
   testId: string;
   onCheckedChange: (checked: boolean) => void;
 }) {
-  return (
-    <div className="flex items-start justify-between gap-6" data-testid={testId}>
-      <div className="min-w-0 space-y-0.5">
+  // The permission tooltip states its own reason, so only one shows at a time.
+  const reason = canUpdate && disabled ? disabledReason : undefined;
+  const row = (
+    <div className="flex w-full items-start justify-between gap-6" data-testid={testId}>
+      <div className={cn("min-w-0 space-y-0.5", reason && "opacity-60")}>
         <p className="text-[13px] font-medium text-foreground">{label}</p>
         <p className="text-[12px] leading-5 text-muted-foreground">{helper}</p>
       </div>
@@ -403,5 +411,20 @@ function BadgeSwitchRow({
         />
       </PermissionTooltip>
     </div>
+  );
+
+  if (!reason) {
+    return row;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex cursor-not-allowed">{row}</div>
+      </TooltipTrigger>
+      <TooltipContent side="top" data-testid={`${testId}-reason`}>
+        {reason}
+      </TooltipContent>
+    </Tooltip>
   );
 }

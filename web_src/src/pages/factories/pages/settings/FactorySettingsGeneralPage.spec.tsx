@@ -230,6 +230,15 @@ describe("FactorySettingsGeneralPage", () => {
     expect(snippet.value).not.toContain("accent=");
   });
 
+  it("explains on hover why the board link is off limits", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    await user.hover(screen.getByTestId("factory-settings-public-badge-board-link"));
+    const reason = await screen.findByText("The workspace is private. Make it public in the Visibility section above.");
+    expect(reason).toBeInTheDocument();
+  });
+
   it("links the badge to the board only while the workspace is public", async () => {
     const user = userEvent.setup();
     renderPage(badgeOnFactory);
