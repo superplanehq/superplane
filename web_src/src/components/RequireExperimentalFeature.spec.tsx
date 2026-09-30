@@ -88,7 +88,7 @@ describe("RequireExperimentalFeature", () => {
         registry: {
           features: [
             { id: "workspace_mcp", label: "Workspace MCP", description: "", released: false },
-            { id: "superplane_mcp_server", label: "SuperPlane MCP Server", description: "", released: false },
+            { id: "superplane_mcp_server", label: "MCP Server", description: "", released: false },
           ],
         },
       },

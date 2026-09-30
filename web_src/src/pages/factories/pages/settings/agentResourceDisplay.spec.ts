@@ -31,8 +31,8 @@ describe("connectionStatusLabel", () => {
   it("maps oauth statuses", () => {
     expect(connectionStatusLabel(OAUTH_NOT_CONNECTED_RESOURCE)).toBe("Not connected");
     expect(connectionStatusLabel(OAUTH_CONNECTED_RESOURCE)).toBe("Connected");
-    expect(connectionStatusLabel(OAUTH_NEEDS_RECONNECT_RESOURCE)).toBe("Reconnect");
-    expect(connectionStatusLabel(OAUTH_VENDOR_REJECTED_RESOURCE)).toBe("Reconnect");
+    expect(connectionStatusLabel(OAUTH_NEEDS_RECONNECT_RESOURCE)).toBe("Reconnection needed");
+    expect(connectionStatusLabel(OAUTH_VENDOR_REJECTED_RESOURCE)).toBe("Reconnection needed");
   });
 });
 
