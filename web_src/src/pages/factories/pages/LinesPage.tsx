@@ -1172,6 +1172,7 @@ function LineDetail({
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
           canUpdate={workOrderCardContext.canAssign}
+          canCreateWorkOrder={canCreateWorkOrder}
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
@@ -1193,6 +1194,7 @@ function LineBoardSplitRunPopup({
   peekOrder,
   canDispatch,
   canUpdate,
+  canCreateWorkOrder,
   isDispatching,
   onDispatch,
   analysisRuns,
@@ -1208,6 +1210,7 @@ function LineBoardSplitRunPopup({
   peekOrder: FactoriesWorkOrderSummary;
   canDispatch: boolean;
   canUpdate: boolean;
+  canCreateWorkOrder: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
@@ -1247,6 +1250,7 @@ function LineBoardSplitRunPopup({
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
+      canCreateWorkOrder={canCreateWorkOrder}
       isDispatching={isDispatching}
       onDispatch={
         resolvedLineName
