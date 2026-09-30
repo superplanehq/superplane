@@ -7,10 +7,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestCatalogGitHubRequestsFollowOnboardingGuide(t *testing.T) {
@@ -88,6 +92,55 @@ func TestCatalogGitHubRequestsFollowOnboardingGuide(t *testing.T) {
 		assert.Equal(t, int64(9), models[0].ProviderUserID)
 		assert.Equal(t, "writer", models[0].ProviderLogin)
 	})
+}
+
+func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+
+	appClient, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app/installations":
+			_, _ = w.Write([]byte(`[
+          {"id":101,"account":{"id":1,"login":"broken"}},
+          {"id":202,"account":{"id":2,"login":"ready"}}
+        ]`))
+		case "/app/installation-requests":
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	brokenClient, _ := guideClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "temporary GitHub error", http.StatusInternalServerError)
+	})
+	readyClient, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/installation/repositories", r.URL.Path)
+		_, _ = w.Write([]byte(`{"total_count":1,"repositories":[{"id":77,"full_name":"ready/api"}]}`))
+	})
+	now := time.Now()
+	catalog := &Catalog{
+		db:        database.Conn(),
+		appClient: appClient,
+		installation: func(installationID int64) (*gh.Client, error) {
+			if installationID == 101 {
+				return brokenClient, nil
+			}
+			return readyClient, nil
+		},
+		now: func() time.Time { return now },
+	}
+
+	err := catalog.Reconcile(t.Context(), models.VCSProviderRepositorySyncPriorityInteractive)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "GitHub installation 101")
+
+	repository, findErr := models.FindVCSProviderRepository(database.Conn(), models.ProviderGitHub, 77)
+	require.NoError(t, findErr)
+	assert.Equal(t, "ready/api", repository.FullName)
+	var job models.VCSProviderRepositorySyncJob
+	require.NoError(t, database.Conn().First(&job, "provider = ? AND repository_id = ?", models.ProviderGitHub, 77).Error)
+	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, job.Priority)
 }
 
 func guideClient(t *testing.T, handler http.HandlerFunc) (*gh.Client, *int) {

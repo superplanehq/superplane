@@ -79,7 +79,7 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		})
 	}
 
-	response.Synchronizing, err = models.VCSProviderCatalogSynchronizing(database.DB(ctx), provider)
+	response.Synchronizing, err = models.VCSProviderCatalogSynchronizing(database.DB(ctx), provider, identity.userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to inspect repository synchronization")
 	}

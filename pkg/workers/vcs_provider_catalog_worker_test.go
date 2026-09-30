@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -16,11 +17,24 @@ import (
 
 type recordingVCSProviderCatalog struct {
 	mu                  sync.Mutex
+	installationIDs     []int64
 	repositoryIDs       []int64
 	blockID             int64
 	release             chan struct{}
 	started             chan int64
+	installationError   error
 	reconcilePriorities []models.VCSProviderRepositorySyncPriority
+}
+
+func (c *recordingVCSProviderCatalog) ReconcileInstallation(
+	_ context.Context,
+	installationID int64,
+	_ models.VCSProviderRepositorySyncPriority,
+) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.installationIDs = append(c.installationIDs, installationID)
+	return c.installationError
 }
 
 func (c *recordingVCSProviderCatalog) Reconcile(
@@ -52,6 +66,12 @@ func (c *recordingVCSProviderCatalog) repositories() []int64 {
 	return append([]int64(nil), c.repositoryIDs...)
 }
 
+func (c *recordingVCSProviderCatalog) installations() []int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]int64(nil), c.installationIDs...)
+}
+
 func (c *recordingVCSProviderCatalog) priorities() []models.VCSProviderRepositorySyncPriority {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -74,6 +94,51 @@ func TestVCSProviderCatalogWorkerPrioritizesRequestedReconciliation(t *testing.T
 	assert.Equal(t, []models.VCSProviderRepositorySyncPriority{
 		models.VCSProviderRepositorySyncPriorityInteractive,
 	}, catalog.priorities())
+}
+
+func TestVCSProviderCatalogWorkerReconcilesRequestedInstallation(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	require.NoError(t, models.EnqueueVCSProviderInstallationReconciliation(
+		database.Conn(),
+		models.ProviderGitHub,
+		101,
+		time.Now().Add(-time.Second),
+	))
+
+	catalog := &recordingVCSProviderCatalog{}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+	worker.processInstallationJobs(t.Context())
+	worker.installationJobs.Wait()
+
+	assert.Equal(t, []int64{101}, catalog.installations())
+	var remaining int64
+	require.NoError(t, database.Conn().Model(&models.VCSProviderInstallationReconcileJob{}).Count(&remaining).Error)
+	assert.Zero(t, remaining)
+}
+
+func TestVCSProviderCatalogWorkerDiscardsRepeatedlyFailingInstallation(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	require.NoError(t, models.EnqueueVCSProviderInstallationReconciliation(
+		db,
+		models.ProviderGitHub,
+		101,
+		time.Now().Add(-time.Second),
+	))
+	require.NoError(t, db.Model(&models.VCSProviderInstallationReconcileJob{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, 101).
+		Update("attempts", vcsProviderInstallationMaxAttempts-1).Error)
+
+	catalog := &recordingVCSProviderCatalog{installationError: errors.New("installation is unavailable")}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+	worker.processInstallationJobs(t.Context())
+	worker.installationJobs.Wait()
+
+	var remaining int64
+	require.NoError(t, db.Model(&models.VCSProviderInstallationReconcileJob{}).Count(&remaining).Error)
+	assert.Zero(t, remaining)
 }
 
 func TestVCSProviderCatalogWorkerProcessesRepositoryJobsInBatches(t *testing.T) {
@@ -190,6 +255,14 @@ func (c *progressivelyVisibleVCSProviderCatalog) Reconcile(
 	return nil
 }
 
+func (c *progressivelyVisibleVCSProviderCatalog) ReconcileInstallation(
+	context.Context,
+	int64,
+	models.VCSProviderRepositorySyncPriority,
+) error {
+	return nil
+}
+
 func (c *progressivelyVisibleVCSProviderCatalog) SyncRepositoryCollaborators(
 	_ context.Context,
 	repositoryID int64,
@@ -263,9 +336,19 @@ func TestVCSProviderCatalogWorkerMakesRepositoriesVisibleProgressively(t *testin
 }
 
 type blockingReconcileVCSProviderCatalog struct {
-	reconcileStarted chan struct{}
-	releaseReconcile chan struct{}
-	repositorySynced chan int64
+	reconcileStarted       chan struct{}
+	releaseReconcile       chan struct{}
+	installationReconciled chan int64
+	repositorySynced       chan int64
+}
+
+func (c *blockingReconcileVCSProviderCatalog) ReconcileInstallation(
+	_ context.Context,
+	installationID int64,
+	_ models.VCSProviderRepositorySyncPriority,
+) error {
+	c.installationReconciled <- installationID
+	return nil
 }
 
 func (c *blockingReconcileVCSProviderCatalog) Reconcile(context.Context, models.VCSProviderRepositorySyncPriority) error {
@@ -279,7 +362,7 @@ func (c *blockingReconcileVCSProviderCatalog) SyncRepositoryCollaborators(_ cont
 	return nil
 }
 
-func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRepositoryJobs(t *testing.T) {
+func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRequestedWork(t *testing.T) {
 	registry := support.Setup(t)
 	t.Cleanup(registry.Close)
 	db := database.Conn()
@@ -298,11 +381,18 @@ func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRepositoryJobs(t *tes
 		time.Now().Add(-time.Second),
 		models.VCSProviderRepositorySyncPriorityInteractive,
 	))
+	require.NoError(t, models.EnqueueVCSProviderInstallationReconciliation(
+		db,
+		models.ProviderGitHub,
+		101,
+		time.Now().Add(-time.Second),
+	))
 
 	catalog := &blockingReconcileVCSProviderCatalog{
-		reconcileStarted: make(chan struct{}),
-		releaseReconcile: make(chan struct{}),
-		repositorySynced: make(chan int64, 1),
+		reconcileStarted:       make(chan struct{}),
+		releaseReconcile:       make(chan struct{}),
+		installationReconciled: make(chan int64, 1),
+		repositorySynced:       make(chan int64, 1),
 	}
 	worker := newTestVCSProviderCatalogWorker(catalog)
 	ctx, cancel := context.WithCancel(t.Context())
@@ -323,6 +413,12 @@ func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRepositoryJobs(t *tes
 	case <-time.After(time.Second):
 		t.Fatal("repository synchronization was blocked by reconciliation")
 	}
+	select {
+	case installationID := <-catalog.installationReconciled:
+		assert.Equal(t, int64(101), installationID)
+	case <-time.After(time.Second):
+		t.Fatal("installation reconciliation was blocked by catalog reconciliation")
+	}
 
 	cancel()
 	close(catalog.releaseReconcile)
@@ -333,11 +429,19 @@ func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRepositoryJobs(t *tes
 	}
 }
 
+func TestVCSProviderInstallationRetryDelay(t *testing.T) {
+	assert.Equal(t, time.Second, vcsProviderInstallationRetryDelay(1))
+	assert.Equal(t, 2*time.Second, vcsProviderInstallationRetryDelay(2))
+	assert.Equal(t, vcsProviderInstallationRetryMaximumDelay, vcsProviderInstallationRetryDelay(6))
+	assert.Equal(t, vcsProviderInstallationRetryMaximumDelay, vcsProviderInstallationRetryDelay(100))
+}
+
 func newTestVCSProviderCatalogWorker(catalog vcsProviderCatalog) *VCSProviderCatalogWorker {
 	return &VCSProviderCatalogWorker{
-		provider:        models.ProviderGitHub,
-		catalog:         catalog,
-		logger:          log.WithField("worker", "VCSProviderCatalogWorker"),
-		repositorySlots: make(chan struct{}, vcsProviderJobBatchSize),
+		provider:          models.ProviderGitHub,
+		catalog:           catalog,
+		logger:            log.WithField("worker", "VCSProviderCatalogWorker"),
+		installationSlots: make(chan struct{}, vcsProviderInstallationJobConcurrency),
+		repositorySlots:   make(chan struct{}, vcsProviderJobBatchSize),
 	}
 }

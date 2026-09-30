@@ -65,25 +65,36 @@ func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepo
 	}
 
 	seen := make(map[int64]struct{}, len(installations))
+	reconcileErrors := make([]error, 0)
 	for _, installation := range installations {
 		if installation == nil || installation.GetID() <= 0 || installation.GetAccount() == nil {
 			continue
 		}
 		seen[installation.GetID()] = struct{}{}
 		if err := c.reconcileInstallation(ctx, installation, priority); err != nil {
-			return err
+			reconcileErrors = append(
+				reconcileErrors,
+				fmt.Errorf("reconcile GitHub installation %d: %w", installation.GetID(), err),
+			)
 		}
 	}
 
 	if err := c.removeMissingInstallations(seen); err != nil {
-		return err
+		reconcileErrors = append(reconcileErrors, fmt.Errorf("remove missing GitHub installations: %w", err))
 	}
 
 	requests, err := c.listInstallationRequests(ctx)
 	if err != nil {
-		return err
+		reconcileErrors = append(reconcileErrors, err)
+	} else if err := models.ReplaceVCSProviderInstallRequests(
+		c.db,
+		models.ProviderGitHub,
+		installRequestModels(requests, c.now()),
+	); err != nil {
+		reconcileErrors = append(reconcileErrors, fmt.Errorf("save GitHub App installation requests: %w", err))
 	}
-	return models.ReplaceVCSProviderInstallRequests(c.db, models.ProviderGitHub, installRequestModels(requests, c.now()))
+
+	return errors.Join(reconcileErrors...)
 }
 
 func (c *Catalog) ReconcileInstallation(
