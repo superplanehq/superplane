@@ -75,6 +75,29 @@ func (s *githubInstallRequestSteps) visitWorkspaceRepositorySelection(factory *m
 }
 
 func (s *githubInstallRequestSteps) whenGitHubReturnsAnOwnerApproval() {
+	const installationID = int64(159131070)
+	accountID := int64(301)
+	require.NoError(s.t, models.ReplaceVCSProviderInstallRequests(
+		database.DB(s.t.Context()),
+		models.ProviderGitHub,
+		[]models.VCSProviderInstallRequest{{
+			RequestID:    101,
+			AccountID:    &accountID,
+			AccountLogin: "acme",
+			RequesterID:  42,
+			RequestedAt:  time.Now(),
+		}},
+	))
+	require.NoError(s.t, models.UpsertVCSProviderInstallation(
+		database.DB(s.t.Context()),
+		&models.VCSProviderInstallation{
+			Provider:       models.ProviderGitHub,
+			InstallationID: installationID,
+			AccountID:      &accountID,
+			AccountLogin:   "acme",
+			AccountType:    "Organization",
+		},
+	))
 	s.session.Visit("/api/v1/github/app/setup?installation_id=159131070&setup_action=install")
 }
 

@@ -174,6 +174,57 @@ func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCatalogConsumeInstallationRequestUsesStoredInstallation(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	accountID := int64(301)
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountID:      &accountID,
+		AccountLogin:   "acme",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountID:    &accountID,
+		AccountLogin: "acme",
+		RequesterID:  501,
+		RequestedAt:  time.Now(),
+	}}))
+
+	catalog := &Catalog{db: db}
+	requested, err := catalog.ConsumeInstallationRequest(t.Context(), 101)
+	require.NoError(t, err)
+	assert.True(t, requested)
+	requested, err = catalog.ConsumeInstallationRequest(t.Context(), 101)
+	require.NoError(t, err)
+	assert.False(t, requested)
+}
+
+func TestCatalogConsumeInstallationRequestLoadsMissingInstallation(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	accountID := int64(301)
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountID:    &accountID,
+		AccountLogin: "acme",
+		RequesterID:  501,
+		RequestedAt:  time.Now(),
+	}}))
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installations/101", r.URL.Path)
+		_, _ = w.Write([]byte(`{"id":101,"account":{"id":301,"login":"acme"}}`))
+	})
+
+	catalog := &Catalog{db: db, appClient: client}
+	requested, err := catalog.ConsumeInstallationRequest(t.Context(), 101)
+	require.NoError(t, err)
+	assert.True(t, requested)
+}
+
 func guideClient(t *testing.T, handler http.HandlerFunc) (*gh.Client, *int) {
 	t.Helper()
 	requests := 0

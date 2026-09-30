@@ -29,11 +29,13 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 	setGitHubAppEnvironment(t)
 	previousReconciliation := enqueueGitHubAppReconciliation
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
+	previousConsumeInstallationRequest := consumeGitHubAppInstallationRequest
 	organizationID := uuid.New()
 	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
 	require.NoError(t, err)
 	var installationIDs []int64
 	var organizationIDs []uuid.UUID
+	installationRequested := true
 	reconciliationCount := 0
 	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error {
 		reconciliationCount++
@@ -49,9 +51,13 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		organizationIDs = append(organizationIDs, requestedOrganizationID)
 		return nil
 	}
+	consumeGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
+		return installationRequested, nil
+	}
 	t.Cleanup(func() {
 		enqueueGitHubAppReconciliation = previousReconciliation
 		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
+		consumeGitHubAppInstallationRequest = previousConsumeInstallationRequest
 	})
 
 	t.Run("direct installation returns to the app", func(t *testing.T) {
@@ -69,7 +75,24 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Zero(t, reconciliationCount)
 	})
 
+	t.Run("direct listing installation returns to the app", func(t *testing.T) {
+		installationRequested = false
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
 	t.Run("approved request opens the confirmation page", func(t *testing.T) {
+		installationRequested = true
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
@@ -79,8 +102,8 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
-		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
-		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil}, organizationIDs)
+		assert.Equal(t, []int64{159131070, 159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
@@ -94,8 +117,8 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
-		assert.Equal(t, []int64{159131070, 159131070, 159131070}, installationIDs)
-		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, organizationID}, organizationIDs)
+		assert.Equal(t, []int64{159131070, 159131070, 159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil, organizationID}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
@@ -299,13 +322,14 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 		Repositories: []*gh.Repository{repository},
 	}
 
-	// Duplicate deliveries are idempotent and remove a matching approval row
-	// as soon as the installation becomes authoritative.
+	// Duplicate deliveries are idempotent and preserve the approval row until
+	// the browser callback can identify why the installation was created.
 	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
 	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
 	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, requesterID)
 	require.NoError(t, err)
-	assert.Empty(t, requests)
+	require.Len(t, requests, 1)
+	assert.Equal(t, int64(501), requests[0].RequestID)
 	stored, err := models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
 	require.NoError(t, err)
 	assert.Equal(t, "acme/api", stored.FullName)
