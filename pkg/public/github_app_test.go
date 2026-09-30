@@ -54,7 +54,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
 	})
 
-	t.Run("approved installation returns to onboarding", func(t *testing.T) {
+	t.Run("direct installation returns to the app", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
@@ -63,9 +63,24 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		))
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
-		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070}, installationIDs)
 		assert.Equal(t, []uuid.UUID{organizationID}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("approved request opens the confirmation page", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
@@ -79,8 +94,8 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
-		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
-		assert.Equal(t, []uuid.UUID{organizationID, organizationID}, organizationIDs)
+		assert.Equal(t, []int64{159131070, 159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, organizationID}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
