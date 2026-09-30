@@ -73,6 +73,10 @@ const AdminLayout: React.FC = () => {
                 <Webhook size={14} />
                 Polar Webhooks
               </NavLink>
+              <NavLink to="/admin/sentry-webhooks" className={navLinkClass}>
+                <Webhook size={14} />
+                Sentry Webhooks
+              </NavLink>
             </nav>
           </div>
 

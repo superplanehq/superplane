@@ -8,45 +8,38 @@ import {
   TimelineSeparator,
   TimelineTitle,
 } from "@/components/reui/timeline";
-import { MarkdownContent } from "@/pages/app/Markdown";
 import { Badge } from "@/components/reui/badge";
-import { Link } from "@/components/Link/link";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
-import { ArrowLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { Check, ChevronRight, Circle, Clock, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest, FilesFile } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
-import { splitRunPhaseRunHref } from "../splitRunPopupModel";
 import { AutomationCardBody } from "./AutomationCardBody";
-import { ConsoleRunsDrawer } from "./ConsoleRunsDrawer";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { StepOutputCounts } from "./consoleOutputChips";
-import { LiveAgentSteps } from "./LiveAgentSteps";
-import { runFooterLine, runMetaLine } from "./consoleCardText";
+import { runMetaLine } from "./consoleCardText";
 import {
   allStages,
+  automationsFromStages,
   outcomeSummary,
   stagesByConsoleColumn,
   stagesFromFixture,
-  type AutomationStage,
   type ConsoleAutomation,
 } from "./automationsViewModel";
-import { HEADER_ICON_BUTTON, META_TEXT_CLASSNAME } from "./redesignFormat";
+import { META_TEXT_CLASSNAME } from "./redesignFormat";
 import { StageStatusGlyph } from "./redesignShared";
 
 /**
  * Variant B: automation console. Backlog, Implement, Verify, and Done sit
  * on a timeline. Each card is the latest run of one automation, seen
- * through its agent. The header carries status and this run's spend. The
+ * through its agent. The header carries status and this run's duration. The
  * body is the same marker list on a finished run and on a running one. A
- * running step is the live row. The footer carries start time, model, and
- * the way into the runs drawer. Canvas nodes are not shown on this tab.
+ * running step is the live row. The footer carries start time, live
+ * spend, model, and Retry or Stop. Canvas nodes are not shown on this tab.
  * Columns the task has not reached read "Not started". A sticky Frame
  * holds the task status, spend, checks, and outputs.
  */
@@ -55,9 +48,6 @@ export function AutomationsConsoleVariant({
   organizationId,
   factoryId,
   orderId,
-  factoryKey,
-  orderNumber,
-  lineId,
   taskDescription,
   canEditDescription = false,
   descriptionBusy = false,
@@ -65,6 +55,7 @@ export function AutomationsConsoleVariant({
   source,
   files,
   pullRequests,
+  artifacts,
   panelReview,
   canStopRun = false,
   actionBusy = false,
@@ -87,6 +78,8 @@ export function AutomationsConsoleVariant({
   files?: FilesFile[];
   /** Pull requests tracked on this task, for the summary panel. */
   pullRequests?: FactoriesFactoryPullRequest[];
+  /** Every artifact on this task, for the summary panel. */
+  artifacts?: FactoriesWorkOrderArtifact[];
   /** Decision note and actions for the summary panel. */
   panelReview?: ReactNode;
   /** True when this person can cancel a live canvas run. */
@@ -101,32 +94,22 @@ export function AutomationsConsoleVariant({
   const stages = allStages(groups);
   const columns = consoleColumns(groups, fixture.footer.run?.appId);
   const currentColumn = reachedColumns(columns);
-  const [openAutomation, setOpenAutomation] = useState<ConsoleAutomation | null>(null);
-  const [fullLogAutomation, setFullLogAutomation] = useState<ConsoleAutomation | null>(null);
-
-  if (fullLogAutomation) {
-    const phase = fixture.phases.find((entry) => entry.id === fullLogAutomation.latest.id);
-    return (
-      <ConsoleFullLog
-        automation={fullLogAutomation}
-        phase={phase}
-        organizationId={organizationId}
-        runHref={phase ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase }) : undefined}
-        onBack={() => setFullLogAutomation(null)}
-      />
-    );
-  }
+  const markers = columns.map((column, index) => columnMarker(column, index, currentColumn));
+  const anyLive = hasLiveAutomation(columns);
+  const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
+  const liveRun = liveRunTarget(fixture);
+  const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="redesign-console-variant">
       <section className="flex min-w-0 flex-col gap-4">
-        <Timeline value={currentColumn} className="pl-1">
+        <Timeline value={reachedColumnCount(markers)} className="pl-1">
           {columns.map((column, index) => (
             <TimelineItem key={column.id} step={index + 1} data-testid={`redesign-console-column-${column.id}`}>
-              <TimelineSeparator />
-              <TimelineIndicator />
               <TimelineHeader className="flex items-center gap-2">
-                <TimelineTitle>{column.title}</TimelineTitle>
+                <TimelineSeparator />
+                <ColumnStatusIndicator marker={markers[index]} columnId={column.id} />
+                <TimelineTitle className="font-semibold">{column.title}</TimelineTitle>
                 {column.automations.length > 0 ? (
                   <Badge variant="secondary" className="h-5 min-w-5 px-1.5">
                     {column.automations.length}
@@ -142,24 +125,22 @@ export function AutomationsConsoleVariant({
                       key={automation.id}
                       automation={automation}
                       phase={fixture.phases.find((phase) => phase.id === automation.latest.id)}
+                      phases={fixture.phases}
                       organizationId={organizationId}
                       factoryId={factoryId}
                       orderId={orderId}
-                      factoryKey={factoryKey}
-                      orderNumber={orderNumber}
-                      lineId={lineId}
                       taskDescription={taskDescription}
                       canEditDescription={canEditDescription}
                       descriptionBusy={descriptionBusy}
                       onDescriptionSave={onDescriptionSave}
+                      source={source}
                       files={files}
-                      defaultOpen={index + 1 === currentColumn}
+                      expandIdle={expandIdleCards && index + 1 === currentColumn}
+                      anyLive={anyLive}
                       canStopRun={canStopRun}
                       actionBusy={actionBusy}
                       onStopRun={onStopRun}
                       onRerunStep={onRerunStep}
-                      onOpen={() => setOpenAutomation(automation)}
-                      onFullLog={() => setFullLogAutomation(automation)}
                     />
                   ))
                 )}
@@ -173,19 +154,11 @@ export function AutomationsConsoleVariant({
         outcome={outcome}
         stages={stages}
         pullRequests={pullRequests}
+        artifacts={artifacts}
         panelReview={panelReview}
         source={source}
-        files={files}
-      />
-      <ConsoleRunsDrawer
-        automation={openAutomation}
-        open={openAutomation !== null}
-        onOpenChange={(open) => !open && setOpenAutomation(null)}
-        fixture={fixture}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        lineId={lineId}
+        actionBusy={actionBusy}
+        onStopLiveRun={stopLiveRun}
       />
     </div>
   );
@@ -225,84 +198,139 @@ function reachedColumns(columns: ConsoleColumn[]): number {
   return reached + 1;
 }
 
-function automationsFromStages(stages: AutomationStage[]): ConsoleAutomation[] {
-  const byKey = new Map<string, AutomationStage[]>();
-  for (const stage of stages) {
-    const key = stage.appId || stage.componentName;
-    const runs = byKey.get(key) ?? [];
-    runs.push(stage);
-    byKey.set(key, runs);
+/** The run the summary-panel Stop cancels: the running phase, else the footer's live run. */
+function liveRunTarget(fixture: SplitRunFixture): { appId: string; runId: string } | undefined {
+  const phase = fixture.phases.find((entry) => entry.status === "running" && entry.appId && entry.runId);
+  if (phase?.appId && phase.runId) {
+    return { appId: phase.appId, runId: phase.runId };
   }
-  return [...byKey.entries()].map(([key, runs]) => {
-    const newestFirst = [...runs].sort(
-      (left, right) => Date.parse(right.startedAt ?? "") - Date.parse(left.startedAt ?? ""),
-    );
-    const name = newestFirst[0]?.componentName ?? key;
-    return {
-      id: automationDomId(name, key),
-      name,
-      latest: newestFirst[0],
-      runs: newestFirst,
-    };
-  });
+  return fixture.footer.kind === "running" ? fixture.footer.run : undefined;
 }
 
-function automationDomId(name: string, key: string): string {
-  const slug = `${name}-${key}`.toLowerCase().replace(/\W+/g, "-").replace(/^-|-$/g, "");
-  return slug || "automation";
+function isLiveAutomationStatus(status: SplitRunPhaseStatus): boolean {
+  return status === "running" || status === "waiting";
+}
+
+function hasLiveAutomation(columns: ConsoleColumn[]): boolean {
+  return columns.some((column) =>
+    column.automations.some((automation) => isLiveAutomationStatus(automation.latest.status)),
+  );
+}
+
+type ColumnMarker = "completed" | "running" | "waiting" | "failed" | "cancelled" | "pending";
+
+/**
+ * Rail marker for one console column. Composition matches ReUI
+ * solution-agents-3: size-5 disk, size-3 icon, indicator in the header.
+ */
+function columnMarker(column: ConsoleColumn, index: number, currentColumn: number): ColumnMarker {
+  if (column.automations.length === 0) {
+    return index + 1 < currentColumn ? "completed" : "pending";
+  }
+  const statuses = column.automations.map((automation) => automation.latest.status);
+  if (statuses.some((status) => status === "running")) return "running";
+  if (statuses.some((status) => status === "waiting")) return "waiting";
+  if (statuses.some((status) => status === "failed")) return "failed";
+  if (statuses.some((status) => status === "cancelled")) return "cancelled";
+  if (statuses.every((status) => status === "pending")) return "pending";
+  return "completed";
+}
+
+/** Fill the rail through every started column, including failed and running. */
+function reachedColumnCount(markers: ColumnMarker[]): number {
+  const firstPending = markers.findIndex((marker) => marker === "pending");
+  return firstPending === -1 ? markers.length : firstPending;
+}
+
+const COLUMN_MARKER_LABEL: Record<ColumnMarker, string> = {
+  completed: "Completed",
+  running: "Running",
+  waiting: "Waiting",
+  failed: "Failed",
+  cancelled: "Canceled",
+  pending: "Not started",
+};
+
+function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; columnId: string }) {
+  return (
+    <TimelineIndicator
+      aria-hidden={false}
+      className={cn(
+        "flex size-5 items-center justify-center border-none",
+        marker === "pending"
+          ? "bg-muted text-muted-foreground"
+          : "bg-foreground text-background group-data-completed/timeline-item:bg-foreground group-data-completed/timeline-item:text-background",
+      )}
+      data-testid={`redesign-console-column-marker-${columnId}`}
+      data-status={marker}
+    >
+      <span className="sr-only">{COLUMN_MARKER_LABEL[marker]}</span>
+      {marker === "completed" ? <Check className="size-3" aria-hidden /> : null}
+      {marker === "running" ? <LoaderCircle className="size-3 animate-spin" aria-hidden /> : null}
+      {marker === "waiting" ? <Clock className="size-3" aria-hidden /> : null}
+      {marker === "failed" || marker === "cancelled" ? <X className="size-3" aria-hidden /> : null}
+      {marker === "pending" ? <Circle className="size-3" aria-hidden /> : null}
+    </TimelineIndicator>
+  );
 }
 
 function ConsoleAutomationCard({
   automation,
   phase,
+  phases,
   organizationId,
   factoryId,
   orderId,
-  factoryKey,
-  orderNumber,
-  lineId,
   taskDescription,
   canEditDescription,
   descriptionBusy,
   onDescriptionSave,
+  source,
   files,
-  defaultOpen,
+  expandIdle,
+  anyLive,
   canStopRun,
   actionBusy,
   onStopRun,
   onRerunStep,
-  onOpen,
-  onFullLog,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
+  phases: SplitRunPhase[];
   organizationId?: string;
   factoryId?: string;
   orderId?: string;
-  factoryKey?: string;
-  orderNumber?: string;
-  lineId?: string;
   taskDescription?: string;
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
+  /** Where the task came from. The Backlog creation card shows it. */
+  source?: SplitRunSource;
   files?: FilesFile[];
-  /** True for cards in the column the task is currently in. */
-  defaultOpen: boolean;
+  /** True for the current-column card on a draft that has not started a run. */
+  expandIdle: boolean;
+  /** True when any automation on this task is running or waiting. */
+  anyLive: boolean;
   canStopRun: boolean;
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
-  onOpen: () => void;
-  onFullLog: () => void;
 }) {
   const { latest } = automation;
   const stopping = useStopRequested(latest.status, actionBusy);
   const shownStatus: SplitRunPhaseStatus = stopping.active && latest.status === "running" ? "cancelled" : latest.status;
   const shownPhase = phase && shownStatus !== phase.status ? { ...phase, status: shownStatus } : phase;
-  const runHref = shownPhase
-    ? splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: shownPhase })
-    : undefined;
+  const live = isLiveAutomationStatus(shownStatus);
+  const [open, setOpen] = useState(live || expandIdle);
+  useEffect(() => {
+    if (live) {
+      setOpen(true);
+      return;
+    }
+    if (!anyLive && !expandIdle) {
+      setOpen(false);
+    }
+  }, [anyLive, expandIdle, live]);
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
       ? () => {
@@ -323,34 +351,30 @@ function ConsoleAutomationCard({
       className="[--frame-radius:var(--radius-lg)]"
       data-testid={`redesign-console-automation-${automation.id}`}
     >
-      <Collapsible defaultOpen={defaultOpen || shownStatus === "running"} className="group/collapsible">
-        <FrameHeader className="flex min-w-0 flex-row items-center gap-2 py-2">
+      <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+        <FrameHeader
+          className="relative flex min-w-0 flex-row items-center gap-2 py-2"
+          data-testid={`redesign-console-card-header-${automation.id}`}
+        >
           <CollapsibleTrigger
-            className="flex min-w-0 shrink-0 items-center gap-2"
+            className="absolute inset-0 z-10 cursor-pointer rounded-[inherit]"
             aria-label={`Toggle ${automation.name} details`}
-          >
-            <StageStatusGlyph status={shownStatus} />
-            <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
-          </CollapsibleTrigger>
-          <StepOutputCounts stage={latest} />
+          />
+          <StageStatusGlyph status={shownStatus} />
+          <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
+          <StepOutputCounts stage={latest} phase={shownPhase} runs={automation.runs} />
           <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
-          {latest.appId ? <FullLogButton onFullLog={onFullLog} /> : null}
-          <CollapsibleTrigger
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            tabIndex={-1}
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
             aria-hidden
-          >
-            <ChevronRight
-              className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-              aria-hidden
-            />
-          </CollapsibleTrigger>
+          />
         </FrameHeader>
         <CollapsibleContent>
           <FramePanel className="space-y-3">
             <AutomationCardBody
               automation={automation}
               phase={shownPhase}
+              phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
               organizationId={organizationId}
               factoryId={factoryId}
               orderId={orderId}
@@ -358,12 +382,11 @@ function ConsoleAutomationCard({
               canEditDescription={canEditDescription}
               descriptionBusy={descriptionBusy}
               onDescriptionSave={onDescriptionSave}
+              source={source}
               files={files}
-              runHref={runHref}
               onStop={stopRun}
               onRetry={rerunStep}
               actionBusy={actionBusy}
-              onOpen={onOpen}
             />
           </FramePanel>
         </CollapsibleContent>
@@ -391,75 +414,4 @@ function useStopRequested(status: SplitRunPhaseStatus, actionBusy: boolean) {
     }
   }, [actionBusy, status]);
   return { active: stopping, request: () => setStopping(true) };
-}
-
-function FullLogButton({ onFullLog }: { onFullLog: () => void }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button type="button" aria-label="Full log" onClick={onFullLog} className={HEADER_ICON_BUTTON}>
-          <Maximize2 className="size-3.5" aria-hidden />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top">Full log</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/**
- * The stage stream on the whole popup: a sticky bar with the way back and
- * the run page link, then every step open for reading.
- */
-function ConsoleFullLog({
-  automation,
-  phase,
-  organizationId,
-  runHref,
-  onBack,
-}: {
-  automation: ConsoleAutomation;
-  phase?: SplitRunPhase;
-  organizationId?: string;
-  runHref?: string;
-  onBack: () => void;
-}) {
-  const { latest } = automation;
-  return (
-    <div className="flex min-w-0 flex-col gap-3" data-testid="redesign-console-full-log">
-      <div className="sticky -top-4 z-10 -mx-1 flex items-center gap-2 border-b bg-background px-1 py-2">
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={onBack}>
-          <ArrowLeft className="size-3.5" aria-hidden />
-          Back
-        </Button>
-        <StageStatusGlyph status={latest.status} />
-        <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{automation.name}</span>
-        <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{runMetaLine(latest)}</span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" aria-label="Collapse full log" onClick={onBack} className={HEADER_ICON_BUTTON}>
-              <Minimize2 className="size-3.5" aria-hidden />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Collapse</TooltipContent>
-        </Tooltip>
-      </div>
-      {latest.description ? (
-        <div className="text-[12.5px] leading-5 text-muted-foreground">
-          <MarkdownContent content={latest.description} variant="workspace" />
-        </div>
-      ) : null}
-      <LiveAgentSteps stage={latest} phase={phase} organizationId={organizationId} expandSteps />
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
-        <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(latest)}</span>
-        {runHref ? (
-          <Button size="sm" variant="outline" className="ms-auto shrink-0 gap-1.5" asChild>
-            <Link href={runHref}>
-              <Maximize2 className="size-3.5" aria-hidden />
-              View run
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
 }

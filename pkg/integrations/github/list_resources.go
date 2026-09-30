@@ -2,16 +2,51 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "repository":
+		metadata := common.Metadata{}
+		if decodeErr := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); decodeErr != nil {
+			return nil, fmt.Errorf("failed to decode GitHub integration metadata: %w", decodeErr)
+		}
+		binding, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID())
+		if err == nil {
+			if binding.Provider != models.ProviderGitHub {
+				return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
+			}
+			repositories, listErr := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.Integration.ID())
+			if listErr != nil {
+				return nil, fmt.Errorf("failed to list cached repositories: %w", listErr)
+			}
+			resources := make([]core.IntegrationResource, 0, len(repositories))
+			for _, repository := range repositories {
+				resources = append(resources, core.IntegrationResource{
+					Type: "repository",
+					Name: repository.FullName,
+					ID:   fmt.Sprintf("%d", repository.RepositoryID),
+				})
+			}
+			return resources, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("failed to resolve GitHub App binding: %w", err)
+		}
+		if metadata.HostedApp {
+			return nil, fmt.Errorf("hosted GitHub integration has no global installation binding")
+		}
+
 		client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client: %w", err)

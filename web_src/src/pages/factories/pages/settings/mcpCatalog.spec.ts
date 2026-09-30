@@ -4,6 +4,7 @@ import {
   AGENT_RESOURCES_COPY,
   CIRCLECI_PERSONAL_API_TOKEN_URL,
   GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+  SEMAPHORE_API_TOKEN_URL,
 } from "./agentResourceCopy";
 import {
   catalogConnectionDefaults,
@@ -19,12 +20,27 @@ describe("MCP_CATALOG", () => {
   it("includes a HTTPS URL and a SuperPlane-ready auth method on every entry", () => {
     expect(MCP_CATALOG.map((entry) => entry.id)).toEqual([
       "github",
+      "gitlab",
+      "postman",
       "jira",
       "linear",
+      "notion",
+      "figma",
+      "slack",
       "circleci",
       "semaphore",
+      "vercel",
+      "render",
+      "railway",
       "sentry",
       "datadog",
+      "grafana",
+      "cloudflare",
+      "stripe",
+      "supabase",
+      "mongodb-atlas",
+      "neon",
+      "prisma",
     ]);
     for (const entry of MCP_CATALOG) {
       expect(entry.url.startsWith("https://")).toBe(true);
@@ -32,12 +48,15 @@ describe("MCP_CATALOG", () => {
     }
     const github = MCP_CATALOG.find((entry) => entry.id === "github");
     const circleci = MCP_CATALOG.find((entry) => entry.id === "circleci");
+    const semaphore = MCP_CATALOG.find((entry) => entry.id === "semaphore");
     expect(github?.auth).toBe("AUTH_HEADERS");
     expect(github?.headerName).toBe("Authorization");
     expect(circleci?.auth).toBe("AUTH_HEADERS");
     expect(circleci?.headerName).toBe("Authorization");
+    expect(semaphore?.auth).toBe("AUTH_HEADERS");
+    expect(semaphore?.headerName).toBe("Authorization");
     expect(
-      MCP_CATALOG.filter((entry) => entry.id !== "github" && entry.id !== "circleci").every(
+      MCP_CATALOG.filter((entry) => entry.id !== "github" && entry.id !== "circleci" && entry.id !== "semaphore").every(
         (entry) => entry.auth === "AUTH_OAUTH",
       ),
     ).toBe(true);
@@ -77,6 +96,23 @@ describe("MCP_CATALOG", () => {
     });
   });
 
+  it("prefills Semaphore header auth and a token instruction", () => {
+    const semaphore = MCP_CATALOG.find((entry) => entry.id === "semaphore");
+    expect(catalogConnectionDefaults(semaphore)).toEqual({
+      name: "semaphore",
+      url: "https://mcp.semaphoreci.com/mcp",
+      auth: "AUTH_HEADERS",
+      headers: [{ name: "Authorization" }],
+      instruction: AGENT_RESOURCES_COPY.semaphoreInstruction,
+    });
+    expect(AGENT_RESOURCES_COPY.semaphoreInstruction).toEqual({
+      before: "Ask Semaphore support to enable MCP. Reset your ",
+      href: SEMAPHORE_API_TOKEN_URL,
+      label: "Semaphore API token",
+      after: " and paste it here.",
+    });
+  });
+
   it("omits defaults for a custom MCP server", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
@@ -95,6 +131,10 @@ describe("MCP_CATALOG", () => {
     expect(catalogEntryForResource({ url: "https://mcp.circleci.com/v1/mcp", auth: "AUTH_HEADERS" })?.id).toBe(
       "circleci",
     );
+    expect(catalogEntryForResource({ url: "https://mcp.semaphoreci.com/mcp", auth: "AUTH_HEADERS" })?.id).toBe(
+      "semaphore",
+    );
+    expect(catalogEntryForResource({ url: "https://mcp.semaphoreci.com/mcp", auth: "AUTH_OAUTH" })).toBeUndefined();
     expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_HEADERS" })).toBeUndefined();
     expect(catalogEntryForResource({ url: "https://mcp.example.com/mcp", auth: "AUTH_OAUTH" })).toBeUndefined();
     expect(catalogEntryForResource(undefined)).toBeUndefined();
@@ -105,6 +145,7 @@ describe("catalogOAuthResourceForEntry", () => {
   const sentry = MCP_CATALOG.find((entry) => entry.id === "sentry");
   const github = MCP_CATALOG.find((entry) => entry.id === "github");
   const circleci = MCP_CATALOG.find((entry) => entry.id === "circleci");
+  const semaphore = MCP_CATALOG.find((entry) => entry.id === "semaphore");
 
   it("finds an OAuth server that already uses the catalog URL", () => {
     expect(sentry).toBeDefined();
@@ -169,6 +210,10 @@ describe("catalogOAuthResourceForEntry", () => {
     expect(
       catalogOAuthResourceForEntry([{ url: "https://mcp.circleci.com/v1/mcp", auth: "AUTH_HEADERS" }], circleci!),
     ).toBeUndefined();
+    expect(semaphore).toBeDefined();
+    expect(
+      catalogOAuthResourceForEntry([{ url: "https://mcp.semaphoreci.com/mcp", auth: "AUTH_HEADERS" }], semaphore!),
+    ).toBeUndefined();
   });
 });
 
@@ -186,26 +231,57 @@ describe("filterMCPCatalog", () => {
       filterMCPCatalog(MCP_CATALOG, "observability")
         .map((entry) => entry.id)
         .sort(),
-    ).toEqual(["datadog", "sentry"]);
+    ).toEqual(["datadog", "grafana", "sentry"]);
   });
 });
 
 describe("groupMCPCatalog", () => {
   it("groups by category and sorts servers by name", () => {
     const groups = groupMCPCatalog(MCP_CATALOG);
-    expect(groups.map((group) => group.id)).toEqual(["code", "issues", "cicd", "observability"]);
-    expect(groups.find((group) => group.id === "code")?.entries.map((entry) => entry.label)).toEqual(["GitHub"]);
+    expect(groups.map((group) => group.id)).toEqual([
+      "code",
+      "issues",
+      "docs",
+      "design",
+      "chat",
+      "cicd",
+      "observability",
+      "infrastructure",
+      "database",
+    ]);
+    expect(groups.find((group) => group.id === "code")?.entries.map((entry) => entry.label)).toEqual([
+      "GitHub",
+      "GitLab",
+      "Postman",
+    ]);
     expect(groups.find((group) => group.id === "issues")?.entries.map((entry) => entry.label)).toEqual([
       "Jira",
       "Linear",
     ]);
+    expect(groups.find((group) => group.id === "docs")?.entries.map((entry) => entry.label)).toEqual(["Notion"]);
+    expect(groups.find((group) => group.id === "design")?.entries.map((entry) => entry.label)).toEqual(["Figma"]);
+    expect(groups.find((group) => group.id === "chat")?.entries.map((entry) => entry.label)).toEqual(["Slack"]);
     expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual([
       "CircleCI",
+      "Railway",
+      "Render",
       "Semaphore",
+      "Vercel",
     ]);
     expect(groups.find((group) => group.id === "observability")?.entries.map((entry) => entry.label)).toEqual([
       "Datadog",
+      "Grafana",
       "Sentry",
+    ]);
+    expect(groups.find((group) => group.id === "infrastructure")?.entries.map((entry) => entry.label)).toEqual([
+      "Cloudflare",
+      "Stripe",
+    ]);
+    expect(groups.find((group) => group.id === "database")?.entries.map((entry) => entry.label)).toEqual([
+      "MongoDB Atlas",
+      "Neon",
+      "Prisma",
+      "Supabase",
     ]);
   });
 

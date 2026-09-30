@@ -7,9 +7,6 @@ export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 /** Organization experimental feature: SetupProvider wizard for GitHub and similar integrations. */
 export const FEATURE_NEW_INTEGRATION_SETUP_FLOW = "new_integration_setup_flow";
 
-/** Organization experimental feature: Sentry intake setup from the Backlog column. */
-export const FEATURE_FACTORY_SENTRY_INTAKE = "factory_sentry_intake";
-
 /** Organization experimental feature: manual "Add intake" entry for Jira in the Backlog column menu. */
 export const FEATURE_FACTORY_JIRA_INTAKE = "factory_jira_intake";
 
@@ -42,3 +39,6 @@ export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
 
 /** Organization experimental feature: unified task popup with one console timeline instead of tabs. */
 export const FEATURE_FACTORY_TASK_CONSOLE = "factory_task_console";
+
+/** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
+export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";

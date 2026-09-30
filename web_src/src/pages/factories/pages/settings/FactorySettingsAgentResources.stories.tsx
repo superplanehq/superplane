@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -17,6 +21,8 @@ import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
@@ -37,7 +43,7 @@ function withResources(resources: typeof MIXED_AGENT_RESOURCES, pathSuffix = mcp
   return (
     <FactoriesHarness
       pathSuffix={pathSuffix}
-      experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
+      experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS, FEATURE_SUPERPLANE_MCP_SERVER]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         agentResourcesByFactoryId: {
@@ -65,7 +71,7 @@ export const OAuthNotConnected: Story = {
 };
 
 export const ConnectedGreenDot: Story = {
-  render: () => withResources([OAUTH_CONNECTED_RESOURCE]),
+  render: () => withResources([HEADER_MCP_RESOURCE, OAUTH_CONNECTED_RESOURCE]),
 };
 
 export const OAuthNeedsReconnect: Story = {
@@ -94,4 +100,27 @@ export const SkillsGitHub: Story = {
 
 export const SkillEditor: Story = {
   render: () => withResources([INLINE_SKILL], `${skillsPath}/new`),
+};
+
+export const SuperPlaneClients: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={mcpPath}
+      experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS, FEATURE_SUPERPLANE_MCP_SERVER]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        mcpClientsByFactoryId: {
+          [PRIMARY_FACTORY_ID]: [
+            {
+              id: "mcp-client-cursor",
+              clientName: "Cursor",
+              userId: STORYBOOK_ME_USER_ID,
+              userName: STORYBOOK_ME_USER_NAME,
+              createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+            },
+          ],
+        },
+      }}
+    />
+  ),
 };

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -203,4 +204,9 @@ func Test__ResumeOrganizationSubscription(t *testing.T) {
 		assert.True(t, resp.CreditPurchaseAllowed)
 		assert.False(t, resp.CancelAtPeriodEnd)
 	})
+}
+
+func TestBusinessCheckoutSuccessURLIncludesCheckoutID(t *testing.T) {
+	id := uuid.New()
+	assert.Equal(t, "https://app.superplane.com/"+id.String()+"/organization/billing?subscribed=1&checkout_id={CHECKOUT_ID}", businessCheckoutSuccessURL("https://app.superplane.com/", id))
 }

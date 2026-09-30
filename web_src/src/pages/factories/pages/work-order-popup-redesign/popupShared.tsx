@@ -225,7 +225,8 @@ export function OwnerTimeCostRow({
   );
 }
 
-function OwnerSpendValue({
+/** Underlined spend total; hovering shows the per-model and machine-time breakdown. */
+export function OwnerSpendValue({
   costUsd,
   usageByModel,
   usageByMachineType,

@@ -56,9 +56,19 @@ func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactor
 	return actions.UpdateFactory(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SetFactoryVisibility(ctx context.Context, req *pb.SetFactoryVisibilityRequest) (*pb.SetFactoryVisibilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SetFactoryVisibility(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.UpdateFactoryOnboardingRequest) (*pb.UpdateFactoryOnboardingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) SelectFactoryVCSProviderRepository(ctx context.Context, req *pb.SelectFactoryVCSProviderRepositoryRequest) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SelectFactoryVCSProviderRepository(ctx, organizationID, req)
 }
 
 func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
@@ -370,4 +380,14 @@ func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context
 func (s *FactoryService) ListFactoryAgentResourceTools(ctx context.Context, req *pb.ListFactoryAgentResourceToolsRequest) (*pb.ListFactoryAgentResourceToolsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryAgentResourceTools(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.ListFactoryMCPClientsRequest) (*pb.ListFactoryMCPClientsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryMCPClients(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }

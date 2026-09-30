@@ -74,6 +74,18 @@ service Factories {
     };
   }
 
+  rpc SetFactoryVisibility(SetFactoryVisibilityRequest) returns (SetFactoryVisibilityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}/visibility"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set factory visibility";
+      description: "Makes a workspace board public or private. Requires factories publish permission.";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryOnboarding(UpdateFactoryOnboardingRequest) returns (UpdateFactoryOnboardingResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/onboarding"
@@ -106,6 +118,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory repository";
       description: "Updates the repository used by a factory workspace";
+      tags: "Factory";
+    };
+  }
+
+  rpc SelectFactoryVCSProviderRepository(SelectFactoryVCSProviderRepositoryRequest) returns (SelectFactoryVCSProviderRepositoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/onboarding/vcs-repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a Factory VCS repository";
+      description: "Selects an accessible VCS repository and creates the organization integration reference";
       tags: "Factory";
     };
   }
@@ -761,6 +785,28 @@ service Factories {
     };
   }
 
+  rpc ListFactoryMCPClients(ListFactoryMCPClientsRequest) returns (ListFactoryMCPClientsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/mcp-clients"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List SuperPlane MCP clients";
+      description: "Returns MCP clients that signed in to this workspace.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RevokeFactoryMCPClient(RevokeFactoryMCPClientRequest) returns (RevokeFactoryMCPClientResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a SuperPlane MCP client";
+      description: "Disconnects an MCP client from this workspace. The client must sign in again.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -864,9 +910,24 @@ message UpdateFactoryRequest {
   bool clear_hosted_spend_budget = 6;
   // Full replacement of Planning settings. Absent means do not change.
   optional FactoryPlanning planning = 7;
+  // When true, the public badge URL returns an SVG. Absent means do not change.
+  optional bool public_badge_enabled = 8;
+  // When true, Large and Full width badges show cost per merged pull request.
+  // Absent means do not change. A public URL cannot turn this on.
+  optional bool public_badge_show_cost = 9;
 }
 
 message UpdateFactoryResponse {
+  Factory factory = 1;
+}
+
+message SetFactoryVisibilityRequest {
+  string id = 1;
+  // True when anyone with the line URL can view the board.
+  bool public = 2;
+}
+
+message SetFactoryVisibilityResponse {
   Factory factory = 1;
 }
 
@@ -921,6 +982,16 @@ message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
+message SelectFactoryVCSProviderRepositoryRequest {
+  string id = 1;
+  string provider = 2;
+  int64 repository_id = 3;
+}
+
+message SelectFactoryVCSProviderRepositoryResponse {
+  Factory factory = 1;
+}
+
 message DeleteFactoryRequest {
   string id = 1;
 }
@@ -957,6 +1028,8 @@ message FactoryOnboarding {
   string default_branch = 10;
   // True when account onboarding created this workspace.
   bool initial = 11;
+  int64 app_repository_id = 12;
+  int64 backlog_repository_id = 13;
 }
 
 message Factory {
@@ -982,6 +1055,12 @@ message Factory {
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
   FactoryPlanning planning = 8;
+  // True when anyone with the line URL can view the board.
+  bool public = 9;
+  bool public_badge_enabled = 10;
+  bool public_badge_show_cost = 11;
+  // Unguessable token for the public badge URL. Empty until the badge is turned on once.
+  string public_badge_token = 12;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
@@ -991,6 +1070,8 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
+  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message FactoryLine {
@@ -1733,6 +1814,9 @@ message WorkOrder {
   PlanningSessionSummary planning_session = 23;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 24;
+  // Set after an auto-start attempt that did not start the task.
+  // Empty before the attempt, and empty again after a successful start.
+  string auto_start_line_id = 25;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2800,3 +2884,27 @@ message FindPlanningSessionByWorkOrderRequest {
 message FindPlanningSessionByWorkOrderResponse {
   PlanningSession session = 1;
 }
+
+message FactoryMCPClient {
+  string id = 1;
+  string client_name = 2;
+  string user_id = 3;
+  string user_name = 4;
+  string user_email = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListFactoryMCPClientsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryMCPClientsResponse {
+  repeated FactoryMCPClient clients = 1;
+}
+
+message RevokeFactoryMCPClientRequest {
+  string factory_id = 1;
+  string client_id = 2;
+}
+
+message RevokeFactoryMCPClientResponse {}

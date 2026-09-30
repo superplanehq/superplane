@@ -20,7 +20,7 @@ import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import { classicSplitRunFooter, isTaskResultFooter, showsArchive, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import {
   defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
@@ -179,7 +179,7 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: true }) : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
   const descriptionReview = taskConsole
     ? !unified && !showSidebarNote
@@ -309,7 +309,7 @@ function analysisPopupHeader(args: {
       actions={
         <PopupHeaderActions
           copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
-          onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
+          onArchive={showsArchive(args.fixture.footer) ? args.mutations.onArchive : undefined}
           archiveBusy={args.footerBusy}
           taskActions={args.reviewActions}
         />
@@ -387,7 +387,7 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  compact: boolean;
+  compact: boolean | "stacked";
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
@@ -485,7 +485,7 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSour
     return undefined;
   }
   if (unified) {
-    return "h-[min(52rem,calc(100vh-5rem))] w-[min(80rem,calc(100vw-5rem))]";
+    return "h-[min(52rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]";
   }
   return SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
 }

@@ -1,4 +1,6 @@
 import { useCallback } from "react";
+import { useAccount } from "@/contexts/useAccount";
+import { useGooglePurchaseTracking } from "@/hooks/useGooglePurchaseTracking";
 import { useSearchParams } from "react-router";
 
 import type {
@@ -112,7 +114,13 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const orgBilling = useOrganizationBilling(organizationId);
   const grantsQuery = useOrganizationCreditGrants(organizationId);
+  const { account } = useAccount();
   const metrics = creditMetricsFromSpend(spend.data);
+  const purchasePending = useGooglePurchaseTracking({
+    checkoutID: searchParams.get("checkout_id") ?? "",
+    invoices: metrics.invoices,
+    enabled: (creditAdded || subscribed) && canManageBilling && !account?.impersonation?.active,
+  });
   const flags = billingFlags(orgBilling.data);
   const billing = useHostedCreditActions(
     organizationId,
@@ -125,9 +133,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     organizationId,
     creditAdded,
     grantTotalCents: metrics.grantTotalCents,
-    refetch: async () => {
-      await Promise.all([spend.refetch(), grantsQuery.refetch(), orgBilling.refetch()]);
-    },
+    pollingEnabled: false,
   });
   const billingContactMessage = useHostedCreditOwnerContactMessage(organizationId, billingEnabled && !canManageBilling);
 
@@ -149,6 +155,7 @@ export function useOrganizationBillingPageModel(organizationId: string): Organiz
     organizationId,
     subscribed,
     creditPurchaseAllowed: flags.creditPurchaseAllowed,
+    returnRefreshPending: purchasePending || creditRefreshStatus === "refreshing",
     sync: syncFromPolar,
     refetch: refetchBillingState,
   });

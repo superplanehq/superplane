@@ -4,13 +4,7 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
-import {
-  groupClaudeSteps,
-  groupSplitRunStream,
-  toolCallSummary,
-  type ClaudeStepGroup,
-  type StreamNodeGroup,
-} from "../phaseLogStream";
+import { groupClaudeSteps, groupSplitRunStream, type ClaudeStepGroup, type StreamNodeGroup } from "../phaseLogStream";
 import {
   SPLIT_RUN_CLOSURE_PHASE_ID,
   splitRunStatusLabel,
@@ -71,7 +65,7 @@ export interface AgentStep {
   iconSlug?: string;
 }
 
-/** One automation with every run it made for this task, newest first. */
+/** One automation with every run it made for this task, oldest first. */
 export interface ConsoleAutomation {
   id: string;
   name: string;
@@ -201,6 +195,43 @@ export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "nam
   return "implement";
 }
 
+/**
+ * One card per automation, not per run. Comment replies share a handler
+ * name even when each run has its own canvas id, so the name is the key.
+ */
+export function consoleAutomationKey(stage: Pick<AutomationStage, "id" | "appId" | "componentName">): string {
+  return stage.componentName.trim() || stage.appId || stage.id;
+}
+
+export function automationsFromStages(stages: AutomationStage[]): ConsoleAutomation[] {
+  const byKey = new Map<string, AutomationStage[]>();
+  for (const stage of stages) {
+    const key = consoleAutomationKey(stage);
+    const runs = byKey.get(key) ?? [];
+    runs.push(stage);
+    byKey.set(key, runs);
+  }
+  return [...byKey.entries()].map(([key, runs]) => {
+    const oldestFirst = [...runs].sort(
+      (left, right) => Date.parse(left.startedAt ?? "") - Date.parse(right.startedAt ?? ""),
+    );
+    const newest = oldestFirst.at(-1);
+    const name = newest?.componentName || key;
+    const latest = oldestFirst.find((run) => run.status === "running") ?? newest;
+    return {
+      id: consoleAutomationDomId(name, key),
+      name,
+      latest: latest ?? oldestFirst[0],
+      runs: oldestFirst,
+    };
+  });
+}
+
+function consoleAutomationDomId(name: string, key: string): string {
+  const slug = `${name}-${key}`.toLowerCase().replace(/\W+/g, "-").replace(/^-|-$/g, "");
+  return slug || "automation";
+}
+
 export function stagesByConsoleColumn(
   groups: AutomationStageGroups,
   closerAppId?: string,
@@ -312,7 +343,7 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     type: group.line.componentType === "bash" ? "bash" : "prompt",
     status: group.line.status,
     duration: group.line.duration,
-    summary: tools.length > 0 ? toolCallSummary(tools) : "",
+    summary: "",
     toolCount: tools.length,
     output: group.line.detail?.trim() || undefined,
     events: group.events.map((event) =>

@@ -54,6 +54,7 @@ func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("mint file URLs for the runner prompt: %w", err)
 	}
+	rewritten, files = RewriteLoopbackTaskFileURLs(rewritten, files)
 	r.mu.Lock()
 	r.files = mergeDispatchFiles(r.files, files)
 	r.mu.Unlock()

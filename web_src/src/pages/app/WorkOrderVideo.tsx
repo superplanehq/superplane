@@ -27,7 +27,7 @@ export function WorkOrderVideo({
 
   useEffect(() => {
     setFailed(!playable);
-  }, [playable]);
+  }, [src, playable]);
 
   if (failed) {
     return (

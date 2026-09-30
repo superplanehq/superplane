@@ -24,10 +24,6 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactorySentryIntake gates Sentry intake setup from the Backlog
-// column until the flow is generally available.
-const FeatureFactorySentryIntake = "factory_sentry_intake"
-
 // FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
 // in the Backlog column menu until the flow is generally available.
 const FeatureFactoryJiraIntake = "factory_jira_intake"
@@ -76,6 +72,11 @@ const FeatureFactoryRiskScore = "factory_risk_score"
 // timeline with a summary panel instead of the Task and Automations tabs.
 const FeatureFactoryTaskConsole = "factory_task_console"
 
+// FeatureSuperPlaneMCPServer gates the public workspace MCP server.
+// Organizations with this flag can authorize Cursor and other MCP clients
+// against one workspace. Without it, POST /mcp returns 404.
+const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
+
 func released() *bool {
 	v := true
 	return &v
@@ -85,7 +86,6 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column"},
 	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDependabotIntake, Label: "Factory Dependabot Intake", Description: "Add Dependabot alert intake from the Backlog column menu"},
@@ -98,6 +98,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
 	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "SuperPlane MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }
 
 func All() []Feature {

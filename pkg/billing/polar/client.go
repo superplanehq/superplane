@@ -86,11 +86,15 @@ type CustomerSessionRequest struct {
 }
 
 type Order struct {
-	ID          string
-	CreatedAt   string
-	AmountCents int64
-	Status      string
-	ProductName string
+	CheckoutID     string
+	Currency       string
+	NetAmountCents int64
+	TaxAmountCents int64
+	ID             string
+	CreatedAt      string
+	AmountCents    int64
+	Status         string
+	ProductName    string
 }
 
 func Configured() bool {
@@ -683,6 +687,10 @@ type memberJSON struct {
 }
 
 type orderJSON struct {
+	CheckoutID  string `json:"checkout_id"`
+	Currency    string `json:"currency"`
+	NetAmount   int64  `json:"net_amount"`
+	TaxAmount   int64  `json:"tax_amount"`
 	ID          string `json:"id"`
 	CreatedAt   string `json:"created_at"`
 	Status      string `json:"status"`
@@ -701,11 +709,15 @@ func (o orderJSON) toOrder() Order {
 		}
 	}
 	return Order{
-		ID:          o.ID,
-		CreatedAt:   o.CreatedAt,
-		AmountCents: o.TotalAmount,
-		Status:      o.Status,
-		ProductName: name,
+		CheckoutID:     o.CheckoutID,
+		Currency:       o.Currency,
+		NetAmountCents: o.NetAmount,
+		TaxAmountCents: o.TaxAmount,
+		ID:             o.ID,
+		CreatedAt:      o.CreatedAt,
+		AmountCents:    o.TotalAmount,
+		Status:         o.Status,
+		ProductName:    name,
 	}
 }
 

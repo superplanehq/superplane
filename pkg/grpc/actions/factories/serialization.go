@@ -24,28 +24,59 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
 	}
 	serialized.Planning = serializeFactoryPlanning(factory.Planning())
+	serialized.Public = factory.Public
+	serialized.PublicBadgeEnabled = factory.PublicBadgeEnabled
+	serialized.PublicBadgeShowCost = factory.PublicBadgeShowCost
+	if factory.PublicBadgeToken != nil {
+		serialized.PublicBadgeToken = *factory.PublicBadgeToken
+	}
 	return serialized
 }
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
 	return &pb.FactoryPlanning{
-		Enabled:        planning.Enabled,
-		Clarity:        planning.Clarity,
-		Confidence:     planning.Confidence,
-		SetupCompleted: planning.SetupCompleted,
+		Enabled:         planning.Enabled,
+		Clarity:         planning.Clarity,
+		Confidence:      planning.Confidence,
+		SetupCompleted:  planning.SetupCompleted,
+		AutoStartLineId: serializeOptionalID(planning.AutoStartLineID),
 	}
 }
 
-func factoryPlanningFromProto(planning *pb.FactoryPlanning) models.FactoryPlanning {
+func factoryPlanningFromProto(planning *pb.FactoryPlanning) (models.FactoryPlanning, error) {
 	if planning == nil {
-		return models.DefaultFactoryPlanning()
+		return models.DefaultFactoryPlanning(), nil
+	}
+	lineID, err := optionalAutoStartLineID(planning.GetAutoStartLineId())
+	if err != nil {
+		return models.FactoryPlanning{}, err
 	}
 	return models.FactoryPlanning{
-		Enabled:        planning.GetEnabled(),
-		Clarity:        planning.GetClarity(),
-		Confidence:     planning.GetConfidence(),
-		SetupCompleted: planning.GetSetupCompleted(),
+		Enabled:         planning.GetEnabled(),
+		Clarity:         planning.GetClarity(),
+		Confidence:      planning.GetConfidence(),
+		SetupCompleted:  planning.GetSetupCompleted(),
+		AutoStartLineID: lineID,
+	}, nil
+}
+
+func optionalAutoStartLineID(raw string) (*uuid.UUID, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
 	}
+	parsed, err := uuid.Parse(trimmed)
+	if err != nil {
+		return nil, invalidArgument("auto_start_line_id must be a UUID")
+	}
+	return &parsed, nil
+}
+
+func serializeOptionalID(id *uuid.UUID) string {
+	if id == nil || *id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }
 
 func serializeFactoryWithLines(
@@ -76,16 +107,18 @@ func serializeFactoryWithLineMetrics(
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 	config := factory.OnboardingConfigValue()
 	onboarding := &pb.FactoryOnboarding{
-		VcsIntegrationId:   config.VCSIntegrationID,
-		AgentIntegrationId: config.AgentIntegrationID,
-		AppRepository:      config.AppRepository,
-		BacklogRepository:  config.BacklogRepository,
-		DefaultBranch:      config.DefaultBranch,
-		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
-		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
-		ProvisionedAppId:   config.ProvisionedAppID,
-		ProvisionedLineId:  config.ProvisionedLineID,
-		Initial:            factory.IsInitialOnboarding(),
+		VcsIntegrationId:    config.VCSIntegrationID,
+		AgentIntegrationId:  config.AgentIntegrationID,
+		AppRepository:       config.AppRepository,
+		AppRepositoryId:     config.AppRepositoryID,
+		BacklogRepository:   config.BacklogRepository,
+		BacklogRepositoryId: config.BacklogRepositoryID,
+		DefaultBranch:       config.DefaultBranch,
+		IssuesSource:        serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:        serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:    config.ProvisionedAppID,
+		ProvisionedLineId:   config.ProvisionedLineID,
+		Initial:             factory.IsInitialOnboarding(),
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
@@ -459,6 +492,7 @@ func serializeWorkOrder(
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
+		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
 	}, nil
 }
 
@@ -863,6 +897,10 @@ func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	default:
 		return pb.WorkOrder_STATE_UNSPECIFIED
 	}
+}
+
+func WorkOrderStateToProto(state string) pb.WorkOrder_State {
+	return serializeWorkOrderState(state)
 }
 
 func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
