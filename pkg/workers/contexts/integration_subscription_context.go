@@ -4,12 +4,15 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
+
+const datadogIntegrationApp = "datadog"
 
 type IntegrationSubscriptionContext struct {
 	tx             *gorm.DB
@@ -127,9 +130,62 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		Integration:       c.integrationCtx,
 		Message:           message,
 		Events:            NewEventContext(c.tx, c.node, nil, c.onNewEvents),
-		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		Logger:            c.triggerLogger(),
 		FindExecutionByKV: c.findExecutionByKV,
 	})
+}
+
+func (c *IntegrationSubscriptionContext) triggerLogger() *log.Entry {
+	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
+	if c.integration.AppName != datadogIntegrationApp {
+		return logger
+	}
+	return logger.WithFields(c.datadogDeliveryLogFields())
+}
+
+func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields() log.Fields {
+	fields := log.Fields{
+		"organization_id":   c.integration.OrganizationID.String(),
+		"organization_name": "",
+		"integration_id":    c.integration.ID.String(),
+		"workspace_id":      "",
+		"workspace_name":    "",
+		"intake_id":         "",
+		"intake_name":       "",
+	}
+
+	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.integration.OrganizationID.String())
+	if err == nil && organization != nil {
+		fields["organization_name"] = organization.Name
+	}
+
+	canvas, canvasErr := models.FindCanvasInTransaction(c.tx, c.integration.OrganizationID, c.node.WorkflowID)
+	if canvasErr == nil && canvas != nil && canvas.FactoryID != nil {
+		fields["workspace_id"] = canvas.FactoryID.String()
+		factory, factoryErr := models.FindFactory(c.tx, c.integration.OrganizationID, *canvas.FactoryID)
+		if factoryErr == nil && factory != nil {
+			fields["workspace_name"] = factory.Name
+		}
+	}
+
+	intake, intakeErr := models.FindFactoryIntakeByCanvasID(c.tx, c.node.WorkflowID)
+	if intakeErr != nil || intake == nil {
+		return fields
+	}
+
+	fields["intake_id"] = intake.ID.String()
+	fields["intake_name"] = intakeCanvasName(canvas, intake)
+	return fields
+}
+
+func intakeCanvasName(canvas *models.Canvas, intake *models.FactoryIntake) string {
+	if canvas != nil && canvas.Name != "" {
+		return canvas.Name
+	}
+	if intake == nil {
+		return ""
+	}
+	return intake.Name()
 }
 
 func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value string) (*core.ExecutionContext, error) {

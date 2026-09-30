@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 const ErrorTrackingAlertPayloadType = "datadog.errorTrackingAlert"
@@ -187,7 +189,45 @@ func (t *OnErrorTrackingAlert) OnIntegrationMessage(ctx core.IntegrationMessageC
 		return nil
 	}
 
-	return ctx.Events.Emit(ErrorTrackingAlertPayloadType, enriched)
+	if err := ctx.Events.Emit(ErrorTrackingAlertPayloadType, enriched); err != nil {
+		return err
+	}
+
+	logDatadogWebhookDelivered(ctx, enriched)
+	return nil
+}
+
+func logDatadogWebhookDelivered(ctx core.IntegrationMessageContext, payload ErrorTrackingAlertPayload) {
+	logging.LogDatadogWebhookInfo("Datadog webhook delivered", log.Fields{
+		"outcome":           datadogWebhookOutcomeDelivered,
+		"event_type":        payload.EventType,
+		"alert_transition":  payload.AlertTransition,
+		"organization_id":   datadogLoggerField(ctx.Logger, "organization_id"),
+		"organization_name": datadogLoggerField(ctx.Logger, "organization_name"),
+		"integration_id":    datadogLoggerField(ctx.Logger, "integration_id"),
+		"workspace_id":      datadogLoggerField(ctx.Logger, "workspace_id"),
+		"workspace_name":    datadogLoggerField(ctx.Logger, "workspace_name"),
+		"intake_id":         datadogLoggerField(ctx.Logger, "intake_id"),
+		"intake_name":       datadogLoggerField(ctx.Logger, "intake_name"),
+	}, nil)
+}
+
+func datadogLoggerField(logger *log.Entry, key string) string {
+	if logger == nil || logger.Data == nil {
+		return ""
+	}
+
+	value, ok := logger.Data[key]
+	if !ok || value == nil {
+		return ""
+	}
+
+	switch typed := value.(type) {
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
 }
 
 func (t *OnErrorTrackingAlert) Cleanup(ctx core.TriggerContext) error {
