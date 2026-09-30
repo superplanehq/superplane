@@ -618,6 +618,9 @@ function factoryAgentResourceListRoute(fixture: FactoriesFixture): FactoriesRout
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
     resolve: (match, method, body, url) => {
+      if (method === "GET" && fixture.failAgentResourcesListForFactoryIds?.includes(match[1])) {
+        return { json: { message: "Storybook agent resources list failure." }, status: 503 };
+      }
       const resources = ensureAgentResources(fixture, match[1]);
       if (method === "POST") {
         const resource = createPostedAgentResource(
@@ -668,6 +671,9 @@ function factoryMCPClientRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       pattern: re("/api/v1/factories/([^/]+)/mcp-clients"),
       resolve: (match, method) => {
         if (method !== "GET") return { json: {} };
+        if (fixture.failMcpClientsListForFactoryIds?.includes(match[1])) {
+          return { json: { message: "Storybook MCP clients list failure." }, status: 503 };
+        }
         return { json: { clients: ensureMCPClients(fixture, match[1]) } };
       },
     },

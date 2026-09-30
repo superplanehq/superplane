@@ -190,6 +190,49 @@ WHERE u.organization_id = ?
 ORDER BY u.id, l.linked_at DESC NULLS LAST, p.updated_at DESC NULLS LAST
 `
 
+type userAvatarURLScan struct {
+	UserID    uuid.UUID `gorm:"column:user_id"`
+	AvatarURL string    `gorm:"column:avatar_url"`
+}
+
+// FindUserAvatarURLsInOrganization returns profile image URLs for organization
+// members, using linked GitHub accounts when present and sign-in providers as
+// fallback. Keys are omitted when no avatar URL is known.
+func FindUserAvatarURLsInOrganization(tx *gorm.DB, orgID uuid.UUID, userIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	out := make(map[uuid.UUID]string)
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+
+	var rows []userAvatarURLScan
+	err := tx.Raw(listUserAvatarURLsInOrganizationSQL, ProviderGitHub, ProviderGitHub, orgID, userIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		url := strings.TrimSpace(row.AvatarURL)
+		if url == "" {
+			continue
+		}
+		out[row.UserID] = url
+	}
+	return out, nil
+}
+
+const listUserAvatarURLsInOrganizationSQL = `
+SELECT DISTINCT ON (u.id)
+	u.id AS user_id,
+	COALESCE(NULLIF(l.avatar_url, ''), p.avatar_url, '') AS avatar_url
+FROM users u
+LEFT JOIN accounts a ON a.id = u.account_id
+LEFT JOIN account_linked_accounts l ON l.account_id = a.id AND l.provider = ?
+LEFT JOIN account_providers p ON p.account_id = a.id AND p.provider = ?
+WHERE u.organization_id = ?
+	AND u.id IN ?
+	AND u.deleted_at IS NULL
+ORDER BY u.id, l.linked_at DESC NULLS LAST, p.updated_at DESC NULLS LAST
+`
+
 type factoryVelocityPullRequestScan struct {
 	WorkOrderID  uuid.UUID
 	Repository   string

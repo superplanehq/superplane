@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
@@ -12,13 +12,27 @@ import {
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
 import {
+  AGENT_RESOURCES_COPY,
   CIRCLECI_PERSONAL_API_TOKEN_URL,
   GITHUB_PERSONAL_ACCESS_TOKEN_URL,
   SEMAPHORE_API_TOKEN_URL,
 } from "./agentResourceCopy";
+import type { FactoriesFixture } from "../../__fixtures__/factoryPageResponses";
 
-const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+
+function emptyAgentResourcesFixture(): FactoriesFixture {
+  return {
+    ...defaultFactoriesFixture,
+    agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
+  };
+}
+
+function stubLocationAssign(assign: ReturnType<typeof vi.fn>) {
+  const { pathname, href, origin, search, hash } = window.location;
+  vi.stubGlobal("location", { pathname, href, origin, search, hash, assign });
+}
 
 describe("FactorySettingsMCPPage catalog", () => {
   beforeAll(() => {
@@ -26,10 +40,14 @@ describe("FactorySettingsMCPPage catalog", () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("opens the MCP catalog from the query string", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -51,7 +69,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -75,7 +93,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -108,7 +126,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -143,7 +161,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -170,7 +188,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -193,12 +211,12 @@ describe("FactorySettingsMCPPage catalog", () => {
 
   it("creates a Datadog server for the selected site", async () => {
     const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
+    stubLocationAssign(assign);
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
-        factoriesFixture={defaultFactoriesFixture}
+        pathSuffix={`${agentPath}?dialog=add`}
+        factoriesFixture={emptyAgentResourcesFixture()}
         experimentalFeatures={mcpAndSkills}
       />,
     );
@@ -218,8 +236,8 @@ describe("FactorySettingsMCPPage catalog", () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith("https://auth.example.com/authorize?client_id=storybook");
     });
-    expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("https://mcp.datadoghq.eu/v1/mcp");
-    vi.unstubAllGlobals();
+    expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("Datadog");
+    expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("Not connected");
   }, 10000);
 
   it("opens a saved Datadog server on its site", async () => {
@@ -232,7 +250,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={mcpPath}
+        pathSuffix={agentPath}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [datadogResource] },
@@ -242,6 +260,9 @@ describe("FactorySettingsMCPPage catalog", () => {
     );
 
     await user.click(await screen.findByTestId(`agent-resource-edit-${datadogResource.id}`, {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("mcp-connection-settings", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByText("https://mcp.us5.datadoghq.com/v1/mcp")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: AGENT_RESOURCES_COPY.edit }));
     expect(await screen.findByTestId("mcp-catalog-setup-site")).toHaveTextContent("US5 (us5.datadoghq.com)");
   }, 10000);
 
@@ -249,7 +270,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -271,8 +292,8 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
-        factoriesFixture={defaultFactoriesFixture}
+        pathSuffix={`${agentPath}?dialog=add`}
+        factoriesFixture={emptyAgentResourcesFixture()}
         experimentalFeatures={mcpAndSkills}
       />,
     );
@@ -283,7 +304,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     await user.click(screen.getByTestId("mcp-catalog-setup-save"));
 
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toHaveTextContent(
-      "github",
+      "GitHub",
     );
     expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
   }, 10000);
@@ -292,8 +313,8 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
-        factoriesFixture={defaultFactoriesFixture}
+        pathSuffix={`${agentPath}?dialog=add`}
+        factoriesFixture={emptyAgentResourcesFixture()}
         experimentalFeatures={mcpAndSkills}
       />,
     );
@@ -304,19 +325,19 @@ describe("FactorySettingsMCPPage catalog", () => {
     await user.click(screen.getByTestId("mcp-catalog-setup-save"));
 
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toHaveTextContent(
-      "circleci",
+      "CircleCI",
     );
     expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
   }, 10000);
 
   it("starts Linear sign-in from the catalog", async () => {
     const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
+    stubLocationAssign(assign);
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
-        factoriesFixture={defaultFactoriesFixture}
+        pathSuffix={`${agentPath}?dialog=add`}
+        factoriesFixture={emptyAgentResourcesFixture()}
         experimentalFeatures={mcpAndSkills}
       />,
     );
@@ -328,14 +349,13 @@ describe("FactorySettingsMCPPage catalog", () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith("https://auth.example.com/authorize?client_id=storybook");
     });
-    vi.unstubAllGlobals();
   }, 10000);
 
   it("opens Add custom without catalog instructions", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -353,7 +373,7 @@ describe("FactorySettingsMCPPage catalog", () => {
 
   it("resumes Sign in from Add when the catalog OAuth server already exists", async () => {
     const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
+    stubLocationAssign(assign);
     const user = userEvent.setup();
     const sentryResource = {
       ...OAUTH_NOT_CONNECTED_RESOURCE,
@@ -363,7 +383,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
@@ -381,7 +401,6 @@ describe("FactorySettingsMCPPage catalog", () => {
     });
     expect(screen.getByTestId(`agent-resource-edit-${sentryResource.id}`)).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resource-edit-resource-2")).not.toBeInTheDocument();
-    vi.unstubAllGlobals();
   }, 10000);
 
   it("does not open Sign in from Add when the catalog OAuth server is already connected", async () => {
@@ -394,7 +413,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
