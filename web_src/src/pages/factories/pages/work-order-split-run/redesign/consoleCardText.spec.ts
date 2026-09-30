@@ -1,8 +1,15 @@
 import { describe, expect, it } from "bun:test";
 
+import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
 import { stagesFromFixture } from "./automationsViewModel";
-import { outputCountLabel, runMetaLine, stepOutputSummary } from "./consoleCardText";
+import {
+  outputCountLabel,
+  runFooterLine,
+  runFooterSpendLabel,
+  runMetaLine,
+  stepOutputSummary,
+} from "./consoleCardText";
 
 function runningStage(id: string) {
   const stage = stagesFromFixture(SPLIT_RUN_RUNNING).taskStages.find((candidate) => candidate.id === id);
@@ -40,5 +47,28 @@ describe("runMetaLine", () => {
     const stage = { ...runningStage("implement"), status: "running" as const, duration: "10m 56s" };
 
     expect(runMetaLine(stage)).toBe("10m 56s so far");
+  });
+});
+
+describe("runFooterLine", () => {
+  it("shows the start date and time without a Started prefix", () => {
+    const startedAt = "2026-09-30T00:59:00.000Z";
+    const stage = {
+      ...runningStage("implement"),
+      startedAt,
+      model: "claude-sonnet-4-6",
+    };
+
+    expect(runFooterLine(stage)).toBe(formatWorkOrderDateTime(new Date(startedAt)));
+    expect(runFooterLine(stage)).not.toContain("Started");
+    expect(runFooterLine(stage)).not.toContain("claude-sonnet-4-6");
+  });
+});
+
+describe("runFooterSpendLabel", () => {
+  it("joins cost and tokens", () => {
+    expect(runFooterSpendLabel("$0.45", "2.1k")).toBe("$0.45 · 2.1k");
+    expect(runFooterSpendLabel("$0.45")).toBe("$0.45");
+    expect(runFooterSpendLabel(undefined, "2.1k")).toBe("2.1k");
   });
 });

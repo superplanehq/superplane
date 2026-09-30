@@ -200,6 +200,7 @@ function AgentStepMarker({
   const follow = useFollowLogScroll<HTMLDivElement>(
     running ? step.id : null,
     liveActive ? activityFollowTick(activity) : step.events.length,
+    { resumeOnBottom: true },
   );
   const row = (
     <Marker className={cn("min-w-0 py-1", running && "bg-muted")}>

@@ -81,7 +81,11 @@ describe("SplitRunReview draft model select", () => {
   });
 
   it("keeps the model select off a waiting footer", () => {
-    render(<SplitRunReview footer={splitRunFixtureForWorkOrder(OPEN_WORK_ORDER).footer} onStart={vi.fn()} />);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <SplitRunReview footer={splitRunFixtureForWorkOrder(OPEN_WORK_ORDER).footer} onStart={vi.fn()} />
+      </QueryClientProvider>,
+    );
 
     expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
   });

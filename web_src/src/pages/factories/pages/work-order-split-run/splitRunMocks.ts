@@ -1266,6 +1266,9 @@ function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOr
   return {
     ...DESCRIPTION_ARTIFACT,
     id: `art-description-${order.id ?? "draft"}`,
+    // The description is written when the task is created, so it carries the
+    // task's createdAt and sorts first in age-ordered artifact lists.
+    createdAt: order.createdAt,
     data: {
       name: "description.md",
       title: "description.md",
