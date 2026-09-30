@@ -307,50 +307,17 @@ func TestSentryIntakeItemSource_StaysInsideItsProject(t *testing.T) {
 func TestDatadogIntakeItemSource_StaysInsideItsService(t *testing.T) {
 	source := &datadogIntakeItemSource{service: "checkout"}
 
-	assert.True(t, source.ownsSearchResult(datadog.ErrorTrackingIssue{Service: "checkout"}))
-	assert.True(t, source.ownsSearchResult(datadog.ErrorTrackingIssue{Service: "Checkout"}))
-	assert.False(t, source.ownsSearchResult(datadog.ErrorTrackingIssue{Service: "billing"}))
-	assert.True(t, source.ownsSearchResult(datadog.ErrorTrackingIssue{Service: ""}))
-	assert.True(t, source.ownsSearchResult(datadog.ErrorTrackingIssue{}))
-
-	assert.True(t, source.ownsLoadedIssue(datadog.ErrorTrackingIssue{Service: "checkout"}))
-	assert.False(t, source.ownsLoadedIssue(datadog.ErrorTrackingIssue{Service: "billing"}))
-	assert.False(t, source.ownsLoadedIssue(datadog.ErrorTrackingIssue{Service: ""}))
-	assert.False(t, source.ownsLoadedIssue(datadog.ErrorTrackingIssue{}))
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "checkout"}))
+	assert.True(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "Checkout"}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: "billing"}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{Service: ""}))
+	assert.False(t, source.ownsIssue(datadog.ErrorTrackingIssue{}))
 }
 
 func TestDatadogServiceSearchQuery(t *testing.T) {
 	assert.Equal(t, "service:checkout", datadogServiceSearchQuery("checkout", ""))
 	assert.Equal(t, "service:checkout", datadogServiceSearchQuery(" checkout ", "  "))
 	assert.Equal(t, "service:checkout timeout", datadogServiceSearchQuery("checkout", "timeout"))
-}
-
-func TestDatadogIntakeItemSource_GetRejectsIssuesWithoutService(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/v2/error-tracking/issues/"):
-			_, _ = w.Write([]byte(`{"data":{"id":"issue-1","type":"issue","attributes":{"error_type":"TimeoutError","error_message":"checkout timed out"}}}`))
-		case r.URL.Path == "/api/v2/error-tracking/issues/search":
-			_, _ = w.Write([]byte(`{"data":[]}`))
-		case r.URL.Path == "/api/v2/spans/events/search", r.URL.Path == "/api/v2/logs/events/search", r.URL.Path == "/api/v2/rum/events/search":
-			_, _ = w.Write([]byte(`{"data":[]}`))
-		default:
-			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer server.Close()
-
-	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
-		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
-	})
-	require.NoError(t, err)
-	client.BaseURL = server.URL
-
-	source := &datadogIntakeItemSource{datadog: client, service: "checkout"}
-	item, err := source.Get(t.Context(), "issue-1")
-	assert.ErrorIs(t, err, errIntakeItemNotFound)
-	assert.Nil(t, item)
 }
 
 func TestDatadogIntakeItemSource_GetIncludesSampleAndRelatedLogs(t *testing.T) {

@@ -909,7 +909,7 @@ func Test__intakeSettingsFromGraph_Datadog(t *testing.T) {
 		assert.Equal(t, []string{"prod", "staging"}, parsed.DatadogEnvironments)
 	})
 
-	t.Run("missing alertTransitions keeps Triggered", func(t *testing.T) {
+	t.Run("an empty transition list keeps Triggered", func(t *testing.T) {
 		parsed := intakeSettingsFromGraph(
 			models.FactoryIntakeSourceDatadog,
 			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
@@ -923,21 +923,6 @@ func Test__intakeSettingsFromGraph_Datadog(t *testing.T) {
 		assert.True(t, parsed.DatadogTriggeredAlerts)
 		assert.False(t, parsed.DatadogRetriggeredAlerts)
 		assert.Empty(t, parsed.DatadogEnvironments)
-	})
-
-	t.Run("an explicit empty transition list disables both alert types", func(t *testing.T) {
-		parsed := intakeSettingsFromGraph(
-			models.FactoryIntakeSourceDatadog,
-			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
-			models.LiveCanvasSpec{
-				Nodes: []models.Node{
-					{ID: intakeTriggerNodeID, Configuration: map[string]any{"alertTransitions": []any{}}},
-				},
-			},
-		)
-
-		assert.False(t, parsed.DatadogTriggeredAlerts)
-		assert.False(t, parsed.DatadogRetriggeredAlerts)
 	})
 
 	t.Run("a hand-edited expression falls back to the defaults", func(t *testing.T) {

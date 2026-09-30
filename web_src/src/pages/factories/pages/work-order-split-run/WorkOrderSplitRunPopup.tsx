@@ -13,13 +13,19 @@ import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
+import type { CreatedTaskHref } from "./CreatedTaskCard";
+import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { isTaskResultFooter, showsArchive, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
-import { defaultSplitRunPopupTab, refinePopupShowsAutomations } from "./splitRunPopupModel";
+import { classicSplitRunFooter, isTaskResultFooter, showsArchive, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import {
+  defaultSplitRunPopupTab,
+  refinePopupShowsAutomations,
+  SPLIT_RUN_POPUP_DIALOG_CLASSNAME,
+} from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -28,17 +34,9 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
 import { workOrderPopupMode } from "./workOrderPopupMode";
-import { factoryPlanningEnabled } from "../planningSettingsModel";
-import {
-  analysisDraftChrome,
-  analysisPopupClassName,
-  analysisPopupView,
-  analysisReviewCompact,
-  analysisShellReview,
-  showsDescriptionReview,
-} from "./workOrderSplitRunPopupPlanning";
+import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -417,4 +415,126 @@ function analysisPopupReview(args: {
       modelSelect={args.modelSelect}
     />
   );
+}
+
+function analysisDraftChrome(args: {
+  factory?: FactoriesFactory;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  lineId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  analysis: ReturnType<typeof useAnalysisPlanningSession>;
+  draftModel: string;
+  draftThinking: string;
+  onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
+  disabled: boolean;
+}) {
+  if (!factoryPlanningEnabled(args.factory)) {
+    return { footerModelSelect: undefined, stripAnalysis: undefined };
+  }
+  const modelSelects = draftModelSelects({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    fixture: args.fixture,
+    model: args.draftModel,
+    thinkingLevel: args.draftThinking,
+    onChange: args.onDraftStartChange,
+    disabled: args.disabled,
+  });
+  return {
+    footerModelSelect: modelSelects.footer,
+    stripAnalysis: draftStripAnalysis(
+      args.fixture.footer.kind,
+      args.analysis,
+      modelSelects.strip,
+      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+      {
+        showClarity: factoryShowsClarity(args.factory),
+        showConfidence: factoryShowsConfidence(args.factory),
+      },
+    ),
+  };
+}
+
+/** A draft with Planning on uses the compact review; a source-only draft keeps the classic one. */
+function analysisReviewCompact(
+  showSidebarNote: boolean,
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  sourceOnly: boolean,
+) {
+  return showSidebarNote || (footerKind === "draft" && !sourceOnly);
+}
+
+/** In the classic tabs, the review renders inside the description tab only. */
+function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
+  return !sourceOnly && !showSidebarNote && tab === "description";
+}
+
+/** In the classic tabs, the review renders below the tabs when the description tab does not carry it. */
+function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
+  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
+    return review;
+  }
+  return null;
+}
+
+/** The unified view is wide; the Planning draft and the classic source-only view keep the refine widths. */
+function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSourceOnly: boolean) {
+  if (fullPage || classicSourceOnly) {
+    return undefined;
+  }
+  if (unified) {
+    return "h-[min(52rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]";
+  }
+  return SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
+}
+
+/**
+ * The refine strip only shows for a draft. It gets the ghost model select
+ * and a permalink builder for tasks the agent splits off this one.
+ */
+function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
+  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+  return {
+    sourceOnly,
+    viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
+  };
+}
+
+function draftStripAnalysis(
+  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
+  analysis: ReturnType<typeof useAnalysisPlanningSession>,
+  modelSelect: ReactNode | undefined,
+  taskHref: CreatedTaskHref,
+  scores: { showClarity: boolean; showConfidence: boolean },
+) {
+  if (footerKind !== "draft") {
+    return undefined;
+  }
+  return { ...analysis, modelSelect, taskHref, ...scores };
+}
+
+/**
+ * One model select per surface: `labeled` for the footer capsule under the
+ * plan, `ghost` for the refine strip settings row. Only a draft with Start
+ * gets one.
+ */
+function draftModelSelects(args: {
+  organizationId?: string;
+  factoryId?: string;
+  fixture: WorkOrderSplitRunPopupProps["fixture"];
+  model: string;
+  thinkingLevel: string;
+  onChange: (next: { model: string; thinkingLevel: string }) => void;
+  disabled: boolean;
+}): { footer?: ReactNode; strip?: ReactNode } {
+  const { fixture, ...select } = args;
+  if (fixture.footer.kind !== "draft" || !fixture.footer.actions.some((action) => action.kind === "start")) {
+    return {};
+  }
+  return {
+    footer: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="labeled" />,
+    strip: <DraftStartModelSelect {...select} lineName={fixture.lineName} appearance="ghost" />,
+  };
 }

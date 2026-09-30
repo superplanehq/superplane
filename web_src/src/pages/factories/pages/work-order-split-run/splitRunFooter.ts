@@ -1,7 +1,6 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
-import { OUT_OF_CREDIT_ACTION_TOOLTIP, type HostedCreditBlockNotice } from "../../lib/workOrderFailureReason";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
@@ -160,10 +159,6 @@ export interface SplitRunFooter {
   clarityScore?: number;
   /** Draft Confidence. 0–5. Missing while analysis has not scored yet. */
   confidenceScore?: number;
-  /** Overrides the strip color when the failure is a credit warning. */
-  attentionTone?: SplitRunDecisionTone;
-  /** Set when hosted credit blocks Start. The refine strip shows this instead of readiness. */
-  creditNotice?: HostedCreditBlockNotice;
 }
 
 export function isTaskResultFooter(footer: SplitRunFooter): boolean {
@@ -182,23 +177,6 @@ const SEND_TO_BACKLOG: SplitRunFooterAction = {
   label: "Send to backlog",
   emphasis: "quiet",
 };
-
-/** Tooltip when Start or Rerun is blocked because the organization has no credit. */
-export { OUT_OF_CREDIT_ACTION_TOOLTIP };
-
-function startAction(outOfCredit?: boolean): SplitRunFooterAction {
-  if (!outOfCredit) {
-    return START;
-  }
-  return { ...START, disabled: true, tooltip: OUT_OF_CREDIT_ACTION_TOOLTIP };
-}
-
-function rerunAction(outOfCredit?: boolean): SplitRunFooterAction {
-  if (!outOfCredit) {
-    return RERUN;
-  }
-  return { ...RERUN, disabled: true, tooltip: OUT_OF_CREDIT_ACTION_TOOLTIP };
-}
 
 export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
@@ -226,16 +204,13 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
   if (footer.kind !== "draft") {
     return footer;
   }
-  const outOfCredit = Boolean(footer.actions.find((action) => action.kind === "start")?.disabled);
-  const blocked = footer.creditNotice;
   return {
     ...footer,
     sentence: "This task is a draft.",
-    note: blocked ? creditNoticeNote(blocked) : { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
-    ...(blocked ? { attentionTone: creditNoticeTone(blocked) } : {}),
+    note: { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
     clarityScore: undefined,
     confidenceScore: undefined,
-    actions: [ARCHIVE, startAction(outOfCredit)],
+    actions: [ARCHIVE, START],
   };
 }
 
@@ -250,7 +225,6 @@ export type SplitRunDecisionTone =
   | "draft-caution"
   | "draft-ready"
   | "waiting"
-  | "warning"
   | "failed"
   | "done"
   | "rejected";
@@ -261,9 +235,6 @@ export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore"
 }
 
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
-  if (footer.attentionTone) {
-    return footer.attentionTone;
-  }
   if (footer.kind === "draft") {
     return draftDecisionTone(draftReadiness(splitRunFooterScores(footer)).tone);
   }
@@ -354,36 +325,13 @@ type FooterInput = {
   isAnalyzing?: boolean;
   clarityScore?: number;
   confidenceScore?: number;
-  attentionTone?: SplitRunDecisionTone;
-  /** When true, Start and Rerun are disabled with an out-of-credit tooltip. */
-  outOfCredit?: boolean;
-  /** Replaces the draft readiness note when the organization cannot start the task. */
-  creditNotice?: HostedCreditBlockNotice;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
   const withRun = input.run ? { ...next, run: input.run } : next;
   const withClarity = input.clarityScore == null ? withRun : { ...withRun, clarityScore: input.clarityScore };
-  const withConfidence =
-    input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
-  const withTone = input.attentionTone ? { ...withConfidence, attentionTone: input.attentionTone } : withConfidence;
-  return input.creditNotice ? { ...withTone, creditNotice: input.creditNotice } : withTone;
-}
-
-function creditNoticeNote(notice: HostedCreditBlockNotice): SplitRunFooterNote {
-  return {
-    headline: notice.headline,
-    text: notice.text,
-    ...(notice.href ? { cta: { label: notice.actionLabel, href: notice.href } } : {}),
-  };
-}
-
-function creditNoticeTone(notice: HostedCreditBlockNotice | undefined): SplitRunDecisionTone | undefined {
-  if (!notice) {
-    return undefined;
-  }
-  return notice.warning ? "warning" : "failed";
+  return input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
 }
 
 const DRAFT_TONE: Record<DraftReadinessTone, SplitRunDecisionTone> = {
@@ -403,8 +351,8 @@ function draftReadinessNote(input: FooterInput): SplitRunFooterNote {
   return { headline: readiness.headline, text: readiness.text };
 }
 
-function draftDecisionActions(outOfCredit?: boolean): SplitRunFooterAction[] {
-  return [ARCHIVE, startAction(outOfCredit)];
+function draftDecisionActions(): SplitRunFooterAction[] {
+  return [ARCHIVE, START];
 }
 
 function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
@@ -419,17 +367,12 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   const hasScore = input.clarityScore != null || input.confidenceScore != null;
   const analyzing = Boolean(input.isAnalyzing) && !hasScore;
-  const blocked = input.creditNotice;
-  return withFooterMeta(blocked ? { ...input, attentionTone: creditNoticeTone(blocked) } : input, {
+  return withFooterMeta(input, {
     kind: "draft",
-    sentence: analyzing && !blocked ? "SuperPlane is analyzing this task." : "This task is a draft.",
-    note: blocked
-      ? creditNoticeNote(blocked)
-      : analyzing || hasScore
-        ? draftReadinessNote(input)
-        : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
+    sentence: analyzing ? "SuperPlane is analyzing this task." : "This task is a draft.",
+    note: analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
     attentionCard: true,
-    actions: draftDecisionActions(input.outOfCredit),
+    actions: draftDecisionActions(),
   });
 }
 
@@ -486,7 +429,7 @@ function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): S
     sentence: splitRunKindSentence("stopped"),
     note: stoppedNote(note, input.actor),
     attentionCard: true,
-    actions: [REJECT, rerunAction(input.outOfCredit)],
+    actions: [REJECT, RERUN],
   });
 }
 
@@ -495,7 +438,7 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
     return hiddenDecisionFooter(input);
   }
 
-  const actions = input.kind === "failed" ? [REJECT, rerunAction(input.outOfCredit)] : [REJECT, APPROVE];
+  const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
     sentence: splitRunKindSentence(input.kind),

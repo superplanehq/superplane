@@ -820,7 +820,7 @@ func (s *datadogIntakeItemSource) Search(_ context.Context, query string, limit 
 
 	items := make([]IntakeItem, 0, len(issues))
 	for _, issue := range issues {
-		if !s.ownsSearchResult(issue) {
+		if !s.ownsIssue(issue) {
 			continue
 		}
 		items = append(items, datadogIssueItem(s.datadog, issue))
@@ -838,7 +838,7 @@ func (s *datadogIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem
 	if err != nil {
 		return nil, err
 	}
-	if issue == nil || strings.TrimSpace(issue.ID) == "" || !s.ownsLoadedIssue(*issue) {
+	if issue == nil || strings.TrimSpace(issue.ID) == "" || !s.ownsIssue(*issue) {
 		return nil, errIntakeItemNotFound
 	}
 
@@ -850,21 +850,9 @@ func (s *datadogIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem
 	return &item, nil
 }
 
-func (s *datadogIntakeItemSource) ownsSearchResult(issue datadog.ErrorTrackingIssue) bool {
-	return datadogIssueMatchesService(issue, s.service, true)
-}
-
-func (s *datadogIntakeItemSource) ownsLoadedIssue(issue datadog.ErrorTrackingIssue) bool {
-	return datadogIssueMatchesService(issue, s.service, false)
-}
-
-func datadogIssueMatchesService(issue datadog.ErrorTrackingIssue, service string, allowEmptyFromScopedSearch bool) bool {
+func (s *datadogIntakeItemSource) ownsIssue(issue datadog.ErrorTrackingIssue) bool {
 	name := strings.TrimSpace(issue.Service)
-	service = strings.TrimSpace(service)
-	if name == "" {
-		return allowEmptyFromScopedSearch
-	}
-	return strings.EqualFold(name, service)
+	return name != "" && strings.EqualFold(name, s.service)
 }
 
 func datadogServiceSearchQuery(service, query string) string {

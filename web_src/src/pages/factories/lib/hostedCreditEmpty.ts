@@ -1,6 +1,6 @@
 import { parseWorkOrderMetric } from "./workOrderUsage";
 
-export type HostedCreditBannerKind = "trial" | "trial-empty" | "trial-expired" | "low" | "empty" | "lapsed";
+export type HostedCreditBannerKind = "trial" | "trial-expired" | "low" | "empty" | "lapsed";
 
 /** At or below this remaining balance, paid organizations see a low-credit warning. */
 export const LOW_HOSTED_CREDIT_THRESHOLD_CENTS = 2000;
@@ -69,9 +69,6 @@ export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCre
     if (expiresAt.getTime() <= now.getTime()) {
       return "trial-expired";
     }
-    if (remaining <= 0) {
-      return "trial-empty";
-    }
     return "trial";
   }
 
@@ -95,7 +92,7 @@ export function shouldShowHostedCreditEmptyBanner(args: HostedCreditBannerInput)
 }
 
 /** Compact header chip kinds. These sit next to the page title, not in the banner row. */
-export type HostedCreditHeaderKickerKind = "trial" | "trial-empty" | "trial-expired" | "lapsed" | "low" | "empty";
+export type HostedCreditHeaderKickerKind = "trial" | "trial-expired" | "lapsed" | "low" | "empty";
 
 export function isHostedCreditHeaderKickerKind(_kind: HostedCreditBannerKind): _kind is HostedCreditHeaderKickerKind {
   return true;
@@ -103,8 +100,6 @@ export function isHostedCreditHeaderKickerKind(_kind: HostedCreditBannerKind): _
 
 export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind): string {
   switch (kind) {
-    case "trial-empty":
-      return "No credit";
     case "trial-expired":
       return "Trial ended";
     case "lapsed":
@@ -120,9 +115,6 @@ export function hostedCreditHeaderKickerLabel(kind: HostedCreditHeaderKickerKind
 
 /** Action that the header chip calls. Low and empty credit send the user to billing to add credit. */
 export function hostedCreditHeaderKickerActionLabel(kind: HostedCreditHeaderKickerKind): string {
-  if (kind === "trial-empty") {
-    return "Open billing";
-  }
   return kind === "low" || kind === "empty" ? "Add credits" : "Subscribe";
 }
 

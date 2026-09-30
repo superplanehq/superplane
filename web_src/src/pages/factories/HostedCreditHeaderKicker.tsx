@@ -117,7 +117,6 @@ const LAPSED_KICKER_PALETTE: KickPalette = {
 
 const KICKER_PALETTE: Record<HostedCreditHeaderKickerKind, KickPalette> = {
   trial: TRIAL_KICKER_PALETTE,
-  "trial-empty": LAPSED_KICKER_PALETTE,
   "trial-expired": LAPSED_KICKER_PALETTE,
   lapsed: LAPSED_KICKER_PALETTE,
   low: LAPSED_KICKER_PALETTE,
@@ -129,7 +128,7 @@ function kickerDetails(
   welcomeCreditExpiresAt: string | undefined,
   remainingCreditCents: number,
 ): Array<{ key: string; text: string; emphasis?: boolean }> {
-  if (kind === "trial" || kind === "trial-empty") {
+  if (kind === "trial") {
     return trialKickerDetails(welcomeCreditExpiresAt, remainingCreditCents);
   }
   if (kind === "low") {

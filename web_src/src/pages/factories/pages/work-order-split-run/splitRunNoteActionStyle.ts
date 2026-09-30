@@ -4,13 +4,10 @@ export function noteActionDisabled(
   kind: SplitRunFooterAction["kind"],
   flags: { actionBusy: boolean; startBusy: boolean; startDisabled: boolean; actionDisabled?: boolean },
 ) {
-  if (flags.actionDisabled) {
-    return true;
-  }
   if (kind !== "start") {
     return flags.actionBusy;
   }
-  return flags.startDisabled || flags.startBusy;
+  return flags.startDisabled || flags.startBusy || Boolean(flags.actionDisabled);
 }
 
 /** A Start fused to the model chevron loses its right radius. */
