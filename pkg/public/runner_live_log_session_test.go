@@ -189,6 +189,11 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{})
 		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
 		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Equal(
+			t,
+			runneraction.LiveLogSessionNotReadyErrorCode,
+			rec.Header().Get(runneraction.LiveLogErrorCodeHeader),
+		)
 		assert.Contains(t, rec.Body.String(), "not available for this execution")
 	})
 
