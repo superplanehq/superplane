@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +90,9 @@ func Test__GitHubAppSetup_installRequestWithoutSessionReturnsToApp(t *testing.T)
 func Test__GitHubAppSetup_ownerApprovedWithoutSession(t *testing.T) {
 	r := support.Setup(t)
 	server, _, _ := setupTestServer(r, t)
+	previousHasInstallationRequest := hasGitHubAppInstallationRequest
+	hasGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) { return true, nil }
+	t.Cleanup(func() { hasGitHubAppInstallationRequest = previousHasInstallationRequest })
 
 	req := httptest.NewRequest(
 		http.MethodGet,
