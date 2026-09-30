@@ -16,7 +16,7 @@ export const SEMAPHORE_API_TOKEN_URL =
 
 export const AGENT_RESOURCES_COPY = {
   agentTitle: "Agent",
-  agentPageSubtitle: "MCP servers and skills for runs in this workspace.",
+  agentPageSubtitle: "MCP servers and skills agents use during work.",
   superplaneMcpServerTitle: "MCP Server",
   superplaneMcpServerPageSubtitle: "Connect from Cursor, Claude, Codex, or any other external service.",
   mcpTitle: "MCP servers",
