@@ -333,6 +333,27 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.headline).not.toBe("This task is ready to start");
     expect(splitRunDecisionTone(footer)).toBe("failed");
   });
+
+  it("keeps the credit note when a failed task is closed", () => {
+    const footer = buildSplitRunFooter({
+      kind: "failed",
+      status: "failed",
+      note: {
+        key: "step-failed",
+        headline: "Implement did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+    });
+
+    expect(footer.note).toEqual({
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(footer.actions.map((action) => action.kind)).toEqual(["send-to-backlog", "reopen"]);
+    expect(footer.note?.headline).not.toBe("This task is closed as failed");
+  });
 });
 
 describe("availableSplitRunStopChoices", () => {

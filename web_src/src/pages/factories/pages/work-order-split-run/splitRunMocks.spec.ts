@@ -29,6 +29,7 @@ import {
   VERIFY_STEP_CHECKS,
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
+import { splitRunDecisionTone } from "./splitRunFooter";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 
@@ -884,6 +885,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
       cta: { label: "Add credits", destination: "billing" },
     });
+    expect(splitRunDecisionTone(fixture.footer)).toBe("failed");
   });
 
   it("explains a hosted credit failure on the failed note", () => {
@@ -932,6 +934,36 @@ describe("splitRunFixtureForWorkOrder", () => {
         cta: { label: credit.label, destination: "billing" },
       });
     }
+  });
+
+  it("keeps the credit note after the task is closed as failed", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Failed job",
+        state: "STATE_CLOSED",
+        result: "RESULT_FAILED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "no_hosted_credit",
+              run: { id: "run-1", appId: "app-1" },
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Send to backlog", "Reopen"]);
   });
 
   it("marks a cancelled implement step as canceled, not waiting", () => {

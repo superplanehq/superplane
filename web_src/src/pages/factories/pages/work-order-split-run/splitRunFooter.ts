@@ -235,8 +235,15 @@ export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore"
   return { clarity: footer.clarityScore, confidence: footer.confidenceScore };
 }
 
+function creditBillingNote(note?: SplitRunFooterNote): SplitRunFooterNote | undefined {
+  if (note?.cta?.destination !== "billing") {
+    return undefined;
+  }
+  return note;
+}
+
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
-  if (footer.kind === "draft" && footer.note?.cta?.destination === "billing") {
+  if (footer.kind === "draft" && creditBillingNote(footer.note)) {
     return "failed";
   }
   if (footer.kind === "draft") {
@@ -419,7 +426,7 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   const hasScore = input.clarityScore != null || input.confidenceScore != null;
   const analyzing = Boolean(input.isAnalyzing) && !hasScore;
-  const creditNote = note?.cta?.destination === "billing" ? note : undefined;
+  const creditNote = creditBillingNote(note);
   const resolvedNote =
     creditNote ?? (analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }));
   return withFooterMeta(input, {
@@ -432,6 +439,10 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
 }
 
 function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooterNote {
+  const credit = creditBillingNote(note);
+  if (credit) {
+    return credit;
+  }
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }
