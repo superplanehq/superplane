@@ -487,11 +487,11 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     await user.click(screen.getByTestId("checks-setup-finish"));
 
-    expect(mocks.createHandler).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-    expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
-  });
+     expect(mocks.createHandler).not.toHaveBeenCalled();
+     expect(onCreated).not.toHaveBeenCalled();
+     expect(onClose).toHaveBeenCalled();
+     expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
+   });
 
   it("preselects a connected integration and hides Connect", async () => {
     const user = userEvent.setup();

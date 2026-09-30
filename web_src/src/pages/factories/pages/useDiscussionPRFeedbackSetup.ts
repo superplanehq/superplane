@@ -1,7 +1,7 @@
 import { useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -60,10 +60,16 @@ export function useDiscussionPRFeedbackSetup(
 ) {
   const [step, setStep] = useState<"mention" | "bots">("mention");
   const [mentionRequired, setMentionRequired] = useState(true);
-  const [botMode, setBotMode] = useState<DiscussionBotMode>("ignore");
+  const [botMode, setBotModeState] = useState<DiscussionBotMode>("ignore");
   const [allowedBots, setAllowedBots] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
+  const botModeChosenByUser = useRef(false);
+
+  const setBotMode = (mode: DiscussionBotMode) => {
+    botModeChosenByUser.current = true;
+    setBotModeState(mode);
+  };
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters);
@@ -76,6 +82,10 @@ export function useDiscussionPRFeedbackSetup(
       return;
     }
     setAllowedBots(catalog.map((bot) => bot.login));
+    // Auto-select "address" mode when bots are discovered, unless the user already made an explicit choice.
+    if (catalog.length > 0 && !botModeChosenByUser.current) {
+      setBotModeState("address");
+    }
     setCatalogApplied(true);
   }, [catalog, catalogApplied, catalogLoading]);
 
