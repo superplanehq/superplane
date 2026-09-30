@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
+import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { LiveHeaderSpendProvider, useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import { buildSplitRunFooter } from "../splitRunFooter";
@@ -46,6 +48,90 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-marker-done")).toHaveAttribute("data-status", "pending");
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
     expect(screen.getByTestId("redesign-console-column-verify").getAttribute("data-completed")).toBeNull();
+  });
+
+  it("lists Risk score in Checks when the task has no verify step", () => {
+    renderConsole(
+      splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, {
+        checks: OPEN_WORK_ORDER_CHECKS,
+        demoArtifacts: false,
+      }),
+    );
+
+    const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
+    expect(within(checks).getByText("Risk score")).toBeInTheDocument();
+    expect(within(checks).getByText("Confidence score")).toBeInTheDocument();
+  });
+
+  it("lists each column app that ran for the task as its own card", () => {
+    renderConsole(
+      splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-risk",
+            key: "risk-review",
+            name: "Risk score",
+            score: 2,
+            maxScore: 5,
+            level: "LEVEL_POSITIVE",
+            automation: { appId: "app-risk", appName: "Risk score" },
+            runId: "run-risk",
+            updatedAt: "2026-08-26T11:10:00Z",
+          },
+        ],
+        columnApps: [
+          { id: "app-risk", name: "Risk score", columnKey: "verify" },
+          { id: "app-storybook", name: "Deploys Storybook", columnKey: "verify" },
+        ],
+        prFeedbackRuns: [
+          {
+            canvasId: "app-storybook",
+            title: "Storybook deployment ready",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-storybook",
+              canvasId: "app-storybook",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:30:00Z",
+            },
+          },
+          {
+            canvasId: "canvas-comment",
+            handlerName: "Address PR feedback",
+            title: "Address new review comment",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-comment",
+              canvasId: "canvas-comment",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+          {
+            canvasId: "canvas-checks",
+            handlerName: "Fix pull request checks",
+            title: "Fix failing checks",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-checks",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T10:00:00Z",
+            },
+          },
+        ],
+      }),
+    );
+
+    const verify = screen.getByTestId("redesign-console-column-verify");
+    expect(within(verify).getByText("Fix pull request checks")).toBeInTheDocument();
+    expect(within(verify).getByText("Address PR feedback")).toBeInTheDocument();
+    expect(within(verify).getByText("Deploys Storybook")).toBeInTheDocument();
+    expect(within(verify).getByText("Risk score")).toBeInTheDocument();
   });
 
   it("marks a failed implement column", () => {

@@ -160,6 +160,8 @@ export interface SplitRunPhase {
   totalTokens?: string;
   /** Runner model this automation used. Hidden when empty. */
   model?: string;
+  /** Board column this app sits on, when it is a column automation. */
+  columnKey?: SplitRunBoardColumn;
   /** Pull request and revision that started this activity. */
   pullRequestActivity?: {
     pullRequest?: FactoriesFactoryPullRequest;
@@ -182,6 +184,22 @@ export interface SplitRunRevision extends FactoriesFactoryPullRequestRevision {
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
 
 export type SplitRunBoardColumn = "backlog" | "implement" | "verify" | "done";
+
+/** Factory app attached to a board column. */
+export type SplitRunColumnApp = {
+  id: string;
+  name?: string;
+  columnKey?: string;
+};
+
+export function columnAppsFromFactoryApps(
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+): SplitRunColumnApp[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    return id ? [{ id, name: app.name, columnKey: app.columnKey }] : [];
+  });
+}
 
 export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
@@ -369,6 +387,11 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /**
+   * Factory apps on board columns. A related run becomes a console card
+   * in that column, under the app name.
+   */
+  columnApps?: SplitRunColumnApp[];
   /** Task files used to decide if a cancelled analysis already delivered a plan. */
   artifacts?: FactoriesWorkOrderArtifact[];
   /**
@@ -666,7 +689,8 @@ function phasesForOrder(
   const apiChecks = options?.checks;
   const prior = priorLineExecutions(order, options?.lineId, executions);
   const peers = [...prior, ...executions];
-  return [
+  const columnApps = options?.columnApps ?? [];
+  const knownPhases = [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
     ...prior.map((execution) => ({
@@ -674,8 +698,9 @@ function phasesForOrder(
       historyRun: true,
     })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
-    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
+    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? [], columnApps),
   ];
+  return [...knownPhases, ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases)];
 }
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
@@ -854,11 +879,187 @@ function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheck
   return presentWorkOrderChecks(reported);
 }
 
-function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[]): SplitRunPhase[] {
+function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[], columnApps: SplitRunColumnApp[] = []): SplitRunPhase[] {
   return [...runs]
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
-    .map(prFeedbackRunToPhase);
+    .map((entry) => prFeedbackRunToPhase(entry, columnApps));
+}
+
+function phasesForColumnAppChecks(
+  columnApps: SplitRunColumnApp[],
+  checks: FactoriesWorkOrderCheck[] | undefined,
+  artifacts: FactoriesWorkOrderArtifact[] | undefined,
+  knownPhases: SplitRunPhase[],
+): SplitRunPhase[] {
+  const checksByRun = columnAppChecksByRun(columnApps, checks);
+  const extras: SplitRunPhase[] = [];
+  for (const [runId, runChecks] of checksByRun) {
+    const presented = presentWorkOrderChecks(runChecks);
+    const existing = knownPhases.find((phase) => phase.runId === runId);
+    if (existing) {
+      existing.checks = uniquePresentedChecks([...(existing.checks ?? []), ...presented]);
+      continue;
+    }
+    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts);
+    if (phase) {
+      extras.push(phase);
+    }
+  }
+  return extras;
+}
+
+function columnAppChecksByRun(
+  columnApps: SplitRunColumnApp[],
+  checks: FactoriesWorkOrderCheck[] | undefined,
+): Map<string, FactoriesWorkOrderCheck[]> {
+  const checksByRun = new Map<string, FactoriesWorkOrderCheck[]>();
+  for (const check of checks ?? []) {
+    const ref = columnAppCheckRef(check);
+    if (!ref) {
+      continue;
+    }
+    const app = columnApps.find((entry) => entry.id === ref.appId);
+    if (!app || !consoleColumnForAppKey(app.columnKey)) {
+      continue;
+    }
+    const runChecks = checksByRun.get(ref.runId) ?? [];
+    runChecks.push(check);
+    checksByRun.set(ref.runId, runChecks);
+  }
+  return checksByRun;
+}
+
+function uniquePresentedChecks(checks: WorkOrderCheckPresentation[]): WorkOrderCheckPresentation[] {
+  const seen = new Set<string>();
+  return checks.filter((check) => {
+    const key = check.id || check.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function phaseForColumnAppCheck(
+  columnApps: SplitRunColumnApp[],
+  checks: FactoriesWorkOrderCheck[],
+  artifacts: FactoriesWorkOrderArtifact[] | undefined,
+): SplitRunPhase | undefined {
+  const first = checks[0];
+  const ref = first ? columnAppCheckRef(first) : undefined;
+  if (!first || !ref) {
+    return undefined;
+  }
+  const app = columnApps.find((entry) => entry.id === ref.appId);
+  const columnKey = consoleColumnForAppKey(app?.columnKey);
+  if (!app || !columnKey) {
+    return undefined;
+  }
+  const name = phaseNameForColumn(columnKey);
+  const componentName = columnAppCheckName(app, first, name);
+  const latest = checks[checks.length - 1] ?? first;
+  const status: SplitRunPhaseStatus = "passed";
+  const line: SplitRunStreamLine = {
+    id: ref.runId,
+    at: clockLabel(latest.updatedAt),
+    componentName,
+    status,
+    duration: "",
+    kind: "action",
+    componentType: componentName,
+    action: "passed",
+    iconSlug: "box",
+  };
+  return {
+    id: `column-app-${ref.runId}`,
+    name,
+    status,
+    duration: "",
+    startedAt: first.updatedAt,
+    componentName,
+    artifacts: artifactsForCanvasRun(artifacts, ref.runId),
+    checks: presentWorkOrderChecks(checks),
+    stream: [line],
+    canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+    appId: ref.appId,
+    runId: ref.runId,
+    columnKey,
+  };
+}
+
+function columnAppCheckRef(check: FactoriesWorkOrderCheck): { appId: string; runId: string } | undefined {
+  const appId = check.automation?.appId?.trim();
+  const runId = check.runId?.trim();
+  if (!appId || !runId) {
+    return undefined;
+  }
+  return { appId, runId };
+}
+
+function columnAppCheckName(app: SplitRunColumnApp, check: FactoriesWorkOrderCheck, fallback: string): string {
+  return app.name?.trim() || check.automation?.appName?.trim() || check.name || fallback;
+}
+
+function consoleColumnForAppKey(columnKey?: string): SplitRunBoardColumn | undefined {
+  const key = columnKey?.trim();
+  if (key === "verify" || key === "done" || key === "backlog") {
+    return key;
+  }
+  if (key === "implement" || key?.startsWith("phase-")) {
+    return "implement";
+  }
+  return undefined;
+}
+
+function phaseNameForColumn(column: SplitRunBoardColumn): string {
+  if (column === "verify") {
+    return "Verify";
+  }
+  if (column === "done") {
+    return "Done";
+  }
+  if (column === "backlog") {
+    return "Backlog";
+  }
+  return "Implement";
+}
+
+function artifactsForCanvasRun(
+  artifacts: FactoriesWorkOrderArtifact[] | undefined,
+  runId: string,
+): FactoriesWorkOrderArtifact[] {
+  return (artifacts ?? []).filter((artifact) => artifactCanvasRunId(artifact) === runId);
+}
+
+function artifactCanvasRunId(artifact: FactoriesWorkOrderArtifact): string | undefined {
+  const data = artifact.data;
+  if (!data || typeof data !== "object") {
+    return undefined;
+  }
+  const value = data.canvasRunId;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function columnAppForCanvas(columnApps: SplitRunColumnApp[], canvasId?: string): SplitRunColumnApp | undefined {
+  const id = canvasId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  return columnApps.find((app) => app.id === id);
+}
+
+function prFeedbackComponentName(entry: PRFeedbackLogRun, columnApps: SplitRunColumnApp[]): string {
+  const handlerName = entry.handlerName?.trim();
+  if (handlerName) {
+    return handlerName;
+  }
+  const appName = columnAppForCanvas(columnApps, entry.canvasId)?.name?.trim();
+  if (appName) {
+    return appName;
+  }
+  return "Address PR feedback";
 }
 
 function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | undefined {
@@ -960,10 +1161,10 @@ function prFeedbackPhaseDescription(entry: PRFeedbackLogRun) {
   return entry.description?.trim();
 }
 
-function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
+function prFeedbackRunToPhase(entry: PRFeedbackLogRun, columnApps: SplitRunColumnApp[] = []): SplitRunPhase {
   const status = prFeedbackPhaseStatus(entry);
   const name = prFeedbackActivityName(entry);
-  const componentName = entry.handlerName?.trim() || "Address PR feedback";
+  const componentName = prFeedbackComponentName(entry, columnApps);
   const duration = durationForExecution(
     { createdAt: entry.run.createdAt, updatedAt: prFeedbackUpdatedAt(entry) },
     status,
@@ -994,6 +1195,7 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     runId: entry.run.id,
     costCents: entry.costCents,
     totalTokens: entry.totalTokens,
+    columnKey: consoleColumnForAppKey(columnAppForCanvas(columnApps, entry.canvasId)?.columnKey),
     pullRequestActivity: {
       pullRequest: prFeedbackAttachedPullRequest(entry),
       revision: entry.revision,

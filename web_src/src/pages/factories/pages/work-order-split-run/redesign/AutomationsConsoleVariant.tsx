@@ -178,10 +178,10 @@ interface ConsoleColumn {
 }
 
 /**
- * Task stages sit in the column named after them. The creation stage
- * sits in Backlog even when no automation ran. Pull request activity
- * sits in Verify, except the runs of the automation that closed the
- * task: those sit in Done.
+ * Task stages sit in the column named after them. A column app uses the
+ * column it is installed on. The creation stage sits in Backlog even
+ * when no automation ran. Pull request activity sits in Verify, except
+ * a closer run or an app installed on another column.
  */
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
   const byColumn = stagesByConsoleColumn(groups, closerAppId);

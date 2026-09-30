@@ -173,7 +173,9 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    checks: stages.flatMap((stage) => stage.checks),
+    // Every check on the task. A stage list would drop Risk score when
+    // no verify step ran, because only that step copies checks onto a card.
+    checks: fixture.checks,
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };
 }
