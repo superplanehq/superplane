@@ -1444,7 +1444,8 @@ CREATE TABLE public.vcs_provider_repository_sync_jobs (
     locked_at timestamp with time zone,
     last_error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    priority smallint DEFAULT 0 NOT NULL
 );
 
 
@@ -3785,7 +3786,7 @@ CREATE INDEX vcs_provider_repository_collaborators_user_idx ON public.vcs_provid
 -- Name: vcs_provider_repository_sync_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, run_at) WHERE (locked_at IS NULL);
+CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, priority DESC, run_at) WHERE (locked_at IS NULL);
 
 
 --
@@ -4994,7 +4995,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930093305	f
+20260930113318	f
 \.
 
 

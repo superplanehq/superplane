@@ -193,6 +193,26 @@ describe("FirstRunChooseScreen", () => {
     expect(status).toHaveClass("sp-ai-thinking");
   });
 
+  it("shows each repository without hiding earlier synchronization results", () => {
+    const props = {
+      selectedRepository: null,
+      synchronizing: true,
+      onSelectRepository: vi.fn(),
+      onGrantAccess: vi.fn(),
+      onContinue: vi.fn(),
+    };
+    const view = render(<FirstRunChooseScreen {...props} repositories={[]} />);
+
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+
+    view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api"]} />);
+    expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
+
+    view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api", "acme/web"]} />);
+    expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /acme\/web/ })).toBeInTheDocument();
+  });
+
   it("shows every pending organization approval in the repository step", () => {
     render(
       <FirstRunChooseScreen

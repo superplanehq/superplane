@@ -73,10 +73,18 @@ func (VCSProviderInstallRequest) TableName() string {
 	return "vcs_provider_install_requests"
 }
 
+type VCSProviderRepositorySyncPriority int16
+
+const (
+	VCSProviderRepositorySyncPriorityBackground  VCSProviderRepositorySyncPriority = 0
+	VCSProviderRepositorySyncPriorityInteractive VCSProviderRepositorySyncPriority = 100
+)
+
 type VCSProviderRepositorySyncJob struct {
 	Provider     string `gorm:"primaryKey"`
 	RepositoryID int64  `gorm:"primaryKey"`
 	RunAt        time.Time
+	Priority     VCSProviderRepositorySyncPriority
 	Attempts     int
 	LockedAt     *time.Time
 	LastError    string
@@ -551,17 +559,49 @@ func DeleteVCSProviderInstallRequestsForAccount(
 		Error
 }
 
-func EnqueueVCSProviderRepositorySync(tx *gorm.DB, provider string, repositoryID int64, runAt time.Time) error {
+func EnqueueVCSProviderRepositorySync(
+	tx *gorm.DB,
+	provider string,
+	repositoryID int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
 	provider, err := normalizeVCSProvider(provider)
 	if err != nil {
 		return err
 	}
-	job := VCSProviderRepositorySyncJob{Provider: provider, RepositoryID: repositoryID, RunAt: runAt}
+	job := VCSProviderRepositorySyncJob{
+		Provider:     provider,
+		RepositoryID: repositoryID,
+		RunAt:        runAt,
+		Priority:     priority,
+	}
 	updatedAt := time.Now()
 	return tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "provider"}, {Name: "repository_id"}},
 		DoUpdates: clause.Assignments(map[string]any{
-			"run_at":     runAt,
+			"run_at": gorm.Expr(
+				`CASE
+					WHEN vcs_provider_repository_sync_jobs.locked_at IS NULL
+						THEN LEAST(vcs_provider_repository_sync_jobs.run_at, ?)
+					WHEN vcs_provider_repository_sync_jobs.updated_at <= vcs_provider_repository_sync_jobs.locked_at
+						THEN ?
+					ELSE LEAST(vcs_provider_repository_sync_jobs.run_at, ?)
+				END`,
+				runAt,
+				runAt,
+				runAt,
+			),
+			"priority": gorm.Expr(
+				`CASE
+					WHEN vcs_provider_repository_sync_jobs.locked_at IS NOT NULL
+						AND vcs_provider_repository_sync_jobs.updated_at <= vcs_provider_repository_sync_jobs.locked_at
+						THEN ?
+					ELSE GREATEST(vcs_provider_repository_sync_jobs.priority, ?)
+				END`,
+				priority,
+				priority,
+			),
 			"last_error": "",
 			"updated_at": gorm.Expr(
 				"GREATEST(?, COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', ?))",
@@ -585,7 +625,7 @@ func ClaimVCSProviderRepositorySync(
 			Where("provider = ?", provider).
 			Where("run_at <= ?", now).
 			Where("locked_at IS NULL OR locked_at < ?", claimableBefore).
-			Order("run_at ASC").
+			Order("priority DESC, run_at ASC").
 			First(&job).
 			Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {

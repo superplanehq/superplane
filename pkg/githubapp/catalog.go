@@ -15,10 +15,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	repositoryDiscoveryDelay = 10 * time.Second
-)
-
 // Catalog synchronizes the public SuperPlane GitHub App into the global
 // installation catalog. It never uses a GitHub user OAuth token.
 type Catalog struct {
@@ -62,7 +58,7 @@ func NewCatalog(db *gorm.DB, cfg config.GitHubHostedAppConfig) (*Catalog, error)
 // Reconcile imports installations, repositories, and pending approval
 // requests. App-JWT requests follow the endpoints and pagination documented in
 // onboarding-guide.md.
-func (c *Catalog) Reconcile(ctx context.Context) error {
+func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepositorySyncPriority) error {
 	installations, err := c.listInstallations(ctx)
 	if err != nil {
 		return err
@@ -74,7 +70,7 @@ func (c *Catalog) Reconcile(ctx context.Context) error {
 			continue
 		}
 		seen[installation.GetID()] = struct{}{}
-		if err := c.reconcileInstallation(ctx, installation); err != nil {
+		if err := c.reconcileInstallation(ctx, installation, priority); err != nil {
 			return err
 		}
 	}
@@ -90,15 +86,23 @@ func (c *Catalog) Reconcile(ctx context.Context) error {
 	return models.ReplaceVCSProviderInstallRequests(c.db, models.ProviderGitHub, installRequestModels(requests, c.now()))
 }
 
-func (c *Catalog) ReconcileInstallation(ctx context.Context, installationID int64) error {
+func (c *Catalog) ReconcileInstallation(
+	ctx context.Context,
+	installationID int64,
+	priority models.VCSProviderRepositorySyncPriority,
+) error {
 	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
 	if err != nil {
 		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
 	}
-	return c.reconcileInstallation(ctx, installation)
+	return c.reconcileInstallation(ctx, installation, priority)
 }
 
-func (c *Catalog) reconcileInstallation(ctx context.Context, installation *gh.Installation) error {
+func (c *Catalog) reconcileInstallation(
+	ctx context.Context,
+	installation *gh.Installation,
+	priority models.VCSProviderRepositorySyncPriority,
+) error {
 	model := installationModel(installation)
 	if err := models.UpsertVCSProviderInstallation(c.db, &model); err != nil {
 		return fmt.Errorf("save GitHub App installation %d: %w", model.InstallationID, err)
@@ -118,7 +122,12 @@ func (c *Catalog) reconcileInstallation(ctx context.Context, installation *gh.In
 	if err := models.ReplaceVCSProviderRepositories(c.db, models.ProviderGitHub, model.InstallationID, repositoryModels); err != nil {
 		return fmt.Errorf("save GitHub App repositories: %w", err)
 	}
-	return enqueueRepositories(c.db, repositoryModels, c.now().Add(repositoryDiscoveryDelay))
+	return enqueueRepositories(
+		c.db,
+		repositoryModels,
+		c.now(),
+		priority,
+	)
 }
 
 func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID int64) error {
@@ -153,7 +162,13 @@ func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID 
 func (c *Catalog) EnqueueRefresh(repositoryIDs []int64) error {
 	runAt := c.now()
 	for _, repositoryID := range repositoryIDs {
-		if err := models.EnqueueVCSProviderRepositorySync(c.db, models.ProviderGitHub, repositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			c.db,
+			models.ProviderGitHub,
+			repositoryID,
+			runAt,
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		); err != nil {
 			return err
 		}
 	}
@@ -312,9 +327,20 @@ func installRequestModels(requests []*gh.InstallationRequest, now time.Time) []m
 	return result
 }
 
-func enqueueRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository, runAt time.Time) error {
+func enqueueRepositories(
+	tx *gorm.DB,
+	repositories []models.VCSProviderRepository,
+	runAt time.Time,
+	priority models.VCSProviderRepositorySyncPriority,
+) error {
 	for _, repository := range repositories {
-		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			tx,
+			models.ProviderGitHub,
+			repository.RepositoryID,
+			runAt,
+			priority,
+		); err != nil {
 			return err
 		}
 	}

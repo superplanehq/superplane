@@ -191,7 +191,13 @@ func TestVCSProviderRepositorySyncJobClaim(t *testing.T) {
 	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
 		{RepositoryID: 201, InstallationID: 101, FullName: "acme/api"},
 	}))
-	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now.Add(-time.Second)))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(-time.Second),
+		VCSProviderRepositorySyncPriorityBackground,
+	))
 
 	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
 	require.NoError(t, err)
@@ -214,7 +220,13 @@ func TestVCSProviderRepositorySyncKeepsRefreshEnqueuedDuringClaim(t *testing.T) 
 	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
 		{RepositoryID: 201, FullName: "acme/api"},
 	}))
-	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now.Add(-time.Second)))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(-time.Second),
+		VCSProviderRepositorySyncPriorityBackground,
+	))
 
 	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
 	require.NoError(t, err)
@@ -222,13 +234,87 @@ func TestVCSProviderRepositorySyncKeepsRefreshEnqueuedDuringClaim(t *testing.T) 
 	require.NotNil(t, job.LockedAt)
 
 	refreshAt := now.Add(time.Second)
-	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, refreshAt))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		refreshAt,
+		VCSProviderRepositorySyncPriorityInteractive,
+	))
 	require.NoError(t, CompleteVCSProviderRepositorySync(db, ProviderGitHub, 201, *job.LockedAt))
 
 	var queued VCSProviderRepositorySyncJob
 	require.NoError(t, db.Where("provider = ? AND repository_id = ?", ProviderGitHub, 201).First(&queued).Error)
 	assert.Nil(t, queued.LockedAt)
 	assert.WithinDuration(t, refreshAt, queued.RunAt, time.Millisecond)
+}
+
+func TestVCSProviderRepositorySyncClaimsInteractiveJobsFirst(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 101,
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/background"},
+		{RepositoryID: 202, FullName: "acme/interactive"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(-time.Minute),
+		VCSProviderRepositorySyncPriorityBackground,
+	))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		202,
+		now,
+		VCSProviderRepositorySyncPriorityInteractive,
+	))
+
+	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now.Add(time.Second), now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.Equal(t, int64(202), job.RepositoryID)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, job.Priority)
+}
+
+func TestVCSProviderRepositorySyncReenqueueKeepsUrgency(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 101,
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now,
+		VCSProviderRepositorySyncPriorityInteractive,
+	))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(time.Minute),
+		VCSProviderRepositorySyncPriorityBackground,
+	))
+
+	var job VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&job, "provider = ? AND repository_id = ?", ProviderGitHub, 201).Error)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, job.Priority)
+	assert.WithinDuration(t, now, job.RunAt, time.Millisecond)
 }
 
 func TestVCSProviderReconciliationJobClaim(t *testing.T) {

@@ -202,7 +202,13 @@ func RefreshVCSProviderOnboarding(
 			continue
 		}
 		found = true
-		if err := models.EnqueueVCSProviderRepositorySync(database.DB(ctx), provider, repository.RepositoryID, now); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			database.DB(ctx),
+			provider,
+			repository.RepositoryID,
+			now,
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		); err != nil {
 			return nil, grpcerrors.Internal(err, "failed to queue repository refresh")
 		}
 	}
