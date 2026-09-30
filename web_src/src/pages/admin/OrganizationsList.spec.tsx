@@ -50,7 +50,7 @@ describe("OrganizationsList", () => {
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByRole("row", { name: /Acme/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Automations" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tasks", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Tasks$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Done Tasks" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Canvases" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Description" })).not.toBeInTheDocument();
