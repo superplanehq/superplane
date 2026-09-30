@@ -62,56 +62,208 @@ func skippableDescriptionLine(line string) bool {
 }
 
 func stripMarkdownImages(line string) string {
+	if !strings.Contains(line, "![") {
+		return line
+	}
+	closes := markdownLabelCloses(line)
+	lastParen := strings.LastIndexByte(line, ')')
+	var bareEnds []int
+	if lastParen >= 0 {
+		bareEnds = bareDestinationEnds(line)
+	}
 	var builder strings.Builder
 	builder.Grow(len(line))
-	for index := 0; index < len(line); {
-		if end, ok := markdownImageEnd(line, index); ok {
+	index := 0
+	for index < len(line) {
+		next := strings.Index(line[index:], "![")
+		if next < 0 {
+			builder.WriteString(line[index:])
+			break
+		}
+		next += index
+		builder.WriteString(line[index:next])
+		if end, ok := markdownImageEnd(line, next, closes, lastParen, bareEnds); ok {
 			builder.WriteByte(' ')
 			index = end
 			continue
 		}
-		builder.WriteByte(line[index])
-		index++
+		builder.WriteByte(line[next])
+		index = next + 1
 	}
 	return builder.String()
 }
 
-func markdownImageEnd(line string, start int) (int, bool) {
-	if !strings.HasPrefix(line[start:], "![") {
-		return 0, false
+func markdownLabelCloses(line string) []int {
+	closes := make([]int, len(line))
+	for index := range closes {
+		closes[index] = -1
 	}
-	labelEnd, ok := linkLabelEnd(line, start+1)
-	if !ok || labelEnd+1 >= len(line) || line[labelEnd+1] != '(' {
-		return 0, false
-	}
-	return inlineImageClose(line, labelEnd+1)
-}
-
-func linkLabelEnd(line string, open int) (int, bool) {
-	if open >= len(line) || line[open] != '[' {
-		return 0, false
-	}
-	depth := 1
-	for index := open + 1; index < len(line); {
-		if escaped, ok := skipEscapedByte(line, index); ok {
-			index = escaped
-			continue
+	var stack []int
+	for index := 0; index < len(line); {
+		if len(stack) > 0 {
+			if escaped, ok := skipEscapedByte(line, index); ok {
+				index = escaped
+				continue
+			}
 		}
 		switch line[index] {
 		case '[':
-			depth++
+			stack = append(stack, index)
 		case ']':
-			depth--
-			if depth == 0 {
-				return index, true
+			if len(stack) > 0 {
+				open := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				closes[open] = index
 			}
 		}
 		index++
 	}
-	return 0, false
+	return closes
 }
 
-func inlineImageClose(line string, openParen int) (int, bool) {
+func markdownImageEnd(line string, start int, closes []int, lastParen int, bareEnds []int) (int, bool) {
+	if start+1 >= len(line) || line[start] != '!' || line[start+1] != '[' {
+		return 0, false
+	}
+	labelEnd := closes[start+1]
+	if labelEnd < 0 || labelEnd+1 >= len(line) || line[labelEnd+1] != '(' {
+		return 0, false
+	}
+	if labelEnd+1 > lastParen {
+		return 0, false
+	}
+	return inlineImageClose(line, labelEnd+1, bareEnds)
+}
+
+func bareDestinationEnds(line string) []int {
+	escaped := escapedBytes(line)
+	matchOpen, matchClose := parenthesisMatches(line, escaped)
+	nextSpace := nextUnescapedSpace(line, escaped)
+	nextClose := nextDepthZeroClose(line, escaped, matchOpen)
+	outside := outsideOpenCounts(line, escaped, matchClose, nextSpace)
+	ends := make([]int, len(line))
+	for index := range ends {
+		ends[index] = -1
+	}
+	for start := 0; start < len(line); start++ {
+		if line[start] == ')' {
+			ends[start] = start
+			continue
+		}
+		space := nextSpace[start]
+		closeAt := nextClose[start]
+		if closeAt >= 0 && closeAt < space {
+			ends[start] = closeAt
+			continue
+		}
+		if space >= len(line) {
+			continue
+		}
+		if outside[space]-outside[start] > 0 {
+			continue
+		}
+		ends[start] = space
+	}
+	return ends
+}
+
+func escapedBytes(line string) []bool {
+	escaped := make([]bool, len(line))
+	for index := 0; index < len(line); {
+		if index+1 < len(line) && line[index] == '\\' {
+			escaped[index+1] = true
+			index += 2
+			continue
+		}
+		index++
+	}
+	return escaped
+}
+
+func parenthesisMatches(line string, escaped []bool) ([]int, []int) {
+	matchOpen := make([]int, len(line))
+	matchClose := make([]int, len(line))
+	for index := range matchOpen {
+		matchOpen[index] = -2
+		matchClose[index] = -2
+	}
+	var stack []int
+	for index := 0; index < len(line); index++ {
+		if escaped[index] {
+			continue
+		}
+		switch line[index] {
+		case '(':
+			stack = append(stack, index)
+		case ')':
+			if len(stack) == 0 {
+				matchOpen[index] = -1
+				continue
+			}
+			open := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			matchOpen[index] = open
+			matchClose[open] = index
+		}
+	}
+	return matchOpen, matchClose
+}
+
+func nextUnescapedSpace(line string, escaped []bool) []int {
+	nextSpace := make([]int, len(line)+1)
+	next := len(line)
+	nextSpace[len(line)] = len(line)
+	for index := len(line) - 1; index >= 0; index-- {
+		if !escaped[index] && isSpaceByte(line, index) {
+			next = index
+		}
+		nextSpace[index] = next
+	}
+	return nextSpace
+}
+
+func nextDepthZeroClose(line string, escaped []bool, matchOpen []int) []int {
+	nextClose := make([]int, len(line))
+	for index := range nextClose {
+		nextClose[index] = -1
+	}
+	var closes []int
+	for index := len(line) - 1; index >= 0; index-- {
+		if index+1 < len(line) && !escaped[index+1] && line[index+1] == ')' {
+			closes = append(closes, index+1)
+		}
+		for len(closes) > 0 {
+			top := closes[len(closes)-1]
+			open := matchOpen[top]
+			if open >= index && open != -1 {
+				closes = closes[:len(closes)-1]
+				continue
+			}
+			break
+		}
+		if len(closes) > 0 {
+			nextClose[index] = closes[len(closes)-1]
+		}
+	}
+	return nextClose
+}
+
+func outsideOpenCounts(line string, escaped []bool, matchClose []int, nextSpace []int) []int {
+	outside := make([]int, len(line)+1)
+	for index := 0; index < len(line); index++ {
+		outside[index+1] = outside[index]
+		if escaped[index] || line[index] != '(' {
+			continue
+		}
+		match := matchClose[index]
+		if match < 0 || match >= nextSpace[index] {
+			outside[index+1]++
+		}
+	}
+	return outside
+}
+
+func inlineImageClose(line string, openParen int, bareEnds []int) (int, bool) {
 	index := skipSpace(line, openParen+1)
 	if index >= len(line) {
 		return 0, false
@@ -119,8 +271,8 @@ func inlineImageClose(line string, openParen int) (int, bool) {
 	var ok bool
 	if line[index] == '<' {
 		index, ok = angleDestinationEnd(line, index)
-	} else {
-		index, ok = bareDestinationEnd(line, index)
+	} else if index < len(bareEnds) && bareEnds[index] >= 0 {
+		index, ok = bareEnds[index], true
 	}
 	if !ok {
 		return 0, false
@@ -150,37 +302,6 @@ func angleDestinationEnd(line string, start int) (int, bool) {
 		}
 		if line[index] == '>' {
 			return index + 1, true
-		}
-		index++
-	}
-	return 0, false
-}
-
-func bareDestinationEnd(line string, start int) (int, bool) {
-	if start < len(line) && line[start] == ')' {
-		return start, true
-	}
-	depth := 0
-	for index := start; index < len(line); {
-		if escaped, ok := skipEscapedByte(line, index); ok {
-			index = escaped
-			continue
-		}
-		switch line[index] {
-		case '(':
-			depth++
-		case ')':
-			if depth == 0 {
-				return index, true
-			}
-			depth--
-		default:
-			if isSpaceByte(line, index) {
-				if depth != 0 {
-					return 0, false
-				}
-				return index, true
-			}
 		}
 		index++
 	}

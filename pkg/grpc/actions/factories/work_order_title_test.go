@@ -1,9 +1,12 @@
 package factories
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test__titleFromWorkOrderDescription(t *testing.T) {
@@ -154,6 +157,26 @@ func Test__titleFromWorkOrderDescription(t *testing.T) {
 			description: "- [ ]\u00a0n/a\n" + realLine,
 			want:        realLine,
 		},
+		{
+			name:        "skips an image after unmatched image markers",
+			description: strings.Repeat("![", 40) + "shot](sp-file://abc)\n" + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "keeps text beside an image after unmatched markers",
+			description: strings.Repeat("![", 8) + "shot](sp-file://abc) Fix checkout",
+			want:        strings.Repeat("![", 7) + " Fix checkout",
+		},
+		{
+			name:        "skips an image nested in an unmatched image marker",
+			description: "![outer ![shot](sp-file://abc)\n" + realLine,
+			want:        "![outer",
+		},
+		{
+			name:        "skips an image whose label escapes a bracket",
+			description: "![a \\[b](sp-file://abc)\n" + realLine,
+			want:        realLine,
+		},
 	}
 
 	for _, tc := range tests {
@@ -161,4 +184,25 @@ func Test__titleFromWorkOrderDescription(t *testing.T) {
 			assert.Equal(t, tc.want, titleFromWorkOrderDescription(tc.description))
 		})
 	}
+}
+
+func Test__stripMarkdownImages_unmatchedMarkersDoNotRescan(t *testing.T) {
+	line := strings.Repeat("![", 200000)
+	started := time.Now()
+	got := stripMarkdownImages(line)
+	require.Less(t, time.Since(started), 2*time.Second)
+	assert.Equal(t, line, got)
+
+	unclosed := strings.Repeat("![a](", 200000)
+	started = time.Now()
+	got = stripMarkdownImages(unclosed)
+	require.Less(t, time.Since(started), 2*time.Second)
+	assert.Equal(t, unclosed, got)
+
+	withParen := strings.Repeat("![a](", 20000) + ")"
+	started = time.Now()
+	got = stripMarkdownImages(withParen)
+	require.Less(t, time.Since(started), 2*time.Second)
+	assert.Contains(t, got, "![a](")
+	assert.NotContains(t, got, "![a]()")
 }
