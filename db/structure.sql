@@ -1358,6 +1358,17 @@ CREATE TABLE public.vcs_provider_installation_reconcile_jobs (
 
 
 --
+-- Name: vcs_provider_installation_reconcile_requesters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installation_reconcile_requesters (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    organization_id uuid NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2474,6 +2485,14 @@ ALTER TABLE ONLY public.vcs_provider_install_requests
 
 ALTER TABLE ONLY public.vcs_provider_installation_reconcile_jobs
     ADD CONSTRAINT vcs_provider_installation_reconcile_jobs_pkey PRIMARY KEY (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_pkey PRIMARY KEY (provider, installation_id, organization_id);
 
 
 --
@@ -3772,6 +3791,13 @@ CREATE INDEX vcs_provider_installation_reconcile_jobs_due_idx ON public.vcs_prov
 
 
 --
+-- Name: vcs_provider_installation_reconcile_requesters_organization_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_installation_reconcile_requesters_organization_idx ON public.vcs_provider_installation_reconcile_requesters USING btree (provider, organization_id);
+
+
+--
 -- Name: vcs_provider_installations_account_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4667,6 +4693,14 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_job_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_job_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installation_reconcile_jobs(provider, installation_id) ON DELETE CASCADE;
+
+
+--
 -- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_installation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5026,7 +5060,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930121042	f
+20260930124041	f
 \.
 
 

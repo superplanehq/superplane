@@ -111,6 +111,16 @@ func (VCSProviderInstallationReconcileJob) TableName() string {
 	return "vcs_provider_installation_reconcile_jobs"
 }
 
+type VCSProviderInstallationReconcileRequester struct {
+	Provider       string    `gorm:"primaryKey"`
+	InstallationID int64     `gorm:"primaryKey"`
+	OrganizationID uuid.UUID `gorm:"primaryKey"`
+}
+
+func (VCSProviderInstallationReconcileRequester) TableName() string {
+	return "vcs_provider_installation_reconcile_requesters"
+}
+
 type VCSProviderReconcileJob struct {
 	Provider  string `gorm:"primaryKey"`
 	RunAt     time.Time
@@ -195,6 +205,24 @@ func FindVCSProviderInstallation(tx *gorm.DB, provider string, installationID in
 
 func DeleteVCSProviderInstallation(tx *gorm.DB, provider string, installationID int64) error {
 	return tx.Where("provider = ? AND installation_id = ?", provider, installationID).Delete(&VCSProviderInstallation{}).Error
+}
+
+func DeleteVCSProviderInstallationsMissingFromSnapshot(
+	tx *gorm.DB,
+	provider string,
+	installationIDs []int64,
+	observedBefore time.Time,
+) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+
+	query := tx.Where("provider = ? AND updated_at <= ?", provider, observedBefore)
+	if len(installationIDs) > 0 {
+		query = query.Where("installation_id NOT IN ?", installationIDs)
+	}
+	return query.Delete(&VCSProviderInstallation{}).Error
 }
 
 func ReplaceVCSProviderRepositories(
@@ -320,7 +348,12 @@ func VCSProviderRepositoriesSynchronizing(tx *gorm.DB, provider string, reposito
 	return count > 0, err
 }
 
-func VCSProviderCatalogSynchronizing(tx *gorm.DB, provider string, providerUserID int64) (bool, error) {
+func VCSProviderCatalogSynchronizing(
+	tx *gorm.DB,
+	provider string,
+	providerUserID int64,
+	organizationID uuid.UUID,
+) (bool, error) {
 	provider, err := normalizeVCSProvider(provider)
 	if err != nil {
 		return false, err
@@ -356,12 +389,24 @@ func VCSProviderCatalogSynchronizing(tx *gorm.DB, provider string, providerUserI
 			UNION ALL
 			SELECT 1
 			FROM vcs_provider_installation_reconcile_jobs AS job
-			JOIN relevant_installations AS relevant
-				ON relevant.provider = job.provider
-				AND relevant.installation_id = job.installation_id
 			WHERE job.provider = ?
+				AND (
+					EXISTS (
+						SELECT 1
+						FROM relevant_installations AS relevant
+						WHERE relevant.provider = job.provider
+							AND relevant.installation_id = job.installation_id
+					)
+					OR EXISTS (
+						SELECT 1
+						FROM vcs_provider_installation_reconcile_requesters AS requester
+						WHERE requester.provider = job.provider
+							AND requester.installation_id = job.installation_id
+							AND requester.organization_id = ?
+					)
+				)
 		)
-	`, provider, providerUserID, provider, providerUserID, provider, provider).Scan(&synchronizing).Error
+	`, provider, providerUserID, provider, providerUserID, provider, provider, organizationID).Scan(&synchronizing).Error
 	return synchronizing, err
 }
 
@@ -369,6 +414,7 @@ func EnqueueVCSProviderInstallationReconciliation(
 	tx *gorm.DB,
 	provider string,
 	installationID int64,
+	organizationID uuid.UUID,
 	runAt time.Time,
 ) error {
 	provider, err := normalizeVCSProvider(provider)
@@ -385,29 +431,42 @@ func EnqueueVCSProviderInstallationReconciliation(
 		RunAt:          runAt,
 	}
 	updatedAt := time.Now()
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "provider"}, {Name: "installation_id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"run_at": gorm.Expr(
-				`CASE
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "provider"}, {Name: "installation_id"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"run_at": gorm.Expr(
+					`CASE
 					WHEN vcs_provider_installation_reconcile_jobs.locked_at IS NULL
 						THEN LEAST(vcs_provider_installation_reconcile_jobs.run_at, ?)
 					WHEN vcs_provider_installation_reconcile_jobs.updated_at <= vcs_provider_installation_reconcile_jobs.locked_at
 						THEN ?
 					ELSE LEAST(vcs_provider_installation_reconcile_jobs.run_at, ?)
 				END`,
-				runAt,
-				runAt,
-				runAt,
-			),
-			"last_error": "",
-			"updated_at": gorm.Expr(
-				"GREATEST(?, COALESCE(vcs_provider_installation_reconcile_jobs.locked_at + INTERVAL '1 microsecond', ?))",
-				updatedAt,
-				updatedAt,
-			),
-		}),
-	}).Create(&job).Error
+					runAt,
+					runAt,
+					runAt,
+				),
+				"last_error": "",
+				"updated_at": gorm.Expr(
+					"GREATEST(?, COALESCE(vcs_provider_installation_reconcile_jobs.locked_at + INTERVAL '1 microsecond', ?))",
+					updatedAt,
+					updatedAt,
+				),
+			}),
+		}).Create(&job).Error; err != nil {
+			return err
+		}
+		if organizationID == uuid.Nil {
+			return nil
+		}
+		requester := VCSProviderInstallationReconcileRequester{
+			Provider:       provider,
+			InstallationID: installationID,
+			OrganizationID: organizationID,
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&requester).Error
+	})
 }
 
 func ClaimVCSProviderInstallationReconciliation(

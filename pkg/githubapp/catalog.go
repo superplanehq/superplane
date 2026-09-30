@@ -59,6 +59,7 @@ func NewCatalog(db *gorm.DB, cfg config.GitHubHostedAppConfig) (*Catalog, error)
 // requests. App-JWT requests follow the endpoints and pagination documented in
 // onboarding-guide.md.
 func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepositorySyncPriority) error {
+	reconciliationStartedAt := c.now()
 	installations, err := c.listInstallations(ctx)
 	if err != nil {
 		return err
@@ -79,7 +80,7 @@ func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepo
 		}
 	}
 
-	if err := c.removeMissingInstallations(seen); err != nil {
+	if err := c.removeMissingInstallations(seen, reconciliationStartedAt); err != nil {
 		reconcileErrors = append(reconcileErrors, fmt.Errorf("remove missing GitHub installations: %w", err))
 	}
 
@@ -358,18 +359,15 @@ func enqueueRepositories(
 	return nil
 }
 
-func (c *Catalog) removeMissingInstallations(seen map[int64]struct{}) error {
-	var current []models.VCSProviderInstallation
-	if err := c.db.Where("provider = ?", models.ProviderGitHub).Find(&current).Error; err != nil {
-		return err
+func (c *Catalog) removeMissingInstallations(seen map[int64]struct{}, observedBefore time.Time) error {
+	installationIDs := make([]int64, 0, len(seen))
+	for installationID := range seen {
+		installationIDs = append(installationIDs, installationID)
 	}
-	for _, installation := range current {
-		if _, ok := seen[installation.InstallationID]; ok {
-			continue
-		}
-		if err := models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installation.InstallationID); err != nil {
-			return err
-		}
-	}
-	return nil
+	return models.DeleteVCSProviderInstallationsMissingFromSnapshot(
+		c.db,
+		models.ProviderGitHub,
+		installationIDs,
+		observedBefore,
+	)
 }

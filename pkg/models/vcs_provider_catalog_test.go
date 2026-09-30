@@ -354,6 +354,7 @@ func TestVCSProviderCatalogSynchronizingIgnoresUnrelatedRepositoryJobs(t *testin
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	now := time.Now()
+	organizationID := uuid.New()
 
 	for _, installation := range []VCSProviderInstallation{
 		{Provider: ProviderGitHub, InstallationID: 101, AccountLogin: "acme", AccountType: "Organization"},
@@ -378,7 +379,7 @@ func TestVCSProviderCatalogSynchronizingIgnoresUnrelatedRepositoryJobs(t *testin
 		VCSProviderRepositorySyncPriorityBackground,
 	))
 
-	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42)
+	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
 	require.NoError(t, err)
 	assert.False(t, synchronizing)
 
@@ -389,9 +390,43 @@ func TestVCSProviderCatalogSynchronizingIgnoresUnrelatedRepositoryJobs(t *testin
 		now,
 		VCSProviderRepositorySyncPriorityInteractive,
 	))
-	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42)
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
 	require.NoError(t, err)
 	assert.True(t, synchronizing)
+}
+
+func TestVCSProviderCatalogSynchronizingIncludesRequestedOrganizationJobs(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	firstOrganizationID := uuid.New()
+	secondOrganizationID := uuid.New()
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(
+		db,
+		ProviderGitHub,
+		101,
+		firstOrganizationID,
+		now,
+	))
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(
+		db,
+		ProviderGitHub,
+		101,
+		secondOrganizationID,
+		now,
+	))
+
+	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, firstOrganizationID)
+	require.NoError(t, err)
+	assert.True(t, synchronizing)
+
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, secondOrganizationID)
+	require.NoError(t, err)
+	assert.True(t, synchronizing)
+
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, uuid.New())
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
 }
 
 func TestVCSProviderCatalogSynchronizingIncludesRelevantInstallationJobs(t *testing.T) {
@@ -406,13 +441,19 @@ func TestVCSProviderCatalogSynchronizingIncludesRelevantInstallationJobs(t *test
 		AccountLogin:   "octocat",
 		AccountType:    "User",
 	}))
-	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, now))
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(
+		db,
+		ProviderGitHub,
+		101,
+		uuid.Nil,
+		now,
+	))
 
-	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42)
+	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, uuid.New())
 	require.NoError(t, err)
 	assert.True(t, synchronizing)
 
-	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 7)
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 7, uuid.New())
 	require.NoError(t, err)
 	assert.False(t, synchronizing)
 }
@@ -422,7 +463,13 @@ func TestVCSProviderInstallationReconciliationJobClaim(t *testing.T) {
 	db := database.Conn()
 	now := time.Now()
 
-	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, now.Add(-time.Second)))
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(
+		db,
+		ProviderGitHub,
+		101,
+		uuid.New(),
+		now.Add(-time.Second),
+	))
 	job, err := ClaimVCSProviderInstallationReconciliation(db, ProviderGitHub, now, now.Add(-time.Minute))
 	require.NoError(t, err)
 	require.NotNil(t, job)
@@ -437,6 +484,9 @@ func TestVCSProviderInstallationReconciliationJobClaim(t *testing.T) {
 		job.InstallationID,
 		*job.LockedAt,
 	))
+	var requesterCount int64
+	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).Count(&requesterCount).Error)
+	assert.Zero(t, requesterCount)
 }
 
 func TestVCSProviderReconciliationJobClaim(t *testing.T) {

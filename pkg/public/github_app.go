@@ -14,6 +14,7 @@ import (
 	"time"
 
 	gh "github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
@@ -33,12 +34,14 @@ var enqueueGitHubAppReconciliation = func(ctx context.Context, availableAt time.
 var enqueueGitHubAppInstallationReconciliation = func(
 	ctx context.Context,
 	installationID int64,
+	organizationID uuid.UUID,
 	availableAt time.Time,
 ) error {
 	return models.EnqueueVCSProviderInstallationReconciliation(
 		database.DB(ctx),
 		models.ProviderGitHub,
 		installationID,
+		organizationID,
 		availableAt,
 	)
 }
@@ -60,16 +63,17 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing installation id", http.StatusBadRequest)
 		return
 	}
+	organizationID := githubAppSetupOrganizationID(query.Get("state"))
 
 	switch query.Get("setup_action") {
 	case "install":
-		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, time.Now()); err != nil {
+		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
 	case "update":
-		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, time.Now()); err != nil {
+		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
@@ -77,6 +81,18 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
+}
+
+func githubAppSetupOrganizationID(state string) uuid.UUID {
+	value, ok := strings.CutPrefix(strings.TrimSpace(state), "o_")
+	if !ok {
+		return uuid.Nil
+	}
+	organizationID, err := uuid.Parse(value)
+	if err != nil {
+		return uuid.Nil
+	}
+	return organizationID
 }
 
 // HandleGitHubAppWebhook validates the public App signature, updates the

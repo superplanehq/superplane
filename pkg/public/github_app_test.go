@@ -27,14 +27,22 @@ import (
 func TestHandleGitHubAppSetup(t *testing.T) {
 	previousReconciliation := enqueueGitHubAppReconciliation
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
+	organizationID := uuid.New()
 	var installationIDs []int64
+	var organizationIDs []uuid.UUID
 	reconciliationCount := 0
 	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error {
 		reconciliationCount++
 		return nil
 	}
-	enqueueGitHubAppInstallationReconciliation = func(_ context.Context, installationID int64, _ time.Time) error {
+	enqueueGitHubAppInstallationReconciliation = func(
+		_ context.Context,
+		installationID int64,
+		requestedOrganizationID uuid.UUID,
+		_ time.Time,
+	) error {
 		installationIDs = append(installationIDs, installationID)
+		organizationIDs = append(organizationIDs, requestedOrganizationID)
 		return nil
 	}
 	t.Cleanup(func() {
@@ -46,13 +54,14 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install&state=o_"+organizationID.String(),
 			nil,
 		))
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
@@ -60,13 +69,14 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update",
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update&state=o_"+organizationID.String(),
 			nil,
 		))
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, organizationID}, organizationIDs)
 		assert.Zero(t, reconciliationCount)
 	})
 
@@ -93,6 +103,13 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	})
+}
+
+func TestGitHubAppSetupOrganizationID(t *testing.T) {
+	organizationID := uuid.New()
+	assert.Equal(t, organizationID, githubAppSetupOrganizationID("o_"+organizationID.String()))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("invalid"))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("o_invalid"))
 }
 
 func TestGitHubInstallationID(t *testing.T) {

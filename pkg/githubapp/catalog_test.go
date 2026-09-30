@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func TestCatalogGitHubRequestsFollowOnboardingGuide(t *testing.T) {
@@ -141,6 +142,36 @@ func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
 	var job models.VCSProviderRepositorySyncJob
 	require.NoError(t, database.Conn().First(&job, "provider = ? AND repository_id = ?", models.ProviderGitHub, 77).Error)
 	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, job.Priority)
+}
+
+func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	cutoff := time.Now()
+
+	for _, installationID := range []int64{101, 202, 303} {
+		require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+			Provider:       models.ProviderGitHub,
+			InstallationID: installationID,
+			AccountLogin:   fmt.Sprintf("account-%d", installationID),
+		}))
+	}
+	require.NoError(t, db.Model(&models.VCSProviderInstallation{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, 101).
+		Update("updated_at", cutoff.Add(-time.Second)).Error)
+	require.NoError(t, db.Model(&models.VCSProviderInstallation{}).
+		Where("provider = ? AND installation_id = ?", models.ProviderGitHub, 202).
+		Update("updated_at", cutoff.Add(time.Second)).Error)
+
+	catalog := &Catalog{db: db}
+	require.NoError(t, catalog.removeMissingInstallations(map[int64]struct{}{303: {}}, cutoff))
+	_, err := models.FindVCSProviderInstallation(db, models.ProviderGitHub, 101)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, 202)
+	require.NoError(t, err)
+	_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, 303)
+	require.NoError(t, err)
 }
 
 func guideClient(t *testing.T, handler http.HandlerFunc) (*gh.Client, *int) {

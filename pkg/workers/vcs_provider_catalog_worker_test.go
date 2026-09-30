@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,6 +104,7 @@ func TestVCSProviderCatalogWorkerReconcilesRequestedInstallation(t *testing.T) {
 		database.Conn(),
 		models.ProviderGitHub,
 		101,
+		uuid.New(),
 		time.Now().Add(-time.Second),
 	))
 
@@ -125,6 +127,7 @@ func TestVCSProviderCatalogWorkerDiscardsRepeatedlyFailingInstallation(t *testin
 		db,
 		models.ProviderGitHub,
 		101,
+		uuid.New(),
 		time.Now().Add(-time.Second),
 	))
 	require.NoError(t, db.Model(&models.VCSProviderInstallationReconcileJob{}).
@@ -385,6 +388,7 @@ func TestVCSProviderCatalogWorkerReconciliationDoesNotBlockRequestedWork(t *test
 		db,
 		models.ProviderGitHub,
 		101,
+		uuid.New(),
 		time.Now().Add(-time.Second),
 	))
 
