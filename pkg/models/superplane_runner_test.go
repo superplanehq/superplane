@@ -187,6 +187,7 @@ func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoCredit))
+	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrHostedCreditEmpty))
 	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoFactoryBudget))
 	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrFactoryHostedBudgetEmpty))
 	assert.Equal(t, models.SuperPlaneRunnerNoModelMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoModel))
