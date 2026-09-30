@@ -52,6 +52,26 @@ func TestResolvePalette_ReplacesOneColorAndKeepsTheRest(t *testing.T) {
 	assert.Equal(t, base.Border, out.Border)
 }
 
+func TestResolvePalette_KeepsTextOffTheBackground(t *testing.T) {
+	out := resolvePalette(ThemeDefault, Colors{Background: "#0d1117", Text: "#0d1117", Subtle: "#111318"})
+
+	assert.Equal(t, "#ffffff", out.Text, "text on its own background must change")
+	assert.Equal(t, "#ffffff", out.Subtle, "muted text on the background must change")
+	assert.GreaterOrEqual(t, contrastRatio(out.Text, out.Background), 3.0)
+}
+
+func TestResolvePalette_KeepsEveryPresetAsItIs(t *testing.T) {
+	for _, name := range ThemeNames() {
+		preset := themes[name]
+		out := resolvePalette(name, Colors{})
+
+		// Every preset has enough contrast to keep its own accent and colors.
+		assert.Equal(t, preset.Accent, out.ShareColor, "theme %s", name)
+		out.ShareColor = ""
+		assert.Equal(t, preset, out, "theme %s", name)
+	}
+}
+
 func TestRender_ThemeSetsCardColors(t *testing.T) {
 	for _, size := range []Size{SizeSmall, SizeLarge, SizeWide} {
 		in := exampleInput()

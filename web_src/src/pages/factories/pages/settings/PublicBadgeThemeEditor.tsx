@@ -172,7 +172,7 @@ function ColorField({
         value={shown}
         disabled={locked}
         onChange={(event) => onChange(event.target.value)}
-        className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-8 w-8 shrink-0 cursor-pointer p-0.5"
         data-testid={`factory-settings-public-badge-color-swatch-${slot}`}
       />
       <div className="min-w-0 flex-1">

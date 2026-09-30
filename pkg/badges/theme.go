@@ -196,8 +196,22 @@ func resolvePalette(theme string, colors Colors) palette {
 		out.Accent = custom
 		out.OnAccent = readableOn(custom)
 	}
+
+	// A custom background can land on the text color. The badge keeps its
+	// labels readable, because a figure nobody can see is worse than a color
+	// the editor did not ask for.
+	out.Text = legible(out.Text, out.Background)
+	out.Subtle = legible(out.Subtle, out.Background)
 	out.ShareColor = shareColor(out.Accent, out.Background, out.Text)
 	return out
+}
+
+// legible keeps a text color unless it disappears into the background.
+func legible(text, background string) string {
+	if contrastRatio(text, background) >= minTextContrast {
+		return text
+	}
+	return readableOn(background)
 }
 
 func replace(target *string, color string) {
@@ -212,6 +226,10 @@ const (
 	// minShareContrast is WCAG AA for large text. A share number below this
 	// uses the card text color so it stays visible.
 	minShareContrast = 3
+	// minTextContrast is the lowest ratio a text color can have against the
+	// background. It sits below the WCAG text ratios on purpose: it rejects a
+	// color that is close to invisible and leaves every preset alone.
+	minTextContrast = 2
 )
 
 // readableOn picks the text color with the higher contrast on a custom
