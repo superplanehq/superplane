@@ -58,13 +58,12 @@ export function ComposerPlanStack({
   creditVerdict?: ComposerCreditVerdict;
 }) {
   const analyzing = Boolean(isAnalyzing) && !creditVerdict;
-  const readiness = creditVerdict
-    ? { tone: "blocked" as const, headline: creditVerdict.headline, text: creditVerdict.text }
-    : liveDraftReadiness({
-        clarity: showClarity ? clarity?.score : undefined,
-        confidence: showConfidence ? confidence?.score : undefined,
-        isAnalyzing: analyzing,
-      });
+  const readiness = composerReadiness({
+    creditVerdict,
+    clarity: showClarity ? clarity?.score : undefined,
+    confidence: showConfidence ? confidence?.score : undefined,
+    isAnalyzing: analyzing,
+  });
   const showControls = canTogglePlan || Boolean(modelSelect) || Boolean(actions);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
@@ -92,6 +91,16 @@ export function ComposerPlanStack({
       </FramePanel>
     </Frame>
   );
+}
+
+function composerReadiness({
+  creditVerdict,
+  ...scores
+}: Parameters<typeof liveDraftReadiness>[0] & { creditVerdict?: ComposerCreditVerdict }): DraftReadiness {
+  if (creditVerdict) {
+    return { tone: "blocked", headline: creditVerdict.headline, text: creditVerdict.text };
+  }
+  return liveDraftReadiness(scores);
 }
 
 function Verdict({ readiness, creditVerdict }: { readiness: DraftReadiness; creditVerdict?: ComposerCreditVerdict }) {

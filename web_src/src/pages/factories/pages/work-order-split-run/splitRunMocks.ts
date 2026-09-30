@@ -508,19 +508,7 @@ function reviewSurfaces(
   const checks = overviewChecks(input.phases, input.apiChecks, demoArtifacts);
 
   if (displayStatus === "draft") {
-    const credit = backlogAnalysisCreditFailure(input.analysisRuns ?? []);
-    return surfaces(
-      buildSplitRunFooter({
-        kind: "draft",
-        note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
-        status: displayStatus,
-        isAnalyzing: credit ? false : draftIsAnalyzing(input),
-        clarityScore: clarityScoreFromChecks(checks),
-        confidenceScore: confidenceScoreFromChecks(checks),
-      }),
-      [],
-      checks,
-    );
+    return draftReviewSurface(order, checks, input);
   }
   if (displayStatus === "completed" || displayStatus === "rejected") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
@@ -556,6 +544,26 @@ function reviewSurfaces(
  */
 function draftIsAnalyzing(input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] }): boolean {
   return Boolean(input.isAnalyzing) || hasActiveBacklogAnalysisRun(input.analysisRuns ?? []);
+}
+
+function draftReviewSurface(
+  order: FactoriesWorkOrder,
+  checks: WorkOrderCheckPresentation[],
+  input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] },
+): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
+  const credit = backlogAnalysisCreditFailure(input.analysisRuns ?? []);
+  return surfaces(
+    buildSplitRunFooter({
+      kind: "draft",
+      note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
+      status: "draft",
+      isAnalyzing: credit ? false : draftIsAnalyzing(input),
+      clarityScore: clarityScoreFromChecks(checks),
+      confidenceScore: confidenceScoreFromChecks(checks),
+    }),
+    [],
+    checks,
+  );
 }
 
 function stoppedReviewSurface(

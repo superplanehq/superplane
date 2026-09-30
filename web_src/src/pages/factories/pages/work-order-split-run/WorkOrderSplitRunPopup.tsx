@@ -8,13 +8,11 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
-import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
@@ -24,6 +22,7 @@ import { SplitRunReview } from "./SplitRunReview";
 import {
   classicSplitRunFooter,
   composerCreditVerdict,
+  creditBillingHref,
   isTaskResultFooter,
   showsArchive,
   SPLIT_RUN_ANALYZING_NOTE,
@@ -424,7 +423,7 @@ function analysisPopupReview(args: {
   );
 }
 
-function analysisDraftChrome(args: {
+type AnalysisDraftChromeArgs = {
   factory?: FactoriesFactory;
   organizationId?: string;
   factoryId?: string;
@@ -436,7 +435,9 @@ function analysisDraftChrome(args: {
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled: boolean;
-}) {
+};
+
+function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   if (!factoryPlanningEnabled(args.factory)) {
     return { footerModelSelect: undefined, stripAnalysis: undefined };
   }
@@ -449,23 +450,9 @@ function analysisDraftChrome(args: {
     onChange: args.onDraftStartChange,
     disabled: args.disabled,
   });
-  const billingHref =
-    args.organizationId && args.factoryKey
-      ? factorySettingsSectionPath(args.organizationId, args.factoryKey, "organization", "billing")
-      : undefined;
   return {
     footerModelSelect: modelSelects.footer,
-    stripAnalysis: draftStripAnalysis(
-      args.fixture.footer.kind,
-      args.analysis,
-      modelSelects.strip,
-      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
-      {
-        showClarity: factoryShowsClarity(args.factory),
-        showConfidence: factoryShowsConfidence(args.factory),
-      },
-      composerCreditVerdict(args.fixture.footer.note, billingHref),
-    ),
+    stripAnalysis: draftStripAnalysis(args, modelSelects.strip),
   };
 }
 
@@ -514,18 +501,19 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
   };
 }
 
-function draftStripAnalysis(
-  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
-  analysis: ReturnType<typeof useAnalysisPlanningSession>,
-  modelSelect: ReactNode | undefined,
-  taskHref: CreatedTaskHref,
-  scores: { showClarity: boolean; showConfidence: boolean },
-  creditVerdict: ReturnType<typeof composerCreditVerdict>,
-) {
-  if (footerKind !== "draft") {
+function draftStripAnalysis(args: AnalysisDraftChromeArgs, modelSelect: ReactNode | undefined) {
+  if (args.fixture.footer.kind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores, creditVerdict };
+  const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
+  return {
+    ...args.analysis,
+    modelSelect,
+    taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+    showClarity: factoryShowsClarity(args.factory),
+    showConfidence: factoryShowsConfidence(args.factory),
+    creditVerdict: composerCreditVerdict(args.fixture.footer.note, billingHref),
+  };
 }
 
 /**

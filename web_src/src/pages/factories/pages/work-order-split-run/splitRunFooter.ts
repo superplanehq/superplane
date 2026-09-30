@@ -1,5 +1,6 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
@@ -319,6 +320,13 @@ export function composerCreditVerdict(
     actionLabel: note.cta.label,
     ...(billingHref ? { href: billingHref } : {}),
   };
+}
+
+export function creditBillingHref(organizationId?: string, factoryKey?: string): string | undefined {
+  if (!organizationId || !factoryKey) {
+    return undefined;
+  }
+  return factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
 }
 
 export function creditBillingHrefForNote(
