@@ -487,11 +487,38 @@ describe("ChecksPRFeedbackSetupDialog", () => {
 
     await user.click(screen.getByTestId("checks-setup-finish"));
 
-    expect(mocks.createHandler).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-    expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
-  });
+     expect(mocks.createHandler).not.toHaveBeenCalled();
+     expect(onCreated).not.toHaveBeenCalled();
+     expect(onClose).toHaveBeenCalled();
+     expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
+   });
+
+   it("auto-selects suggested integrations that are ready", async () => {
+     const user = userEvent.setup();
+     mocks.connected.push({
+       metadata: { id: "int-cci", name: "circleci-prod", integrationName: "circleci" },
+       status: { state: "ready" },
+     });
+     render(
+       <ChecksPRFeedbackSetupDialog
+         organizationId="org-1"
+         factoryId="factory-1"
+         githubIntegrationId="gh-1"
+         repository="acme/api"
+         source={checksSource}
+         onClose={vi.fn()}
+         onCreated={vi.fn()}
+       />,
+     );
+
+     await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("e2e"));
+     await user.click(screen.getByTestId("checks-setup-continue"));
+
+     const row = screen.getByTestId("checks-setup-integration-int-cci");
+     await waitFor(() => expect(row).toHaveAttribute("aria-selected", "true"));
+     expect(row).toHaveTextContent("circleci-prod");
+     expect(screen.getByTestId("checks-setup-preview-tool-outcome")).toHaveTextContent("Reading CircleCI logs.");
+   });
 
   it("preselects a connected integration and hides Connect", async () => {
     const user = userEvent.setup();

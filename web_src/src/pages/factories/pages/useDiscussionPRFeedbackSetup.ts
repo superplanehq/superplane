@@ -76,6 +76,10 @@ export function useDiscussionPRFeedbackSetup(
       return;
     }
     setAllowedBots(catalog.map((bot) => bot.login));
+    // Auto-select "address" mode if bots are discovered
+    if (catalog.length > 0) {
+      setBotMode("address");
+    }
     setCatalogApplied(true);
   }, [catalog, catalogApplied, catalogLoading]);
 

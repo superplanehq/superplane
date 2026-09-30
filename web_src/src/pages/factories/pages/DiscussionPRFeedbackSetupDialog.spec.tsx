@@ -192,6 +192,33 @@ describe("DiscussionPRFeedbackSetupDialog", () => {
     );
   });
 
+  it("auto-selects address bot mode and all discovered bots", async () => {
+    const user = userEvent.setup();
+    const onCreated = vi.fn();
+    render(
+      <DiscussionPRFeedbackSetupDialog
+        organizationId="org-1"
+        factoryId="factory-1"
+        githubIntegrationId="gh-1"
+        repository="acme/app"
+        source={discussionSource}
+        onClose={vi.fn()}
+        onCreated={onCreated}
+      />,
+    );
+
+    await openBotsStep(user);
+    expect(screen.getByRole("radio", { name: /Address bot comments/ })).toBeChecked();
+    expect(screen.getByTestId("discussion-setup-bots-found")).toBeInTheDocument();
+    expect(screen.getByTestId("discussion-setup-bot-coderabbitai")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("discussion-setup-bot-bugbot")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("discussion-setup-preview-comment")).toHaveAttribute("data-author", "coderabbitai[bot]");
+    expect(screen.getByTestId("discussion-setup-preview-bot-outcome")).toHaveTextContent("Fixing...");
+    expect(screen.getByTestId("discussion-setup-preview-caption")).toHaveTextContent(
+      "Selected bots start pull request feedback.",
+    );
+  });
+
   it("shows a step question for human comments and AI comments", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
