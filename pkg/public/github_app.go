@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	appcatalog "github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -47,6 +48,28 @@ var enqueueGitHubAppInstallationReconciliation = func(
 	)
 }
 
+var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID int64) (bool, error) {
+	db := database.DB(ctx)
+	installation, err := models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
+	if err == nil {
+		return models.HasVCSProviderInstallRequestForAccount(
+			db,
+			models.ProviderGitHub,
+			installation.AccountID,
+			installation.AccountLogin,
+		)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, fmt.Errorf("find GitHub App installation %d: %w", installationID, err)
+	}
+
+	catalog, err := appcatalog.NewCatalog(db, config.LoadGitHubHostedAppConfig())
+	if err != nil {
+		return false, err
+	}
+	return catalog.HasInstallationRequest(ctx, installationID)
+}
+
 // HandleGitHubAppSetup handles only GitHub's installation and repository
 // settings redirect. Signed webhooks are authoritative for catalog state.
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
@@ -68,11 +91,22 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 
 	switch query.Get("setup_action") {
 	case "install":
+		redirectPath := "/"
+		if strings.TrimSpace(query.Get("state")) == "" {
+			requested, requestErr := hasGitHubAppInstallationRequest(r.Context(), installationID)
+			if requestErr != nil {
+				log.WithError(requestErr).WithField("installation_id", installationID).Warn(
+					"failed to identify GitHub App installation request",
+				)
+			} else if requested {
+				redirectPath = githubInstallApprovedPath
+			}
+		}
 		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
+		http.Redirect(w, r, redirectPath, http.StatusFound)
 	case "update":
 		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
@@ -83,7 +117,6 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
 }
-
 func githubAppSetupOrganizationID(state string) uuid.UUID {
 	cfg := config.LoadGitHubHostedAppConfig()
 	organizationID, err := common.VerifyHostedAppInstallState(cfg.WebhookSecret, state)
@@ -259,11 +292,13 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		if err := models.UpsertVCSProviderInstallation(tx, &installation); err != nil {
 			return err
 		}
-		if err := models.DeleteVCSProviderInstallRequestsForAccount(tx, models.ProviderGitHub, installation.AccountID, installation.AccountLogin); err != nil {
-			return err
-		}
 		if event.GetAction() != "created" {
-			return nil
+			return models.DeleteVCSProviderInstallRequestsForAccount(
+				tx,
+				models.ProviderGitHub,
+				installation.AccountID,
+				installation.AccountLogin,
+			)
 		}
 		repositories := githubRepositoryModels(installationID, event.Repositories)
 		if err := models.ReplaceVCSProviderRepositories(tx, models.ProviderGitHub, installationID, repositories); err != nil {

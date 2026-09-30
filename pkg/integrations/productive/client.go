@@ -66,16 +66,20 @@ func (e *responseError) Error() string {
 }
 
 func IsNotFoundError(err error) bool {
-	code, ok := responseStatusCode(err)
+	code, ok := StatusCode(err)
 	return ok && code == http.StatusNotFound
 }
 
-func responseStatusCode(err error) (int, bool) {
+func StatusCode(err error) (int, bool) {
 	var responseErr *responseError
 	if !errors.As(err, &responseErr) {
 		return 0, false
 	}
 	return responseErr.statusCode, true
+}
+
+func StatusError(statusCode int) error {
+	return &responseError{statusCode: statusCode}
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -215,7 +219,7 @@ func (c *Client) ValidateWebhookPermission() error {
 		return err
 	}
 
-	code, ok := responseStatusCode(err)
+	code, ok := StatusCode(err)
 	if !ok {
 		return err
 	}
@@ -318,7 +322,7 @@ func webhookCreateError(err error) error {
 	if errors.Is(err, ErrWebhooksLimitExceeded) {
 		return err
 	}
-	code, ok := responseStatusCode(err)
+	code, ok := StatusCode(err)
 	if ok && code == http.StatusForbidden {
 		return fmt.Errorf("%w: %v", ErrMissingWritePermission, err)
 	}

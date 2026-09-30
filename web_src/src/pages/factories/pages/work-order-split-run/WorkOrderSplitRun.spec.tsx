@@ -838,6 +838,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const expand = screen.getByRole("button", { name: "Open full screen" });
     const close = screen.getByRole("button", { name: "Close" });
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
     expect(expand.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(expand).toHaveClass("h-6", "w-6", "rounded-full");
     expect(close).toHaveClass("h-6", "w-6", "rounded-full");
@@ -851,6 +852,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
     expect(fullPage.className).toContain("w-full");
     expect(fullPage.className).not.toContain("w-[min(72rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
@@ -2061,7 +2063,7 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("heading", { name: "Implement job" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "RF-101 Implement job" })).toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-implement-0")).not.toBeInTheDocument();
@@ -2104,13 +2106,40 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
+    const heading = screen.getByRole("heading", { name: "RF-105 Draft: rework refund telemetry" });
+    expect(within(heading).getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("popup-work-order-title"));
     const titleInput = await screen.findByTestId("popup-work-order-title-input");
+    expect(titleInput).toHaveValue("Draft: rework refund telemetry");
+    expect(within(heading).getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
     await user.clear(titleInput);
     await user.type(titleInput, "Renamed draft");
     await user.keyboard("{Enter}");
     expect(screen.getByTestId("popup-work-order-title")).toHaveTextContent("Renamed draft");
+    expect(screen.getByTestId("popup-work-order-title")).not.toHaveTextContent("RF-105");
+    expect(screen.getByRole("heading", { name: "RF-105 Renamed draft" })).toBeInTheDocument();
+    expect(screen.getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
+  });
+
+  it("shows the title alone when the task has no key and no number", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({ ...DRAFT_WORK_ORDER, key: "", number: "" }),
+    });
+
+    expect(screen.getByRole("heading", { name: "Draft: rework refund telemetry" })).toBeInTheDocument();
+    expect(screen.queryByTestId("popup-work-order-key")).not.toBeInTheDocument();
+  });
+
+  it("builds the heading key from the workspace key and task number", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({ ...OPEN_WORK_ORDER, key: "" }),
+      factoryKey: "RF",
+      orderNumber: "101",
+    });
+
+    expect(screen.getByTestId("popup-work-order-key")).toHaveTextContent("RF-101");
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
   });
 
   it("does not let you edit a completed task", () => {

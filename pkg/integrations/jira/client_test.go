@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -208,6 +209,30 @@ func Test__Client__GetCurrentUser(t *testing.T) {
 
 		_, err = client.GetCurrentUser()
 		require.ErrorContains(t, err, "token refresh failed")
+		var apiErr *APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
+	})
+
+	t.Run("401 whose token refresh hits 429 keeps the refresh status", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"unauthorized"}`))},
+				{StatusCode: http.StatusTooManyRequests, Body: io.NopCloser(strings.NewReader(`{"error":"rate_limited"}`))},
+			},
+		}
+
+		appCtx := newAuthorizedIntegration()
+		appCtx.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		_, err = client.GetCurrentUser()
+		require.ErrorContains(t, err, "token refresh failed")
+		var apiErr *APIError
+		require.True(t, errors.As(err, &apiErr))
+		assert.Equal(t, http.StatusTooManyRequests, apiErr.StatusCode)
+		assert.True(t, IsRetryableAPIError(err))
 	})
 }
 

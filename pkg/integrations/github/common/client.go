@@ -36,14 +36,14 @@ type Client struct {
 }
 
 func IsNotFoundError(err error) bool {
-	return githubStatusCode(err) == http.StatusNotFound
+	return StatusCode(err) == http.StatusNotFound
 }
 
 func IsForbiddenError(err error) bool {
-	return githubStatusCode(err) == http.StatusForbidden
+	return StatusCode(err) == http.StatusForbidden
 }
 
-func githubStatusCode(err error) int {
+func StatusCode(err error) int {
 	var githubErr *github.ErrorResponse
 	if errors.As(err, &githubErr) && githubErr.Response != nil {
 		return githubErr.Response.StatusCode

@@ -31,17 +31,17 @@ func ImportFactoryIntakeItem(
 ) (*pb.ImportFactoryIntakeItemResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	itemID := strings.TrimSpace(req.GetItemId())
 	if itemID == "" {
-		return nil, factoryErrorToStatus(invalidArgument("item id is required"), "failed to import factory intake item")
+		return nil, intakeErrorToStatus(invalidArgument("item id is required"), "failed to import factory intake item")
 	}
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -50,28 +50,28 @@ func ImportFactoryIntakeItem(
 	}
 	createdByID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to import factory intake item")
+		return nil, intakeErrorToStatus(invalidArgument("invalid user id"), "failed to import factory intake item")
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	intake, err := factory.FindIntake(db, intakeID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	source, err := deps.itemSource(ctx, db, intake)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	item, err := source.Get(ctx, itemID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
@@ -175,7 +175,7 @@ func ImportFactoryIntakeItem(
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
@@ -190,7 +190,7 @@ func ImportFactoryIntakeItem(
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	return &pb.ImportFactoryIntakeItemResponse{Order: serialized}, nil
