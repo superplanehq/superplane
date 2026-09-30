@@ -48,12 +48,12 @@ var enqueueGitHubAppInstallationReconciliation = func(
 	)
 }
 
-var consumeGitHubAppInstallationRequest = func(ctx context.Context, installationID int64) (bool, error) {
+var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID int64) (bool, error) {
 	catalog, err := appcatalog.NewCatalog(database.DB(ctx), config.LoadGitHubHostedAppConfig())
 	if err != nil {
 		return false, err
 	}
-	return catalog.ConsumeInstallationRequest(ctx, installationID)
+	return catalog.HasInstallationRequest(ctx, installationID)
 }
 
 // HandleGitHubAppSetup handles only GitHub's installation and repository
@@ -79,7 +79,7 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	case "install":
 		redirectPath := "/"
 		if strings.TrimSpace(query.Get("state")) == "" {
-			requested, requestErr := consumeGitHubAppInstallationRequest(r.Context(), installationID)
+			requested, requestErr := hasGitHubAppInstallationRequest(r.Context(), installationID)
 			if requestErr != nil {
 				log.WithError(requestErr).WithField("installation_id", installationID).Warn(
 					"failed to identify GitHub App installation request",

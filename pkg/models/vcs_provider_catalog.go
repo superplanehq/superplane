@@ -781,29 +781,42 @@ func DeleteVCSProviderInstallRequestsForAccount(
 	accountID *int64,
 	accountLogin string,
 ) error {
-	_, err := ConsumeVCSProviderInstallRequestsForAccount(tx, provider, accountID, accountLogin)
-	return err
+	query := tx.Model(&VCSProviderInstallRequest{})
+	if accountID != nil {
+		return query.Where("provider = ? AND account_id = ?", provider, *accountID).Delete(&VCSProviderInstallRequest{}).Error
+	}
+	accountLogin = strings.TrimSpace(accountLogin)
+	if accountLogin == "" {
+		return nil
+	}
+	return query.
+		Where("provider = ? AND LOWER(account_login) = LOWER(?)", provider, accountLogin).
+		Delete(&VCSProviderInstallRequest{}).
+		Error
 }
 
-func ConsumeVCSProviderInstallRequestsForAccount(
+func HasVCSProviderInstallRequestForAccount(
 	tx *gorm.DB,
 	provider string,
 	accountID *int64,
 	accountLogin string,
 ) (bool, error) {
-	query := tx.Model(&VCSProviderInstallRequest{})
+	query := tx.Model(&VCSProviderInstallRequest{}).Where("provider = ?", provider)
 	if accountID != nil {
-		result := query.Where("provider = ? AND account_id = ?", provider, *accountID).Delete(&VCSProviderInstallRequest{})
-		return result.RowsAffected > 0, result.Error
+		query = query.Where("account_id = ?", *accountID)
+	} else {
+		accountLogin = strings.TrimSpace(accountLogin)
+		if accountLogin == "" {
+			return false, nil
+		}
+		query = query.Where("LOWER(account_login) = LOWER(?)", accountLogin)
 	}
-	accountLogin = strings.TrimSpace(accountLogin)
-	if accountLogin == "" {
-		return false, nil
+
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
 	}
-	result := query.
-		Where("provider = ? AND LOWER(account_login) = LOWER(?)", provider, accountLogin).
-		Delete(&VCSProviderInstallRequest{})
-	return result.RowsAffected > 0, result.Error
+	return count > 0, nil
 }
 
 func EnqueueVCSProviderRepositorySync(

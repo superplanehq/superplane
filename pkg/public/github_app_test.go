@@ -29,7 +29,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 	setGitHubAppEnvironment(t)
 	previousReconciliation := enqueueGitHubAppReconciliation
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
-	previousConsumeInstallationRequest := consumeGitHubAppInstallationRequest
+	previousHasInstallationRequest := hasGitHubAppInstallationRequest
 	organizationID := uuid.New()
 	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
 	require.NoError(t, err)
@@ -51,13 +51,13 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		organizationIDs = append(organizationIDs, requestedOrganizationID)
 		return nil
 	}
-	consumeGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
+	hasGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
 		return installationRequested, nil
 	}
 	t.Cleanup(func() {
 		enqueueGitHubAppReconciliation = previousReconciliation
 		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
-		consumeGitHubAppInstallationRequest = previousConsumeInstallationRequest
+		hasGitHubAppInstallationRequest = previousHasInstallationRequest
 	})
 
 	t.Run("direct installation returns to the app", func(t *testing.T) {

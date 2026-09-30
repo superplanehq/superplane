@@ -90,9 +90,9 @@ func Test__GitHubAppSetup_installRequestWithoutSessionReturnsToApp(t *testing.T)
 func Test__GitHubAppSetup_ownerApprovedWithoutSession(t *testing.T) {
 	r := support.Setup(t)
 	server, _, _ := setupTestServer(r, t)
-	previousConsumeInstallationRequest := consumeGitHubAppInstallationRequest
-	consumeGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) { return true, nil }
-	t.Cleanup(func() { consumeGitHubAppInstallationRequest = previousConsumeInstallationRequest })
+	previousHasInstallationRequest := hasGitHubAppInstallationRequest
+	hasGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) { return true, nil }
+	t.Cleanup(func() { hasGitHubAppInstallationRequest = previousHasInstallationRequest })
 
 	req := httptest.NewRequest(
 		http.MethodGet,

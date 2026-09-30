@@ -174,7 +174,7 @@ func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCatalogConsumeInstallationRequestUsesStoredInstallation(t *testing.T) {
+func TestCatalogHasInstallationRequestUsesStoredInstallationWithoutRemovingRequest(t *testing.T) {
 	registry := support.Setup(t)
 	t.Cleanup(registry.Close)
 	db := database.Conn()
@@ -194,15 +194,15 @@ func TestCatalogConsumeInstallationRequestUsesStoredInstallation(t *testing.T) {
 	}}))
 
 	catalog := &Catalog{db: db}
-	requested, err := catalog.ConsumeInstallationRequest(t.Context(), 101)
+	requested, err := catalog.HasInstallationRequest(t.Context(), 101)
 	require.NoError(t, err)
 	assert.True(t, requested)
-	requested, err = catalog.ConsumeInstallationRequest(t.Context(), 101)
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, 501)
 	require.NoError(t, err)
-	assert.False(t, requested)
+	assert.Len(t, requests, 1)
 }
 
-func TestCatalogConsumeInstallationRequestLoadsMissingInstallation(t *testing.T) {
+func TestCatalogHasInstallationRequestLoadsMissingInstallation(t *testing.T) {
 	registry := support.Setup(t)
 	t.Cleanup(registry.Close)
 	db := database.Conn()
@@ -220,7 +220,7 @@ func TestCatalogConsumeInstallationRequestLoadsMissingInstallation(t *testing.T)
 	})
 
 	catalog := &Catalog{db: db, appClient: client}
-	requested, err := catalog.ConsumeInstallationRequest(t.Context(), 101)
+	requested, err := catalog.HasInstallationRequest(t.Context(), 101)
 	require.NoError(t, err)
 	assert.True(t, requested)
 }
