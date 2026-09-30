@@ -10,13 +10,18 @@ import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from 
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
-import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import {
+  classicSplitRunFooter,
+  composerCreditVerdict,
+  creditBillingHref,
+  isTaskResultFooter,
+  SPLIT_RUN_ANALYZING_NOTE,
+} from "./splitRunFooter";
 import {
   defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
@@ -373,7 +378,7 @@ function analysisPopupReview(args: {
   );
 }
 
-function analysisDraftChrome(args: {
+type AnalysisDraftChromeArgs = {
   factory?: FactoriesFactory;
   organizationId?: string;
   factoryId?: string;
@@ -385,7 +390,9 @@ function analysisDraftChrome(args: {
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled: boolean;
-}) {
+};
+
+function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   if (!factoryPlanningEnabled(args.factory)) {
     return { footerModelSelect: undefined, stripAnalysis: undefined };
   }
@@ -400,16 +407,7 @@ function analysisDraftChrome(args: {
   });
   return {
     footerModelSelect: modelSelects.footer,
-    stripAnalysis: draftStripAnalysis(
-      args.fixture.footer.kind,
-      args.analysis,
-      modelSelects.strip,
-      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
-      {
-        showClarity: factoryShowsClarity(args.factory),
-        showConfidence: factoryShowsConfidence(args.factory),
-      },
-    ),
+    stripAnalysis: draftStripAnalysis(args, modelSelects.strip),
   };
 }
 
@@ -458,17 +456,19 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
   };
 }
 
-function draftStripAnalysis(
-  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
-  analysis: ReturnType<typeof useAnalysisPlanningSession>,
-  modelSelect: ReactNode | undefined,
-  taskHref: CreatedTaskHref,
-  scores: { showClarity: boolean; showConfidence: boolean },
-) {
-  if (footerKind !== "draft") {
+function draftStripAnalysis(args: AnalysisDraftChromeArgs, modelSelect: ReactNode | undefined) {
+  if (args.fixture.footer.kind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores };
+  const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
+  return {
+    ...args.analysis,
+    modelSelect,
+    taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+    showClarity: factoryShowsClarity(args.factory),
+    showConfidence: factoryShowsConfidence(args.factory),
+    creditVerdict: composerCreditVerdict(args.fixture.footer.note, billingHref),
+  };
 }
 
 /**

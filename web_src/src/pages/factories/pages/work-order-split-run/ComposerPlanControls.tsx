@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { EyeOff, FileText } from "lucide-react";
 
+import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,6 +13,7 @@ import { ReadinessDot } from "../../workOrders/ReadinessMark";
 import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
+import type { ComposerCreditVerdict } from "./splitRunFooter";
 
 export type ComposerScore = ScoreEvidenceValue;
 
@@ -40,6 +42,7 @@ export function ComposerPlanStack({
   onToggle,
   actions,
   modelSelect,
+  creditVerdict,
 }: {
   open: boolean;
   clarity?: ComposerScore;
@@ -52,30 +55,33 @@ export function ComposerPlanStack({
   onToggle?: () => void;
   actions?: ReactNode;
   modelSelect?: ReactNode;
+  creditVerdict?: ComposerCreditVerdict;
 }) {
-  const readiness = liveDraftReadiness({
+  const analyzing = Boolean(isAnalyzing) && !creditVerdict;
+  const readiness = composerReadiness({
+    creditVerdict,
     clarity: showClarity ? clarity?.score : undefined,
     confidence: showConfidence ? confidence?.score : undefined,
-    isAnalyzing,
+    isAnalyzing: analyzing,
   });
   const showControls = canTogglePlan || Boolean(modelSelect) || Boolean(actions);
   return (
     <Frame dense className="w-full min-w-0" data-testid="split-run-intent-status-card">
       <FramePanel fit className="flex flex-col gap-1.5 px-3 py-2" data-testid="split-run-intent-plan-updated">
-        <Verdict readiness={readiness} />
+        <Verdict readiness={readiness} creditVerdict={creditVerdict} />
         <div className="flex min-w-0 items-center gap-2" data-testid="split-run-intent-composer-chips">
           <ScoreEvidenceRow
             clarity={clarity}
             confidence={confidence}
             showClarity={showClarity}
             showConfidence={showConfidence}
-            isAnalyzing={isAnalyzing}
+            isAnalyzing={analyzing}
             testIds={SCORE_TEST_IDS}
           />
           {showControls ? (
             <div className="ml-auto flex shrink-0 items-center gap-1" data-testid="split-run-intent-settings">
               {canTogglePlan ? (
-                <PlanToggle open={open} isAnalyzing={isAnalyzing} planStatus={planStatus} onToggle={onToggle} />
+                <PlanToggle open={open} isAnalyzing={analyzing} planStatus={planStatus} onToggle={onToggle} />
               ) : null}
               {modelSelect}
               {actions ? <div className="ml-1 flex items-center">{actions}</div> : null}
@@ -87,7 +93,17 @@ export function ComposerPlanStack({
   );
 }
 
-function Verdict({ readiness }: { readiness: DraftReadiness }) {
+function composerReadiness({
+  creditVerdict,
+  ...scores
+}: Parameters<typeof liveDraftReadiness>[0] & { creditVerdict?: ComposerCreditVerdict }): DraftReadiness {
+  if (creditVerdict) {
+    return { tone: "blocked", headline: creditVerdict.headline, text: creditVerdict.text };
+  }
+  return liveDraftReadiness(scores);
+}
+
+function Verdict({ readiness, creditVerdict }: { readiness: DraftReadiness; creditVerdict?: ComposerCreditVerdict }) {
   const showText = VERDICT_WITH_TEXT.includes(readiness.tone);
   return (
     <div
@@ -99,7 +115,22 @@ function Verdict({ readiness }: { readiness: DraftReadiness }) {
       <VerdictMark tone={readiness.tone} />
       <div className="min-w-0">
         <p className="text-[13px] leading-5 font-medium text-foreground">{readiness.headline}</p>
-        {showText ? <p className="text-[12px] leading-4 text-muted-foreground">{readiness.text}</p> : null}
+        {showText ? (
+          <p className="text-[12px] leading-4 text-muted-foreground">
+            {readiness.text}
+            {creditVerdict?.href ? (
+              <>
+                {" "}
+                <Link
+                  href={creditVerdict.href}
+                  className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+                >
+                  {creditVerdict.actionLabel}
+                </Link>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );
