@@ -20,7 +20,6 @@ import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
@@ -434,21 +433,12 @@ describe("columnAutomationOpenPath", () => {
   } as const;
 
   it("opens Planning settings for Task analysis", () => {
-    const href = columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: true });
+    const href = columnAutomationOpenPath(analysisAutomation, nav);
 
     expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
-  });
-
-  it("opens the Planning setup wizard for Task analysis until setup is confirmed", () => {
-    expect(columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: false })).toBe(
-      factoryPlanningSetupPath("org-1", "RF", "line-plan"),
-    );
-  });
-
-  it("opens Planning settings for Task analysis when the setup state is unknown", () => {
-    expect(columnAutomationOpenPath(analysisAutomation, nav)).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
+    expect(href).not.toContain("/setup/planning");
   });
 
   it("opens the intake settings popup on the first tab", () => {

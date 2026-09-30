@@ -62,6 +62,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -209,7 +215,8 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		// Self-scoped: members read their own notification settings.
 		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*,
-		// /api/v1/me/last-location, and POST /api/v1/me/feedback have no
+		// /api/v1/me/last-location, /api/v1/me/vcs/*, and POST
+		// /api/v1/me/feedback have no
 		// entry here on purpose. They only ever act on the calling user's
 		// own record, so GatewayAuthorizer.AuthorizeHTTP's no-rule-found
 		// path (allow without an org permission check) is the correct
@@ -359,6 +366,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "read",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/mcp-clients"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/line-runner-models"}: {
 			Resource:                     "factories",
@@ -557,6 +570,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
 		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{id}/onboarding"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{id}/onboarding/vcs-repository"}: {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
@@ -945,6 +964,13 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Resource:                     "factories",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "PUT", Pattern: "/api/v1/factories/{id}/visibility"}: {
+			Resource:                     "factories",
+			Action:                       "publish",
+			DomainType:                   models.DomainTypeOrganization,
+			ResourcePathParams:           []string{IDPathParam},
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "PUT", Pattern: "/api/v1/factories/{factory_id}/llm-models"}: {

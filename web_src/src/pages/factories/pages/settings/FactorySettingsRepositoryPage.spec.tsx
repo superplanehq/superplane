@@ -38,4 +38,23 @@ describe("FactorySettingsRepositoryPage", () => {
     await waitFor(() => expect(saveButton).toBeDisabled());
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toHaveAttribute("aria-selected", "true");
   }, 10000);
+
+  it("shows only repositories accessible to the linked account for a hosted binding", async () => {
+    const fixture = factoriesFixtureWithSetupAnswers({
+      ...SETUP_ANSWERS.agent,
+      appRepositoryId: "201",
+      backlogRepositoryId: "201",
+    });
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+        factoriesFixture={fixture}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
+    expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
+    expect(within(settings).queryByRole("option", { name: /acme\/web/i })).not.toBeInTheDocument();
+  }, 10000);
 });

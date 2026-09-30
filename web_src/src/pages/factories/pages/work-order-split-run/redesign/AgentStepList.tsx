@@ -3,10 +3,12 @@ import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { JumpToLatestPill } from "../JumpToLatestPill";
+import type { AgentActivity } from "../agentActivity";
+import { activityFollowTick, activityFromAgentStep } from "./activityFromAgentStep";
+import { StepMarkerDetail } from "./AgentStepMarkerBody";
 import { useFollowLogScroll } from "../useFollowLogScroll";
 import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
@@ -105,7 +107,7 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-[13px] font-medium text-foreground">{step.title}</span>
-          {step.status !== "passed" ? <StepStatusBadge status={step.status} /> : null}
+          <StepStatusBadge status={step.status} />
           {step.duration ? (
             <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{step.duration}</span>
           ) : null}
@@ -137,22 +139,55 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
   );
 }
 
-export function AgentStepMarkers({ stage, expandSteps = false }: { stage: AutomationStage; expandSteps?: boolean }) {
+export function AgentStepMarkers({
+  stage,
+  expandSteps = false,
+  liveActivity,
+  liveActive = false,
+}: {
+  stage: AutomationStage;
+  expandSteps?: boolean;
+  /** Live turn for the open running step. Finished steps keep the collapsible body. */
+  liveActivity?: AgentActivity;
+  liveActive?: boolean;
+}) {
   if (stage.agentSteps.length === 0) {
     return null;
   }
+  const liveStepId = liveActive
+    ? [...stage.agentSteps].reverse().find((step) => step.status === "running")?.id
+    : undefined;
   return (
     <div className="flex flex-col" data-testid={`redesign-agent-steps-${stage.id}`}>
       {stage.agentSteps.map((step) => (
-        <AgentStepMarker key={step.id} step={step} defaultOpen={expandSteps} />
+        <AgentStepMarker
+          key={step.id}
+          step={step}
+          defaultOpen={expandSteps}
+          liveActivity={step.id === liveStepId ? liveActivity : undefined}
+          liveActive={step.id === liveStepId}
+          liveTestId={`redesign-live-activity-${stage.id}`}
+        />
       ))}
     </div>
   );
 }
 
-function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defaultOpen?: boolean }) {
-  const expandable = step.events.length > 0 || Boolean(step.output);
+function AgentStepMarker({
+  step,
+  defaultOpen = false,
+  liveActivity,
+  liveActive = false,
+  liveTestId,
+}: {
+  step: AgentStep;
+  defaultOpen?: boolean;
+  liveActivity?: AgentActivity;
+  liveActive?: boolean;
+  liveTestId?: string;
+}) {
   const running = step.status === "running";
+  const expandable = step.events.length > 0 || Boolean(step.output) || liveActive;
   const [open, setOpen] = useState(running || defaultOpen);
   const userToggled = useRef(false);
   useEffect(() => {
@@ -161,10 +196,14 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
     }
   }, [defaultOpen, running]);
   const reason = open && !step.summary ? "" : stepReason(step);
-  const follow = useFollowLogScroll<HTMLDivElement>(running ? step.id : null, step.events.length);
+  const activity = liveActivity && liveActivity.items.length > 0 ? liveActivity : activityFromAgentStep(step);
+  const follow = useFollowLogScroll<HTMLDivElement>(
+    running ? step.id : null,
+    liveActive ? activityFollowTick(activity) : step.events.length,
+  );
   const row = (
-    <Marker className={cn("items-start py-1", running && "bg-muted")}>
-      <MarkerIcon className="mt-0.5 text-muted-foreground">
+    <Marker className={cn("min-w-0 py-1", running && "bg-muted")}>
+      <MarkerIcon className="text-muted-foreground">
         {expandable ? (
           <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
         ) : step.type === "node" ? (
@@ -173,13 +212,14 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
           <ToolKindIcon type={step.type} />
         )}
       </MarkerIcon>
-      <MarkerContent className="flex min-w-0 flex-1 items-start gap-2 text-[13px] leading-5 text-foreground">
-        <span className="min-w-0 break-words">{step.title}</span>
-        {step.status !== "passed" ? <StepStatusBadge status={step.status} /> : null}
-        {reason ? <span className="min-w-0 break-words font-mono text-xs text-muted-foreground">{reason}</span> : null}
-        {running ? (
-          <Loader2 className="ml-auto size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-        ) : step.duration ? (
+      <MarkerContent className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[13px] leading-5 text-foreground">
+        <span className="max-w-[50%] shrink-0 truncate">{step.title}</span>
+        {step.type === "node" ? <NodeIcon iconSlug={step.iconSlug} /> : <ToolKindIcon type={step.type} />}
+        <StepStatusBadge status={step.status} />
+        {reason ? (
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
+        ) : null}
+        {step.duration ? (
           <span className="ml-auto w-12 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
             {step.duration}
           </span>
@@ -204,31 +244,16 @@ function AgentStepMarker({ step, defaultOpen = false }: { step: AgentStep; defau
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="min-w-0">
-        {running ? (
-          <div className="relative min-w-0">
-            <div
-              ref={follow.scrollRef}
-              onScroll={follow.onScroll}
-              className={cn(
-                "flex min-w-0 flex-col gap-2 overflow-y-auto py-1 pl-6",
-                defaultOpen ? "max-h-[60vh]" : "max-h-80",
-              )}
-              data-testid={`redesign-step-log-${step.id}`}
-            >
-              <StepDetail step={step} />
-            </div>
-            {follow.showJumpToLatest ? (
-              <JumpToLatestPill
-                onJumpToLatest={() => follow.setFollowing(true)}
-                testId={`redesign-step-older-${step.id}`}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2 py-1 pl-6">
-            <StepDetail step={step} />
-          </div>
-        )}
+        <StepMarkerDetail
+          step={step}
+          activity={activity}
+          running={running}
+          liveActive={liveActive}
+          liveActivity={liveActivity}
+          liveTestId={liveTestId}
+          defaultOpen={defaultOpen}
+          follow={follow}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -308,6 +333,10 @@ function stepReason(step: AgentStep): string {
   return output;
 }
 
+/**
+ * Only outcomes that interrupt reading get a badge. A running step is
+ * already marked by the card header spinner and its own live rows.
+ */
 function StepStatusBadge({ status }: { status: AgentStep["status"] }) {
   if (status === "failed" || status === "cancelled") {
     return (
@@ -323,7 +352,7 @@ function StepStatusBadge({ status }: { status: AgentStep["status"] }) {
       </Badge>
     );
   }
-  return <Badge variant="outline">Running</Badge>;
+  return null;
 }
 
 function AgentEventBlock({ event }: { event: AgentStepEvent }) {

@@ -139,6 +139,25 @@ func Test__IssueStatusIsSettled(t *testing.T) {
 	assert.False(t, IssueStatusIsSettled(""))
 }
 
+func Test__ReceiptIDFromEventData(t *testing.T) {
+	receiptID := "6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d"
+	id, ok := ReceiptIDFromEventData(map[string]any{
+		"type": IssuePayloadType,
+		"data": map[string]any{
+			SuperplaneReceiptField: receiptID,
+			"data":                 map[string]any{"issue": map[string]any{"id": "99"}},
+		},
+	})
+	require.True(t, ok)
+	assert.Equal(t, receiptID, id.String())
+
+	_, ok = ReceiptIDFromEventData(map[string]any{
+		"type": IssuePayloadType,
+		"data": map[string]any{"data": map[string]any{"issue": map[string]any{"id": "99"}}},
+	})
+	assert.False(t, ok)
+}
+
 func Test__IsRetryableAPIError(t *testing.T) {
 	t.Run("retries rate limits, timeouts, and server errors", func(t *testing.T) {
 		assert.True(t, IsRetryableAPIError(&apiError{StatusCode: http.StatusTooManyRequests}))

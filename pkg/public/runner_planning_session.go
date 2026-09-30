@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -445,11 +446,53 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
+	maybeAutoStartPlannedWorkOrder(db, session)
 	if !hasOutstandingPlanningQuestion(session) {
 		return nil
 	}
 	messages.PublishPlanningAgentQuestion(session)
 	return nil
+}
+
+func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanningSession) {
+	if session == nil || session.DraftWorkOrderID == nil {
+		return
+	}
+	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start skipped for session %s", session.ID)
+		return
+	}
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start skipped for work order %s", session.DraftWorkOrderID)
+		return
+	}
+	ready, err := models.WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start readiness check failed for order %s", order.ID)
+		return
+	}
+	if !ready || factoryModel.PlanningAutoStartLineID == nil {
+		return
+	}
+	lineID := *factoryModel.PlanningAutoStartLineID
+	claimed, err := order.ClaimAutoStart(db, lineID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start could not claim the line for order %s", order.ID)
+		return
+	}
+	if !claimed {
+		return
+	}
+	line, err := factoryModel.FindLine(db, lineID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+		return
+	}
+	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", ""); err != nil {
+		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+	}
 }
 
 func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSession, body string) error {
@@ -516,6 +559,7 @@ func mintPlanningWait(ctx context.Context, session *models.FactoryPlanningSessio
 	if err != nil {
 		return "", nil, err
 	}
+	rewritten, files = runneraction.RewriteLoopbackTaskFileURLs(rewritten, files)
 	payload := make([]map[string]any, 0, len(files))
 	for _, file := range files {
 		payload = append(payload, file.Map())

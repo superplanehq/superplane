@@ -35,29 +35,34 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                     uuid.UUID
-	OrganizationID         uuid.UUID
-	Name                   string
-	Description            string
-	Key                    string
-	NextWorkOrderNumber    int64
-	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
-	OnboardingCompletedAt  *time.Time
-	HostedSpendBudgetCents *int64
-	PlanningEnabled        bool
-	PlanningClarity        bool
-	PlanningConfidence     bool
-	PlanningSetupCompleted bool
-	PublicBadgeEnabled     bool
-	PublicBadgeShowCost    bool
-	PublicBadgeToken       *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
-	DeletedAt              gorm.DeletedAt `gorm:"index"`
+	ID                      uuid.UUID
+	OrganizationID          uuid.UUID
+	Name                    string
+	Description             string
+	Key                     string
+	NextWorkOrderNumber     int64
+	OnboardingConfig        datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt   *time.Time
+	HostedSpendBudgetCents  *int64
+	PlanningEnabled         bool
+	PlanningClarity         bool
+	PlanningConfidence      bool
+	PlanningSetupCompleted  bool
+	PlanningAutoStartLineID *uuid.UUID
+	// Public lets anyone with the line URL view the board. They cannot open
+	// tasks, logs, or settings.
+	Public              bool
+	PublicBadgeEnabled  bool
+	PublicBadgeShowCost bool
+	PublicBadgeToken    *string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           gorm.DeletedAt `gorm:"index"`
 }
 
 // FactoryPlanning is the workspace toggle for draft chat plus the two
@@ -65,10 +70,11 @@ type Factory struct {
 // estimate on. The Clarity check is opt-in because it makes the agent ask
 // more questions before a task is ready.
 type FactoryPlanning struct {
-	Enabled        bool
-	Clarity        bool
-	Confidence     bool
-	SetupCompleted bool
+	Enabled         bool
+	Clarity         bool
+	Confidence      bool
+	SetupCompleted  bool
+	AutoStartLineID *uuid.UUID
 }
 
 func DefaultFactoryPlanning() FactoryPlanning {
@@ -276,6 +282,18 @@ func FindFactoryByPublicBadgeToken(tx *gorm.DB, token string) (*Factory, error) 
 	return &factory, nil
 }
 
+func FindFactoryByID(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.Where("id = ?", factoryID).First(&factory).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &factory, nil
+}
+
 func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
 	normalized := NormalizeFactoryKey(key)
 	if err := ValidateFactoryKey(normalized); err != nil {
@@ -428,10 +446,11 @@ func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error
 
 func (f *Factory) Planning() FactoryPlanning {
 	return FactoryPlanning{
-		Enabled:        f.PlanningEnabled,
-		Clarity:        f.PlanningClarity,
-		Confidence:     f.PlanningConfidence,
-		SetupCompleted: f.PlanningSetupCompleted,
+		Enabled:         f.PlanningEnabled,
+		Clarity:         f.PlanningClarity,
+		Confidence:      f.PlanningConfidence,
+		SetupCompleted:  f.PlanningSetupCompleted,
+		AutoStartLineID: f.PlanningAutoStartLineID,
 	}
 }
 
@@ -439,13 +458,21 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	now := time.Now()
 	err := tx.Model(f).
 		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
-		Select("planning_enabled", "planning_clarity", "planning_confidence", "planning_setup_completed", "updated_at").
+		Select(
+			"planning_enabled",
+			"planning_clarity",
+			"planning_confidence",
+			"planning_setup_completed",
+			"planning_auto_start_line_id",
+			"updated_at",
+		).
 		Updates(map[string]any{
-			"planning_enabled":         planning.Enabled,
-			"planning_clarity":         planning.Clarity,
-			"planning_confidence":      planning.Confidence,
-			"planning_setup_completed": planning.SetupCompleted,
-			"updated_at":               now,
+			"planning_enabled":            planning.Enabled,
+			"planning_clarity":            planning.Clarity,
+			"planning_confidence":         planning.Confidence,
+			"planning_setup_completed":    planning.SetupCompleted,
+			"planning_auto_start_line_id": planning.AutoStartLineID,
+			"updated_at":                  now,
 		}).Error
 	if err != nil {
 		return err
@@ -454,6 +481,27 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningClarity = planning.Clarity
 	f.PlanningConfidence = planning.Confidence
 	f.PlanningSetupCompleted = planning.SetupCompleted
+	f.PlanningAutoStartLineID = planning.AutoStartLineID
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) SetPublic(tx *gorm.DB, public bool) error {
+	if f.OnboardingCompletedAt == nil {
+		return ErrFactoryOnboardingNotComplete
+	}
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public", "updated_at").
+		Updates(map[string]any{
+			"public":     public,
+			"updated_at": now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.Public = public
 	f.UpdatedAt = now
 	return nil
 }
@@ -677,7 +725,18 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithAutoStart(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, autoStartLineID)
 }
 
 // SnapshotWorkOrderRepository records the current repository before a
@@ -703,7 +762,7 @@ func (f *Factory) CreateWorkOrderWithOrigin(
 	sourceRunID *uuid.UUID,
 	origin WorkOrderOrigin,
 ) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil)
 }
 
 func (f *Factory) createWorkOrder(
@@ -713,10 +772,16 @@ func (f *Factory) createWorkOrder(
 	assignees []uuid.UUID,
 	sourceRunID *uuid.UUID,
 	origin *WorkOrderOrigin,
+	autoStartLineID *uuid.UUID,
 ) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+	if autoStartLineID != nil {
+		if _, err := f.FindLine(tx, *autoStartLineID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
@@ -731,18 +796,19 @@ func (f *Factory) createWorkOrder(
 
 	now := time.Now()
 	order := &FactoryWorkOrder{
-		ID:             uuid.New(),
-		OrganizationID: f.OrganizationID,
-		FactoryID:      f.ID,
-		Number:         nextNumber,
-		Title:          title,
-		Description:    description,
-		State:          FactoryWorkOrderStateDraft,
-		Result:         "",
-		CreatedByID:    createdBy,
-		SourceRunID:    sourceRunID,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:              uuid.New(),
+		OrganizationID:  f.OrganizationID,
+		FactoryID:       f.ID,
+		Number:          nextNumber,
+		Title:           title,
+		Description:     description,
+		State:           FactoryWorkOrderStateDraft,
+		Result:          "",
+		CreatedByID:     createdBy,
+		SourceRunID:     sourceRunID,
+		AutoStartLineID: autoStartLineID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	config := f.OnboardingConfigValue()
 	if config.AppRepository != "" && config.DefaultBranch != "" {
@@ -917,6 +983,10 @@ type ListFactoryWorkOrdersFilters struct {
 	BeforeID *uuid.UUID
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
+	// PublicBoard keeps the orders a public line board can show. Drafts stay
+	// even after a run on another line. Closed rejected orders are omitted
+	// so they do not consume the page.
+	PublicBoard bool
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -941,7 +1011,11 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)
-	query = applyWorkOrderLineFilter(query, filters.LineID)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -1011,6 +1085,37 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 			)
 			OR factory_work_orders.created_by_id = ?
 		)`, *filters.UserID, *filters.UserID)
+}
+
+func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	query = query.Where(`
+		(
+			factory_work_orders.state IN ?
+			OR (
+				factory_work_orders.state = ?
+				AND factory_work_orders.result IN ?
+			)
+		)`,
+		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed,
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+	)
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			factory_work_orders.state = ?
+			OR EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, FactoryWorkOrderStateDraft, *lineID)
 }
 
 func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {

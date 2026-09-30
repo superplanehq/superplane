@@ -4,7 +4,7 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest, FilesFile } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
@@ -13,14 +13,19 @@ import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
-import { SplitRunCheckPills } from "../SplitRunReview";
+import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunLinkedArtifacts } from "../splitRunPopupModel";
+import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
-import { StageStatusGlyph } from "./redesignShared";
+import { StaticStatusGlyph } from "./redesignShared";
 
+/**
+ * Reads top to bottom by priority: the decision, then what the run
+ * produced (pull request, checks, artifacts), then reference details.
+ */
 export function ConsoleSummaryPanel({
   fixture,
   outcome,
@@ -28,7 +33,6 @@ export function ConsoleSummaryPanel({
   pullRequests,
   panelReview,
   source,
-  files,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -36,17 +40,21 @@ export function ConsoleSummaryPanel({
   pullRequests?: FactoriesFactoryPullRequest[];
   panelReview?: ReactNode;
   source?: SplitRunSource;
-  files?: FilesFile[];
 }) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
+  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
+  const panelPullRequests = withoutPullRequest(
+    pullRequests?.length ? pullRequests : outcome.pullRequests,
+    reviewedHref,
+  );
+  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
   const artifacts = splitRunLinkedArtifacts([
     ...new Map(stages.flatMap((stage) => stage.outputs.artifacts).map((artifact) => [artifact.id, artifact])).values(),
-  ]);
+  ]).filter((artifact) => !(hasPullRequest && isBranchArtifact(artifact)));
   const checks = stages.flatMap((stage) => stage.checks);
-  const panelPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
-  const attachedFiles = (files ?? []).filter((file) => file.id);
-  const hasOutputs = artifacts.length > 0 || checks.length > 0;
+  // Placeholder values such as "Waiting" mirror the status; only a real time reads as a duration.
+  const duration = /\d/.test(outcome.duration) ? outcome.duration : undefined;
   const spendRows = (fixture.usageByModel ?? []).map((row) => ({
     label: row.model?.split("/").at(-1) ?? row.provider ?? "",
     value: `$${(Number(row.costCents ?? 0) / 100).toFixed(2)}`,
@@ -56,32 +64,12 @@ export function ConsoleSummaryPanel({
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
         <FrameHeader>
           <FrameTitle className="flex items-center gap-2">
-            <StageStatusGlyph status={outcome.status} />
+            <StaticStatusGlyph status={outcome.status} />
             {outcome.statusLabel}
           </FrameTitle>
           {panelReview ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
         {panelReview ? <FramePanel className="py-3">{panelReview}</FramePanel> : null}
-        {source || attachedFiles.length > 0 ? (
-          <FramePanel className="flex flex-col gap-3 py-3" data-testid="redesign-console-context">
-            {source ? (
-              <div>
-                <span className="text-[12px] font-medium text-muted-foreground">Source</span>
-                <WorkOrderSplitRunSource source={source} />
-              </div>
-            ) : null}
-            {attachedFiles.length > 0 ? (
-              <div>
-                <span className="text-[12px] font-medium text-muted-foreground">Files</span>
-                <ul className="mt-2 flex flex-col gap-1.5" data-testid="redesign-console-files">
-                  {attachedFiles.map((file) => (
-                    <AttachedFileRow key={file.id} file={file} />
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </FramePanel>
-        ) : null}
         {panelPullRequests.length > 0 ? (
           <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
             <span className="text-[12px] font-medium text-muted-foreground">
@@ -92,12 +80,30 @@ export function ConsoleSummaryPanel({
             ))}
           </FramePanel>
         ) : null}
-        <FramePanel className="flex flex-col gap-2 py-3">
+        {checks.length > 0 ? (
+          <FramePanel className="flex flex-col gap-2 py-3">
+            <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
+            <ConsoleCheckRows checks={checks} />
+          </FramePanel>
+        ) : null}
+        {artifacts.length > 0 ? (
+          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
+            <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
+            {artifacts.map((artifact) => (
+              <WorkOrderArtifactInline
+                key={artifact.id}
+                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+              />
+            ))}
+          </FramePanel>
+        ) : null}
+        <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
           <SummaryRow label="Owner">
             <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
           </SummaryRow>
+          <PanelSource source={source} owner={outcome.owner.id} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
-          <SummaryRow label="Duration">{outcome.duration}</SummaryRow>
+          {duration ? <SummaryRow label="Duration">{duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
             {spend.costUsd} <span className="text-muted-foreground">· {spend.tokensLabel}</span>
           </SummaryRow>
@@ -107,25 +113,51 @@ export function ConsoleSummaryPanel({
             </SummaryRow>
           ))}
         </FramePanel>
-        {hasOutputs ? (
-          <FramePanel className="flex flex-col gap-2 py-3">
-            <span className="text-[12px] font-medium text-muted-foreground">Outputs</span>
-            {artifacts.map((artifact) => (
-              <WorkOrderArtifactInline
-                key={artifact.id}
-                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
-              />
-            ))}
-            {checks.length > 0 ? (
-              <>
-                <span className="mt-1 text-[12px] font-medium text-muted-foreground">Checks</span>
-                <SplitRunCheckPills checks={checks} testId="redesign-console-checks" />
-              </>
-            ) : null}
-          </FramePanel>
-        ) : null}
       </Frame>
     </aside>
+  );
+}
+
+/** The pull request the decision strip already shows. The panel lists it only once. */
+function reviewStripPullRequestHref(fixture: SplitRunFixture): string | undefined {
+  if (!fixture.footer.note || !isPullRequestReviewFooter(fixture.footer)) {
+    return undefined;
+  }
+  return pullRequestReviewNote(fixture.footer.note)?.href;
+}
+
+function withoutPullRequest(
+  pullRequests: FactoriesFactoryPullRequest[],
+  href: string | undefined,
+): FactoriesFactoryPullRequest[] {
+  if (!href) {
+    return pullRequests;
+  }
+  const normalized = href.replace(/\/$/, "");
+  return pullRequests.filter((pullRequest) => (pullRequest.url ?? "").replace(/\/$/, "") !== normalized);
+}
+
+/** The pull request supersedes its branch, so a listed branch would repeat it. */
+function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
+  return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase() === "branch";
+}
+
+/**
+ * The source of the task. A task the owner created by hand keeps one
+ * "Created manually" row instead of repeating the owner's name.
+ */
+function PanelSource({ source, owner }: { source?: SplitRunSource; owner: string }) {
+  if (!source) {
+    return null;
+  }
+  if (source.kind === "manual" && source.person.id === owner) {
+    return <SummaryRow label="Source">{source.detail}</SummaryRow>;
+  }
+  return (
+    <div>
+      <span className="text-[12px] font-medium text-muted-foreground">Source</span>
+      <WorkOrderSplitRunSource source={source} />
+    </div>
   );
 }
 
@@ -155,22 +187,6 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
         {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>
-  );
-}
-
-function AttachedFileRow({ file }: { file: FilesFile }) {
-  const name = file.filename?.trim() || "File";
-  const href = safeExternalUrl(file.downloadUrl);
-  return (
-    <li className="min-w-0 text-[13px]">
-      {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="truncate text-foreground hover:underline">
-          {name}
-        </a>
-      ) : (
-        <span className="truncate text-foreground">{name}</span>
-      )}
-    </li>
   );
 }
 

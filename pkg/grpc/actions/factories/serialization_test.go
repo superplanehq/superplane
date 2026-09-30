@@ -435,3 +435,14 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 	assert.False(t, serialized.Planning.Confidence)
 	assert.False(t, serialized.Planning.SetupCompleted)
 }
+
+func TestWorkOrderStateProtoMapping(t *testing.T) {
+	assert.Equal(t, pb.WorkOrder_STATE_DRAFT, WorkOrderStateToProto(models.FactoryWorkOrderStateDraft))
+	assert.Equal(t, pb.WorkOrder_STATE_OPEN, WorkOrderStateToProto(models.FactoryWorkOrderStateOpen))
+	assert.Equal(t, pb.WorkOrder_STATE_CLOSED, WorkOrderStateToProto(models.FactoryWorkOrderStateClosed))
+	assert.Equal(t, pb.WorkOrder_STATE_UNSPECIFIED, WorkOrderStateToProto("unknown"))
+
+	name, ok := WorkOrderStateFromProto(pb.WorkOrder_STATE_DRAFT)
+	assert.True(t, ok)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, name)
+}

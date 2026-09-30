@@ -112,8 +112,8 @@ export function ssoLinkHref(provider: "github" | "google", redirectPath: string)
 
 export type LinkableProvider = "github";
 
-export async function disconnectLinkedAccount(provider: LinkableProvider): Promise<void> {
-  const response = await fetch(`/account/linked-accounts/${provider}`, {
+export async function disconnectLinkedAccount(provider: LinkableProvider, providerId: string): Promise<void> {
+  const response = await fetch(`/account/linked-accounts/${provider}/${encodeURIComponent(providerId)}`, {
     method: "DELETE",
     credentials: "include",
   });

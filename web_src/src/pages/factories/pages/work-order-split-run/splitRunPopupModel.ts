@@ -56,6 +56,10 @@ export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =
   "flex shrink-0 items-center border-t border-border bg-background px-5 py-3 min-h-[5.5rem]";
 
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
+
+export function isWorkOrderDescriptionName(name: string): boolean {
+  return DESCRIPTION_NAMES.includes(name);
+}
 const PLAN_NAMES = ["plan.md"];
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {

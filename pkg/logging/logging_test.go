@@ -78,6 +78,34 @@ func TestProductiveWebhookWarning_JSONUsesWarningLevel(t *testing.T) {
 	assert.Equal(t, "no activity", payloads[0]["error"])
 }
 
+func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
+	logger := SentryWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+
+	LogSentryWebhookInfo("Sentry app webhook received", log.Fields{
+		"hook_resource":     "issue",
+		"action":            "created",
+		"installation_uuid": "install-1",
+	})
+
+	payloads := decodeJSONLines(t, buffer.String())
+	require.Len(t, payloads, 1)
+	assert.Equal(t, "info", payloads[0]["level"])
+	assert.Equal(t, "Sentry app webhook received", payloads[0]["msg"])
+	assert.Equal(t, ComponentWebhookSentry, payloads[0]["component"])
+	assert.Equal(t, "issue", payloads[0]["hook_resource"])
+	assert.Equal(t, "created", payloads[0]["action"])
+	assert.Equal(t, "install-1", payloads[0]["installation_uuid"])
+
+	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
+	assert.True(t, processIsText)
+}
+
 func TestWithWebhookNode_AddsOrganizationCanvasAndWebhook(t *testing.T) {
 	entry := WithWebhookNode(log.NewEntry(log.New()), WebhookNodeFields{
 		OrganizationID: "org-1",

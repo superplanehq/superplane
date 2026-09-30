@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import type { FactoriesFactory } from "@/api-client";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
@@ -11,6 +12,7 @@ import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsGeneralPage } from "./FactorySettingsGeneralPage";
 
 const mutateAsync = vi.fn();
+const setVisibilityMutateAsync = vi.fn();
 let canUpdate = true;
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -24,6 +26,7 @@ vi.mock("@/contexts/useAccount", () => ({
 vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateFactory: () => ({ mutateAsync, isPending: false }),
   useDeleteFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSetFactoryVisibility: () => ({ mutateAsync: setVisibilityMutateAsync, isPending: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -35,7 +38,7 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
 }));
 
-function renderPage(factory = REFUND_FACTORY) {
+function renderPage(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
@@ -67,6 +70,8 @@ describe("FactorySettingsGeneralPage", () => {
     canUpdate = true;
     mutateAsync.mockReset();
     mutateAsync.mockResolvedValue({});
+    setVisibilityMutateAsync.mockReset();
+    setVisibilityMutateAsync.mockResolvedValue({});
   });
 
   it("shows a character avatar, name, and slug in a profile-style card", () => {
@@ -148,5 +153,29 @@ describe("FactorySettingsGeneralPage", () => {
     expect(screen.getByTestId("factory-settings-public-badge-size")).toBeDisabled();
     expect(screen.getByTestId("factory-settings-public-badge-copy")).toBeDisabled();
     expect(screen.getByTestId("factory-settings-public-badge-markdown")).toBeDisabled();
+  });
+
+  it("asks before it makes the workspace public", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("switch", { name: "Change to public" }));
+    expect(screen.getByTestId("factory-settings-visibility-dialog")).toHaveTextContent("Make this workspace public?");
+    expect(setVisibilityMutateAsync).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("factory-settings-visibility-cancel"));
+    expect(setVisibilityMutateAsync).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("switch", { name: "Change to public" }));
+    await user.click(screen.getByTestId("factory-settings-visibility-confirm"));
+    expect(setVisibilityMutateAsync).toHaveBeenCalledWith(true);
+  });
+
+  it("shows the line board link when the workspace is public", () => {
+    renderPage({ ...REFUND_FACTORY, public: true });
+
+    const link = screen.getByTestId("factory-settings-visibility-board-link");
+    expect(link).toHaveAttribute("href", "/org-1/workspaces/rf/lines/line-plan-and-implement");
+    expect(link).toHaveTextContent("/org-1/workspaces/rf/lines/line-plan-and-implement");
   });
 });

@@ -10,11 +10,37 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
+
+func Test__GitHubWebhookHandler__Setup__HostedApp(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "12345")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "app-webhook-secret")
+
+	httpCtx := &contexts.HTTPContext{}
+	integrationCtx := &contexts.IntegrationContext{Metadata: common.Metadata{HostedApp: true}}
+	webhookCtx := &contexts.WebhookContext{
+		Configuration: common.WebhookConfiguration{Repository: "superplane/superplane"},
+		Secret:        []byte("local-webhook-secret"),
+	}
+
+	metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+		HTTP:        httpCtx,
+		Integration: integrationCtx,
+		Webhook:     webhookCtx,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []byte("local-webhook-secret"), webhookCtx.Secret)
+	assert.Empty(t, httpCtx.Requests)
+	assert.Equal(t, &Webhook{WebhookName: "github_app"}, metadata)
+}
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &GitHubWebhookHandler{}

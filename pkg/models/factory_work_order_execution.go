@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -322,7 +323,17 @@ func RootEventSourcePayload(eventData any) any {
 		return eventData
 	}
 
-	return source
+	sourceMap, ok := source.(map[string]any)
+	if !ok {
+		return source
+	}
+	if _, exists := sourceMap["superplaneReceiptId"]; !exists {
+		return source
+	}
+
+	cleaned := maps.Clone(sourceMap)
+	delete(cleaned, "superplaneReceiptId")
+	return cleaned
 }
 
 func cancelledByUserRef(cancelledBy *uuid.UUID) *factory.UserRef {

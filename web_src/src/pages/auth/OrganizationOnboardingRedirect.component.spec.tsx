@@ -17,7 +17,7 @@ const accountState = vi.hoisted(() => ({
     avatar_url: "",
     installation_admin: false,
     has_password: true,
-    linked_accounts: [{ provider: "github", username: "dev-user" }],
+    linked_accounts: [{ provider: "github", provider_id: "101", username: "dev-user", active: true }],
     organizations_pending_deletion: [],
     providers: [],
   } as NonNullable<AccountContextType["account"]>,
@@ -72,7 +72,7 @@ describe("OrganizationOnboardingRedirect", () => {
       avatar_url: "",
       installation_admin: false,
       has_password: true,
-      linked_accounts: [{ provider: "github", username: "dev-user" }],
+      linked_accounts: [{ provider: "github", provider_id: "101", username: "dev-user", active: true }],
       organizations_pending_deletion: [],
       providers: [],
     };
