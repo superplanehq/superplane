@@ -16,13 +16,18 @@ export const SEMAPHORE_API_TOKEN_URL =
 
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
+  mcpPageSubtitle: "Manage MCP connections for agents and external clients in this workspace.",
+  mcpConnectionsSectionTitle: "SuperPlane → External services",
+  mcpConnectionsSectionDescription: "SuperPlane agents use them to reach external tools on agent runs.",
   skillsTitle: "Skills",
-  mcpHelper:
-    "Agents on every run in this workspace can use these MCP servers. One signed-in account is shared by every agent.",
   skillsHelper: "Agents on every run in this workspace can use these skills.",
-  refinementNote:
-    "These MCP servers can change systems outside SuperPlane during refinement. The repository stays read-only.",
+  configure: "Configure",
+  backToMcpServers: "Back to MCP servers",
+  mcpConnectionNotFound: "SuperPlane could not find this MCP server.",
+  mcpConnectionToolsTitle: "Tools",
+  mcpConnectionSettingsTitle: "Connection",
   addConnection: "Add MCP server",
+  connectMcpServer: "Connect",
   addServerTitle: (label: string) => `Add ${label}`,
   editConnection: "Edit MCP server",
   dialogDescription: "Agents on every run in this workspace can use this MCP server.",
@@ -51,7 +56,7 @@ export const AGENT_RESOURCES_COPY = {
   authSignIn: "Sign-in",
   statusConnected: "Connected",
   statusNotConnected: "Not connected",
-  statusReconnect: "Reconnect",
+  statusReconnect: "Reconnection needed",
   statusReady: "Ready",
   statusFetchFailed: "Failed to fetch",
   toolsEmpty: "This server has no tools.",

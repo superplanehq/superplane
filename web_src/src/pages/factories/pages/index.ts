@@ -38,6 +38,7 @@ export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FactorySettingsRepositoryPage } from "./settings/FactorySettingsRepositoryPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
 export { FactorySettingsMCPPage } from "./settings/FactorySettingsMCPPage";
+export { FactorySettingsMCPConnectionPage } from "./settings/FactorySettingsMCPConnectionPage";
 export { FactorySettingsSkillsPage } from "./settings/FactorySettingsSkillsPage";
 export { FactorySettingsSkillEditorPage } from "./settings/FactorySettingsSkillEditorPage";
 export { FACTORY_SETTINGS_NAV_GROUPS, FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";

@@ -40,7 +40,10 @@ export function buildStorybookMeUser(orgId: string) {
   };
 }
 
-export type FixtureResult = { json: unknown } | { text: string } | null;
+export type FixtureResult =
+  | { json: unknown; status?: number }
+  | { text: string; status?: number }
+  | null;
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
@@ -247,11 +250,12 @@ export function requestMethod(input: RequestInfo | URL, init?: RequestInit): str
 }
 
 export function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
+  const status = resolved.status ?? 200;
   if ("text" in resolved) {
-    return new Response(resolved.text, { status: 200, headers: { "content-type": "text/plain" } });
+    return new Response(resolved.text, { status, headers: { "content-type": "text/plain" } });
   }
   return new Response(JSON.stringify(resolved.json), {
-    status: 200,
+    status,
     headers: { "content-type": "application/json" },
   });
 }

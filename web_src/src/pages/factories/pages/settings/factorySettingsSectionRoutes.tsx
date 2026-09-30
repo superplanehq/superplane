@@ -14,6 +14,7 @@ import {
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
   FactorySettingsMCPPage,
+  FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
   FactorySettingsSkillEditorPage,
   FactorySettingsRepositoryPage,
@@ -94,6 +95,17 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-workspace-agent-resources"
     path="workspace/agent-resources"
     element={<LegacyAgentResourcesRedirect />}
+  />,
+  <Route
+    key="factory-settings-workspace-mcp-connection"
+    path="workspace/mcp/:resourceId"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
+          <FactorySettingsMCPConnectionPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
   />,
   <Route
     key="factory-settings-workspace-mcp"

@@ -124,9 +124,9 @@ export function useMCPPage() {
       setEditResource(catalogOAuthResourceForEntry(connections.data ?? [], entry));
       setCatalogEntry(entry);
     },
-    startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startOAuthRedirect(mutations, resource),
+    startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startMCPOAuthRedirect(mutations, resource),
     saveConnection: (draft: AgentResourceConnectionDraft) =>
-      saveConnection(mutations, connections.data ?? [], editResource, draft, closeConnection),
+      saveMCPConnection(mutations, connections.data ?? [], editResource, draft, closeConnection),
     saveCatalogToken: (entry: MCPCatalogEntry, token: string) =>
       saveCatalogToken(mutations, connections.data ?? [], entry, token, closeCatalogSetup),
     startCatalogOAuth: (entry: MCPCatalogEntry) =>
@@ -134,11 +134,11 @@ export function useMCPPage() {
         rememberResource: setEditResource,
         onRedirecting: closeCatalogSetup,
       }),
-    disconnectResource: (resource: FactoriesFactoryAgentResource) => disconnectResource(mutations, resource),
+    disconnectResource: (resource: FactoriesFactoryAgentResource) => disconnectMCPResource(mutations, resource),
     toggleEnabled: (resource: FactoriesFactoryAgentResource, enabled: boolean) =>
-      toggleEnabled(mutations, resource, enabled),
+      toggleMCPEnabled(mutations, resource, enabled),
     toggleTools: (resource: FactoriesFactoryAgentResource, disabledTools: string[]) =>
-      toggleTools(mutations, resource, disabledTools),
+      toggleMCPTools(mutations, resource, disabledTools),
     setEditResource: (resource?: FactoriesFactoryAgentResource) => {
       setAddPickerOpen(false);
       if (!resource) {
@@ -160,7 +160,7 @@ export function useMCPPage() {
     setPendingDelete,
     closeConnection,
     closeCatalogSetup,
-    confirmDelete: () => confirmDelete(mutations, pendingDelete),
+    confirmDelete: () => confirmMCPDelete(mutations, pendingDelete),
   };
 }
 
@@ -173,7 +173,7 @@ type MCPMutations = {
   createSecret: ReturnType<typeof useCreateSecret>;
 };
 
-async function startOAuthRedirect(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
+export async function startMCPOAuthRedirect(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
   if (!resource.id) {
     return;
   }
@@ -187,7 +187,7 @@ async function startOAuthRedirect(mutations: MCPMutations, resource: FactoriesFa
   }
 }
 
-async function startCatalogOAuth(
+export async function startCatalogOAuth(
   mutations: MCPMutations,
   entry: MCPCatalogEntry,
   existing: FactoriesFactoryAgentResource | undefined,
@@ -236,7 +236,7 @@ async function startCatalogOAuth(
   }
 }
 
-async function saveCatalogToken(
+export async function saveCatalogToken(
   mutations: MCPMutations,
   resources: FactoriesFactoryAgentResource[],
   entry: MCPCatalogEntry,
@@ -276,7 +276,7 @@ async function saveCatalogToken(
   }
 }
 
-async function saveConnection(
+export async function saveMCPConnection(
   mutations: MCPMutations,
   resources: FactoriesFactoryAgentResource[],
   editResource: FactoriesFactoryAgentResource | undefined,
@@ -318,7 +318,7 @@ async function saveConnection(
   }
 }
 
-function disconnectResource(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
+export function disconnectMCPResource(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
   if (!resource.id) {
     return;
   }
@@ -328,7 +328,7 @@ function disconnectResource(mutations: MCPMutations, resource: FactoriesFactoryA
   );
 }
 
-function toggleEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, enabled: boolean) {
+export function toggleMCPEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, enabled: boolean) {
   if (!resource.id) {
     return;
   }
@@ -339,7 +339,11 @@ function toggleEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentR
 
 const mcpToolUpdateQueues = new Map<string, Promise<unknown>>();
 
-function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, disabledTools: string[]) {
+export function toggleMCPTools(
+  mutations: MCPMutations,
+  resource: FactoriesFactoryAgentResource,
+  disabledTools: string[],
+) {
   if (!resource.id) {
     return;
   }
@@ -355,7 +359,7 @@ function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentRes
   mcpToolUpdateQueues.set(resourceId, next);
 }
 
-async function confirmDelete(mutations: MCPMutations, pendingDelete?: FactoriesFactoryAgentResource) {
+export async function confirmMCPDelete(mutations: MCPMutations, pendingDelete?: FactoriesFactoryAgentResource) {
   if (!pendingDelete?.id) {
     return;
   }

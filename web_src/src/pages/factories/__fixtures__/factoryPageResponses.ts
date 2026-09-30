@@ -395,6 +395,10 @@ export interface FactoriesFixture {
   mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
   agentResourceToolsById?: Record<string, Array<{ name: string; description?: string; readOnly?: boolean }>>;
+  /** Storybook: GET agent-resources list returns this HTTP status for these factory ids. */
+  failAgentResourcesListForFactoryIds?: string[];
+  /** Storybook: GET mcp-clients list returns this HTTP status for these factory ids. */
+  failMcpClientsListForFactoryIds?: string[];
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

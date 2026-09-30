@@ -18,6 +18,7 @@ export {
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsMCPPage,
+  FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
   FactorySettingsSkillEditorPage,
   FACTORY_SETTINGS_NAV_GROUPS,

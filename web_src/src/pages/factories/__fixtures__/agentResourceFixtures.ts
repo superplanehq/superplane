@@ -1,5 +1,6 @@
-import type { FactoriesFactoryAgentResource } from "@/api-client";
+import type { FactoriesFactoryAgentResource, FactoryAgentResourceAuth } from "@/api-client";
 
+import { MCP_CATALOG } from "../pages/settings/mcpCatalog";
 import { PRIMARY_FACTORY_ID, YESTERDAY } from "./factoryPageIds";
 
 const NOW = YESTERDAY;
@@ -82,3 +83,91 @@ export const MIXED_AGENT_RESOURCES: FactoriesFactoryAgentResource[] = [
   OAUTH_CONNECTED_RESOURCE,
   OAUTH_NOT_CONNECTED_RESOURCE,
 ];
+
+function catalogEntry(catalogId: string) {
+  const entry = MCP_CATALOG.find((item) => item.id === catalogId);
+  if (!entry) {
+    throw new Error(`Missing MCP catalog entry: ${catalogId}`);
+  }
+  return entry;
+}
+
+function storybookMcpResource({
+  id,
+  catalogId,
+  oauthStatus,
+  oauthError,
+  enabled = true,
+}: {
+  id: string;
+  catalogId: string;
+  oauthStatus?: FactoriesFactoryAgentResource["oauthStatus"];
+  oauthError?: string;
+  enabled?: boolean;
+}): FactoriesFactoryAgentResource {
+  const entry = catalogEntry(catalogId);
+  const auth = entry.auth as FactoryAgentResourceAuth;
+  return {
+    id,
+    factoryId: PRIMARY_FACTORY_ID,
+    kind: "KIND_MCP_SERVER",
+    name: entry.name,
+    enabled,
+    url: entry.url,
+    auth,
+    ...(auth === "AUTH_HEADERS" && entry.headerName
+      ? { headers: [{ name: entry.headerName, secretName: "vendor-mcp", secretKey: "token" }] }
+      : {}),
+    ...(oauthStatus ? { oauthStatus, oauthConnectedAt: oauthStatus === "OAUTH_STATUS_CONNECTED" ? NOW : undefined } : {}),
+    ...(oauthError ? { oauthError } : {}),
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+/** Storybook Configured state: catalog labels, auth methods, and connection statuses. */
+export const CONFIGURED_MCP_RESOURCES: FactoriesFactoryAgentResource[] = [
+  storybookMcpResource({ id: "resource-github", catalogId: "github" }),
+  storybookMcpResource({ id: "resource-gitlab", catalogId: "gitlab", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
+  storybookMcpResource({ id: "resource-linear", catalogId: "linear", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
+  storybookMcpResource({ id: "resource-sentry", catalogId: "sentry", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
+  storybookMcpResource({ id: "resource-circleci", catalogId: "circleci" }),
+  storybookMcpResource({ id: "resource-semaphore", catalogId: "semaphore" }),
+  storybookMcpResource({ id: "resource-jira", catalogId: "jira", oauthStatus: "OAUTH_STATUS_NOT_CONNECTED" }),
+  storybookMcpResource({
+    id: "resource-notion",
+    catalogId: "notion",
+    oauthStatus: "OAUTH_STATUS_NEEDS_RECONNECT",
+    oauthError: "SuperPlane could not refresh the access token. Connect again.",
+  }),
+  storybookMcpResource({
+    id: "resource-figma",
+    catalogId: "figma",
+    oauthStatus: "OAUTH_STATUS_VENDOR_REJECTED",
+    oauthError:
+      "This vendor does not allow SuperPlane as an OAuth client. Use header authentication if the vendor ships an API key.",
+  }),
+  storybookMcpResource({ id: "resource-slack", catalogId: "slack", oauthStatus: "OAUTH_STATUS_NOT_CONNECTED" }),
+  storybookMcpResource({ id: "resource-vercel", catalogId: "vercel", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
+  storybookMcpResource({ id: "resource-datadog", catalogId: "datadog", oauthStatus: "OAUTH_STATUS_NOT_CONNECTED" }),
+];
+
+function toolList(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    name: `tool_${index + 1}`,
+    description: `Tool ${index + 1}.`,
+    readOnly: index % 2 === 0,
+  }));
+}
+
+/** Tool counts for connected rows in the Configured story. */
+export const CONFIGURED_MCP_RESOURCE_TOOLS_BY_ID: Record<
+  string,
+  Array<{ name: string; description?: string; readOnly?: boolean }>
+> = {
+  "resource-github": toolList(45),
+  "resource-linear": toolList(12),
+  "resource-sentry": toolList(8),
+  "resource-semaphore": toolList(3),
+  "resource-vercel": toolList(21),
+};
