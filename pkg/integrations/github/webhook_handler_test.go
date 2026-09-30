@@ -17,29 +17,62 @@ import (
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
-func Test__GitHubWebhookHandler__Setup__HostedApp(t *testing.T) {
-	t.Setenv(config.EnvGitHubAppID, "12345")
-	t.Setenv(config.EnvGitHubAppSlug, "superplane")
-	t.Setenv(config.EnvGitHubAppPrivateKey, "private-key")
-	t.Setenv(config.EnvGitHubAppWebhookSecret, "app-webhook-secret")
+func Test__GitHubWebhookHandler__Setup(t *testing.T) {
+	t.Run("registers a repository hook", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":456,"name":"web"}`),
+			},
+		}
 
-	httpCtx := &contexts.HTTPContext{}
-	integrationCtx := &contexts.IntegrationContext{Metadata: common.Metadata{HostedApp: true}}
-	webhookCtx := &contexts.WebhookContext{
-		Configuration: common.WebhookConfiguration{Repository: "superplane/superplane"},
-		Secret:        []byte("local-webhook-secret"),
-	}
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://app.example/api/v1/webhooks/webhook-id",
+				Secret:        []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{EventType: "pull_request", Repository: "hello"},
+			},
+		})
 
-	metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
-		HTTP:        httpCtx,
-		Integration: integrationCtx,
-		Webhook:     webhookCtx,
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: 456, WebhookName: "web"}, metadata)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, []byte("local-webhook-secret"), webhookCtx.Secret)
-	assert.Empty(t, httpCtx.Requests)
-	assert.Equal(t, &Webhook{WebhookName: "github_app"}, metadata)
+	// Hosted GitHub App connections hold repository hook write access, so they
+	// register their own hook instead of relying on the App webhook endpoint.
+	t.Run("registers a repository hook for a hosted app connection", func(t *testing.T) {
+		t.Setenv(config.EnvGitHubAppID, "12345")
+		t.Setenv(config.EnvGitHubAppSlug, "superplane")
+		t.Setenv(config.EnvGitHubAppPrivateKey, "private-key")
+		t.Setenv(config.EnvGitHubAppWebhookSecret, "app-webhook-secret")
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":789,"name":"web"}`),
+			},
+		}
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		integrationCtx.Metadata = map[string]any{"hostedApp": true}
+
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://app.example/api/v1/webhooks/webhook-id",
+				Secret:        []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{EventType: "pull_request", Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: 789, WebhookName: "web"}, metadata)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
+	})
 }
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
@@ -166,6 +199,31 @@ func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
 		err := handler.Cleanup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      Webhook{ID: 123},
+				Configuration: common.WebhookConfiguration{Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("removes the hook of a hosted app connection", func(t *testing.T) {
+		handler := &GitHubWebhookHandler{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNoContent, ""),
+			},
+		}
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		integrationCtx.Metadata = map[string]any{"hostedApp": true}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
 			Webhook: &contexts.WebhookContext{
 				Metadata:      Webhook{ID: 123},
 				Configuration: common.WebhookConfiguration{Repository: "hello"},
