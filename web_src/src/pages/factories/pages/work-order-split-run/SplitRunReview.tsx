@@ -6,6 +6,7 @@ import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { draftReadiness, startEmphasisForTone, type DraftReadinessTone } from "../../lib/draftReadiness";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import {
   formatCheckScore,
   LEVEL_LABEL,
@@ -18,10 +19,12 @@ import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import { StartConfirmDialog } from "./StartConfirmDialog";
 import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
+  creditBillingHrefForNote,
   splitRunDecisionTone,
   splitRunFooterScores,
   type SplitRunFooter,
   type SplitRunFooterAction,
+  type SplitRunFooterNote,
   type SplitRunStopChoice,
 } from "./splitRunFooter";
 import { SendWorkOrderToBacklogDialog } from "../../workOrders/SendWorkOrderToBacklogDialog";
@@ -98,6 +101,18 @@ function reviewStartEmphasis(footer: SplitRunFooter, startTone?: DraftReadinessT
   return startEmphasisForTone(startTone ?? draftReadiness(splitRunFooterScores(footer)).tone);
 }
 
+function reviewAttentionNote(
+  note: SplitRunFooterNote,
+  organizationId?: string,
+  factoryKey?: string,
+): SplitRunFooterNote {
+  const billingHref =
+    organizationId && factoryKey
+      ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing")
+      : undefined;
+  return creditBillingHrefForNote(note, billingHref);
+}
+
 /**
  * Decision note under the plan on Description, and under Automations.
  */
@@ -155,6 +170,7 @@ export function SplitRunReview({
   }
   const startEmphasis = reviewStartEmphasis(footer, startTone);
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
+  const note = reviewAttentionNote(footer.note, organizationId, factoryKey);
   const actions = canAct
     ? footer.actions.filter((action) => action.kind !== "refine" && action.kind !== "archive")
     : [];
@@ -187,7 +203,7 @@ export function SplitRunReview({
       data-testid={actionsOnly ? undefined : "split-run-review"}
     >
       <SplitRunAttentionNote
-        note={footer.note}
+        note={note}
         tone={splitRunDecisionTone(footer)}
         actions={actions}
         runHref={runHref}

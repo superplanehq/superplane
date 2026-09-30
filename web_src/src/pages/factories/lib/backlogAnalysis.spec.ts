@@ -7,6 +7,8 @@ import {
   backlogAnalysisRunsByWorkOrder,
   clearBacklogAnalysisPending,
   findBacklogAnalyzerCanvasId,
+  backlogAnalysisCreditFailure,
+  backlogAnalysisCreditLabels,
   hasActiveBacklogAnalysisRun,
   markBacklogAnalysisPending,
   mergeBacklogAnalysisRunSnapshots,
@@ -137,6 +139,54 @@ describe("backlogAnalysisRunsByWorkOrder", () => {
 
     expect(grouped.get("wo-1")?.map((entry) => entry.run.id)).toEqual(["run-1", "run-2"]);
     expect(grouped.get("wo-2")?.map((entry) => entry.run.id)).toEqual(["run-3"]);
+  });
+});
+
+describe("backlogAnalysisCreditFailure", () => {
+  it("reads a hosted credit failure from the latest finished analysis", () => {
+    const runs = backlogAnalysisRuns("app-analyzer", [
+      {
+        ...analysisRun({
+          id: "run-old",
+          workOrderId: "wo-1",
+          state: "STATE_FINISHED",
+          createdAt: "2026-08-28T10:00:00Z",
+        }),
+        result: "RESULT_FAILED",
+        executions: [{ result: "RESULT_FAILED", resultMessage: "integration not found" }],
+      },
+      {
+        ...analysisRun({
+          id: "run-new",
+          workOrderId: "wo-1",
+          state: "STATE_FINISHED",
+          createdAt: "2026-08-28T11:00:00Z",
+        }),
+        result: "RESULT_FAILED",
+        executions: [{ result: "RESULT_FAILED", resultMessage: "This organization has no hosted credit." }],
+      },
+    ]);
+
+    expect(backlogAnalysisCreditFailure(runs)?.label).toBe("No credit");
+    expect(backlogAnalysisCreditLabels(backlogAnalysisRunsByWorkOrder(runs)).get("wo-1")).toBe("No credit");
+  });
+
+  it("hides the credit failure while a newer analysis is still running", () => {
+    const runs = backlogAnalysisRuns("app-analyzer", [
+      {
+        ...analysisRun({
+          id: "run-old",
+          workOrderId: "wo-1",
+          state: "STATE_FINISHED",
+          createdAt: "2026-08-28T10:00:00Z",
+        }),
+        result: "RESULT_FAILED",
+        executions: [{ result: "RESULT_FAILED", resultMessage: "This organization has no hosted credit." }],
+      },
+      analysisRun({ id: "run-new", workOrderId: "wo-1", state: "STATE_STARTED", createdAt: "2026-08-28T11:00:00Z" }),
+    ]);
+
+    expect(backlogAnalysisCreditFailure(runs)).toBeNull();
   });
 });
 

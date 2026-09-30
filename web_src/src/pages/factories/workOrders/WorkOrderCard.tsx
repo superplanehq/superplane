@@ -3,7 +3,11 @@ import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
-import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
+import {
+  getWorkOrderAttentionReasons,
+  getWorkOrderFailedAttentionLabel,
+  type WorkOrderAttentionReason,
+} from "../lib/workOrderAttention";
 import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
@@ -89,6 +93,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
   /**
+   * Short credit-failure label for a draft whose analysis never started.
+   * Line steps use the failed attention chip instead.
+   */
+  creditLabel?: string;
+  /**
    * False on the public board. The card is static text: no link, no dialog.
    */
   interactive?: boolean;
@@ -130,6 +139,7 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  creditLabel,
   interactive = true,
   showOwner = false,
 }: WorkOrderCardProps) {
@@ -182,6 +192,8 @@ export function WorkOrderCard({
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
+          failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
+          creditLabel={creditLabel}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}
@@ -247,6 +259,8 @@ function WorkOrderCardStatusRow({
   reasons,
   feedbackLabel,
   checksPassedLabel,
+  failedLabel,
+  creditLabel,
   cardPullRequest,
   hasAgentQuestion,
   showPullRequestMerge,
@@ -255,11 +269,14 @@ function WorkOrderCardStatusRow({
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   checksPassedLabel?: string;
+  failedLabel?: string;
+  creditLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
   showPullRequestMerge?: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  const showCredit = Boolean(creditLabel) && !reasons.includes("failed");
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion && !showCredit) {
     return null;
   }
 
@@ -274,11 +291,12 @@ function WorkOrderCardStatusRow({
           ) : null}
         </>
       ) : null}
+      {showCredit ? <WorkOrderAttentionChip reason="failed" label={creditLabel} /> : null}
       {reasons.map((reason) => (
         <WorkOrderAttentionChip
           key={reason}
           reason={reason}
-          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+          label={attentionChipLabel(reason, { feedbackLabel, checksPassedLabel, failedLabel })}
         />
       ))}
     </div>
@@ -287,14 +305,16 @@ function WorkOrderCardStatusRow({
 
 function attentionChipLabel(
   reason: WorkOrderAttentionReason,
-  feedbackLabel?: string,
-  checksPassedLabel?: string,
+  labels: { feedbackLabel?: string; checksPassedLabel?: string; failedLabel?: string },
 ): string | undefined {
   if (reason === "feedback") {
-    return feedbackLabel;
+    return labels.feedbackLabel;
   }
   if (reason === "checksPassed") {
-    return checksPassedLabel;
+    return labels.checksPassedLabel;
+  }
+  if (reason === "failed") {
+    return labels.failedLabel;
   }
   return undefined;
 }
