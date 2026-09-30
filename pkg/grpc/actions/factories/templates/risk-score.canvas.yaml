@@ -13,6 +13,9 @@ spec:
       targetId: find-pull-request
     - channel: found
       sourceId: find-pull-request
+      targetId: add-pr-activity
+    - channel: default
+      sourceId: add-pr-activity
       targetId: assess-risk
     - channel: passed
       sourceId: assess-risk
@@ -57,6 +60,17 @@ spec:
         url: "{{ root().data.pull_request.html_url }}"
       position:
         x: 640
+        "y": 80
+      isCollapsed: true
+    - id: add-pr-activity
+      name: Add Pull Request Activity
+      type: TYPE_ACTION
+      component: addPullRequestActivity
+      configuration:
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        description: 'Risk assessment is running on PR #{{ root().data.pull_request.number }}'
+      position:
+        x: 780
         "y": 80
       isCollapsed: true
     - id: assess-risk
