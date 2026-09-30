@@ -94,6 +94,7 @@ export function AutomationCardBody({
               phases={phases ?? (phase ? [phase] : [])}
               automationName={automation.name}
               organizationId={organizationId}
+              usagePhaseId={latest.id}
             />
           </div>
         ) : null}

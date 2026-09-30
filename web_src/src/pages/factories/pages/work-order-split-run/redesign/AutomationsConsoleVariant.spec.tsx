@@ -40,7 +40,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
 
     expect(screen.getByTestId("redesign-console-column-marker-backlog")).toHaveAttribute("data-status", "completed");
     expect(screen.getByTestId("redesign-console-column-marker-backlog")).toHaveTextContent("Completed");
-    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "active");
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "running");
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Running");
     expect(screen.getByTestId("redesign-console-column-marker-verify")).toHaveAttribute("data-status", "pending");
     expect(screen.getByTestId("redesign-console-column-marker-done")).toHaveAttribute("data-status", "pending");
@@ -54,6 +54,53 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "failed");
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Failed");
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
+  });
+
+  it("marks a stopped implement column as canceled", () => {
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "cancelled",
+      footerTone: "stopped",
+      footer: buildSplitRunFooter({ kind: "stopped" }),
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, status: "cancelled" as const } : phase,
+      ),
+    });
+
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "cancelled");
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Canceled");
+    expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
+  });
+
+  it("marks a waiting implement column as waiting", () => {
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "waiting",
+      footerTone: "waiting",
+      footer: buildSplitRunFooter({ kind: "waiting" }),
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, status: "waiting" as const } : phase,
+      ),
+    });
+
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "waiting");
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Waiting");
+  });
+
+  it("keeps a pending implement column as not started", () => {
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "pending",
+      footerTone: "draft",
+      footer: buildSplitRunFooter({ kind: "draft" }),
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, status: "pending" as const } : phase,
+      ),
+    });
+
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "pending");
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Not started");
+    expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBeNull();
   });
 });
 

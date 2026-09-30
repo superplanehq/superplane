@@ -23,6 +23,7 @@ export function LiveAgentSteps({
   organizationId,
   expandSteps = false,
   emptyNote,
+  reportUsage = true,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
@@ -31,6 +32,8 @@ export function LiveAgentSteps({
   expandSteps?: boolean;
   /** Shown when a finished run has no transcript to replay. */
   emptyNote?: string;
+  /** When false, skip the usage chart. The card footer only charts the latest run. */
+  reportUsage?: boolean;
 }) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
@@ -81,6 +84,7 @@ export function LiveAgentSteps({
           organizationId={organizationId}
           canvasId={phase.appId ?? ""}
           spendPhaseId={phase.id}
+          reportUsage={reportUsage}
           onLive={reportLive}
         />
       ))}
@@ -107,12 +111,14 @@ function RunnerNotes({
   organizationId,
   canvasId,
   spendPhaseId,
+  reportUsage,
   onLive,
 }: {
   line: SplitRunStreamLine;
   organizationId: string;
   canvasId: string;
   spendPhaseId: string;
+  reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
 }) {
   const { notes, activities, spend, usageSeries } = useRunnerLiveNotes(line, organizationId, canvasId);
@@ -121,7 +127,7 @@ function RunnerNotes({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
     series: usageSeries,
-    enabled: isRunnerComponent(line.component),
+    enabled: reportUsage && isRunnerComponent(line.component),
   });
   useEffect(() => {
     onLive(line.id, { notes, activities });

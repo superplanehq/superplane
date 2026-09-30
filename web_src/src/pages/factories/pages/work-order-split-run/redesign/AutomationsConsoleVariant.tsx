@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/reui/badge";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
-import { Check, ChevronRight, Circle, LoaderCircle, X } from "lucide-react";
+import { Check, ChevronRight, Circle, Clock, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
@@ -217,7 +217,7 @@ function hasLiveAutomation(columns: ConsoleColumn[]): boolean {
   );
 }
 
-type ColumnMarker = "completed" | "active" | "failed" | "pending";
+type ColumnMarker = "completed" | "running" | "waiting" | "failed" | "cancelled" | "pending";
 
 /**
  * Rail marker for one console column. Composition matches ReUI
@@ -228,10 +228,11 @@ function columnMarker(column: ConsoleColumn, index: number, currentColumn: numbe
     return index + 1 < currentColumn ? "completed" : "pending";
   }
   const statuses = column.automations.map((automation) => automation.latest.status);
-  if (statuses.some((status) => status === "running" || status === "waiting" || status === "queued")) {
-    return "active";
-  }
+  if (statuses.some((status) => status === "running")) return "running";
+  if (statuses.some((status) => status === "waiting" || status === "queued")) return "waiting";
   if (statuses.some((status) => status === "failed")) return "failed";
+  if (statuses.some((status) => status === "cancelled")) return "cancelled";
+  if (statuses.every((status) => status === "pending")) return "pending";
   return "completed";
 }
 
@@ -243,8 +244,10 @@ function reachedColumnCount(markers: ColumnMarker[]): number {
 
 const COLUMN_MARKER_LABEL: Record<ColumnMarker, string> = {
   completed: "Completed",
-  active: "Running",
+  running: "Running",
+  waiting: "Waiting",
   failed: "Failed",
+  cancelled: "Canceled",
   pending: "Not started",
 };
 
@@ -263,8 +266,9 @@ function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; col
     >
       <span className="sr-only">{COLUMN_MARKER_LABEL[marker]}</span>
       {marker === "completed" ? <Check className="size-3" aria-hidden /> : null}
-      {marker === "active" ? <LoaderCircle className="size-3 animate-spin" aria-hidden /> : null}
-      {marker === "failed" ? <X className="size-3" aria-hidden /> : null}
+      {marker === "running" ? <LoaderCircle className="size-3 animate-spin" aria-hidden /> : null}
+      {marker === "waiting" ? <Clock className="size-3" aria-hidden /> : null}
+      {marker === "failed" || marker === "cancelled" ? <X className="size-3" aria-hidden /> : null}
       {marker === "pending" ? <Circle className="size-3" aria-hidden /> : null}
     </TimelineIndicator>
   );

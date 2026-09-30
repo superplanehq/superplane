@@ -24,11 +24,14 @@ export function AgentRunsPage({
   phases,
   automationName,
   organizationId,
+  usagePhaseId,
 }: {
   runs: AutomationStage[];
   phases: SplitRunPhase[];
   automationName: string;
   organizationId?: string;
+  /** Only this run reports into the card usage chart. */
+  usagePhaseId?: string;
 }) {
   const single = runs.length === 1 ? runs[0] : undefined;
   if (single) {
@@ -38,6 +41,7 @@ export function AgentRunsPage({
         phase={phases.find((phase) => phase.id === single.id)}
         automationName={automationName}
         organizationId={organizationId}
+        reportUsage={!usagePhaseId || single.id === usagePhaseId}
       />
     );
   }
@@ -50,6 +54,7 @@ export function AgentRunsPage({
           phase={phases.find((phase) => phase.id === run.id)}
           organizationId={organizationId}
           defaultOpen={index === runs.length - 1}
+          reportUsage={!usagePhaseId || run.id === usagePhaseId}
         />
       ))}
     </div>
@@ -62,11 +67,13 @@ function SingleRun({
   phase,
   automationName,
   organizationId,
+  reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   automationName: string;
   organizationId?: string;
+  reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
   return (
@@ -81,7 +88,13 @@ function SingleRun({
         />
       ) : null}
       <RunDescription description={run.description} />
-      <LiveAgentSteps stage={run} phase={phase} organizationId={organizationId} emptyNote="No steps for this run." />
+      <LiveAgentSteps
+        stage={run}
+        phase={phase}
+        organizationId={organizationId}
+        emptyNote="No steps for this run."
+        reportUsage={reportUsage}
+      />
     </div>
   );
 }
@@ -91,11 +104,13 @@ function AgentRunRow({
   phase,
   organizationId,
   defaultOpen,
+  reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
   defaultOpen: boolean;
+  reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
   const clock = formatClock(run.startedAt);
@@ -126,7 +141,13 @@ function AgentRunRow({
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
         <RunDescription description={run.description} />
-        <LiveAgentSteps stage={run} phase={phase} organizationId={organizationId} emptyNote="No steps for this run." />
+        <LiveAgentSteps
+          stage={run}
+          phase={phase}
+          organizationId={organizationId}
+          emptyNote="No steps for this run."
+          reportUsage={reportUsage}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
