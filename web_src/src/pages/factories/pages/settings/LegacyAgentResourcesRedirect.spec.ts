@@ -4,15 +4,15 @@ import { legacyAgentResourcesPath } from "./legacyAgentResourcesPath";
 
 describe("legacyAgentResourcesPath", () => {
   it("sends the default route to MCP", () => {
-    expect(legacyAgentResourcesPath(new URLSearchParams())).toBe("../workspace/mcp");
+    expect(legacyAgentResourcesPath(new URLSearchParams())).toBe("../workspace/agent");
   });
 
   it("keeps the add catalog on MCP", () => {
-    expect(legacyAgentResourcesPath(new URLSearchParams("dialog=add"))).toBe("../workspace/mcp?dialog=add");
+    expect(legacyAgentResourcesPath(new URLSearchParams("dialog=add"))).toBe("../workspace/agent?dialog=add");
   });
 
   it("sends the skills tab to Skills", () => {
-    expect(legacyAgentResourcesPath(new URLSearchParams("tab=skills"))).toBe("../workspace/skills");
+    expect(legacyAgentResourcesPath(new URLSearchParams("tab=skills"))).toBe("../workspace/agent");
   });
 
   it("sends add on the skills tab to the skill editor", () => {

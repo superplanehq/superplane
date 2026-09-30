@@ -21,17 +21,17 @@ import { useMCPConnectionPage } from "./useMCPConnectionPage";
 import { useMCPDisabledTools } from "./useMCPDisabledTools";
 export function FactorySettingsMCPConnectionPage() {
   const page = useMCPConnectionPage();
-  usePageTitle([page.displayName, AGENT_RESOURCES_COPY.mcpTitle, "Settings", page.factory.name ?? "Workspace"]);
+  usePageTitle([page.displayName, AGENT_RESOURCES_COPY.agentTitle, "Settings", page.factory.name ?? "Workspace"]);
 
   const backProps = {
     backHref: page.listPath,
-    backLabel: AGENT_RESOURCES_COPY.backToMcpServers,
+    backLabel: AGENT_RESOURCES_COPY.backToAgent,
     backTestId: "mcp-connection-back",
   };
 
   if (!page.isLoading && !page.resource) {
     return (
-      <FactorySettingsPageFrame title={AGENT_RESOURCES_COPY.mcpTitle} {...backProps}>
+      <FactorySettingsPageFrame title={AGENT_RESOURCES_COPY.agentTitle} {...backProps}>
         <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.mcpConnectionNotFound}</p>
       </FactorySettingsPageFrame>
     );
@@ -39,7 +39,7 @@ export function FactorySettingsMCPConnectionPage() {
 
   if (!page.resource) {
     return (
-      <FactorySettingsPageFrame title={AGENT_RESOURCES_COPY.mcpTitle} {...backProps}>
+      <FactorySettingsPageFrame title={AGENT_RESOURCES_COPY.agentTitle} {...backProps}>
         <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.loading}</p>
       </FactorySettingsPageFrame>
     );
@@ -59,7 +59,7 @@ function MCPConnectionContent({
 }) {
   const backProps = {
     backHref: listPath,
-    backLabel: AGENT_RESOURCES_COPY.backToMcpServers,
+    backLabel: AGENT_RESOURCES_COPY.backToAgent,
     backTestId: "mcp-connection-back",
   };
   const showTools = connectionIsEstablished(resource);

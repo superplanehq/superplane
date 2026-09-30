@@ -78,6 +78,61 @@ export const UI_UX_PRO_MAX_SKILL: FactoriesFactoryAgentResource = {
   updatedAt: NOW,
 };
 
+function storybookInlineSkill({
+  id,
+  name,
+  title,
+  description,
+  enabled = true,
+}: {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  enabled?: boolean;
+}): FactoriesFactoryAgentResource {
+  return {
+    id,
+    factoryId: PRIMARY_FACTORY_ID,
+    kind: "KIND_SKILL",
+    name,
+    enabled,
+    markdown: `---\nname: ${name}\ntitle: ${title}\ndescription: ${description}\n---\n\nSkill body.`,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+/** Storybook Agent Configured state: five workspace skills. */
+export const CONFIGURED_SKILLS: FactoriesFactoryAgentResource[] = [
+  INLINE_SKILL,
+  UI_UX_PRO_MAX_SKILL,
+  storybookInlineSkill({
+    id: "resource-commit-messages",
+    name: "commit-messages",
+    title: "Commit messages",
+    description: "Write Conventional Commits subjects and STE bodies.",
+  }),
+  storybookInlineSkill({
+    id: "resource-pr-description",
+    name: "pr-description",
+    title: "Pull request description",
+    description: "Draft pull request summaries and test plans.",
+  }),
+  {
+    id: "resource-superplane-changelog",
+    factoryId: PRIMARY_FACTORY_ID,
+    kind: "KIND_SKILL",
+    name: "superplane-changelog",
+    enabled: false,
+    repository: "superplane/superplane",
+    ref: "main",
+    path: ".agents/skills/superplane-changelog",
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+];
+
 export const MIXED_AGENT_RESOURCES: FactoriesFactoryAgentResource[] = [
   HEADER_MCP_RESOURCE,
   OAUTH_CONNECTED_RESOURCE,
@@ -127,7 +182,10 @@ function storybookMcpResource({
 
 /** Storybook Configured state: catalog labels, auth methods, and connection statuses. */
 export const CONFIGURED_MCP_RESOURCES: FactoriesFactoryAgentResource[] = [
-  storybookMcpResource({ id: "resource-github", catalogId: "github" }),
+  {
+    ...storybookMcpResource({ id: "resource-github", catalogId: "github" }),
+    disabledTools: Array.from({ length: 11 }, (_, index) => `tool_${index + 1}`),
+  },
   storybookMcpResource({ id: "resource-gitlab", catalogId: "gitlab", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
   storybookMcpResource({ id: "resource-linear", catalogId: "linear", oauthStatus: "OAUTH_STATUS_CONNECTED" }),
   storybookMcpResource({ id: "resource-sentry", catalogId: "sentry", oauthStatus: "OAUTH_STATUS_CONNECTED" }),

@@ -17,7 +17,7 @@ import {
   SEMAPHORE_API_TOKEN_URL,
 } from "./agentResourceCopy";
 
-const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 describe("FactorySettingsMCPPage catalog", () => {
@@ -29,7 +29,7 @@ describe("FactorySettingsMCPPage catalog", () => {
   it("opens the MCP catalog from the query string", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -51,7 +51,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -75,7 +75,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -108,7 +108,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -143,7 +143,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -170,7 +170,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -197,7 +197,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -232,7 +232,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={mcpPath}
+        pathSuffix={agentPath}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [datadogResource] },
@@ -249,7 +249,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -271,7 +271,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -292,7 +292,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -315,7 +315,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -335,7 +335,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -363,7 +363,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
@@ -394,7 +394,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     };
     render(
       <FactoriesHarness
-        pathSuffix={`${mcpPath}?dialog=add`}
+        pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },

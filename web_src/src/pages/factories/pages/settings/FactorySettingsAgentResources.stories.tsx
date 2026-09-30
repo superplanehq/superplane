@@ -11,9 +11,9 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 
-/** MCP server stories live in `FactorySettingsMCPPage.stories.tsx`. */
+/** Agent MCP stories live in `FactorySettingsMCPPage.stories.tsx`. */
 const meta = {
-  title: "Factories/Pages/Settings/Skills",
+  title: "Factories/Pages/Settings/Agent skills",
   component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof FactorySettingsLayout>;
@@ -22,7 +22,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const skillsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 
 function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
   return (
@@ -40,17 +40,17 @@ function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
 }
 
 export const Empty: Story = {
-  render: () => skillsHarness(skillsPath, []),
+  render: () => skillsHarness(agentPath, []),
 };
 
 export const InlineSkill: Story = {
-  render: () => skillsHarness(skillsPath, [INLINE_SKILL]),
+  render: () => skillsHarness(agentPath, [INLINE_SKILL]),
 };
 
 export const GitHubSkill: Story = {
-  render: () => skillsHarness(skillsPath, [UI_UX_PRO_MAX_SKILL]),
+  render: () => skillsHarness(agentPath, [UI_UX_PRO_MAX_SKILL]),
 };
 
 export const EditorNew: Story = {
-  render: () => skillsHarness(`${skillsPath}/new`, [INLINE_SKILL]),
+  render: () => skillsHarness(`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills/new`, [INLINE_SKILL]),
 };

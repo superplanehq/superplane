@@ -181,7 +181,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             },
             {
               id: "superplane_mcp_server",
-              label: "SuperPlane MCP Server",
+              label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
             },
           ],

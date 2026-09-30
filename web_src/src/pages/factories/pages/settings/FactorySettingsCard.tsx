@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import {
   factoryCardClassName,
+  factorySettingsNarrowSectionBodyClassName,
+  factorySettingsNarrowSectionHeaderClassName,
   factorySettingsSectionBodyClassName,
   factorySettingsSectionHeaderClassName,
   factorySettingsWideSectionBodyClassName,
@@ -15,6 +17,7 @@ export function FactorySettingsPageFrame({
   actions,
   children,
   wide = false,
+  narrow = false,
   backHref,
   backLabel,
   backTestId,
@@ -25,13 +28,23 @@ export function FactorySettingsPageFrame({
   children: ReactNode;
   /** Use the wide column for tables that do not fit the form measure. */
   wide?: boolean;
+  /** Shorter column for compact list pages such as Agent. Ignored when `wide` is true. */
+  narrow?: boolean;
   /** When set, shows a back link above the title in the page header. */
   backHref?: string;
   backLabel?: string;
   backTestId?: string;
 }) {
-  const headerClassName = wide ? factorySettingsWideSectionHeaderClassName : factorySettingsSectionHeaderClassName;
-  const bodyClassName = wide ? factorySettingsWideSectionBodyClassName : factorySettingsSectionBodyClassName;
+  const headerClassName = wide
+    ? factorySettingsWideSectionHeaderClassName
+    : narrow
+      ? factorySettingsNarrowSectionHeaderClassName
+      : factorySettingsSectionHeaderClassName;
+  const bodyClassName = wide
+    ? factorySettingsWideSectionBodyClassName
+    : narrow
+      ? factorySettingsNarrowSectionBodyClassName
+      : factorySettingsSectionBodyClassName;
   const hasBack = Boolean(backHref && backLabel);
   return (
     <>
@@ -81,14 +94,14 @@ export function FactorySettingsCard({
   return (
     <section
       id={sectionId}
-      className={cn(factoryCardClassName, "scroll-mt-8 p-4", attachedList && "pb-3", className)}
+      className={cn(factoryCardClassName, "scroll-mt-8 p-4", attachedList && "pb-0", className)}
       data-testid={testId}
     >
       {showHeader ? (
         <div
           className={cn(
             "flex justify-between gap-3",
-            attachedList ? "pb-3" : "mb-3",
+            attachedList ? "pb-2" : "mb-3",
             action ? "items-start" : "items-center",
           )}
         >

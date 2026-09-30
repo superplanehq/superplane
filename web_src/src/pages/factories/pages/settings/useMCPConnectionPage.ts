@@ -54,7 +54,7 @@ export function useMCPConnectionPage() {
   const [catalogEntry, setCatalogEntry] = useState<MCPCatalogEntry | undefined>();
   const [pendingDelete, setPendingDelete] = useState(false);
 
-  const listPath = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "mcp");
+  const listPath = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
 
   const openEdit = () => {
     if (!resource) {

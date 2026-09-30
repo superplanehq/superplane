@@ -17,6 +17,8 @@ export {
   FactorySettingsSoonPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
+  FactorySettingsAgentPage,
+  FactorySettingsConnectPage,
   FactorySettingsMCPPage,
   FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,

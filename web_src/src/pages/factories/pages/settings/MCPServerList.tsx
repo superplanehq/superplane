@@ -1,6 +1,7 @@
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
 import { Plug, Settings2 } from "lucide-react";
 import { Link } from "react-router";
@@ -10,24 +11,28 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { connectionIsEstablished, connectionStatusLabel } from "./agentResourceDisplay";
 import { mcpConnectionCatalogEntry, mcpConnectionDisplayName } from "./mcpConnectionDisplay";
+import { enabledToolCount, mcpToolItems, workspaceDisabledTools } from "./mcpTools";
 
 export function MCPServerList({
+  organizationId,
+  factoryId,
   resources,
   canUpdate,
   configurePath,
 }: {
+  organizationId: string;
+  factoryId: string;
   resources: FactoriesFactoryAgentResource[];
   canUpdate: boolean;
   configurePath: (resourceId: string) => string;
 }) {
   return (
-    <ul
-      className="mx-4 divide-y divide-border border-t border-border"
-      data-testid="agent-resources-connections-list"
-    >
+    <ul className="divide-y divide-border border-t border-border" data-testid="agent-resources-connections-list">
       {resources.map((resource) => (
         <MCPServerRow
           key={resource.id || resource.name}
+          organizationId={organizationId}
+          factoryId={factoryId}
           resource={resource}
           canUpdate={canUpdate}
           configureHref={resource.id ? configurePath(resource.id) : "#"}
@@ -38,10 +43,14 @@ export function MCPServerList({
 }
 
 function MCPServerRow({
+  organizationId,
+  factoryId,
   resource,
   canUpdate,
   configureHref,
 }: {
+  organizationId: string;
+  factoryId: string;
   resource: FactoriesFactoryAgentResource;
   canUpdate: boolean;
   configureHref: string;
@@ -50,13 +59,12 @@ function MCPServerRow({
   const connected = connectionIsEstablished(resource);
   const reconnect =
     resource.oauthStatus === "OAUTH_STATUS_NEEDS_RECONNECT" || resource.oauthStatus === "OAUTH_STATUS_VENDOR_REJECTED";
-  const statusLabel = connectionStatusLabel(resource);
-
   const rowTitle = resource.oauthError?.trim() || undefined;
+  const toolsLine = useMCPServerRowToolsLine(organizationId, factoryId, resource, connected);
 
   return (
     <li
-      className="flex min-w-0 items-center gap-4 py-2"
+      className="flex min-w-0 items-center gap-4 py-2.5"
       data-testid={`agent-resource-row-${resource.id}`}
       title={rowTitle}
     >
@@ -69,18 +77,23 @@ function MCPServerRow({
         <MCPConnectionRowIcon resource={resource} />
         <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{name}</span>
       </Link>
-      <div className="flex shrink-0 items-center gap-1" data-testid={`agent-resource-actions-${resource.id}`}>
-        <span
-          className={cn(
-            "whitespace-nowrap text-[12px]",
-            connected && "text-emerald-600 dark:text-emerald-500",
-            reconnect && "text-amber-600 dark:text-amber-500",
-            !connected && !reconnect && "text-muted-foreground",
-          )}
-          data-testid={`agent-resource-status-${resource.id}`}
-        >
-          {statusLabel}
-        </span>
+      <div className="flex shrink-0 items-center gap-2" data-testid={`agent-resource-actions-${resource.id}`}>
+        <div className="flex items-center gap-1.5">
+          {toolsLine ? (
+            <>
+              <span
+                className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground"
+                data-testid={`agent-resource-tools-${resource.id}`}
+              >
+                {toolsLine}
+              </span>
+              <span className="text-[12px] text-muted-foreground" aria-hidden>
+                ·
+              </span>
+            </>
+          ) : null}
+          <MCPServerConnectionStatus resource={resource} connected={connected} reconnect={reconnect} />
+        </div>
         <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
           <Button
             type="button"
@@ -102,6 +115,51 @@ function MCPServerRow({
       </div>
     </li>
   );
+}
+
+function MCPServerConnectionStatus({
+  resource,
+  connected,
+  reconnect,
+}: {
+  resource: FactoriesFactoryAgentResource;
+  connected: boolean;
+  reconnect: boolean;
+}) {
+  const statusLabel = connectionStatusLabel(resource);
+
+  return (
+    <span
+      className={cn(
+        "shrink-0 whitespace-nowrap text-[12px]",
+        connected && "text-emerald-600 dark:text-emerald-500",
+        reconnect && "text-amber-600 dark:text-amber-500",
+        !connected && !reconnect && "text-muted-foreground",
+      )}
+      data-testid={`agent-resource-status-${resource.id}`}
+    >
+      {statusLabel}
+    </span>
+  );
+}
+
+function useMCPServerRowToolsLine(
+  organizationId: string,
+  factoryId: string,
+  resource: FactoriesFactoryAgentResource,
+  connected: boolean,
+): string {
+  const resourceId = resource.id ?? "";
+  const workspaceOff = resource.enabled === false;
+  const showTools = connected && !workspaceOff && Boolean(resourceId);
+  const toolsQuery = useFactoryAgentResourceTools(organizationId, factoryId, resourceId, showTools);
+  const tools = mcpToolItems(toolsQuery.data);
+  const disabled = workspaceDisabledTools(resource);
+
+  if (!showTools || toolsQuery.isLoading || toolsQuery.isError || tools.length === 0) {
+    return "";
+  }
+  return AGENT_RESOURCES_COPY.connectedToolsSummary(enabledToolCount(tools, disabled), tools.length);
 }
 
 function MCPConnectionRowIcon({ resource }: { resource: FactoriesFactoryAgentResource }) {
