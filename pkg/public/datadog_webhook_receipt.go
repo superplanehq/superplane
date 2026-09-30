@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,45 @@ const (
 )
 
 var errRequestBodyTooLarge = errors.New("request body is too large")
+
+// rejectedReceiptLimitCache remembers integrations that are already at the
+// rejected-receipt limit. Later calls skip the database until a stored
+// receipt leaves the window.
+type rejectedReceiptLimitCache struct {
+	mu        sync.Mutex
+	fullUntil map[uuid.UUID]time.Time
+}
+
+func (c *rejectedReceiptLimitCache) blocked(id uuid.UUID, now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	until, ok := c.fullUntil[id]
+	if !ok {
+		return false
+	}
+	if !now.Before(until) {
+		delete(c.fullUntil, id)
+		return false
+	}
+	return true
+}
+
+func (c *rejectedReceiptLimitCache) markFull(id uuid.UUID, until time.Time) {
+	if until.IsZero() {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fullUntil == nil {
+		c.fullUntil = map[uuid.UUID]time.Time{}
+	}
+	if current, ok := c.fullUntil[id]; ok && !current.Before(until) {
+		return
+	}
+	c.fullUntil[id] = until
+}
+
+var rejectedDatadogReceiptLimits rejectedReceiptLimitCache
 
 type statusCapture struct {
 	http.ResponseWriter
@@ -96,8 +136,13 @@ func (s *Server) trackDatadogWebhook(r *http.Request, w http.ResponseWriter, int
 
 func (s *Server) trackRejectedDatadogWebhook(r *http.Request, w http.ResponseWriter, integration *models.Integration) (*http.Request, http.ResponseWriter, func()) {
 	noop := func() {}
-	since := time.Now().UTC().Add(-rejectedDatadogReceiptWindow)
-	receiptID, stored, err := models.CreateRejectedDatadogWebhookReceiptIfAllowed(
+	now := time.Now().UTC()
+	if rejectedDatadogReceiptLimits.blocked(integration.ID, now) {
+		return r, w, noop
+	}
+
+	since := now.Add(-rejectedDatadogReceiptWindow)
+	receiptID, stored, oldest, err := models.CreateRejectedDatadogWebhookReceiptIfAllowed(
 		database.DB(r.Context()),
 		models.DatadogWebhookReceipt{
 			IntegrationID:  integration.ID,
@@ -113,6 +158,9 @@ func (s *Server) trackRejectedDatadogWebhook(r *http.Request, w http.ResponseWri
 		return r, w, noop
 	}
 	if !stored {
+		if !oldest.IsZero() {
+			rejectedDatadogReceiptLimits.markFull(integration.ID, oldest.Add(rejectedDatadogReceiptWindow))
+		}
 		return r, w, noop
 	}
 

@@ -198,6 +198,51 @@ func TestAdminDatadogWebhooks(t *testing.T) {
 		assert.Equal(t, int64(rejectedDatadogReceiptLimit+1), stored)
 	})
 
+	t.Run("does not wait on the receipt lock when the limit is full", func(t *testing.T) {
+		integration, err := models.CreateIntegration(uuid.New(), registry.Organization.ID, "datadog", "Datadog lock", map[string]any{
+			"site": "datadoghq.com",
+		})
+		require.NoError(t, err)
+		integrationContext := contexts.NewIntegrationContext(database.Conn(), nil, integration, server.encryptor, server.registry, nil)
+		require.NoError(t, integrationContext.SetSecret(datadog.WebhookSecretName, []byte("webhook-token")))
+		for range rejectedDatadogReceiptLimit {
+			_, err := models.CreateDatadogWebhookReceipt(database.Conn(), models.DatadogWebhookReceipt{
+				IntegrationID:  integration.ID,
+				OrganizationID: integration.OrganizationID,
+				HTTPStatus:     http.StatusForbidden,
+				Outcome:        models.DatadogWebhookOutcomeRejected,
+			})
+			require.NoError(t, err)
+		}
+
+		blocker := database.Conn().Begin()
+		require.NoError(t, blocker.Error)
+		t.Cleanup(func() { blocker.Rollback() })
+		require.NoError(t, blocker.Exec(
+			"SELECT pg_advisory_xact_lock(?)",
+			models.RejectedDatadogWebhookReceiptLockKey(integration.ID),
+		).Error)
+
+		bodyRead := false
+		request := httptest.NewRequest(
+			http.MethodPost,
+			"/integrations/"+integration.ID.String()+"/events",
+			readFailReader{onRead: func() { bodyRead = true }},
+		)
+		request.Header.Set(datadog.WebhookHeaderName, "wrong-token")
+		response := httptest.NewRecorder()
+		started := time.Now()
+		server.Router.ServeHTTP(response, request)
+
+		assert.Equal(t, http.StatusForbidden, response.Code)
+		assert.False(t, bodyRead)
+		assert.Less(t, time.Since(started), time.Second)
+
+		var stored int64
+		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
+		assert.Equal(t, int64(rejectedDatadogReceiptLimit), stored)
+	})
+
 	t.Run("rejects an authenticated body larger than the webhook limit", func(t *testing.T) {
 		integration, err := models.CreateIntegration(uuid.New(), registry.Organization.ID, "datadog", "Datadog size", map[string]any{
 			"site": "datadoghq.com",
@@ -220,6 +265,18 @@ func TestAdminDatadogWebhooks(t *testing.T) {
 		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
 		assert.Equal(t, int64(0), stored)
 	})
+}
+
+func TestRejectedDatadogReceiptLimitCache(t *testing.T) {
+	cache := rejectedReceiptLimitCache{}
+	id := uuid.New()
+	now := time.Now().UTC()
+
+	assert.False(t, cache.blocked(id, now))
+	cache.markFull(id, now.Add(time.Minute))
+	assert.True(t, cache.blocked(id, now))
+	assert.False(t, cache.blocked(id, now.Add(2*time.Minute)))
+	assert.False(t, cache.blocked(id, now.Add(2*time.Minute)))
 }
 
 type readFailReader struct {

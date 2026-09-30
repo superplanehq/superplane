@@ -111,22 +111,37 @@ func AppendDatadogWebhookTask(tx *gorm.DB, receiptID, taskID uuid.UUID) error {
 
 // CreateRejectedDatadogWebhookReceiptIfAllowed stores one rejected receipt when
 // this integration is under the limit. A caller that is already at the limit
-// stores nothing. The check and the insert share one transaction.
+// stores nothing. oldest is the earliest rejected receipt in the window when
+// the limit is already met, so the caller can skip later calls until it expires.
+// The limit is counted before any lock. The lock is taken only when a receipt
+// may still be stored.
 func CreateRejectedDatadogWebhookReceiptIfAllowed(
 	tx *gorm.DB,
 	receipt DatadogWebhookReceipt,
 	since time.Time,
 	limit int,
-) (uuid.UUID, bool, error) {
-	if tx == nil {
-		return uuid.Nil, false, nil
+) (uuid.UUID, bool, time.Time, error) {
+	if tx == nil || limit <= 0 {
+		return uuid.Nil, false, time.Time{}, nil
+	}
+
+	count, oldest, err := countRejectedDatadogWebhookReceipts(tx, receipt.IntegrationID, since)
+	if err != nil {
+		return uuid.Nil, false, time.Time{}, err
+	}
+	if count >= int64(limit) {
+		return uuid.Nil, false, oldest, nil
 	}
 
 	var id uuid.UUID
 	stored := false
-	err := tx.Transaction(func(inner *gorm.DB) error {
-		allowed, err := rejectedDatadogWebhookReceiptAllowed(inner, receipt.IntegrationID, since, limit)
-		if err != nil || !allowed {
+	err = tx.Transaction(func(inner *gorm.DB) error {
+		if err := lockRejectedDatadogWebhookReceipts(inner, receipt.IntegrationID); err != nil {
+			return err
+		}
+
+		count, oldest, err = countRejectedDatadogWebhookReceipts(inner, receipt.IntegrationID, since)
+		if err != nil || count >= int64(limit) {
 			return err
 		}
 
@@ -139,9 +154,12 @@ func CreateRejectedDatadogWebhookReceiptIfAllowed(
 		return nil
 	})
 	if err != nil {
-		return uuid.Nil, false, err
+		return uuid.Nil, false, time.Time{}, err
 	}
-	return id, stored, nil
+	if !stored {
+		return uuid.Nil, false, oldest, nil
+	}
+	return id, true, time.Time{}, nil
 }
 
 func UpdateDatadogWebhookReceiptSummary(tx *gorm.DB, id uuid.UUID, summary DatadogWebhookReceipt) error {
@@ -168,28 +186,37 @@ func ListDatadogWebhookReceipts(tx *gorm.DB, limit, offset int) ([]DatadogWebhoo
 	return receipts, total, err
 }
 
-func rejectedDatadogWebhookReceiptAllowed(tx *gorm.DB, integrationID uuid.UUID, since time.Time, limit int) (bool, error) {
-	if integrationID == uuid.Nil || limit <= 0 {
-		return false, nil
-	}
-	if err := lockRejectedDatadogWebhookReceipts(tx, integrationID); err != nil {
-		return false, err
+func countRejectedDatadogWebhookReceipts(tx *gorm.DB, integrationID uuid.UUID, since time.Time) (int64, time.Time, error) {
+	if integrationID == uuid.Nil {
+		return 0, time.Time{}, nil
 	}
 
-	var count int64
-	err := tx.Model(&DatadogWebhookReceipt{}).
-		Where("integration_id = ? AND outcome = ? AND received_at >= ?", integrationID, DatadogWebhookOutcomeRejected, since).
-		Count(&count).Error
-	if err != nil {
-		return false, err
+	var row struct {
+		Count  int64
+		Oldest *time.Time
 	}
-	return count < int64(limit), nil
+	err := tx.Model(&DatadogWebhookReceipt{}).
+		Select("COUNT(*) AS count, MIN(received_at) AS oldest").
+		Where("integration_id = ? AND outcome = ? AND received_at >= ?", integrationID, DatadogWebhookOutcomeRejected, since).
+		Scan(&row).Error
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	if row.Oldest == nil {
+		return row.Count, time.Time{}, nil
+	}
+	return row.Count, row.Oldest.UTC(), nil
+}
+
+// RejectedDatadogWebhookReceiptLockKey identifies the advisory lock that
+// guards rejected receipt storage for one integration.
+func RejectedDatadogWebhookReceiptLockKey(integrationID uuid.UUID) int64 {
+	sum := sha256.Sum256(append([]byte("datadog-webhook-rejected:"), integrationID[:]...))
+	return int64(binary.BigEndian.Uint64(sum[:8]))
 }
 
 func lockRejectedDatadogWebhookReceipts(tx *gorm.DB, integrationID uuid.UUID) error {
-	sum := sha256.Sum256(append([]byte("datadog-webhook-rejected:"), integrationID[:]...))
-	key := int64(binary.BigEndian.Uint64(sum[:8]))
-	return tx.Exec("SELECT pg_advisory_xact_lock(?)", key).Error
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", RejectedDatadogWebhookReceiptLockKey(integrationID)).Error
 }
 
 func splitCommaIDs(value string) []string {
