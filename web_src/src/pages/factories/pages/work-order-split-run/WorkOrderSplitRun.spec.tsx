@@ -1413,6 +1413,55 @@ describe("WorkOrderSplitRunPopup", () => {
     );
   });
 
+  it("keeps the billing link when a scored draft fails analysis for credit", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          id: "wo-draft-credit-scored",
+          title: "test",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+        {
+          demoArtifacts: false,
+          checks: [
+            { id: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+            { id: "confidence", name: "Confidence score", score: 5, maxScore: 5 },
+          ],
+          analysisRuns: [
+            {
+              canvasId: "canvas-1",
+              workOrderId: "wo-draft-credit-scored",
+              run: {
+                id: "run-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                createdAt: "2026-09-30T14:37:29Z",
+                executions: [
+                  {
+                    id: "exec-1",
+                    result: "RESULT_FAILED",
+                    resultMessage: "This organization has no hosted credit.",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ),
+    });
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "blocked");
+    expect(verdict).not.toHaveTextContent("This task is ready to start");
+    expect(within(verdict).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+  });
+
   it("offers Reject and Rerun after a person stops the run", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({

@@ -842,6 +842,50 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
   });
 
+  it("keeps the credit failure note when an earlier score is still on the draft", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "test",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      }),
+      {
+        demoArtifacts: false,
+        checks: [
+          { id: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+          { id: "confidence", name: "Confidence score", score: 5, maxScore: 5 },
+        ],
+        analysisRuns: [
+          {
+            canvasId: "canvas-1",
+            workOrderId: "wo-1",
+            run: {
+              id: "run-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-09-30T14:37:29Z",
+              executions: [
+                {
+                  id: "exec-1",
+                  result: "RESULT_FAILED",
+                  resultMessage: "This organization has no hosted credit.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(fixture.footer.clarityScore).toBe(5);
+    expect(fixture.footer.confidenceScore).toBe(5);
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+  });
+
   it("explains a hosted credit failure on the failed note", () => {
     const cases = [
       {
