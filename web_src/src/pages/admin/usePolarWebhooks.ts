@@ -107,21 +107,36 @@ async function fetchPolarWebhookEndpoints(signal: AbortSignal): Promise<PolarWeb
 
 function usePolarWebhookEndpoints(configured: boolean | null) {
   const [endpoints, setEndpoints] = useState<PolarWebhookEndpointsResponse | null>(null);
+  const [checkFailed, setCheckFailed] = useState(false);
 
   useEffect(() => {
-    if (configured !== true) {
+    if (configured !== true || endpoints !== null) {
       return;
     }
     const controller = new AbortController();
-    fetchPolarWebhookEndpoints(controller.signal)
-      .then(setEndpoints)
-      .catch(() => {
-        // The drift check is advisory. The deliveries list already reports Polar errors.
-      });
-    return () => controller.abort();
-  }, [configured]);
+    let retryId: number | undefined;
+    const check = () => {
+      fetchPolarWebhookEndpoints(controller.signal)
+        .then((data) => {
+          setEndpoints(data);
+          setCheckFailed(false);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          setCheckFailed(true);
+          retryId = window.setTimeout(check, POLAR_WEBHOOK_POLL_INTERVAL_MS);
+        });
+    };
+    check();
+    return () => {
+      controller.abort();
+      window.clearTimeout(retryId);
+    };
+  }, [configured, endpoints]);
 
-  return endpoints;
+  return { endpoints, checkFailed };
 }
 
 function usePolarWebhookList() {
@@ -215,7 +230,7 @@ function usePolarWebhookList() {
 
 export function usePolarWebhooks() {
   const list = usePolarWebhookList();
-  const endpoints = usePolarWebhookEndpoints(list.configured);
+  const { endpoints, checkFailed: versionCheckFailed } = usePolarWebhookEndpoints(list.configured);
   const mismatchedEndpoints = useMemo(() => mismatchedPolarWebhookEndpoints(endpoints), [endpoints]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const eventGroups = useMemo(
@@ -287,5 +302,6 @@ export function usePolarWebhooks() {
     handleRedeliverFailed,
     pinnedApiVersion: endpoints?.api_version ?? "",
     mismatchedEndpoints,
+    versionCheckFailed,
   };
 }

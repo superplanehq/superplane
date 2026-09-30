@@ -17,6 +17,7 @@ import {
   POLAR_WEBHOOKS_NOT_CONFIGURED,
   POLAR_WEBHOOKS_REDELIVER_FAILED,
   POLAR_WEBHOOKS_TITLE,
+  POLAR_WEBHOOKS_VERSION_CHECK_FAILED,
   polarWebhookEndpointVersionWarning,
   type PolarWebhookEndpoint,
   type PolarWebhookStatusFilter,
@@ -113,6 +114,7 @@ function PolarWebhooksBody({
       <PolarWebhookVersionWarnings
         endpoints={pageState.mismatchedEndpoints}
         pinnedVersion={pageState.pinnedApiVersion}
+        checkFailed={pageState.versionCheckFailed}
       />
       <PolarWebhooksFilters
         statusFilter={pageState.statusFilter}
@@ -197,10 +199,19 @@ function PolarWebhooksFilters({
 function PolarWebhookVersionWarnings({
   endpoints,
   pinnedVersion,
+  checkFailed,
 }: {
   endpoints: PolarWebhookEndpoint[];
   pinnedVersion: string;
+  checkFailed: boolean;
 }) {
+  if (checkFailed) {
+    return (
+      <Text data-testid="polar-webhook-version-check-failed" className="text-sm text-gray-500 dark:text-gray-400">
+        {POLAR_WEBHOOKS_VERSION_CHECK_FAILED}
+      </Text>
+    );
+  }
   if (endpoints.length === 0) {
     return null;
   }
