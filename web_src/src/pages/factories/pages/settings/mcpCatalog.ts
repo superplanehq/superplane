@@ -4,7 +4,17 @@ import { AGENT_RESOURCES_COPY, type AgentResourceInstruction } from "./agentReso
 import { DATADOG_MCP_DEFAULT_SITE_ID, DATADOG_MCP_SITES, datadogMCPURL, isDatadogMCPURL } from "./datadogMcpSites";
 import { connectedMCPResourceForURL } from "./mcpServerMatch";
 
-export type MCPCatalogCategory = "code" | "issues" | "chat" | "cicd" | "observability" | "incident" | "infrastructure";
+export type MCPCatalogCategory =
+  | "code"
+  | "issues"
+  | "docs"
+  | "design"
+  | "chat"
+  | "cicd"
+  | "observability"
+  | "incident"
+  | "infrastructure"
+  | "database";
 
 export type MCPCatalogEntry = {
   id: string;
@@ -98,21 +108,27 @@ export const CUSTOM_MCP_CATALOG_ID = "custom";
 export const MCP_CATALOG_CATEGORY_ORDER: MCPCatalogCategory[] = [
   "code",
   "issues",
+  "docs",
+  "design",
   "chat",
   "cicd",
   "observability",
   "incident",
   "infrastructure",
+  "database",
 ];
 
 export const MCP_CATALOG_CATEGORY_LABELS: Record<MCPCatalogCategory, string> = {
   code: "Code",
   issues: "Issues",
+  docs: "Docs",
+  design: "Design",
   chat: "Chat",
   cicd: "CI/CD",
   observability: "Observability",
   incident: "Incident",
   infrastructure: "Infrastructure",
+  database: "Database",
 };
 
 function catalogSearchText(entry: MCPCatalogEntry): string {
@@ -154,6 +170,26 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     instruction: AGENT_RESOURCES_COPY.githubInstruction,
   },
   {
+    id: "gitlab",
+    name: "gitlab",
+    label: "GitLab",
+    icon: "gitlab",
+    category: "code",
+    url: "https://gitlab.com/api/v4/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.gitlabInstruction,
+  },
+  {
+    id: "postman",
+    name: "postman",
+    label: "Postman",
+    icon: "postman",
+    category: "code",
+    url: "https://mcp.postman.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.postmanInstruction,
+  },
+  {
     id: "jira",
     name: "jira",
     label: "Jira",
@@ -172,6 +208,36 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     url: "https://mcp.linear.app/mcp",
     auth: "AUTH_OAUTH",
     instruction: AGENT_RESOURCES_COPY.linearInstruction,
+  },
+  {
+    id: "notion",
+    name: "notion",
+    label: "Notion",
+    icon: "notion",
+    category: "docs",
+    url: "https://mcp.notion.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.notionInstruction,
+  },
+  {
+    id: "figma",
+    name: "figma",
+    label: "Figma",
+    icon: "figma",
+    category: "design",
+    url: "https://mcp.figma.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.figmaInstruction,
+  },
+  {
+    id: "slack",
+    name: "slack",
+    label: "Slack",
+    icon: "slack",
+    category: "chat",
+    url: "https://mcp.slack.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.slackInstruction,
   },
   // CircleCI hosted OAuth DCR rejects SuperPlane's redirect, so SuperPlane uses a personal API token.
   {
@@ -192,8 +258,39 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     icon: "semaphore",
     category: "cicd",
     url: "https://mcp.semaphoreci.com/mcp",
-    auth: "AUTH_OAUTH",
+    auth: "AUTH_HEADERS",
+    headerName: "Authorization",
     instruction: AGENT_RESOURCES_COPY.semaphoreInstruction,
+  },
+  {
+    id: "vercel",
+    name: "vercel",
+    label: "Vercel",
+    icon: "vercel",
+    category: "cicd",
+    url: "https://mcp.vercel.com",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.vercelInstruction,
+  },
+  {
+    id: "render",
+    name: "render",
+    label: "Render",
+    icon: "render",
+    category: "cicd",
+    url: "https://mcp.render.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.renderInstruction,
+  },
+  {
+    id: "railway",
+    name: "railway",
+    label: "Railway",
+    icon: "railway",
+    category: "cicd",
+    url: "https://mcp.railway.com",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.railwayInstruction,
   },
   {
     id: "sentry",
@@ -214,5 +311,75 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     url: datadogMCPURL(DATADOG_MCP_DEFAULT_SITE_ID),
     auth: "AUTH_OAUTH",
     instruction: AGENT_RESOURCES_COPY.datadogInstruction,
+  },
+  {
+    id: "grafana",
+    name: "grafana",
+    label: "Grafana",
+    icon: "grafana",
+    category: "observability",
+    url: "https://mcp.grafana.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.grafanaInstruction,
+  },
+  {
+    id: "cloudflare",
+    name: "cloudflare",
+    label: "Cloudflare",
+    icon: "cloudflare",
+    category: "infrastructure",
+    url: "https://bindings.mcp.cloudflare.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.cloudflareInstruction,
+  },
+  {
+    id: "stripe",
+    name: "stripe",
+    label: "Stripe",
+    icon: "stripe",
+    category: "infrastructure",
+    url: "https://mcp.stripe.com",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.stripeInstruction,
+  },
+  {
+    id: "supabase",
+    name: "supabase",
+    label: "Supabase",
+    icon: "supabase",
+    category: "database",
+    url: "https://mcp.supabase.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.supabaseInstruction,
+  },
+  {
+    id: "mongodb-atlas",
+    name: "mongodb-atlas",
+    label: "MongoDB Atlas",
+    icon: "mongodb",
+    category: "database",
+    url: "https://mcp.mongodb.com/",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.mongodbInstruction,
+  },
+  {
+    id: "neon",
+    name: "neon",
+    label: "Neon",
+    icon: "neon",
+    category: "database",
+    url: "https://mcp.neon.tech/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.neonInstruction,
+  },
+  {
+    id: "prisma",
+    name: "prisma",
+    label: "Prisma",
+    icon: "prisma",
+    category: "database",
+    url: "https://mcp.prisma.io/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.prismaInstruction,
   },
 ];
