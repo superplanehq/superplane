@@ -30,7 +30,7 @@ describe("client-side navigation updates document.title", () => {
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     const permalinkPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
     expect(
-      within(permalinkPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+      within(permalinkPopup).getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" }),
     ).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
@@ -46,7 +46,7 @@ describe("client-side navigation updates document.title", () => {
 
     const legacyPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
     expect(
-      within(legacyPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+      within(legacyPopup).getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" }),
     ).toBeInTheDocument();
   }, 15000);
 
@@ -75,7 +75,7 @@ describe("client-side navigation updates document.title", () => {
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     const permalinkPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
     expect(
-      within(permalinkPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+      within(permalinkPopup).getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" }),
     ).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);

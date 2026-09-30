@@ -209,7 +209,7 @@ describe("Line board job popup", () => {
 
     const dialog = await screen.findByTestId("work-order-split-run");
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "RF-103 Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: "Open task" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Open task" })).not.toBeInTheDocument();
