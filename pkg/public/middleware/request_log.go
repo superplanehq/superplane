@@ -56,6 +56,15 @@ func SetRequestLogUser(ctx context.Context, user *models.User) {
 	}
 }
 
+// requestLogAccountIdentity keeps the impersonated account as account_id
+// and the admin account as impersonator_account_id.
+func requestLogAccountIdentity(account, effective *models.Account, adminAccountID string) (*models.Account, string) {
+	if effective == nil {
+		return account, ""
+	}
+	return effective, strings.TrimSpace(adminAccountID)
+}
+
 // SetRequestLogAccount records the authenticated account for the access log.
 func SetRequestLogAccount(ctx context.Context, account *models.Account) {
 	if account == nil {

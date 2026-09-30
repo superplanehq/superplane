@@ -149,7 +149,6 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			}
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
-			SetRequestLogAccount(ctx, account)
 
 			// If there's a valid impersonation session, resolve the
 			// impersonated user's account so that non-admin handlers
@@ -159,11 +158,17 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
 				impersonation.ClearCookie(w, r)
 			}
+			adminAccountID := ""
+			if info != nil {
+				adminAccountID = info.AdminAccountID
+			}
 			if impAccount != nil {
 				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
-				SetRequestLogImpersonator(ctx, info.AdminAccountID)
 			}
+			loggedAccount, adminAccountID := requestLogAccountIdentity(account, impAccount, adminAccountID)
+			SetRequestLogAccount(ctx, loggedAccount)
+			SetRequestLogImpersonator(ctx, adminAccountID)
 
 			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
 

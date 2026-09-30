@@ -29,8 +29,9 @@ func TestCloudLoggingFormatter_SeverityAndMessage(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.level.String(), func(t *testing.T) {
+			loggedAt := time.Now().UTC()
 			entry := &log.Entry{
-				Time:    time.Date(2026, 9, 30, 8, 11, 12, 233707649, time.UTC),
+				Time:    loggedAt,
 				Level:   tc.level,
 				Message: "handled request",
 				Data: log.Fields{
@@ -53,7 +54,7 @@ func TestCloudLoggingFormatter_SeverityAndMessage(t *testing.T) {
 
 			parsed, err := time.Parse(time.RFC3339Nano, payload["time"].(string))
 			require.NoError(t, err)
-			assert.True(t, entry.Time.Equal(parsed))
+			assert.True(t, loggedAt.Equal(parsed))
 		})
 	}
 }

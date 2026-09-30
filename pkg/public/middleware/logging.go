@@ -72,7 +72,7 @@ func handledRequestFields(r *http.Request, status int, duration time.Duration) l
 		fields["user_agent"] = r.UserAgent()
 	}
 
-	if clientIP := clientIPFromForwardedFor(r); clientIP != "" {
+	if clientIP := clientIP(r); clientIP != "" {
 		fields["client_ip"] = clientIP
 	}
 
@@ -116,14 +116,26 @@ func durationMilliseconds(duration time.Duration) float64 {
 	return float64(duration) / float64(time.Millisecond)
 }
 
-func clientIPFromForwardedFor(r *http.Request) string {
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded == "" {
-		return ""
+// clientIP uses the same trust order as hosted credit billing.
+// Proxy-set headers win. For X-Forwarded-For, the rightmost address is the
+// one a trusted proxy appended. The leftmost address is caller-supplied.
+func clientIP(r *http.Request) string {
+	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP"} {
+		if ip := strings.TrimSpace(r.Header.Get(header)); ip != "" {
+			return ip
+		}
 	}
+	return rightMostForwardedIP(r.Header.Get("X-Forwarded-For"))
+}
 
-	clientIP, _, _ := strings.Cut(forwarded, ",")
-	return strings.TrimSpace(clientIP)
+func rightMostForwardedIP(forwarded string) string {
+	parts := strings.Split(forwarded, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if ip := strings.TrimSpace(parts[i]); ip != "" {
+			return ip
+		}
+	}
+	return ""
 }
 
 // cloudTraceID returns the trace id from the GCP load balancer header.
