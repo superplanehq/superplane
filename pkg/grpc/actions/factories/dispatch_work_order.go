@@ -149,6 +149,9 @@ func DispatchWorkOrderOnLine(
 		}
 
 		fromState = order.State
+		if err := fillMissingWorkOrderTitle(tx, order); err != nil {
+			return err
+		}
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}
