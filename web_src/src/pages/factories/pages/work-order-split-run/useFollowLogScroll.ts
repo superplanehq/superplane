@@ -63,50 +63,21 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   const releaseScrollIgnore = useCallback(() => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        ignoreScrollRef.current = false;
-        const node = scrollRef.current;
-        if (!node) {
-          return;
-        }
-        if (followingRef.current) {
-          const away = !isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight);
-          const movedUp = node.scrollTop < lastScrollTopRef.current - 1;
-          if (away && movedUp) {
-            followingRef.current = false;
-            setFollowing(false);
-            lastScrollTopRef.current = node.scrollTop;
-            syncJumpToLatest(false, node);
-            return;
-          }
-          if (away) {
-            node.scrollTop = node.scrollHeight;
-          }
-          lastScrollTopRef.current = node.scrollTop;
-          setJumpToLatest(false);
-          return;
-        }
-        lastScrollTopRef.current = node.scrollTop;
-        syncJumpToLatest(false, node);
+        finishIgnoreWindow({
+          ignoreScrollRef,
+          followingRef,
+          lastScrollTopRef,
+          scrollRef,
+          setFollowing,
+          setJumpToLatest,
+          syncJumpToLatest,
+        });
       });
     });
   }, [syncJumpToLatest]);
 
   const scrollToBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) {
-      return;
-    }
-    ignoreScrollRef.current = true;
-    el.scrollTop = el.scrollHeight;
-    lastScrollTopRef.current = el.scrollTop;
-    requestAnimationFrame(() => {
-      const node = scrollRef.current;
-      if (node && followingRef.current) {
-        node.scrollTop = node.scrollHeight;
-        lastScrollTopRef.current = node.scrollTop;
-      }
-    });
-    releaseScrollIgnore();
+    pinLogToBottom({ scrollRef, ignoreScrollRef, lastScrollTopRef, followingRef, releaseScrollIgnore });
   }, [releaseScrollIgnore]);
 
   const setFollow = useCallback(
@@ -146,27 +117,128 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   useEffect(() => bindUserScrollStop(scrollRef.current, followingRef, stopFollow), [stopFollow]);
 
   const onScroll = useCallback(() => {
-    if (ignoreScrollRef.current) {
-      return;
-    }
-    const el = scrollRef.current;
-    if (!el) {
-      return;
-    }
-    const distance = distanceFromLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight);
-    const next = nextFollowAfterScroll({
-      following: followingRef.current,
+    applyFollowScroll({
+      ignoreScrollRef,
+      scrollRef,
+      lastScrollTopRef,
+      followingRef,
       resumeOnBottom,
-      distanceFromBottom: distance,
-      scrollingUp: el.scrollTop < lastScrollTopRef.current,
+      setFollowing,
+      setJumpToLatest,
     });
-    lastScrollTopRef.current = el.scrollTop;
-    followingRef.current = next;
-    setFollowing(next);
-    setJumpToLatest(showJumpToLatest(next, distance));
   }, [resumeOnBottom]);
 
   return { following, setFollowing: setFollow, showJumpToLatest: jumpToLatest, scrollRef, onScroll };
+}
+
+function pinLogToBottom({
+  scrollRef,
+  ignoreScrollRef,
+  lastScrollTopRef,
+  followingRef,
+  releaseScrollIgnore,
+}: {
+  scrollRef: { current: HTMLElement | null };
+  ignoreScrollRef: { current: boolean };
+  lastScrollTopRef: { current: number };
+  followingRef: { current: boolean };
+  releaseScrollIgnore: () => void;
+}) {
+  const el = scrollRef.current;
+  if (!el) {
+    return;
+  }
+  ignoreScrollRef.current = true;
+  el.scrollTop = el.scrollHeight;
+  lastScrollTopRef.current = el.scrollTop;
+  requestAnimationFrame(() => {
+    const node = scrollRef.current;
+    if (node && followingRef.current) {
+      node.scrollTop = node.scrollHeight;
+      lastScrollTopRef.current = node.scrollTop;
+    }
+  });
+  releaseScrollIgnore();
+}
+
+function applyFollowScroll({
+  ignoreScrollRef,
+  scrollRef,
+  lastScrollTopRef,
+  followingRef,
+  resumeOnBottom,
+  setFollowing,
+  setJumpToLatest,
+}: {
+  ignoreScrollRef: { current: boolean };
+  scrollRef: { current: HTMLElement | null };
+  lastScrollTopRef: { current: number };
+  followingRef: { current: boolean };
+  resumeOnBottom: boolean;
+  setFollowing: (next: boolean) => void;
+  setJumpToLatest: (next: boolean) => void;
+}) {
+  if (ignoreScrollRef.current) {
+    return;
+  }
+  const el = scrollRef.current;
+  if (!el) {
+    return;
+  }
+  const distance = distanceFromLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight);
+  const next = nextFollowAfterScroll({
+    following: followingRef.current,
+    resumeOnBottom,
+    distanceFromBottom: distance,
+    scrollingUp: el.scrollTop < lastScrollTopRef.current,
+  });
+  lastScrollTopRef.current = el.scrollTop;
+  followingRef.current = next;
+  setFollowing(next);
+  setJumpToLatest(showJumpToLatest(next, distance));
+}
+
+function finishIgnoreWindow({
+  ignoreScrollRef,
+  followingRef,
+  lastScrollTopRef,
+  scrollRef,
+  setFollowing,
+  setJumpToLatest,
+  syncJumpToLatest,
+}: {
+  ignoreScrollRef: { current: boolean };
+  followingRef: { current: boolean };
+  lastScrollTopRef: { current: number };
+  scrollRef: { current: HTMLElement | null };
+  setFollowing: (next: boolean) => void;
+  setJumpToLatest: (next: boolean) => void;
+  syncJumpToLatest: (nextFollowing: boolean, node: HTMLElement) => void;
+}) {
+  ignoreScrollRef.current = false;
+  const node = scrollRef.current;
+  if (!node) {
+    return;
+  }
+  if (followingRef.current) {
+    const away = !isNearLogBottom(node.scrollTop, node.scrollHeight, node.clientHeight);
+    const movedUp = node.scrollTop < lastScrollTopRef.current - 1;
+    if (away && movedUp) {
+      followingRef.current = false;
+      setFollowing(false);
+      lastScrollTopRef.current = node.scrollTop;
+      syncJumpToLatest(false, node);
+      return;
+    }
+    if (away) {
+      node.scrollTop = node.scrollHeight;
+    }
+    lastScrollTopRef.current = node.scrollTop;
+    setJumpToLatest(false);
+    return;
+  }
+  lastScrollTopRef.current = node.scrollTop;
+  syncJumpToLatest(false, node);
 }
 
 function observeLogMutations(

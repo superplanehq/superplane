@@ -58,36 +58,7 @@ export function ConsoleSummaryPanel({
 }) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
-  // Matches the gate inside SplitRunReview: without both, the review node renders nothing.
-  const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
-  const liveStage = stages.find((stage) => stage.status === "running");
-  const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
-  const showsStrip = hasDecision ? Boolean(panelReview) : true;
-  // The decision fills its panel section: the section carries the tone color.
-  const decisionClassName = hasDecision
-    ? attentionToneClassName(isPullRequestReviewFooter(fixture.footer) ? "done" : splitRunDecisionTone(fixture.footer))
-    : undefined;
-  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
-  const panelPullRequests = withoutPullRequest(
-    pullRequests?.length ? pullRequests : outcome.pullRequests,
-    reviewedHref,
-  );
-  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
-  // Everything the task carries — markdown documents, links, files — plus what
-  // the runs produced, one entry per id. The task list leads: it is live and
-  // already chronological, so artifacts without a createdAt still sort in
-  // creation order.
-  const taskArtifacts = artifacts ?? [];
-  const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
-  const stageArtifacts = stages
-    .flatMap((stage) => stage.outputs.artifacts)
-    .filter((artifact) => !artifact.id || !taskArtifactIds.has(artifact.id));
-  const panelArtifacts = splitRunPanelArtifacts([...taskArtifacts, ...stageArtifacts], source).filter(
-    (artifact) => !(hasPullRequest && isBranchArtifact(artifact)),
-  );
-  const checks = stages.flatMap((stage) => stage.checks);
-  // Placeholder values such as "Waiting" mirror the status; only a real time reads as a duration.
-  const duration = /\d/.test(outcome.duration) ? outcome.duration : undefined;
+  const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
@@ -96,37 +67,38 @@ export function ConsoleSummaryPanel({
             <StaticStatusGlyph status={outcome.status} />
             {outcome.statusLabel}
           </FrameTitle>
-          {showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
+          {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
-        {hasDecision ? (
-          panelReview ? (
-            <FramePanel className={cn("py-3", decisionClassName)}>{panelReview}</FramePanel>
-          ) : null
-        ) : isLive ? (
-          <ConsoleLiveNote stage={liveStage} footer={fixture.footer} actionBusy={actionBusy} onStop={onStopLiveRun} />
-        ) : (
-          <ConsoleWaitingNote />
-        )}
-        {panelPullRequests.length > 0 ? (
+        <SummaryDecisionStrip
+          hasDecision={panel.hasDecision}
+          panelReview={panelReview}
+          decisionClassName={panel.decisionClassName}
+          isLive={panel.isLive}
+          liveStage={panel.liveStage}
+          footer={fixture.footer}
+          actionBusy={actionBusy}
+          onStop={onStopLiveRun}
+        />
+        {panel.panelPullRequests.length > 0 ? (
           <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
             <span className="text-[12px] font-medium text-muted-foreground">
-              {panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
+              {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
             </span>
-            {panelPullRequests.map((pullRequest, index) => (
+            {panel.panelPullRequests.map((pullRequest, index) => (
               <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} />
             ))}
           </FramePanel>
         ) : null}
-        {checks.length > 0 ? (
+        {panel.checks.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3">
             <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
-            <ConsoleCheckRows checks={checks} />
+            <ConsoleCheckRows checks={panel.checks} />
           </FramePanel>
         ) : null}
-        {panelArtifacts.length > 0 ? (
+        {panel.panelArtifacts.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
             <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
-            {panelArtifacts.map((artifact) => (
+            {panel.panelArtifacts.map((artifact) => (
               <WorkOrderArtifactInline
                 key={artifact.id}
                 artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
@@ -140,7 +112,7 @@ export function ConsoleSummaryPanel({
           </SummaryRow>
           <PanelSource source={source} owner={outcome.owner.id} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
-          {duration ? <SummaryRow label="Duration">{duration}</SummaryRow> : null}
+          {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
             <OwnerSpendValue
               costUsd={spend.costUsd}
@@ -153,6 +125,85 @@ export function ConsoleSummaryPanel({
       </Frame>
     </aside>
   );
+}
+
+function consolePanelFacts({
+  fixture,
+  outcome,
+  stages,
+  pullRequests,
+  artifacts,
+  source,
+  panelReview,
+}: {
+  fixture: SplitRunFixture;
+  outcome: ReturnType<typeof outcomeSummary>;
+  stages: AutomationStage[];
+  pullRequests?: FactoriesFactoryPullRequest[];
+  artifacts?: FactoriesWorkOrderArtifact[];
+  source?: SplitRunSource;
+  panelReview?: ReactNode;
+}) {
+  const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
+  const liveStage = stages.find((stage) => stage.status === "running");
+  const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
+  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
+  const panelPullRequests = withoutPullRequest(
+    pullRequests?.length ? pullRequests : outcome.pullRequests,
+    reviewedHref,
+  );
+  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
+  const taskArtifacts = artifacts ?? [];
+  const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
+  const stageArtifacts = stages
+    .flatMap((stage) => stage.outputs.artifacts)
+    .filter((artifact) => !artifact.id || !taskArtifactIds.has(artifact.id));
+  const panelArtifacts = splitRunPanelArtifacts([...taskArtifacts, ...stageArtifacts], source).filter(
+    (artifact) => !(hasPullRequest && isBranchArtifact(artifact)),
+  );
+  return {
+    hasDecision,
+    liveStage,
+    isLive,
+    showsStrip: hasDecision ? Boolean(panelReview) : true,
+    decisionClassName: hasDecision
+      ? attentionToneClassName(
+          isPullRequestReviewFooter(fixture.footer) ? "done" : splitRunDecisionTone(fixture.footer),
+        )
+      : undefined,
+    panelPullRequests,
+    panelArtifacts,
+    checks: stages.flatMap((stage) => stage.checks),
+    duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
+  };
+}
+
+function SummaryDecisionStrip({
+  hasDecision,
+  panelReview,
+  decisionClassName,
+  isLive,
+  liveStage,
+  footer,
+  actionBusy,
+  onStop,
+}: {
+  hasDecision: boolean;
+  panelReview?: ReactNode;
+  decisionClassName?: string;
+  isLive: boolean;
+  liveStage?: AutomationStage;
+  footer: SplitRunFixture["footer"];
+  actionBusy: boolean;
+  onStop?: () => void;
+}) {
+  if (hasDecision) {
+    return panelReview ? <FramePanel className={cn("py-3", decisionClassName)}>{panelReview}</FramePanel> : null;
+  }
+  if (isLive) {
+    return <ConsoleLiveNote stage={liveStage} footer={footer} actionBusy={actionBusy} onStop={onStop} />;
+  }
+  return <ConsoleWaitingNote />;
 }
 
 /** The strip fills its panel section: the tint sits on the panel, the alert stays flat. */

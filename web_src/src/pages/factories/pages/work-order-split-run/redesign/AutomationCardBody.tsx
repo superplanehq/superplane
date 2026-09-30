@@ -218,17 +218,7 @@ function CardRunFooter({
   onRetry?: () => void;
   onStop?: () => void;
 }) {
-  const live = useLivePhaseSpend(stage.id);
-  const tokens = Math.max(parseWorkOrderMetric(phase?.totalTokens), live.tokens);
-  const cents = Math.max(parseWorkOrderMetric(phase?.costCents), live.cents);
-  const modelIds = useSpecificModelIds();
-  const model = displayRunnerModel(phase?.model ?? stage.model ?? "", modelIds);
-  const spendLabel = runFooterSpendLabel(
-    cents > 0 ? formatUsdCents(cents) : undefined,
-    tokens > 0 ? formatCompactTokenValue(tokens) : undefined,
-  );
-  const lead = runFooterLine(stage);
-  const liveSpend = stage.status === "running";
+  const { lead, spendLabel, model } = useCardFooterMeta(stage, phase);
   if (!lead && !spendLabel && !model && !onRetry && !onStop) {
     return null;
   }
@@ -237,34 +227,87 @@ function CardRunFooter({
       className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3"
       data-testid={`redesign-console-run-footer-${stage.id}`}
     >
-      <span className={cn(META_TEXT_CLASSNAME, "inline-flex min-w-0 flex-wrap items-center gap-x-1")}>
-        {lead ? <span>{lead}</span> : null}
-        {lead && spendLabel ? <span aria-hidden>·</span> : null}
-        {spendLabel ? (
-          <PhaseUsageSpendButton
-            phaseId={stage.id}
-            spendLabel={spendLabel}
-            live={liveSpend}
-            className={cn(META_TEXT_CLASSNAME, "font-medium text-current underline underline-offset-2")}
-          />
-        ) : null}
-        {(lead || spendLabel) && model ? <span aria-hidden>·</span> : null}
-        {model ? <span>{model}</span> : null}
-      </span>
-      <div className="ms-auto flex shrink-0 items-center gap-1.5">
-        {onRetry ? (
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
-            <RotateCw className="size-3.5" aria-hidden />
-            Retry
-          </Button>
-        ) : null}
-        {onStop ? (
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
-            <CircleStop className="size-3.5" aria-hidden />
-            Stop
-          </Button>
-        ) : null}
-      </div>
+      <CardFooterMeta
+        stageId={stage.id}
+        live={stage.status === "running"}
+        lead={lead}
+        spendLabel={spendLabel}
+        model={model}
+      />
+      <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
+    </div>
+  );
+}
+
+function useCardFooterMeta(stage: AutomationStage, phase?: SplitRunPhase) {
+  const live = useLivePhaseSpend(stage.id);
+  const tokens = Math.max(parseWorkOrderMetric(phase?.totalTokens), live.tokens);
+  const cents = Math.max(parseWorkOrderMetric(phase?.costCents), live.cents);
+  const modelIds = useSpecificModelIds();
+  return {
+    lead: runFooterLine(stage),
+    spendLabel: runFooterSpendLabel(
+      cents > 0 ? formatUsdCents(cents) : undefined,
+      tokens > 0 ? formatCompactTokenValue(tokens) : undefined,
+    ),
+    model: displayRunnerModel(phase?.model ?? stage.model ?? "", modelIds),
+  };
+}
+
+function CardFooterMeta({
+  stageId,
+  live,
+  lead,
+  spendLabel,
+  model,
+}: {
+  stageId: string;
+  live: boolean;
+  lead?: string;
+  spendLabel?: string;
+  model?: string;
+}) {
+  return (
+    <span className={cn(META_TEXT_CLASSNAME, "inline-flex min-w-0 flex-wrap items-center gap-x-1")}>
+      {lead ? <span>{lead}</span> : null}
+      {lead && spendLabel ? <span aria-hidden>·</span> : null}
+      {spendLabel ? (
+        <PhaseUsageSpendButton
+          phaseId={stageId}
+          spendLabel={spendLabel}
+          live={live}
+          className={cn(META_TEXT_CLASSNAME, "font-medium text-current underline underline-offset-2")}
+        />
+      ) : null}
+      {(lead || spendLabel) && model ? <span aria-hidden>·</span> : null}
+      {model ? <span>{model}</span> : null}
+    </span>
+  );
+}
+
+function CardFooterActions({
+  actionBusy,
+  onRetry,
+  onStop,
+}: {
+  actionBusy: boolean;
+  onRetry?: () => void;
+  onStop?: () => void;
+}) {
+  return (
+    <div className="ms-auto flex shrink-0 items-center gap-1.5">
+      {onRetry ? (
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
+          <RotateCw className="size-3.5" aria-hidden />
+          Retry
+        </Button>
+      ) : null}
+      {onStop ? (
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
+          <CircleStop className="size-3.5" aria-hidden />
+          Stop
+        </Button>
+      ) : null}
     </div>
   );
 }
