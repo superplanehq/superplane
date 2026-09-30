@@ -5,7 +5,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dro
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { DRAFT_START_THINKING_AUTO, DRAFT_START_THINKING_DEFAULT, THINKING_LEVELS } from "@/lib/thinkingLevel";
+import {
+  DRAFT_START_THINKING_AUTO,
+  DRAFT_START_THINKING_DEFAULT,
+  THINKING_LEVELS,
+  modelNameWithThinking,
+} from "@/lib/thinkingLevel";
 
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 
@@ -34,7 +39,8 @@ const START_THINKING_LEVELS = [
 /**
  * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
- * strip settings row. Closed labeled and ghost triggers show the model name.
+ * strip settings row. Closed labeled and ghost triggers show the model name
+ * and the thinking word when one is chosen.
  */
 export function DraftStartModelSelect({
   organizationId,
@@ -58,6 +64,7 @@ export function DraftStartModelSelect({
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO ? "Auto" : (models.data ?? []).find((item) => item.id === model)?.name || model;
+  const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 
   return (
@@ -67,13 +74,13 @@ export function DraftStartModelSelect({
           type="button"
           size={showName ? "sm" : "icon-xs"}
           variant={TRIGGER_VARIANT[appearance]}
-          aria-label={`Model: ${selectedName}`}
+          aria-label={`Model: ${closedLabel}`}
           data-testid="split-run-draft-model"
           disabled={disabled}
           className={TRIGGER_CLASS[appearance]}
         >
           {appearance === "ghost" ? <Bot className="size-4" aria-hidden /> : null}
-          {showName ? selectedName : null}
+          {showName ? closedLabel : null}
           <ChevronDown className={showName ? "size-3 opacity-60" : "size-3.5"} aria-hidden />
         </Button>
       </DropdownMenuTrigger>

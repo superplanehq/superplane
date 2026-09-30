@@ -27,3 +27,24 @@ export function draftStartThinkingPayload(selected: string): string | undefined 
   }
   return trimmed;
 }
+
+/** Word shown after a model name. Auto and an empty value stay hidden. */
+export function visibleThinkingLevelLabel(value: string | undefined): string | undefined {
+  const key = value?.trim() ?? "";
+  if (key === "" || key === DRAFT_START_THINKING_AUTO) {
+    return undefined;
+  }
+  if (key === DRAFT_START_THINKING_DEFAULT) {
+    return "Default";
+  }
+  return THINKING_LEVELS.find((level) => level.value === key)?.label;
+}
+
+/** Model name plus a thinking word. No model name means no word. */
+export function modelNameWithThinking(modelName: string, thinkingLevel: string | undefined): string {
+  const word = visibleThinkingLevelLabel(thinkingLevel);
+  if (!modelName || !word) {
+    return modelName;
+  }
+  return `${modelName} ${word}`;
+}

@@ -9,7 +9,7 @@ import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPag
 import { SplitRunReview } from "./SplitRunReview";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
-import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
+import { DRAFT_START_THINKING_AUTO, THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
@@ -136,5 +136,59 @@ describe("SplitRunReview draft model select", () => {
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
+  });
+
+  it("shows Medium after the model name on the closed ghost box", () => {
+    render(
+      <DraftStartModelSelect
+        model="claude-opus-4-6"
+        thinkingLevel={THINKING_LEVEL_MEDIUM}
+        onChange={vi.fn()}
+        appearance="ghost"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
+      "claude-opus-4-6 Medium",
+    );
+  });
+
+  it("shows Medium after the model name on the closed labeled box", () => {
+    render(
+      <DraftStartModelSelect
+        model="claude-opus-4-6"
+        thinkingLevel={THINKING_LEVEL_MEDIUM}
+        onChange={vi.fn()}
+        appearance="labeled"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
+      "claude-opus-4-6 Medium",
+    );
+  });
+
+  it("leaves Auto as the model name without a thinking word", () => {
+    render(
+      <DraftStartModelSelect
+        model="claude-opus-4-6"
+        thinkingLevel={DRAFT_START_THINKING_AUTO}
+        onChange={vi.fn()}
+        appearance="ghost"
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Model: claude-opus-4-6" });
+    expect(button).toHaveTextContent("claude-opus-4-6");
+    expect(button).not.toHaveTextContent("Medium");
+    expect(button).not.toHaveTextContent("Default");
+  });
+
+  it("keeps the icon control free of visible thinking text", () => {
+    render(<DraftStartModelSelect model="claude-opus-4-6" thinkingLevel={THINKING_LEVEL_MEDIUM} onChange={vi.fn()} />);
+
+    const button = screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" });
+    expect(button).not.toHaveTextContent("Medium");
+    expect(button).not.toHaveTextContent("claude-opus-4-6");
   });
 });
