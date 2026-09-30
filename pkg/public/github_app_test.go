@@ -245,6 +245,10 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	var jobCount int64
 	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
 	assert.Equal(t, int64(1), jobCount)
+	var queuedJob models.VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&queuedJob, "provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).Error)
+	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, queuedJob.Priority)
+	assert.WithinDuration(t, time.Now(), queuedJob.RunAt, time.Second)
 
 	// Member changes enqueue the repository again after the previous job is
 	// complete so cached push access is refreshed.

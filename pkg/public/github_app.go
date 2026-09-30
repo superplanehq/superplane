@@ -278,16 +278,28 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		} else if err != nil {
 			return err
 		}
-		return models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, event.GetRepo().GetID(), time.Now().Add(10*time.Second))
+		return models.EnqueueVCSProviderRepositorySync(
+			tx,
+			models.ProviderGitHub,
+			event.GetRepo().GetID(),
+			time.Now().Add(10*time.Second),
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		)
 	}
 
 	return nil
 }
 
 func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {
-	runAt := time.Now().Add(10 * time.Second)
+	runAt := time.Now()
 	for _, repository := range repositories {
-		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			tx,
+			models.ProviderGitHub,
+			repository.RepositoryID,
+			runAt,
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		); err != nil {
 			return err
 		}
 	}

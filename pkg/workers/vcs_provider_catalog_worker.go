@@ -20,14 +20,16 @@ const (
 )
 
 type vcsProviderCatalog interface {
-	Reconcile(context.Context) error
+	Reconcile(context.Context, models.VCSProviderRepositorySyncPriority) error
 	SyncRepositoryCollaborators(context.Context, int64) error
 }
 
 type VCSProviderCatalogWorker struct {
-	provider string
-	catalog  vcsProviderCatalog
-	logger   *log.Entry
+	provider        string
+	catalog         vcsProviderCatalog
+	logger          *log.Entry
+	repositorySlots chan struct{}
+	repositoryJobs  sync.WaitGroup
 }
 
 func NewVCSProviderCatalogWorker(provider string, catalog vcsProviderCatalog) *VCSProviderCatalogWorker {
@@ -38,12 +40,25 @@ func NewVCSProviderCatalogWorker(provider string, catalog vcsProviderCatalog) *V
 			"worker":   "VCSProviderCatalogWorker",
 			"provider": provider,
 		}),
+		repositorySlots: make(chan struct{}, vcsProviderJobBatchSize),
 	}
 }
 
 func (w *VCSProviderCatalogWorker) Start(ctx context.Context) {
-	w.reconcile(ctx)
+	var loops sync.WaitGroup
+	loops.Add(1)
+	go func() {
+		defer loops.Done()
+		w.startReconciliation(ctx)
+	}()
 
+	w.startRepositorySynchronization(ctx)
+	loops.Wait()
+}
+
+func (w *VCSProviderCatalogWorker) startReconciliation(ctx context.Context) {
+	w.reconcile(ctx)
+	w.processReconcileJob(ctx)
 	reconcileTicker := time.NewTicker(vcsProviderReconcileInterval)
 	jobTicker := time.NewTicker(vcsProviderJobPollInterval)
 	defer reconcileTicker.Stop()
@@ -57,6 +72,22 @@ func (w *VCSProviderCatalogWorker) Start(ctx context.Context) {
 			w.reconcile(ctx)
 		case <-jobTicker.C:
 			w.processReconcileJob(ctx)
+		}
+	}
+}
+
+func (w *VCSProviderCatalogWorker) startRepositorySynchronization(ctx context.Context) {
+	w.processJobs(ctx)
+
+	jobTicker := time.NewTicker(vcsProviderJobPollInterval)
+	defer jobTicker.Stop()
+	defer w.repositoryJobs.Wait()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-jobTicker.C:
 			w.processJobs(ctx)
 		}
 	}
@@ -73,7 +104,7 @@ func (w *VCSProviderCatalogWorker) processReconcileJob(ctx context.Context) {
 		return
 	}
 
-	err = w.catalog.Reconcile(ctx)
+	err = w.catalog.Reconcile(ctx, models.VCSProviderRepositorySyncPriorityInteractive)
 	if err == nil {
 		if completeErr := models.CompleteVCSProviderReconciliation(database.Conn(), w.provider, *job.LockedAt); completeErr != nil {
 			w.logger.WithError(completeErr).Error("failed to complete a VCS provider reconciliation job")
@@ -93,35 +124,39 @@ func (w *VCSProviderCatalogWorker) processReconcileJob(ctx context.Context) {
 }
 
 func (w *VCSProviderCatalogWorker) reconcile(ctx context.Context) {
-	if err := w.catalog.Reconcile(ctx); err != nil {
+	if err := w.catalog.Reconcile(ctx, models.VCSProviderRepositorySyncPriorityBackground); err != nil {
 		w.logger.WithError(err).Error("failed to reconcile the VCS provider catalog")
 	}
 }
 
 func (w *VCSProviderCatalogWorker) processJobs(ctx context.Context) {
-	now := time.Now()
-	jobs := make([]*models.VCSProviderRepositorySyncJob, 0, vcsProviderJobBatchSize)
-	for range vcsProviderJobBatchSize {
+	availableSlots := cap(w.repositorySlots) - len(w.repositorySlots)
+	for range availableSlots {
+		select {
+		case w.repositorySlots <- struct{}{}:
+		default:
+			return
+		}
+
+		now := time.Now()
 		job, err := models.ClaimVCSProviderRepositorySync(database.Conn(), w.provider, now, now.Add(-vcsProviderClaimTimeout))
 		if err != nil {
+			<-w.repositorySlots
 			w.logger.WithError(err).Error("failed to claim a VCS collaborator synchronization job")
-			break
+			return
 		}
 		if job == nil {
-			break
+			<-w.repositorySlots
+			return
 		}
-		jobs = append(jobs, job)
-	}
 
-	var group sync.WaitGroup
-	for _, job := range jobs {
-		group.Add(1)
-		go func() {
-			defer group.Done()
-			w.processClaimedJob(ctx, job, now)
-		}()
+		w.repositoryJobs.Add(1)
+		go func(job *models.VCSProviderRepositorySyncJob, claimedAt time.Time) {
+			defer w.repositoryJobs.Done()
+			defer func() { <-w.repositorySlots }()
+			w.processClaimedJob(ctx, job, claimedAt)
+		}(job, now)
 	}
-	group.Wait()
 }
 
 func (w *VCSProviderCatalogWorker) processClaimedJob(
@@ -129,6 +164,16 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 	job *models.VCSProviderRepositorySyncJob,
 	claimedAt time.Time,
 ) {
+	startedAt := time.Now()
+	fields := log.Fields{
+		"repository_id": job.RepositoryID,
+		"priority":      job.Priority,
+		"attempt":       job.Attempts,
+		"queue_delay_ms": max(
+			startedAt.Sub(job.RunAt).Milliseconds(),
+			int64(0),
+		),
+	}
 	err := w.catalog.SyncRepositoryCollaborators(ctx, job.RepositoryID)
 	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
 		if completeErr := models.CompleteVCSProviderRepositorySync(
@@ -137,21 +182,29 @@ func (w *VCSProviderCatalogWorker) processClaimedJob(
 			job.RepositoryID,
 			*job.LockedAt,
 		); completeErr != nil {
-			w.logger.WithError(completeErr).Error("failed to complete a VCS collaborator synchronization job")
+			w.logger.WithFields(fields).WithError(completeErr).Error("failed to complete a VCS collaborator synchronization job")
+			return
 		}
+		fields["duration_ms"] = time.Since(startedAt).Milliseconds()
+		w.logger.WithFields(fields).Info("synchronized VCS repository collaborators")
 		return
 	}
 
+	retryAt := time.Now().Add(vcsProviderRetryDelay(job.Attempts))
+	fields["duration_ms"] = time.Since(startedAt).Milliseconds()
+	fields["retry_at"] = retryAt
 	if retryErr := models.RetryVCSProviderRepositorySync(
 		database.Conn(),
 		w.provider,
 		job.RepositoryID,
 		*job.LockedAt,
-		claimedAt.Add(vcsProviderRetryDelay(job.Attempts)),
+		retryAt,
 		err,
 	); retryErr != nil {
-		w.logger.WithError(retryErr).Error("failed to retry a VCS collaborator synchronization job")
+		w.logger.WithFields(fields).WithError(retryErr).Error("failed to retry a VCS collaborator synchronization job")
+		return
 	}
+	w.logger.WithFields(fields).WithError(err).Warn("VCS repository collaborator synchronization will retry")
 }
 
 func vcsProviderRetryDelay(attempts int) time.Duration {
