@@ -193,7 +193,7 @@ export function WorkOrderCard({
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
           failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
-          creditLabel={creditLabel}
+          creditLabel={isDraft ? creditLabel : undefined}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}

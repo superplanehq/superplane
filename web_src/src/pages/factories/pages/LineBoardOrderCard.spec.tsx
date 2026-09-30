@@ -92,6 +92,12 @@ describe("LineBoardOrderCard", () => {
     expect(screen.getByText("No credit")).toBeInTheDocument();
   });
 
+  it("hides the analysis credit label after the task leaves the backlog", () => {
+    renderCard({ ...draft, state: "STATE_CLOSED", result: "RESULT_COMPLETED" }, false, "No credit");
+
+    expect(screen.queryByText("No credit")).not.toBeInTheDocument();
+  });
+
   it("shows a local backlog analysis without loading a planning session", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     renderCard(draft, true);

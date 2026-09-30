@@ -6,7 +6,6 @@ import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { draftReadiness, startEmphasisForTone, type DraftReadinessTone } from "../../lib/draftReadiness";
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import {
   formatCheckScore,
   LEVEL_LABEL,
@@ -19,6 +18,7 @@ import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import { StartConfirmDialog } from "./StartConfirmDialog";
 import { needsStartConfirm, persistSkipStartConfirm } from "./startConfirm";
 import {
+  creditBillingHref,
   creditBillingHrefForNote,
   splitRunDecisionTone,
   splitRunFooterScores,
@@ -106,11 +106,7 @@ function reviewAttentionNote(
   organizationId?: string,
   factoryKey?: string,
 ): SplitRunFooterNote {
-  const billingHref =
-    organizationId && factoryKey
-      ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing")
-      : undefined;
-  return creditBillingHrefForNote(note, billingHref);
+  return creditBillingHrefForNote(note, creditBillingHref(organizationId, factoryKey));
 }
 
 /**
