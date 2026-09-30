@@ -3,6 +3,7 @@ package common
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,7 @@ func Test__HostedAppInstallURL(t *testing.T) {
 }
 
 func Test__HostedAppInstallState(t *testing.T) {
+	assert.GreaterOrEqual(t, hostedAppInstallStateTTL, 7*24*time.Hour)
 	organizationID := uuid.New()
 	state, err := SignHostedAppInstallState("setup-secret", organizationID)
 	require.NoError(t, err)

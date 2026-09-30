@@ -22,7 +22,7 @@ const (
 	EnvGitHubAppSlug          = config.EnvGitHubAppSlug
 	EnvGitHubAppPrivateKey    = config.EnvGitHubAppPrivateKey
 	EnvGitHubAppWebhookSecret = config.EnvGitHubAppWebhookSecret
-	hostedAppInstallStateTTL  = 30 * time.Minute
+	hostedAppInstallStateTTL  = 7 * 24 * time.Hour
 	hostedAppInstallIntent    = "github-app-install"
 	hostedAppInstallPrefix    = "github-install:"
 )
