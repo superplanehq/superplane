@@ -7,9 +7,6 @@ const (
 	RunnerStateIdle       = "idle"
 	RunnerStateBusy       = "busy"
 	RunnerStateTerminated = "terminated"
-
-	TaskStateQueued   = "queued"
-	TaskStateReserved = "reserved"
 )
 
 type FleetSpec struct {
@@ -45,18 +42,6 @@ type Runner struct {
 	Ephemeral         bool       `json:"ephemeral"`
 }
 
-type Task struct {
-	ID             string     `json:"id"`
-	OrganizationID string     `json:"organizationId"`
-	FleetID        string     `json:"fleetId"`
-	RunnerID       *string    `json:"runnerId,omitempty"`
-	State          string     `json:"state"`
-	QueuedAt       time.Time  `json:"queuedAt"`
-	ReservedAt     *time.Time `json:"reservedAt,omitempty"`
-	StartedAt      *time.Time `json:"startedAt,omitempty"`
-	FinishedAt     *time.Time `json:"finishedAt,omitempty"`
-}
-
 type Capacity struct {
 	RunnableTasks     int64  `json:"runnableTasks,string"`
 	PendingRunners    int64  `json:"pendingRunners,string"`
@@ -67,9 +52,8 @@ type Capacity struct {
 }
 
 type CreateRunnerRequest struct {
-	TaskID         *string `json:"taskId,omitempty"`
-	IdempotencyKey string  `json:"idempotencyKey,omitempty"`
-	Ephemeral      bool    `json:"ephemeral"`
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+	Ephemeral      bool   `json:"ephemeral"`
 }
 
 type CreateRunnerResponse struct {

@@ -92,22 +92,6 @@ func (c *Client) GetFleetCapacity(
 	return response, err
 }
 
-func (c *Client) ListFleetTasks(
-	ctx context.Context,
-	fleetID string,
-	states []string,
-	limit int,
-) ([]Task, error) {
-	query := listQuery(states, limit)
-	var response struct {
-		Tasks []Task `json:"tasks"`
-	}
-	if err := c.do(ctx, http.MethodGet, fleetPath(fleetID)+"/tasks", query, nil, &response); err != nil {
-		return nil, err
-	}
-	return response.Tasks, nil
-}
-
 func (c *Client) CreateRunner(
 	ctx context.Context,
 	fleetID string,

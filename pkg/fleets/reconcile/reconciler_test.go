@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/fleets/adminclient"
 	"github.com/superplanehq/superplane/pkg/fleets/artifact"
@@ -15,7 +15,6 @@ import (
 type fakeAdmin struct {
 	fleet             adminclient.Fleet
 	capacity          adminclient.Capacity
-	tasks             []adminclient.Task
 	activeRunners     []adminclient.Runner
 	terminatedRunners []adminclient.Runner
 	createResponse    adminclient.CreateRunnerResponse
@@ -35,15 +34,6 @@ func (f *fakeAdmin) GetFleetCapacity(
 	int,
 ) (adminclient.Capacity, error) {
 	return f.capacity, nil
-}
-
-func (f *fakeAdmin) ListFleetTasks(
-	context.Context,
-	string,
-	[]string,
-	int,
-) ([]adminclient.Task, error) {
-	return f.tasks, nil
 }
 
 func (f *fakeAdmin) CreateRunner(
@@ -145,18 +135,19 @@ func (f *fakeProvider) Delete(_ context.Context, resource provider.Resource) err
 	return nil
 }
 
-func TestTaskSpecificRunnerIsCreatedBeforeInfrastructure(t *testing.T) {
+func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	var events []string
 	admin := newFakeAdmin()
 	admin.events = &events
-	admin.tasks = []adminclient.Task{{
-		ID:      "task-1",
+	admin.capacity.RunnableTasks = 1
+	admin.activeRunners = []adminclient.Runner{{
+		ID:      "runner-idle",
 		FleetID: "fleet-a",
-		State:   adminclient.TaskStateQueued,
+		State:   adminclient.RunnerStateIdle,
 	}}
 	resourceProvider := &fakeProvider{events: &events}
 	resolver := &fakeArtifactResolver{}
-	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, true, 0)
+	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, 1)
 
 	if err := reconciler.Reconcile(context.Background()); err != nil {
 		t.Fatal(err)
@@ -165,11 +156,15 @@ func TestTaskSpecificRunnerIsCreatedBeforeInfrastructure(t *testing.T) {
 		t.Fatalf("events = %#v", events)
 	}
 	if len(admin.createRequests) != 1 ||
-		admin.createRequests[0].TaskID == nil ||
-		*admin.createRequests[0].TaskID != "task-1" ||
-		admin.createRequests[0].IdempotencyKey != "fleet-manager/fleet-a/task/task-1" ||
+		!strings.HasPrefix(
+			admin.createRequests[0].IdempotencyKey,
+			"fleet-manager/fleet-a/generic/",
+		) ||
 		!admin.createRequests[0].Ephemeral {
 		t.Fatalf("create request = %#v", admin.createRequests)
+	}
+	if len(admin.deletedRunnerIDs) != 0 {
+		t.Fatalf("deleted runners = %#v", admin.deletedRunnerIDs)
 	}
 	if resolver.requestedVersion != "1.2.3" ||
 		resolver.requestedOS != "linux" ||
@@ -188,6 +183,33 @@ func TestTaskSpecificRunnerIsCreatedBeforeInfrastructure(t *testing.T) {
 	}
 }
 
+func TestWarmRunnerRemainsWhenNoTasksAreQueued(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.activeRunners = []adminclient.Runner{{
+		ID:      "runner-idle",
+		FleetID: "fleet-a",
+		State:   adminclient.RunnerStateIdle,
+	}}
+	reconciler := newTestReconciler(
+		t,
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		1,
+	)
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 0 || len(admin.deletedRunnerIDs) != 0 {
+		t.Fatalf(
+			"create requests = %#v, deleted runners = %#v",
+			admin.createRequests,
+			admin.deletedRunnerIDs,
+		)
+	}
+}
+
 func TestProviderCreationFailureTerminatesLogicalRunner(t *testing.T) {
 	admin := newFakeAdmin()
 	admin.capacity.RunnableTasks = 1
@@ -197,7 +219,6 @@ func TestProviderCreationFailureTerminatesLogicalRunner(t *testing.T) {
 		admin,
 		&fakeArtifactResolver{},
 		resourceProvider,
-		false,
 		0,
 	)
 
@@ -228,7 +249,6 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 		admin,
 		&fakeArtifactResolver{},
 		resourceProvider,
-		false,
 		0,
 	)
 
@@ -238,39 +258,6 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 	if len(resourceProvider.deleted) != 1 ||
 		resourceProvider.deleted[0].ID != "resource-terminated" {
 		t.Fatalf("deleted resources = %#v", resourceProvider.deleted)
-	}
-}
-
-func TestReservedPendingRunnerIsReprovisionedWithStableTaskKey(t *testing.T) {
-	admin := newFakeAdmin()
-	runnerID := "runner-1"
-	admin.tasks = []adminclient.Task{{
-		ID:       "task-1",
-		FleetID:  "fleet-a",
-		RunnerID: &runnerID,
-		State:    adminclient.TaskStateReserved,
-	}}
-	admin.activeRunners = []adminclient.Runner{{
-		ID:        runnerID,
-		FleetID:   "fleet-a",
-		State:     adminclient.RunnerStatePending,
-		CreatedAt: time.Now(),
-	}}
-	reconciler := newTestReconciler(
-		t,
-		admin,
-		&fakeArtifactResolver{},
-		&fakeProvider{},
-		true,
-		0,
-	)
-
-	if err := reconciler.Reconcile(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(admin.createRequests) != 1 ||
-		admin.createRequests[0].IdempotencyKey != "fleet-manager/fleet-a/task/task-1" {
-		t.Fatalf("create requests = %#v", admin.createRequests)
 	}
 }
 
@@ -305,14 +292,12 @@ func newTestReconciler(
 	admin AdminClient,
 	resolver ArtifactResolver,
 	resourceProvider provider.Provider,
-	taskSpecific bool,
 	warmCapacity int,
 ) *Reconciler {
 	t.Helper()
 	reconciler, err := New(admin, resolver, resourceProvider, Config{
 		FleetID:             "fleet-a",
 		WarmCapacity:        warmCapacity,
-		TaskSpecific:        taskSpecific,
 		OperatingSystem:     "linux",
 		Architecture:        "amd64",
 		CapacityWaitSeconds: 0,

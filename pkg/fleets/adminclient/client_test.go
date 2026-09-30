@@ -35,17 +35,16 @@ func TestCreateRunnerUsesFleetPathAndAdminBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskID := "task-1"
 	response, err := client.CreateRunner(context.Background(), "linux-amd64", CreateRunnerRequest{
-		TaskID:         &taskID,
-		IdempotencyKey: "fleet-manager/task/task-1",
+		IdempotencyKey: "fleet-manager/linux-amd64/generic/request-1",
 		Ephemeral:      true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if received.TaskID == nil || *received.TaskID != taskID || !received.Ephemeral {
+	if received.IdempotencyKey != "fleet-manager/linux-amd64/generic/request-1" ||
+		!received.Ephemeral {
 		t.Fatalf("request = %#v", received)
 	}
 	if response.Runner.ID != "runner-1" || response.Runner.RunnerVersion != "1.2.3" {

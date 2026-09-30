@@ -1,6 +1,7 @@
 package fleets
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -98,4 +99,52 @@ func TestDescribeFleetGetsCapacityWithoutLongPolling(t *testing.T) {
 		"/admin/api/installation/fleets/aws-large-amd64/capacity",
 	}, paths)
 	assert.Contains(t, stdout.String(), `"runnableTasks": "2"`)
+}
+
+func TestDescribeYAMLCanBeEditedAndUsedForUpdate(t *testing.T) {
+	var update updateFile
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet &&
+			r.URL.Path == "/admin/api/installation/fleets/aws-large-amd64":
+			_, _ = fmt.Fprint(w, `{
+				"fleet":{
+					"id":"aws-large-amd64",
+					"runnerVersion":"v0.0.1",
+					"enabled":true,
+					"spec":{"operatingSystem":"linux","architecture":"amd64"}
+				}
+			}`)
+		case r.Method == http.MethodGet &&
+			r.URL.Path == "/admin/api/installation/fleets/aws-large-amd64/capacity":
+			_, _ = fmt.Fprint(w, `{"runnableTasks":"0","idleRunners":"1","generation":"3"}`)
+		case r.Method == http.MethodPatch &&
+			r.URL.Path == "/admin/api/installation/fleets/aws-large-amd64":
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&update))
+			_, _ = fmt.Fprint(w, `{"fleet":{"id":"aws-large-amd64","runnerVersion":"v0.0.2"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	describeContext, described := clitest.NewCommandContext(t, server, "yaml")
+	require.NoError(
+		t,
+		(&describeCommand{FleetID: "aws-large-amd64"}).Execute(describeContext),
+	)
+	definition := strings.Replace(described.String(), "v0.0.1", "v0.0.2", 1)
+
+	updateContext, _ := clitest.NewCommandContext(t, server, "yaml")
+	updateContext.Cmd.SetIn(strings.NewReader(definition))
+	require.NoError(
+		t,
+		(&updateCommand{fileCommand: fileCommand{File: "-"}}).Execute(updateContext),
+	)
+
+	require.NotNil(t, update.RunnerVersion)
+	assert.Equal(t, "v0.0.2", *update.RunnerVersion)
+	assert.Equal(t, "linux", update.Spec.GetOperatingSystem())
+	assert.Nil(t, update.Capacity)
 }

@@ -31,7 +31,6 @@ type Config struct {
 type Fleet struct {
 	ID           string `json:"id"`
 	WarmCapacity int    `json:"warm_capacity"`
-	TaskSpecific bool   `json:"task_specific"`
 	Provider     string `json:"provider"`
 	AWS          AWS    `json:"aws"`
 	Docker       Docker `json:"docker"`

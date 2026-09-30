@@ -7,7 +7,6 @@
     {
       "id": "e1-large-amd64",
       "provider": "docker",
-      "task_specific": true,
       "docker": {
         "image": "superplane-runner-local:dev",
         "architecture": "amd64",
@@ -20,7 +19,6 @@
     {
       "id": "e1-large-arm64",
       "provider": "docker",
-      "task_specific": true,
       "docker": {
         "image": "superplane-runner-local:dev",
         "architecture": "arm64",
@@ -33,7 +31,6 @@
     {
       "id": "e1-tiny-amd64",
       "provider": "docker",
-      "task_specific": true,
       "docker": {
         "image": "superplane-runner-local:dev",
         "architecture": "amd64",
@@ -46,7 +43,6 @@
     {
       "id": "e1-tiny-arm64",
       "provider": "docker",
-      "task_specific": true,
       "docker": {
         "image": "superplane-runner-local:dev",
         "architecture": "arm64",

@@ -25,9 +25,9 @@ the archive, verifies its SHA-256, extracts it, and runs the bundled installer.
 
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
-`superplane-runner-local:dev` image and starts one ephemeral container for
-each task.
+`superplane-runner-local:dev` image.
 
-Set `task_specific` to `true` to create one runner for each queued task.
-Fleet Manager uses a stable task idempotency key so it can resume provisioning
-after a restart. `warm_capacity` adds unbound runners.
+Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
+next queued task. The target capacity is the number of queued tasks plus
+`warm_capacity`. Set `warm_capacity` to the number of idle runners that the
+fleet must keep when no tasks are queued.

@@ -85,9 +85,9 @@ func (c *describeCommand) Execute(ctx core.CommandContext) error {
 		return core.FormatCommandError(err)
 	}
 
-	result := fleetDescription{
-		Fleet:    fleetResponse.Fleet,
-		Capacity: capacity,
+	result, err := newFleetDescription(fleetResponse.Fleet, capacity)
+	if err != nil {
+		return err
 	}
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(result)
@@ -98,8 +98,31 @@ func (c *describeCommand) Execute(ctx core.CommandContext) error {
 }
 
 type fleetDescription struct {
-	Fleet    *openapi_client.RunnersFleet                    `json:"fleet" yaml:"fleet"`
-	Capacity *openapi_client.RunnersGetFleetCapacityResponse `json:"capacity" yaml:"capacity"`
+	FleetID       string                                          `json:"fleetId" yaml:"fleetId"`
+	RunnerVersion string                                          `json:"runnerVersion" yaml:"runnerVersion"`
+	Enabled       bool                                            `json:"enabled" yaml:"enabled"`
+	Spec          openapi_client.RunnersFleetSpec                 `json:"spec" yaml:"spec"`
+	CreatedAt     *time.Time                                      `json:"createdAt,omitempty" yaml:"createdAt,omitempty"`
+	UpdatedAt     *time.Time                                      `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+	Capacity      *openapi_client.RunnersGetFleetCapacityResponse `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+}
+
+func newFleetDescription(
+	fleet *openapi_client.RunnersFleet,
+	capacity *openapi_client.RunnersGetFleetCapacityResponse,
+) (fleetDescription, error) {
+	if fleet == nil {
+		return fleetDescription{}, fmt.Errorf("server returned an empty fleet")
+	}
+	return fleetDescription{
+		FleetID:       fleet.GetId(),
+		RunnerVersion: fleet.GetRunnerVersion(),
+		Enabled:       fleet.GetEnabled(),
+		Spec:          fleet.GetSpec(),
+		CreatedAt:     fleet.CreatedAt,
+		UpdatedAt:     fleet.UpdatedAt,
+		Capacity:      capacity,
+	}, nil
 }
 
 type fileCommand struct {
@@ -150,10 +173,13 @@ type updateCommand struct {
 }
 
 type updateFile struct {
-	FleetID       string                           `json:"fleetId"`
-	RunnerVersion *string                          `json:"runnerVersion,omitempty"`
-	Enabled       *bool                            `json:"enabled,omitempty"`
-	Spec          *openapi_client.RunnersFleetSpec `json:"spec,omitempty"`
+	FleetID       string                                          `json:"fleetId"`
+	RunnerVersion *string                                         `json:"runnerVersion,omitempty"`
+	Enabled       *bool                                           `json:"enabled,omitempty"`
+	Spec          *openapi_client.RunnersFleetSpec                `json:"spec,omitempty"`
+	CreatedAt     *time.Time                                      `json:"createdAt,omitempty"`
+	UpdatedAt     *time.Time                                      `json:"updatedAt,omitempty"`
+	Capacity      *openapi_client.RunnersGetFleetCapacityResponse `json:"capacity,omitempty"`
 }
 
 func newUpdateCommand(options core.BindOptions) *cobra.Command {
@@ -218,7 +244,15 @@ func renderFleetResponse(ctx core.CommandContext, fleet *openapi_client.RunnersF
 }
 
 func renderFleetDescription(stdout io.Writer, description fleetDescription) error {
-	if err := renderFleet(stdout, description.Fleet); err != nil {
+	fleet := &openapi_client.RunnersFleet{
+		Id:            &description.FleetID,
+		Enabled:       &description.Enabled,
+		Spec:          &description.Spec,
+		RunnerVersion: &description.RunnerVersion,
+		CreatedAt:     description.CreatedAt,
+		UpdatedAt:     description.UpdatedAt,
+	}
+	if err := renderFleet(stdout, fleet); err != nil {
 		return err
 	}
 	capacity := description.Capacity

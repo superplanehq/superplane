@@ -58,7 +58,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=ubuntu
+Group=ubuntu
 EnvironmentFile=/etc/default/superplane-runner
+WorkingDirectory=/home/ubuntu
 ExecStart=/usr/local/bin/superplane-runner
 Restart=no
 ExecStopPost=+/bin/sh -c 'sleep 5; /usr/sbin/poweroff'

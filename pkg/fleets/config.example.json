@@ -9,7 +9,6 @@
     {
       "id": "linux-amd64",
       "warm_capacity": 1,
-      "task_specific": true,
       "aws": {
         "ami": "ami-00000000000000000",
         "instance_type": "t3.micro",

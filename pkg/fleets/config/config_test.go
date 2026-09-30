@@ -16,7 +16,6 @@ func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 		"fleets":[{
 			"id":"linux-amd64",
 			"warm_capacity":1,
-			"task_specific":true,
 			"aws":{
 				"ami":"ami-123",
 				"architecture":"amd64",
@@ -54,6 +53,13 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
+	_, err := Load(writeConfig(t, `{"fleets":[{"task_specific":true}]}`))
+	if err == nil || !strings.Contains(err.Error(), `unknown field "task_specific"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	config, err := Load(writeConfig(t, `{
@@ -62,7 +68,6 @@ func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 		"fleets":[{
 			"id":"e1-large-amd64",
 			"provider":"docker",
-			"task_specific":true,
 			"docker":{
 				"image":"runner:dev",
 				"architecture":"amd64",

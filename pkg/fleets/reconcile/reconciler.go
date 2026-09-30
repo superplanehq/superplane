@@ -22,7 +22,6 @@ const listLimit = 1000
 type AdminClient interface {
 	DescribeFleet(context.Context, string) (adminclient.Fleet, error)
 	GetFleetCapacity(context.Context, string, string, int) (adminclient.Capacity, error)
-	ListFleetTasks(context.Context, string, []string, int) ([]adminclient.Task, error)
 	CreateRunner(
 		context.Context,
 		string,
@@ -39,7 +38,6 @@ type ArtifactResolver interface {
 type Config struct {
 	FleetID             string
 	WarmCapacity        int
-	TaskSpecific        bool
 	OperatingSystem     string
 	Architecture        string
 	CapacityWaitSeconds int
@@ -159,11 +157,7 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		return errors.Join(reconcileErrors...)
 	}
 
-	if r.config.TaskSpecific {
-		err = r.reconcileTaskSpecific(ctx, fleet, activeRunners, resourcesByRunner)
-	} else {
-		err = r.reconcileGeneric(ctx, fleet, capacity, activeRunners, resourcesByRunner)
-	}
+	err = r.reconcileCapacity(ctx, fleet, capacity, activeRunners, resourcesByRunner)
 	if err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
@@ -238,7 +232,7 @@ func (r *Reconciler) validateFleet(fleet adminclient.Fleet) error {
 	return nil
 }
 
-func (r *Reconciler) reconcileGeneric(
+func (r *Reconciler) reconcileCapacity(
 	ctx context.Context,
 	fleet adminclient.Fleet,
 	capacity adminclient.Capacity,
@@ -249,7 +243,12 @@ func (r *Reconciler) reconcileGeneric(
 	if len(activeRunners) < target {
 		var provisionErrors []error
 		for range target - len(activeRunners) {
-			if err := r.provision(ctx, fleet, nil, genericIdempotencyKey(r.config.FleetID), resourcesByRunner); err != nil {
+			if err := r.provision(
+				ctx,
+				fleet,
+				genericIdempotencyKey(r.config.FleetID),
+				resourcesByRunner,
+			); err != nil {
 				provisionErrors = append(provisionErrors, err)
 			}
 		}
@@ -265,105 +264,13 @@ func (r *Reconciler) reconcileGeneric(
 	)
 }
 
-func (r *Reconciler) reconcileTaskSpecific(
-	ctx context.Context,
-	fleet adminclient.Fleet,
-	activeRunners []adminclient.Runner,
-	resourcesByRunner map[string][]provider.Resource,
-) error {
-	tasks, err := r.admin.ListFleetTasks(
-		ctx,
-		r.config.FleetID,
-		[]string{adminclient.TaskStateQueued, adminclient.TaskStateReserved},
-		listLimit,
-	)
-	if err != nil {
-		return fmt.Errorf("list tasks for fleet %s: %w", r.config.FleetID, err)
-	}
-
-	activeByID := make(map[string]adminclient.Runner, len(activeRunners))
-	for _, runner := range activeRunners {
-		activeByID[runner.ID] = runner
-	}
-	boundRunnerIDs := make(map[string]struct{}, len(tasks))
-	var reconcileErrors []error
-	for _, task := range tasks {
-		if task.RunnerID != nil && *task.RunnerID != "" {
-			boundRunnerIDs[*task.RunnerID] = struct{}{}
-		}
-		switch task.State {
-		case adminclient.TaskStateQueued:
-			taskID := task.ID
-			if err := r.provision(
-				ctx,
-				fleet,
-				&taskID,
-				taskIdempotencyKey(r.config.FleetID, task.ID),
-				resourcesByRunner,
-			); err != nil {
-				reconcileErrors = append(reconcileErrors, err)
-			}
-		case adminclient.TaskStateReserved:
-			if task.RunnerID == nil || len(resourcesByRunner[*task.RunnerID]) > 0 {
-				continue
-			}
-			runner, exists := activeByID[*task.RunnerID]
-			if !exists || runner.State != adminclient.RunnerStatePending {
-				continue
-			}
-			taskID := task.ID
-			if err := r.provision(
-				ctx,
-				fleet,
-				&taskID,
-				taskIdempotencyKey(r.config.FleetID, task.ID),
-				resourcesByRunner,
-			); err != nil {
-				reconcileErrors = append(reconcileErrors, err)
-			}
-		}
-	}
-
-	var unbound []adminclient.Runner
-	for _, runner := range activeRunners {
-		if _, bound := boundRunnerIDs[runner.ID]; !bound {
-			unbound = append(unbound, runner)
-		}
-	}
-	switch {
-	case len(unbound) < r.config.WarmCapacity:
-		for range r.config.WarmCapacity - len(unbound) {
-			if err := r.provision(
-				ctx,
-				fleet,
-				nil,
-				genericIdempotencyKey(r.config.FleetID),
-				resourcesByRunner,
-			); err != nil {
-				reconcileErrors = append(reconcileErrors, err)
-			}
-		}
-	case len(unbound) > r.config.WarmCapacity:
-		if err := r.terminateRunners(
-			ctx,
-			oldestRunners(unbound, len(unbound)-r.config.WarmCapacity),
-			resourcesByRunner,
-		); err != nil {
-			reconcileErrors = append(reconcileErrors, err)
-		}
-	}
-	return errors.Join(reconcileErrors...)
-}
-
 func (r *Reconciler) provision(
 	ctx context.Context,
 	fleet adminclient.Fleet,
-	taskID *string,
 	idempotencyKey string,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
 	created, err := r.admin.CreateRunner(ctx, r.config.FleetID, adminclient.CreateRunnerRequest{
-		TaskID:         taskID,
 		IdempotencyKey: idempotencyKey,
 		Ephemeral:      true,
 	})
@@ -585,10 +492,6 @@ func oldestRunners(runners []adminclient.Runner, count int) []adminclient.Runner
 		count = len(sorted)
 	}
 	return sorted[:count]
-}
-
-func taskIdempotencyKey(fleetID, taskID string) string {
-	return "fleet-manager/" + fleetID + "/task/" + taskID
 }
 
 func genericIdempotencyKey(fleetID string) string {
