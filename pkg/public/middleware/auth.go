@@ -158,10 +158,17 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
 				impersonation.ClearCookie(w, r)
 			}
+			adminAccountID := ""
+			if info != nil {
+				adminAccountID = info.AdminAccountID
+			}
 			if impAccount != nil {
 				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
+			loggedAccount, adminAccountID := requestLogAccountIdentity(account, impAccount, adminAccountID)
+			SetRequestLogAccount(ctx, loggedAccount)
+			SetRequestLogImpersonator(ctx, adminAccountID)
 
 			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
 
@@ -237,6 +244,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				}
 
 				ctx = context.WithValue(ctx, UserContextKey, user)
+				SetRequestLogUser(ctx, user)
 				if scopedClaims != nil {
 					ctx = context.WithValue(ctx, ScopedTokenClaimsContextKey, scopedClaims)
 				}
@@ -266,8 +274,10 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			}
 
 			ctx = context.WithValue(ctx, UserContextKey, user)
+			SetRequestLogUser(ctx, user)
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
+				SetRequestLogImpersonator(ctx, impersonationInfo.AdminAccountID)
 			}
 
 			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
