@@ -54,9 +54,8 @@ type Input struct {
 	Size                     Size
 	// Theme names a palette. An empty or unknown name uses ThemeDefault.
 	Theme string
-	// Accent overrides the theme accent with a "#rrggbb" color. An empty or
-	// invalid value keeps the theme accent.
-	Accent string
+	// Colors replaces single colors from that theme.
+	Colors Colors
 }
 
 type metrics struct {
@@ -313,7 +312,7 @@ func layoutSmall(in Input) smallModel {
 	leftWidth := leftTextX + textWidth(left, 12, true) + pad
 	rightWidth := textWidth(right, 12, true) + pad*2
 	return smallModel{
-		Palette:    resolvePalette(in.Theme, in.Accent),
+		Palette:    resolvePalette(in.Theme, in.Colors),
 		RootID:     uniqueID(),
 		Logo:       logo,
 		Width:      leftWidth + rightWidth,
@@ -366,7 +365,7 @@ func layoutLarge(in Input) largeModel {
 	)
 	logo := placeLogo(pad, logoBaselineY-logoSize, logoSize)
 	out := largeModel{
-		Palette:   resolvePalette(in.Theme, in.Accent),
+		Palette:   resolvePalette(in.Theme, in.Colors),
 		RootID:    uniqueID(),
 		Logo:      logo,
 		ClipID:    uniqueID(),
@@ -469,7 +468,7 @@ func layoutWide(in Input) wideModel {
 		logoSize    = 19
 		logoGap     = 10
 	)
-	p := resolvePalette(in.Theme, in.Accent)
+	p := resolvePalette(in.Theme, in.Colors)
 	logo := placeLogo(pad, row1Y-logoSize, logoSize)
 	wordmarkX := pad + logo.Width + logoGap
 	out := wideModel{
@@ -762,7 +761,7 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
   {{if .ShowTrack}}
   <clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="3"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="{{.Palette.Track}}"/>
+    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="{{.Palette.Border}}"/>
     {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="{{.Palette.Accent}}"/>{{end}}
     {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="{{.Palette.Manual}}"/>{{end}}
   </g>

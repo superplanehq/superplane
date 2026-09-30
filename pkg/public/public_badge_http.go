@@ -43,7 +43,7 @@ func (s *Server) handlePublicBadge(w http.ResponseWriter, r *http.Request) {
 
 	in := badgeInput(windows, period, size, now, factory.PublicBadgeShowCost)
 	in.Theme = badges.NormalizeTheme(r.URL.Query().Get("theme"))
-	in.Accent = badges.NormalizeAccent(r.URL.Query().Get("accent"))
+	in.Colors = badges.ColorsFromQuery(r.URL.Query())
 
 	body, err := badges.Render(in)
 	if err != nil {

@@ -179,26 +179,53 @@ describe("FactorySettingsGeneralPage", () => {
     expect(link).toHaveTextContent("View public board");
   });
 
-  it("adds the theme and accent to the badge URL", async () => {
+  it("loads a theme preset into the color fields and names it", async () => {
     const user = userEvent.setup();
     renderPage(badgeOnFactory);
 
     const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
     expect(snippet.value).not.toContain("theme=");
+    expect(screen.getByTestId("factory-settings-public-badge-theme-name")).toHaveTextContent("SuperPlane");
 
-    await user.click(screen.getByTestId("factory-settings-public-badge-theme"));
-    await user.click(screen.getByRole("option", { name: "Tokyo Night" }));
+    await user.click(screen.getByRole("button", { name: "Tokyo Night" }));
     expect(snippet.value).toContain("theme=tokyonight");
+    expect(screen.getByTestId("factory-settings-public-badge-theme-name")).toHaveTextContent("Tokyo Night");
 
-    await user.type(screen.getByTestId("factory-settings-public-badge-accent"), "#ff8800");
-    expect(snippet.value).toContain("accent=ff8800");
+    // The preset fills every field, and a preset alone adds no color params.
+    await user.click(screen.getByTestId("factory-settings-public-badge-colors-toggle"));
+    expect(screen.getByTestId("factory-settings-public-badge-color-bg")).toHaveValue("#1a1b27");
+    expect(snippet.value).not.toContain("bg=");
   });
 
-  it("ignores an accent that is not a hex color", async () => {
+  it("sends only the colors that differ from the preset", async () => {
     const user = userEvent.setup();
     renderPage(badgeOnFactory);
 
-    await user.type(screen.getByTestId("factory-settings-public-badge-accent"), "nope");
+    await user.click(screen.getByTestId("factory-settings-public-badge-colors-toggle"));
+    const background = screen.getByTestId("factory-settings-public-badge-color-bg");
+    await user.clear(background);
+    await user.type(background, "#000000");
+
+    const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
+    expect(snippet.value).toContain("bg=000000");
+    expect(snippet.value).not.toContain("accent=");
+    expect(screen.getByTestId("factory-settings-public-badge-theme-name")).toHaveTextContent("Custom");
+
+    await user.click(screen.getByTestId("factory-settings-public-badge-reset"));
+    expect((screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement).value).not.toContain(
+      "bg=",
+    );
+  });
+
+  it("ignores a color that is not a hex value", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    await user.click(screen.getByTestId("factory-settings-public-badge-colors-toggle"));
+    const accent = screen.getByTestId("factory-settings-public-badge-color-accent");
+    await user.clear(accent);
+    await user.type(accent, "nope");
+
     const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
     expect(snippet.value).not.toContain("accent=");
   });
@@ -217,9 +244,7 @@ describe("FactorySettingsGeneralPage", () => {
     expect(boardSwitch).not.toBeDisabled();
 
     await user.click(boardSwitch);
-    const snippet = screen
-      .getAllByTestId("factory-settings-public-badge-markdown")
-      .at(-1) as HTMLInputElement;
+    const snippet = screen.getAllByTestId("factory-settings-public-badge-markdown").at(-1) as HTMLInputElement;
     expect(snippet.value).toContain(`](${window.location.origin}/org-1/workspaces/rf/lines/line-plan-and-implement)`);
   });
 });
