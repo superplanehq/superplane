@@ -1,5 +1,6 @@
 import type { AgentActivityItem, AgentToolItem } from "@/lib/agentActivity";
 import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
+import { shellScriptHeadline } from "@/lib/shellScript";
 
 const OUTPUT_PREVIEW_LINE_LIMIT = 3;
 const FILE_KINDS = new Set(["read", "edit", "write"]);
@@ -50,6 +51,23 @@ export function toolFilePaths(input: string): string[] {
 
 export function agentToolDisplayText(tool: AgentToolDisplayInput): string {
   return toolInputDisplayText(tool) ?? toolDisplayName(tool);
+}
+
+export function agentToolScriptText(tool: AgentToolDisplayInput): string {
+  if (!isCommandKind(tool.kind)) return "";
+  const input = tool.input.trim();
+  if (!input) return "";
+  if (!startsWithJSON(input)) return trimBlankEdges(tool.input);
+  return trimBlankEdges(stringField(parseJSONObject(input), ["command"]) ?? "");
+}
+
+export function agentToolCommandHeadline(tool: AgentToolDisplayInput): string {
+  const input = tool.input.trim();
+  if (startsWithJSON(input)) {
+    const description = collapseWhitespace(stringField(parseJSONObject(input), ["description"]));
+    if (description) return description;
+  }
+  return shellScriptHeadline(agentToolScriptText(tool)) || agentToolDisplayText(tool);
 }
 
 export function agentToolOutputPreview(tool: AgentToolItem): AgentToolOutputPreview {
@@ -159,4 +177,8 @@ function unique(values: string[]): string[] {
 function collapseWhitespace(value: string | undefined): string | undefined {
   const collapsed = value?.trim().replace(/\r?\n/g, " ");
   return collapsed || undefined;
+}
+
+function trimBlankEdges(value: string): string {
+  return value.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/(?:\r?\n[ \t]*)+$/, "");
 }
