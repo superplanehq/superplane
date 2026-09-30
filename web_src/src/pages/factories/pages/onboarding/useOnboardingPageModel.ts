@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
+import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -252,9 +253,10 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const factory = await args.mutations.selectGitHubRepository.mutateAsync(repositoryId);
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("GitHub repository selection returned no integration");
+      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
       args.integrations.setSelections((current) => ({
         ...current,
-        github: { id: integrationId, name: "GitHub", ready: true },
+        github: githubIntegrationSelection(integrationId, installationName),
       }));
       args.setup.selectVcsHost("github");
       args.setup.selectRepo(fullName);
