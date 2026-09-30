@@ -24,6 +24,7 @@ import {
   splitRunDescriptionMarkdown,
   splitRunIntentDocument,
   splitRunLinkedArtifacts,
+  splitRunPanelArtifacts,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
   splitRunSourceDescription,
@@ -357,6 +358,41 @@ describe("splitRunPopupModel", () => {
     ]);
 
     expect(artifacts.map((artifact) => artifact.id)).toEqual(["older", "newer", "undated"]);
+  });
+
+  it("keeps document markdowns in the panel artifact list, oldest first", () => {
+    const artifacts = splitRunPanelArtifacts([
+      {
+        id: "spec",
+        type: "TYPE_MARKDOWN",
+        createdAt: "2026-08-25T11:00:00.000Z",
+        data: { name: "spec.md", body: "# Spec" },
+      },
+      {
+        id: "description",
+        type: "TYPE_MARKDOWN",
+        createdAt: "2026-08-25T09:00:00.000Z",
+        data: { name: "description.md", body: "The task." },
+      },
+      {
+        id: "preview",
+        type: "TYPE_LINK",
+        createdAt: "2026-08-25T10:00:00.000Z",
+        data: { title: "Preview", url: "https://preview.example.com/2" },
+      },
+    ]);
+
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "preview", "spec"]);
+  });
+
+  it("keeps the input order for panel artifacts without a createdAt", () => {
+    const artifacts = splitRunPanelArtifacts([
+      { id: "description", type: "TYPE_MARKDOWN", data: { name: "description.md" } },
+      { id: "spec", type: "TYPE_MARKDOWN", data: { name: "spec.md" } },
+      { id: "branch", type: "TYPE_BRANCH", data: { name: "feat/duplicate-task" } },
+    ]);
+
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "spec", "branch"]);
   });
 });
 

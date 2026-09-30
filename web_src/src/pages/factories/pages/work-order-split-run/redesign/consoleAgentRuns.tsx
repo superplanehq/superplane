@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage } from "./automationsViewModel";
@@ -131,13 +132,55 @@ function AgentRunRow({
   );
 }
 
+/** Review comments stay at five lines until the person asks for the rest. */
 function RunDescription({ description }: { description?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (expanded) {
+      return;
+    }
+    const el = textRef.current;
+    if (!el) {
+      return;
+    }
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [description, expanded]);
+
   if (!description?.trim()) {
     return null;
   }
   return (
-    <div className="text-[12.5px] leading-5 text-muted-foreground">
-      <MarkdownContent content={description} variant="workspace" />
+    <div data-testid="redesign-run-description">
+      <div
+        ref={textRef}
+        data-testid="redesign-run-description-body"
+        className={cn("text-[12.5px] leading-5 text-muted-foreground", !expanded && "line-clamp-5")}
+      >
+        <MarkdownContent content={description} variant="workspace" />
+      </div>
+      {overflows ? (
+        <button
+          type="button"
+          className="mt-1 text-[12px] font-medium text-muted-foreground hover:text-foreground"
+          aria-expanded={expanded}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((open) => !open);
+          }}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      ) : null}
     </div>
   );
 }

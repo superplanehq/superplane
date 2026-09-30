@@ -1,7 +1,7 @@
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
+import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
-import { formatClock } from "./redesignFormat";
 
 /**
  * One line of outcome for the collapsed row. A running stage names the
@@ -54,8 +54,8 @@ function liveAgentLine(stage: AutomationStage): string {
 }
 
 /**
- * Duration of the latest run for the collapsed row. Spend stays out of
- * the card: the summary panel carries the one spend breakdown.
+ * Duration of the latest run for the collapsed row. Spend and model sit
+ * on the open-card footer, where they can update live.
  */
 export function runMetaLine(stage: AutomationStage): string {
   if (stage.status === "running" && stage.duration) {
@@ -93,15 +93,20 @@ export function outputCountLabel(count: number, singular: string, plural: string
 }
 
 /**
- * Footer of the open card. Only facts the header row does not show: when
- * the run started and which model ran it.
+ * Footer of the open card. Start stamp stays here. Model and spend are
+ * rendered beside this lead so spend can stay a live control.
  */
 export function runFooterLine(stage: AutomationStage): string {
-  const clock = formatClock(stage.startedAt);
+  const stamp = formatWorkOrderDateTime(new Date(stage.startedAt ?? ""));
   if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID) {
-    return clock ? `Closed ${clock}` : "";
+    return stamp ? `Closed ${stamp}` : "";
   }
-  return [clock ? `Started ${clock}` : "", stage.model].filter(Boolean).join(" · ");
+  return stamp;
+}
+
+/** Dollar amount and compact token count for the run footer. */
+export function runFooterSpendLabel(cost?: string, tokens?: string): string {
+  return [cost, tokens].filter(Boolean).join(" · ");
 }
 
 /** Markdown and inline HTML down to the words, for a one-line header. */
