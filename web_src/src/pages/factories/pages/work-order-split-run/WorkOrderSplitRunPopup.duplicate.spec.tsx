@@ -1,7 +1,11 @@
+import type * as ReactRouterDom from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+
+import type * as FactoryData from "@/hooks/useFactoryData";
+import { unmockedPackage, unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@/hooks/useCanvasWebsocket", () => ({
   useCanvasRuntimeWebsocket: () => undefined,
@@ -14,8 +18,8 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 const mockNavigate = vi.fn();
-vi.mock("react-router", async () => {
-  const actual = await vi.importActual("react-router");
+vi.mock("react-router", () => {
+  const actual = unmockedPackage<typeof ReactRouterDom>("react-router/dist/development/index.js");
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -24,8 +28,8 @@ vi.mock("react-router", async () => {
 
 const createWorkOrderMutate = vi.fn();
 const useCreateWorkOrderSpy = vi.fn();
-vi.mock("@/hooks/useFactoryData", async () => {
-  const actual = await vi.importActual("@/hooks/useFactoryData");
+vi.mock("@/hooks/useFactoryData", () => {
+  const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
   return {
     ...actual,
     useCreateWorkOrder: (organizationId: string, factoryId: string) => {
