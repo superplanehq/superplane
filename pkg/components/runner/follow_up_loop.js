@@ -27,7 +27,7 @@ const IMAGE_CONTENT_TYPES = {
   "image/gif": ".gif",
   "image/webp": ".webp",
 };
-const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 70 * 1024 * 1024;
 const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_ATTACHMENT_REDIRECTS = 3;
 

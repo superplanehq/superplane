@@ -660,6 +660,30 @@ const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0
 const FILE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const APP_ENV = { SUPERPLANE_BASE_URL: "https://app.example" };
 
+function byteBody(size) {
+  const chunkSize = 1024 * 1024;
+  let sent = 0;
+  return {
+    getReader() {
+      return {
+        async read() {
+          if (sent >= size) {
+            return { done: true };
+          }
+          const n = Math.min(chunkSize, size - sent);
+          const value = Buffer.alloc(n);
+          if (sent === 0) {
+            PNG_BYTES.copy(value);
+          }
+          sent += n;
+          return { done: false, value };
+        },
+        async cancel() {},
+      };
+    },
+  };
+}
+
 function gcsSignedURL(fileID = FILE_ID) {
   return `https://storage.googleapis.com/bucket/orgs/x/workspaces/y/tasks/z/${fileID}?sp_file=1`;
 }
@@ -837,10 +861,10 @@ test("materializeFollowUpAttachments reuses indexed files without downloading", 
   assert.deepEqual(fs.readdirSync(attachments).sort(), ["01-shot.png", "manifest.json"]);
 });
 
-test("materializeFollowUpAttachments allows images up to 50 MiB", async () => {
-  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-50mib-"));
+test("materializeFollowUpAttachments allows an image at the size limit", async () => {
+  assert.equal(MAX_ATTACHMENT_BYTES, 70 * 1024 * 1024);
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-limit-"));
   const signed = gcsSignedURL();
-  const elevenMiB = 11 * 1024 * 1024;
   const rewritten = await materializeFollowUpAttachments(
     taskDir,
     `See ![shot.png](${signed})`,
@@ -848,22 +872,16 @@ test("materializeFollowUpAttachments allows images up to 50 MiB", async () => {
       ok: true,
       status: 200,
       headers: {
-        get: (name) => {
-          const key = String(name).toLowerCase();
-          if (key === "content-length") {
-            return String(elevenMiB);
-          }
-          if (key === "content-type") {
-            return "image/png";
-          }
-          return null;
-        },
+        get: (name) => (String(name).toLowerCase() === "content-type" ? "image/png" : null),
       },
-      arrayBuffer: async () => PNG_BYTES,
+      body: byteBody(MAX_ATTACHMENT_BYTES),
     }),
   );
   assert.doesNotMatch(rewritten, /could not download/);
   assert.match(rewritten, /inspect_attachment/);
+  const saved = fs.readdirSync(path.join(taskDir, "attachments"));
+  assert.equal(saved.length, 1);
+  assert.equal(fs.statSync(path.join(taskDir, "attachments", saved[0])).size, MAX_ATTACHMENT_BYTES);
 });
 
 test("materializeFollowUpAttachments rejects an oversized Content-Length", async () => {

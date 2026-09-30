@@ -163,6 +163,24 @@ describe("useWorkOrderFileUpload", () => {
     expect(filesCreateFactoryFile).not.toHaveBeenCalled();
   });
 
+  it("uploads a file at the attachment limit", async () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+    const file = new File([new Uint8Array(MAX_WORK_ORDER_FILE_BYTES)], "limit.png", { type: "image/png" });
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([file]);
+    });
+
+    expect(file.size).toBe(MAX_WORK_ORDER_FILE_BYTES);
+    expect(uploaded).toEqual([expect.objectContaining({ id, ref: `sp-file://${id}` })]);
+    expect(showErrorToast).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(uploadUrl, expect.objectContaining({ method: "PUT", body: file }));
+  });
+
   it("rejects a file larger than the attachment limit", async () => {
     const file = new File(["x"], "large.png", { type: "image/png" });
     Object.defineProperty(file, "size", { value: MAX_WORK_ORDER_FILE_BYTES + 1 });
