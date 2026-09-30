@@ -74,7 +74,7 @@ Example:
 4. bash — ` + "`git push`" + `
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
@@ -94,7 +94,7 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 
 func (c *RunClaudeCode) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "Anthropic API Key",
 			IntegrationName:  "claude",

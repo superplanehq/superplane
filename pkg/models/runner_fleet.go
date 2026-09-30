@@ -204,10 +204,51 @@ func ListInstallationRunnerFleets(tx *gorm.DB) ([]RunnerFleet, error) {
 	return fleets, err
 }
 
+func ListEnabledRunnerFleetsForOrganization(tx *gorm.DB, organizationID uuid.UUID) ([]RunnerFleet, error) {
+	var fleets []RunnerFleet
+	err := tx.
+		Where("enabled = ?", true).
+		Where(
+			"(scope_type = ? AND scope_id IS NULL) OR (scope_type = ? AND scope_id = ?)",
+			RunnerFleetScopeInstallation,
+			RunnerFleetScopeOrganization,
+			organizationID,
+		).
+		Order("slug ASC").
+		Find(&fleets).
+		Error
+	return fleets, err
+}
+
 func FindInstallationRunnerFleet(tx *gorm.DB, slug string) (*RunnerFleet, error) {
 	var fleet RunnerFleet
 	err := tx.
 		Where("slug = ? AND scope_type = ? AND scope_id IS NULL", slug, RunnerFleetScopeInstallation).
+		First(&fleet).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRunnerFleetNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &fleet, nil
+}
+
+func FindEnabledRunnerFleetForOrganization(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	slug string,
+) (*RunnerFleet, error) {
+	var fleet RunnerFleet
+	err := tx.
+		Where("slug = ? AND enabled = ?", slug, true).
+		Where(
+			"(scope_type = ? AND scope_id IS NULL) OR (scope_type = ? AND scope_id = ?)",
+			RunnerFleetScopeInstallation,
+			RunnerFleetScopeOrganization,
+			organizationID,
+		).
 		First(&fleet).
 		Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

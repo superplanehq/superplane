@@ -56,7 +56,7 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	if !json.Valid(payload) {
 		return errors.New("runner task payload must be valid JSON")
 	}
-	fleet, err := models.FindInstallationRunnerFleet(c.tx, fleetID)
+	fleet, err := models.FindEnabledRunnerFleetForOrganization(c.tx, c.organizationID, fleetID)
 	if err != nil {
 		return err
 	}

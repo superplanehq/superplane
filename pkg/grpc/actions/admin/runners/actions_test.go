@@ -120,6 +120,80 @@ func TestCreateGenericEphemeralRunner(t *testing.T) {
 	assert.True(t, response.Runner.Ephemeral)
 }
 
+func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
+	support.Setup(t)
+	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	spec := &pb.FleetSpec{
+		OperatingSystem:            "linux",
+		Architecture:               "amd64",
+		CpuMillicores:              8000,
+		MemoryMb:                   32768,
+		DiskGb:                     30,
+		Capabilities:               []string{"docker"},
+		MaxExecutionTimeoutSeconds: 3600,
+	}
+
+	response, err := service.CreateFleet(t.Context(), &pb.CreateFleetRequest{
+		FleetId:       " aws-large-amd64 ",
+		Spec:          spec,
+		RunnerVersion: "v0.0.1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "aws-large-amd64", response.Fleet.Id)
+	assert.Equal(t, "v0.0.1", response.Fleet.RunnerVersion)
+	assert.True(t, response.Fleet.Enabled)
+	assert.Equal(t, spec, response.Fleet.Spec)
+
+	reloaded, err := models.FindInstallationRunnerFleet(
+		database.DB(t.Context()),
+		"aws-large-amd64",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerFleetScopeInstallation, reloaded.ScopeType)
+	assert.Nil(t, reloaded.ScopeID)
+	assert.Equal(t, int32(32768), reloaded.Spec.Data().MemoryMB)
+}
+
+func TestCreateFleetRejectsDuplicateID(t *testing.T) {
+	support.Setup(t)
+	createTestFleetWithSlug(t, "aws-large-amd64")
+	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+
+	_, err := service.CreateFleet(t.Context(), &pb.CreateFleetRequest{
+		FleetId:       "aws-large-amd64",
+		Spec:          &pb.FleetSpec{OperatingSystem: "linux", Architecture: "amd64"},
+		RunnerVersion: "v0.0.1",
+	})
+
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
+
+func TestCreateFleetValidatesRequiredFields(t *testing.T) {
+	support.Setup(t)
+	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	requests := map[string]*pb.CreateFleetRequest{
+		"fleet ID": {
+			Spec:          &pb.FleetSpec{},
+			RunnerVersion: "v0.0.1",
+		},
+		"spec": {
+			FleetId:       "aws-large-amd64",
+			RunnerVersion: "v0.0.1",
+		},
+		"runner version": {
+			FleetId: "aws-large-amd64",
+			Spec:    &pb.FleetSpec{},
+		},
+	}
+
+	for name, request := range requests {
+		t.Run(name, func(t *testing.T) {
+			_, err := service.CreateFleet(t.Context(), request)
+			assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		})
+	}
+}
+
 func TestUpdateFleetReplacesSpec(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)

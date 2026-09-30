@@ -57,6 +57,47 @@ func (s *Service) ListFleets(ctx context.Context, _ *pb.ListFleetsRequest) (*pb.
 	return &pb.ListFleetsResponse{Fleets: out}, nil
 }
 
+func (s *Service) CreateFleet(
+	ctx context.Context,
+	req *pb.CreateFleetRequest,
+) (*pb.CreateFleetResponse, error) {
+	fleetID, err := parseFleetID(req.GetFleetId())
+	if err != nil {
+		return nil, err
+	}
+	runnerVersion := strings.TrimSpace(req.GetRunnerVersion())
+	if runnerVersion == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "runner version is required")
+	}
+	if req.Spec == nil {
+		return nil, grpcerrors.InvalidArgument(nil, "fleet spec is required")
+	}
+
+	enabled := true
+	if req.Enabled != nil {
+		enabled = req.GetEnabled()
+	}
+	now := time.Now()
+	fleet := &models.RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          fleetID,
+		ScopeType:     models.RunnerFleetScopeInstallation,
+		Enabled:       enabled,
+		Spec:          datatypes.NewJSONType(fleetSpecFromProto(req.Spec)),
+		RunnerVersion: runnerVersion,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	err = fleet.Create(database.DB(ctx))
+	if errors.Is(err, models.ErrRunnerFleetIDConflict) {
+		return nil, grpcerrors.AlreadyExists(err, "fleet ID already exists")
+	}
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to create fleet")
+	}
+	return &pb.CreateFleetResponse{Fleet: serializeFleet(fleet)}, nil
+}
+
 func (s *Service) DescribeFleet(ctx context.Context, req *pb.DescribeFleetRequest) (*pb.DescribeFleetResponse, error) {
 	fleet, err := findFleet(ctx, req.GetFleetId())
 	if err != nil {

@@ -65,7 +65,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
 - **Model**: Required. Select a model from Organization LLM Models.
@@ -86,7 +86,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 	model := runner.AgentModelField("openrouter")
 	model.Required = true
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "OpenRouter API Key",
 			IntegrationName:  "openrouter",

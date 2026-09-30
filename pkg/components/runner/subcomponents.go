@@ -2,7 +2,6 @@ package runner
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -13,10 +12,6 @@ const (
 	HookPoll                          = hookActionPoll
 	MaxExecutionTimeoutSecondsRequest = maxExecutionTimeoutSecondsRequest
 )
-
-func MachineTypeOptions() []configuration.FieldOption {
-	return machineTypeSelectOptions
-}
 
 func IntPtr(v int) *int { return intPtr(v) }
 

@@ -23,6 +23,13 @@ func (s *AdminRunnersService) ListFleets(
 	return s.actions.ListFleets(ctx, req)
 }
 
+func (s *AdminRunnersService) CreateFleet(
+	ctx context.Context,
+	req *pb.CreateFleetRequest,
+) (*pb.CreateFleetResponse, error) {
+	return s.actions.CreateFleet(ctx, req)
+}
+
 func (s *AdminRunnersService) DescribeFleet(
 	ctx context.Context,
 	req *pb.DescribeFleetRequest,

@@ -49,6 +49,49 @@ func TestOrganizationRunnerFleetIsNotListedAsInstallationFleet(t *testing.T) {
 	assert.Empty(t, list)
 }
 
+func TestEnabledRunnerFleetsForOrganization(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	firstOrganization, err := models.CreateOrganization("First Visible Fleet Organization", "")
+	require.NoError(t, err)
+	secondOrganization, err := models.CreateOrganization("Second Visible Fleet Organization", "")
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+
+	installationFleet := newTestRunnerFleet()
+	installationFleet.Slug = "installation-amd64"
+	require.NoError(t, installationFleet.Create(db))
+
+	organizationFleet := newOrganizationTestRunnerFleet(firstOrganization.ID, "organization-amd64")
+	require.NoError(t, organizationFleet.Create(db))
+
+	foreignFleet := newOrganizationTestRunnerFleet(secondOrganization.ID, "foreign-amd64")
+	require.NoError(t, foreignFleet.Create(db))
+
+	disabledFleet := newOrganizationTestRunnerFleet(firstOrganization.ID, "disabled-amd64")
+	disabledFleet.Enabled = false
+	require.NoError(t, disabledFleet.Create(db))
+
+	fleets, err := models.ListEnabledRunnerFleetsForOrganization(db, firstOrganization.ID)
+	require.NoError(t, err)
+	require.Len(t, fleets, 2)
+	assert.Equal(t, "installation-amd64", fleets[0].Slug)
+	assert.Equal(t, "organization-amd64", fleets[1].Slug)
+
+	found, err := models.FindEnabledRunnerFleetForOrganization(
+		db,
+		firstOrganization.ID,
+		organizationFleet.Slug,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, organizationFleet.ID, found.ID)
+
+	_, err = models.FindEnabledRunnerFleetForOrganization(db, firstOrganization.ID, foreignFleet.Slug)
+	assert.ErrorIs(t, err, models.ErrRunnerFleetNotFound)
+
+	_, err = models.FindEnabledRunnerFleetForOrganization(db, firstOrganization.ID, disabledFleet.Slug)
+	assert.ErrorIs(t, err, models.ErrRunnerFleetNotFound)
+}
+
 func TestRunnerFleetIDCanBeReusedByDifferentOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	firstOrganization, err := models.CreateOrganization("First Fleet Organization", "")

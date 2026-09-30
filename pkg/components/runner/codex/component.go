@@ -65,7 +65,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — a Codex turn. Later prompts continue in the same working directory.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
@@ -82,7 +82,7 @@ Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 func (c *RunCodex) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "OpenAI API Key",
 			IntegrationName:  "openai",

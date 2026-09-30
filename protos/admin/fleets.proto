@@ -14,6 +14,13 @@ service Runners {
     };
   }
 
+  rpc CreateFleet(CreateFleetRequest) returns (CreateFleetResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/fleets"
+      body: "*"
+    };
+  }
+
   rpc DescribeFleet(DescribeFleetRequest) returns (DescribeFleetResponse) {
     option (google.api.http) = {
       get: "/admin/api/installation/fleets/{fleet_id}"
@@ -114,6 +121,17 @@ message ListFleetsRequest {}
 
 message ListFleetsResponse {
   repeated Fleet fleets = 1;
+}
+
+message CreateFleetRequest {
+  string fleet_id = 1;
+  FleetSpec spec = 2;
+  string runner_version = 3;
+  optional bool enabled = 4;
+}
+
+message CreateFleetResponse {
+  Fleet fleet = 1;
 }
 
 message DescribeFleetRequest {

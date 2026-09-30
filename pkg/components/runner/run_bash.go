@@ -76,7 +76,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ` + "```" + `
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -92,17 +92,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 
 func (c *RunBash) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     configurationFieldMachineType,
-			Label:    "Machine type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
-				},
-			},
-		},
+		MachineTypeField(configurationFieldMachineType),
 		{
 			Name:        "execution_mode",
 			Label:       "Execution mode",

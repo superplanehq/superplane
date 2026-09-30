@@ -69,7 +69,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — an agent turn. Later prompts continue the same session.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
@@ -88,7 +88,7 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 
 func (c *RunSuperPlane) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.SuperPlaneAgentModelField(),
 		runner.AgentStepsField(
 			"Ordered bash commands and SuperPlane agent prompts. Add, reorder, and mix freely.",
