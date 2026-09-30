@@ -331,6 +331,7 @@ describe("buildSplitRunFooter", () => {
       cta: { label: "Add credits", destination: "billing" },
     });
     expect(footer.note?.headline).not.toBe("This task is ready to start");
+    expect(splitRunDecisionTone(footer)).toBe("failed");
   });
 });
 

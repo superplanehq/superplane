@@ -236,6 +236,9 @@ export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore"
 }
 
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
+  if (footer.kind === "draft" && footer.note?.cta?.destination === "billing") {
+    return "failed";
+  }
   if (footer.kind === "draft") {
     return draftDecisionTone(draftReadiness(splitRunFooterScores(footer)).tone);
   }
