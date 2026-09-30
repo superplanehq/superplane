@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
@@ -11,7 +12,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
-import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
+import { extractArtifactTitle, extractArtifactUrl, toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
 import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
@@ -95,6 +96,18 @@ export function ConsoleSummaryPanel({
             <ConsoleCheckRows checks={panel.checks} />
           </FramePanel>
         ) : null}
+        {panel.deployPreviews.length > 0 ? (
+          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-deploy-previews">
+            <span className="text-[12px] font-medium text-muted-foreground">Deploy preview environments</span>
+            <ul className="flex flex-col gap-2">
+              {panel.deployPreviews.map((artifact) => (
+                <li key={artifact.id} data-testid={`deploy-preview-${artifact.id}`}>
+                  <DeployPreviewRow artifact={artifact} />
+                </li>
+              ))}
+            </ul>
+          </FramePanel>
+        ) : null}
         {panel.panelArtifacts.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
             <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
@@ -158,7 +171,13 @@ function consolePanelFacts({
   const stageArtifacts = stages
     .flatMap((stage) => stage.outputs.artifacts)
     .filter((artifact) => !artifact.id || !taskArtifactIds.has(artifact.id));
-  const panelArtifacts = splitRunPanelArtifacts([...taskArtifacts, ...stageArtifacts], source).filter(
+  const allArtifacts = [...taskArtifacts, ...stageArtifacts];
+  const deployPreviews = extractDeployPreviews(allArtifacts);
+  const deployPreviewIds = new Set(deployPreviews.map((artifact) => artifact.id).filter(Boolean));
+  const nonPreviewArtifacts = allArtifacts.filter(
+    (artifact) => !artifact.id || !deployPreviewIds.has(artifact.id),
+  );
+  const panelArtifacts = splitRunPanelArtifacts(nonPreviewArtifacts, source).filter(
     (artifact) => !(hasPullRequest && isBranchArtifact(artifact)),
   );
   return {
@@ -173,6 +192,7 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
+    deployPreviews,
     // Every check on the task. A stage list would drop Risk score when
     // no verify step ran, because only that step copies checks onto a card.
     checks: fixture.checks,
@@ -291,6 +311,32 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
 }
 
 /**
+ * Returns true if the artifact is a link artifact that represents a deploy preview
+ * (typically identified by a "Preview" title or similar deployment-related naming).
+ */
+function isDeployPreviewArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
+  const type = (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase();
+  if (type !== "link") {
+    return false;
+  }
+  const data = toArtifactDataRecord(artifact.data);
+  const title = extractArtifactTitle(data);
+  if (!title) {
+    return false;
+  }
+  // Identify preview artifacts by common keywords in their title
+  const previewKeywords = ["preview", "deploy", "environment", "staging", "live"];
+  return previewKeywords.some((keyword) => title.toLowerCase().includes(keyword));
+}
+
+/**
+ * Extracts deploy preview artifacts from a list of artifacts.
+ */
+function extractDeployPreviews(artifacts: FactoriesWorkOrderArtifact[]): FactoriesWorkOrderArtifact[] {
+  return artifacts.filter(isDeployPreviewArtifact);
+}
+
+/**
  * The source of the task. A task the owner created by hand keeps one
  * "Created manually" row instead of repeating the owner's name.
  */
@@ -335,6 +381,39 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
         {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Renders a single deploy preview environment link in the summary panel.
+ */
+function DeployPreviewRow({ artifact }: { artifact: FactoriesWorkOrderArtifact }) {
+  const data = toArtifactDataRecord(artifact.data);
+  const url = extractArtifactUrl(data);
+  const title = extractArtifactTitle(data);
+  const displayTitle = title || "Preview";
+  const href = safeExternalUrl(url);
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-auto justify-start gap-1.5 px-0 py-1 text-[13px] font-medium text-foreground"
+      asChild={Boolean(href)}
+    >
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer">
+          <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="truncate">{displayTitle}</span>
+        </a>
+      ) : (
+        <>
+          <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="truncate">{displayTitle}</span>
+        </>
+      )}
+    </Button>
   );
 }
 
