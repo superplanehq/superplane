@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -267,6 +268,36 @@ func LogDatadogWebhookWarn(message string, fields log.Fields, err error) {
 // type and integration stay set when fields repeat them.
 func LogDatadogWebhookError(message string, fields log.Fields, err error) {
 	datadogWebhookEntry(fields, err).Error(message)
+}
+
+type datadogWebhookIdentityKey struct{}
+
+// WithDatadogWebhookIdentity stores a resolver on the logger.
+// The caller runs the resolver only when a delivery line needs the fields.
+func WithDatadogWebhookIdentity(logger *log.Entry, resolve func() log.Fields) *log.Entry {
+	if logger == nil {
+		return nil
+	}
+
+	parent := logger.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+	return logger.WithContext(context.WithValue(parent, datadogWebhookIdentityKey{}, resolve))
+}
+
+// DatadogWebhookIdentity returns fields from a resolver attached by
+// WithDatadogWebhookIdentity. It returns nil when the logger has no resolver.
+func DatadogWebhookIdentity(logger *log.Entry) log.Fields {
+	if logger == nil || logger.Context == nil {
+		return nil
+	}
+
+	resolve, ok := logger.Context.Value(datadogWebhookIdentityKey{}).(func() log.Fields)
+	if !ok || resolve == nil {
+		return nil
+	}
+	return resolve()
 }
 
 func datadogWebhookEntry(fields log.Fields, err error) *log.Entry {

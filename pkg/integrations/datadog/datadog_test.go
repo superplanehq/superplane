@@ -361,7 +361,7 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		lines := datadogWebhookLogLines(t, logs.String())
 		require.Len(t, lines, 1)
 		assertDatadogReceipt(t, lines[0], organizationID, integrationID.String(), "received", "error_tracking_alert", "Triggered")
-		assert.Equal(t, "info", lines[0]["level"])
+		assert.Equal(t, "error", lines[0]["level"])
 		assert.Contains(t, lines[0]["error"], "queue is full")
 	})
 

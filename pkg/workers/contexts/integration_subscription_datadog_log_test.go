@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__IntegrationSubscriptionContext_DatadogWebhookDeliveryLog(t *testing.T) {
@@ -65,6 +66,7 @@ func Test__IntegrationSubscriptionContext_DatadogWebhookDeliveryLog(t *testing.T
 		})
 
 		logs := captureDatadogWebhookLogs(t)
+		tables := captureQueryTables(t)
 		events := sendDatadogAlert(t, r, integration, node, map[string]any{
 			"event_type":       datadog.ErrorTrackingAlertEventType,
 			"alert_transition": datadog.AlertTransitionTriggered,
@@ -74,6 +76,8 @@ func Test__IntegrationSubscriptionContext_DatadogWebhookDeliveryLog(t *testing.T
 
 		assert.Empty(t, events)
 		assert.Empty(t, datadogWebhookLogLines(t, logs.String()))
+		assert.NotContains(t, *tables, "organizations")
+		assert.NotContains(t, *tables, "factories")
 	})
 }
 
@@ -140,6 +144,28 @@ func sendDatadogAlert(
 
 	require.NoError(t, subscriptions[0].SendMessage(message))
 	return newEvents
+}
+
+func captureQueryTables(t *testing.T) *[]string {
+	t.Helper()
+
+	tables := []string{}
+	db := database.Conn()
+	callbackName := "test:datadog-identity-query-tables"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		table := tx.Statement.Table
+		if table == "" && tx.Statement.Schema != nil {
+			table = tx.Statement.Schema.Table
+		}
+		if table == "" {
+			return
+		}
+		tables = append(tables, table)
+	}))
+	t.Cleanup(func() {
+		db.Callback().Query().Remove(callbackName)
+	})
+	return &tables
 }
 
 func captureDatadogWebhookLogs(t *testing.T) *bytes.Buffer {

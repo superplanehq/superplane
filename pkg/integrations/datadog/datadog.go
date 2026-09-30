@@ -232,7 +232,13 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	logDatadogWebhookReceived(ctx, eventType, alertTransition, err)
+	if err != nil {
+		logDatadogWebhookPartialFailure(ctx, eventType, alertTransition, err)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	logDatadogWebhookReceived(ctx, eventType, alertTransition, nil)
 	ctx.Response.WriteHeader(http.StatusOK)
 }
 
@@ -268,6 +274,14 @@ func logDatadogWebhookIgnored(ctx core.HTTPRequestContext, eventType, alertTrans
 
 func logDatadogWebhookReceived(ctx core.HTTPRequestContext, eventType, alertTransition string, err error) {
 	logging.LogDatadogWebhookInfo(
+		"Datadog webhook received",
+		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeReceived),
+		err,
+	)
+}
+
+func logDatadogWebhookPartialFailure(ctx core.HTTPRequestContext, eventType, alertTransition string, err error) {
+	logging.LogDatadogWebhookError(
 		"Datadog webhook received",
 		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeReceived),
 		err,

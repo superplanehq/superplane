@@ -143,6 +143,23 @@ func TestLogDatadogWebhookInfo_JSONKeepsTypeAndIntegration(t *testing.T) {
 	assert.True(t, webhookIsJSON)
 }
 
+func TestDatadogWebhookIdentity_ResolvesOnlyWhenAsked(t *testing.T) {
+	calls := 0
+	logger := WithDatadogWebhookIdentity(log.NewEntry(log.New()), func() log.Fields {
+		calls++
+		return log.Fields{"workspace_id": "ws-1"}
+	})
+
+	assert.Zero(t, calls)
+	assert.Equal(t, "ws-1", DatadogWebhookIdentity(logger)["workspace_id"])
+	assert.Equal(t, 1, calls)
+	assert.Nil(t, DatadogWebhookIdentity(nil))
+	assert.Nil(t, DatadogWebhookIdentity(log.NewEntry(log.New())))
+	assert.Nil(t, WithDatadogWebhookIdentity(nil, func() log.Fields {
+		return log.Fields{}
+	}))
+}
+
 func TestWithWebhookNode_AddsOrganizationCanvasAndWebhook(t *testing.T) {
 	entry := WithWebhookNode(log.NewEntry(log.New()), WebhookNodeFields{
 		OrganizationID: "org-1",

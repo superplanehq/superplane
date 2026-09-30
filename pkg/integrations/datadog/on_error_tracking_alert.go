@@ -198,26 +198,27 @@ func (t *OnErrorTrackingAlert) OnIntegrationMessage(ctx core.IntegrationMessageC
 }
 
 func logDatadogWebhookDelivered(ctx core.IntegrationMessageContext, payload ErrorTrackingAlertPayload) {
+	identity := logging.DatadogWebhookIdentity(ctx.Logger)
 	logging.LogDatadogWebhookInfo("Datadog webhook delivered", log.Fields{
 		"outcome":           datadogWebhookOutcomeDelivered,
 		"event_type":        payload.EventType,
 		"alert_transition":  payload.AlertTransition,
-		"organization_id":   datadogLoggerField(ctx.Logger, "organization_id"),
-		"organization_name": datadogLoggerField(ctx.Logger, "organization_name"),
-		"integration_id":    datadogLoggerField(ctx.Logger, "integration_id"),
-		"workspace_id":      datadogLoggerField(ctx.Logger, "workspace_id"),
-		"workspace_name":    datadogLoggerField(ctx.Logger, "workspace_name"),
-		"intake_id":         datadogLoggerField(ctx.Logger, "intake_id"),
-		"intake_name":       datadogLoggerField(ctx.Logger, "intake_name"),
+		"organization_id":   datadogIdentityField(identity, "organization_id"),
+		"organization_name": datadogIdentityField(identity, "organization_name"),
+		"integration_id":    datadogIdentityField(identity, "integration_id"),
+		"workspace_id":      datadogIdentityField(identity, "workspace_id"),
+		"workspace_name":    datadogIdentityField(identity, "workspace_name"),
+		"intake_id":         datadogIdentityField(identity, "intake_id"),
+		"intake_name":       datadogIdentityField(identity, "intake_name"),
 	}, nil)
 }
 
-func datadogLoggerField(logger *log.Entry, key string) string {
-	if logger == nil || logger.Data == nil {
+func datadogIdentityField(fields log.Fields, key string) string {
+	if fields == nil {
 		return ""
 	}
 
-	value, ok := logger.Data[key]
+	value, ok := fields[key]
 	if !ok || value == nil {
 		return ""
 	}

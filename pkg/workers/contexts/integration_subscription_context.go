@@ -92,7 +92,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 }
 
 func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error {
-	skip, err := SkipPausedIntakeFeed(c.tx, c.node.WorkflowID)
+	intake, skip, err := intakeForFeed(c.tx, c.node.WorkflowID)
 	if err != nil {
 		return err
 	}
@@ -130,20 +130,22 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		Integration:       c.integrationCtx,
 		Message:           message,
 		Events:            NewEventContext(c.tx, c.node, nil, c.onNewEvents),
-		Logger:            c.triggerLogger(),
+		Logger:            c.triggerLogger(intake),
 		FindExecutionByKV: c.findExecutionByKV,
 	})
 }
 
-func (c *IntegrationSubscriptionContext) triggerLogger() *log.Entry {
+func (c *IntegrationSubscriptionContext) triggerLogger(intake *models.FactoryIntake) *log.Entry {
 	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
 	if c.integration.AppName != datadogIntegrationApp {
 		return logger
 	}
-	return logger.WithFields(c.datadogDeliveryLogFields())
+	return logging.WithDatadogWebhookIdentity(logger, func() log.Fields {
+		return c.datadogDeliveryLogFields(intake)
+	})
 }
 
-func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields() log.Fields {
+func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields(intake *models.FactoryIntake) log.Fields {
 	fields := log.Fields{
 		"organization_id":   c.integration.OrganizationID.String(),
 		"organization_name": "",
@@ -159,8 +161,14 @@ func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields() log.Fields {
 		fields["organization_name"] = organization.Name
 	}
 
-	canvas, canvasErr := models.FindCanvasInTransaction(c.tx, c.integration.OrganizationID, c.node.WorkflowID)
-	if canvasErr == nil && canvas != nil && canvas.FactoryID != nil {
+	canvas := intakeCanvas(intake)
+	if canvas == nil {
+		loaded, canvasErr := models.FindCanvasInTransaction(c.tx, c.integration.OrganizationID, c.node.WorkflowID)
+		if canvasErr == nil {
+			canvas = loaded
+		}
+	}
+	if canvas != nil && canvas.FactoryID != nil {
 		fields["workspace_id"] = canvas.FactoryID.String()
 		factory, factoryErr := models.FindFactory(c.tx, c.integration.OrganizationID, *canvas.FactoryID)
 		if factoryErr == nil && factory != nil {
@@ -168,14 +176,20 @@ func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields() log.Fields {
 		}
 	}
 
-	intake, intakeErr := models.FindFactoryIntakeByCanvasID(c.tx, c.node.WorkflowID)
-	if intakeErr != nil || intake == nil {
+	if intake == nil {
 		return fields
 	}
 
 	fields["intake_id"] = intake.ID.String()
 	fields["intake_name"] = intakeCanvasName(canvas, intake)
 	return fields
+}
+
+func intakeCanvas(intake *models.FactoryIntake) *models.Canvas {
+	if intake == nil {
+		return nil
+	}
+	return intake.Canvas
 }
 
 func intakeCanvasName(canvas *models.Canvas, intake *models.FactoryIntake) string {
