@@ -923,14 +923,16 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description string  `json:"description"`
-	CanvasCount int64   `json:"canvas_count"`
-	MemberCount int64   `json:"member_count"`
-	CreatedAt   *string `json:"created_at,omitempty"`
-	UpdatedAt   *string `json:"updated_at,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Slug          string  `json:"slug"`
+	Description   string  `json:"description"`
+	CanvasCount   int64   `json:"canvas_count"`
+	TaskCount     int64   `json:"task_count"`
+	DoneTaskCount int64   `json:"done_task_count"`
+	MemberCount   int64   `json:"member_count"`
+	CreatedAt     *string `json:"created_at,omitempty"`
+	UpdatedAt     *string `json:"updated_at,omitempty"`
 }
 
 func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
@@ -959,12 +961,14 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 
 func serializeAdminOrganization(org models.OrganizationWithCounts) adminOrgItem {
 	item := adminOrgItem{
-		ID:          org.ID.String(),
-		Name:        org.Name,
-		Slug:        org.Slug,
-		Description: org.Description,
-		CanvasCount: org.CanvasCount,
-		MemberCount: org.MemberCount,
+		ID:            org.ID.String(),
+		Name:          org.Name,
+		Slug:          org.Slug,
+		Description:   org.Description,
+		CanvasCount:   org.CanvasCount,
+		TaskCount:     org.TaskCount,
+		DoneTaskCount: org.DoneTaskCount,
+		MemberCount:   org.MemberCount,
 	}
 
 	if org.CreatedAt != nil {
