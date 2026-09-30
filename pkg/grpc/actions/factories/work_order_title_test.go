@@ -95,6 +95,46 @@ func Test__titleFromWorkOrderDescription(t *testing.T) {
 			want:        "Fix checkout",
 		},
 		{
+			name:        "skips an image whose url contains parentheses",
+			description: "![shot](https://example.com/file_(1).png)\n" + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "returns empty when an image url contains parentheses",
+			description: "![shot](https://example.com/file_(1).png)",
+			want:        "",
+		},
+		{
+			name:        "keeps text beside an image whose url contains parentheses",
+			description: "![shot](https://example.com/file_(1).png) Fix checkout",
+			want:        "Fix checkout",
+		},
+		{
+			name:        "keeps text around an image whose url contains parentheses",
+			description: "Before ![shot](https://example.com/file_(1).png) after",
+			want:        "Before after",
+		},
+		{
+			name:        "skips an image whose label has nested brackets",
+			description: "![shot [1]](sp-file://abc)\n" + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "keeps text beside an image whose label has nested brackets",
+			description: "- ![before [crop]](sp-file://abc) Fix checkout",
+			want:        "Fix checkout",
+		},
+		{
+			name:        "skips an image with an angle-bracket url that contains parentheses",
+			description: "![shot](<https://example.com/a(b).png>)\n" + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "skips an image whose title contains a closing parenthesis",
+			description: "![shot](https://example.com/a.png \"see (a)\")\n" + realLine,
+			want:        realLine,
+		},
+		{
 			name:        "strips a task checkbox from a real title",
 			description: "- [ ] " + realLine,
 			want:        realLine,

@@ -11,11 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
-var (
-	attachmentLinkPattern = regexp.MustCompile(
-		`(?i)!?\[[^\]]*]\(` + regexp.QuoteMeta(blob.FileRefScheme) + `://[^)\s]+\)`,
-	)
-	markdownImagePattern = regexp.MustCompile(`!\[[^\]]*]\([^)]*\)`)
+var attachmentLinkPattern = regexp.MustCompile(
+	`(?i)!?\[[^\]]*]\(` + regexp.QuoteMeta(blob.FileRefScheme) + `://[^)\s]+\)`,
 )
 
 const untitledWorkOrderTitle = "Untitled task"
@@ -65,7 +62,171 @@ func skippableDescriptionLine(line string) bool {
 }
 
 func stripMarkdownImages(line string) string {
-	return markdownImagePattern.ReplaceAllString(line, " ")
+	var builder strings.Builder
+	builder.Grow(len(line))
+	for index := 0; index < len(line); {
+		if end, ok := markdownImageEnd(line, index); ok {
+			builder.WriteByte(' ')
+			index = end
+			continue
+		}
+		builder.WriteByte(line[index])
+		index++
+	}
+	return builder.String()
+}
+
+func markdownImageEnd(line string, start int) (int, bool) {
+	if !strings.HasPrefix(line[start:], "![") {
+		return 0, false
+	}
+	labelEnd, ok := linkLabelEnd(line, start+1)
+	if !ok || labelEnd+1 >= len(line) || line[labelEnd+1] != '(' {
+		return 0, false
+	}
+	return inlineImageClose(line, labelEnd+1)
+}
+
+func linkLabelEnd(line string, open int) (int, bool) {
+	if open >= len(line) || line[open] != '[' {
+		return 0, false
+	}
+	depth := 1
+	for index := open + 1; index < len(line); {
+		if escaped, ok := skipEscapedByte(line, index); ok {
+			index = escaped
+			continue
+		}
+		switch line[index] {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return index, true
+			}
+		}
+		index++
+	}
+	return 0, false
+}
+
+func inlineImageClose(line string, openParen int) (int, bool) {
+	index := skipSpace(line, openParen+1)
+	if index >= len(line) {
+		return 0, false
+	}
+	var ok bool
+	if line[index] == '<' {
+		index, ok = angleDestinationEnd(line, index)
+	} else {
+		index, ok = bareDestinationEnd(line, index)
+	}
+	if !ok {
+		return 0, false
+	}
+	index = skipSpace(line, index)
+	if index < len(line) && isImageTitleStart(line[index]) {
+		index, ok = imageTitleEnd(line, index)
+		if !ok {
+			return 0, false
+		}
+		index = skipSpace(line, index)
+	}
+	if index >= len(line) || line[index] != ')' {
+		return 0, false
+	}
+	return index + 1, true
+}
+
+func angleDestinationEnd(line string, start int) (int, bool) {
+	for index := start + 1; index < len(line); {
+		if escaped, ok := skipEscapedByte(line, index); ok {
+			index = escaped
+			continue
+		}
+		if line[index] == '<' {
+			return 0, false
+		}
+		if line[index] == '>' {
+			return index + 1, true
+		}
+		index++
+	}
+	return 0, false
+}
+
+func bareDestinationEnd(line string, start int) (int, bool) {
+	if start < len(line) && line[start] == ')' {
+		return start, true
+	}
+	depth := 0
+	for index := start; index < len(line); {
+		if escaped, ok := skipEscapedByte(line, index); ok {
+			index = escaped
+			continue
+		}
+		switch line[index] {
+		case '(':
+			depth++
+		case ')':
+			if depth == 0 {
+				return index, true
+			}
+			depth--
+		default:
+			if isSpaceByte(line, index) {
+				if depth != 0 {
+					return 0, false
+				}
+				return index, true
+			}
+		}
+		index++
+	}
+	return 0, false
+}
+
+func isImageTitleStart(value byte) bool {
+	return value == '"' || value == '\'' || value == '('
+}
+
+func imageTitleEnd(line string, start int) (int, bool) {
+	closer := line[start]
+	if closer == '(' {
+		closer = ')'
+	}
+	for index := start + 1; index < len(line); {
+		if escaped, ok := skipEscapedByte(line, index); ok {
+			index = escaped
+			continue
+		}
+		if line[index] == closer {
+			return index + 1, true
+		}
+		index++
+	}
+	return 0, false
+}
+
+func skipEscapedByte(line string, index int) (int, bool) {
+	if index+1 >= len(line) || line[index] != '\\' {
+		return 0, false
+	}
+	return index + 2, true
+}
+
+func skipSpace(line string, index int) int {
+	for index < len(line) && isSpaceByte(line, index) {
+		_, width := utf8.DecodeRuneInString(line[index:])
+		index += width
+	}
+	return index
+}
+
+func isSpaceByte(line string, index int) bool {
+	value, _ := utf8.DecodeRuneInString(line[index:])
+	return unicode.IsSpace(value)
 }
 
 func isAttachmentOnlyLine(line string) bool {
