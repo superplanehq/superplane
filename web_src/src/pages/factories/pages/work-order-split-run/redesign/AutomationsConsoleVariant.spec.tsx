@@ -63,6 +63,29 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(within(checks).getByText("Confidence score")).toBeInTheDocument();
   });
 
+  it("shows non-stage checks from the full API check list", () => {
+    // A task with an Implement step (no Verify) but with API checks from non-line-step apps.
+    // This verifies that checks from apps not tied to a named factory-line step still appear.
+    renderConsole(
+      splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, {
+        checks: OPEN_WORK_ORDER_CHECKS,
+        // demoArtifacts: true is the default; this tests the full code path with demo artifacts.
+      }),
+    );
+
+    const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
+    // Risk score comes from an app that is not a factory-line step in this fixture.
+    expect(within(checks).getByText("Risk score")).toBeInTheDocument();
+    // Code quality also comes from a non-step app.
+    expect(within(checks).getByText("Code quality")).toBeInTheDocument();
+    // Test coverage comes from a non-step app.
+    expect(within(checks).getByText("Test coverage")).toBeInTheDocument();
+    // Confidence score is a score check; still shows even when derived from the API.
+    expect(within(checks).getByText("Confidence score")).toBeInTheDocument();
+    // CI check also shows.
+    expect(within(checks).getByText("CI")).toBeInTheDocument();
+  });
+
   it("lists each column app that ran for the task as its own card", () => {
     renderConsole(
       splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
@@ -187,6 +210,34 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "pending");
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Not started");
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBeNull();
+  });
+
+  it("deduplicates checks that appear in both the full API list and in stages", () => {
+    // Create a fixture where a check appears both in the API list and in a phase.
+    // The panel should show it exactly once, not duplicated.
+    const checkFromBoth = {
+      id: "check-both",
+      key: "check-both",
+      name: "Check in Both",
+      score: 100,
+      maxScore: 100,
+      level: "LEVEL_POSITIVE",
+      automation: { appId: "app-both", appName: "Check App" },
+      runId: "run-both",
+      updatedAt: "2026-08-26T11:10:00Z",
+    };
+
+    renderConsole(
+      splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, {
+        checks: [checkFromBoth],
+        demoArtifacts: true,
+      }),
+    );
+
+    const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
+    const checkElements = within(checks).getAllByText("Check in Both");
+    // Verify the check appears exactly once, not duplicated.
+    expect(checkElements).toHaveLength(1);
   });
 });
 
