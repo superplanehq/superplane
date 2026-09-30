@@ -110,6 +110,36 @@ func (c *Catalog) ReconcileInstallation(
 	return c.reconcileInstallation(ctx, installation, priority)
 }
 
+func (c *Catalog) ConsumeInstallationRequest(ctx context.Context, installationID int64) (bool, error) {
+	stored, err := models.FindVCSProviderInstallation(c.db, models.ProviderGitHub, installationID)
+	if err == nil {
+		return models.ConsumeVCSProviderInstallRequestsForAccount(
+			c.db,
+			models.ProviderGitHub,
+			stored.AccountID,
+			stored.AccountLogin,
+		)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, fmt.Errorf("find GitHub App installation %d: %w", installationID, err)
+	}
+
+	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
+	if err != nil {
+		return false, fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
+	}
+	if installation.GetAccount() == nil {
+		return false, fmt.Errorf("GitHub App installation %d has no account", installationID)
+	}
+	model := installationModel(installation)
+	return models.ConsumeVCSProviderInstallRequestsForAccount(
+		c.db,
+		models.ProviderGitHub,
+		model.AccountID,
+		model.AccountLogin,
+	)
+}
+
 func (c *Catalog) reconcileInstallation(
 	ctx context.Context,
 	installation *gh.Installation,

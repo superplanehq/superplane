@@ -781,18 +781,29 @@ func DeleteVCSProviderInstallRequestsForAccount(
 	accountID *int64,
 	accountLogin string,
 ) error {
+	_, err := ConsumeVCSProviderInstallRequestsForAccount(tx, provider, accountID, accountLogin)
+	return err
+}
+
+func ConsumeVCSProviderInstallRequestsForAccount(
+	tx *gorm.DB,
+	provider string,
+	accountID *int64,
+	accountLogin string,
+) (bool, error) {
 	query := tx.Model(&VCSProviderInstallRequest{})
 	if accountID != nil {
-		return query.Where("provider = ? AND account_id = ?", provider, *accountID).Delete(&VCSProviderInstallRequest{}).Error
+		result := query.Where("provider = ? AND account_id = ?", provider, *accountID).Delete(&VCSProviderInstallRequest{})
+		return result.RowsAffected > 0, result.Error
 	}
 	accountLogin = strings.TrimSpace(accountLogin)
 	if accountLogin == "" {
-		return nil
+		return false, nil
 	}
-	return query.
+	result := query.
 		Where("provider = ? AND LOWER(account_login) = LOWER(?)", provider, accountLogin).
-		Delete(&VCSProviderInstallRequest{}).
-		Error
+		Delete(&VCSProviderInstallRequest{})
+	return result.RowsAffected > 0, result.Error
 }
 
 func EnqueueVCSProviderRepositorySync(
