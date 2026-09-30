@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -112,6 +113,61 @@ func TestListAllOrganizations(t *testing.T) {
 		assert.Equal(t, "Low Count", orgs[2].Name)
 	})
 
+	t.Run("sorts organizations by task count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		lowCount, err := CreateOrganization("Low Tasks", "")
+		require.NoError(t, err)
+		highCount, err := CreateOrganization("High Tasks", "")
+		require.NoError(t, err)
+		midCount, err := CreateOrganization("Mid Tasks", "")
+		require.NoError(t, err)
+
+		createTestTasks(t, lowCount.ID, 1)
+		createTestTasks(t, highCount.ID, 3)
+		createTestTasks(t, midCount.ID, 2)
+
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "task_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "High Tasks", orgs[0].Name)
+		assert.Equal(t, int64(3), orgs[0].TaskCount)
+		assert.Equal(t, "Mid Tasks", orgs[1].Name)
+		assert.Equal(t, int64(2), orgs[1].TaskCount)
+		assert.Equal(t, "Low Tasks", orgs[2].Name)
+		assert.Equal(t, int64(1), orgs[2].TaskCount)
+		assert.Equal(t, int64(0), orgs[0].DoneTaskCount)
+	})
+
+	t.Run("sorts organizations by done task count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		noneDone, err := CreateOrganization("None Done", "")
+		require.NoError(t, err)
+		mostDone, err := CreateOrganization("Most Done", "")
+		require.NoError(t, err)
+		someDone, err := CreateOrganization("Some Done", "")
+		require.NoError(t, err)
+
+		createTestTasks(t, noneDone.ID, 2)
+		createTestDoneTasks(t, mostDone.ID, 2, 1, 1)
+		createTestDoneTasks(t, someDone.ID, 1, 0, 1)
+
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "done_task_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "Most Done", orgs[0].Name)
+		assert.Equal(t, int64(3), orgs[0].DoneTaskCount)
+		assert.Equal(t, int64(4), orgs[0].TaskCount)
+		assert.Equal(t, "Some Done", orgs[1].Name)
+		assert.Equal(t, int64(1), orgs[1].DoneTaskCount)
+		assert.Equal(t, int64(2), orgs[1].TaskCount)
+		assert.Equal(t, "None Done", orgs[2].Name)
+		assert.Equal(t, int64(0), orgs[2].DoneTaskCount)
+	})
+
 	t.Run("sorts organizations by member count", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
@@ -209,6 +265,8 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		assert.Equal(t, org.Slug, found.Slug)
 		assert.Equal(t, "counted", found.Description)
 		assert.Equal(t, int64(2), found.CanvasCount)
+		assert.Equal(t, int64(0), found.TaskCount)
+		assert.Equal(t, int64(0), found.DoneTaskCount)
 		assert.Equal(t, int64(1), found.MemberCount)
 	})
 
@@ -232,6 +290,44 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
+}
+
+func createTestTasks(t *testing.T, organizationID uuid.UUID, count int) {
+	t.Helper()
+
+	factory, err := CreateFactory(database.Conn(), organizationID, "Factory", "", "")
+	require.NoError(t, err)
+	for i := 0; i < count; i++ {
+		_, err := factory.CreateWorkOrder(database.Conn(), fmt.Sprintf("Task %d", i+1), "", nil, nil, nil)
+		require.NoError(t, err)
+	}
+}
+
+func createTestDoneTasks(t *testing.T, organizationID uuid.UUID, completed, failed, rejected int) {
+	t.Helper()
+
+	factory, err := CreateFactory(database.Conn(), organizationID, "Factory", "", "")
+	require.NoError(t, err)
+
+	createClosed := func(title, result string) {
+		t.Helper()
+		order, err := factory.CreateWorkOrder(database.Conn(), title, "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"state":  FactoryWorkOrderStateClosed,
+			"result": result,
+		}).Error)
+	}
+
+	for i := 0; i < completed; i++ {
+		createClosed(fmt.Sprintf("Completed %d", i+1), FactoryWorkOrderResultCompleted)
+	}
+	for i := 0; i < failed; i++ {
+		createClosed(fmt.Sprintf("Failed %d", i+1), FactoryWorkOrderResultFailed)
+	}
+	for i := 0; i < rejected; i++ {
+		createClosed(fmt.Sprintf("Rejected %d", i+1), FactoryWorkOrderResultRejected)
+	}
 }
 
 func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
