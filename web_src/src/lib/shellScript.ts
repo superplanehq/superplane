@@ -26,9 +26,10 @@ function commandCandidates(lines: string[]): string[] {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (isPrologueLine(line)) continue;
-    const guardEnd = guardBlockEnd(lines, index);
-    if (guardEnd !== undefined) {
-      index = guardEnd;
+    const block = ifBlock(lines, index);
+    if (block) {
+      candidates.push(...block.commands);
+      index = block.end;
       continue;
     }
     const trimmed = line.trim();
@@ -53,19 +54,17 @@ function isSetupCommand(segment: string): boolean {
   return SETUP_COMMAND.test(segment.trim());
 }
 
-function guardBlockEnd(lines: string[], start: number): number | undefined {
+function ifBlock(lines: string[], start: number): { end: number; commands: string[] } | undefined {
   if (!/^\s*if\b/.test(lines[start])) return undefined;
   let depth = 0;
-  let exits = false;
-  let runsCommand = false;
+  const commands: string[] = [];
   for (let index = start; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
     if (/^if\b/.test(trimmed)) depth += 1;
-    if (!isGuardBodyLine(trimmed)) runsCommand = true;
-    if (/\bexit\b/.test(trimmed)) exits = true;
+    if (!isGuardBodyLine(trimmed)) commands.push(trimmed);
     if (/^fi\b/.test(trimmed)) {
       depth -= 1;
-      if (depth === 0) return exits && !runsCommand ? index : undefined;
+      if (depth === 0) return { end: index, commands };
     }
   }
   return undefined;

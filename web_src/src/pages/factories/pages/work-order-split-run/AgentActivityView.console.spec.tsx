@@ -52,6 +52,46 @@ describe("AgentActivityView console", () => {
     expect(command.textContent).toBe("cd /tmp/opencode && curl -fL bun.zip\nunzip bun.zip");
   });
 
+  it("expands a one-line chain when the headline omits the start", async () => {
+    const user = userEvent.setup();
+    const script = "cd /tmp/opencode && curl -fL bun.zip";
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: script,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Researched 1 source" }));
+    await user.click(screen.getByRole("button", { name: "curl -fL bun.zip" }));
+    expect(screen.getByTestId("agent-tool-command-1").textContent).toBe(script);
+  });
+
+  it("keeps blank lines in file output", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("read-1", "read", "read"),
+          input: "README.md",
+          output: "one\n\n\n\ntwo",
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Explored 1 file" }));
+    expect(document.querySelector("pre")?.textContent).toBe("one\n\n\n\ntwo");
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+  });
+
   it("shows the clone command and keeps its line breaks", async () => {
     const user = userEvent.setup();
     const script = [

@@ -30,6 +30,10 @@ describe("shellScriptHeadline", () => {
     expect(shellScriptHeadline("rm -rf repo")).toBe("rm -rf repo");
   });
 
+  it("names the command inside a conditional block", () => {
+    expect(shellScriptHeadline("if [ -f repo ]; then\n  git status\nfi")).toBe("git status");
+  });
+
   it("skips a shebang and comments", () => {
     expect(shellScriptHeadline("#!/bin/bash\n# refresh\ngit status")).toBe("git status");
   });

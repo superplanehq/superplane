@@ -240,8 +240,9 @@ function ToolLine({
   ) : (
     <ToolLabel tool={tool} tone={tone} />
   );
-  const output = tone === "log" ? normalizeTerminalOutput(tool.output) : "";
-  const exitCode = tone === "log" && failedTool(tool) ? tool.exitCode : undefined;
+  if (tone !== "log") return line;
+  const output = isCommandTool(tool) ? normalizeTerminalOutput(tool.output) : tool.output.trim();
+  const exitCode = failedTool(tool) ? tool.exitCode : undefined;
   if (!output && exitCode === undefined) {
     return line;
   }
@@ -251,12 +252,17 @@ function ToolLine({
       {exitCode !== undefined ? (
         <p className="px-1 text-[11px] leading-4 text-destructive">Exit code {exitCode}</p>
       ) : null}
-      {output ? <CommandOutput text={output} /> : null}
+      {output ? <ToolOutput command={isCommandTool(tool)} text={output} /> : null}
     </div>
   );
 }
 
-function CommandOutput({ text }: { text: string }) {
+function ToolOutput({ command, text }: { command: boolean; text: string }) {
+  if (!command) {
+    return (
+      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{text}</pre>
+    );
+  }
   return (
     <div className="mt-1 px-1">
       <p className="text-[11px] leading-4 text-muted-foreground">Output</p>
@@ -331,10 +337,11 @@ function ExpandableCommand({
   status: string;
 }) {
   const multiLine = script.includes("\n");
+  const hidesRest = script.trim() !== headline;
   const lineCount = shellScriptLineCount(script);
   const [open, setOpen] = useState(false);
   const lineRef = useRef<HTMLPreElement>(null);
-  const [overflows, setOverflows] = useState(multiLine);
+  const [overflows, setOverflows] = useState(multiLine || hidesRest);
   useEffect(() => {
     const node = lineRef.current;
     if (!node || overflows) {
