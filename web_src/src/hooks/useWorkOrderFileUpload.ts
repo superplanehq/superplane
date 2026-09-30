@@ -79,7 +79,7 @@ async function uploadOneWorkOrderFile(
     return null;
   }
   if (file.size > MAX_WORK_ORDER_FILE_BYTES) {
-    showErrorToast("Each file must be 50 MB or smaller.");
+    showErrorToast("Each file must be 70 MB or smaller.");
     return null;
   }
 
