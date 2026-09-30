@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runnerpkg "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -282,14 +283,14 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "task().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
-		assert.Contains(t, dco, `${COAUTHORS:-}`)
-
-		// "git commit -s" signs off and the agent amends commits, so appending
-		// the trailers wrote them twice. It also put a blank line before the
-		// sign-off, which left it outside the trailer block GitHub reads.
-		assert.Contains(t, dco, "--if-exists doNothing")
+		assert.Contains(t, dco, runnerpkg.FactoryRepoCommitSetup())
+		assert.Contains(t, dco, "agent@superplane.com")
+		assert.Contains(t, dco, "agent@superplane.ai")
+		assert.Contains(t, dco, "opencode@superplane.io")
 		assert.Contains(t, dco, "--if-exists addIfDifferent")
+		assert.NotContains(t, dco, "--if-exists doNothing")
 		assert.NotContains(t, dco, `>> "$1"`)
+		assert.Contains(t, runnerStepPrompt(t, runner, "Address PR feedback"), runnerpkg.FactoryCommitIdentityPrompt)
 	})
 
 	t.Run("the runner names the model it runs", func(t *testing.T) {
@@ -408,6 +409,8 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, push, "REMOTE_HEAD")
 		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
 		assert.Contains(t, push, `git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`)
+		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
+		assert.Contains(t, runnerStepPrompt(t, runner, "Fix Failed Checks"), runnerpkg.FactoryCommitIdentityPrompt)
 
 		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
 		assert.Contains(t, checkout, "gh auth setup-git --hostname github.com --force")
@@ -487,6 +490,16 @@ func runnerEnv(t *testing.T, node yaml.Node, name string) string {
 
 func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 	t.Helper()
+	return runnerStepString(t, node, name, "command")
+}
+
+func runnerStepPrompt(t *testing.T, node yaml.Node, name string) string {
+	t.Helper()
+	return runnerStepString(t, node, name, "prompt")
+}
+
+func runnerStepString(t *testing.T, node yaml.Node, name, field string) string {
+	t.Helper()
 
 	steps, ok := node.Configuration["steps"].([]any)
 	require.True(t, ok, "runner has no steps")
@@ -494,9 +507,9 @@ func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 		item, ok := step.(map[string]any)
 		require.True(t, ok)
 		if item["name"] == name {
-			command, ok := item["command"].(string)
-			require.True(t, ok, "step %q has no command", name)
-			return command
+			value, ok := item[field].(string)
+			require.True(t, ok, "step %q has no %s", name, field)
+			return value
 		}
 	}
 	require.Failf(t, "step not found", "runner has no step %q", name)
