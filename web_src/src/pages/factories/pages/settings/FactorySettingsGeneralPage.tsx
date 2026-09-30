@@ -37,6 +37,7 @@ import {
   normalizeWorkspaceKey,
 } from "../../lib/workspaceKey";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { PublicBadgeSettingsSection } from "./PublicBadgeSettingsSection";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { SettingsIdentityField } from "./settingsIdentityField";
 
@@ -135,6 +136,14 @@ export function FactorySettingsGeneralPage() {
             if (keyError) setKeyError("");
           }}
           onSave={handleSave}
+        />
+
+        <PublicBadgeSettingsSection
+          factory={factory}
+          canUpdate={canUpdate}
+          permissionsLoading={permissionsLoading}
+          isSaving={updateFactory.isPending}
+          onUpdate={(input) => updateFactory.mutateAsync(input)}
         />
 
         <VisibilitySection

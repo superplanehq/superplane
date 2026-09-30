@@ -1,0 +1,8 @@
+BEGIN;
+
+ALTER TABLE factories
+  ADD COLUMN public_badge_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN public_badge_show_cost BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN public_badge_token TEXT UNIQUE;
+
+COMMIT;
