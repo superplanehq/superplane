@@ -2,6 +2,12 @@ import type { FilesFile } from "@/api-client";
 
 export const FILE_REF_SCHEME = "sp-file";
 export const MAX_WORK_ORDER_FILE_BYTES = 70 * 1024 * 1024;
+
+export function workOrderFileTooLargeMessage(): string {
+  const megabytes = MAX_WORK_ORDER_FILE_BYTES / (1024 * 1024);
+  return `Each file must be ${megabytes} MB or smaller.`;
+}
+
 export const MAX_WORK_ORDER_FILES = 20;
 
 export const ALLOWED_WORK_ORDER_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;

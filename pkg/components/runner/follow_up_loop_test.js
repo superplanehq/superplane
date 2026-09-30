@@ -862,7 +862,6 @@ test("materializeFollowUpAttachments reuses indexed files without downloading", 
 });
 
 test("materializeFollowUpAttachments allows an image at the size limit", async () => {
-  assert.equal(MAX_ATTACHMENT_BYTES, 70 * 1024 * 1024);
   const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-attachments-limit-"));
   const signed = gcsSignedURL();
   const rewritten = await materializeFollowUpAttachments(

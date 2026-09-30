@@ -120,7 +120,7 @@ func attachPlanningSessionFiles(task OpenRouterBrokerTask, environment []runner.
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+	task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
 	return task
 }
 
@@ -131,7 +131,7 @@ func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.Broke
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = runner.AppendAttachmentSetupFiles(append(task.Files, runner.FollowUpLoopFile()))
+	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
 	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
 	return task
 }

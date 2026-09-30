@@ -10,6 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
+const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
 const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
@@ -27,7 +28,6 @@ const IMAGE_CONTENT_TYPES = {
   "image/gif": ".gif",
   "image/webp": ".webp",
 };
-const MAX_ATTACHMENT_BYTES = 70 * 1024 * 1024;
 const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 15_000;
 const MAX_ATTACHMENT_REDIRECTS = 3;
 

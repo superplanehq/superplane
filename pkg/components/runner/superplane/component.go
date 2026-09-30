@@ -301,7 +301,7 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := claude.ApplyPlanningFollowUp(claude.BuildDispatchedBrokerTask(claudeSpec, usage, setups, dispatched, attachments, runner.HasPlanningSessionToken(environment)), environment, claudeSpec)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	case models.UsageProviderOpenAI:
 		codexSpec := codex.RunCodexSpec{
 			MachineType:             spec.MachineType,
@@ -312,7 +312,7 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := codex.ApplyPlanningFollowUp(codex.BuildDispatchedBrokerTask(codexSpec, usage, setups, dispatched, attachments, runner.HasPlanningSessionToken(environment)), environment, codexSpec)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	case models.UsageProviderOpenRouter:
 		openRouterSpec := openrouter.RunOpenRouterSpec{
 			MachineType:             spec.MachineType,
@@ -327,7 +327,7 @@ func buildSuperPlaneBrokerTask(
 			environment,
 			openRouterSpec,
 		)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	default:
 		return nil, nil, fmt.Errorf("unsupported SuperPlane agent provider: %s", provider)
 	}
@@ -337,10 +337,9 @@ func withPlanningSessionFiles(
 	commands []runner.BrokerCommand,
 	files []runner.BrokerTaskFile,
 	environment []runner.BrokerEnvironmentVariable,
-	extra ...runner.BrokerTaskFile,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	if runner.HasPlanningSessionToken(environment) {
-		files = append(files, extra...)
+		files = runner.AppendPlanningSessionMCPFiles(files)
 	}
 	return commands, files, nil
 }

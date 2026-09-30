@@ -5,8 +5,9 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
+const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
-const MAX_INSPECTABLE_ATTACHMENT_BYTES = 70 * 1024 * 1024;
+const MAX_INSPECTABLE_ATTACHMENT_BYTES = MAX_ATTACHMENT_BYTES;
 
 /**
  * Stdio MCP server for task refinement.
