@@ -50,6 +50,17 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		}
 	}
 
+	if req.PublicBadgeEnabled != nil {
+		if err := factory.UpdatePublicBadgeEnabled(db, req.GetPublicBadgeEnabled()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	}
+	if req.PublicBadgeShowCost != nil {
+		if err := factory.UpdatePublicBadgeShowCost(db, req.GetPublicBadgeShowCost()); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	}
+
 	lines, err := factory.ListLines(db)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
