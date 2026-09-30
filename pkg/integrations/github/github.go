@@ -214,6 +214,15 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
+func hostedGitHubApp(integration core.IntegrationContext) bool {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+
+	return metadata.HostedApp
+}
+
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 	if hostedGitHubApp(ctx.Integration) {
 		ctx.Response.WriteHeader(http.StatusNotFound)

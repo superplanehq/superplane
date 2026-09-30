@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -459,4 +460,11 @@ func joinStatuses(statuses []int) string {
 		parts[i] = fmt.Sprintf("%d", s)
 	}
 	return strings.Join(parts, ",")
+}
+
+func cloneRequestWithBody(r *http.Request, body []byte) (*http.Request, error) {
+	cloned := r.Clone(r.Context())
+	cloned.Body = io.NopCloser(bytes.NewReader(body))
+	cloned.ContentLength = int64(len(body))
+	return cloned, nil
 }

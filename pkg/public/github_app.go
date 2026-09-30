@@ -1,25 +1,19 @@
 package public
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	appcatalog "github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -126,9 +120,10 @@ func githubAppSetupOrganizationID(state string) uuid.UUID {
 	return organizationID
 }
 
-// HandleGitHubAppWebhook validates the public App signature, updates the
-// global catalog, and fans repository events out to every local binding for
-// the installation.
+// HandleGitHubAppWebhook validates the public App signature and updates the
+// global catalog. Repository events reach nodes through the repository hook
+// that WebhookProvisioner registers for each webhook, so this endpoint does
+// not deliver them.
 func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) {
 	app, ok := common.HostedAppFromEnv()
 	if !ok {
@@ -154,123 +149,13 @@ func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Load bindings before an uninstall removes the catalog row and its
-	// binding references.
-	integrations, err := models.ListVCSProviderBoundIntegrations(database.DB(r.Context()), models.ProviderGitHub, installationID)
-	if err != nil {
-		log.WithError(err).Error("failed to list GitHub App bindings")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	if err := applyGitHubCatalogWebhook(database.DB(r.Context()), event, installationID); err != nil {
 		log.WithError(err).Error("failed to update the GitHub App catalog")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if githubAppRepositoryEvent(event) {
-		for i := range integrations {
-			if err := s.dispatchGitHubAppWebhook(r, payload, &integrations[i]); err != nil {
-				log.WithError(err).WithField("integration_id", integrations[i].ID).Error(
-					"failed to dispatch GitHub App webhook",
-				)
-			}
-		}
-	}
-
 	w.WriteHeader(http.StatusOK)
-}
-
-func githubAppRepositoryEvent(event any) bool {
-	switch event.(type) {
-	case *gh.InstallationEvent, *gh.InstallationRepositoriesEvent, *gh.MemberEvent:
-		return false
-	default:
-		return true
-	}
-}
-
-func (s *Server) dispatchGitHubAppWebhook(r *http.Request, payload []byte, integration *models.Integration) error {
-	webhooks, err := models.ListIntegrationWebhooks(database.DB(r.Context()), integration.ID)
-	if err != nil {
-		return fmt.Errorf("list integration webhooks: %w", err)
-	}
-
-	dispatchErrors := make([]error, 0)
-	for i := range webhooks {
-		if webhooks[i].State != models.WebhookStateReady {
-			continue
-		}
-		if !githubAppWebhookMatches(&webhooks[i], r.Header.Get("X-GitHub-Event"), payload) {
-			continue
-		}
-
-		cloned, err := cloneRequestWithBody(r, payload)
-		if err != nil {
-			dispatchErrors = append(dispatchErrors, fmt.Errorf("clone webhook request for %s: %w", webhooks[i].ID, err))
-			continue
-		}
-		secret, err := s.encryptor.Decrypt(r.Context(), webhooks[i].Secret, []byte(webhooks[i].ID.String()))
-		if err != nil {
-			dispatchErrors = append(dispatchErrors, fmt.Errorf("decrypt webhook secret for %s: %w", webhooks[i].ID, err))
-			continue
-		}
-		cloned.Header.Set("X-Hub-Signature-256", "sha256="+crypto.Sign(secret, payload))
-
-		cloned = mux.SetURLVars(cloned, map[string]string{"webhookID": webhooks[i].ID.String()})
-		response := httptest.NewRecorder()
-		s.HandleWebhook(response, cloned)
-		if response.Code >= http.StatusBadRequest {
-			dispatchErrors = append(dispatchErrors, fmt.Errorf("webhook %s returned status %d", webhooks[i].ID, response.Code))
-		}
-	}
-
-	return errors.Join(dispatchErrors...)
-}
-
-func githubAppWebhookMatches(webhook *models.Webhook, eventType string, payload []byte) bool {
-	var configuration common.WebhookConfiguration
-	if webhook == nil || mapstructure.Decode(webhook.Configuration.Data(), &configuration) != nil {
-		return false
-	}
-
-	eventTypes := configuration.EventTypes
-	if len(eventTypes) == 0 && configuration.EventType != "" {
-		eventTypes = []string{configuration.EventType}
-	}
-	if len(eventTypes) > 0 {
-		matched := false
-		for _, configured := range eventTypes {
-			if configured == eventType {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-
-	configuredRepository := strings.TrimSpace(configuration.Repository)
-	if configuredRepository == "" {
-		return true
-	}
-
-	var envelope struct {
-		Repository struct {
-			ID       int64  `json:"id"`
-			Name     string `json:"name"`
-			FullName string `json:"full_name"`
-		} `json:"repository"`
-	}
-	if json.Unmarshal(payload, &envelope) != nil {
-		return false
-	}
-
-	return strings.EqualFold(configuredRepository, envelope.Repository.FullName) ||
-		strings.EqualFold(configuredRepository, envelope.Repository.Name) ||
-		configuredRepository == strconv.FormatInt(envelope.Repository.ID, 10)
 }
 
 func applyGitHubCatalogWebhook(tx *gorm.DB, event any, installationID int64) error {
@@ -379,13 +264,6 @@ func githubInstallationID(payload []byte) (int64, bool) {
 		return 0, false
 	}
 	return envelope.Installation.ID, true
-}
-
-func cloneRequestWithBody(r *http.Request, body []byte) (*http.Request, error) {
-	cloned := r.Clone(r.Context())
-	cloned.Body = io.NopCloser(bytes.NewReader(body))
-	cloned.ContentLength = int64(len(body))
-	return cloned, nil
 }
 
 func writeHostedGitHubAppAuthError(w http.ResponseWriter, status int) {
