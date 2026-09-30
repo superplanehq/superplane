@@ -6,12 +6,12 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 
 describe("JumpToLatestPill", () => {
-  it("renders the default copy and testid", () => {
+  it("renders a jump control without the older-messages sentence", () => {
     render(<JumpToLatestPill onJumpToLatest={vi.fn()} />);
 
     expect(screen.getByTestId("jump-to-latest")).toBeInTheDocument();
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).toBeInTheDocument();
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
   it("fires onJumpToLatest when the action button is clicked", async () => {
@@ -23,12 +23,5 @@ describe("JumpToLatestPill", () => {
 
     expect(onJumpToLatest).toHaveBeenCalledOnce();
     expect(screen.getByTestId("custom-pill")).toBeInTheDocument();
-  });
-
-  it("supports overriding the message and action copy", () => {
-    render(<JumpToLatestPill onJumpToLatest={vi.fn()} message="Custom message" action="Custom action" />);
-
-    expect(screen.getByText("Custom message")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Custom action" })).toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ import {
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
   splitRunDecisionTone,
+  showsArchive,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
 
@@ -317,5 +318,19 @@ describe("rerunStartStepIndex", () => {
 
   it("keeps the current step for Rerun this step", () => {
     expect(rerunStartStepIndex("rerun-step", 2)).toBe(2);
+  });
+});
+
+describe("showsArchive", () => {
+  it("keeps Archive on a draft and on a started open task", () => {
+    expect(showsArchive({ kind: "draft" })).toBe(true);
+    expect(showsArchive({ kind: "waiting", status: "waiting" })).toBe(true);
+  });
+
+  it("hides Archive while the task is running or closed", () => {
+    expect(showsArchive({ kind: "running", status: "running" })).toBe(false);
+    expect(showsArchive({ kind: "waiting", status: "running" })).toBe(false);
+    expect(showsArchive({ kind: "done", status: "completed" })).toBe(false);
+    expect(showsArchive({ kind: "done", status: "rejected" })).toBe(false);
   });
 });

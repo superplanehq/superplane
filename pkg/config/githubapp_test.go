@@ -54,31 +54,4 @@ func TestLoadGitHubHostedAppConfig(t *testing.T) {
 		assert.False(t, LoadGitHubHostedAppConfig().Enabled())
 	})
 
-	t.Run("oauth env is optional for Enabled", func(t *testing.T) {
-		t.Setenv(EnvGitHubAppID, "12345")
-		t.Setenv(EnvGitHubAppSlug, "superplane")
-		t.Setenv(EnvGitHubAppPrivateKey, "pem")
-		t.Setenv(EnvGitHubAppWebhookSecret, "whsec")
-		t.Setenv(EnvGitHubAppClientID, "")
-		t.Setenv(EnvGitHubAppClientSecret, "")
-
-		cfg := LoadGitHubHostedAppConfig()
-		assert.True(t, cfg.Enabled())
-		assert.False(t, cfg.UserOAuthEnabled())
-	})
-
-	t.Run("user oauth needs client id and secret", func(t *testing.T) {
-		t.Setenv(EnvGitHubAppID, "12345")
-		t.Setenv(EnvGitHubAppSlug, "superplane")
-		t.Setenv(EnvGitHubAppPrivateKey, "pem")
-		t.Setenv(EnvGitHubAppWebhookSecret, "whsec")
-		t.Setenv(EnvGitHubAppClientID, "Iv1.abc")
-		t.Setenv(EnvGitHubAppClientSecret, "app-secret")
-
-		cfg := LoadGitHubHostedAppConfig()
-		assert.True(t, cfg.Enabled())
-		assert.True(t, cfg.UserOAuthEnabled())
-		assert.Equal(t, "Iv1.abc", cfg.ClientID)
-		assert.Equal(t, "app-secret", cfg.ClientSecret)
-	})
 }

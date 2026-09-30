@@ -73,7 +73,12 @@ describe("WorkOrderSplitRunPopup action busy state", () => {
     const user = userEvent.setup();
     renderRunningPopup();
 
-    await user.click(screen.getByRole("button", { name: "Stop" }));
+    // Stop shows on the running card and on the summary strip; click the card's.
+    const cardStop = screen
+      .getAllByRole("button", { name: "Stop" })
+      .find((button) => button.getAttribute("data-testid") !== "redesign-console-stop-run");
+    expect(cardStop).toBeDefined();
+    await user.click(cardStop!);
     await waitFor(() => {
       expect(cancelRunMock).toHaveBeenCalledTimes(1);
     });

@@ -21,6 +21,7 @@ type HostedApp struct {
 	Slug         string
 	ClientID     string
 	ClientSecret string
+	APIToken     string
 }
 
 // HostedAppFromEnv returns the public Sentry app when Cloud holds complete
@@ -35,6 +36,7 @@ func HostedAppFromEnv() (HostedApp, bool) {
 		Slug:         cfg.Slug,
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
+		APIToken:     cfg.APIToken,
 	}, true
 }
 

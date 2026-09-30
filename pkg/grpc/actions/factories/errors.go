@@ -35,6 +35,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory not found")
 	case errors.Is(err, models.ErrFactoryHostedSpendBudgetNegative):
 		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
+	case errors.Is(err, models.ErrFactoryOnboardingNotComplete):
+		return grpcerrors.FailedPrecondition(err, "finish workspace setup before you change visibility")
 	case errors.Is(err, models.ErrModelNotInParentList):
 		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
@@ -209,6 +211,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
+	case errors.Is(err, errSuperPlaneMCPServerDisabled):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane MCP Server is not enabled for this organization.")
+	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
+		return grpcerrors.NotFound(err, "MCP client not found")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -227,6 +233,7 @@ var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not e
 var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")
 var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")

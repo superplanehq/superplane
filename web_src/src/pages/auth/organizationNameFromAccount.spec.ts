@@ -12,7 +12,9 @@ describe("organizationNameFromAccount", () => {
         avatar_url: "",
         installation_admin: false,
         has_password: true,
-        linked_accounts: [{ provider: "github", name: "GitHub Owner", username: "dev-user" }],
+        linked_accounts: [
+          { provider: "github", provider_id: "101", name: "GitHub Owner", username: "dev-user", active: true },
+        ],
         organizations_pending_deletion: [],
         providers: [{ provider: "github", username: "dev-user" }],
       }),

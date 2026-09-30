@@ -387,6 +387,17 @@ describe("MarkdownContent work order files", () => {
     expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
   });
 
+  it("keeps the video element mounted when the chat rerenders", () => {
+    const content = `See ![clip](sp-file://${fileId})`;
+    const files = [{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }];
+    const { rerender } = render(<MarkdownContent content={content} files={files} />);
+    const video = document.querySelector("video");
+
+    rerender(<MarkdownContent content={content} files={[{ ...files[0] }]} />);
+
+    expect(document.querySelector("video")).toBe(video);
+  });
+
   it("shows a download fallback for videos the browser cannot play", () => {
     render(
       <MarkdownContent
@@ -402,6 +413,30 @@ describe("MarkdownContent work order files", () => {
       "https://cdn.example/clip.mov",
     );
     expect(screen.getByText("This browser cannot play this video.")).toBeInTheDocument();
+  });
+
+  it("retries a video after a new download URL when playback failed", () => {
+    const { rerender } = render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    fireEvent.error(document.querySelector("video")!);
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Download video" })).toBeInTheDocument();
+
+    rerender(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip-2.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip-2.mp4");
   });
 });
 

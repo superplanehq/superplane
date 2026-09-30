@@ -285,6 +285,16 @@ func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
 	}
 }
 
+func TestSetFactoryVisibilityRequiresPublish(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	rule, ok := rules[HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/factories/{id}/visibility"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", rule.Resource)
+	assert.Equal(t, "publish", rule.Action)
+	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
 func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
@@ -344,6 +354,22 @@ func TestAgentResourceRoutesRequireFactoriesFeature(t *testing.T) {
 		}
 		assert.Equal(t, "update", rule.Action)
 	}
+}
+
+func TestMCPClientRoutesRequireSuperPlaneMCPServerFeature(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+	required := []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer}
+	listRule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/mcp-clients"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", listRule.Resource)
+	assert.Equal(t, "read", listRule.Action)
+	assert.Equal(t, required, listRule.RequiredExperimentalFeatures)
+
+	revokeRule, ok := rules[HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", revokeRule.Resource)
+	assert.Equal(t, "update", revokeRule.Action)
+	assert.Equal(t, required, revokeRule.RequiredExperimentalFeatures)
 }
 
 func TestMCPToolAndOAuthRoutesRequireWorkspaceMCPFeature(t *testing.T) {

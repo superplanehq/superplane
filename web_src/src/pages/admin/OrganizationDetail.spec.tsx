@@ -31,7 +31,12 @@ function renderPage() {
       createElement(
         MemoryRouter,
         { initialEntries: [`/admin/organizations/${ORG_ID}`] },
-        createElement(Routes, null, createElement(Route, { path: "/admin/organizations/:orgId", element: children })),
+        createElement(
+          Routes,
+          null,
+          createElement(Route, { path: "/admin/organizations/:orgId", element: children }),
+          createElement(Route, { path: "/admin", element: createElement("p", null, "All organizations page") }),
+        ),
       ),
     );
   return render(<OrganizationDetail />, { wrapper });
@@ -48,8 +53,11 @@ describe("OrganizationDetail", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url === "/admin/api/accounts/acc-1" && init?.method === "DELETE") {
+          return jsonResponse({ status: "deleted", deleted_organization_ids: [ORG_ID] });
+        }
         if (url === `/admin/api/organizations/${ORG_ID}`) {
           return jsonResponse({
             id: ORG_ID,
@@ -151,6 +159,28 @@ describe("OrganizationDetail", () => {
 
     expect(await screen.findByPlaceholderText("Search users...")).toBeInTheDocument();
     expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByText("user-1")).toBeInTheDocument();
+    expect(screen.getByText("acc-1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy user id" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy account id" })).toBeInTheDocument();
+  });
+
+  it("deletes a user account and leaves the deleted organization", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Users" }));
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText(/You cannot undo this action/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete Account" }));
+
+    expect(await screen.findByText("All organizations page")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      "/admin/api/accounts/acc-1",
+      expect.objectContaining({ method: "DELETE", credentials: "include" }),
+    );
   });
 
   it("shows overview first and opens automations after a tab click", async () => {

@@ -37,7 +37,6 @@ import {
   factoryJiraIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factoryRiskScoreSetupPath,
@@ -710,7 +709,7 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
-  it("opens the Planning setup wizard from the Task analysis row until setup is confirmed", async () => {
+  it("opens Planning settings from the Task analysis row before setup is confirmed", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
     renderLinesBoard(
@@ -721,11 +720,11 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
-    expect(screen.getByTestId("planning-setup")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-setup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPlanningSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
-    expect(screen.queryByTestId("planning-settings")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
   });
 
   it("opens the phase automation view from the header icon", async () => {

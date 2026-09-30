@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import {
   HEADER_MCP_RESOURCE,
   OAUTH_CONNECTED_RESOURCE,
@@ -14,6 +18,8 @@ import {
   defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 
 const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
@@ -142,17 +148,70 @@ describe("FactorySettingsMCPPage", () => {
     );
 
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`).className).toContain("rounded-lg");
     expect(screen.getByText("docs")).toBeInTheDocument();
     expect(screen.getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
     expect(screen.queryByText("Header")).not.toBeInTheDocument();
     expect(screen.queryByText("Connected")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connected" })).toHaveAttribute("type", "button");
     expect(screen.getByTestId("mcp-status-connected")).toHaveAttribute("aria-label", "Connected");
+    expect(screen.getByTestId("mcp-status-connected").className).toContain("size-3");
+    expect(screen.getByTestId("mcp-status-connected").className).toContain("absolute");
     expect(screen.getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("Tools");
 
     const user = userEvent.setup();
     await user.hover(screen.getByTestId("mcp-status-connected"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Connected");
+  }, 10000);
+
+  it("renders each server as its own compact card", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE],
+          },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    const list = await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 });
+    const docsCard = screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`);
+    const mobbinCard = screen.getByTestId(`agent-resource-row-${OAUTH_NOT_CONNECTED_RESOURCE.id}`);
+    expect(list.className).toContain("gap-2");
+    expect(docsCard).not.toBe(mobbinCard);
+    expect(docsCard.className).toContain("rounded-lg");
+    expect(mobbinCard.className).toContain("rounded-lg");
+    expect(within(docsCard).getByText("docs")).toBeInTheDocument();
+    expect(within(docsCard).getByText("https://mcp.example.com/mcp")).toBeInTheDocument();
+    expect(within(docsCard).getByTestId("mcp-status-connected")).toBeInTheDocument();
+    expect(within(mobbinCard).getByTestId("mcp-status-disconnected")).toBeInTheDocument();
+    expect(within(docsCard).getByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`)).toBeInTheDocument();
+    expect(within(docsCard).getByTestId(`agent-resource-actions-${HEADER_MCP_RESOURCE.id}`).className).toContain(
+      "flex-wrap",
+    );
+  }, 10000);
+
+  it("shows the full server name and address on hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await user.hover(await screen.findByTestId(`agent-resource-edit-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("docs");
+    expect(tooltip).toHaveTextContent("https://mcp.example.com/mcp");
   }, 10000);
 
   it("expands tools without showing descriptions", async () => {
@@ -168,10 +227,14 @@ describe("FactorySettingsMCPPage", () => {
       />,
     );
 
-    await user.click(
-      await screen.findByTestId(`agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`, {}, { timeout: 8000 }),
+    const toolsButton = await screen.findByTestId(
+      `agent-resource-view-tools-${HEADER_MCP_RESOURCE.id}`,
+      {},
+      { timeout: 8000 },
     );
-    expect(await screen.findByTestId("mcp-tools-list")).toHaveTextContent("search");
+    await user.click(toolsButton);
+    const card = screen.getByTestId(`agent-resource-row-${HEADER_MCP_RESOURCE.id}`);
+    expect(await within(card).findByTestId("mcp-tools-list")).toHaveTextContent("search");
     expect(screen.queryByText("Search the catalog.")).not.toBeInTheDocument();
   }, 10000);
 
@@ -309,5 +372,113 @@ describe("FactorySettingsMCPPage", () => {
     await user.click(screen.getByText("Edit"));
     expect(await screen.findByTestId("agent-resource-connection-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("agent-resource-auth")).toHaveTextContent("Header");
+  }, 10000);
+
+  it("shows MCP nav when only SuperPlane MCP Server is on", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-mcp")).toHaveTextContent("MCP servers");
+  }, 10000);
+
+  it("hides SuperPlane MCP Server when the flag is off", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-settings-mcp", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("superplane-mcp-server")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows how to connect when no SuperPlane MCP clients exist", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toHaveTextContent(
+      "No MCP clients connected",
+    );
+    expect(screen.getByTestId("superplane-mcp-clients-empty")).toHaveTextContent(
+      "Add this server in your MCP client. Sign in when the client asks.",
+    );
+    expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
+    expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows Claude Code and VS Code setup after the matching tab", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-claudeCode"));
+    expect(screen.getByText("Run this command in a terminal.")).toBeInTheDocument();
+    expect(screen.getByTestId("superplane-mcp-config-copy-claudeCode")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-vscode"));
+    expect(screen.getByText("Open MCP settings in VS Code.")).toBeInTheDocument();
+    expect(screen.getByTestId("superplane-mcp-config-copy-vscode")).toBeInTheDocument();
+  }, 10000);
+
+  it("lists a connected SuperPlane MCP client and revokes it", async () => {
+    const user = userEvent.setup();
+    const clientId = "mcp-client-cursor";
+    render(
+      <FactoriesHarness
+        pathSuffix={mcpPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          mcpClientsByFactoryId: {
+            [PRIMARY_FACTORY_ID]: [
+              {
+                id: clientId,
+                clientName: "Cursor",
+                userId: STORYBOOK_ME_USER_ID,
+                userName: STORYBOOK_ME_USER_NAME,
+                createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+              },
+            ],
+          },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-list", {}, { timeout: 8000 })).toHaveTextContent("Cursor");
+    expect(screen.getByTestId("superplane-mcp-client-setup")).toHaveTextContent("Connect a client");
+    expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
+    expect(screen.getByTestId(`superplane-mcp-client-${clientId}`)).toHaveTextContent(STORYBOOK_ME_USER_NAME);
+
+    await user.click(screen.getByTestId(`superplane-mcp-client-revoke-${clientId}`));
+    expect(screen.getByText(`Revoke "Cursor"?`)).toBeInTheDocument();
+    await user.click(screen.getByTestId("factory-delete-confirm-button"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("superplane-mcp-clients-list")).not.toBeInTheDocument();
+    });
+    expect(await screen.findByTestId("superplane-mcp-clients-empty")).toBeInTheDocument();
   }, 10000);
 });
