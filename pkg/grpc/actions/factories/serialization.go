@@ -25,6 +25,11 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	}
 	serialized.Planning = serializeFactoryPlanning(factory.Planning())
 	serialized.Public = factory.Public
+	serialized.PublicBadgeEnabled = factory.PublicBadgeEnabled
+	serialized.PublicBadgeShowCost = factory.PublicBadgeShowCost
+	if factory.PublicBadgeToken != nil {
+		serialized.PublicBadgeToken = *factory.PublicBadgeToken
+	}
 	return serialized
 }
 
