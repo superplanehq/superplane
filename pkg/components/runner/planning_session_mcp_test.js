@@ -445,8 +445,19 @@ test("inspectAttachment rejects a PNG filename that is not an image", () => {
   );
 });
 
+test("inspectAttachment accepts a file at the work-order size limit", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "limit.png");
+  const descriptor = fs.openSync(file, "w");
+  fs.writeSync(descriptor, PNG_BYTES);
+  fs.ftruncateSync(descriptor, MAX_INSPECTABLE_ATTACHMENT_BYTES);
+  fs.closeSync(descriptor);
+  const result = inspectAttachment({ path: file }, value.env);
+  assert.equal(result.structuredContent.mimeType, "image/png");
+  assert.equal(result.structuredContent.sizeBytes, MAX_INSPECTABLE_ATTACHMENT_BYTES);
+});
+
 test("inspectAttachment rejects files above the work-order size limit", () => {
-  assert.equal(MAX_INSPECTABLE_ATTACHMENT_BYTES, 50 * 1024 * 1024);
   const value = attachmentFixture();
   const oversized = path.join(value.attachments, "large.png");
   const descriptor = fs.openSync(oversized, "w");

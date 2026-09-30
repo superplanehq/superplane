@@ -115,7 +115,7 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = runner.AppendAttachmentSetupFiles(append(task.Files, runner.FollowUpLoopFile()))
+	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
 	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
 	return task
 }
