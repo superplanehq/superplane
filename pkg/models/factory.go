@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
@@ -33,6 +35,7 @@ var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
@@ -51,9 +54,15 @@ type Factory struct {
 	PlanningConfidence      bool
 	PlanningSetupCompleted  bool
 	PlanningAutoStartLineID *uuid.UUID
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	DeletedAt               gorm.DeletedAt `gorm:"index"`
+	// Public lets anyone with the line URL view the board. They cannot open
+	// tasks, logs, or settings.
+	Public              bool
+	PublicBadgeEnabled  bool
+	PublicBadgeShowCost bool
+	PublicBadgeToken    *string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           gorm.DeletedAt `gorm:"index"`
 }
 
 // FactoryPlanning is the workspace toggle for draft chat plus the two
@@ -254,6 +263,37 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	return &factory, nil
 }
 
+// FindFactoryByPublicBadgeToken loads the workspace that owns a public badge
+// link. An empty token is not a match. Soft-deleted workspaces are excluded.
+func FindFactoryByPublicBadgeToken(tx *gorm.DB, token string) (*Factory, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, ErrFactoryNotFound
+	}
+
+	var factory Factory
+	err := tx.Where("public_badge_token = ?", token).First(&factory).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+	return &factory, nil
+}
+
+func FindFactoryByID(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.Where("id = ?", factoryID).First(&factory).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &factory, nil
+}
+
 func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
 	normalized := NormalizeFactoryKey(key)
 	if err := ValidateFactoryKey(normalized); err != nil {
@@ -444,6 +484,94 @@ func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
 	f.PlanningAutoStartLineID = planning.AutoStartLineID
 	f.UpdatedAt = now
 	return nil
+}
+
+func (f *Factory) SetPublic(tx *gorm.DB, public bool) error {
+	if f.OnboardingCompletedAt == nil {
+		return ErrFactoryOnboardingNotComplete
+	}
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public", "updated_at").
+		Updates(map[string]any{
+			"public":     public,
+			"updated_at": now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.Public = public
+	f.UpdatedAt = now
+	return nil
+}
+
+// UpdatePublicBadgeEnabled turns the public badge on or off. The first enable
+// stores a random URL-safe token. A later enable keeps that token, including
+// when two first enables run together, so a README link stays valid.
+func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
+	now := time.Now()
+	updates := map[string]any{
+		"public_badge_enabled": enabled,
+		"updated_at":           now,
+	}
+	columns := []string{"public_badge_enabled", "updated_at"}
+	if enabled {
+		token, err := newPublicBadgeToken()
+		if err != nil {
+			return err
+		}
+		updates["public_badge_token"] = gorm.Expr("COALESCE(NULLIF(public_badge_token, ''), ?)", token)
+		columns = append(columns, "public_badge_token")
+	}
+
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select(columns).
+		Updates(updates).Error
+	if err != nil {
+		return err
+	}
+	if enabled {
+		var stored Factory
+		err = tx.Select("public_badge_token").
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			First(&stored).Error
+		if err != nil {
+			return err
+		}
+		f.PublicBadgeToken = stored.PublicBadgeToken
+	}
+	f.PublicBadgeEnabled = enabled
+	f.UpdatedAt = now
+	return nil
+}
+
+// UpdatePublicBadgeShowCost stores the cost switch on its own. Turning the
+// badge off does not clear this value.
+func (f *Factory) UpdatePublicBadgeShowCost(tx *gorm.DB, showCost bool) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public_badge_show_cost", "updated_at").
+		Updates(map[string]any{
+			"public_badge_show_cost": showCost,
+			"updated_at":             now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PublicBadgeShowCost = showCost
+	f.UpdatedAt = now
+	return nil
+}
+
+func newPublicBadgeToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
@@ -855,6 +983,10 @@ type ListFactoryWorkOrdersFilters struct {
 	BeforeID *uuid.UUID
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
+	// PublicBoard keeps the orders a public line board can show. Drafts stay
+	// even after a run on another line. Closed rejected orders are omitted
+	// so they do not consume the page.
+	PublicBoard bool
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -879,7 +1011,11 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)
-	query = applyWorkOrderLineFilter(query, filters.LineID)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -949,6 +1085,37 @@ func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilt
 			)
 			OR factory_work_orders.created_by_id = ?
 		)`, *filters.UserID, *filters.UserID)
+}
+
+func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	query = query.Where(`
+		(
+			factory_work_orders.state IN ?
+			OR (
+				factory_work_orders.state = ?
+				AND factory_work_orders.result IN ?
+			)
+		)`,
+		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed,
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+	)
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			factory_work_orders.state = ?
+			OR EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, FactoryWorkOrderStateDraft, *lineID)
 }
 
 func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {

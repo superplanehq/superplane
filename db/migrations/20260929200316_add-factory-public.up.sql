@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE factories
+  ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false;
+
+COMMIT;

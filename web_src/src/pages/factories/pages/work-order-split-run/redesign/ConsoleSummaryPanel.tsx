@@ -1,98 +1,104 @@
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
+import { Button } from "@/components/ui/button";
 import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { type ReactNode } from "react";
 
-import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
+import { splitRunDecisionTone } from "../splitRunFooter";
+import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
 import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
+import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
-import { SplitRunCheckPills } from "../SplitRunReview";
+import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
-import { splitRunLinkedArtifacts } from "../splitRunPopupModel";
+import { splitRunPanelArtifacts } from "../splitRunPopupModel";
 import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
-import { StageStatusGlyph } from "./redesignShared";
+import { StaticStatusGlyph } from "./redesignShared";
 
 /**
  * Reads top to bottom by priority: the decision, then what the run
  * produced (pull request, checks, artifacts), then reference details.
+ * The strip under the status never goes blank: a decision when there is
+ * one, the live run while an automation works, a waiting note otherwise.
  */
 export function ConsoleSummaryPanel({
   fixture,
   outcome,
   stages,
   pullRequests,
+  artifacts,
   panelReview,
   source,
-  files,
+  actionBusy = false,
+  onStopLiveRun,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
   stages: AutomationStage[];
   pullRequests?: FactoriesFactoryPullRequest[];
+  /** Every artifact on this task. Merged with what the runs produced. */
+  artifacts?: FactoriesWorkOrderArtifact[];
   panelReview?: ReactNode;
   source?: SplitRunSource;
-  files?: FilesFile[];
+  actionBusy?: boolean;
+  /** Cancels the live run. The live note shows Stop only when set. */
+  onStopLiveRun?: () => void;
 }) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
-  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
-  const panelPullRequests = withoutPullRequest(
-    pullRequests?.length ? pullRequests : outcome.pullRequests,
-    reviewedHref,
-  );
-  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
-  const artifacts = splitRunLinkedArtifacts([
-    ...new Map(stages.flatMap((stage) => stage.outputs.artifacts).map((artifact) => [artifact.id, artifact])).values(),
-  ]).filter((artifact) => !(hasPullRequest && isBranchArtifact(artifact)));
-  const checks = stages.flatMap((stage) => stage.checks);
-  const attachedFiles = (files ?? []).filter((file) => file.id);
-  // Placeholder values such as "Waiting" mirror the status; only a real time reads as a duration.
-  const duration = /\d/.test(outcome.duration) ? outcome.duration : undefined;
-  const spendRows = (fixture.usageByModel ?? []).map((row) => ({
-    label: row.model?.split("/").at(-1) ?? row.provider ?? "",
-    value: `$${(Number(row.costCents ?? 0) / 100).toFixed(2)}`,
-  }));
+  const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
         <FrameHeader>
           <FrameTitle className="flex items-center gap-2">
-            <StageStatusGlyph status={outcome.status} />
+            <StaticStatusGlyph status={outcome.status} />
             {outcome.statusLabel}
           </FrameTitle>
-          {panelReview ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
+          {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
-        {panelReview ? <FramePanel className="py-3">{panelReview}</FramePanel> : null}
-        {panelPullRequests.length > 0 ? (
+        <SummaryDecisionStrip
+          hasDecision={panel.hasDecision}
+          panelReview={panelReview}
+          decisionClassName={panel.decisionClassName}
+          isLive={panel.isLive}
+          liveStage={panel.liveStage}
+          footer={fixture.footer}
+          actionBusy={actionBusy}
+          onStop={onStopLiveRun}
+        />
+        {panel.panelPullRequests.length > 0 ? (
           <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
             <span className="text-[12px] font-medium text-muted-foreground">
-              {panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
+              {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
             </span>
-            {panelPullRequests.map((pullRequest, index) => (
+            {panel.panelPullRequests.map((pullRequest, index) => (
               <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} />
             ))}
           </FramePanel>
         ) : null}
-        {checks.length > 0 ? (
+        {panel.checks.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3">
             <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
-            <SplitRunCheckPills checks={checks} testId="redesign-console-checks" />
+            <ConsoleCheckRows checks={panel.checks} />
           </FramePanel>
         ) : null}
-        {artifacts.length > 0 ? (
+        {panel.panelArtifacts.length > 0 ? (
           <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
             <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
-            {artifacts.map((artifact) => (
+            {panel.panelArtifacts.map((artifact) => (
               <WorkOrderArtifactInline
                 key={artifact.id}
                 artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
@@ -105,29 +111,158 @@ export function ConsoleSummaryPanel({
             <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
           </SummaryRow>
           <PanelSource source={source} owner={outcome.owner.id} />
-          {attachedFiles.length > 0 ? (
-            <div>
-              <span className="text-[12px] font-medium text-muted-foreground">Files</span>
-              <ul className="mt-2 flex flex-col gap-1.5" data-testid="redesign-console-files">
-                {attachedFiles.map((file) => (
-                  <AttachedFileRow key={file.id} file={file} />
-                ))}
-              </ul>
-            </div>
-          ) : null}
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
-          {duration ? <SummaryRow label="Duration">{duration}</SummaryRow> : null}
+          {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
-            {spend.costUsd} <span className="text-muted-foreground">· {spend.tokensLabel}</span>
+            <OwnerSpendValue
+              costUsd={spend.costUsd}
+              usageByModel={fixture.usageByModel}
+              usageByMachineType={fixture.usageByMachineType}
+            />{" "}
+            <span className="text-muted-foreground">· {spend.tokensLabel}</span>
           </SummaryRow>
-          {spendRows.map((row) => (
-            <SummaryRow key={row.label} label={row.label} muted>
-              {row.value}
-            </SummaryRow>
-          ))}
         </FramePanel>
       </Frame>
     </aside>
+  );
+}
+
+function consolePanelFacts({
+  fixture,
+  outcome,
+  stages,
+  pullRequests,
+  artifacts,
+  source,
+  panelReview,
+}: {
+  fixture: SplitRunFixture;
+  outcome: ReturnType<typeof outcomeSummary>;
+  stages: AutomationStage[];
+  pullRequests?: FactoriesFactoryPullRequest[];
+  artifacts?: FactoriesWorkOrderArtifact[];
+  source?: SplitRunSource;
+  panelReview?: ReactNode;
+}) {
+  const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
+  const liveStage = stages.find((stage) => stage.status === "running");
+  const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
+  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
+  const panelPullRequests = withoutPullRequest(
+    pullRequests?.length ? pullRequests : outcome.pullRequests,
+    reviewedHref,
+  );
+  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
+  const taskArtifacts = artifacts ?? [];
+  const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
+  const stageArtifacts = stages
+    .flatMap((stage) => stage.outputs.artifacts)
+    .filter((artifact) => !artifact.id || !taskArtifactIds.has(artifact.id));
+  const panelArtifacts = splitRunPanelArtifacts([...taskArtifacts, ...stageArtifacts], source).filter(
+    (artifact) => !(hasPullRequest && isBranchArtifact(artifact)),
+  );
+  return {
+    hasDecision,
+    liveStage,
+    isLive,
+    showsStrip: hasDecision ? Boolean(panelReview) : true,
+    decisionClassName: hasDecision
+      ? attentionToneClassName(
+          isPullRequestReviewFooter(fixture.footer) ? "done" : splitRunDecisionTone(fixture.footer),
+        )
+      : undefined,
+    panelPullRequests,
+    panelArtifacts,
+    // Every check on the task. A stage list would drop Risk score when
+    // no verify step ran, because only that step copies checks onto a card.
+    checks: fixture.checks,
+    duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
+  };
+}
+
+function SummaryDecisionStrip({
+  hasDecision,
+  panelReview,
+  decisionClassName,
+  isLive,
+  liveStage,
+  footer,
+  actionBusy,
+  onStop,
+}: {
+  hasDecision: boolean;
+  panelReview?: ReactNode;
+  decisionClassName?: string;
+  isLive: boolean;
+  liveStage?: AutomationStage;
+  footer: SplitRunFixture["footer"];
+  actionBusy: boolean;
+  onStop?: () => void;
+}) {
+  if (hasDecision) {
+    return panelReview ? <FramePanel className={cn("py-3", decisionClassName)}>{panelReview}</FramePanel> : null;
+  }
+  if (isLive) {
+    return <ConsoleLiveNote stage={liveStage} footer={footer} actionBusy={actionBusy} onStop={onStop} />;
+  }
+  return <ConsoleWaitingNote />;
+}
+
+/** The strip fills its panel section: the tint sits on the panel, the alert stays flat. */
+const FLAT_ALERT_CLASSNAME = "rounded-none border-0 bg-transparent p-0";
+
+/**
+ * Strip while an automation works: which automation, on what, and Stop.
+ * The card glyph already spins, so this note stays static. Blue, as the
+ * Running status everywhere else.
+ */
+function ConsoleLiveNote({
+  stage,
+  footer,
+  actionBusy,
+  onStop,
+}: {
+  stage?: AutomationStage;
+  footer: SplitRunFixture["footer"];
+  actionBusy: boolean;
+  onStop?: () => void;
+}) {
+  // A footer note describes the live run only while the footer itself is
+  // running; on a follow-up run (kind "waiting") it can be stale.
+  const note = footer.kind === "running" ? footer.note : undefined;
+  // The automation name, as on the card. A stage name can be an activity title.
+  const stageName = stage ? stage.componentName.trim() || stage.name : undefined;
+  const headline = note?.headline ?? (stageName ? `${stageName} is running` : "An automation is running");
+  const text = note?.text ?? "The log shows live progress.";
+  return (
+    <FramePanel
+      className="border-[color:var(--status-running-border)] bg-[color:var(--status-running-bg)] py-3"
+      data-testid="redesign-console-live-note"
+    >
+      <Alert className={FLAT_ALERT_CLASSNAME}>
+        <AlertTitle>{headline}</AlertTitle>
+        <AlertDescription>{text}</AlertDescription>
+        {onStop && !actionBusy ? (
+          <AlertAction>
+            <Button type="button" variant="outline" size="sm" onClick={onStop} data-testid="redesign-console-stop-run">
+              Stop
+            </Button>
+          </AlertAction>
+        ) : null}
+      </Alert>
+    </FramePanel>
+  );
+}
+
+/** Strip for an open task with no decision and no live run. */
+function ConsoleWaitingNote() {
+  return (
+    <FramePanel className="py-3" data-testid="redesign-console-waiting-note">
+      <Alert className={FLAT_ALERT_CLASSNAME}>
+        <AlertTitle>This task is waiting</AlertTitle>
+        <AlertDescription>No automation is running. Review the run output to decide the next step.</AlertDescription>
+      </Alert>
+    </FramePanel>
   );
 }
 
@@ -203,29 +338,11 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
   );
 }
 
-function AttachedFileRow({ file }: { file: FilesFile }) {
-  const name = file.filename?.trim() || "File";
-  const href = safeExternalUrl(file.downloadUrl);
-  return (
-    <li className="min-w-0 text-[13px]">
-      {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="truncate text-foreground hover:underline">
-          {name}
-        </a>
-      ) : (
-        <span className="truncate text-foreground">{name}</span>
-      )}
-    </li>
-  );
-}
-
-function SummaryRow({ label, children, muted = false }: { label: string; children: ReactNode; muted?: boolean }) {
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-[13px]">
-      <span className={cn("shrink-0 text-muted-foreground", muted && "pl-3 text-[12px]")}>{label}</span>
-      <span className={cn("min-w-0 truncate text-right text-foreground tabular-nums", muted && "text-[12px]")}>
-        {children}
-      </span>
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate text-right text-foreground tabular-nums">{children}</span>
     </div>
   );
 }

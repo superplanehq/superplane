@@ -223,6 +223,7 @@ export function SplitRunPopupTabs({
           source={fixture.source}
           files={files}
           pullRequests={popupData.pullRequests}
+          artifacts={popupData.artifacts}
           panelReview={panelReview}
           canStopRun={Boolean(canUpdate && organizationId && factoryId && orderId)}
           actionBusy={footerActions.busy}

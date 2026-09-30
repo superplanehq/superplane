@@ -56,6 +56,7 @@ describe("createHomeFixtureFetch", () => {
         expect.objectContaining({ id: "claude_managed_agents", released: true }),
         expect.objectContaining({ id: "workspace_mcp" }),
         expect.objectContaining({ id: "workspace_skills" }),
+        expect.objectContaining({ id: "superplane_mcp_server" }),
       ]),
     });
   });

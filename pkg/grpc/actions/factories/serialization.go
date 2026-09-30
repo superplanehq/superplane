@@ -24,6 +24,12 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
 	}
 	serialized.Planning = serializeFactoryPlanning(factory.Planning())
+	serialized.Public = factory.Public
+	serialized.PublicBadgeEnabled = factory.PublicBadgeEnabled
+	serialized.PublicBadgeShowCost = factory.PublicBadgeShowCost
+	if factory.PublicBadgeToken != nil {
+		serialized.PublicBadgeToken = *factory.PublicBadgeToken
+	}
 	return serialized
 }
 
@@ -101,16 +107,18 @@ func serializeFactoryWithLineMetrics(
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 	config := factory.OnboardingConfigValue()
 	onboarding := &pb.FactoryOnboarding{
-		VcsIntegrationId:   config.VCSIntegrationID,
-		AgentIntegrationId: config.AgentIntegrationID,
-		AppRepository:      config.AppRepository,
-		BacklogRepository:  config.BacklogRepository,
-		DefaultBranch:      config.DefaultBranch,
-		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
-		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
-		ProvisionedAppId:   config.ProvisionedAppID,
-		ProvisionedLineId:  config.ProvisionedLineID,
-		Initial:            factory.IsInitialOnboarding(),
+		VcsIntegrationId:    config.VCSIntegrationID,
+		AgentIntegrationId:  config.AgentIntegrationID,
+		AppRepository:       config.AppRepository,
+		AppRepositoryId:     config.AppRepositoryID,
+		BacklogRepository:   config.BacklogRepository,
+		BacklogRepositoryId: config.BacklogRepositoryID,
+		DefaultBranch:       config.DefaultBranch,
+		IssuesSource:        serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:        serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:    config.ProvisionedAppID,
+		ProvisionedLineId:   config.ProvisionedLineID,
+		Initial:             factory.IsInitialOnboarding(),
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
@@ -892,6 +900,10 @@ func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	default:
 		return pb.WorkOrder_STATE_UNSPECIFIED
 	}
+}
+
+func WorkOrderStateToProto(state string) pb.WorkOrder_State {
+	return serializeWorkOrderState(state)
 }
 
 func serializeWorkOrderResult(result string) pb.WorkOrder_Result {

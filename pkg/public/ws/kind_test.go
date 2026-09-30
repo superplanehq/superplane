@@ -10,6 +10,7 @@ func TestKindFromTopic(t *testing.T) {
 		{topic: "agent-session:abc", want: KindAgent},
 		{topic: "agent-session:", want: KindAgent},
 		{topic: "factory:abc", want: KindFactory},
+		{topic: "public-line:abc", want: KindPublic},
 		{topic: "factory:", want: KindFactory},
 		{topic: "user:abc", want: KindUser},
 		{topic: "user:", want: KindUser},
