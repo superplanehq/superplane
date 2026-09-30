@@ -79,7 +79,16 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		})
 	}
 
-	response.Synchronizing, err = models.VCSProviderCatalogSynchronizing(database.DB(ctx), provider)
+	organizationID, err := currentOrganizationID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	response.Synchronizing, err = models.VCSProviderCatalogSynchronizing(
+		database.DB(ctx),
+		provider,
+		identity.userID,
+		organizationID,
+	)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to inspect repository synchronization")
 	}
@@ -129,8 +138,16 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
+	organizationUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+	state, err := githubcommon.SignHostedAppInstallState(cfg.WebhookSecret, organizationUUID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to create GitHub App setup state")
+	}
 	return &pb.StartVCSProviderInstallationResponse{
-		Url: githubcommon.HostedAppInstallURL(cfg.Slug, "o_"+organizationID),
+		Url: githubcommon.HostedAppInstallURL(cfg.Slug, state),
 	}, nil
 }
 
@@ -202,7 +219,13 @@ func RefreshVCSProviderOnboarding(
 			continue
 		}
 		found = true
-		if err := models.EnqueueVCSProviderRepositorySync(database.DB(ctx), provider, repository.RepositoryID, now); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			database.DB(ctx),
+			provider,
+			repository.RepositoryID,
+			now,
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		); err != nil {
 			return nil, grpcerrors.Internal(err, "failed to queue repository refresh")
 		}
 	}
