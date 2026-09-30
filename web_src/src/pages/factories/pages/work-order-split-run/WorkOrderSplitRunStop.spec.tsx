@@ -180,7 +180,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const strip = screen.getByTestId("split-run-intent-status-card");
     const settings = within(strip).getByTestId("split-run-intent-settings");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(settings).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(within(settings).getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
     await user.click(within(strip).getByRole("button", { name: "Start" }));
     await user.click(await screen.findByRole("button", { name: "Start anyway" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
@@ -273,13 +273,13 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const strip = screen.getByTestId("split-run-intent-status-card");
     const settings = within(strip).getByTestId("split-run-intent-settings");
-    const model = within(settings).getByRole("button", { name: "Model: Auto" });
-    expect(model).toHaveTextContent("Auto");
+    const model = within(settings).getByRole("button", { name: "Model: Auto Medium" });
+    expect(model).toHaveTextContent("Auto Medium");
     await user.click(model);
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.keyboard("{Escape}");
-    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6" })).toBeInTheDocument();
+    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
     const actions = within(strip).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(within(actions).getByRole("button", { name: "Start" }));
@@ -306,7 +306,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const strip = screen.getByTestId("split-run-intent-status-card");
-    await user.click(within(strip).getByRole("button", { name: "Model: Auto" }));
+    await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
     await user.keyboard("{Escape}");
@@ -334,7 +334,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const strip = screen.getByTestId("split-run-intent-status-card");
-    await user.click(within(strip).getByRole("button", { name: "Model: Auto" }));
+    await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "High" }));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));

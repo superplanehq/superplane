@@ -160,6 +160,8 @@ export interface SplitRunPhase {
   totalTokens?: string;
   /** Runner model this automation used. Hidden when empty. */
   model?: string;
+  /** Start thinking level from the dispatch that owns this run. Hidden when empty or Auto. */
+  thinkingLevel?: string;
   /** Board column this app sits on, when it is a column automation. */
   columnKey?: SplitRunBoardColumn;
   /** Pull request and revision that started this activity. */
@@ -1524,6 +1526,7 @@ function executionToPhase(
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
     model: modelsForExecution(order, execution),
+    thinkingLevel: thinkingLevelForExecution(order, execution),
   };
 }
 
@@ -1654,15 +1657,26 @@ function modelsForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkO
   return dispatchModelForExecution(order, execution);
 }
 
+function thinkingLevelForExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): string | undefined {
+  const value = dispatchForExecution(order, execution)?.thinkingLevel?.trim();
+  return value || undefined;
+}
+
 function dispatchModelForExecution(
   order: FactoriesWorkOrder,
   execution: FactoriesWorkOrderExecution,
 ): string | undefined {
-  const owner = (order.lineDispatches ?? []).find((dispatch) =>
+  const value = dispatchForExecution(order, execution)?.model?.trim();
+  return value || undefined;
+}
+
+function dispatchForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution) {
+  return (order.lineDispatches ?? []).find((dispatch) =>
     (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
   );
-  const value = owner?.model?.trim();
-  return value || undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

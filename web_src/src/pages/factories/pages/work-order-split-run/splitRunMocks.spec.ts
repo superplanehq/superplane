@@ -154,11 +154,63 @@ describe("splitRunFixtureForWorkOrder", () => {
               },
             ]),
             model: "anthropic/claude-sonnet-4-6",
+            thinkingLevel: "medium",
           },
         ],
       }),
     );
-    expect(fixture.phases.find((phase) => phase.name === "Implement")?.model).toBe("openai/gpt-4.1");
+    const implement = fixture.phases.find((phase) => phase.name === "Implement");
+    expect(implement?.model).toBe("openai/gpt-4.1");
+    expect(implement?.thinkingLevel).toBe("medium");
+  });
+
+  it("keeps an older line's thinking when a later dispatch uses another level", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        lineDispatches: [
+          {
+            ...dispatch("STATE_FINISHED", [
+              {
+                id: "exec-old",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                models: ["openai/gpt-4.1"],
+                createdAt: "2026-08-28T12:00:00Z",
+              },
+            ]),
+            id: "dispatch-old",
+            thinkingLevel: "medium",
+          },
+          {
+            ...dispatch("STATE_ACTIVE", [
+              {
+                id: "exec-new",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                models: ["openai/gpt-5"],
+                createdAt: "2026-08-28T13:00:00Z",
+              },
+            ]),
+            id: "dispatch-new",
+            thinkingLevel: "high",
+          },
+        ],
+      }),
+      { demoArtifacts: false },
+    );
+
+    expect(fixture.phases.find((phase) => phase.historyRun && phase.name === "Implement")).toMatchObject({
+      model: "openai/gpt-4.1",
+      thinkingLevel: "medium",
+    });
+    expect(fixture.phases.find((phase) => !phase.historyRun && phase.name === "Implement")).toMatchObject({
+      model: "openai/gpt-5",
+      thinkingLevel: "high",
+    });
   });
 
   it("keeps a single Backlog ingest row on an ingest draft", () => {
@@ -1243,6 +1295,9 @@ describe("line board work-order examples", () => {
       totalTokens: "1200",
       model: "anthropic/claude-sonnet-4-6",
     });
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.thinkingLevel).toBe(
+      undefined,
+    );
   });
 
   it("aggregates analysis usage across attempts without counting idle time", () => {
