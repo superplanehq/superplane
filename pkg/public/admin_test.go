@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -1191,5 +1192,83 @@ func TestAdminBlockAndUnblockAccount(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "Cannot block yourself")
+	})
+}
+
+func TestAdminDeleteAccount(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("deletes the account, its organization, and its workspaces", func(t *testing.T) {
+		target, err := models.CreateAccount("Delete Target", "delete-target@example.com")
+		require.NoError(t, err)
+		organization, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.SetOrganizationCreatedByAccount(database.Conn(), organization.ID, target.ID))
+		owner, err := models.CreateUserInTransaction(database.Conn(), organization.ID, target.ID, target.Email, target.Name)
+		require.NoError(t, err)
+		require.NoError(t, models.SetUserIsOwner(database.Conn(), owner.ID, true))
+		factory, err := models.CreateFactory(database.Conn(), organization.ID, "Workspace", "", "WSP")
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + target.ID.String(),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			DeletedOrganizationIDs []string `json:"deleted_organization_ids"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Equal(t, []string{organization.ID.String()}, body.DeletedOrganizationIDs)
+
+		_, err = models.FindAccountByID(target.ID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindAccountByEmail("delete-target@example.com")
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindOrganizationByID(organization.ID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		var remainingFactories int64
+		require.NoError(t, database.Conn().Model(&models.Factory{}).Where("id = ?", factory.ID).Count(&remainingFactories).Error)
+		assert.Zero(t, remainingFactories)
+	})
+
+	t.Run("keeps organizations that have another owner", func(t *testing.T) {
+		target := support.CreateUser(t, r, r.Organization.ID)
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + target.AccountID.String(),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		_, err := models.FindAccountByID(target.AccountID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects self-delete", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + r.Account.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		_, err := models.FindAccountByID(r.Account.ID.String())
+		require.NoError(t, err)
+	})
+
+	t.Run("returns not found for an unknown account", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + uuid.NewString(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 }

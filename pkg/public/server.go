@@ -782,6 +782,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/unblock", s.unblockAccount).Methods("POST")
+	adminRoute.HandleFunc("/accounts/{accountId}", s.adminDeleteAccount).Methods("DELETE")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
