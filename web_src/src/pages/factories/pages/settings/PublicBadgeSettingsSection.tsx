@@ -395,36 +395,44 @@ function BadgeSwitchRow({
 }) {
   // The permission tooltip states its own reason, so only one shows at a time.
   const reason = canUpdate && disabled ? disabledReason : undefined;
-  const row = (
-    <div className="flex w-full items-start justify-between gap-6" data-testid={testId}>
+  // The whole row opens the tooltip, but the switch anchors it, so the arrow
+  // points at the control the reason is about.
+  const [showReason, setShowReason] = useState(false);
+  const control = (
+    <Switch
+      checked={checked}
+      disabled={disabled}
+      onCheckedChange={onCheckedChange}
+      aria-label={label}
+      className="mt-0.5"
+    />
+  );
+
+  return (
+    <div
+      className="flex items-start justify-between gap-6"
+      data-testid={testId}
+      onMouseEnter={() => setShowReason(true)}
+      onMouseLeave={() => setShowReason(false)}
+    >
       <div className={cn("min-w-0 space-y-0.5", reason && "opacity-60")}>
         <p className="text-[13px] font-medium text-foreground">{label}</p>
         <p className="text-[12px] leading-5 text-muted-foreground">{helper}</p>
       </div>
-      <PermissionTooltip allowed={canUpdate || permissionsLoading} message={PUBLIC_BADGE_COPY.permission}>
-        <Switch
-          checked={checked}
-          disabled={disabled}
-          onCheckedChange={onCheckedChange}
-          aria-label={label}
-          className="mt-0.5"
-        />
-      </PermissionTooltip>
+      {reason ? (
+        <Tooltip open={showReason} onOpenChange={setShowReason}>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-not-allowed">{control}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" data-testid={`${testId}-reason`}>
+            {reason}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <PermissionTooltip allowed={canUpdate || permissionsLoading} message={PUBLIC_BADGE_COPY.permission}>
+          {control}
+        </PermissionTooltip>
+      )}
     </div>
-  );
-
-  if (!reason) {
-    return row;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="flex cursor-not-allowed">{row}</div>
-      </TooltipTrigger>
-      <TooltipContent side="top" data-testid={`${testId}-reason`}>
-        {reason}
-      </TooltipContent>
-    </Tooltip>
   );
 }
