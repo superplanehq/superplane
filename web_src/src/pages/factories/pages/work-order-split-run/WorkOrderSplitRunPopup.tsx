@@ -16,7 +16,7 @@ import { planningHeaderSpendActive } from "./planningHeaderSpend";
 import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
-import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
+import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
@@ -128,19 +128,19 @@ function AnalysisWorkOrderPopup({
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
+  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
   const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const draftStart = draftStartAction(
     fixture.footer.kind,
     onDispatch,
     taskConsole ? () => {} : () => setTab("log"),
     draftModel,
-    draftThinking,
+    factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = taskConsole && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
