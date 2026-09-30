@@ -3236,6 +3236,13 @@ CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders
 
 
 --
+-- Name: idx_factory_work_orders_organization_state_result; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_organization_state_result ON public.factory_work_orders USING btree (organization_id, state, result);
+
+
+--
 -- Name: idx_factory_work_orders_source_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4987,7 +4994,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930011130	f
+20260930093305	f
 \.
 
 

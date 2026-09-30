@@ -1,5 +1,5 @@
 import { Text } from "@/components/Text/text";
-import { Building, Palette, User } from "lucide-react";
+import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link } from "react-router";
@@ -11,13 +11,14 @@ import { SortableHeader, type SortDirection } from "./SortableHeader";
 interface AdminOrganization {
   id: string;
   name: string;
-  description: string;
   canvas_count: number;
+  task_count: number;
+  done_task_count: number;
   member_count: number;
   created_at?: string;
 }
 
-type SortField = "canvas_count" | "created_at" | "member_count" | "name";
+type SortField = "canvas_count" | "created_at" | "done_task_count" | "member_count" | "name" | "task_count";
 
 const PAGE_SIZE = 50;
 
@@ -26,6 +27,10 @@ interface OrganizationsTableProps {
   sortBy: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
+}
+
+function organizationPath(orgId: string): string {
+  return `/admin/organizations/${orgId}`;
 }
 
 function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
@@ -41,10 +46,23 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Description</th>
             <SortableHeader
-              label="Canvases"
+              label="Automations"
               field="canvas_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Tasks"
+              field="task_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Done Tasks"
+              field="done_task_count"
               currentSort={sortBy}
               currentDirection={sortDirection}
               onSort={onSort}
@@ -71,10 +89,10 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               key={org.id}
               className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
             >
-              <td className="px-4 py-2.5">
+              <td className="p-0">
                 <Link
-                  to={`/admin/organizations/${org.id}`}
-                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
+                  to={organizationPath(org.id)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
                 >
                   <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
                   {org.name || (
@@ -84,23 +102,54 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
                   )}
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-gray-500 max-w-xs truncate dark:text-gray-400">
-                {org.description || <span className="text-gray-300 dark:text-gray-600">—</span>}
-              </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Automations, ${org.canvas_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <Palette size={13} />
                   {org.canvas_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Tasks, ${org.task_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
+                  <ClipboardList size={13} />
+                  {org.task_count}
+                </Link>
+              </td>
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Done Tasks, ${org.done_task_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
+                  <CircleCheck size={13} />
+                  {org.done_task_count}
+                </Link>
+              </td>
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Members, ${org.member_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <User size={13} />
                   {org.member_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
-                {formatDate(org.created_at)}
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Created, ${formatDate(org.created_at)}`}
+                  className="block px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500"
+                >
+                  {formatDate(org.created_at)}
+                </Link>
               </td>
             </tr>
           ))}
