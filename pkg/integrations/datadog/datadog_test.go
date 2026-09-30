@@ -1,6 +1,7 @@
 package datadog
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -230,6 +232,29 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		})
 
 		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("rejects a body larger than the webhook limit", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			IntegrationID: integrationID.String(),
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				WebhookSecretName: {Name: WebhookSecretName, Value: []byte("secret-token")},
+			},
+		}
+
+		body := bytes.Repeat([]byte("a"), config.MaxWebhookPayloadSize+1)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/"+integrationID.String()+"/events", bytes.NewReader(body))
+		request.Header.Set(WebhookHeaderName, "secret-token")
+		recorder := httptest.NewRecorder()
+
+		d.HandleRequest(core.HTTPRequestContext{
+			Integration: appCtx,
+			Request:     request,
+			Response:    recorder,
+			Logger:      logrus.NewEntry(logrus.New()),
+		})
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, recorder.Code)
 	})
 
 	t.Run("rejects invalid token", func(t *testing.T) {

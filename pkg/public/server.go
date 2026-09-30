@@ -876,8 +876,11 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	)
 
 	logging.ForIntegration(*integrationInstance).WithField("source", "oauth_callback").Info("Integration operation may write secrets")
-	request, response, finishReceipt := s.trackDatadogWebhook(r, w, integrationInstance)
+	request, response, finishReceipt, deliver := s.trackDatadogWebhook(r, w, integrationInstance)
 	defer finishReceipt()
+	if !deliver {
+		return
+	}
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:           logging.ForIntegration(*integrationInstance),
 		Request:          request,

@@ -1,8 +1,11 @@
 package public
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -142,6 +145,90 @@ func TestAdminDatadogWebhooks(t *testing.T) {
 			Where("integration_id = ? AND outcome = ?", integration.ID, models.DatadogWebhookOutcomeRejected).
 			First(&rejectedReceipt).Error)
 		assert.Equal(t, http.StatusForbidden, rejectedReceipt.HTTPStatus)
+		assert.Equal(t, "error_tracking_alert", rejectedReceipt.EventType)
 		assert.NotContains(t, rejectedReceipt.EventType+rejectedReceipt.Service+rejectedReceipt.AlertID, "payload-secret-body")
 	})
+
+	t.Run("limits rejected receipts and does not read the body after the limit", func(t *testing.T) {
+		integration, err := models.CreateIntegration(uuid.New(), registry.Organization.ID, "datadog", "Datadog limit", map[string]any{
+			"site": "datadoghq.com",
+		})
+		require.NoError(t, err)
+		integrationContext := contexts.NewIntegrationContext(database.Conn(), nil, integration, server.encryptor, server.registry, nil)
+		require.NoError(t, integrationContext.SetSecret(datadog.WebhookSecretName, []byte("webhook-token")))
+
+		path := "/integrations/" + integration.ID.String() + "/events"
+		for range rejectedDatadogReceiptLimit {
+			response := execRequest(server, requestParams{
+				method: "POST",
+				path:   path,
+				body:   []byte(`{"event_type":"error_tracking_alert","body":"payload-secret-body"}`),
+				headers: map[string]string{
+					datadog.WebhookHeaderName: "wrong-token",
+				},
+			})
+			assert.Equal(t, http.StatusForbidden, response.Code)
+		}
+
+		var stored int64
+		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
+		assert.Equal(t, int64(rejectedDatadogReceiptLimit), stored)
+
+		bodyRead := false
+		request := httptest.NewRequest(http.MethodPost, path, readFailReader{onRead: func() { bodyRead = true }})
+		request.Header.Set(datadog.WebhookHeaderName, "wrong-token")
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		assert.Equal(t, http.StatusForbidden, response.Code)
+		assert.False(t, bodyRead)
+
+		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
+		assert.Equal(t, int64(rejectedDatadogReceiptLimit), stored)
+
+		accepted := execRequest(server, requestParams{
+			method: "POST",
+			path:   path,
+			body:   []byte(`{"event_type":"error_tracking_alert","alert_transition":"Triggered"}`),
+			headers: map[string]string{
+				datadog.WebhookHeaderName: "webhook-token",
+			},
+		})
+		assert.Equal(t, http.StatusOK, accepted.Code)
+		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
+		assert.Equal(t, int64(rejectedDatadogReceiptLimit+1), stored)
+	})
+
+	t.Run("rejects an authenticated body larger than the webhook limit", func(t *testing.T) {
+		integration, err := models.CreateIntegration(uuid.New(), registry.Organization.ID, "datadog", "Datadog size", map[string]any{
+			"site": "datadoghq.com",
+		})
+		require.NoError(t, err)
+		integrationContext := contexts.NewIntegrationContext(database.Conn(), nil, integration, server.encryptor, server.registry, nil)
+		require.NoError(t, integrationContext.SetSecret(datadog.WebhookSecretName, []byte("webhook-token")))
+
+		response := execRequest(server, requestParams{
+			method: "POST",
+			path:   "/integrations/" + integration.ID.String() + "/events",
+			body:   bytes.Repeat([]byte("a"), MaxEventSize+1),
+			headers: map[string]string{
+				datadog.WebhookHeaderName: "webhook-token",
+			},
+		})
+		assert.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
+
+		var stored int64
+		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
+		assert.Equal(t, int64(0), stored)
+	})
+}
+
+type readFailReader struct {
+	onRead func()
+}
+
+func (r readFailReader) Read(_ []byte) (int, error) {
+	if r.onRead != nil {
+		r.onRead()
+	}
+	return 0, io.EOF
 }

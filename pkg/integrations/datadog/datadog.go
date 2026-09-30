@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -195,8 +196,13 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	body, err := io.ReadAll(ctx.Request.Body)
+	body, err := readWebhookBody(ctx.Request.Body)
 	if err != nil {
+		if errors.Is(err, errWebhookBodyTooLarge) {
+			setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
+			ctx.Response.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
 		ctx.Logger.Errorf("failed to read datadog webhook body: %v", err)
 		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
@@ -232,6 +238,23 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 	setWebhookReceipt(ctx.Request, outcome, subscriptions)
 	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+var errWebhookBodyTooLarge = errors.New("webhook body is too large")
+
+func readWebhookBody(body io.Reader) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+
+	payload, err := io.ReadAll(io.LimitReader(body, int64(config.MaxWebhookPayloadSize)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(payload) > config.MaxWebhookPayloadSize {
+		return nil, errWebhookBodyTooLarge
+	}
+	return payload, nil
 }
 
 func shouldDispatchErrorTrackingAlert(payload map[string]any) bool {
