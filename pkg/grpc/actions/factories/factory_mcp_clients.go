@@ -137,8 +137,15 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		return nil, err
 	}
 	usersByID := make(map[uuid.UUID]models.User, len(users))
+	userUUIDs := make([]uuid.UUID, 0, len(users))
 	for _, user := range users {
 		usersByID[user.ID] = user
+		userUUIDs = append(userUUIDs, user.ID)
+	}
+
+	avatarURLs, err := models.FindUserAvatarURLsInOrganization(tx, orgID, userUUIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	oauthClients, err := models.ListMCPOAuthClientsByClientIDs(tx, clientIDs)
@@ -161,6 +168,9 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		if user, ok := usersByID[token.UserID]; ok {
 			client.UserName = user.Name
 			client.UserEmail = user.GetEmail()
+		}
+		if avatarURL, ok := avatarURLs[token.UserID]; ok {
+			client.UserAvatarUrl = avatarURL
 		}
 		out = append(out, client)
 	}

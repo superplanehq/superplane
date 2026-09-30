@@ -54,11 +54,21 @@ export const factoryCenteredSectionBodyClassName = cn(factorySectionBodyClassNam
  * measure, while the report column is sized for charts.
  */
 const settingsColumn = "mx-auto w-full max-w-3xl";
+/** Shorter measure for list-first settings such as Agent MCP servers and skills. */
+const settingsNarrowColumn = "mx-auto w-full max-w-2xl";
 const settingsWideColumn = "mx-auto w-full max-w-6xl";
 
 export const factorySettingsSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsColumn, "pt-14");
 
 export const factorySettingsSectionBodyClassName = cn(factorySectionBodyClassName, settingsColumn, "pb-10");
+
+export const factorySettingsNarrowSectionHeaderClassName = cn(
+  factorySectionHeaderClassName,
+  settingsNarrowColumn,
+  "pt-14",
+);
+
+export const factorySettingsNarrowSectionBodyClassName = cn(factorySectionBodyClassName, settingsNarrowColumn, "pb-10");
 
 /** Wider settings column for tables that cannot stay readable at the form measure. */
 export const factorySettingsWideSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsWideColumn, "pt-14");

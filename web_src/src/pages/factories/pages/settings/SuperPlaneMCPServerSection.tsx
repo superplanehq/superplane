@@ -1,10 +1,12 @@
 import type { FactoriesFactoryMcpClient } from "@/api-client";
+import { Avatar } from "@/components/Avatar/avatar";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRevokeFactoryMCPClient } from "@/hooks/useFactoryMCPClients";
 import { getApiErrorMessage } from "@/lib/errors";
+import { getUserInitials } from "@/lib/orgUserDisplay";
 import { formatRelativeTime, formatTimestampInUserTimezone } from "@/lib/timezone";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
@@ -12,12 +14,15 @@ import {
   workspaceMCPClientSnippet,
   workspaceMCPServerURL,
 } from "@/lib/workspaceMCPClientConfig";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/ui/CopyButton";
-import { Cable } from "lucide-react";
-import { useState } from "react";
+import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { FactorySettingsCard } from "./FactorySettingsCard";
+import { SuperPlaneMCPClientsEmptyIllustration } from "./SuperPlaneMCPClientsEmptyIllustration";
 import { SUPERPLANE_MCP_SERVER_COPY } from "./superplaneMCPServerCopy";
 
 const MCP_CLIENT_TOOLS: WorkspaceMCPClientTool[] = ["cursor", "claudeCode", "vscode"];
@@ -29,6 +34,11 @@ export function SuperPlaneMCPServerSection({
   isLoading,
   isError,
   canUpdate,
+  cardTitle = SUPERPLANE_MCP_SERVER_COPY.title,
+  showCardDescription = true,
+  connectAction = "card",
+  connectDialogOpen: connectDialogOpenProp,
+  onConnectDialogOpenChange,
 }: {
   organizationId: string;
   factoryId: string;
@@ -36,15 +46,36 @@ export function SuperPlaneMCPServerSection({
   isLoading: boolean;
   isError: boolean;
   canUpdate: boolean;
+  /** Omit on a dedicated Connect settings page that already sets the page title. */
+  cardTitle?: string | null;
+  showCardDescription?: boolean;
+  /** Put Connect in the page header with `connectAction="none"` and controlled dialog state. */
+  connectAction?: "card" | "none";
+  connectDialogOpen?: boolean;
+  onConnectDialogOpenChange?: (open: boolean) => void;
 }) {
   const [pendingRevoke, setPendingRevoke] = useState<FactoriesFactoryMcpClient | undefined>();
+  const [connectOpenInternal, setConnectOpenInternal] = useState(false);
+  const connectOpen = connectDialogOpenProp ?? connectOpenInternal;
+  const setConnectOpen = onConnectDialogOpenChange ?? setConnectOpenInternal;
   const revokeClient = useRevokeFactoryMCPClient(organizationId, factoryId);
   const pendingName = mcpClientDisplayName(pendingRevoke);
+  const connectClientAction =
+    connectAction === "card" ? (
+      <Button type="button" size="sm" onClick={() => setConnectOpen(true)} data-testid="superplane-mcp-connect-client">
+        {SUPERPLANE_MCP_SERVER_COPY.connectClient}
+      </Button>
+    ) : undefined;
 
   return (
     <>
-      <FactorySettingsCard title={SUPERPLANE_MCP_SERVER_COPY.title} data-testid="superplane-mcp-server">
-        <p className="mb-3 text-[12px] text-muted-foreground">{SUPERPLANE_MCP_SERVER_COPY.helper}</p>
+      <FactorySettingsCard
+        title={cardTitle === null ? undefined : (cardTitle ?? SUPERPLANE_MCP_SERVER_COPY.title)}
+        description={showCardDescription ? SUPERPLANE_MCP_SERVER_COPY.sectionDescription : undefined}
+        action={connectClientAction}
+        attachedList={clients.length > 0}
+        data-testid="superplane-mcp-server"
+      >
         {isLoading ? (
           <p className="text-[13px] text-muted-foreground">{SUPERPLANE_MCP_SERVER_COPY.loading}</p>
         ) : isError ? (
@@ -52,25 +83,26 @@ export function SuperPlaneMCPServerSection({
         ) : clients.length === 0 ? (
           <SuperPlaneMCPServerEmptyState />
         ) : (
-          <div>
-            <ul className="divide-y divide-border" data-testid="superplane-mcp-clients-list">
-              {clients.map((client) => (
-                <SuperPlaneMCPClientRow
-                  key={client.id}
-                  client={client}
-                  canUpdate={canUpdate}
-                  isRevoking={revokeClient.isPending && pendingRevoke?.id === client.id}
-                  onRevoke={() => setPendingRevoke(client)}
-                />
-              ))}
-            </ul>
-            <div className="mt-5 border-t border-border pt-5" data-testid="superplane-mcp-client-setup">
-              <p className="mb-3 text-[13px] font-medium text-foreground">{SUPERPLANE_MCP_SERVER_COPY.connectTitle}</p>
-              <SuperPlaneMCPClientSetup origin={window.location.origin} />
-            </div>
-          </div>
+          <SuperPlaneMCPClientsTable
+            clients={clients}
+            canUpdate={canUpdate}
+            pendingRevokeId={pendingRevoke?.id}
+            isRevoking={revokeClient.isPending}
+            onRevoke={setPendingRevoke}
+          />
         )}
       </FactorySettingsCard>
+      <Dialog open={connectOpen} onOpenChange={(open) => setConnectOpen(open)}>
+        <DialogContent
+          className="flex max-h-[min(42rem,85vh)] max-w-lg flex-col gap-3 overflow-y-auto sm:max-w-2xl"
+          data-testid="superplane-mcp-connect-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>{SUPERPLANE_MCP_SERVER_COPY.connectTitle}</DialogTitle>
+          </DialogHeader>
+          <SuperPlaneMCPClientSetup origin={window.location.origin} />
+        </DialogContent>
+      </Dialog>
       <FactoryDeleteDialog
         open={Boolean(pendingRevoke)}
         factoryName={pendingName}
@@ -98,19 +130,88 @@ export function SuperPlaneMCPServerSection({
   );
 }
 
+function SuperPlaneMCPClientsTable({
+  clients,
+  canUpdate,
+  pendingRevokeId,
+  isRevoking,
+  onRevoke,
+}: {
+  clients: FactoriesFactoryMcpClient[];
+  canUpdate: boolean;
+  pendingRevokeId?: string;
+  isRevoking: boolean;
+  onRevoke: (client: FactoriesFactoryMcpClient) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredClients = useMemo(() => filterMcpClients(clients, searchQuery), [clients, searchQuery]);
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={SUPERPLANE_MCP_SERVER_COPY.clientsSearchPlaceholder}
+          className="h-8 pl-8 text-[13px]"
+          data-testid="superplane-mcp-clients-search"
+        />
+      </div>
+      {filteredClients.length === 0 ? (
+        <p
+          className="py-8 text-center text-[13px] text-muted-foreground"
+          data-testid="superplane-mcp-clients-search-empty"
+        >
+          {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
+        </p>
+      ) : (
+        <table className="w-full text-left" data-testid="superplane-mcp-clients-list">
+          <tbody>
+            {filteredClients.map((client) => (
+              <SuperPlaneMCPClientRow
+                key={client.id}
+                client={client}
+                canUpdate={canUpdate}
+                isRevoking={isRevoking && pendingRevokeId === client.id}
+                onRevoke={() => onRevoke(client)}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function filterMcpClients(clients: FactoriesFactoryMcpClient[], query: string): FactoriesFactoryMcpClient[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return clients;
+  }
+  return clients.filter((client) => mcpClientSearchText(client).includes(normalized));
+}
+
+function mcpClientSearchText(client: FactoriesFactoryMcpClient): string {
+  return [mcpClientUserName(client), client.userEmail?.trim(), mcpClientDisplayName(client)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 function SuperPlaneMCPServerEmptyState() {
   return (
-    <Empty className="border-0 p-6 md:p-10" data-testid="superplane-mcp-clients-empty">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Cable />
+    <Empty className="flex-none gap-3 border-none p-6 md:p-8" data-testid="superplane-mcp-clients-empty">
+      <EmptyHeader className="max-w-md gap-3">
+        <EmptyMedia variant="default" className="mb-0">
+          <SuperPlaneMCPClientsEmptyIllustration />
         </EmptyMedia>
-        <EmptyTitle>{SUPERPLANE_MCP_SERVER_COPY.emptyTitle}</EmptyTitle>
-        <EmptyDescription>{SUPERPLANE_MCP_SERVER_COPY.emptyBody}</EmptyDescription>
+        <EmptyTitle className="text-[15px] font-medium">{SUPERPLANE_MCP_SERVER_COPY.emptyTitle}</EmptyTitle>
+        <EmptyDescription className="text-[13px]">{SUPERPLANE_MCP_SERVER_COPY.emptyDescription}</EmptyDescription>
       </EmptyHeader>
-      <EmptyContent className="max-w-full items-stretch text-left">
-        <SuperPlaneMCPClientSetup origin={window.location.origin} />
-      </EmptyContent>
     </Empty>
   );
 }
@@ -220,32 +321,43 @@ function SuperPlaneMCPClientRow({
   isRevoking: boolean;
   onRevoke: () => void;
 }) {
-  const name = mcpClientDisplayName(client);
-  const user = mcpClientUserName(client);
+  const clientName = mcpClientDisplayName(client);
+  const userName = mcpClientUserName(client);
   const when = formatRelativeTime(client.createdAt);
   const absoluteWhen = client.createdAt ? formatTimestampInUserTimezone(client.createdAt) : undefined;
 
   return (
-    <li className="flex items-center justify-between gap-4 py-3" data-testid={`superplane-mcp-client-${client.id}`}>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
-        <p className="truncate text-[12px] text-muted-foreground" title={absoluteWhen}>
-          {SUPERPLANE_MCP_SERVER_COPY.connectedBy(user, when)}
-        </p>
-      </div>
-      <PermissionTooltip allowed={canUpdate} message={SUPERPLANE_MCP_SERVER_COPY.noUpdatePermission}>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={!canUpdate || isRevoking}
-          onClick={onRevoke}
-          data-testid={`superplane-mcp-client-revoke-${client.id}`}
-        >
-          {SUPERPLANE_MCP_SERVER_COPY.revoke}
-        </Button>
-      </PermissionTooltip>
-    </li>
+    <tr className="border-b border-border last:border-b-0" data-testid={`superplane-mcp-client-${client.id}`}>
+      <td className="max-w-[12rem] py-2.5 pr-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Avatar
+            src={client.userAvatarUrl?.trim() || undefined}
+            initials={getUserInitials(userName)}
+            alt={userName}
+            className="size-6 shrink-0 bg-muted text-[10px] text-muted-foreground"
+          />
+          <span className="truncate text-[13px] font-medium text-foreground">{userName}</span>
+        </div>
+      </td>
+      <td className="py-2.5 pr-3 text-[13px] text-foreground">{clientName}</td>
+      <td className="whitespace-nowrap py-2.5 pr-3 text-[13px] text-muted-foreground" title={absoluteWhen}>
+        {when}
+      </td>
+      <td className="py-2.5 text-right">
+        <PermissionTooltip allowed={canUpdate} message={SUPERPLANE_MCP_SERVER_COPY.noUpdatePermission}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={!canUpdate || isRevoking}
+            onClick={onRevoke}
+            data-testid={`superplane-mcp-client-revoke-${client.id}`}
+          >
+            {SUPERPLANE_MCP_SERVER_COPY.revoke}
+          </Button>
+        </PermissionTooltip>
+      </td>
+    </tr>
   );
 }
 

@@ -222,7 +222,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
-		return grpcerrors.FailedPrecondition(err, "SuperPlane MCP Server is not enabled for this organization.")
+		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
 		return grpcerrors.NotFound(err, "MCP client not found")
 	case errors.Is(err, errInvalidArgument):
