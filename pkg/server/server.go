@@ -31,6 +31,7 @@ import (
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -508,19 +509,7 @@ func lookupPublicAPIPort() int {
 }
 
 func configureLogging() {
-	appEnv := os.Getenv("APP_ENV")
-
-	if appEnv == "development" || appEnv == "test" {
-		log.SetFormatter(&log.TextFormatter{
-			FullTimestamp:   false,
-			TimestampFormat: time.Stamp,
-		})
-	} else {
-		log.SetFormatter(&log.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: time.StampMilli,
-		})
-	}
+	logging.ConfigureProcessLogger()
 }
 
 func setupOtel() {
