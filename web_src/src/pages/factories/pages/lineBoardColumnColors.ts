@@ -8,7 +8,19 @@ import {
   type LineBoardColumnColorView,
 } from "../lib/lineBoardColumnColorViewPreference";
 
-export type LineBoardColumnColorId = "lime" | "yellow" | "teal" | "sky" | "purple" | "slate" | "rose" | "orange" | "indigo" | "emerald";
+export type LineBoardColumnColorId =
+  | "lime"
+  | "yellow"
+  | "teal"
+  | "sky"
+  | "purple"
+  | "slate"
+  | "rose"
+  | "orange"
+  | "indigo"
+  | "emerald"
+  | "cyan"
+  | "pink";
 
 export interface LineBoardColumnColor {
   id: LineBoardColumnColorId;
@@ -92,6 +104,20 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     className: "bg-emerald-300 dark:bg-emerald-800",
     laneClassName: "bg-emerald-100 dark:bg-emerald-950/40",
     borderClassName: "border-emerald-400 dark:border-emerald-800/45",
+  },
+  {
+    id: "cyan",
+    label: "Cyan",
+    className: "bg-cyan-300 dark:bg-cyan-800",
+    laneClassName: "bg-cyan-100 dark:bg-cyan-950/40",
+    borderClassName: "border-cyan-400 dark:border-cyan-800/45",
+  },
+  {
+    id: "pink",
+    label: "Pink",
+    className: "bg-pink-300 dark:bg-pink-800",
+    laneClassName: "bg-pink-100 dark:bg-pink-950/40",
+    borderClassName: "border-pink-400 dark:border-pink-800/45",
   },
 ];
 

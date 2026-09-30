@@ -43,6 +43,26 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 		assert.Equal(t, map[string]string{"backlog": "lime"}, updated.ColumnColorsValue())
 	})
 
+	t.Run("sets and reads back every allowed color id", func(t *testing.T) {
+		for colorID := range factoryLineColumnColorIDs {
+			t.Run(colorID, func(t *testing.T) {
+				factory, line := newFactoryAndLine(t)
+
+				response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+					FactoryId:    factory.ID.String(),
+					LineId:       line.ID.String(),
+					ColumnColors: map[string]string{"backlog": colorID},
+				})
+				require.NoError(t, err)
+				assert.Equal(t, map[string]string{"backlog": colorID}, response.Line.ColumnColors)
+
+				updated, err := factory.FindLine(db, line.ID)
+				require.NoError(t, err)
+				assert.Equal(t, map[string]string{"backlog": colorID}, updated.ColumnColorsValue())
+			})
+		}
+	})
+
 	t.Run("colors-only update does not require name or steps", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
