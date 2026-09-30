@@ -11,8 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
-var attachmentLinkPattern = regexp.MustCompile(
-	`(?i)!?\[[^\]]*]\(` + regexp.QuoteMeta(blob.FileRefScheme) + `://[^)\s]+\)`,
+var (
+	attachmentLinkPattern = regexp.MustCompile(
+		`(?i)!?\[[^\]]*]\(` + regexp.QuoteMeta(blob.FileRefScheme) + `://[^)\s]+\)`,
+	)
+	markdownImagePattern = regexp.MustCompile(`!\[[^\]]*]\([^)]*\)`)
 )
 
 const untitledWorkOrderTitle = "Untitled task"
@@ -52,12 +55,17 @@ func titleFromDescriptionLine(line string) string {
 	line = strings.TrimSpace(line)
 	line = stripLeadingHeading(line)
 	line = stripLeadingListMarker(line)
+	line = stripMarkdownImages(line)
 	line = unwrapFullEmphasis(line)
 	return collapseWhitespace(line)
 }
 
 func skippableDescriptionLine(line string) bool {
-	return strings.HasPrefix(line, "![") || isAttachmentOnlyLine(line)
+	return isAttachmentOnlyLine(line)
+}
+
+func stripMarkdownImages(line string) string {
+	return markdownImagePattern.ReplaceAllString(line, " ")
 }
 
 func isAttachmentOnlyLine(line string) bool {
@@ -127,10 +135,12 @@ func stripTaskCheckbox(line string) string {
 	default:
 		return line
 	}
-	if !hasLeadingSpace(line[3:]) {
+	rest := line[3:]
+	space, width := utf8.DecodeRuneInString(rest)
+	if width == 0 || !unicode.IsSpace(space) {
 		return line
 	}
-	return strings.TrimSpace(line[4:])
+	return strings.TrimSpace(rest[width:])
 }
 
 func descriptionLines(description string) []string {

@@ -84,6 +84,36 @@ func Test__titleFromWorkOrderDescription(t *testing.T) {
 			description: "![shot](sp-file://abc)",
 			want:        "",
 		},
+		{
+			name:        "keeps text beside a list image",
+			description: "- ![shot](sp-file://abc) Fix checkout",
+			want:        "Fix checkout",
+		},
+		{
+			name:        "keeps text before an image",
+			description: "Fix checkout ![shot](sp-file://abc)",
+			want:        "Fix checkout",
+		},
+		{
+			name:        "strips a task checkbox from a real title",
+			description: "- [ ] " + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "strips a checkbox followed by a non-breaking space",
+			description: "- [ ]\u00a0Fix checkout",
+			want:        "Fix checkout",
+		},
+		{
+			name:        "strips a checked checkbox followed by an em space",
+			description: "- [x]\u2003" + realLine,
+			want:        realLine,
+		},
+		{
+			name:        "skips a checkbox placeholder after a non-breaking space",
+			description: "- [ ]\u00a0n/a\n" + realLine,
+			want:        realLine,
+		},
 	}
 
 	for _, tc := range tests {
