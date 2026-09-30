@@ -19,6 +19,7 @@ const (
 	webhookIDHeader        = "Webhook-Id"
 	webhookTimestampHeader = "Webhook-Timestamp"
 	webhookSignatureHeader = "Webhook-Signature"
+	webhookVersionHeader   = "Webhook-Api-Version"
 	signatureTolerance     = 5 * time.Minute
 	orderPaidType          = "order.paid"
 	orderRefundedType      = "order.refunded"
@@ -186,8 +187,16 @@ func (p polarTime) TimePtr() *time.Time {
 
 type ParsedWebhook struct {
 	Type         string
+	APIVersion   string
 	Order        *OrderWebhookEvent
 	Subscription *SubscriptionWebhookEvent
+}
+
+// APIVersionMismatch reports whether Polar sent this event with a payload
+// contract other than the pinned one. The event must still be applied:
+// redeliveries keep the version of the first delivery.
+func (p *ParsedWebhook) APIVersionMismatch() bool {
+	return p != nil && p.APIVersion != "" && p.APIVersion != APIVersion()
 }
 
 func isSubscriptionEventType(eventType string) bool {
@@ -206,10 +215,15 @@ func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*Pa
 	}
 
 	var envelope struct {
-		Type string `json:"type"`
+		Type       string `json:"type"`
+		APIVersion string `json:"api_version"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnusableWebhookPayload, err)
+	}
+	apiVersion := headerValue(headers, webhookVersionHeader)
+	if apiVersion == "" {
+		apiVersion = strings.TrimSpace(envelope.APIVersion)
 	}
 
 	switch {
@@ -218,13 +232,13 @@ func VerifyAndParseWebhook(headers http.Header, body []byte, secret string) (*Pa
 		if err != nil {
 			return nil, err
 		}
-		return &ParsedWebhook{Type: event.Type, Order: event}, nil
+		return &ParsedWebhook{Type: event.Type, APIVersion: apiVersion, Order: event}, nil
 	case isSubscriptionEventType(envelope.Type):
 		event, err := parseSubscriptionEvent(body)
 		if err != nil {
 			return nil, err
 		}
-		return &ParsedWebhook{Type: event.Type, Subscription: event}, nil
+		return &ParsedWebhook{Type: event.Type, APIVersion: apiVersion, Subscription: event}, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedWebhookEvent, envelope.Type)
 	}

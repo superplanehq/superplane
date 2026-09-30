@@ -622,7 +622,10 @@ func Test__BillingState(t *testing.T) {
 
 func polarAPIServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Polar-Version", r.Header.Get("Polar-Version"))
+		handler(w, r)
+	}))
 	t.Cleanup(server.Close)
 	return server
 }

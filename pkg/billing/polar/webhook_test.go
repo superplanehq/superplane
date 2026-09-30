@@ -136,6 +136,53 @@ func Test__VerifyAndParseSubscriptionReadsModifiedAt(t *testing.T) {
 	assert.True(t, parsed.Subscription.Timestamp.Time.Equal(modifiedAt.Add(time.Minute)))
 }
 
+func Test__VerifyAndParseWebhookReadsAPIVersion(t *testing.T) {
+	t.Setenv("POLAR_API_VERSION", "")
+	secret := "whsec_test-secret"
+
+	t.Run("header wins over body", func(t *testing.T) {
+		body := []byte(`{"type":"order.paid","api_version":"2026-04","data":{"id":"order_1"}}`)
+		headers := signedHeaders("msg_header", body, secret)
+		headers.Set("webhook-api-version", defaultAPIVersion)
+
+		parsed, err := VerifyAndParseWebhook(headers, body, secret)
+		require.NoError(t, err)
+		assert.Equal(t, defaultAPIVersion, parsed.APIVersion)
+		assert.False(t, parsed.APIVersionMismatch())
+	})
+
+	t.Run("body when header is missing", func(t *testing.T) {
+		body := []byte(`{"type":"order.paid","api_version":"2026-04","data":{"id":"order_1"}}`)
+		headers := signedHeaders("msg_body", body, secret)
+
+		parsed, err := VerifyAndParseWebhook(headers, body, secret)
+		require.NoError(t, err)
+		assert.Equal(t, "2026-04", parsed.APIVersion)
+	})
+
+	t.Run("mismatch still parses the event", func(t *testing.T) {
+		body := []byte(`{"type":"subscription.updated","data":{"id":"sub_1"}}`)
+		headers := signedHeaders("msg_mismatch", body, secret)
+		headers.Set("webhook-api-version", "2026-04")
+
+		parsed, err := VerifyAndParseWebhook(headers, body, secret)
+		require.NoError(t, err)
+		require.NotNil(t, parsed.Subscription)
+		assert.Equal(t, "sub_1", parsed.Subscription.Data.ID)
+		assert.True(t, parsed.APIVersionMismatch())
+	})
+
+	t.Run("no version is not a mismatch", func(t *testing.T) {
+		body := []byte(`{"type":"order.paid","data":{"id":"order_1"}}`)
+		headers := signedHeaders("msg_none", body, secret)
+
+		parsed, err := VerifyAndParseWebhook(headers, body, secret)
+		require.NoError(t, err)
+		assert.Empty(t, parsed.APIVersion)
+		assert.False(t, parsed.APIVersionMismatch())
+	})
+}
+
 func orderPaidBody(orderID string) []byte {
 	return []byte(fmt.Sprintf(`{
 		"type": "order.paid",
