@@ -32,6 +32,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -1141,6 +1142,38 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	assert.Equal(t, active.ID, activeAgain.ID)
 }
 
+func TestBeginPlanningWaitAndNotify_AutoStartsWhenGitHubAssigneeDoesNotMatch(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	line := mustAutoStartLine(t, r, factoryModel, true)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NotNil(t, session.CanvasID)
+	runID := attachUnmatchedGitHubIssueSource(t, db, *session.CanvasID, "start")
+	require.NoError(t, db.Exec(
+		"UPDATE factory_work_orders SET source_run_id = ?, created_by_id = NULL WHERE id = ?",
+		runID,
+		order.ID,
+	).Error)
+	reloadedBeforeStart, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	require.Nil(t, reloadedBeforeStart.CreatedByID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Empty(t, reloaded.Assignees)
+	active, err := reloaded.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, line.ID, active.LineID)
+}
+
 func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	r := support.Setup(t)
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
@@ -1213,6 +1246,66 @@ func mustEnableAutoStart(t *testing.T, db *gorm.DB, factoryModel *models.Factory
 	planning := factoryModel.Planning()
 	planning.AutoStartLineID = &lineID
 	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
+}
+
+func attachUnmatchedGitHubIssueSource(t *testing.T, db *gorm.DB, canvasID uuid.UUID, nodeID string) uuid.UUID {
+	t.Helper()
+	var canvas models.Canvas
+	require.NoError(t, db.First(&canvas, "id = ?", canvasID).Error)
+	require.NotNil(t, canvas.LiveVersionID)
+
+	now := time.Now()
+	run := models.CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     nodeID,
+		VersionID:  *canvas.LiveVersionID,
+		State:      models.CanvasRunStateFinished,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	event := models.CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     nodeID,
+		Channel:    "default",
+		Data: models.NewJSONValue(map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"action": "opened",
+				"issue": map[string]any{
+					"assignees": []any{map[string]any{"login": "stranger"}},
+				},
+				"repository": map[string]any{"full_name": "acme/payments"},
+			},
+		}),
+		State:     models.CanvasEventStatePending,
+		RunID:     run.ID,
+		CreatedAt: &now,
+	}
+	execution := models.CanvasNodeExecution{
+		ID:            uuid.New(),
+		WorkflowID:    canvas.ID,
+		NodeID:        nodeID,
+		RootEventID:   event.ID,
+		EventID:       event.ID,
+		RunID:         run.ID,
+		State:         models.CanvasNodeExecutionStateFinished,
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&run).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&event).Error; err != nil {
+			return err
+		}
+		return tx.Create(&execution).Error
+	}))
+	return run.ID
 }
 
 func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {

@@ -395,6 +395,160 @@ func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_DraftToOpenAssignsGitHubAssignee(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org, creatorID, factoryModel := setupFactoryWithUser(t, "github-owner")
+	member := createOrgUser(t, org.ID, "ada")
+	linkGitHubLogin(t, member, "AdaLovelace")
+
+	t.Run("assigns the first matched GitHub assignee", func(t *testing.T) {
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"  AdaLovelace  "})
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, member.ID, loaded.Assignees[0].UserID)
+		assertGitHubOwnerRecorded(t, loaded, member.ID)
+	})
+
+	t.Run("uses a later assignee when earlier logins do not match", func(t *testing.T) {
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"stranger", "adalovelace"})
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, member.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("uses the GitHub sign-in username when no account is linked", func(t *testing.T) {
+		signer := createOrgUser(t, org.ID, "hubot")
+		signInWithGitHub(t, signer, "hubot")
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"Hubot"})
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, signer.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("prefers the linked GitHub username over the sign-in username", func(t *testing.T) {
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"signin-only"})
+		signInWithGitHub(t, member, "signin-only")
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		assert.Empty(t, loaded.Assignees)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+	})
+
+	t.Run("leaves the task unassigned when the origin is not GitHub", func(t *testing.T) {
+		order := draftFromSourcePayload(t, factoryModel, org.ID, creatorID, map[string]any{
+			"action": "created",
+			"issue": map[string]any{
+				"key": "PAY-1",
+				"fields": map[string]any{
+					"assignee": map[string]any{"displayName": "Ada Lovelace"},
+				},
+			},
+			"url": "https://acme.atlassian.net/browse/PAY-1",
+		})
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		assert.Empty(t, loaded.Assignees)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+	})
+
+	t.Run("leaves the task unassigned when the payload has no assignees", func(t *testing.T) {
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, nil)
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		assert.Empty(t, loaded.Assignees)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+	})
+
+	t.Run("leaves the task unassigned when no login matches a member", func(t *testing.T) {
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"stranger", "dependabot[bot]"})
+
+		require.NoError(t, order.TransitionOnDispatch(database.Conn(), nil))
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		assert.Empty(t, loaded.Assignees)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+	})
+
+	t.Run("still opens when the source run has no root event", func(t *testing.T) {
+		runID := createSourceRun(t, org.ID, creatorID)
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Missing event", "", nil, nil, &runID)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		assert.Empty(t, loaded.Assignees)
+		assert.Equal(t, FactoryWorkOrderStateOpen, loaded.State)
+	})
+
+	t.Run("assigns the person who opens the draft and ignores GitHub assignees", func(t *testing.T) {
+		starter := createOrgUser(t, org.ID, "starter")
+		order := draftFromGitHubIssue(t, factoryModel, org.ID, creatorID, []string{"AdaLovelace"})
+
+		_, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &starter.ID,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("keeps an existing owner when nobody opens the draft", func(t *testing.T) {
+		runID := createGitHubIssueSource(t, org.ID, creatorID, []string{"AdaLovelace"})
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Owned draft", "", &creatorID, []uuid.UUID{creatorID}, &runID)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded := reloadWorkOrder(t, factoryModel, order.ID)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, creatorID, loaded.Assignees[0].UserID)
+	})
+}
+
 func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -1345,4 +1499,198 @@ func mustArtifactData(t *testing.T, artifact *FactoryWorkOrderArtifact) map[stri
 	var data map[string]any
 	require.NoError(t, json.Unmarshal(artifact.Data, &data))
 	return data
+}
+
+func reloadWorkOrder(t *testing.T, factoryModel *Factory, orderID uuid.UUID) *FactoryWorkOrder {
+	t.Helper()
+	loaded, err := factoryModel.FindWorkOrder(database.Conn(), orderID)
+	require.NoError(t, err)
+	return loaded
+}
+
+func assertGitHubOwnerRecorded(t *testing.T, order *FactoryWorkOrder, ownerID uuid.UUID) {
+	t.Helper()
+	events, err := order.ListEvents(database.Conn(), 50, nil)
+	require.NoError(t, err)
+	recorded := findEventOfType(t, events, factory.EventTypeOrderAssigneesUpdated)
+	var payload factory.WorkOrderAssigneesUpdated
+	require.NoError(t, json.Unmarshal(recorded.Data, &payload))
+	require.NotNil(t, payload.User)
+	assert.Equal(t, ownerID, payload.User.ID)
+	require.Len(t, payload.Assigned, 1)
+	assert.Equal(t, ownerID, payload.Assigned[0].ID)
+}
+
+func linkGitHubLogin(t *testing.T, user *User, login string) {
+	t.Helper()
+	require.NotNil(t, user.AccountID)
+	require.NoError(t, SaveAccountLinkedAccount(database.Conn(), NewAccountLinkedAccount(
+		*user.AccountID,
+		ProviderGitHub,
+		uuid.NewString(),
+		login,
+		user.Name,
+		"",
+	)))
+}
+
+func signInWithGitHub(t *testing.T, user *User, login string) {
+	t.Helper()
+	require.NotNil(t, user.AccountID)
+	require.NoError(t, database.Conn().Create(&AccountProvider{
+		AccountID:  *user.AccountID,
+		Provider:   ProviderGitHub,
+		ProviderID: uuid.NewString(),
+		Username:   login,
+		Email:      user.GetEmail(),
+		Name:       user.Name,
+	}).Error)
+}
+
+func draftFromGitHubIssue(t *testing.T, factoryModel *Factory, orgID, ownerID uuid.UUID, logins []string) *FactoryWorkOrder {
+	t.Helper()
+	runID := createGitHubIssueSource(t, orgID, ownerID, logins)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Imported issue", "", nil, nil, &runID)
+	require.NoError(t, err)
+	assert.Empty(t, order.Assignees)
+	return order
+}
+
+func draftFromSourcePayload(t *testing.T, factoryModel *Factory, orgID, ownerID uuid.UUID, payload map[string]any) *FactoryWorkOrder {
+	t.Helper()
+	runID := createSourceEvent(t, orgID, ownerID, payload)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Imported ticket", "", nil, nil, &runID)
+	require.NoError(t, err)
+	return order
+}
+
+func createGitHubIssueSource(t *testing.T, orgID, ownerID uuid.UUID, logins []string) uuid.UUID {
+	t.Helper()
+	assignees := make([]any, 0, len(logins))
+	for _, login := range logins {
+		assignees = append(assignees, map[string]any{"login": login})
+	}
+	return createSourceEvent(t, orgID, ownerID, map[string]any{
+		"action": "opened",
+		"issue": map[string]any{
+			"html_url":  "https://github.com/acme/payments/issues/12",
+			"assignees": assignees,
+		},
+		"repository": map[string]any{"full_name": "acme/payments"},
+	})
+}
+
+func createSourceRun(t *testing.T, orgID, ownerID uuid.UUID) uuid.UUID {
+	t.Helper()
+	canvas, node, versionID := createSourceCanvas(t, orgID, ownerID)
+	now := time.Now()
+	run := CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     node.NodeID,
+		VersionID:  versionID,
+		State:      CanvasRunStateFinished,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return run.ID
+}
+
+func createSourceEvent(t *testing.T, orgID, ownerID uuid.UUID, payload map[string]any) uuid.UUID {
+	t.Helper()
+	canvas, node, versionID := createSourceCanvas(t, orgID, ownerID)
+	now := time.Now()
+	run := CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     node.NodeID,
+		VersionID:  versionID,
+		State:      CanvasRunStateFinished,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	event := CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     node.NodeID,
+		Channel:    "default",
+		Data: NewJSONValue(map[string]any{
+			"type": "github.issue",
+			"data": payload,
+		}),
+		State:     CanvasEventStatePending,
+		RunID:     run.ID,
+		CreatedAt: &now,
+	}
+	execution := CanvasNodeExecution{
+		ID:            uuid.New(),
+		WorkflowID:    canvas.ID,
+		NodeID:        node.NodeID,
+		RootEventID:   event.ID,
+		EventID:       event.ID,
+		RunID:         run.ID,
+		State:         CanvasNodeExecutionStateFinished,
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&run).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&event).Error; err != nil {
+			return err
+		}
+		return tx.Create(&execution).Error
+	}))
+	return run.ID
+}
+
+func createSourceCanvas(t *testing.T, orgID, ownerID uuid.UUID) (Canvas, CanvasNode, uuid.UUID) {
+	t.Helper()
+	now := time.Now()
+	versionID := uuid.New()
+	canvas := Canvas{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		LiveVersionID:  &versionID,
+		Name:           fmt.Sprintf("intake-%s", uuid.NewString()),
+		CreatedBy:      &ownerID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	version := CanvasVersion{
+		ID:         versionID,
+		WorkflowID: canvas.ID,
+		OwnerID:    &ownerID,
+		Nodes:      datatypes.NewJSONSlice([]Node{}),
+		Edges:      datatypes.NewJSONSlice([]Edge{}),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	node := CanvasNode{
+		WorkflowID:    canvas.ID,
+		NodeID:        "trigger",
+		Name:          "GitHub issue",
+		State:         CanvasNodeStateReady,
+		Type:          NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(NodeRef{Trigger: &TriggerRef{Name: "github.onIssue"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(Position{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&canvas).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+		return tx.Create(&node).Error
+	}))
+	return canvas, node, versionID
 }
