@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -462,4 +463,173 @@ func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
+func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	longLine := strings.Repeat("a", 300)
+	skippedLead := "\n\n  ![shot](sp-file://abc)\nnull\nUntitled task\nn/a\n"
+	tests := []struct {
+		name        string
+		title       string
+		description string
+		wantTitle   string
+	}{
+		{
+			name:        "empty title",
+			title:       "",
+			description: "Refunds fail on retry.\n\nMore context.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "null",
+			title:       "null",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "unknown",
+			title:       "unknown",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "Unknown",
+			title:       "Unknown",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "quoted null",
+			title:       `"null"`,
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "n/a",
+			title:       "n/a",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "quoted null with trailing punctuation",
+			title:       `"null."`,
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "meaningful title stays",
+			title:       "Ship the retry fix",
+			description: "A different first line.",
+			wantTitle:   "Ship the retry fix",
+		},
+		{
+			name:        "null pointer stays",
+			title:       "null pointer",
+			description: "A different first line.",
+			wantTitle:   "null pointer",
+		},
+		{
+			name:        "skips blank image and placeholder lines",
+			title:       "",
+			description: skippedLead + "Fix the checkout retry.",
+			wantTitle:   "Fix the checkout retry.",
+		},
+		{
+			name:        "heading line",
+			title:       "",
+			description: "## Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "fully wrapped emphasis",
+			title:       "null",
+			description: "## **Refunds fail on retry.**",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "collapses whitespace",
+			title:       "",
+			description: "Refunds   fail\ton retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "cuts a long derived title",
+			title:       "unknown",
+			description: longLine + "\nMore context.",
+			wantTitle:   longLine[:workOrderTitleMaxLength],
+		},
+		{
+			name:        "untitled task is still a placeholder",
+			title:       "Untitled task",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "skips a list placeholder",
+			title:       "null",
+			description: "- n/a\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "skips an attachment file link",
+			title:       "unknown",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "attachment only becomes untitled task",
+			title:       "",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)",
+			wantTitle:   untitledWorkOrderTitle,
+		},
+		{
+			name:        "no real description line",
+			title:       "",
+			description: skippedLead,
+			wantTitle:   untitledWorkOrderTitle,
+		},
+		{
+			name:        "title with no letter or digit",
+			title:       "???",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			order, err := factoryModel.CreateWorkOrder(db, "Seed title", tc.description, &r.User, nil, nil)
+			require.NoError(t, err)
+			title := tc.title
+			require.NoError(t, order.UpdateContent(db, &title, nil))
+
+			resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factoryModel.ID.String(),
+				OrderId:   order.ID.String(),
+				LineName:  line.Name,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTitle, resp.Order.Title)
+			require.NotEmpty(t, resp.Order.LineDispatches)
+			assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, resp.Order.LineDispatches[0].State)
+
+			reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTitle, reloaded.Title)
+			assert.Equal(t, tc.description, reloaded.Description)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+		})
+	}
 }
