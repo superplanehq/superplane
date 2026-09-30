@@ -71,6 +71,72 @@ describe("PhaseLogCard title line", () => {
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · opus 4-6 · 1m");
   });
 
+  it("shows the thinking level in the model segment", () => {
+    render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          costCents: "45",
+          totalTokens: "1200",
+          model: "anthropic/claude-opus-4-6",
+          thinkingLevel: "medium",
+        }}
+        expanded={false}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent(
+      "$0.45 · 1.2k · opus 4-6 Medium · 1m",
+    );
+  });
+
+  it("does not add a thinking word for Auto or an empty value", () => {
+    const { rerender } = render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          costCents: "45",
+          totalTokens: "1200",
+          model: "anthropic/claude-opus-4-6",
+          thinkingLevel: "auto",
+        }}
+        expanded={false}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · opus 4-6 · 1m");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).not.toHaveTextContent("Medium");
+
+    rerender(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          costCents: "45",
+          totalTokens: "1200",
+          model: "anthropic/claude-opus-4-6",
+          thinkingLevel: "",
+        }}
+        expanded={false}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · opus 4-6 · 1m");
+    expect(screen.getByTestId("split-run-phase-duration-plan")).not.toHaveTextContent("Default");
+  });
+
+  it("does not add a thinking word when the phase has no model", () => {
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "1200", thinkingLevel: "medium" }}
+        expanded={false}
+      />,
+    );
+
+    const metrics = screen.getByTestId("split-run-phase-duration-plan");
+    expect(metrics).toHaveTextContent("$0.45 · 1.2k · 1m");
+    expect(metrics).not.toHaveTextContent("Medium");
+  });
+
   it("uses one mono face and size on the name and artifact", () => {
     render(
       <PhaseLogCard
