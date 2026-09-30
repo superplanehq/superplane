@@ -42,9 +42,9 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
 	})
 
-	// Hosted GitHub App connections hold repository hook write access, so they
-	// register their own hook instead of relying on the App webhook endpoint.
-	t.Run("registers a repository hook for a hosted app connection", func(t *testing.T) {
+	// Hosted GitHub App metadata must not skip hook registration. The App
+	// webhook endpoint no longer delivers repository events to nodes.
+	t.Run("does not skip hook registration for hosted app metadata", func(t *testing.T) {
 		t.Setenv(config.EnvGitHubAppID, "12345")
 		t.Setenv(config.EnvGitHubAppSlug, "superplane")
 		t.Setenv(config.EnvGitHubAppPrivateKey, "private-key")
@@ -211,7 +211,7 @@ func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
 		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
 	})
 
-	t.Run("removes the hook of a hosted app connection", func(t *testing.T) {
+	t.Run("does not skip hook removal for hosted app metadata", func(t *testing.T) {
 		handler := &GitHubWebhookHandler{}
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
