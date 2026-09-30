@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -43,6 +44,29 @@ func IssueIDFromEventData(eventData any) (string, bool) {
 		return issueID, true
 	}
 	return issueIDInValue(payload)
+}
+
+// ReceiptIDFromEventData reads the SuperPlane webhook receipt ID stored on a
+// datadog.errorTrackingAlert canvas event. Datadog does not send this field.
+func ReceiptIDFromEventData(eventData any) (uuid.UUID, bool) {
+	envelope, ok := eventData.(map[string]any)
+	if !ok {
+		return uuid.Nil, false
+	}
+	if typeName, _ := envelope["type"].(string); typeName != "" && typeName != ErrorTrackingAlertPayloadType {
+		return uuid.Nil, false
+	}
+
+	payload, ok := envelope["data"].(map[string]any)
+	if !ok {
+		return uuid.Nil, false
+	}
+	raw, _ := payload[ReceiptField].(string)
+	receiptID, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return receiptID, true
 }
 
 func issueIDInValue(value any) (string, bool) {

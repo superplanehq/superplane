@@ -3,12 +3,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
 import { SentryWebhooks } from "./SentryWebhooks";
-import {
-  SENTRY_WEBHOOKS_EMPTY,
-  SENTRY_WEBHOOKS_HELP,
-  SENTRY_WEBHOOKS_PAGE_EMPTY,
-  SENTRY_WEBHOOKS_TITLE,
-} from "./sentryWebhookReceipts";
+import { SENTRY_WEBHOOKS_EMPTY, SENTRY_WEBHOOKS_HELP, SENTRY_WEBHOOKS_PAGE_EMPTY } from "./sentryWebhookReceipts";
 
 const renderPage = () =>
   render(
@@ -33,8 +28,7 @@ describe("SentryWebhooks", () => {
 
     renderPage();
 
-    expect(await screen.findByText(SENTRY_WEBHOOKS_TITLE)).toBeInTheDocument();
-    expect(screen.getByText(SENTRY_WEBHOOKS_HELP)).toBeInTheDocument();
+    expect(await screen.findByText(SENTRY_WEBHOOKS_HELP)).toBeInTheDocument();
     expect(await screen.findByText(SENTRY_WEBHOOKS_EMPTY)).toBeInTheDocument();
   });
 

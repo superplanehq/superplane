@@ -34,6 +34,23 @@ func Test__OnErrorTrackingAlert__OnIntegrationMessage(t *testing.T) {
 		assert.Equal(t, payload.Description, payload.Body)
 	})
 
+	t.Run("keeps the webhook receipt id on the event", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		receiptID := "6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d"
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message: map[string]any{
+				"event_type":       ErrorTrackingAlertEventType,
+				"alert_transition": AlertTransitionTriggered,
+				ReceiptField:       receiptID,
+			},
+			Events: events,
+		})
+		require.NoError(t, err)
+		require.Len(t, events.Payloads, 1)
+		payload := events.Payloads[0].Data.(ErrorTrackingAlertPayload)
+		assert.Equal(t, receiptID, payload.ReceiptID)
+	})
+
 	t.Run("loads the error tracking issue named by the alert", func(t *testing.T) {
 		const issueID = "da226b38-baac-11f1-bad1-da7ad0900005"
 		httpContext := &contexts.HTTPContext{

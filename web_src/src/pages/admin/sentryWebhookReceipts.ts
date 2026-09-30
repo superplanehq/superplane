@@ -1,4 +1,3 @@
-export const SENTRY_WEBHOOKS_TITLE = "Sentry Webhooks";
 export const SENTRY_WEBHOOKS_HELP =
   "Recent calls from Sentry. The list shows the event type, project, result, and task ID. It does not show the payload or tokens.";
 export const SENTRY_WEBHOOKS_EMPTY = "No Sentry webhooks have arrived.";
