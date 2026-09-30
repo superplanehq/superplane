@@ -42,10 +42,89 @@ describe("AgentActivityView console", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Researched 1 source" }));
+    expect(screen.getByText("2 lines")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "curl -fL bun.zip" }));
+
     const command = screen.getByTestId("agent-tool-command-1");
     expect(command.tagName).toBe("PRE");
-    expect(command).toHaveClass("text-foreground/90");
+    expect(command).toHaveClass("whitespace-pre", "text-foreground/90");
     expect(command).not.toHaveClass("text-muted-foreground");
+    expect(command.textContent).toBe("cd /tmp/opencode && curl -fL bun.zip\nunzip bun.zip");
+  });
+
+  it("shows the clone command and keeps its line breaks", async () => {
+    const user = userEvent.setup();
+    const script = [
+      "set -euo pipefail",
+      'if [ -z "${REPO_URL:-}" ]; then',
+      '  echo "This workspace has no repository to analyze." >&2',
+      "  exit 1",
+      "fi",
+      'git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"',
+      "rm -rf repo",
+      'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo',
+    ].join("\n");
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: script,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
+    await user.click(
+      screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
+    );
+
+    expect(screen.getByTestId("agent-tool-command-1").textContent).toBe(script);
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+  });
+
+  it("collapses carriage-return progress into finished output lines", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "git clone repo",
+          output: "remote: Enumerating objects: 1\rremote: Enumerating objects: 9364, done.\n",
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("remote: Enumerating objects: 9364, done.")).toBeInTheDocument();
+    expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
+  });
+
+  it("shows the exit code when a console command fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "false",
+          status: "failed",
+          exitCode: 1,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Used terminal" }));
+    expect(screen.getByText("Exit code 1")).toBeInTheDocument();
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
   it("shows finished tool output after the console command row", async () => {
