@@ -311,6 +311,27 @@ describe("buildSplitRunFooter", () => {
 
     expect(classicSplitRunFooter(footer).note?.headline).toBe("Analysis did not pass");
   });
+
+  it("keeps a credit failure note when the draft already has scores", () => {
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: {
+        key: "draft-credit",
+        headline: "Analysis did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+      clarityScore: 4,
+      confidenceScore: 5,
+    });
+
+    expect(footer.note).toEqual({
+      headline: "Analysis did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(footer.note?.headline).not.toBe("This task is ready to start");
+  });
 });
 
 describe("availableSplitRunStopChoices", () => {

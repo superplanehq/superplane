@@ -408,10 +408,13 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   const hasScore = input.clarityScore != null || input.confidenceScore != null;
   const analyzing = Boolean(input.isAnalyzing) && !hasScore;
+  const creditNote = note?.cta?.destination === "billing" ? note : undefined;
+  const resolvedNote =
+    creditNote ?? (analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }));
   return withFooterMeta(input, {
     kind: "draft",
     sentence: analyzing ? "SuperPlane is analyzing this task." : "This task is a draft.",
-    note: analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
+    note: resolvedNote,
     attentionCard: true,
     actions: draftDecisionActions(),
   });
