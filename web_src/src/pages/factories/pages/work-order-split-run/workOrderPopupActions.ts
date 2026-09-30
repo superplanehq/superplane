@@ -57,13 +57,20 @@ export function draftStartAction(
   onDispatch: ((model?: string, thinkingLevel?: string) => Promise<void>) | undefined,
   openAutomations: () => void,
   selectedModel: string,
-  selectedThinking: string,
+  selectedThinking?: string,
 ) {
   if (kind !== "draft") {
     return undefined;
   }
   return async () => {
-    await onDispatch?.(draftStartModelPayload(selectedModel), draftStartThinkingPayload(selectedThinking));
+    await onDispatch?.(draftStartModelPayload(selectedModel), startThinkingPayload(selectedThinking));
     openAutomations();
   };
+}
+
+function startThinkingPayload(selectedThinking?: string) {
+  if (selectedThinking === undefined) {
+    return undefined;
+  }
+  return draftStartThinkingPayload(selectedThinking);
 }
