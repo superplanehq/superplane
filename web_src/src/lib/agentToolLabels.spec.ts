@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import type { AgentToolItem } from "@/lib/agentActivity";
-import { agentToolDisplayText, agentToolOutputPreview } from "@/lib/agentToolLabels";
+import {
+  agentToolCommandHeadline,
+  agentToolDisplayText,
+  agentToolOutputPreview,
+  agentToolScriptText,
+} from "@/lib/agentToolLabels";
 
 function tool(overrides: Partial<AgentToolItem> = {}): AgentToolItem {
   return {
@@ -76,6 +81,36 @@ describe("agentToolDisplayText", () => {
 
   it("does not expose partial command JSON", () => {
     expect(agentToolDisplayText(tool({ input: '{"command":"ls pkg' }))).toBe("Bash");
+  });
+});
+
+describe("agentToolScriptText", () => {
+  it("keeps newlines in a shell script", () => {
+    const script = "set -euo pipefail\ngit status";
+    expect(agentToolScriptText(tool({ input: script }))).toBe(script);
+  });
+
+  it("reads the command field without collapsing it", () => {
+    const script = "set -e\ngit status";
+    expect(agentToolScriptText(tool({ input: JSON.stringify({ command: script }) }))).toBe(script);
+  });
+
+  it("returns an empty string for a non-command tool", () => {
+    expect(agentToolScriptText(tool({ kind: "read", name: "Read", input: "README.md" }))).toBe("");
+  });
+});
+
+describe("agentToolCommandHeadline", () => {
+  it("prefers the provider description", () => {
+    expect(
+      agentToolCommandHeadline(
+        tool({ input: JSON.stringify({ command: "set -e\ngit status", description: "Check status" }) }),
+      ),
+    ).toBe("Check status");
+  });
+
+  it("falls back to the first substantive command", () => {
+    expect(agentToolCommandHeadline(tool({ input: "set -euo pipefail\ngit status" }))).toBe("git status");
   });
 });
 
