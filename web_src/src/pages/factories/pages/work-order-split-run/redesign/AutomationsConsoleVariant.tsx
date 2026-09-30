@@ -229,7 +229,7 @@ function columnMarker(column: ConsoleColumn, index: number, currentColumn: numbe
   }
   const statuses = column.automations.map((automation) => automation.latest.status);
   if (statuses.some((status) => status === "running")) return "running";
-  if (statuses.some((status) => status === "waiting" || status === "queued")) return "waiting";
+  if (statuses.some((status) => status === "waiting")) return "waiting";
   if (statuses.some((status) => status === "failed")) return "failed";
   if (statuses.some((status) => status === "cancelled")) return "cancelled";
   if (statuses.every((status) => status === "pending")) return "pending";
