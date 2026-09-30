@@ -2,7 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import { formatDate } from "./formatDate";
@@ -29,9 +29,11 @@ interface OrganizationsTableProps {
   onSort: (field: SortField) => void;
 }
 
-function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
-  const navigate = useNavigate();
+function organizationPath(orgId: string): string {
+  return `/admin/organizations/${orgId}`;
+}
 
+function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
@@ -85,62 +87,69 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
           {organizations.map((org) => (
             <tr
               key={org.id}
-              role="link"
-              tabIndex={0}
-              aria-label={org.name || org.id}
-              className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 dark:border-gray-800/70 dark:hover:bg-gray-800/50"
-              onClick={(event) => {
-                const path = `/admin/organizations/${org.id}`;
-                if (event.metaKey || event.ctrlKey || event.shiftKey) {
-                  window.open(path, "_blank", "noopener,noreferrer");
-                  return;
-                }
-                navigate(path);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") {
-                  return;
-                }
-                event.preventDefault();
-                navigate(`/admin/organizations/${org.id}`);
-              }}
+              className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
             >
-              <td className="px-4 py-2.5">
-                <span className="flex items-center gap-2 text-gray-800 font-medium dark:text-gray-100">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
+                >
                   <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
                   {org.name || (
                     <span className="text-gray-400 italic dark:text-gray-500" title={org.id}>
                       {org.id.slice(0, 8)}...
                     </span>
                   )}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Automations, ${org.canvas_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <Palette size={13} />
                   {org.canvas_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Tasks, ${org.task_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <ClipboardList size={13} />
                   {org.task_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Done Tasks, ${org.done_task_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <CircleCheck size={13} />
                   {org.done_task_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Members, ${org.member_count}`}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-gray-500 dark:text-gray-400"
+                >
                   <User size={13} />
                   {org.member_count}
-                </span>
+                </Link>
               </td>
-              <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
-                {formatDate(org.created_at)}
+              <td className="p-0">
+                <Link
+                  to={organizationPath(org.id)}
+                  aria-label={`${org.name || org.id}, Created, ${formatDate(org.created_at)}`}
+                  className="block px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500"
+                >
+                  {formatDate(org.created_at)}
+                </Link>
               </td>
             </tr>
           ))}
