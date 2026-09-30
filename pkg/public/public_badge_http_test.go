@@ -60,6 +60,27 @@ func TestPublicBadge_ReturnsVelocitySVG(t *testing.T) {
 	assert.NotContains(t, small.svg, "of merged PRs via SuperPlane")
 }
 
+func TestPublicBadge_AppliesTheThemeAndAccentFromTheURL(t *testing.T) {
+	r := support.Setup(t)
+	server := newPublicTestServer(t, r)
+	factoryModel := newBadgeFactory(t, r, "example/repo")
+	require.NoError(t, factoryModel.UpdatePublicBadgeEnabled(database.DB(t.Context()), true))
+	token := *factoryModel.PublicBadgeToken
+
+	themed := getBadge(t, server, token, "size=large&theme=github_light")
+	assert.Equal(t, http.StatusOK, themed.status)
+	assert.Contains(t, themed.svg, "#ffffff")
+	assert.Contains(t, themed.svg, "#0969da")
+
+	accented := getBadge(t, server, token, "size=large&accent=F59E0B")
+	assert.Contains(t, accented.svg, "#f59e0b")
+
+	// An unusable theme or accent still renders the default card.
+	fallback := getBadge(t, server, token, "size=large&theme=banana&accent=red")
+	assert.Equal(t, http.StatusOK, fallback.status)
+	assert.Contains(t, fallback.svg, "#10b981")
+}
+
 func TestPublicBadge_HidesCostUnlessTheSwitchIsOn(t *testing.T) {
 	r := support.Setup(t)
 	server := newPublicTestServer(t, r)

@@ -41,7 +41,11 @@ func (s *Server) handlePublicBadge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := badges.Render(badgeInput(windows, period, size, now, factory.PublicBadgeShowCost))
+	in := badgeInput(windows, period, size, now, factory.PublicBadgeShowCost)
+	in.Theme = badges.NormalizeTheme(r.URL.Query().Get("theme"))
+	in.Accent = badges.NormalizeAccent(r.URL.Query().Get("accent"))
+
+	body, err := badges.Render(in)
 	if err != nil {
 		log.Errorf("Failed to render public badge: %v", err)
 		http.Error(w, "Badge unavailable", http.StatusInternalServerError)

@@ -12,18 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// Series colors match the Velocity "who created" chart. The card chrome
-// follows a dark README stat card: muted labels, one large number, quiet chart.
-const (
-	colorSuperplane = "#10b981"
-	colorManual     = "#64748b"
-	colorBorder     = "#30363d"
-	colorText       = "#f0f6fc"
-	colorSubtle     = "#8b949e"
-	cardBackground  = "#0d1117"
-
-	fontFamily = "-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
-)
+// The card chrome follows a dark README stat card: muted labels, one large
+// number, and a quiet chart. Colors come from the theme, not from here.
+const fontFamily = "-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
 
 // Size is the badge layout. Small is a shields-style strip. Large is a card.
 // Wide is a full-width card with a daily chart.
@@ -61,6 +52,11 @@ type Input struct {
 	Days                     []DayPoint
 	Updated                  time.Time
 	Size                     Size
+	// Theme names a palette. An empty or unknown name uses ThemeDefault.
+	Theme string
+	// Accent overrides the theme accent with a "#rrggbb" color. An empty or
+	// invalid value keeps the theme accent.
+	Accent string
 }
 
 type metrics struct {
@@ -276,11 +272,17 @@ func glyphWidth(r rune) float64 {
 	}
 }
 
-func clipID() string {
+// uniqueID names an element inside one badge. The badge scopes its own
+// stylesheet and its clip paths by id, so nothing collides when a page
+// inlines more than one badge.
+func uniqueID() string {
 	return "spb-" + strings.ReplaceAll(uuid.NewString(), "-", "")
 }
 
 type smallModel struct {
+	Palette    palette
+	RootID     string
+	Logo       logoMark
 	Width      int
 	LeftWidth  int
 	RightWidth int
@@ -301,23 +303,35 @@ func layoutSmall(in Input) smallModel {
 		right = fmt.Sprintf("%d%% PRs · %dd", m.share, in.PeriodDays)
 		title = fmt.Sprintf("SuperPlane %d%% · %d PRs · %dd", m.share, in.SuperplaneMerged, in.PeriodDays)
 	}
-	pad := 10
-	leftWidth := textWidth(left, 12, true) + pad*2
+	const (
+		pad      = 10
+		logoGap  = 7
+		logoSize = 13
+	)
+	logo := placeLogo(pad, (28-logoSize)/2, logoSize)
+	leftTextX := pad + logo.Width + logoGap
+	leftWidth := leftTextX + textWidth(left, 12, true) + pad
 	rightWidth := textWidth(right, 12, true) + pad*2
 	return smallModel{
+		Palette:    resolvePalette(in.Theme, in.Accent),
+		RootID:     uniqueID(),
+		Logo:       logo,
 		Width:      leftWidth + rightWidth,
 		LeftWidth:  leftWidth,
 		RightWidth: rightWidth,
-		LeftTextX:  pad,
+		LeftTextX:  leftTextX,
 		RightTextX: leftWidth + pad,
 		LeftText:   escapeXML(left),
 		RightText:  escapeXML(right),
 		Title:      escapeXML(title),
-		ClipID:     clipID(),
+		ClipID:     uniqueID(),
 	}
 }
 
 type largeModel struct {
+	Palette   palette
+	RootID    string
+	Logo      logoMark
 	Height    int
 	InnerH    int
 	Title     string
@@ -342,14 +356,22 @@ type largeModel struct {
 func layoutLarge(in Input) largeModel {
 	m := derive(in)
 	const (
-		width = 360
-		pad   = 20
-		step  = 20
+		width         = 360
+		pad           = 20
+		step          = 20
+		wordmarkY     = 28
+		logoSize      = 15
+		logoGap       = 8
+		logoBaselineY = wordmarkY
 	)
+	logo := placeLogo(pad, logoBaselineY-logoSize, logoSize)
 	out := largeModel{
-		ClipID:    clipID(),
+		Palette:   resolvePalette(in.Theme, in.Accent),
+		RootID:    uniqueID(),
+		Logo:      logo,
+		ClipID:    uniqueID(),
 		Title:     escapeXML(largeTitle(in, m)),
-		Wordmark:  text(pad, 28, "SuperPlane"),
+		Wordmark:  text(pad+logo.Width+logoGap, wordmarkY, "SuperPlane"),
 		BarX:      pad,
 		BarW:      width - pad*2,
 		BarH:      6,
@@ -414,6 +436,9 @@ func largeTitle(in Input, m metrics) string {
 }
 
 type wideModel struct {
+	Palette   palette
+	RootID    string
+	Logo      logoMark
 	Height    int
 	InnerH    int
 	Title     string
@@ -441,13 +466,21 @@ func layoutWide(in Input) wideModel {
 		baseChartY  = 96
 		baseLegendY = 252
 		baseHeight  = 280
+		logoSize    = 19
+		logoGap     = 10
 	)
+	p := resolvePalette(in.Theme, in.Accent)
+	logo := placeLogo(pad, row1Y-logoSize, logoSize)
+	wordmarkX := pad + logo.Width + logoGap
 	out := wideModel{
+		Palette:  p,
+		RootID:   uniqueID(),
+		Logo:     logo,
 		Title:    escapeXML(wideTitle(in, m)),
-		Wordmark: text(pad, row1Y, "SuperPlane"),
+		Wordmark: text(wordmarkX, row1Y, "SuperPlane"),
 	}
 	if m.showShare {
-		shareX := pad + textWidth("SuperPlane", 16, true) + 16
+		shareX := wordmarkX + textWidth("SuperPlane", 16, true) + 16
 		out.Share = text(shareX, row1Y, fmt.Sprintf("%d%%", m.share))
 	}
 
@@ -465,9 +498,9 @@ func layoutWide(in Input) wideModel {
 	extra := row.place(pad, row2Y, right)
 
 	chartY := baseChartY + extra
-	out.Days = layoutChart(in.Days, chartX, chartY, chartW, chartH)
-	out.Legend = layoutLegend(m, in.Updated, pad, baseLegendY+extra, right)
-	out.Baseline = barRect{X: chartX, Y: chartY + chartH, Width: chartW, Height: 1, Fill: colorBorder}
+	out.Days = layoutChart(in.Days, chartX, chartY, chartW, chartH, p)
+	out.Legend = layoutLegend(m, in.Updated, pad, baseLegendY+extra, right, p)
+	out.Baseline = barRect{X: chartX, Y: chartY + chartH, Width: chartW, Height: 1, Fill: p.Border}
 	out.Height = baseHeight + extra
 	out.InnerH = out.Height - 1
 	return out
@@ -534,7 +567,7 @@ func (r *metricRow) overflows(right int) bool {
 	return last.X+last.Width > right
 }
 
-func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
+func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int, p palette) []dayBar {
 	out := make([]dayBar, len(days))
 	maxCount := 0
 	for _, day := range days {
@@ -603,7 +636,7 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 				}
 				bar.Rects = append(bar.Rects, barRect{
 					X: x, Y: bottom - slateH - greenH, Width: barW, Height: greenH + extend,
-					Radius: radius, Fill: colorSuperplane,
+					Radius: radius, Fill: p.Accent,
 				})
 			}
 			if slateH > 0 {
@@ -618,7 +651,7 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 					}
 				}
 				bar.Rects = append(bar.Rects, barRect{
-					X: x, Y: bottom - slateH, Width: barW, Height: slateH, Radius: radius, Fill: colorManual,
+					X: x, Y: bottom - slateH, Width: barW, Height: slateH, Radius: radius, Fill: p.Manual,
 				})
 			}
 		}
@@ -655,10 +688,10 @@ type legendModel struct {
 	ManualSwatch barRect
 }
 
-func layoutLegend(m metrics, updated time.Time, x, y, right int) legendModel {
+func layoutLegend(m metrics, updated time.Time, x, y, right int, p palette) legendModel {
 	out := legendModel{
 		Updated:    text(right, y, "Updated "+updated.Format("Jan 2")),
-		AutoSwatch: swatch(x, y-8, colorSuperplane),
+		AutoSwatch: swatch(x, y-8, p.Accent),
 	}
 	if !m.showShare {
 		out.Auto = text(x+14, y, "Automated via SuperPlane")
@@ -669,7 +702,7 @@ func layoutLegend(m metrics, updated time.Time, x, y, right int) legendModel {
 	out.Auto = text(x+14, y, auto)
 	manualX := x + 14 + textWidth(auto, 11, false) + 28
 	out.Manual = text(manualX, y, fmt.Sprintf("Manual work (%d%%)", m.manualShare))
-	out.ManualSwatch = swatch(manualX-14, y-8, colorManual)
+	out.ManualSwatch = swatch(manualX-14, y-8, p.Manual)
 	return out
 }
 
@@ -684,35 +717,41 @@ var (
 // GitHub serves the badge as an image, so an internal stylesheet applies.
 
 const smallSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="{{.Width}}" height="28" viewBox="0 0 {{.Width}} 28" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" id="{{.RootID}}" width="{{.Width}}" height="28" viewBox="0 0 {{.Width}} 28" role="img">
   <title>{{.Title}}</title>
   <style>
-    text { font-family: ` + fontFamily + `; font-size: 12px; font-weight: 600; fill: #ffffff; }
+    #{{.RootID}} text { font-family: ` + fontFamily + `; font-size: 12px; font-weight: 600; }
+    #{{.RootID}} .label { fill: {{.Palette.Text}}; }
+    #{{.RootID}} .value { fill: {{.Palette.OnAccent}}; }
+    #{{.RootID}} .logo { fill: {{.Palette.Text}}; }
   </style>
   <clipPath id="{{.ClipID}}"><rect width="{{.Width}}" height="28" rx="4"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect width="{{.LeftWidth}}" height="28" fill="` + cardBackground + `"/>
-    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="` + colorSuperplane + `"/>
-    <text x="{{.LeftTextX}}" y="19">{{.LeftText}}</text>
-    <text x="{{.RightTextX}}" y="19">{{.RightText}}</text>
+    <rect width="{{.LeftWidth}}" height="28" fill="{{.Palette.Background}}"/>
+    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="{{.Palette.Accent}}"/>
+    <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
+    <text class="label" x="{{.LeftTextX}}" y="19">{{.LeftText}}</text>
+    <text class="value" x="{{.RightTextX}}" y="19">{{.RightText}}</text>
   </g>
 </svg>
 `
 
 const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="360" height="{{.Height}}" viewBox="0 0 360 {{.Height}}" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" id="{{.RootID}}" width="360" height="{{.Height}}" viewBox="0 0 360 {{.Height}}" role="img">
   <title>{{.Title}}</title>
   <style>
-    text { font-family: ` + fontFamily + `; }
-    .wordmark { font-size: 13px; font-weight: 700; fill: ` + colorText + `; }
-    .share    { font-size: 36px; font-weight: 700; fill: ` + colorSuperplane + `; }
-    .trend    { font-size: 13px; font-weight: 600; fill: ` + colorSubtle + `; }
-    .caption  { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
-    .count    { font-size: 13px; font-weight: 500; fill: ` + colorText + `; }
-    .rate     { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
-    .cost     { font-size: 13px; font-weight: 600; fill: ` + colorText + `; }
+    #{{.RootID}} text      { font-family: ` + fontFamily + `; }
+    #{{.RootID}} .logo     { fill: {{.Palette.Text}}; }
+    #{{.RootID}} .wordmark { font-size: 13px; font-weight: 700; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .share    { font-size: 36px; font-weight: 700; fill: {{.Palette.Accent}}; }
+    #{{.RootID}} .trend    { font-size: 13px; font-weight: 600; fill: {{.Palette.Subtle}}; }
+    #{{.RootID}} .caption  { font-size: 13px; font-weight: 400; fill: {{.Palette.Subtle}}; }
+    #{{.RootID}} .count    { font-size: 13px; font-weight: 500; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .rate     { font-size: 13px; font-weight: 400; fill: {{.Palette.Subtle}}; }
+    #{{.RootID}} .cost     { font-size: 13px; font-weight: 600; fill: {{.Palette.Text}}; }
   </style>
-  <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="` + cardBackground + `" stroke="` + colorBorder + `"/>
+  <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="{{.Palette.Background}}" stroke="{{.Palette.Border}}"/>
+  <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
   <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
   {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
   {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}
@@ -723,31 +762,33 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
   {{if .ShowTrack}}
   <clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="3"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="#21262d"/>
-    {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="` + colorSuperplane + `"/>{{end}}
-    {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="` + colorManual + `"/>{{end}}
+    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="{{.Palette.Track}}"/>
+    {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="{{.Palette.Accent}}"/>{{end}}
+    {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="{{.Palette.Manual}}"/>{{end}}
   </g>
   {{end}}
 </svg>
 `
 
 const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" id="{{.RootID}}" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
   <title>{{.Title}}</title>
   <style>
-    text { font-family: ` + fontFamily + `; }
-    .wordmark  { font-size: 16px; font-weight: 700; fill: ` + colorText + `; }
-    .share     { font-size: 28px; font-weight: 700; fill: ` + colorSuperplane + `; }
-    .trend     { font-size: 13px; font-weight: 600; fill: ` + colorSubtle + `; }
-    .count     { font-size: 13px; font-weight: 500; fill: ` + colorText + `; }
-    .rate      { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
-    .cost      { font-size: 13px; font-weight: 600; fill: ` + colorText + `; }
-    .day-label { font-size: 10px; font-weight: 400; fill: ` + colorSubtle + `; text-anchor: middle; }
-    .legend    { font-size: 11px; font-weight: 500; fill: ` + colorText + `; }
-    .updated   { font-size: 11px; font-weight: 400; fill: ` + colorSubtle + `; text-anchor: end; }
+    #{{.RootID}} text       { font-family: ` + fontFamily + `; }
+    #{{.RootID}} .logo      { fill: {{.Palette.Text}}; }
+    #{{.RootID}} .wordmark  { font-size: 16px; font-weight: 700; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .share     { font-size: 28px; font-weight: 700; fill: {{.Palette.Accent}}; }
+    #{{.RootID}} .trend     { font-size: 13px; font-weight: 600; fill: {{.Palette.Subtle}}; }
+    #{{.RootID}} .count     { font-size: 13px; font-weight: 500; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .rate      { font-size: 13px; font-weight: 400; fill: {{.Palette.Subtle}}; }
+    #{{.RootID}} .cost      { font-size: 13px; font-weight: 600; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .day-label { font-size: 10px; font-weight: 400; fill: {{.Palette.Subtle}}; text-anchor: middle; }
+    #{{.RootID}} .legend    { font-size: 11px; font-weight: 500; fill: {{.Palette.Text}}; }
+    #{{.RootID}} .updated   { font-size: 11px; font-weight: 400; fill: {{.Palette.Subtle}}; text-anchor: end; }
   </style>
-  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="` + cardBackground + `" stroke="` + colorBorder + `"/>
+  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="{{.Palette.Background}}" stroke="{{.Palette.Border}}"/>
 
+  <path class="logo" transform="{{.Logo.Transform}}" d="` + logoPath + `"/>
   <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
   {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
   {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}

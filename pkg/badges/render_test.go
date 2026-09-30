@@ -57,8 +57,9 @@ func TestRender_StackedDayHasTwoRects(t *testing.T) {
 	require.Len(t, groups, 7)
 	rects := strings.Count(groups[3], "<rect")
 	assert.Equal(t, 2, rects)
-	assert.Contains(t, groups[3], colorSuperplane)
-	assert.Contains(t, groups[3], colorManual)
+	defaultPalette := themes[ThemeDefault]
+	assert.Contains(t, groups[3], defaultPalette.Accent)
+	assert.Contains(t, groups[3], defaultPalette.Manual)
 }
 
 func TestRender_ZeroMergesHasNoBarsTrendMergeRateOrCost(t *testing.T) {

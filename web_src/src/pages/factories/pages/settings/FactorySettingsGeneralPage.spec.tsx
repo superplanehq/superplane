@@ -176,6 +176,50 @@ describe("FactorySettingsGeneralPage", () => {
 
     const link = screen.getByTestId("factory-settings-visibility-board-link");
     expect(link).toHaveAttribute("href", "/org-1/workspaces/rf/lines/line-plan-and-implement");
-    expect(link).toHaveTextContent("/org-1/workspaces/rf/lines/line-plan-and-implement");
+    expect(link).toHaveTextContent("View public board");
+  });
+
+  it("adds the theme and accent to the badge URL", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
+    expect(snippet.value).not.toContain("theme=");
+
+    await user.click(screen.getByTestId("factory-settings-public-badge-theme"));
+    await user.click(screen.getByRole("option", { name: "Tokyo Night" }));
+    expect(snippet.value).toContain("theme=tokyonight");
+
+    await user.type(screen.getByTestId("factory-settings-public-badge-accent"), "#ff8800");
+    expect(snippet.value).toContain("accent=ff8800");
+  });
+
+  it("ignores an accent that is not a hex color", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    await user.type(screen.getByTestId("factory-settings-public-badge-accent"), "nope");
+    const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
+    expect(snippet.value).not.toContain("accent=");
+  });
+
+  it("links the badge to the board only while the workspace is public", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    const privateSwitch = screen.getByRole("switch", { name: "Link the badge to the public board" });
+    expect(privateSwitch).toBeDisabled();
+
+    renderPage({ ...badgeOnFactory, public: true });
+    const boardSwitch = screen
+      .getAllByRole("switch", { name: "Link the badge to the public board" })
+      .at(-1) as HTMLElement;
+    expect(boardSwitch).not.toBeDisabled();
+
+    await user.click(boardSwitch);
+    const snippet = screen
+      .getAllByTestId("factory-settings-public-badge-markdown")
+      .at(-1) as HTMLInputElement;
+    expect(snippet.value).toContain(`](${window.location.origin}/org-1/workspaces/rf/lines/line-plan-and-implement)`);
   });
 });
