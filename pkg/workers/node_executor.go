@@ -501,12 +501,28 @@ func (w *NodeExecutor) executeActionNode(
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute action: %v", err)
-		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
 
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+// failNodeExecution fails the node execution with the action error. A
+// SuperPlane hosted credit error also stores its reason on the factory
+// step, so the task shows why it did not run.
+func failNodeExecution(tx *gorm.DB, state core.ExecutionStateContext, runID uuid.UUID, err error) error {
+	reason := models.WorkOrderExecutionFailureReasonFor(err)
+	if reason == "" {
+		return state.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
+	}
+
+	if err := models.RecordWorkOrderExecutionFailureReason(tx, runID, reason); err != nil {
+		return fmt.Errorf("failed to record factory step failure reason: %w", err)
+	}
+
+	return state.Fail(models.CanvasNodeExecutionResultReasonError, models.SuperPlaneRunnerReadinessMessage(err))
 }
 
 const (

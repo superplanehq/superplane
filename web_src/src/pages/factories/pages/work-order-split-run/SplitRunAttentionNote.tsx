@@ -337,7 +337,7 @@ function NoteActionRow({
   modelSelect?: ReactNode;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const href = note.cta?.href ?? runHref ?? undefined;
+  const href = note.cta?.destination === "billing" ? note.cta.href : (note.cta?.href ?? runHref ?? undefined);
   const showCta = Boolean(note.cta && href);
   if (!showCta && actions.length === 0 && !modelSelect) {
     return null;
