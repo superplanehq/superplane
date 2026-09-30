@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   isWorkOrderCreditFailureReason,
   workOrderCreditFailureCopy,
+  workOrderCreditFailureFromMessage,
   workOrderExecutionCreditFailure,
 } from "./workOrderFailureReason";
 
@@ -29,6 +30,18 @@ describe("workOrderCreditFailureCopy", () => {
       message: "This agent run is blocked. This workspace has no hosted credit budget left.",
       actionLabel: "Open billing",
     });
+  });
+
+  it("maps a runner credit message to the same copy", () => {
+    expect(workOrderCreditFailureFromMessage("This organization has no hosted credit.")?.label).toBe("No credit");
+    expect(workOrderCreditFailureFromMessage("  Subscribe to Business to keep SuperPlane-hosted runs.  ")?.label).toBe(
+      "No plan",
+    );
+    expect(workOrderCreditFailureFromMessage("This workspace has no remaining hosted credit.")?.label).toBe(
+      "No workspace budget",
+    );
+    expect(workOrderCreditFailureFromMessage("integration not found")).toBeNull();
+    expect(workOrderCreditFailureFromMessage(undefined)).toBeNull();
   });
 
   it("returns null for other reasons", () => {

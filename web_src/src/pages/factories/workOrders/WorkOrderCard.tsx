@@ -93,6 +93,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
   /**
+   * Short credit-failure label for a draft whose analysis never started.
+   * Line steps use the failed attention chip instead.
+   */
+  creditLabel?: string;
+  /**
    * False on the public board. The card is static text: no link, no dialog.
    */
   interactive?: boolean;
@@ -134,6 +139,7 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  creditLabel,
   interactive = true,
   showOwner = false,
 }: WorkOrderCardProps) {
@@ -187,6 +193,7 @@ export function WorkOrderCard({
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
           failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
+          creditLabel={creditLabel}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}
@@ -253,6 +260,7 @@ function WorkOrderCardStatusRow({
   feedbackLabel,
   checksPassedLabel,
   failedLabel,
+  creditLabel,
   cardPullRequest,
   hasAgentQuestion,
   showPullRequestMerge,
@@ -262,11 +270,13 @@ function WorkOrderCardStatusRow({
   feedbackLabel?: string;
   checksPassedLabel?: string;
   failedLabel?: string;
+  creditLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
   showPullRequestMerge?: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  const showCredit = Boolean(creditLabel) && !reasons.includes("failed");
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion && !showCredit) {
     return null;
   }
 
@@ -281,6 +291,7 @@ function WorkOrderCardStatusRow({
           ) : null}
         </>
       ) : null}
+      {showCredit ? <WorkOrderAttentionChip reason="failed" label={creditLabel} /> : null}
       {reasons.map((reason) => (
         <WorkOrderAttentionChip
           key={reason}

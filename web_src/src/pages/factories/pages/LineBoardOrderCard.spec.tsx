@@ -42,7 +42,7 @@ const draft: FactoriesWorkOrderSummary = {
   assignees: [],
 };
 
-function renderCard(order: FactoriesWorkOrderSummary = draft, isAnalyzing = false) {
+function renderCard(order: FactoriesWorkOrderSummary = draft, isAnalyzing = false, creditLabel?: string) {
   const onOpenWorkOrder = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -53,6 +53,7 @@ function renderCard(order: FactoriesWorkOrderSummary = draft, isAnalyzing = fals
             workOrderCardContext={cardContext}
             onOpenWorkOrder={onOpenWorkOrder}
             isAnalyzing={isAnalyzing}
+            creditLabel={creditLabel}
           />
         </FactoriesLayoutContext.Provider>
       </MemoryRouter>
@@ -83,6 +84,12 @@ describe("LineBoardOrderCard", () => {
 
     expect(planningSessionRequests(fetchMock)).toEqual([]);
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+  });
+
+  it("shows No credit when backlog analysis stopped for hosted credit", () => {
+    renderCard(draft, false, "No credit");
+
+    expect(screen.getByText("No credit")).toBeInTheDocument();
   });
 
   it("shows a local backlog analysis without loading a planning session", () => {

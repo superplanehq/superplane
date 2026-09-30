@@ -15,6 +15,13 @@ export interface WorkOrderCreditFailureCopy {
   actionLabel: string;
 }
 
+/** Result messages the runner stores when hosted credit blocks a node. */
+const CREDIT_FAILURE_MESSAGE: Record<string, WorkOrderCreditFailureReason> = {
+  "This organization has no hosted credit.": "no_hosted_credit",
+  "Subscribe to Business to keep SuperPlane-hosted runs.": "hosted_subscription_required",
+  "This workspace has no remaining hosted credit.": "workspace_budget_empty",
+};
+
 const CREDIT_FAILURE_COPY: Record<WorkOrderCreditFailureReason, WorkOrderCreditFailureCopy> = {
   no_hosted_credit: {
     label: "No credit",
@@ -40,6 +47,12 @@ export function isWorkOrderCreditFailureReason(value: string | undefined): value
 /** Copy for a SuperPlane hosted credit failure. Other reasons return null. */
 export function workOrderCreditFailureCopy(reason: string | undefined): WorkOrderCreditFailureCopy | null {
   return isWorkOrderCreditFailureReason(reason) ? CREDIT_FAILURE_COPY[reason] : null;
+}
+
+/** Copy for a node result message. Other messages return null. */
+export function workOrderCreditFailureFromMessage(message: string | undefined): WorkOrderCreditFailureCopy | null {
+  const reason = message ? CREDIT_FAILURE_MESSAGE[message.trim()] : undefined;
+  return reason ? CREDIT_FAILURE_COPY[reason] : null;
 }
 
 /** Credit failure copy for a failed step. Steps that did not fail return null. */

@@ -8,6 +8,7 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
@@ -20,7 +21,13 @@ import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { PopupHeaderActions } from "./PopupHeaderActions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter, showsArchive, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import {
+  classicSplitRunFooter,
+  composerCreditVerdict,
+  isTaskResultFooter,
+  showsArchive,
+  SPLIT_RUN_ANALYZING_NOTE,
+} from "./splitRunFooter";
 import {
   defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
@@ -442,6 +449,10 @@ function analysisDraftChrome(args: {
     onChange: args.onDraftStartChange,
     disabled: args.disabled,
   });
+  const billingHref =
+    args.organizationId && args.factoryKey
+      ? factorySettingsSectionPath(args.organizationId, args.factoryKey, "organization", "billing")
+      : undefined;
   return {
     footerModelSelect: modelSelects.footer,
     stripAnalysis: draftStripAnalysis(
@@ -453,6 +464,7 @@ function analysisDraftChrome(args: {
         showClarity: factoryShowsClarity(args.factory),
         showConfidence: factoryShowsConfidence(args.factory),
       },
+      composerCreditVerdict(args.fixture.footer.note, billingHref),
     ),
   };
 }
@@ -508,11 +520,12 @@ function draftStripAnalysis(
   modelSelect: ReactNode | undefined,
   taskHref: CreatedTaskHref,
   scores: { showClarity: boolean; showConfidence: boolean },
+  creditVerdict: ReturnType<typeof composerCreditVerdict>,
 ) {
   if (footerKind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores };
+  return { ...analysis, modelSelect, taskHref, ...scores, creditVerdict };
 }
 
 /**

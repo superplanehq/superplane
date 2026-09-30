@@ -47,6 +47,8 @@ export type BacklogColumnProps = {
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
   analyzingOrderIds?: ReadonlySet<string>;
+  /** Short credit label for a draft whose analysis stopped for hosted credit. */
+  creditFailureLabels?: ReadonlyMap<string, string>;
   /** Intakes that open tasks in this backlog, listed at its head. */
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
@@ -94,6 +96,7 @@ export function BacklogColumn({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  creditFailureLabels,
   intakePanel,
   onAddIntake,
   automations,
@@ -168,6 +171,7 @@ export function BacklogColumn({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           atCapacity={atCapacity}
           createPopover={createPopover}
           paging={paging}
@@ -258,6 +262,7 @@ function BacklogColumnOrderList({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  creditFailureLabels,
   atCapacity,
   createPopover,
   paging,
@@ -265,7 +270,13 @@ function BacklogColumnOrderList({
   scrollPersistenceKey,
 }: Pick<
   BacklogColumnProps,
-  "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds" | "paging" | "cardsPending"
+  | "orders"
+  | "workOrderCardContext"
+  | "onOpenWorkOrder"
+  | "analyzingOrderIds"
+  | "creditFailureLabels"
+  | "paging"
+  | "cardsPending"
 > & {
   atCapacity: boolean;
   createPopover: BacklogCreatePopoverProps;
@@ -296,6 +307,7 @@ function BacklogColumnOrderList({
             workOrderCardContext={workOrderCardContext}
             onOpenWorkOrder={onOpenWorkOrder}
             isAnalyzing={Boolean(order.id && analyzingOrderIds?.has(order.id))}
+            creditLabel={order.id ? creditFailureLabels?.get(order.id) : undefined}
           />
         </li>
       ))}

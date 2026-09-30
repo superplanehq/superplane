@@ -28,6 +28,7 @@ import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
 import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
+import type { ComposerCreditVerdict } from "./splitRunFooter";
 import {
   SPLIT_RUN_CHAT_COLUMN_CLASSNAME,
   SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME,
@@ -59,6 +60,8 @@ export type IntentAnalysisChat = {
   showConfidence?: boolean;
   planStatus?: PlanChipStatus;
   isAnalyzing?: boolean;
+  /** Set when backlog analysis stopped because hosted credit is gone. */
+  creditVerdict?: ComposerCreditVerdict;
   closedDecision?: ReactNode;
   /** Model select for Start. The strip shows it on the settings row. */
   modelSelect?: ReactNode;
@@ -121,11 +124,13 @@ function AnalysisRequestChat({
   const follow = useFollowLogScroll<HTMLDivElement>(state.followKey, analysis.view.messages.length, {
     resumeOnBottom: true,
   });
-  const chipsWorking = composerChipsWorking({
-    isAnalyzing: analysis.isAnalyzing,
-    score: analysis.clarity?.score ?? analysis.confidence?.score,
-    machineStatus: analysis.view.machineStatus,
-  });
+  const chipsWorking =
+    !analysis.creditVerdict &&
+    composerChipsWorking({
+      isAnalyzing: analysis.isAnalyzing,
+      score: analysis.clarity?.score ?? analysis.confidence?.score,
+      machineStatus: analysis.view.machineStatus,
+    });
   const images = useAnalysisComposerImages({
     disabled: !analysis.canSend,
     onUploadFiles: analysis.onUploadFiles,
@@ -259,6 +264,7 @@ function AnalysisComposer({
             onToggle={analysis.onTogglePlan}
             actions={analysis.closedDecision}
             modelSelect={analysis.modelSelect}
+            creditVerdict={analysis.creditVerdict}
           />
           <AnalysisComposerField
             analysis={analysis}
