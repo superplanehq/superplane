@@ -298,6 +298,8 @@ func TestAdminPolarWebhookEndpoints(t *testing.T) {
 	})
 
 	t.Run("lists endpoints with the pinned version", func(t *testing.T) {
+		server.BaseURL = "https://app.superplane.com"
+		server.WebhooksBaseURL = "https://hooks.superplane.com/"
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "/webhooks/endpoints", r.URL.Path)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -308,8 +310,11 @@ func TestAdminPolarWebhookEndpoints(t *testing.T) {
 						"api_version": "2026-04",
 						"format":      "raw",
 					},
+					{"id": "end_hooks", "url": "https://HOOKS.superplane.com/api/v1/polar/webhooks/"},
+					{"id": "end_other_install", "url": "https://staging.superplane.com/api/v1/polar/webhooks"},
+					{"id": "end_other_path", "url": "https://app.superplane.com/hooks/polar"},
 				},
-				"pagination": map[string]any{"total_count": 1, "max_page": 1},
+				"pagination": map[string]any{"total_count": 4, "max_page": 1},
 			}))
 		}))
 		t.Cleanup(upstream.Close)
@@ -329,10 +334,20 @@ func TestAdminPolarWebhookEndpoints(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.True(t, body.Configured)
 		assert.Equal(t, polar.APIVersion(), body.APIVersion)
-		require.Len(t, body.Endpoints, 1)
+		require.Len(t, body.Endpoints, 4)
 		assert.Equal(t, "end_1", body.Endpoints[0].ID)
 		assert.Equal(t, "2026-04", body.Endpoints[0].APIVersion)
 		assert.Equal(t, "raw", body.Endpoints[0].Format)
+		current := map[string]bool{}
+		for _, endpoint := range body.Endpoints {
+			current[endpoint.ID] = endpoint.Current
+		}
+		assert.Equal(t, map[string]bool{
+			"end_1":             true,
+			"end_hooks":         true,
+			"end_other_install": false,
+			"end_other_path":    false,
+		}, current)
 	})
 
 	t.Run("returns 502 when Polar rejects the token", func(t *testing.T) {

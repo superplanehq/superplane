@@ -9,8 +9,10 @@ export const POLAR_WEBHOOKS_SENDING_AGAIN = "Sending again";
 export const POLAR_WEBHOOKS_UNAUTHORIZED =
   "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.";
 
+export const POLAR_WEBHOOKS_VERSION_CHECK_FAILED =
+  "SuperPlane could not check the API version of the Polar webhook endpoint. SuperPlane tries again automatically.";
+
 export const POLAR_WEBHOOK_PAGE_SIZE = 50;
-export const POLAR_WEBHOOK_ROUTE_PATH = "/api/v1/polar/webhooks";
 export const POLAR_WEBHOOK_ALL_VALUE = "all";
 export const POLAR_WEBHOOK_POLL_INTERVAL_MS = 5000;
 export const POLAR_WEBHOOK_REDELIVER_TIMEOUT_MS = 2 * 60 * 1000;
@@ -48,6 +50,7 @@ export type PolarWebhookEndpoint = {
   url: string;
   api_version: string;
   format: string;
+  current: boolean;
 };
 
 export type PolarWebhookEndpointsResponse = {
@@ -63,16 +66,8 @@ export function mismatchedPolarWebhookEndpoints(
     return [];
   }
   return (response.endpoints ?? []).filter(
-    (endpoint) => isSuperPlaneWebhookEndpoint(endpoint.url) && endpoint.api_version !== response.api_version,
+    (endpoint) => endpoint.current && endpoint.api_version !== response.api_version,
   );
-}
-
-function isSuperPlaneWebhookEndpoint(endpointURL: string): boolean {
-  try {
-    return new URL(endpointURL).pathname.replace(/\/+$/, "") === POLAR_WEBHOOK_ROUTE_PATH;
-  } catch {
-    return false;
-  }
 }
 
 export function polarWebhookEndpointVersionWarning(endpoint: PolarWebhookEndpoint, pinnedVersion: string): string {

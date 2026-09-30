@@ -7,6 +7,7 @@ import { PolarWebhooks } from "./PolarWebhooks";
 import {
   isPolarApiVersionMismatch,
   mismatchedPolarWebhookEndpoints,
+  POLAR_WEBHOOKS_VERSION_CHECK_FAILED,
   polarWebhookEndpointVersionWarning,
   type PolarWebhookDelivery,
   type PolarWebhookEndpoint,
@@ -33,6 +34,7 @@ const superPlaneEndpoint: PolarWebhookEndpoint = {
   url: "https://app.superplane.com/api/v1/polar/webhooks",
   api_version: "2026-04",
   format: "raw",
+  current: true,
 };
 
 const otherAppEndpoint: PolarWebhookEndpoint = {
@@ -40,6 +42,7 @@ const otherAppEndpoint: PolarWebhookEndpoint = {
   url: "https://other.example.com/hooks/polar",
   api_version: "2026-10",
   format: "raw",
+  current: false,
 };
 
 const jsonResponse = (body: unknown) =>
@@ -77,19 +80,19 @@ afterEach(() => {
 });
 
 describe("mismatchedPolarWebhookEndpoints", () => {
-  it("returns SuperPlane endpoints that use another API version", () => {
+  it("returns this installation's endpoints that use another API version", () => {
     expect(
       mismatchedPolarWebhookEndpoints({
         configured: true,
         api_version: "2026-10",
         endpoints: [
           superPlaneEndpoint,
-          { ...superPlaneEndpoint, id: "end_trailing", url: `${superPlaneEndpoint.url}/` },
+          { ...superPlaneEndpoint, id: "end_hooks", url: "https://hooks.superplane.com/api/v1/polar/webhooks" },
           { ...superPlaneEndpoint, id: "end_pinned", api_version: "2026-10" },
           { ...otherAppEndpoint, api_version: "2026-04" },
         ],
       }).map((endpoint) => endpoint.id),
-    ).toEqual(["end_superplane", "end_trailing"]);
+    ).toEqual(["end_superplane", "end_hooks"]);
   });
 
   it("returns nothing when Polar is not configured or the response is missing", () => {
@@ -125,6 +128,25 @@ describe("PolarWebhooks API version", () => {
 
     await renderLoadedPage();
 
+    expect(screen.queryByTestId("polar-webhook-version-warning")).not.toBeInTheDocument();
+  });
+
+  it("shows that the version check failed when Polar endpoints do not load", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/admin/api/polar/webhooks/endpoints")) {
+          return new Response("Failed to load Polar webhook endpoints", { status: 502 });
+        }
+        return jsonResponse({ configured: true, items: [failedDelivery], total: 1, page: 1, limit: 50 });
+      }),
+    );
+
+    await renderLoadedPage();
+
+    expect(await screen.findByTestId("polar-webhook-version-check-failed")).toHaveTextContent(
+      POLAR_WEBHOOKS_VERSION_CHECK_FAILED,
+    );
     expect(screen.queryByTestId("polar-webhook-version-warning")).not.toBeInTheDocument();
   });
 

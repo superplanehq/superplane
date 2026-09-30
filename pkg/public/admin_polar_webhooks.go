@@ -2,6 +2,7 @@ package public
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,7 @@ const (
 	defaultPolarWebhookPage  = 1
 	defaultPolarWebhookLimit = 50
 	maxPolarWebhookLimit     = 100
+	polarWebhookPath         = "/api/v1/polar/webhooks"
 )
 
 type adminPolarWebhookDelivery struct {
@@ -34,6 +36,7 @@ type adminPolarWebhookEndpoint struct {
 	URL        string `json:"url"`
 	APIVersion string `json:"api_version"`
 	Format     string `json:"format"`
+	Current    bool   `json:"current"`
 }
 
 type adminPolarWebhookEndpointsResponse struct {
@@ -127,6 +130,7 @@ func (s *Server) adminListPolarWebhookEndpoints(w http.ResponseWriter, r *http.R
 			URL:        endpoint.URL,
 			APIVersion: endpoint.APIVersion,
 			Format:     endpoint.Format,
+			Current:    s.isPolarWebhookEndpoint(endpoint.URL),
 		})
 	}
 
@@ -155,6 +159,25 @@ func (s *Server) adminRedeliverPolarWebhook(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondJSON(w, map[string]string{"status": "accepted"})
+}
+
+// isPolarWebhookEndpoint reports whether a Polar endpoint delivers to this
+// installation. One Polar organization can serve several installations.
+func (s *Server) isPolarWebhookEndpoint(endpointURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(endpointURL))
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	if strings.TrimRight(parsed.Path, "/") != polarWebhookPath {
+		return false
+	}
+	for _, base := range []string{s.BaseURL, s.WebhooksBaseURL} {
+		installation, err := url.Parse(strings.TrimSpace(base))
+		if err == nil && installation.Host != "" && strings.EqualFold(installation.Host, parsed.Host) {
+			return true
+		}
+	}
+	return false
 }
 
 func toAdminPolarWebhookDelivery(item polar.WebhookDelivery) adminPolarWebhookDelivery {
