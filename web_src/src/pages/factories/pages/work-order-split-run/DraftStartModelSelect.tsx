@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dro
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import { DRAFT_START_THINKING_AUTO, DRAFT_START_THINKING_DEFAULT, THINKING_LEVELS } from "@/lib/thinkingLevel";
+import { THINKING_LEVEL_HIGH, THINKING_LEVEL_LOW, THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 
@@ -24,11 +24,9 @@ const TRIGGER_CLASS: Record<Appearance, string> = {
 };
 
 const START_THINKING_LEVELS = [
-  { value: DRAFT_START_THINKING_AUTO, label: "Auto" },
-  ...THINKING_LEVELS.map((level) => ({
-    value: level.value === "" ? DRAFT_START_THINKING_DEFAULT : level.value,
-    label: level.label,
-  })),
+  { value: THINKING_LEVEL_LOW, label: "Low" },
+  { value: THINKING_LEVEL_MEDIUM, label: "Medium" },
+  { value: THINKING_LEVEL_HIGH, label: "High" },
 ];
 
 /**
