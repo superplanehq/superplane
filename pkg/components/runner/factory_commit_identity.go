@@ -109,18 +109,20 @@ func FactoryRepoCommitSetup() string {
 	}, "\n")
 }
 
-// FactoryPrepareCommitMessageHook drops other agent trailers and keeps one
-// SuperPlane Agent sign-off. Human co-authors and the agent co-author stay.
+// FactoryPrepareCommitMessageHook drops other agent trailers from the
+// trailer block and keeps one SuperPlane Agent sign-off. A quoted trailer
+// line in the body stays. Human co-authors and the agent co-author stay.
 func FactoryPrepareCommitMessageHook() string {
 	return `#!/bin/sh
 set -u
 
 msg_file="${1:?}"
 signoff='Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>'
-agent_email='superplaneagent@superplane.com'
 tmp="${msg_file}.sp-identity"
 coauthors_file="${msg_file}.sp-coauthors"
 kept_file="${msg_file}.sp-kept"
+block_file="${msg_file}.sp-block"
+filtered_file="${msg_file}.sp-filtered"
 
 email_of() {
   printf '%s\n' "$1" | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
@@ -135,40 +137,117 @@ is_other_agent_email() {
   return 1
 }
 
-rm -f "$tmp" "$coauthors_file" "$kept_file"
-trap 'rm -f "$tmp" "$coauthors_file" "$kept_file"' EXIT
+trailer_key() {
+  printf '%s\n' "$1" | sed -n '1s/^\([A-Za-z0-9-][A-Za-z0-9-]*\)[ \t]*:.*/\1/p' | tr '[:upper:]' '[:lower:]'
+}
 
-: > "$tmp"
-: > "$kept_file"
-while IFS= read -r line || [ -n "$line" ]; do
-  case "$line" in
-    'Signed-off-by:'*|'Co-authored-by:'*)
-      email=$(email_of "$line")
-      if is_other_agent_email "$email"; then
-        continue
-      fi
-      if [ "$email" = "$agent_email" ]; then
-        case "$line" in
-          'Signed-off-by:'*)
-            continue
-            ;;
-        esac
-      fi
-      if ! grep -qxF "$line" "$kept_file"; then
-        printf '%s\n' "$line" >> "$kept_file"
-      fi
-      continue
+is_continuation_line() {
+  printf '%s\n' "$1" | grep -q '^[ 	][^ 	]'
+}
+
+keep_trailer() {
+  key=$(trailer_key "$1")
+  case "$key" in
+    signed-off-by|co-authored-by) ;;
+    *)
+      return 0
       ;;
   esac
-  printf '%s\n' "$line" >> "$tmp"
-done < "$msg_file"
+  if is_other_agent_email "$(email_of "$1")"; then
+    return 1
+  fi
+  if [ "$key" = "signed-off-by" ]; then
+    return 1
+  fi
+  if grep -qxF "$1" "$kept_file"; then
+    return 1
+  fi
+  printf '%s\n' "$1" >> "$kept_file"
+  return 0
+}
 
+filter_trailer_block() {
+  block_in="$1"
+  block_out="$2"
+  : > "$block_out"
+  pending=""
+  pending_set=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ "$pending_set" -eq 1 ] && is_continuation_line "$line"; then
+      pending="${pending}
+${line}"
+      continue
+    fi
+    if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+      printf '%s\n' "$pending" >> "$block_out"
+    fi
+    pending="$line"
+    pending_set=1
+  done < "$block_in"
+  if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+    printf '%s\n' "$pending" >> "$block_out"
+  fi
+}
+
+rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"
+trap 'rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"' EXIT
+: > "$kept_file"
+
+bounds=$(awk '
+function is_blank(line) { return line ~ /^[ \t]*$/ }
+function is_divider(line) { return line ~ /^---$/ || line ~ /^---[ \t]/ }
+function is_comment(line) { return line ~ /^#/ }
+function is_trailer(line) { return line ~ /^[A-Za-z0-9-]+[ \t]*:/ }
+function is_continuation(line) { return line ~ /^[ \t][^ \t]/ }
+{
+  lines[NR] = $0
+}
+END {
+  n = NR
+  limit = n + 1
+  for (i = 1; i <= n; i++) {
+    if (is_divider(lines[i])) {
+      limit = i
+      break
+    }
+  }
+  end = limit - 1
+  while (end >= 1 && is_blank(lines[end])) end--
+  while (end >= 1 && (is_comment(lines[end]) || is_blank(lines[end]))) end--
+  while (end >= 1 && is_blank(lines[end])) end--
+  block_end = end
+  block_start = end + 1
+  while (block_end >= 1 && (is_trailer(lines[block_end]) || is_continuation(lines[block_end]))) {
+    block_start = block_end
+    block_end--
+  }
+  block_end = end
+  if (block_start <= block_end && block_start > 1 && is_blank(lines[block_start - 1]) && is_trailer(lines[block_start])) {
+    print block_start, block_end
+  } else {
+    print 0, 0
+  }
+}
+' "$msg_file")
+block_start=${bounds%% *}
+block_end=${bounds#* }
+
+: > "$tmp"
+if [ "$block_start" -eq 0 ]; then
+  cat "$msg_file" > "$tmp"
+else
+  if [ "$block_start" -gt 1 ]; then
+    sed -n "1,$((block_start - 1))p" "$msg_file" > "$tmp"
+  fi
+  sed -n "${block_start},${block_end}p" "$msg_file" > "$block_file"
+  filter_trailer_block "$block_file" "$filtered_file"
+  cat "$filtered_file" >> "$tmp"
+  line_count=$(awk 'END { print NR + 0 }' "$msg_file")
+  if [ "$block_end" -lt "$line_count" ]; then
+    sed -n "$((block_end + 1)),\$p" "$msg_file" >> "$tmp"
+  fi
+fi
 mv "$tmp" "$msg_file"
-
-while IFS= read -r trailer || [ -n "$trailer" ]; do
-  [ -n "$trailer" ] || continue
-  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$msg_file" || exit 1
-done < "$kept_file"
 
 printf '%s\n' "${COAUTHORS:-}" > "$coauthors_file"
 while IFS= read -r trailer || [ -n "$trailer" ]; do
@@ -187,8 +266,8 @@ exit 0
 }
 
 // FactoryGitWrapperScript shadows git on factory agent tasks. Commit and
-// merge keep the repository hooks and replace only prepare-commit-msg, so a
-// stored identity hook cannot add a second agent.
+// merge keep the caller's hook directory and replace only prepare-commit-msg.
+// A disabled hooks path skips repository hooks. The identity hook still runs.
 func FactoryGitWrapperScript() string {
 	return `#!/bin/bash
 set -euo pipefail
@@ -199,25 +278,45 @@ sh_quote() {
   printf "'%s'" "$value"
 }
 
-repository_hooks_path() {
-  local configured="" work_tree="" hooks_path="" parent=""
-  configured="$("$real_git" "${global[@]}" config --get core.hooksPath 2>/dev/null || true)"
-  configured="${configured%%$'\n'*}"
+hooks_path_override() {
+  local spec="$1"
+  case "$spec" in
+    core.hooksPath=*)
+      printf '%s\n' "${spec#core.hooksPath=}"
+      return 0
+      ;;
+    core.hooksPath)
+      printf '\n'
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+resolve_hooks_path() {
+  local configured="$1"
+  local work_tree=""
   if [[ "$configured" == "~" && -n "${HOME:-}" ]]; then
     configured="$HOME"
   elif [[ "$configured" == "~/"* && -n "${HOME:-}" ]]; then
     configured="${HOME}/${configured:2}"
   fi
-  if [[ -n "$configured" ]]; then
-    if [[ "$configured" != /* ]]; then
-      work_tree="$("$real_git" "${global[@]}" rev-parse --show-toplevel 2>/dev/null || true)"
-      work_tree="${work_tree%%$'\n'*}"
-      if [[ -z "$work_tree" ]]; then
-        return 0
-      fi
+  if [[ "$configured" != /* ]]; then
+    work_tree="$("$real_git" "${global[@]}" rev-parse --show-toplevel 2>/dev/null || true)"
+    work_tree="${work_tree%%$'\n'*}"
+    if [[ -n "$work_tree" ]]; then
       configured="${work_tree}/${configured}"
     fi
-    printf '%s\n' "$configured"
+  fi
+  printf '%s\n' "$configured"
+}
+
+repository_hooks_path() {
+  local configured="" hooks_path="" parent=""
+  configured="$("$real_git" "${global[@]}" config --get core.hooksPath 2>/dev/null || true)"
+  configured="${configured%%$'\n'*}"
+  if [[ -n "$configured" ]]; then
+    resolve_hooks_path "$configured"
     return 0
   fi
 
@@ -313,6 +412,8 @@ export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
 
 args=("$@")
 global=()
+caller_hooks_path=""
+caller_set_hooks_path=0
 i=0
 while [[ $i -lt ${#args[@]} ]]; do
   arg="${args[$i]}"
@@ -320,7 +421,9 @@ while [[ $i -lt ${#args[@]} ]]; do
     -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--super-prefix|--config-env)
       if [[ "$arg" == "-c" && $((i + 1)) -lt ${#args[@]} ]]; then
         next="${args[$((i + 1))]}"
-        if [[ "$next" == core.hooksPath || "$next" == core.hooksPath=* ]]; then
+        if hooks_value="$(hooks_path_override "$next")"; then
+          caller_set_hooks_path=1
+          caller_hooks_path="$hooks_value"
           i=$((i + 2))
           continue
         fi
@@ -338,7 +441,9 @@ while [[ $i -lt ${#args[@]} ]]; do
       ;;
     -c*)
       value="${arg#-c}"
-      if [[ "$value" == core.hooksPath || "$value" == core.hooksPath=* ]]; then
+      if hooks_value="$(hooks_path_override "$value")"; then
+        caller_set_hooks_path=1
+        caller_hooks_path="$hooks_value"
         i=$((i + 1))
         continue
       fi
@@ -428,7 +533,15 @@ if [[ ! -x "$hooks_dir/prepare-commit-msg" ]]; then
 fi
 
 active_hooks="$(mktemp -d "${task_dir}/git-hooks-active.XXXXXX")"
-source_hooks="$(repository_hooks_path)"
+if [[ $caller_set_hooks_path -eq 1 ]]; then
+  if [[ -n "$caller_hooks_path" ]]; then
+    source_hooks="$(resolve_hooks_path "$caller_hooks_path")"
+  else
+    source_hooks=""
+  fi
+else
+  source_hooks="$(repository_hooks_path)"
+fi
 if [[ -n "$source_hooks" && -d "$source_hooks" ]]; then
   source_hooks="$(cd "$source_hooks" && pwd)"
   if [[ "$source_hooks" == "$hooks_dir" ]]; then
