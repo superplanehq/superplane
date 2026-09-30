@@ -98,7 +98,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
 	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
-	{ID: FeatureSuperPlaneMCPServer, Label: "SuperPlane MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }
 
 func All() []Feature {

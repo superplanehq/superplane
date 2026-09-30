@@ -3,7 +3,6 @@ import {
   BarChart3,
   Bell,
   Blocks,
-  BookOpen,
   CircleDollarSign,
   CircleUser,
   Cpu,
@@ -12,6 +11,7 @@ import {
   KeyRound,
   Plug,
   Receipt,
+  Server,
   Settings,
   Users,
 } from "lucide-react";
@@ -24,6 +24,8 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
+  | "agent"
+  | "superplane-mcp-server"
   | "mcp"
   | "skills"
   | "models"
@@ -162,22 +164,33 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-mcp",
-        label: "MCP servers",
-        Icon: Plug,
+        id: "workspace-agent",
+        label: "Agent",
+        Icon: Cpu,
         scope: "workspace",
-        section: "mcp",
+        section: "agent",
         permission: { resource: "factories", action: "update" },
-        keywords: ["mcp server", "mcp", "oauth", "header", "agent", "sign-in", "tools"],
+        keywords: ["mcp server", "mcp", "oauth", "header", "sign-in", "tools", "skill", "skill.md", "github package"],
       },
       {
-        id: "workspace-skills",
-        label: "Skills",
-        Icon: BookOpen,
+        id: "workspace-superplane-mcp-server",
+        label: "MCP Server",
+        Icon: Server,
         scope: "workspace",
-        section: "skills",
+        section: "superplane-mcp-server",
         permission: { resource: "factories", action: "update" },
-        keywords: ["skill", "skill.md", "agent", "github package"],
+        keywords: [
+          "superplane mcp",
+          "mcp server",
+          "mcp client",
+          "cursor",
+          "claude code",
+          "vscode",
+          "editor",
+          "ide",
+          "inbound",
+          "connect client",
+        ],
       },
       {
         id: "workspace-usage",
