@@ -11,6 +11,8 @@ interface OrganizationOverview {
   slug: string;
   description: string;
   canvas_count: number;
+  task_count: number;
+  done_task_count: number;
   member_count: number;
   created_at?: string;
   updated_at?: string;
@@ -105,6 +107,8 @@ export function OrgOverviewPanel({ orgId }: { orgId: string }) {
             <OverviewField label="Updated" value={formatDate(organization.updated_at)} />
             <OverviewField label="Members" value={String(organization.member_count)} />
             <OverviewField label="Automations" value={String(organization.canvas_count)} />
+            <OverviewField label="Tasks" value={String(organization.task_count)} />
+            <OverviewField label="Done Tasks" value={String(organization.done_task_count)} />
           </div>
         </div>
       ) : null}
