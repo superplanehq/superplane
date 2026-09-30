@@ -2005,6 +2005,10 @@ message WorkOrderExecution {
   // Models that recorded spend on this step. Distinct ledger model ids,
   // oldest first. UI prefers these over the Start override.
   repeated string models = 13;
+  // Why the step failed before it could run. Set only for SuperPlane
+  // hosted credit failures: no_hosted_credit,
+  // hosted_subscription_required, or workspace_budget_empty.
+  string failure_reason = 14;
 }
 
 message WorkOrderExecutionStep {
