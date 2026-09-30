@@ -1,5 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
@@ -57,17 +59,19 @@ export function PublicBadgeThemeEditor({
           </span>
         </div>
         {customized ? (
-          // A text action, not a button: a sized button makes the row taller
-          // and moves the rest of the section down when a color changes.
-          <button
+          // Sized down to the row: a standard button height makes the row
+          // taller and moves the rest of the section down.
+          <Button
             type="button"
-            className="text-[12px] text-muted-foreground underline hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-[12px] text-muted-foreground hover:text-foreground"
             disabled={locked}
             onClick={onReset}
             data-testid="factory-settings-public-badge-reset"
           >
             {COPY.reset}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -85,16 +89,18 @@ export function PublicBadgeThemeEditor({
       </div>
 
       <div>
-        <button
+        <Button
           type="button"
-          className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground"
+          variant="ghost"
+          size="sm"
+          className="h-auto gap-1 p-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
           onClick={() => setOpen(!showColors)}
           aria-expanded={showColors}
           data-testid="factory-settings-public-badge-colors-toggle"
         >
           {showColors ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
           {COPY.colorsLabel}
-        </button>
+        </Button>
         {showColors ? (
           <div className="mt-3 space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -131,21 +137,24 @@ function ThemeSwatch({
   onSelect: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       aria-label={label}
       aria-pressed={selected}
       title={label}
       disabled={disabled}
       onClick={onSelect}
+      // The inline colors are the preset itself, so they beat the variant.
       style={{ backgroundColor: colors.bg, borderColor: selected ? colors.accent : colors.border }}
-      className={`flex h-9 w-12 flex-col items-center justify-center gap-1 rounded-md border transition disabled:cursor-not-allowed disabled:opacity-50 ${
-        selected ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : "hover:opacity-80"
-      }`}
+      className={cn(
+        "h-9 w-12 flex-col gap-1 rounded-md p-0 shadow-none",
+        selected ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : "hover:opacity-80",
+      )}
     >
       <span className="block h-1.5 w-6 rounded-full" style={{ backgroundColor: colors.accent }} />
       <span className="block h-1 w-4 rounded-full" style={{ backgroundColor: colors.muted }} />
-    </button>
+    </Button>
   );
 }
 
