@@ -148,8 +148,44 @@ func TestAdminGetOrganization(t *testing.T) {
 		assert.Equal(t, r.Organization.Description, org.Description)
 		assert.GreaterOrEqual(t, org.MemberCount, int64(0))
 		assert.GreaterOrEqual(t, org.CanvasCount, int64(0))
+		assert.GreaterOrEqual(t, org.TaskCount, int64(0))
+		assert.GreaterOrEqual(t, org.DoneTaskCount, int64(0))
 		require.NotNil(t, org.CreatedAt)
 		require.NotNil(t, org.UpdatedAt)
+	})
+
+	t.Run("returns exact task counts", func(t *testing.T) {
+		org, err := models.CreateOrganization("Counted Tasks Org", "counts")
+		require.NoError(t, err)
+		db := database.DB(t.Context())
+		factory, err := models.CreateFactory(db, org.ID, "Factory", "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateWorkOrder(db, "Open task", "", nil, nil, nil)
+		require.NoError(t, err)
+		done, err := factory.CreateWorkOrder(db, "Done task", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(done).Updates(map[string]any{
+			"state":  models.FactoryWorkOrderStateClosed,
+			"result": models.FactoryWorkOrderResultCompleted,
+		}).Error)
+		rejected, err := factory.CreateWorkOrder(db, "Rejected task", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(rejected).Updates(map[string]any{
+			"state":  models.FactoryWorkOrderStateClosed,
+			"result": models.FactoryWorkOrderResultRejected,
+		}).Error)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + org.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminOrgItem
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Equal(t, int64(3), body.TaskCount)
+		assert.Equal(t, int64(1), body.DoneTaskCount)
 	})
 
 	t.Run("returns 404 for unknown organization", func(t *testing.T) {
