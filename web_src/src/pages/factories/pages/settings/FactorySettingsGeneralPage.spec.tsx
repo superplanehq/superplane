@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -195,6 +195,28 @@ describe("FactorySettingsGeneralPage", () => {
     await user.click(screen.getByTestId("factory-settings-public-badge-colors-toggle"));
     expect(screen.getByTestId("factory-settings-public-badge-color-bg")).toHaveValue("#1a1b27");
     expect(snippet.value).not.toContain("bg=");
+  });
+
+  it("shows the theme accent in the color swatch until the user changes it", async () => {
+    const user = userEvent.setup();
+    renderPage(badgeOnFactory);
+
+    await user.click(screen.getByRole("button", { name: "Tokyo Night" }));
+    await user.click(screen.getByTestId("factory-settings-public-badge-colors-toggle"));
+
+    const swatch = screen.getByTestId("factory-settings-public-badge-color-swatch-accent");
+    expect(swatch).toHaveValue("#7aa2f7");
+
+    const snippet = screen.getByTestId("factory-settings-public-badge-markdown") as HTMLInputElement;
+    expect(snippet.value).toContain("theme=tokyonight");
+    expect(snippet.value).not.toContain("accent=");
+
+    fireEvent.change(swatch, { target: { value: "#7aa2f7" } });
+    expect(snippet.value).not.toContain("accent=");
+
+    fireEvent.change(swatch, { target: { value: "#ff8800" } });
+    expect(snippet.value).toContain("accent=ff8800");
+    expect(swatch).toHaveValue("#ff8800");
   });
 
   it("sends only the colors that differ from the preset", async () => {

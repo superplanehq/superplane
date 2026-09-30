@@ -18,9 +18,11 @@ import (
 // Border doubles as the empty part of the share bar, so the six named
 // colors are the whole surface a user can change.
 type palette struct {
-	// Accent fills the SuperPlane series, the large share, and the small
-	// badge value.
-	Accent string
+	// Accent fills the SuperPlane series and the small badge value.
+	// ShareColor is the large share number. It matches Accent unless that
+	// color disappears on the card.
+	Accent     string
+	ShareColor string
 	// Manual fills the people series.
 	Manual     string
 	Text       string
@@ -194,6 +196,7 @@ func resolvePalette(theme string, colors Colors) palette {
 		out.Accent = custom
 		out.OnAccent = readableOn(custom)
 	}
+	out.ShareColor = shareColor(out.Accent, out.Background, out.Text)
 	return out
 }
 
@@ -203,13 +206,41 @@ func replace(target *string, color string) {
 	}
 }
 
-// readableOn picks the text color for a custom accent fill. A light accent
-// takes dark text, and a dark accent takes white text.
+const (
+	onAccentDark  = "#101418"
+	onAccentLight = "#ffffff"
+	// minShareContrast is WCAG AA for large text. A share number below this
+	// uses the card text color so it stays visible.
+	minShareContrast = 3
+)
+
+// readableOn picks the text color with the higher contrast on a custom
+// accent fill. A luminance cutoff left mid-gray fills, such as #999999,
+// with white text that was hard to read.
 func readableOn(fill string) string {
-	if relativeLuminance(fill) > 0.4 {
-		return "#101418"
+	if contrastRatio(fill, onAccentDark) >= contrastRatio(fill, onAccentLight) {
+		return onAccentDark
 	}
-	return "#ffffff"
+	return onAccentLight
+}
+
+// shareColor keeps the large share number readable on the card. A custom
+// accent that is too close to the background, such as white on a light
+// theme, uses the card text color instead.
+func shareColor(accent, background, text string) string {
+	if contrastRatio(accent, background) >= minShareContrast {
+		return accent
+	}
+	return text
+}
+
+func contrastRatio(a, b string) float64 {
+	lighter := relativeLuminance(a)
+	darker := relativeLuminance(b)
+	if darker > lighter {
+		lighter, darker = darker, lighter
+	}
+	return (lighter + 0.05) / (darker + 0.05)
 }
 
 func relativeLuminance(hex string) float64 {

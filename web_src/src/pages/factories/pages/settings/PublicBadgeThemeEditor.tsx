@@ -10,6 +10,7 @@ import {
   type BadgeColorSlot,
   type BadgeColors,
   type BadgeTheme,
+  badgeThemeColors,
   badgeThemeLabel,
   isBadgeColor,
 } from "../../lib/badgeThemes";
@@ -102,6 +103,7 @@ export function PublicBadgeThemeEditor({
                   key={slot}
                   slot={slot}
                   value={colors[slot]}
+                  fallback={badgeThemeColors(theme)[slot]}
                   locked={locked}
                   onChange={(color) => onColorChange(slot, color)}
                 />
@@ -150,21 +152,24 @@ function ThemeSwatch({
 function ColorField({
   slot,
   value,
+  fallback,
   locked,
   onChange,
 }: {
   slot: BadgeColorSlot;
   value: string;
+  fallback: string;
   locked: boolean;
   onChange: (color: string) => void;
 }) {
   const label = BADGE_COLOR_LABELS[slot];
+  const shown = isBadgeColor(value) ? value.toLowerCase() : fallback;
   return (
     <div className="flex items-center gap-2">
-      <input
+      <Input
         type="color"
         aria-label={`${label} swatch`}
-        value={isBadgeColor(value) ? value : "#000000"}
+        value={shown}
         disabled={locked}
         onChange={(event) => onChange(event.target.value)}
         className="h-8 w-8 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-50"

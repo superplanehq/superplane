@@ -76,9 +76,39 @@ func TestRender_AccentOverridesTheThemeAccent(t *testing.T) {
 
 	assert.Contains(t, svg, "#f59e0b")
 	assert.NotContains(t, svg, themes[ThemeDefault].Accent)
-	// A light accent takes dark text, so the value stays readable.
 	assert.Equal(t, "#101418", readableOn("#f59e0b"))
-	assert.Equal(t, "#ffffff", readableOn(themes[ThemeDefault].Accent))
+	assert.Equal(t, "#101418", readableOn(themes[ThemeDefault].Accent))
+	assert.Contains(t, svg, `fill: #f59e0b;`)
+}
+
+func TestRender_MidGrayAccentKeepsTheSmallValueReadable(t *testing.T) {
+	in := exampleInput()
+	in.Size = SizeSmall
+	in.Colors = Colors{Accent: "#999999"}
+	svg := mustRender(t, in)
+	parseSVG(t, svg)
+
+	assert.Equal(t, "#101418", readableOn("#999999"))
+	assert.GreaterOrEqual(t, contrastRatio("#101418", "#999999"), 4.5)
+	assert.Regexp(t, `\.value \{ fill: #101418; \}`, svg)
+	assert.NotRegexp(t, `\.value \{ fill: #ffffff; \}`, svg)
+}
+
+func TestRender_WhiteAccentOnLightThemeKeepsTheShareVisible(t *testing.T) {
+	light := themes["light"]
+	for _, size := range []Size{SizeLarge, SizeWide} {
+		in := exampleInput()
+		in.Size = size
+		in.Theme = "light"
+		in.Colors = Colors{Accent: "#ffffff"}
+		svg := mustRender(t, in)
+		parseSVG(t, svg)
+
+		assert.Equal(t, light.Text, shareColor("#ffffff", light.Background, light.Text))
+		assert.Regexp(t, `\.share\s*\{[^}]*fill: `+light.Text+`;`, svg, "size %s", size)
+		assert.NotRegexp(t, `\.share\s*\{[^}]*fill: #ffffff;`, svg, "size %s", size)
+		assert.GreaterOrEqual(t, contrastRatio(light.Text, light.Background), 3.0)
+	}
 }
 
 func TestRender_CustomColorsBuildAThemeOnTopOfAPreset(t *testing.T) {

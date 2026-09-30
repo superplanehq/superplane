@@ -742,7 +742,7 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
     #{{.RootID}} text      { font-family: ` + fontFamily + `; }
     #{{.RootID}} .logo     { fill: {{.Palette.Text}}; }
     #{{.RootID}} .wordmark { font-size: 13px; font-weight: 700; fill: {{.Palette.Text}}; }
-    #{{.RootID}} .share    { font-size: 36px; font-weight: 700; fill: {{.Palette.Accent}}; }
+    #{{.RootID}} .share    { font-size: 36px; font-weight: 700; fill: {{.Palette.ShareColor}}; }
     #{{.RootID}} .trend    { font-size: 13px; font-weight: 600; fill: {{.Palette.Subtle}}; }
     #{{.RootID}} .caption  { font-size: 13px; font-weight: 400; fill: {{.Palette.Subtle}}; }
     #{{.RootID}} .count    { font-size: 13px; font-weight: 500; fill: {{.Palette.Text}}; }
@@ -776,7 +776,7 @@ const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
     #{{.RootID}} text       { font-family: ` + fontFamily + `; }
     #{{.RootID}} .logo      { fill: {{.Palette.Text}}; }
     #{{.RootID}} .wordmark  { font-size: 16px; font-weight: 700; fill: {{.Palette.Text}}; }
-    #{{.RootID}} .share     { font-size: 28px; font-weight: 700; fill: {{.Palette.Accent}}; }
+    #{{.RootID}} .share     { font-size: 28px; font-weight: 700; fill: {{.Palette.ShareColor}}; }
     #{{.RootID}} .trend     { font-size: 13px; font-weight: 600; fill: {{.Palette.Subtle}}; }
     #{{.RootID}} .count     { font-size: 13px; font-weight: 500; fill: {{.Palette.Text}}; }
     #{{.RootID}} .rate      { font-size: 13px; font-weight: 400; fill: {{.Palette.Subtle}}; }
