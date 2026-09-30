@@ -577,6 +577,24 @@ func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
 			wantTitle:   "Refunds fail on retry.",
 		},
 		{
+			name:        "skips a list placeholder",
+			title:       "null",
+			description: "- n/a\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "skips an attachment file link",
+			title:       "unknown",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "attachment only becomes untitled task",
+			title:       "",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)",
+			wantTitle:   untitledWorkOrderTitle,
+		},
+		{
 			name:        "no real description line",
 			title:       "",
 			description: skippedLead,

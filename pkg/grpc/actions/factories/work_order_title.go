@@ -1,12 +1,18 @@
 package factories
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+)
+
+var attachmentLinkPattern = regexp.MustCompile(
+	`(?i)!?\[[^\]]*]\(` + regexp.QuoteMeta(blob.FileRefScheme) + `://[^)\s]+\)`,
 )
 
 const untitledWorkOrderTitle = "Untitled task"
@@ -33,12 +39,8 @@ func workOrderTitleMissing(title string) bool {
 
 func titleFromWorkOrderDescription(description string) string {
 	for _, raw := range descriptionLines(description) {
-		line := strings.TrimSpace(raw)
-		if line == "" || strings.HasPrefix(line, "![") {
-			continue
-		}
-		candidate := titleFromDescriptionLine(line)
-		if workOrderTitleMissing(candidate) {
+		candidate := titleFromDescriptionLine(raw)
+		if candidate == "" || skippableDescriptionLine(candidate) || workOrderTitleMissing(candidate) {
 			continue
 		}
 		return cutWorkOrderTitle(candidate)
@@ -47,9 +49,88 @@ func titleFromWorkOrderDescription(description string) string {
 }
 
 func titleFromDescriptionLine(line string) string {
+	line = strings.TrimSpace(line)
 	line = stripLeadingHeading(line)
+	line = stripLeadingListMarker(line)
 	line = unwrapFullEmphasis(line)
 	return collapseWhitespace(line)
+}
+
+func skippableDescriptionLine(line string) bool {
+	return strings.HasPrefix(line, "![") || isAttachmentOnlyLine(line)
+}
+
+func isAttachmentOnlyLine(line string) bool {
+	if !attachmentLinkPattern.MatchString(line) {
+		return false
+	}
+	remaining := attachmentLinkPattern.ReplaceAllString(line, "")
+	return !containsLetterOrDigit(remaining)
+}
+
+func stripLeadingListMarker(line string) string {
+	rest, ok := stripBulletMarker(line)
+	if !ok {
+		rest, ok = stripOrderedMarker(line)
+	}
+	if !ok {
+		return line
+	}
+	return stripTaskCheckbox(rest)
+}
+
+func stripBulletMarker(line string) (string, bool) {
+	if line == "" {
+		return line, false
+	}
+	switch line[0] {
+	case '-', '+', '*':
+	default:
+		return line, false
+	}
+	rest := line[1:]
+	if !hasLeadingSpace(rest) {
+		return line, false
+	}
+	return strings.TrimSpace(rest), true
+}
+
+func stripOrderedMarker(line string) (string, bool) {
+	digits := 0
+	for digits < len(line) && digits < 9 && line[digits] >= '0' && line[digits] <= '9' {
+		digits++
+	}
+	if digits == 0 || digits >= len(line) {
+		return line, false
+	}
+	if line[digits] != '.' && line[digits] != ')' {
+		return line, false
+	}
+	rest := line[digits+1:]
+	if !hasLeadingSpace(rest) {
+		return line, false
+	}
+	return strings.TrimSpace(rest), true
+}
+
+func hasLeadingSpace(value string) bool {
+	first, _ := utf8.DecodeRuneInString(value)
+	return unicode.IsSpace(first)
+}
+
+func stripTaskCheckbox(line string) string {
+	if len(line) < 4 || line[0] != '[' || line[2] != ']' {
+		return line
+	}
+	switch line[1] {
+	case ' ', 'x', 'X':
+	default:
+		return line
+	}
+	if !hasLeadingSpace(line[3:]) {
+		return line
+	}
+	return strings.TrimSpace(line[4:])
 }
 
 func descriptionLines(description string) []string {
