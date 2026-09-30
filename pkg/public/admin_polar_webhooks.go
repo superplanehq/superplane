@@ -26,6 +26,20 @@ type adminPolarWebhookDelivery struct {
 	EventID        string `json:"event_id"`
 	EventSucceeded *bool  `json:"event_succeeded"`
 	Payload        string `json:"payload"`
+	APIVersion     string `json:"api_version"`
+}
+
+type adminPolarWebhookEndpoint struct {
+	ID         string `json:"id"`
+	URL        string `json:"url"`
+	APIVersion string `json:"api_version"`
+	Format     string `json:"format"`
+}
+
+type adminPolarWebhookEndpointsResponse struct {
+	Configured bool                        `json:"configured"`
+	APIVersion string                      `json:"api_version"`
+	Endpoints  []adminPolarWebhookEndpoint `json:"endpoints"`
 }
 
 type adminPolarWebhooksResponse struct {
@@ -90,6 +104,39 @@ func (s *Server) adminListPolarWebhooks(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (s *Server) adminListPolarWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
+	if !polar.Configured() {
+		respondJSON(w, adminPolarWebhookEndpointsResponse{
+			Configured: false,
+			APIVersion: polar.APIVersion(),
+			Endpoints:  []adminPolarWebhookEndpoint{},
+		})
+		return
+	}
+
+	endpoints, err := polar.NewClientFromEnv().ListWebhookEndpoints(r.Context())
+	if err != nil {
+		writePolarAdminError(w, err, "Failed to load Polar webhook endpoints")
+		return
+	}
+
+	items := make([]adminPolarWebhookEndpoint, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		items = append(items, adminPolarWebhookEndpoint{
+			ID:         endpoint.ID,
+			URL:        endpoint.URL,
+			APIVersion: endpoint.APIVersion,
+			Format:     endpoint.Format,
+		})
+	}
+
+	respondJSON(w, adminPolarWebhookEndpointsResponse{
+		Configured: true,
+		APIVersion: polar.APIVersion(),
+		Endpoints:  items,
+	})
+}
+
 func (s *Server) adminRedeliverPolarWebhook(w http.ResponseWriter, r *http.Request) {
 	if !polar.Configured() {
 		http.Error(w, "Polar is not configured", http.StatusBadRequest)
@@ -121,6 +168,7 @@ func toAdminPolarWebhookDelivery(item polar.WebhookDelivery) adminPolarWebhookDe
 		EventID:        item.EventID,
 		EventSucceeded: item.EventSucceeded,
 		Payload:        item.Payload,
+		APIVersion:     item.APIVersion,
 	}
 }
 
@@ -141,6 +189,9 @@ func writePolarAdminError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case polar.IsUnauthorized(err):
 		http.Error(w, "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.", http.StatusBadGateway)
+	case polar.IsUnsupportedAPIVersion(err):
+		log.WithError(err).Error(fallback)
+		http.Error(w, "Polar does not support API version "+polar.APIVersion()+". Upgrade the pinned Polar API version.", http.StatusBadGateway)
 	case polar.IsNotFound(err):
 		http.Error(w, "Polar webhook event was not found.", http.StatusNotFound)
 	case polar.IsRateLimited(err):

@@ -93,6 +93,34 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 	})
 
+	t.Run("grants credit when the webhook api version differs", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		t.Setenv("POLAR_API_VERSION", "2026-10")
+		orderID := uuid.NewString()
+		body := []byte(fmt.Sprintf(`{
+			"type": "order.paid",
+			"api_version": "2026-04",
+			"data": {
+				"id": %q,
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {
+					"id": "prod_1",
+					"name": "Hosted credit 25",
+					"metadata": {"superplane_credit_pack": true},
+					"prices": [{"amount_type": "fixed", "price_amount": 2500}]
+				}
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec := signedPolarWebhook(t, secret, body)
+		rec.request.Header.Set("Webhook-Api-Version", "2026-04")
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		assert.Equal(t, http.StatusAccepted, rec.recorder.Code)
+
+		grant, err := models.FindLLMCreditGrantByPolarOrderID(database.Conn(), orderID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
+	})
+
 	t.Run("apply failure", func(t *testing.T) {
 		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
 		body := []byte(`{
