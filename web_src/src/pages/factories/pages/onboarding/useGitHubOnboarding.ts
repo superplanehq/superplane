@@ -11,6 +11,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const githubOnboardingKey = (organizationId: string) => ["me", organizationId, "github-onboarding"] as const;
 const githubProvider = "github";
+const githubOnboardingPollIntervalMs = 3_000;
+const githubOnboardingSyncPollIntervalMs = 1_000;
+
+type GitHubOnboardingPollingState = Pick<MeDescribeVcsProviderOnboardingResponse, "identity" | "synchronizing">;
+
+export function githubOnboardingPollInterval(data: GitHubOnboardingPollingState | undefined): number | false {
+  if (!data?.identity) return false;
+  return data.synchronizing ? githubOnboardingSyncPollIntervalMs : githubOnboardingPollIntervalMs;
+}
 
 export function useGitHubOnboarding(organizationId: string, options: { poll?: boolean } = {}) {
   const queryClient = useQueryClient();
@@ -26,8 +35,7 @@ export function useGitHubOnboarding(organizationId: string, options: { poll?: bo
     staleTime: 0,
     refetchInterval: (current) => {
       if (options.poll === false) return false;
-      const data = current.state.data;
-      return data?.identity ? 3_000 : false;
+      return githubOnboardingPollInterval(current.state.data);
     },
   });
 

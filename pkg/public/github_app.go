@@ -14,6 +14,7 @@ import (
 	"time"
 
 	gh "github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
@@ -30,6 +31,21 @@ var enqueueGitHubAppReconciliation = func(ctx context.Context, availableAt time.
 	return models.EnqueueVCSProviderReconciliation(database.DB(ctx), models.ProviderGitHub, availableAt)
 }
 
+var enqueueGitHubAppInstallationReconciliation = func(
+	ctx context.Context,
+	installationID int64,
+	organizationID uuid.UUID,
+	availableAt time.Time,
+) error {
+	return models.EnqueueVCSProviderInstallationReconciliation(
+		database.DB(ctx),
+		models.ProviderGitHub,
+		installationID,
+		organizationID,
+		availableAt,
+	)
+}
+
 // HandleGitHubAppSetup handles only GitHub's installation and repository
 // settings redirect. Signed webhooks are authoritative for catalog state.
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
@@ -42,20 +58,22 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
-	if strings.TrimSpace(query.Get("installation_id")) == "" {
+	installationID, err := strconv.ParseInt(strings.TrimSpace(query.Get("installation_id")), 10, 64)
+	if err != nil || installationID <= 0 {
 		http.Error(w, "missing installation id", http.StatusBadRequest)
 		return
 	}
+	organizationID := githubAppSetupOrganizationID(query.Get("state"))
 
 	switch query.Get("setup_action") {
 	case "install":
-		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
 	case "update":
-		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
@@ -63,6 +81,18 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
+}
+
+func githubAppSetupOrganizationID(state string) uuid.UUID {
+	value, ok := strings.CutPrefix(strings.TrimSpace(state), "o_")
+	if !ok {
+		return uuid.Nil
+	}
+	organizationID, err := uuid.Parse(value)
+	if err != nil {
+		return uuid.Nil
+	}
+	return organizationID
 }
 
 // HandleGitHubAppWebhook validates the public App signature, updates the
@@ -278,16 +308,28 @@ func applyGitHubCatalogWebhookInTransaction(tx *gorm.DB, event any, installation
 		} else if err != nil {
 			return err
 		}
-		return models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, event.GetRepo().GetID(), time.Now().Add(10*time.Second))
+		return models.DelayVCSProviderRepositorySync(
+			tx,
+			models.ProviderGitHub,
+			event.GetRepo().GetID(),
+			time.Now().Add(10*time.Second),
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		)
 	}
 
 	return nil
 }
 
 func enqueueWebhookRepositories(tx *gorm.DB, repositories []models.VCSProviderRepository) error {
-	runAt := time.Now().Add(10 * time.Second)
+	runAt := time.Now()
 	for _, repository := range repositories {
-		if err := models.EnqueueVCSProviderRepositorySync(tx, models.ProviderGitHub, repository.RepositoryID, runAt); err != nil {
+		if err := models.EnqueueVCSProviderRepositorySync(
+			tx,
+			models.ProviderGitHub,
+			repository.RepositoryID,
+			runAt,
+			models.VCSProviderRepositorySyncPriorityInteractive,
+		); err != nil {
 			return err
 		}
 	}
