@@ -98,7 +98,7 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn());
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("button", { name: "Model: Auto" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
     expect(within(note).getByTestId("split-run-draft-model")).not.toHaveTextContent("Auto");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("SplitRunReview draft model select", () => {
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     expect(screen.getByTestId("split-run-draft-model-list")).toHaveTextContent("Auto");
     expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
@@ -141,7 +141,7 @@ describe("SplitRunReview draft model select", () => {
     const onChange = vi.fn();
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     expect(await screen.findByRole("menuitem", { name: "Low" })).toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("SplitRunReview draft model select", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
     await selectFlyoutOption(user, "split-run-draft-thinking", "High");
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
     expect(onChange).toHaveBeenNthCalledWith(1, { model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
@@ -176,6 +176,55 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, vi.fn(), true);
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
+  });
+
+  it("shows Medium after the model name on the closed ghost box", () => {
+    render(
+      <DraftStartModelSelect
+        model="claude-opus-4-6"
+        thinkingLevel={THINKING_LEVEL_MEDIUM}
+        onChange={vi.fn()}
+        appearance="ghost"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
+      "claude-opus-4-6 Medium",
+    );
+  });
+
+  it("shows Medium after the model name on the closed labeled box", () => {
+    render(
+      <DraftStartModelSelect
+        model="claude-opus-4-6"
+        thinkingLevel={THINKING_LEVEL_MEDIUM}
+        onChange={vi.fn()}
+        appearance="labeled"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toHaveTextContent(
+      "claude-opus-4-6 Medium",
+    );
+  });
+
+  it("leaves Auto as the model name without a thinking word", () => {
+    render(
+      <DraftStartModelSelect model="claude-opus-4-6" thinkingLevel="auto" onChange={vi.fn()} appearance="ghost" />,
+    );
+
+    const button = screen.getByRole("button", { name: "Model: claude-opus-4-6" });
+    expect(button).toHaveTextContent("claude-opus-4-6");
+    expect(button).not.toHaveTextContent("Medium");
+    expect(button).not.toHaveTextContent("Default");
+  });
+
+  it("keeps the icon control free of visible thinking text", () => {
+    render(<DraftStartModelSelect model="claude-opus-4-6" thinkingLevel={THINKING_LEVEL_MEDIUM} onChange={vi.fn()} />);
+
+    const button = screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" });
+    expect(button).not.toHaveTextContent("Medium");
+    expect(button).not.toHaveTextContent("claude-opus-4-6");
   });
 });

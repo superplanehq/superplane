@@ -6,6 +6,7 @@ const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { durationLabelMs, formatGoDuration, formatGoDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { modelNameWithThinking } from "@/lib/thinkingLevel";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -936,7 +937,7 @@ function PhaseMetrics({
   const { tokens, cents } = displayedPhaseSpend(phase, agents);
   useReportLiveHeaderSpend(phase.id, tokens, cents);
   const modelIds = useSpecificModelIds();
-  const model = displayRunnerModel(phase.model ?? "", modelIds);
+  const model = modelNameWithThinking(displayRunnerModel(phase.model ?? "", modelIds), phase.thinkingLevel);
   const spendParts: string[] = [];
   if (cents > 0) {
     spendParts.push(formatUsdCents(cents));
