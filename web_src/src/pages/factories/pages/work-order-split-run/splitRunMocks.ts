@@ -207,6 +207,8 @@ export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
   title: string;
+  /** Stored task key, for example `RF-101`. Empty when the order has no key. */
+  identifier?: string;
   /** Work-order description field. Artifact markdown is a fallback. */
   descriptionText?: string;
   owner: OrgUserDisplay;
@@ -428,6 +430,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
+    identifier: order.key?.trim() ?? "",
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order, options?.resolveUser),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
