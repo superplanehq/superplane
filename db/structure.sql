@@ -363,6 +363,10 @@ CREATE TABLE public.factories (
     planning_confidence boolean DEFAULT true NOT NULL,
     planning_setup_completed boolean DEFAULT false NOT NULL,
     planning_auto_start_line_id uuid,
+    public boolean DEFAULT false NOT NULL,
+    public_badge_enabled boolean DEFAULT false NOT NULL,
+    public_badge_show_cost boolean DEFAULT false NOT NULL,
+    public_badge_token text,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -948,6 +952,58 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
+-- Name: mcp_oauth_clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_clients (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    client_id text NOT NULL,
+    client_name text DEFAULT ''::text NOT NULL,
+    redirect_uris jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: mcp_oauth_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_codes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    code_hash text NOT NULL,
+    client_id text NOT NULL,
+    redirect_uri text NOT NULL,
+    resource text NOT NULL,
+    code_challenge text NOT NULL,
+    code_challenge_method text NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: mcp_oauth_refresh_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_refresh_tokens (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    token_hash text NOT NULL,
+    client_id text NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    resource text NOT NULL,
+    scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -1860,6 +1916,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factories factories_public_badge_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_public_badge_token_key UNIQUE (public_badge_token);
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2145,6 +2209,30 @@ ALTER TABLE ONLY public.installation_llm_settings
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_clients mcp_oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_clients
+    ADD CONSTRAINT mcp_oauth_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_codes mcp_oauth_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_codes
+    ADD CONSTRAINT mcp_oauth_codes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_refresh_tokens mcp_oauth_refresh_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_refresh_tokens
+    ADD CONSTRAINT mcp_oauth_refresh_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -3575,6 +3663,27 @@ CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (delete
 
 
 --
+-- Name: index_mcp_oauth_clients_on_client_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_clients_on_client_id ON public.mcp_oauth_clients USING btree (client_id);
+
+
+--
+-- Name: index_mcp_oauth_codes_on_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_codes_on_code_hash ON public.mcp_oauth_codes USING btree (code_hash);
+
+
+--
+-- Name: index_mcp_oauth_refresh_tokens_on_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_refresh_tokens_on_token_hash ON public.mcp_oauth_refresh_tokens USING btree (token_hash);
+
+
+--
 -- Name: index_organizations_on_created_by_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4878,7 +4987,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929173132	f
+20260930011130	f
 \.
 
 

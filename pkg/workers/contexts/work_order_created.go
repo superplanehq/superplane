@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -136,6 +137,9 @@ func workOrderCreatedPayloadWithRefinement(
 	if err != nil {
 		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
 	} else {
+		// Local runner containers cannot fetch localhost file URLs. A remote
+		// broker skips this rewrite; public hosts stay unchanged.
+		_, files = runner.RewriteLoopbackTaskFileURLs("", files)
 		for _, file := range files {
 			filePayloads = append(filePayloads, file.Map())
 		}

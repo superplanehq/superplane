@@ -22,6 +22,7 @@ import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
 import digitaloceanIcon from "@/assets/icons/integrations/digitalocean.svg";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import figmaIcon from "@/assets/icons/integrations/figma.svg";
 import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -29,6 +30,8 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
+import mongodbIcon from "@/assets/icons/integrations/mongodb.svg";
+import neonIcon from "@/assets/icons/integrations/neon.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import openRouterIcon from "@/assets/icons/integrations/openrouter.svg";
@@ -47,6 +50,8 @@ import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
+import postmanIcon from "@/assets/icons/integrations/postman.svg";
+import prismaIcon from "@/assets/icons/integrations/prisma.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -55,6 +60,7 @@ import smtpIcon from "@/assets/icons/integrations/smtp.svg";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
+import railwayIcon from "@/assets/icons/integrations/railway.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
@@ -63,11 +69,15 @@ import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
 import servicenowIcon from "@/assets/icons/integrations/servicenow.svg";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
+import stripeIcon from "@/assets/icons/integrations/stripe.svg";
+import supabaseIcon from "@/assets/icons/integrations/supabase.svg";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
+import vercelIcon from "@/assets/icons/integrations/vercel.svg";
 import graphqlIcon from "@/assets/icons/graphql.svg";
 
 /** Integration type name (e.g. "github") → logo src. Used for Settings tab and header. */
@@ -85,6 +95,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
   firehydrant: firehydrantIcon,
+  figma: figmaIcon,
   telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
@@ -93,6 +104,8 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   grafana: grafanaIcon,
   jira: jiraIcon,
   linear: linearIcon,
+  mongodb: mongodbIcon,
+  neon: neonIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -102,6 +115,8 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   cursor: cursorIcon,
   perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
+  postman: postmanIcon,
+  prisma: prismaIcon,
   productive: productiveIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -111,18 +126,23 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   sendgrid: sendgridIcon,
   sentry: sentryIcon,
   prometheus: prometheusIcon,
+  railway: railwayIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
   harness: harnessIcon,
   newrelic: newrelicIcon,
+  notion: notionIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
+  stripe: stripeIcon,
+  supabase: supabaseIcon,
   launchdarkly: launchdarklyIcon,
   teams: teamsIcon,
   elastic: elasticIcon,
   oci: ociIcon,
+  vercel: vercelIcon,
   graphql: graphqlIcon,
 };
 
@@ -139,6 +159,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   digitalocean: digitaloceanIcon,
   discord: discordIcon,
   firehydrant: firehydrantIcon,
+  figma: figmaIcon,
   telegram: telegramIcon,
   github: githubIcon,
   gitlab: gitlabIcon,
@@ -147,6 +168,8 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   grafana: grafanaIcon,
   jira: jiraIcon,
   linear: linearIcon,
+  mongodb: mongodbIcon,
+  neon: neonIcon,
   octopus: octopusIcon,
   openai: openAiIcon,
   "open-ai": openAiIcon,
@@ -156,6 +179,8 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   cursor: cursorIcon,
   perplexity: perplexityIcon,
   pagerduty: pagerDutyIcon,
+  postman: postmanIcon,
+  prisma: prismaIcon,
   productive: productiveIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
@@ -165,12 +190,16 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   sendgrid: sendgridIcon,
   sentry: sentryIcon,
   prometheus: prometheusIcon,
+  railway: railwayIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
   newrelic: newrelicIcon,
+  notion: notionIcon,
   servicenow: servicenowIcon,
   statuspage: statuspageIcon,
+  stripe: stripeIcon,
+  supabase: supabaseIcon,
   launchdarkly: launchdarklyIcon,
   teams: teamsIcon,
   azure: azureIcon,
@@ -212,6 +241,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   },
   elastic: elasticIcon,
   oci: ociIcon,
+  vercel: vercelIcon,
 };
 
 /**

@@ -34,8 +34,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
+	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
@@ -206,6 +208,7 @@ func NewServer(
 
 	server.timeoutHandlerTimeout = 15 * time.Second
 	sentry.EnableHostedInstallBind(encryptor)
+	eventdistributer.SetPublicBoardBroadcaster(server.wsHub, broadcastPublicFactoryBoard)
 	server.InitRouter(middlewares...)
 	return server, nil
 }
@@ -577,6 +580,12 @@ func (s *Server) RegisterWebSocketRoutes() {
 			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
 	)
 
+	// Public line board. The message is only board_changed.
+	s.Router.HandleFunc(
+		"/ws/public/organizations/{org}/workspaces/{key}/lines/{lineId}",
+		s.handlePublicFactoryBoardWebSocket,
+	).Methods(http.MethodGet)
+
 	// User notifications WebSocket: live alerts for the authenticated user.
 	s.Router.Handle(
 		"/ws/users/notifications",
@@ -674,12 +683,21 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
+	publicRoute.HandleFunc("/api/v1/public/organizations/{org}/workspaces/{key}/lines/{lineId}/board", s.handlePublicFactoryBoard).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/public/artifacts/{public_id}/{filename}", s.handlePublicArtifactDownload).Methods(http.MethodGet, http.MethodHead)
+	publicRoute.HandleFunc("/api/v1/public/badges/{token}.svg", s.handlePublicBadge).Methods(http.MethodGet)
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/oauth-client", s.HandleMCPOAuthClientMetadata).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathProtectedResource, s.handleMCPProtectedResource).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathProtectedResourceMCP, s.handleMCPProtectedResource).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathAuthorizationServer, s.handleMCPAuthorizationServer).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathAuthorizationServerMCP, s.handleMCPAuthorizationServer).Methods("GET")
+	publicRoute.HandleFunc(mcpserver.PathToken, s.handleMCPToken).Methods("POST")
+	publicRoute.HandleFunc(mcpserver.PathRegister, s.handleMCPRegister).Methods("POST")
+	publicRoute.HandleFunc(mcpserver.PathMCP, s.handleMCP).Methods("GET", "POST")
 
 	//
 	// Webhook endpoints for triggers
@@ -723,6 +741,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()

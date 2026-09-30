@@ -17,6 +17,7 @@ import {
   factoriesListWorkOrders,
   factoriesSendWorkOrderToBacklog,
   factoriesSelectFactoryVcsProviderRepository,
+  factoriesSetFactoryVisibility,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
   factoriesUpdateWorkOrder,
@@ -448,6 +449,8 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
         setupCompleted?: boolean;
         autoStartLineId?: string;
       };
+      publicBadgeEnabled?: boolean;
+      publicBadgeShowCost?: boolean;
     }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
@@ -463,11 +466,38 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
                 : String(input.hostedSpendBudgetCents),
             clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
             planning: input.planning,
+            ...(input.publicBadgeEnabled !== undefined ? { publicBadgeEnabled: input.publicBadgeEnabled } : {}),
+            ...(input.publicBadgeShowCost !== undefined ? { publicBadgeShowCost: input.publicBadgeShowCost } : {}),
           },
         }),
       );
       if (!response.data?.factory) {
         throw new Error("Failed to update factory");
+      }
+      return response.data.factory;
+    },
+    onSuccess: (factory) => {
+      queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
+      void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
+    },
+  });
+}
+
+export function useSetFactoryVisibility(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (isPublic: boolean) => {
+      const response = await factoriesSetFactoryVisibility(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: factoryId },
+          body: { public: isPublic },
+        }),
+      );
+      if (!response.data?.factory) {
+        throw new Error("Failed to update workspace visibility");
       }
       return response.data.factory;
     },

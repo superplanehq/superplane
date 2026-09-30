@@ -5,14 +5,16 @@ import type { ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 
 interface RequireExperimentalFeatureProps {
-  featureId: string;
+  featureId?: string;
+  anyOf?: string[];
   children: ReactNode;
 }
 
-export function RequireExperimentalFeature({ featureId, children }: RequireExperimentalFeatureProps) {
+export function RequireExperimentalFeature({ featureId, anyOf, children }: RequireExperimentalFeatureProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { has, isLoading } = useExperimentalFeature(organizationId);
   const overlayHandles = useWorkspaceLoading(WORKSPACE_LOADING_COPY.workspace, isLoading);
+  const requiredIds = anyOf?.length ? anyOf : featureId ? [featureId] : [];
 
   if (isLoading) {
     if (overlayHandles) {
@@ -25,7 +27,7 @@ export function RequireExperimentalFeature({ featureId, children }: RequireExper
     );
   }
 
-  if (!has(featureId)) {
+  if (!requiredIds.some((id) => has(id))) {
     return <Navigate to={organizationId ? `/${organizationId}` : "/"} replace />;
   }
 

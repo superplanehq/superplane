@@ -136,6 +136,10 @@ func workOrderStateFromProto(state pb.WorkOrder_State) (string, bool) {
 	return "", false
 }
 
+func WorkOrderStateFromProto(state pb.WorkOrder_State) (string, bool) {
+	return workOrderStateFromProto(state)
+}
+
 func workOrderResultFromProto(result pb.WorkOrder_Result) (string, bool) {
 	switch result {
 	case pb.WorkOrder_RESULT_COMPLETED:

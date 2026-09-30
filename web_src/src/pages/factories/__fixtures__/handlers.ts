@@ -23,6 +23,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryAgentResource,
   FactoriesFactoryLine,
+  FactoriesFactoryMcpClient,
   FactoriesFactoryOnboarding,
   FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
@@ -75,6 +76,8 @@ interface RequestBody {
   key?: unknown;
   hostedSpendBudgetCents?: unknown;
   clearHostedSpendBudget?: unknown;
+  publicBadgeEnabled?: unknown;
+  publicBadgeShowCost?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -316,6 +319,32 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function applyFactoryPut(factory: FactoriesFactory, body: Record<string, unknown> | null) {
+  const request = (body ?? {}) as RequestBody;
+  if (typeof request.name === "string" && request.name.trim()) {
+    factory.name = request.name.trim();
+  }
+  if (typeof request.description === "string") {
+    factory.description = request.description;
+  }
+  if (request.clearHostedSpendBudget === true) {
+    factory.hostedSpendBudgetCents = undefined;
+  } else if (typeof request.hostedSpendBudgetCents === "number") {
+    factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
+  } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
+    factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
+  }
+  if (typeof request.publicBadgeEnabled === "boolean") {
+    factory.publicBadgeEnabled = request.publicBadgeEnabled;
+    if (request.publicBadgeEnabled && !factory.publicBadgeToken) {
+      factory.publicBadgeToken = "public-badge-token";
+    }
+  }
+  if (typeof request.publicBadgeShowCost === "boolean") {
+    factory.publicBadgeShowCost = request.publicBadgeShowCost;
+  }
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -327,20 +356,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
         if (method === "PUT") {
           if (!factory) return { json: {} };
-          const request = (body ?? {}) as RequestBody;
-          if (typeof request.name === "string" && request.name.trim()) {
-            factory.name = request.name.trim();
-          }
-          if (typeof request.description === "string") {
-            factory.description = request.description;
-          }
-          if (request.clearHostedSpendBudget === true) {
-            factory.hostedSpendBudgetCents = undefined;
-          } else if (typeof request.hostedSpendBudgetCents === "number") {
-            factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
-          } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
-            factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
-          }
+          applyFactoryPut(factory, body);
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
@@ -360,6 +376,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryPlanningSessionRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
     ...factoryAgentResourceRoutes(fixture),
+    ...factoryMCPClientRoutes(fixture),
     ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
@@ -624,6 +641,36 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
     factoryAgentResourceOAuthDisconnectRoute(fixture),
     factoryAgentResourceItemRoute(fixture),
     factoryAgentResourceListRoute(fixture),
+  ];
+}
+
+function ensureMCPClients(fixture: FactoriesFixture, factoryId: string): FactoriesFactoryMcpClient[] {
+  fixture.mcpClientsByFactoryId ??= {};
+  fixture.mcpClientsByFactoryId[factoryId] ??= [];
+  return fixture.mcpClientsByFactoryId[factoryId];
+}
+
+function factoryMCPClientRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") return { json: {} };
+        const clients = ensureMCPClients(fixture, match[1]);
+        const index = clients.findIndex((entry) => entry.id === match[2]);
+        if (index >= 0) {
+          clients.splice(index, 1);
+        }
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        return { json: { clients: ensureMCPClients(fixture, match[1]) } };
+      },
+    },
   ];
 }
 
