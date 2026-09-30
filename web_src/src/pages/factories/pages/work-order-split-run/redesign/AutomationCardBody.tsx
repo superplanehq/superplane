@@ -9,8 +9,15 @@ import { useState } from "react";
 
 import type { FilesFile } from "@/api-client";
 
+import { formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { WorkOrderCheckAnalysis } from "../../../WorkOrderCheckDialog";
+import { formatCompactTokenValue } from "@/lib/formatTokenCount";
+import { displayRunnerModel } from "../draftStartModel";
+import { useLivePhaseSpend } from "../liveHeaderSpendContext";
+import { PhaseAgentUsageProvider } from "../phaseAgentUsageContext";
+import { PhaseUsageSpendButton } from "../PhaseUsageChartButton";
+import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
@@ -18,7 +25,7 @@ import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
 import { AgentRunsPage } from "./consoleAgentRuns";
 import { ArtifactsPage } from "./consoleArtifactRows";
-import { runFooterLine } from "./consoleCardText";
+import { runFooterLine, runFooterSpendLabel } from "./consoleCardText";
 import { artifactsPageCount, consolePages, type ConsolePageId } from "./consolePages";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
@@ -75,43 +82,46 @@ export function AutomationCardBody({
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
   return (
-    <div className="space-y-3">
-      {pages.includes("agent") ? null : <StageDescription stage={latest} />}
-      <CardPageTabs pages={pages} active={active} stage={latest} runCount={runs.length} onChange={setChosen} />
-      {/* The log stays mounted so live steps and spend keep streaming. */}
-      {pages.includes("agent") ? (
-        <div className={cn(active !== "agent" && "hidden")}>
-          <AgentRunsPage
-            runs={runs}
-            phases={phases ?? (phase ? [phase] : [])}
-            automationName={automation.name}
-            organizationId={organizationId}
+    <PhaseAgentUsageProvider>
+      <div className="space-y-3">
+        {pages.includes("agent") ? null : <StageDescription stage={latest} />}
+        <CardPageTabs pages={pages} active={active} stage={latest} runCount={runs.length} onChange={setChosen} />
+        {/* The log stays mounted so live steps and spend keep streaming. */}
+        {pages.includes("agent") ? (
+          <div className={cn(active !== "agent" && "hidden")}>
+            <AgentRunsPage
+              runs={runs}
+              phases={phases ?? (phase ? [phase] : [])}
+              automationName={automation.name}
+              organizationId={organizationId}
+              usagePhaseId={latest.id}
+            />
+          </div>
+        ) : null}
+        {active === "artifacts" ? (
+          <ArtifactsPage
+            stage={latest}
+            taskDocument={
+              latest.id === "backlog" ? (
+                <CreationTaskDocument
+                  description={taskDescription}
+                  canEdit={canEditDescription}
+                  busy={descriptionBusy}
+                  onSave={onDescriptionSave}
+                  files={files}
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  orderId={orderId}
+                />
+              ) : undefined
+            }
           />
-        </div>
-      ) : null}
-      {active === "artifacts" ? (
-        <ArtifactsPage
-          stage={latest}
-          taskDocument={
-            latest.id === "backlog" ? (
-              <CreationTaskDocument
-                description={taskDescription}
-                canEdit={canEditDescription}
-                busy={descriptionBusy}
-                onSave={onDescriptionSave}
-                files={files}
-                organizationId={organizationId}
-                factoryId={factoryId}
-                orderId={orderId}
-              />
-            ) : undefined
-          }
-        />
-      ) : null}
-      {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
-      <CreationSource stageId={latest.id} source={source} />
-      <CardRunFooter stage={latest} actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
-    </div>
+        ) : null}
+        {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
+        <CreationSource stageId={latest.id} source={source} />
+        <CardRunFooter stage={latest} phase={phase} actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
+      </div>
+    </PhaseAgentUsageProvider>
   );
 }
 
@@ -197,32 +207,107 @@ function CreationSource({ stageId, source }: { stageId: string; source?: SplitRu
 
 function CardRunFooter({
   stage,
+  phase,
   actionBusy,
   onRetry,
   onStop,
 }: {
   stage: AutomationStage;
+  phase?: SplitRunPhase;
+  actionBusy: boolean;
+  onRetry?: () => void;
+  onStop?: () => void;
+}) {
+  const { lead, spendLabel, model } = useCardFooterMeta(stage, phase);
+  if (!lead && !spendLabel && !model && !onRetry && !onStop) {
+    return null;
+  }
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3"
+      data-testid={`redesign-console-run-footer-${stage.id}`}
+    >
+      <CardFooterMeta
+        stageId={stage.id}
+        live={stage.status === "running"}
+        lead={lead}
+        spendLabel={spendLabel}
+        model={model}
+      />
+      <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
+    </div>
+  );
+}
+
+function useCardFooterMeta(stage: AutomationStage, phase?: SplitRunPhase) {
+  const live = useLivePhaseSpend(stage.id);
+  const tokens = Math.max(parseWorkOrderMetric(phase?.totalTokens), live.tokens);
+  const cents = Math.max(parseWorkOrderMetric(phase?.costCents), live.cents);
+  const modelIds = useSpecificModelIds();
+  return {
+    lead: runFooterLine(stage),
+    spendLabel: runFooterSpendLabel(
+      cents > 0 ? formatUsdCents(cents) : undefined,
+      tokens > 0 ? formatCompactTokenValue(tokens) : undefined,
+    ),
+    model: displayRunnerModel(phase?.model ?? stage.model ?? "", modelIds),
+  };
+}
+
+function CardFooterMeta({
+  stageId,
+  live,
+  lead,
+  spendLabel,
+  model,
+}: {
+  stageId: string;
+  live: boolean;
+  lead?: string;
+  spendLabel?: string;
+  model?: string;
+}) {
+  return (
+    <span className={cn(META_TEXT_CLASSNAME, "inline-flex min-w-0 flex-wrap items-center gap-x-1")}>
+      {lead ? <span>{lead}</span> : null}
+      {lead && spendLabel ? <span aria-hidden>·</span> : null}
+      {spendLabel ? (
+        <PhaseUsageSpendButton
+          phaseId={stageId}
+          spendLabel={spendLabel}
+          live={live}
+          className={cn(META_TEXT_CLASSNAME, "font-medium text-current underline underline-offset-2")}
+        />
+      ) : null}
+      {(lead || spendLabel) && model ? <span aria-hidden>·</span> : null}
+      {model ? <span>{model}</span> : null}
+    </span>
+  );
+}
+
+function CardFooterActions({
+  actionBusy,
+  onRetry,
+  onStop,
+}: {
   actionBusy: boolean;
   onRetry?: () => void;
   onStop?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3">
-      <span className={cn(META_TEXT_CLASSNAME, "min-w-0")}>{runFooterLine(stage)}</span>
-      <div className="ms-auto flex shrink-0 items-center gap-1.5">
-        {onRetry ? (
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
-            <RotateCw className="size-3.5" aria-hidden />
-            Retry
-          </Button>
-        ) : null}
-        {onStop ? (
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
-            <CircleStop className="size-3.5" aria-hidden />
-            Stop
-          </Button>
-        ) : null}
-      </div>
+    <div className="ms-auto flex shrink-0 items-center gap-1.5">
+      {onRetry ? (
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onRetry}>
+          <RotateCw className="size-3.5" aria-hidden />
+          Retry
+        </Button>
+      ) : null}
+      {onStop ? (
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
+          <CircleStop className="size-3.5" aria-hidden />
+          Stop
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -528,14 +528,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(panel).queryByText("bug.png")).not.toBeInTheDocument();
   });
 
-  it("keeps the implement model off the header line while the task is running", () => {
+  it("keeps the model breakdown behind the summary-panel spend hover card", async () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER) });
 
     expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("popup-spend-breakdown-trigger")).not.toBeInTheDocument();
     const panel = screen.getByTestId("redesign-console-summary");
     expect(panel).toHaveTextContent("$0.73");
-    expect(panel).toHaveTextContent("claude-sonnet-4-6");
+    expect(panel).not.toHaveTextContent("claude-sonnet-4-6");
+
+    fireEvent.focus(within(panel).getByTestId("popup-spend-breakdown-trigger"));
+
+    const breakdown = await screen.findByTestId("popup-spend-breakdown");
+    expect(breakdown).toHaveTextContent("sonnet 4-6");
+    expect(breakdown).toHaveTextContent("Machine time");
+    expect(breakdown).toHaveTextContent("$0.28");
   });
 
   it("shows the run console while a step runs", () => {
@@ -1214,7 +1220,9 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    // Stop shows on the running card and on the summary strip.
+    expect(screen.getAllByRole("button", { name: "Stop" })).toHaveLength(2);
+    expect(screen.getByTestId("redesign-console-stop-run")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open run" })).not.toBeInTheDocument();
   });

@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage } from "./automationsViewModel";
@@ -23,11 +24,14 @@ export function AgentRunsPage({
   phases,
   automationName,
   organizationId,
+  usagePhaseId,
 }: {
   runs: AutomationStage[];
   phases: SplitRunPhase[];
   automationName: string;
   organizationId?: string;
+  /** Only this run reports into the card usage chart. */
+  usagePhaseId?: string;
 }) {
   const single = runs.length === 1 ? runs[0] : undefined;
   if (single) {
@@ -37,6 +41,7 @@ export function AgentRunsPage({
         phase={phases.find((phase) => phase.id === single.id)}
         automationName={automationName}
         organizationId={organizationId}
+        reportUsage={!usagePhaseId || single.id === usagePhaseId}
       />
     );
   }
@@ -49,6 +54,7 @@ export function AgentRunsPage({
           phase={phases.find((phase) => phase.id === run.id)}
           organizationId={organizationId}
           defaultOpen={index === runs.length - 1}
+          reportUsage={!usagePhaseId || run.id === usagePhaseId}
         />
       ))}
     </div>
@@ -61,11 +67,13 @@ function SingleRun({
   phase,
   automationName,
   organizationId,
+  reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   automationName: string;
   organizationId?: string;
+  reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
   return (
@@ -80,7 +88,13 @@ function SingleRun({
         />
       ) : null}
       <RunDescription description={run.description} />
-      <LiveAgentSteps stage={run} phase={phase} organizationId={organizationId} emptyNote="No steps for this run." />
+      <LiveAgentSteps
+        stage={run}
+        phase={phase}
+        organizationId={organizationId}
+        emptyNote="No steps for this run."
+        reportUsage={reportUsage}
+      />
     </div>
   );
 }
@@ -90,11 +104,13 @@ function AgentRunRow({
   phase,
   organizationId,
   defaultOpen,
+  reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
   defaultOpen: boolean;
+  reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
   const clock = formatClock(run.startedAt);
@@ -125,19 +141,67 @@ function AgentRunRow({
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
         <RunDescription description={run.description} />
-        <LiveAgentSteps stage={run} phase={phase} organizationId={organizationId} emptyNote="No steps for this run." />
+        <LiveAgentSteps
+          stage={run}
+          phase={phase}
+          organizationId={organizationId}
+          emptyNote="No steps for this run."
+          reportUsage={reportUsage}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
 }
 
+/** Review comments stay at five lines until the person asks for the rest. */
 function RunDescription({ description }: { description?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (expanded) {
+      return;
+    }
+    const el = textRef.current;
+    if (!el) {
+      return;
+    }
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [description, expanded]);
+
   if (!description?.trim()) {
     return null;
   }
   return (
-    <div className="text-[12.5px] leading-5 text-muted-foreground">
-      <MarkdownContent content={description} variant="workspace" />
+    <div data-testid="redesign-run-description">
+      <div
+        ref={textRef}
+        data-testid="redesign-run-description-body"
+        className={cn("text-[12.5px] leading-5 text-muted-foreground", !expanded && "line-clamp-5")}
+      >
+        <MarkdownContent content={description} variant="workspace" />
+      </div>
+      {overflows ? (
+        <button
+          type="button"
+          className="mt-1 text-[12px] font-medium text-muted-foreground hover:text-foreground"
+          aria-expanded={expanded}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((open) => !open);
+          }}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      ) : null}
     </div>
   );
 }
