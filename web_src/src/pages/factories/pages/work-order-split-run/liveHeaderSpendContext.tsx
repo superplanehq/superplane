@@ -6,11 +6,13 @@ import { EMPTY_LIVE_HEADER_SPEND, sumLiveHeaderSpend, type LiveHeaderSpend } fro
 type LiveHeaderSpendContextValue = {
   report: (phaseId: string, spend: LiveHeaderSpend) => void;
   overlay: LiveHeaderSpend;
+  byPhase: Record<string, LiveHeaderSpend>;
 };
 
 const LiveHeaderSpendContext = createContext<LiveHeaderSpendContextValue>({
   report: () => undefined,
   overlay: EMPTY_LIVE_HEADER_SPEND,
+  byPhase: {},
 });
 
 export function LiveHeaderSpendProvider({ children }: { children: ReactNode }) {
@@ -29,7 +31,7 @@ export function LiveHeaderSpendProvider({ children }: { children: ReactNode }) {
     });
   }, []);
   const overlay = useMemo(() => sumLiveHeaderSpend(Object.values(byPhase)), [byPhase]);
-  const value = useMemo(() => ({ report, overlay }), [report, overlay]);
+  const value = useMemo(() => ({ report, overlay, byPhase }), [byPhase, overlay, report]);
 
   return <LiveHeaderSpendContext.Provider value={value}>{children}</LiveHeaderSpendContext.Provider>;
 }
@@ -43,4 +45,20 @@ export function useReportLiveHeaderSpend(phaseId: string, tokens: number, cents:
 
 export function useLiveHeaderSpendOverlay(): LiveHeaderSpend {
   return useContext(LiveHeaderSpendContext).overlay;
+}
+
+/** Live tokens and cents reported for this run, including per-agent keys. */
+export function useLivePhaseSpend(phaseId: string): LiveHeaderSpend {
+  const { byPhase } = useContext(LiveHeaderSpendContext);
+  return useMemo(() => {
+    if (!phaseId) {
+      return EMPTY_LIVE_HEADER_SPEND;
+    }
+    const prefix = `${phaseId}:`;
+    return sumLiveHeaderSpend(
+      Object.entries(byPhase)
+        .filter(([id]) => id === phaseId || id.startsWith(prefix))
+        .map(([, spend]) => spend),
+    );
+  }, [byPhase, phaseId]);
 }

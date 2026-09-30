@@ -24,54 +24,46 @@ import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { StartEmphasis } from "../../lib/draftReadiness";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
-import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
+import { attentionToneClassName, noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
 import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
 
 const TONE = {
   draft: {
-    strip: "border-[color:var(--status-draft-border)] bg-[color:var(--status-draft-bg)]",
     iconWrap: "bg-[color:var(--status-draft-dot)]/15",
     icon: "text-[color:var(--status-draft-fg)]",
     Icon: FileText,
   },
   "draft-blocked": {
-    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
     iconWrap: "bg-[color:var(--status-failed-dot)]/15",
     icon: "text-[color:var(--status-failed-fg)]",
     Icon: CircleAlert,
   },
   "draft-caution": {
-    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
     iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
     icon: "text-[color:var(--status-waiting-fg)]",
     Icon: TriangleAlert,
   },
   "draft-ready": {
-    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
     iconWrap: "bg-[color:var(--status-completed-dot)]/15",
     icon: "text-[color:var(--status-completed-fg)]",
     Icon: CheckCircle2,
   },
   waiting: {
-    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
     iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
     icon: "text-[color:var(--status-waiting-fg)]",
     Icon: Hourglass,
   },
   failed: {
-    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
     iconWrap: "bg-[color:var(--status-failed-dot)]/15",
     icon: "text-[color:var(--status-failed-fg)]",
     Icon: CircleX,
   },
   done: {
-    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
     iconWrap: "bg-[color:var(--status-completed-dot)]/15",
     icon: "text-[color:var(--status-completed-fg)]",
     Icon: CheckCircle2,
   },
   rejected: {
-    strip: "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)]",
     iconWrap: "bg-[color:var(--status-cancelled-dot)]/15",
     icon: "text-[color:var(--status-cancelled-fg)]",
     Icon: CircleX,
@@ -143,6 +135,7 @@ export function SplitRunAttentionNote({
     actions,
     actionBusy,
     compact,
+    stacked,
     actionsOnly,
     organizationId,
     factoryId,
@@ -236,7 +229,7 @@ function StandardAttentionNote({
   const Icon = actions.some((action) => action.kind === "reopen") ? RotateCcw : visual.Icon;
 
   return (
-    <div className={cn("border-t px-5 py-4", visual.strip)} data-testid="split-run-attention-note">
+    <div className={cn("border-t px-5 py-4", attentionToneClassName(tone))} data-testid="split-run-attention-note">
       <div className="flex items-center gap-3.5">
         <span
           className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
