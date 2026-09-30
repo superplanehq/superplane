@@ -19,6 +19,9 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
+			requestID := requestIDFromHeader(r)
+			w.Header().Set(requestIDHeader, requestID)
+			r = withRequestLogFields(r, requestID)
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
@@ -38,19 +41,8 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 					status = http.StatusInternalServerError
 				}
 
-				fields := log.Fields{
-					"method":   r.Method,
-					"path":     r.URL.Path,
-					"duration": duration,
-					"status":   status,
-				}
-
-				if ShowFullLogs() {
-					fields["remote"] = r.RemoteAddr
-					fields["user_agent"] = r.UserAgent()
-				}
-
-				logger.WithFields(fields).Info("handled request")
+				fields := handledRequestFields(r, status, duration)
+				logHandledRequest(logger, fields, status)
 
 				if recovered != nil {
 					captureHTTPPanic(r, status, recovered)
@@ -65,6 +57,85 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			next.ServeHTTP(lrw, r)
 		})
 	}
+}
+
+func handledRequestFields(r *http.Request, status int, duration time.Duration) log.Fields {
+	fields := log.Fields{
+		"method":      r.Method,
+		"path":        r.URL.Path,
+		"duration_ms": durationMilliseconds(duration),
+		"status":      status,
+	}
+
+	if ShowFullLogs() {
+		fields["remote"] = r.RemoteAddr
+		fields["user_agent"] = r.UserAgent()
+	}
+
+	if clientIP := clientIPFromForwardedFor(r); clientIP != "" {
+		fields["client_ip"] = clientIP
+	}
+
+	if traceID := cloudTraceID(r); traceID != "" {
+		fields["trace_id"] = traceID
+	}
+
+	appendRequestIdentity(fields, requestLogFieldsFrom(r.Context()))
+	return fields
+}
+
+func appendRequestIdentity(fields log.Fields, logged *requestLogFields) {
+	if logged == nil {
+		return
+	}
+
+	setLogField(fields, "request_id", logged.requestID)
+	setLogField(fields, "organization_id", logged.organizationID)
+	setLogField(fields, "user_id", logged.userID)
+	setLogField(fields, "account_id", logged.accountID)
+	setLogField(fields, "impersonator_account_id", logged.impersonatorAccountID)
+}
+
+func setLogField(fields log.Fields, key string, value string) {
+	if value == "" {
+		return
+	}
+	fields[key] = value
+}
+
+func logHandledRequest(logger *log.Logger, fields log.Fields, status int) {
+	entry := logger.WithFields(fields)
+	if status >= http.StatusInternalServerError {
+		entry.Error("handled request")
+		return
+	}
+	entry.Info("handled request")
+}
+
+func durationMilliseconds(duration time.Duration) float64 {
+	return float64(duration) / float64(time.Millisecond)
+}
+
+func clientIPFromForwardedFor(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded == "" {
+		return ""
+	}
+
+	clientIP, _, _ := strings.Cut(forwarded, ",")
+	return strings.TrimSpace(clientIP)
+}
+
+// cloudTraceID returns the trace id from the GCP load balancer header.
+// Format: TRACE_ID/SPAN_ID;o=TRACE_TRUE
+func cloudTraceID(r *http.Request) string {
+	header := strings.TrimSpace(r.Header.Get("X-Cloud-Trace-Context"))
+	if header == "" {
+		return ""
+	}
+
+	traceID, _, _ := strings.Cut(header, "/")
+	return strings.TrimSpace(traceID)
 }
 
 func captureHTTPPanic(r *http.Request, status int, recovered any) {
