@@ -221,6 +221,43 @@ describe("useFollowLogScroll", () => {
     }
   });
 
+  it("keeps the scroller where the user dragged during the pin ignore window", async () => {
+    const box = { height: 400, view: 100 };
+    const { rerender } = render(<FollowLog tick={1} />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 300;
+    await settleScrollIgnore();
+
+    rerender(<FollowLog tick={2} />);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = 40;
+        resolve();
+      });
+    });
+    await settleScrollIgnore();
+
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+    expect(scroller.scrollTop).toBe(40);
+    expect(screen.getByTestId("jump")).toHaveTextContent("on");
+  });
+
+  it("keeps following when content grows during the pin ignore window", async () => {
+    const box = { height: 200, view: 100 };
+    const { rerender } = render(<FollowLog tick={1} />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 100;
+
+    rerender(<FollowLog tick={2} />);
+    box.height = 800;
+    await settleScrollIgnore();
+
+    expect(screen.getByTestId("following")).toHaveTextContent("on");
+    expect(scroller.scrollTop).toBe(800);
+  });
+
   it("does not pin the scroller when only text inside a line changes", async () => {
     const box = { height: 200, view: 100 };
     render(<FollowLog tick={1} />);

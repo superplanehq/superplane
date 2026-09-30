@@ -11,6 +11,8 @@ export type AgentResourceInstruction =
 
 export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
 export const CIRCLECI_PERSONAL_API_TOKEN_URL = "https://app.circleci.com/settings/user/tokens";
+export const SEMAPHORE_API_TOKEN_URL =
+  "https://docs.semaphore.io/using-semaphore/ai/mcp-server#connect-with-an-api-token";
 
 export const AGENT_RESOURCES_COPY = {
   mcpTitle: "MCP servers",
@@ -114,7 +116,27 @@ export const AGENT_RESOURCES_COPY = {
     label: "CircleCI personal API token",
     after: " and paste it here.",
   },
-  semaphoreInstruction: "Ask Semaphore support to enable MCP for your organization, then sign in.",
+  semaphoreInstruction: {
+    before: "Ask Semaphore support to enable MCP. Reset your ",
+    href: SEMAPHORE_API_TOKEN_URL,
+    label: "Semaphore API token",
+    after: " and paste it here.",
+  },
+  gitlabInstruction: "Sign in with GitLab.",
+  postmanInstruction: "Sign in with Postman.",
+  notionInstruction: "Sign in with Notion.",
+  figmaInstruction: "Sign in with Figma.",
+  slackInstruction: "Sign in with Slack.",
+  vercelInstruction: "Sign in with Vercel.",
+  renderInstruction: "Sign in with Render.",
+  railwayInstruction: "Sign in with Railway.",
+  grafanaInstruction: "Sign in with Grafana.",
+  cloudflareInstruction: "Sign in with Cloudflare.",
+  stripeInstruction: "Sign in with Stripe.",
+  supabaseInstruction: "Sign in with Supabase.",
+  mongodbInstruction: "Sign in with MongoDB Atlas.",
+  neonInstruction: "Sign in with Neon.",
+  prismaInstruction: "Sign in with Prisma.",
   sentryInstruction: "Sign in with Sentry.",
   datadogInstruction: "Sign in with Datadog.",
   datadogSiteLabel: "Site",

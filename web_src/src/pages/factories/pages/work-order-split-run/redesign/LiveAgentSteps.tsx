@@ -1,3 +1,4 @@
+import type { AgentPromptUsageSeries } from "@/lib/agentRunTelemetry";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -5,6 +6,7 @@ import { mergeAgentActivities, type AgentActivity } from "../agentActivity";
 import { AgentLiveStatus } from "../IntentAnalysisLiveWork";
 import { headerSpendFromUsageSeries } from "../planningHeaderSpend";
 import { useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
+import { useReportPhaseAgentUsageSeries } from "../phaseAgentUsageContext";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 import { activitiesFromLiveLogSections, isRunnerComponent, notesForLiveStream } from "../streamNotesFromLiveLog";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
@@ -21,6 +23,7 @@ export function LiveAgentSteps({
   organizationId,
   expandSteps = false,
   emptyNote,
+  reportUsage = true,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
@@ -29,6 +32,8 @@ export function LiveAgentSteps({
   expandSteps?: boolean;
   /** Shown when a finished run has no transcript to replay. */
   emptyNote?: string;
+  /** When false, skip the usage chart. The card footer only charts the latest run. */
+  reportUsage?: boolean;
 }) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
@@ -79,6 +84,7 @@ export function LiveAgentSteps({
           organizationId={organizationId}
           canvasId={phase.appId ?? ""}
           spendPhaseId={phase.id}
+          reportUsage={reportUsage}
           onLive={reportLive}
         />
       ))}
@@ -105,16 +111,24 @@ function RunnerNotes({
   organizationId,
   canvasId,
   spendPhaseId,
+  reportUsage,
   onLive,
 }: {
   line: SplitRunStreamLine;
   organizationId: string;
   canvasId: string;
   spendPhaseId: string;
+  reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
 }) {
-  const { notes, activities, spend } = useRunnerLiveNotes(line, organizationId, canvasId);
+  const { notes, activities, spend, usageSeries } = useRunnerLiveNotes(line, organizationId, canvasId);
   useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
+  useReportPhaseAgentUsageSeries({
+    nodeId: line.nodeId ?? line.id,
+    fallbackName: line.componentName,
+    series: usageSeries,
+    enabled: reportUsage && isRunnerComponent(line.component),
+  });
   useEffect(() => {
     onLive(line.id, { notes, activities });
   }, [activities, line.id, notes, onLive]);
@@ -129,6 +143,7 @@ function useRunnerLiveNotes(
   notes: SplitRunStreamLine[];
   activities: AgentActivity[];
   spend: ReturnType<typeof headerSpendFromUsageSeries>;
+  usageSeries: AgentPromptUsageSeries[];
 } {
   const canStream = Boolean(canvasId && line.executionId && isRunnerComponent(line.component));
   const { sections, orphanLines, error, isStreaming, usageSeries, activityState } = useLiveLogStream(
@@ -163,7 +178,12 @@ function useRunnerLiveNotes(
     }
     return activitiesFromLiveLogSections(sections);
   }, [activityState?.activities, sections]);
-  return { notes, activities, spend: headerSpendFromUsageSeries(usageSeries ?? []) };
+  return {
+    notes,
+    activities,
+    spend: headerSpendFromUsageSeries(usageSeries ?? []),
+    usageSeries: usageSeries ?? [],
+  };
 }
 
 function stoppedStepStatus(

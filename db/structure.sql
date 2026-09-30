@@ -364,6 +364,9 @@ CREATE TABLE public.factories (
     planning_setup_completed boolean DEFAULT false NOT NULL,
     planning_auto_start_line_id uuid,
     public boolean DEFAULT false NOT NULL,
+    public_badge_enabled boolean DEFAULT false NOT NULL,
+    public_badge_show_cost boolean DEFAULT false NOT NULL,
+    public_badge_token text,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
@@ -1913,6 +1916,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factories factories_public_badge_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_public_badge_token_key UNIQUE (public_badge_token);
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3222,6 +3233,13 @@ CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_orde
 --
 
 CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders USING btree (factory_id, state);
+
+
+--
+-- Name: idx_factory_work_orders_organization_state_result; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_organization_state_result ON public.factory_work_orders USING btree (organization_id, state, result);
 
 
 --
@@ -4976,7 +4994,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260929234051	f
+20260930093305	f
 \.
 
 

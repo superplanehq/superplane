@@ -8,6 +8,7 @@ import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } fro
 import {
   SPLIT_RUN_RUNNING,
   splitRunFixtureForWorkOrder,
+  type SplitRunColumnApp,
   type SplitRunFixture,
   type SplitRunPhase,
 } from "./splitRunMocks";
@@ -43,6 +44,7 @@ export function resolveSplitRunOrder(
 export type FixtureForSplitRunPageOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   analysisRuns?: BacklogAnalysisRun[];
+  columnApps?: SplitRunColumnApp[];
   artifacts?: FactoriesWorkOrderArtifact[];
   /** True while the Backlog automation still scores this draft, including the
    * optimistic window before its run appears in `analysisRuns`. */
@@ -66,6 +68,7 @@ export function fixtureForSplitRunPage(
     demoArtifacts: false,
     prFeedbackRuns: options?.prFeedbackRuns,
     analysisRuns: options?.analysisRuns,
+    columnApps: options?.columnApps,
     artifacts: options?.artifacts,
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,

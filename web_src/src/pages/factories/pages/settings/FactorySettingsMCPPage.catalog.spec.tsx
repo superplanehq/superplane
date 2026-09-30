@@ -11,7 +11,11 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
-import { CIRCLECI_PERSONAL_API_TOKEN_URL, GITHUB_PERSONAL_ACCESS_TOKEN_URL } from "./agentResourceCopy";
+import {
+  CIRCLECI_PERSONAL_API_TOKEN_URL,
+  GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+  SEMAPHORE_API_TOKEN_URL,
+} from "./agentResourceCopy";
 
 const mcpPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
@@ -35,8 +39,11 @@ describe("FactorySettingsMCPPage catalog", () => {
     expect(screen.getByTestId("mcp-catalog-search")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-github")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-circleci")).toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-gitlab")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-category-code")).toHaveTextContent("Code");
     expect(screen.getByTestId("mcp-catalog-category-observability")).toHaveTextContent("Observability");
+    expect(screen.getByTestId("mcp-catalog-category-docs")).toHaveTextContent("Docs");
+    expect(screen.getByTestId("mcp-catalog-category-database")).toHaveTextContent("Database");
     expect(screen.getByTestId("mcp-catalog-custom")).toHaveTextContent("Add custom");
   }, 10000);
 
@@ -130,6 +137,33 @@ describe("FactorySettingsMCPPage catalog", () => {
     expect(
       within(instruction).getByRole("link", { name: "CircleCI personal API token" }).querySelector("svg"),
     ).not.toBeNull();
+  }, 10000);
+
+  it("opens Semaphore from the catalog with a token field", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${mcpPath}?dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-semaphore"));
+
+    expect(await screen.findByTestId("mcp-catalog-setup-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("mcp-catalog-setup-sign-in")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mcp-catalog-setup-token")).toBeInTheDocument();
+
+    const instruction = screen.getByTestId("mcp-catalog-setup-instruction");
+    expect(instruction).toHaveTextContent(
+      "Ask Semaphore support to enable MCP. Reset your Semaphore API token and paste it here.",
+    );
+    expect(within(instruction).getByRole("link", { name: "Semaphore API token" })).toHaveAttribute(
+      "href",
+      SEMAPHORE_API_TOKEN_URL,
+    );
   }, 10000);
 
   it("opens Linear from the catalog with Sign in", async () => {

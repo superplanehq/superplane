@@ -99,7 +99,7 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
   it("hides the pill while the log follows the latest line", () => {
     renderPopup({ fixture: RUNNING_WITH_AGENT_NOTES });
 
-    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).not.toBeInTheDocument();
   });
 
   it("keeps the pill hidden for a finished run, since auto-scroll starts on", () => {
@@ -107,7 +107,7 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
 
-    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).not.toBeInTheDocument();
   });
 
   it("shows jump to latest after the user scrolls up, then hides it on click", async () => {
@@ -123,11 +123,11 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
 
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).toBeInTheDocument();
     expect(document.querySelector("[data-testid^='redesign-step-older-']")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest }));
-    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).not.toBeInTheDocument();
   });
 
   it("turns following back on when the user scrolls to the latest line", async () => {
@@ -142,10 +142,10 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
 
     scroller.scrollTop = 0;
     fireEvent.scroll(scroller);
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).toBeInTheDocument();
 
     scroller.scrollTop = 300;
     fireEvent.scroll(scroller);
-    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).not.toBeInTheDocument();
   });
 });

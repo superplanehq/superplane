@@ -37,6 +37,7 @@ import {
   normalizeWorkspaceKey,
 } from "../../lib/workspaceKey";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { PublicBadgeSettingsSection } from "./PublicBadgeSettingsSection";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { SettingsIdentityField } from "./settingsIdentityField";
 
@@ -144,6 +145,15 @@ export function FactorySettingsGeneralPage() {
           publicBoardPath={publicBoardPath(organizationId, factory)}
           canPublish={canPublish}
           permissionsLoading={permissionsLoading}
+        />
+
+        <PublicBadgeSettingsSection
+          factory={factory}
+          publicBoardPath={publicBoardPath(organizationId, factory)}
+          canUpdate={canUpdate}
+          permissionsLoading={permissionsLoading}
+          isSaving={updateFactory.isPending}
+          onUpdate={(input) => updateFactory.mutateAsync(input)}
         />
 
         <DangerZoneSection
@@ -306,39 +316,35 @@ function VisibilitySection({
 
   return (
     <FactorySettingsCard title="Visibility" data-testid="factory-settings-visibility-card">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 space-y-0.5">
           <p className="text-[13px] font-medium text-foreground">{isPublic ? "Public" : "Private"}</p>
-          <p className="text-[12px] text-muted-foreground">
-            Anyone with the line link can view the board. They cannot open tasks, logs, or settings.
+          <p className="text-[12px] leading-5 text-muted-foreground">
+            {isPublic
+              ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+              : "Only members of this organization can open the line board."}
+            {isPublic && publicBoardPath ? (
+              <>
+                {" "}
+                <Link href={publicBoardPath} className="underline" data-testid="factory-settings-visibility-board-link">
+                  View public board
+                </Link>
+              </>
+            ) : null}
           </p>
-          {isPublic && publicBoardPath ? (
-            <p className="text-[12px] text-muted-foreground">
-              This link opens the line board. No login is required.{" "}
-              <Link
-                href={publicBoardPath}
-                className="break-all underline"
-                data-testid="factory-settings-visibility-board-link"
-              >
-                {publicBoardPath}
-              </Link>
-            </p>
-          ) : null}
         </div>
         <PermissionTooltip
           allowed={canPublish || permissionsLoading}
           message="You do not have permission to change workspace visibility."
         >
-          <div className="flex items-center gap-3">
-            <span className="text-[12px] text-muted-foreground">{actionLabel}</span>
-            <Switch
-              checked={isPublic}
-              disabled={!canPublish || setVisibility.isPending}
-              onCheckedChange={requestChange}
-              aria-label={actionLabel}
-              data-testid="factory-settings-visibility"
-            />
-          </div>
+          <Switch
+            checked={isPublic}
+            disabled={!canPublish || setVisibility.isPending}
+            onCheckedChange={requestChange}
+            aria-label={actionLabel}
+            className="mt-0.5"
+            data-testid="factory-settings-visibility"
+          />
         </PermissionTooltip>
       </div>
       <AlertDialog
@@ -356,8 +362,8 @@ function VisibilitySection({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {nextPublic
-                ? "Anyone with the line link can view the board. They cannot open tasks, logs, or settings."
-                : "Only members of this organization can view the board."}
+                ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+                : "Only members of this organization can open the line board."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
