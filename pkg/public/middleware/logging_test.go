@@ -62,7 +62,8 @@ func TestLoggingMiddleware_GeneratesAndEchoesRequestID(t *testing.T) {
 
 	payload := decodeLogLine(t, buffer.String())
 	assert.Equal(t, "info", payload["level"])
-	assert.Equal(t, "handled request", payload["msg"])
+	assert.Equal(t, "handled request /api/v1/organizations/devzero-inc", payload["msg"])
+	assert.Equal(t, "/api/v1/organizations/devzero-inc", payload["path"])
 	assert.Equal(t, requestID, payload["request_id"])
 	assert.Equal(t, "35.191.62.152", payload["client_ip"])
 	assert.Equal(t, "105445aa7843bc8bf206b12000100000", payload["trace_id"])
@@ -178,6 +179,7 @@ func TestLoggingMiddleware_ServerErrorUsesErrorLevel(t *testing.T) {
 
 	payload := decodeLogLine(t, buffer.String())
 	assert.Equal(t, "error", payload["level"])
+	assert.Equal(t, "handled request /api/v1/organizations/devzero-inc", payload["msg"])
 	assert.EqualValues(t, http.StatusInternalServerError, payload["status"])
 }
 
