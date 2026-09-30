@@ -10,14 +10,38 @@ import {
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
-  it("lists six colours and uses a quieter wash than vivid in both themes", () => {
-    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(6);
+  it("lists eight colours and uses a quieter wash than vivid in both themes", () => {
+    expect(LINE_BOARD_COLUMN_COLORS).toHaveLength(8);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.className.includes("bg-"))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => color.laneClassName !== color.className)).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /bg-\S+-100/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:bg-\S+\/\d+/.test(color.laneClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.every((color) => /dark:border-\S+\/\d+/.test(color.borderClassName))).toBe(true);
     expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).not.toContain("red");
+    expect(LINE_BOARD_COLUMN_COLORS.map((color) => color.id)).toEqual([
+      "lime",
+      "yellow",
+      "orange",
+      "teal",
+      "sky",
+      "purple",
+      "pink",
+      "slate",
+    ]);
+  });
+
+  it("resolves orange and pink to a wash, a vivid fill, and a border", () => {
+    for (const id of ["orange", "pink"] as const) {
+      const color = lineBoardColumnColorById(id);
+      expect(color?.label).toBe(id === "orange" ? "Orange" : "Pink");
+      expect(color?.laneClassName).toContain(`bg-${id}-100`);
+      expect(color?.laneClassName).toContain(`dark:bg-${id}-950/40`);
+      expect(color?.className).toBe(`bg-${id}-300 dark:bg-${id}-800`);
+      expect(color?.borderClassName).toBe(`border-${id}-400 dark:border-${id}-800/45`);
+      expect(lineBoardColumnLaneProps(id, "dim")).toEqual({ surfaceClassName: color?.laneClassName });
+      expect(lineBoardColumnLaneProps(id, "vivid")).toEqual({ surfaceClassName: color?.className });
+      expect(lineBoardColumnLaneProps(id, "borders")).toEqual({ className: color?.borderClassName });
+    }
   });
 
   it("resolves a lane class from a colour id", () => {
