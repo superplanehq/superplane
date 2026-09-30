@@ -16,6 +16,8 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast,
 }));
 
+import { MAX_WORK_ORDER_FILE_BYTES } from "@/lib/workOrderFiles";
+
 import { useWorkOrderFileUpload } from "./useWorkOrderFileUpload";
 
 describe("useWorkOrderFileUpload", () => {
@@ -158,6 +160,21 @@ describe("useWorkOrderFileUpload", () => {
     expect(showErrorToast).toHaveBeenCalledWith(
       "This workspace or task no longer exists. Refresh the page and try again.",
     );
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file larger than the attachment limit", async () => {
+    const file = new File(["x"], "large.png", { type: "image/png" });
+    Object.defineProperty(file, "size", { value: MAX_WORK_ORDER_FILE_BYTES + 1 });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([file]);
+    });
+
+    expect(uploaded).toEqual([]);
+    expect(showErrorToast).toHaveBeenCalledWith("Each file must be 70 MB or smaller.");
     expect(filesCreateFactoryFile).not.toHaveBeenCalled();
   });
 
