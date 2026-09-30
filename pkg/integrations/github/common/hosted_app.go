@@ -1,14 +1,19 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	githubauth "github.com/google/go-github/v75/github"
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -17,6 +22,9 @@ const (
 	EnvGitHubAppSlug          = config.EnvGitHubAppSlug
 	EnvGitHubAppPrivateKey    = config.EnvGitHubAppPrivateKey
 	EnvGitHubAppWebhookSecret = config.EnvGitHubAppWebhookSecret
+	hostedAppInstallStateTTL  = 7 * 24 * time.Hour
+	hostedAppInstallIntent    = "github-app-install"
+	hostedAppInstallPrefix    = "github-install:"
 )
 
 // HostedApp is SuperPlane Cloud's public GitHub App. The process holds the
@@ -108,6 +116,52 @@ func HostedAppConfigured() bool {
 
 func HostedAppInstallURL(slug, state string) string {
 	return fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", slug, url.QueryEscape(state))
+}
+
+func SignHostedAppInstallState(secret string, organizationID uuid.UUID) (string, error) {
+	if strings.TrimSpace(secret) == "" {
+		return "", errors.New("GitHub App setup state secret is required")
+	}
+	if organizationID == uuid.Nil {
+		return "", errors.New("organization id is required")
+	}
+
+	token, err := jwt.NewSigner(secret).GenerateWithClaims(hostedAppInstallStateTTL, map[string]string{
+		"sub":    organizationID.String(),
+		"intent": hostedAppInstallIntent,
+		"jti":    uuid.NewString(),
+	})
+	if err != nil {
+		return "", fmt.Errorf("sign GitHub App setup state: %w", err)
+	}
+	return hostedAppInstallPrefix + token, nil
+}
+
+func VerifyHostedAppInstallState(secret, state string) (uuid.UUID, error) {
+	if strings.TrimSpace(secret) == "" {
+		return uuid.Nil, errors.New("GitHub App setup state secret is required")
+	}
+	token, ok := strings.CutPrefix(strings.TrimSpace(state), hostedAppInstallPrefix)
+	if !ok {
+		return uuid.Nil, errors.New("invalid GitHub App setup state")
+	}
+
+	claims, err := jwt.NewSigner(secret).ValidateAndGetClaims(token)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("verify GitHub App setup state: %w", err)
+	}
+	intent, _ := claims["intent"].(string)
+	nonce, _ := claims["jti"].(string)
+	subject, _ := claims["sub"].(string)
+	if intent != hostedAppInstallIntent || nonce == "" || subject == "" {
+		return uuid.Nil, errors.New("invalid GitHub App setup state claims")
+	}
+
+	organizationID, err := uuid.Parse(subject)
+	if err != nil || organizationID == uuid.Nil {
+		return uuid.Nil, errors.New("invalid organization id in GitHub App setup state")
+	}
+	return organizationID, nil
 }
 
 // LegacyAppPrivateKey returns the PEM for a legacy GitHub App connection.

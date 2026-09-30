@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,32 +26,62 @@ import (
 )
 
 func TestHandleGitHubAppSetup(t *testing.T) {
-	previous := enqueueGitHubAppReconciliation
-	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error { return nil }
-	t.Cleanup(func() { enqueueGitHubAppReconciliation = previous })
+	setGitHubAppEnvironment(t)
+	previousReconciliation := enqueueGitHubAppReconciliation
+	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
+	organizationID := uuid.New()
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
+	var installationIDs []int64
+	var organizationIDs []uuid.UUID
+	reconciliationCount := 0
+	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error {
+		reconciliationCount++
+		return nil
+	}
+	enqueueGitHubAppInstallationReconciliation = func(
+		_ context.Context,
+		installationID int64,
+		requestedOrganizationID uuid.UUID,
+		_ time.Time,
+	) error {
+		installationIDs = append(installationIDs, installationID)
+		organizationIDs = append(organizationIDs, requestedOrganizationID)
+		return nil
+	}
+	t.Cleanup(func() {
+		enqueueGitHubAppReconciliation = previousReconciliation
+		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
+	})
 
 	t.Run("approved installation returns to onboarding", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install&state="+state,
 			nil,
 		))
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
 	})
 
 	t.Run("repository update returns to the app", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update",
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update&state="+state,
 			nil,
 		))
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, organizationID}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
 	})
 
 	t.Run("approval request returns to the app without an installation id", func(t *testing.T) {
@@ -63,6 +94,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, 1, reconciliationCount)
 	})
 
 	t.Run("installation id is required", func(t *testing.T) {
@@ -75,6 +107,27 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	})
+}
+
+func TestGitHubAppSetupOrganizationID(t *testing.T) {
+	setGitHubAppEnvironment(t)
+	organizationID := uuid.New()
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
+	assert.Equal(t, organizationID, githubAppSetupOrganizationID(state))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID(state+"tampered"))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("o_"+organizationID.String()))
+}
+
+func setGitHubAppEnvironment(t *testing.T) {
+	t.Helper()
+	t.Setenv(githubcommon.EnvGitHubAppID, "12345")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+	t.Setenv(
+		githubcommon.EnvGitHubAppPrivateKey,
+		"-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+	)
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "test-webhook-secret")
 }
 
 func TestGitHubInstallationID(t *testing.T) {
@@ -245,6 +298,21 @@ func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	var jobCount int64
 	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
 	assert.Equal(t, int64(1), jobCount)
+	var queuedJob models.VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&queuedJob, "provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).Error)
+	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, queuedJob.Priority)
+	assert.WithinDuration(t, time.Now(), queuedJob.RunAt, time.Second)
+
+	// A member event keeps its delayed refresh even when an immediate job is
+	// already queued. GitHub can take time to publish collaborator changes.
+	memberReceivedAt := time.Now()
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.MemberEvent{
+		Action:       gh.Ptr("edited"),
+		Repo:         repository,
+		Installation: installation,
+	}, installationID))
+	require.NoError(t, db.First(&queuedJob, "provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).Error)
+	assert.WithinDuration(t, memberReceivedAt.Add(10*time.Second), queuedJob.RunAt, time.Second)
 
 	// Member changes enqueue the repository again after the previous job is
 	// complete so cached push access is refreshed.
