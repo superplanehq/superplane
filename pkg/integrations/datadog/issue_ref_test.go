@@ -3,6 +3,7 @@ package datadog
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,6 +54,26 @@ func TestIssueIDFromEventData(t *testing.T) {
 		"type": "sentry.issue",
 		"data": map[string]any{
 			"link": "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+		},
+	})
+	assert.False(t, ok)
+}
+
+func TestReceiptIDFromEventData(t *testing.T) {
+	receiptID := uuid.New()
+	found, ok := ReceiptIDFromEventData(map[string]any{
+		"type": ErrorTrackingAlertPayloadType,
+		"data": map[string]any{
+			ReceiptField: receiptID.String(),
+		},
+	})
+	assert.True(t, ok)
+	assert.Equal(t, receiptID, found)
+
+	_, ok = ReceiptIDFromEventData(map[string]any{
+		"type": "sentry.issue",
+		"data": map[string]any{
+			ReceiptField: receiptID.String(),
 		},
 	})
 	assert.False(t, ok)

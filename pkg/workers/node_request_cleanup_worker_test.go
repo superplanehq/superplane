@@ -100,6 +100,44 @@ func Test__NodeRequestCleanupWorker_DeletesExpiredSentryWebhookReceipts(t *testi
 	assert.Equal(t, int64(1), countSentryReceiptsByID(t, recent))
 }
 
+func Test__NodeRequestCleanupWorker_DeletesExpiredDatadogWebhookReceipts(t *testing.T) {
+	support.Setup(t)
+	now := time.Now().UTC()
+	expiredAt := now.Add(-models.DatadogWebhookReceiptRetention - time.Hour)
+
+	expired := createDatadogReceiptForCleanup(t, expiredAt)
+	recent := createDatadogReceiptForCleanup(t, now.Add(-time.Hour))
+
+	worker := NewNodeRequestCleanupWorker()
+	worker.deleteExpiredDatadogWebhookReceipts()
+
+	assert.Equal(t, int64(0), countDatadogReceiptsByID(t, expired))
+	assert.Equal(t, int64(1), countDatadogReceiptsByID(t, recent))
+}
+
+func createDatadogReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {
+	t.Helper()
+
+	id, err := models.CreateDatadogWebhookReceipt(database.Conn(), models.DatadogWebhookReceipt{
+		ReceivedAt:     receivedAt,
+		IntegrationID:  uuid.New(),
+		OrganizationID: uuid.New(),
+		HTTPStatus:     200,
+		Outcome:        models.DatadogWebhookOutcomeAccepted,
+	})
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("id = ?", id).Update("received_at", receivedAt).Error)
+	return id
+}
+
+func countDatadogReceiptsByID(t *testing.T, id uuid.UUID) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("id = ?", id).Count(&count).Error)
+	return count
+}
+
 func createSentryReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {
 	t.Helper()
 
