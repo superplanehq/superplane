@@ -137,7 +137,7 @@ import {
 import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
-import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
@@ -1176,6 +1176,7 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
+          factoryApps={apps}
           onClose={onClosePeek}
         />
       ) : null}
@@ -1197,6 +1198,7 @@ function LineBoardSplitRunPopup({
   onDispatch,
   analysisRuns,
   isAnalyzing,
+  factoryApps,
   onClose,
 }: {
   organizationId: string;
@@ -1212,6 +1214,7 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
+  factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
@@ -1240,6 +1243,7 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        columnApps: columnAppsFromFactoryApps(factoryApps),
         isAnalyzing,
         stoppedBy: closer.actor,
         closer,
