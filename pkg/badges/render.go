@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"math"
-	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -13,17 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// Colors match the Velocity "who created" chart.
+// Series colors match the Velocity "who created" chart. The card chrome
+// follows a dark README stat card: muted labels, one large number, quiet chart.
 const (
 	colorSuperplane = "#10b981"
 	colorManual     = "#64748b"
-	colorSlateDark  = "#1e293b"
-	colorText       = "#0f172a"
-	colorSubtle     = "#475569"
-	colorBorder     = "#e2e8f0"
-	colorTrack      = "#e2e8f0"
-	colorWhite      = "#ffffff"
-	colorLabel      = "#ffffff"
+	colorBorder     = "#30363d"
+	colorText       = "#f0f6fc"
+	colorSubtle     = "#8b949e"
 
 	fontFamily = "-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
 )
@@ -48,8 +44,9 @@ type DayPoint struct {
 // Input is everything the SVG needs. CostCents is nil when the cost switch
 // is off. The renderer never reads a URL flag.
 //
-// Mobbin and ReUI were not available in this run. Layout follows the badge
-// spec, shields.io proportions, and the Velocity chart colors.
+// Layout follows dark README stat cards (Repobeats-style): rounded card,
+// large share, metric row, and a quiet daily chart. Series colors stay
+// the Velocity chart colors.
 type Input struct {
 	PeriodDays               int
 	SuperplaneMerged         int
@@ -298,9 +295,9 @@ func layoutSmall(in Input) smallModel {
 		right = fmt.Sprintf("%d%% PRs · %dd", m.share, in.PeriodDays)
 		title = fmt.Sprintf("SuperPlane %d%% · %d PRs · %dd", m.share, in.SuperplaneMerged, in.PeriodDays)
 	}
-	pad := 8
-	leftWidth := textWidth(left, 11, true) + pad*2
-	rightWidth := textWidth(right, 11, true) + pad*2
+	pad := 10
+	leftWidth := textWidth(left, 12, true) + pad*2
+	rightWidth := textWidth(right, 12, true) + pad*2
 	return smallModel{
 		Font:       fontFamily,
 		Width:      leftWidth + rightWidth,
@@ -335,50 +332,50 @@ type largeModel struct {
 func layoutLarge(in Input) largeModel {
 	m := derive(in)
 	const (
-		width = 320
-		pad   = 16
+		width = 360
+		pad   = 20
 	)
 	texts := []placedText{
-		{X: pad, Y: 26, Size: 13, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane")},
+		{X: pad, Y: 28, Size: 13, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane")},
 	}
-	y := 48
+	y := 52
 	if m.showShare {
 		shareText := fmt.Sprintf("%d%%", m.share)
-		texts = append(texts, placedText{X: pad, Y: 62, Size: 32, Weight: "700", Fill: colorSuperplane, Text: escapeXML(shareText)})
+		texts = append(texts, placedText{X: pad, Y: 72, Size: 36, Weight: "700", Fill: colorSuperplane, Text: escapeXML(shareText)})
 		if m.showTrend {
 			texts = append(texts, placedText{
-				X:      pad + textWidth(shareText, 32, true) + 10,
-				Y:      54,
-				Size:   12,
+				X:      pad + textWidth(shareText, 36, true) + 12,
+				Y:      64,
+				Size:   13,
 				Weight: "600",
-				Fill:   colorManual,
+				Fill:   colorSubtle,
 				Text:   escapeXML(m.trend),
 			})
 		}
-		y = 84
-		texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "400", Fill: colorSubtle, Text: escapeXML("of merged PRs via SuperPlane")})
-		y += 18
+		y = 96
+		texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "400", Fill: colorSubtle, Text: escapeXML("of merged PRs via SuperPlane")})
+		y += 20
 	}
-	texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "500", Fill: colorText, Text: escapeXML(countLine(in.SuperplaneMerged, in.PeriodDays, false))})
+	texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "500", Fill: colorText, Text: escapeXML(countLine(in.SuperplaneMerged, in.PeriodDays, false))})
 	if m.showMerge {
-		y += 18
+		y += 20
 		texts = append(texts, placedText{
-			X: pad, Y: y, Size: 12, Weight: "400", Fill: colorManual,
+			X: pad, Y: y, Size: 13, Weight: "400", Fill: colorSubtle,
 			Text: escapeXML(fmt.Sprintf("%d%% of SuperPlane PRs merged", m.mergeRate)),
 		})
 	}
 	if m.showCost {
-		y += 18
-		texts = append(texts, placedText{X: pad, Y: y, Size: 12, Weight: "600", Fill: colorText, Text: escapeXML(m.cost)})
+		y += 20
+		texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "600", Fill: colorText, Text: escapeXML(m.cost)})
 	}
-	barY := y + 12
-	barH := 8
+	barY := y + 14
+	barH := 6
 	height := y + 16
 	barW := width - pad*2
 	greenW := 0
 	slateW := 0
 	if m.showShare {
-		height = barY + barH + 16
+		height = barY + barH + 20
 		if m.merged > 0 {
 			greenW = barW * m.share / 100
 			slateW = barW - greenW
@@ -414,67 +411,80 @@ func layoutLarge(in Input) largeModel {
 }
 
 type wideModel struct {
-	Font    string
-	Height  int
-	InnerH  int
-	Title   string
-	Texts   []placedText
-	Days    []dayBar
-	Legend  []placedText
-	Squares []barRect
+	Font     string
+	Height   int
+	InnerH   int
+	Title    string
+	Texts    []placedText
+	Days     []dayBar
+	Legend   []placedText
+	Squares  []barRect
+	Baseline barRect
 }
 
 func layoutWide(in Input) wideModel {
 	m := derive(in)
-	const maxX = 780
-	items := []headerItem{
-		{text: "SuperPlane", size: 14, weight: "700", fill: colorText},
-	}
+	const (
+		pad         = 28
+		maxX        = 772
+		row1Y       = 44
+		row2Y       = 76
+		chartX      = 28
+		chartW      = 744
+		chartH      = 120
+		baseChartY  = 96
+		baseLegendY = 252
+		baseHeight  = 280
+	)
+	texts := []placedText{{
+		X: pad, Y: row1Y, Size: 16, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane"),
+	}}
 	if m.showShare {
-		items = append(items, headerItem{
-			text: fmt.Sprintf("%d%%", m.share), size: 18, weight: "700", fill: colorSuperplane,
-		})
-		if m.showTrend {
-			items = append(items, headerItem{
-				text:   m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
-				size:   12,
-				weight: "600",
-				fill:   colorManual,
-			})
-		}
-		items = append(items, headerItem{
-			text:     "of merged PRs via SuperPlane",
-			size:     12,
-			weight:   "400",
-			fill:     colorSubtle,
-			dropRank: dropPhrase,
+		shareText := fmt.Sprintf("%d%%", m.share)
+		texts = append(texts, placedText{
+			X:      pad + textWidth("SuperPlane", 16, true) + 16,
+			Y:      row1Y,
+			Size:   28,
+			Weight: "700",
+			Fill:   colorSuperplane,
+			Text:   escapeXML(shareText),
 		})
 	}
-	items = append(items, headerItem{
-		text:     countLine(in.SuperplaneMerged, in.PeriodDays, true),
-		size:     12,
-		weight:   "500",
-		fill:     colorText,
-		dropRank: dropCount,
+	metrics := make([]headerItem, 0, 4)
+	if m.showTrend {
+		metrics = append(metrics, headerItem{
+			text:   m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
+			size:   13,
+			weight: "600",
+			fill:   colorSubtle,
+		})
+	}
+	metrics = append(metrics, headerItem{
+		text:   countLine(in.SuperplaneMerged, in.PeriodDays, true),
+		size:   13,
+		weight: "500",
+		fill:   colorText,
 	})
 	if m.showMerge {
-		items = append(items, headerItem{
+		metrics = append(metrics, headerItem{
 			text:   fmt.Sprintf("%d%% merge rate", m.mergeRate),
-			size:   12,
+			size:   13,
 			weight: "400",
-			fill:   colorManual,
+			fill:   colorSubtle,
 		})
 	}
 	if m.showCost {
-		items = append(items, headerItem{
-			text: m.cost, size: 12, weight: "600", fill: colorText, wrap: true,
+		metrics = append(metrics, headerItem{
+			text: m.cost, size: 13, weight: "600", fill: colorText, wrap: true,
 		})
 	}
-	texts, headerExtra := placeHeader(items, 20, 30, maxX)
-	height := 240 + headerExtra
+	metricTexts, headerExtra := placeMetricRow(metrics, pad, row2Y, maxX)
+	texts = append(texts, metricTexts...)
 
-	chart := layoutChart(in.Days, 24, 56+headerExtra, 752, 118)
-	legend, squares := layoutLegend(m, in.Updated, 24, 214+headerExtra, 776)
+	chartY := baseChartY + headerExtra
+	chart := layoutChart(in.Days, chartX, chartY, chartW, chartH)
+	legend, squares := layoutLegend(m, in.Updated, pad, baseLegendY+headerExtra, 772)
+	height := baseHeight + headerExtra
 	title := fmt.Sprintf("SuperPlane · %d PRs merged · last %d days", in.SuperplaneMerged, in.PeriodDays)
 	if m.showShare {
 		title = fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
@@ -488,80 +498,35 @@ func layoutWide(in Input) wideModel {
 		Days:    chart,
 		Legend:  legend,
 		Squares: squares,
+		Baseline: barRect{
+			X: chartX, Y: chartY + chartH, Width: chartW, Height: 1, Fill: colorBorder,
+		},
 	}
 }
-
-const (
-	dropCount      = 1
-	dropPhrase     = 2
-	headerLineStep = 22
-)
 
 type headerItem struct {
-	text     string
-	size     float64
-	weight   string
-	fill     string
-	dropRank int
-	wrap     bool
+	text   string
+	size   float64
+	weight string
+	fill   string
+	wrap   bool
 }
 
-func placeHeader(items []headerItem, startX, y, maxX int) ([]placedText, int) {
-	primary := make([]headerItem, 0, len(items))
-	wrapped := make([]headerItem, 0)
-	for _, item := range items {
-		if item.wrap {
-			wrapped = append(wrapped, item)
-			continue
-		}
-		primary = append(primary, item)
+func placeMetricRow(items []headerItem, startX, y, maxX int) ([]placedText, int) {
+	if len(items) == 0 {
+		return nil, 0
 	}
-	if len(wrapped) == 0 {
-		return fitHeaderLine(primary, startX, y, maxX), 0
-	}
-	oneLine := append(append([]headerItem{}, primary...), wrapped...)
-	placed := fitHeaderLineAbove(oneLine, startX, y, maxX, dropPhrase)
+	placed := placeHeaderPass(items, startX, y)
 	if !headerOverflows(placed, maxX) {
 		return placed, 0
 	}
-	placed = fitHeaderLineAbove(primary, startX, y, maxX, dropPhrase)
-	if headerOverflows(placed, maxX) {
-		placed = fitHeaderLine(primary, startX, y, maxX)
+	last := items[len(items)-1]
+	if !last.wrap || len(items) < 2 {
+		return placed, 0
 	}
-	secondY := y + headerLineStep
-	placed = append(placed, fitHeaderLine(wrapped, startX, secondY, maxX)...)
-	return placed, headerLineStep
-}
-
-func fitHeaderLine(items []headerItem, startX, y, maxX int) []placedText {
-	return fitHeaderLineAbove(items, startX, y, maxX, dropCount)
-}
-
-func fitHeaderLineAbove(items []headerItem, startX, y, maxX, minRank int) []placedText {
-	kept := append([]headerItem(nil), items...)
-	for {
-		placed := placeHeaderPass(kept, startX, y)
-		if !headerOverflows(placed, maxX) {
-			return placed
-		}
-		index := highestDropRank(kept, minRank)
-		if index < 0 {
-			return placed
-		}
-		kept = slices.Delete(kept, index, index+1)
-	}
-}
-
-func highestDropRank(items []headerItem, minRank int) int {
-	best := -1
-	bestRank := minRank - 1
-	for i, item := range items {
-		if item.dropRank > bestRank {
-			best = i
-			bestRank = item.dropRank
-		}
-	}
-	return best
+	head := placeHeaderPass(items[:len(items)-1], startX, y)
+	tail := placeHeaderPass(items[len(items)-1:], startX, y+22)
+	return append(head, tail...), 22
 }
 
 func placeHeaderPass(items []headerItem, startX, y int) []placedText {
@@ -578,7 +543,7 @@ func placeHeaderPass(items []headerItem, startX, y int) []placedText {
 			Text:   escapeXML(item.text),
 			Width:  width,
 		})
-		x += width + 14
+		x += width + 18
 	}
 	return out
 }
@@ -609,7 +574,7 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 		return out
 	}
 	slot := float64(chartW) / float64(len(days))
-	barW := int(math.Round(slot * 0.62))
+	barW := int(math.Round(slot * 0.42))
 	if barW < 3 {
 		barW = 3
 	}
@@ -664,8 +629,18 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 				})
 			}
 			if slateH > 0 {
+				radius := 0
+				if greenH == 0 {
+					radius = 3
+					if radius > barW/2 {
+						radius = barW / 2
+					}
+					if radius > slateH {
+						radius = slateH
+					}
+				}
 				bar.Rects = append(bar.Rects, barRect{
-					X: x, Y: bottom - slateH, Width: barW, Height: slateH, Fill: colorManual,
+					X: x, Y: bottom - slateH, Width: barW, Height: slateH, Radius: radius, Fill: colorManual,
 				})
 			}
 		}
@@ -676,7 +651,7 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 				Y:      bottom + 16,
 				Size:   10,
 				Weight: "400",
-				Fill:   colorManual,
+				Fill:   colorSubtle,
 				Anchor: "middle",
 				Text:   escapeXML(label),
 			}
@@ -706,7 +681,7 @@ func layoutLegend(m metrics, updated time.Time, x, y, right int) ([]placedText, 
 	if !m.showShare {
 		texts := []placedText{
 			{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML("Automated via SuperPlane")},
-			{X: right, Y: y, Size: 11, Weight: "400", Fill: colorManual, Anchor: "end", Text: escapeXML(updatedLabel)},
+			{X: right, Y: y, Size: 11, Weight: "400", Fill: colorSubtle, Anchor: "end", Text: escapeXML(updatedLabel)},
 		}
 		squares := []barRect{
 			{X: x, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorSuperplane},
@@ -718,7 +693,7 @@ func layoutLegend(m metrics, updated time.Time, x, y, right int) ([]placedText, 
 	texts := []placedText{
 		{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(auto)},
 		{X: x + 14 + textWidth(auto, 11, false) + 28, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(manual)},
-		{X: right, Y: y, Size: 11, Weight: "400", Fill: colorManual, Anchor: "end", Text: escapeXML(updatedLabel)},
+		{X: right, Y: y, Size: 11, Weight: "400", Fill: colorSubtle, Anchor: "end", Text: escapeXML(updatedLabel)},
 	}
 	squares := []barRect{
 		{X: x, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorSuperplane},
@@ -734,26 +709,26 @@ var (
 )
 
 const smallSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="{{.Width}}" height="20" viewBox="0 0 {{.Width}} 20" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="{{.Width}}" height="28" viewBox="0 0 {{.Width}} 28" role="img">
   <title>{{.Title}}</title>
-  <clipPath id="{{.ClipID}}"><rect width="{{.Width}}" height="20" rx="3"/></clipPath>
+  <clipPath id="{{.ClipID}}"><rect width="{{.Width}}" height="28" rx="4"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect width="{{.LeftWidth}}" height="20" fill="#1e293b"/>
-    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="20" fill="#10b981"/>
-    <text x="{{.LeftTextX}}" y="14" fill="#ffffff" font-size="11" font-family="{{.Font}}" font-weight="600">{{.LeftText}}</text>
-    <text x="{{.RightTextX}}" y="14" fill="#ffffff" font-size="11" font-family="{{.Font}}" font-weight="600">{{.RightText}}</text>
+    <rect width="{{.LeftWidth}}" height="28" fill="#0d1117"/>
+    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="#10b981"/>
+    <text x="{{.LeftTextX}}" y="19" fill="#ffffff" font-size="12" font-family="{{.Font}}" font-weight="600">{{.LeftText}}</text>
+    <text x="{{.RightTextX}}" y="19" fill="#ffffff" font-size="12" font-family="{{.Font}}" font-weight="600">{{.RightText}}</text>
   </g>
 </svg>
 `
 
 const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="320" height="{{.Height}}" viewBox="0 0 320 {{.Height}}" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="{{.Height}}" viewBox="0 0 360 {{.Height}}" role="img">
   <title>{{.Title}}</title>
-  <rect x="0.5" y="0.5" width="319" height="{{.InnerH}}" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="#0d1117" stroke="#30363d"/>
   {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}">{{.Text}}</text>
-  {{end}}{{if .ShowTrack}}<clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="4"/></clipPath>
+  {{end}}{{if .ShowTrack}}<clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="3"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="#e2e8f0"/>
+    <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="#21262d"/>
     {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="#10b981"/>{{end}}
     {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="#64748b"/>{{end}}
   </g>{{end}}
@@ -763,9 +738,10 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
 const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
   <title>{{.Title}}</title>
-  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="#0d1117" stroke="#30363d"/>
   {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}"{{if .Anchor}} text-anchor="{{.Anchor}}"{{end}}>{{.Text}}</text>
-  {{end}}{{range .Days}}<g class="day">
+  {{end}}<rect x="{{.Baseline.X}}" y="{{.Baseline.Y}}" width="{{.Baseline.Width}}" height="{{.Baseline.Height}}" fill="{{.Baseline.Fill}}"/>
+  {{range .Days}}<g class="day">
     {{range .Rects}}<rect x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}"{{if gt .Radius 0}} rx="{{.Radius}}"{{end}} fill="{{.Fill}}"/>{{end}}
     {{if .Show}}<text x="{{.Label.X}}" y="{{.Label.Y}}" fill="{{.Label.Fill}}" font-size="{{.Label.Size}}" font-family="{{$.Font}}" text-anchor="middle">{{.Label.Text}}</text>{{end}}
   </g>

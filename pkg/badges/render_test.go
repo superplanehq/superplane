@@ -211,7 +211,7 @@ func TestRender_WideKeepsFittingCostOnTheHeaderLine(t *testing.T) {
 	_, costY := textPosition(t, svg, "$1.00 per merged PR")
 	_, rateY := textPosition(t, svg, "100% merge rate")
 	assert.Equal(t, rateY, costY)
-	assert.Equal(t, 240, viewBoxHeight(t, svg))
+	assert.Equal(t, 280, viewBoxHeight(t, svg))
 }
 
 func assertWideKeepsCostAndMetrics(t *testing.T, svg, costLabel string) {
@@ -225,12 +225,14 @@ func assertWideKeepsCostAndMetrics(t *testing.T, svg, costLabel string) {
 	_, rateY := textPosition(t, svg, "92% merge rate")
 	_, countY := textPosition(t, svg, "35 PRs merged · last 14 days")
 	assert.Equal(t, rateY, countY)
-	assert.Greater(t, costY, rateY)
+	assert.GreaterOrEqual(t, costY, rateY)
 	assert.LessOrEqual(t, textRightEdge(t, svg, costLabel), 780)
 	assert.LessOrEqual(t, textRightEdge(t, svg, "92% merge rate"), 780)
 	assert.LessOrEqual(t, textRightEdge(t, svg, "35 PRs merged · last 14 days"), 780)
 	height := viewBoxHeight(t, svg)
 	assert.Greater(t, height, costY)
+	assert.Contains(t, svg, `fill="#0d1117"`)
+	assert.NotContains(t, svg, `fill="#ffffff"`)
 	assert.Contains(t, svg, fmt.Sprintf(`width="799" height="%d"`, height-1))
 }
 
