@@ -41,7 +41,7 @@ export const FIRST_RUN_COPY = {
     missingRepository: "Do not see your repository?",
     grantAccess: "Grant access on GitHub",
     openingGitHub: "Opening GitHub…",
-    synchronizing: "More repositories are syncing…",
+    synchronizing: "Repositories appear as GitHub verifies access…",
     installRequested: (organization: string) => `Waiting for approval for ${organization}.`,
     installRequestedBody: githubInstallRequestBody,
     installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
