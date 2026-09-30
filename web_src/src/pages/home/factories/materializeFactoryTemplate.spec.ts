@@ -127,6 +127,30 @@ spec:
     expect(wired).not.toMatch(/credentials:[\s\S]*name: claude\b/);
   });
 
+  it("rewrites environmentFrom to the installation name", () => {
+    const wired = wireFactoryIntegrations(
+      `
+apiVersion: v1
+kind: Canvas
+spec:
+  nodes:
+    - id: implement
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+`,
+      {},
+      { github: { id: "int-1", name: "github-acme", ready: true } },
+    );
+
+    expect(wired).toMatch(/environmentFrom:[\s\S]*name: github-acme/);
+    expect(wired).not.toContain("name: GitHub");
+    expect(wired).not.toMatch(/name: github\s*$/m);
+  });
+
   it("materializes factory identity, repo, and github wiring", () => {
     const canvasYaml = materializeSoftwareFactory();
     const definition = getFactoryDefinition("software-factory");

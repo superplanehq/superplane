@@ -17,6 +17,7 @@ import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganiza
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
 import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
+import { describeGitHubInstallationName, selectionsWithGitHubInstallation } from "./githubIntegrationSelection";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
@@ -284,16 +285,19 @@ export function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
+      const installationName = await describeGitHubInstallationName(args.organizationId, github.id);
+      const selections = selectionsWithGitHubInstallation(args.selections, installationName);
       const provisioned = await provisionWorkspace({
         ...args,
+        selections,
         workspaceName,
         appRepository,
         backlogRepository,
         issuesChoice,
         github,
         agentPlan: args.plan,
-        agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
-        agentIntegrationId: agentIntegrationIdForPlan(args.plan, args.selections),
+        agentRewrite: agentRewriteFromPlan(args.plan, selections),
+        agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
       });
       await afterWorkspaceProvisioned({
