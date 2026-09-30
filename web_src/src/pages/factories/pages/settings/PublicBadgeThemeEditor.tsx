@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -49,7 +48,7 @@ export function PublicBadgeThemeEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex min-h-5 items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
           <Label>{COPY.themeLabel}</Label>
           <span className="text-[12px] text-muted-foreground" data-testid="factory-settings-public-badge-theme-name">
@@ -57,16 +56,17 @@ export function PublicBadgeThemeEditor({
           </span>
         </div>
         {customized ? (
-          <Button
+          // A text action, not a button: a sized button makes the row taller
+          // and moves the rest of the section down when a color changes.
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
+            className="text-[12px] text-muted-foreground underline hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             disabled={locked}
             onClick={onReset}
             data-testid="factory-settings-public-badge-reset"
           >
             {COPY.reset}
-          </Button>
+          </button>
         ) : null}
       </div>
 
