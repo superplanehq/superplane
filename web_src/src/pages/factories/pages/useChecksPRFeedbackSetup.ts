@@ -16,6 +16,7 @@ import {
   readyChecksHandlerIntegrationIds,
   selectedChecksUseGitHubActions,
   suggestedIntegrationsForChecks,
+  checksHandlerIntegrationRows,
 } from "./checksPRFeedbackSetup";
 import {
   isPRFeedbackMaximumAttemptsValid,
@@ -23,6 +24,32 @@ import {
   toggleUniqueString,
   type PRFeedbackSource,
 } from "./prFeedbackSettingsModel";
+
+/**
+ * Get integration IDs for suggested integrations that are in ready state.
+ * Suggested integrations are those inferred from the selected checks.
+ */
+function getSuggestedIntegrationIds(
+  suggestedNames: string[],
+  connected: Array<{ status?: { state?: string }; metadata?: { id?: string; integrationName?: string } }>,
+): string[] {
+  const suggested = new Set(suggestedNames.map((name) => name.toLowerCase()));
+  return connected.flatMap((integration) => {
+    const id = integration.metadata?.id;
+    if (
+      !id ||
+      integration.status?.state !== "ready" ||
+      !isChecksHandlerCIIntegration(integration.metadata?.integrationName)
+    ) {
+      return [];
+    }
+    const integrationName = integration.metadata?.integrationName?.trim().toLowerCase();
+    if (!integrationName || !suggested.has(integrationName)) {
+      return [];
+    }
+    return [id];
+  });
+}
 
 export function useChecksPRFeedbackSetup(
   organizationId: string,
@@ -127,9 +154,29 @@ function useChecksSetupResources(
     if (seeded.connected || connectedLoading) {
       return;
     }
-    setRunnerIntegrationIds(readyChecksHandlerIntegrationIds(connected));
+    // Start with all ready integrations for checks handler
+    const allReadyIds = readyChecksHandlerIntegrationIds(connected);
+    setRunnerIntegrationIds(allReadyIds);
     setSeeded((current) => ({ ...current, connected: true }));
   }, [connected, connectedLoading, seeded.connected]);
+
+  // Auto-select suggested integrations when checks are selected
+  useEffect(() => {
+    if (checkNames.length === 0 || seeded.connected === false || connectedLoading) {
+      return;
+    }
+    const suggested = suggestedIntegrationsForChecks(catalog, checkNames);
+    if (suggested.length === 0) {
+      return;
+    }
+    // Get IDs of suggested integrations that are ready
+    const suggestedIds = getSuggestedIntegrationIds(suggested, connected);
+    setRunnerIntegrationIds((current) => {
+      const seen = new Set(current);
+      suggestedIds.forEach((id) => seen.add(id));
+      return Array.from(seen);
+    });
+  }, [checkNames, catalog, seeded.connected, connectedLoading, connected]);
 
   const catalogEmpty = !catalogLoading && !catalogQuery.isError && catalog.length === 0;
   const available = (availableQuery.data ?? []).filter((integration) => isChecksHandlerCIIntegration(integration.name));
