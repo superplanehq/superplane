@@ -1233,20 +1233,6 @@ func ListVCSProviderIntegrationBindings(
 	return bindings, err
 }
 
-func ListVCSProviderBoundIntegrations(tx *gorm.DB, provider string, installationID int64) ([]Integration, error) {
-	var integrations []Integration
-	err := tx.
-		Table("app_installations AS integration").
-		Select("integration.*").
-		Joins("JOIN vcs_provider_integration_bindings AS binding ON binding.integration_id = integration.id").
-		Where("binding.provider = ?", provider).
-		Where("binding.installation_id = ?", installationID).
-		Where("integration.deleted_at IS NULL").
-		Find(&integrations).
-		Error
-	return integrations, err
-}
-
 func normalizeVCSProvider(provider string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if provider == "" {
