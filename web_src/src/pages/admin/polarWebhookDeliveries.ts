@@ -9,6 +9,9 @@ export const POLAR_WEBHOOKS_SENDING_AGAIN = "Sending again";
 export const POLAR_WEBHOOKS_UNAUTHORIZED =
   "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.";
 
+export const POLAR_WEBHOOKS_VERSION_CHECK_FAILED =
+  "SuperPlane could not check the API version of the Polar webhook endpoint. SuperPlane tries again automatically.";
+
 export const POLAR_WEBHOOK_PAGE_SIZE = 50;
 export const POLAR_WEBHOOK_ALL_VALUE = "all";
 export const POLAR_WEBHOOK_POLL_INTERVAL_MS = 5000;
@@ -39,7 +42,42 @@ export type PolarWebhookDelivery = {
   event_id: string;
   event_succeeded?: boolean | null;
   payload: string;
+  api_version?: string;
 };
+
+export type PolarWebhookEndpoint = {
+  id: string;
+  url: string;
+  api_version: string;
+  format: string;
+  current: boolean;
+};
+
+export type PolarWebhookEndpointsResponse = {
+  configured: boolean;
+  api_version: string;
+  endpoints: PolarWebhookEndpoint[];
+};
+
+export function mismatchedPolarWebhookEndpoints(
+  response: PolarWebhookEndpointsResponse | null,
+): PolarWebhookEndpoint[] {
+  if (!response || !response.configured || !response.api_version) {
+    return [];
+  }
+  return (response.endpoints ?? []).filter(
+    (endpoint) => endpoint.current && endpoint.api_version !== response.api_version,
+  );
+}
+
+export function polarWebhookEndpointVersionWarning(endpoint: PolarWebhookEndpoint, pinnedVersion: string): string {
+  const endpointVersion = endpoint.api_version || "Current";
+  return `Webhook endpoint ${endpoint.url} uses API version ${endpointVersion}. SuperPlane uses ${pinnedVersion}. Set the endpoint API version to ${pinnedVersion} in Polar.`;
+}
+
+export function isPolarApiVersionMismatch(deliveryVersion: string | undefined, pinnedVersion: string): boolean {
+  return Boolean(deliveryVersion) && Boolean(pinnedVersion) && deliveryVersion !== pinnedVersion;
+}
 
 export type PolarWebhooksResponse = {
   configured: boolean;

@@ -1343,6 +1343,33 @@ CREATE TABLE public.vcs_provider_install_requests (
 
 
 --
+-- Name: vcs_provider_installation_reconcile_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installation_reconcile_jobs (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installation_reconcile_requesters (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    organization_id uuid NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1445,7 +1472,8 @@ CREATE TABLE public.vcs_provider_repository_sync_jobs (
     locked_at timestamp with time zone,
     last_error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    priority smallint DEFAULT 0 NOT NULL
 );
 
 
@@ -2450,6 +2478,22 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.vcs_provider_install_requests
     ADD CONSTRAINT vcs_provider_install_requests_pkey PRIMARY KEY (provider, request_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_jobs vcs_provider_installation_reconcile_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_jobs
+    ADD CONSTRAINT vcs_provider_installation_reconcile_jobs_pkey PRIMARY KEY (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_pkey PRIMARY KEY (provider, installation_id, organization_id);
 
 
 --
@@ -3741,6 +3785,20 @@ CREATE INDEX vcs_provider_install_requests_requester_idx ON public.vcs_provider_
 
 
 --
+-- Name: vcs_provider_installation_reconcile_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_installation_reconcile_jobs_due_idx ON public.vcs_provider_installation_reconcile_jobs USING btree (provider, run_at) WHERE (locked_at IS NULL);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters_organization_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_installation_reconcile_requesters_organization_idx ON public.vcs_provider_installation_reconcile_requesters USING btree (provider, organization_id);
+
+
+--
 -- Name: vcs_provider_installations_account_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3786,7 +3844,7 @@ CREATE INDEX vcs_provider_repository_collaborators_user_idx ON public.vcs_provid
 -- Name: vcs_provider_repository_sync_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, run_at) WHERE (locked_at IS NULL);
+CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, priority DESC, run_at) WHERE (locked_at IS NULL);
 
 
 --
@@ -4636,6 +4694,14 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_job_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_job_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installation_reconcile_jobs(provider, installation_id) ON DELETE CASCADE;
+
+
+--
 -- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_installation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4995,7 +5061,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930111213	f
+20260930135608	f
 \.
 
 

@@ -1,12 +1,14 @@
 package me
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -90,4 +92,35 @@ func TestSelectVCSProviderOnboardingIdentityRejectsUnlinkedIdentity(t *testing.T
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.PermissionDenied, code)
+}
+
+func TestStartVCSProviderInstallationSignsOrganizationState(t *testing.T) {
+	r := support.Setup(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	setVCSProviderGitHubAppEnvironment(t)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "101", "octocat", "", ""),
+	))
+
+	response, err := StartVCSProviderInstallation(ctx, models.ProviderGitHub)
+	require.NoError(t, err)
+	installURL, err := url.Parse(response.Url)
+	require.NoError(t, err)
+	state := installURL.Query().Get("state")
+	assert.NotContains(t, state, r.Organization.ID.String())
+	organizationID, err := githubcommon.VerifyHostedAppInstallState("test-webhook-secret", state)
+	require.NoError(t, err)
+	assert.Equal(t, r.Organization.ID, organizationID)
+}
+
+func setVCSProviderGitHubAppEnvironment(t *testing.T) {
+	t.Helper()
+	t.Setenv(githubcommon.EnvGitHubAppID, "12345")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+	t.Setenv(
+		githubcommon.EnvGitHubAppPrivateKey,
+		"-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+	)
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "test-webhook-secret")
 }

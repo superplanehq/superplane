@@ -105,11 +105,20 @@ func setLogField(fields log.Fields, key string, value string) {
 
 func logHandledRequest(logger *log.Logger, fields log.Fields, status int) {
 	entry := logger.WithFields(fields)
+	message := handledRequestMessage(fields)
 	if status >= http.StatusInternalServerError {
-		entry.Error("handled request")
+		entry.Error(message)
 		return
 	}
-	entry.Info("handled request")
+	entry.Info(message)
+}
+
+func handledRequestMessage(fields log.Fields) string {
+	path, _ := fields["path"].(string)
+	if path == "" {
+		return "handled request"
+	}
+	return "handled request " + path
 }
 
 func durationMilliseconds(duration time.Duration) float64 {
