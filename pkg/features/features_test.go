@@ -117,7 +117,7 @@ func Test__Get(t *testing.T) {
 		f, ok := Get(FeatureSuperPlaneMCPServer)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
-		assert.Equal(t, "SuperPlane MCP Server", f.Label)
+		assert.Equal(t, "MCP Server", f.Label)
 		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
 		assert.Nil(t, f.Released)
 	})

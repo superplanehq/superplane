@@ -97,19 +97,28 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · MCP servers
-  entry("workspace", "mcp", "MCP servers", undefined, [
+  entry("workspace", "agent", "Agent", undefined, [
     "mcp server",
     "mcp",
     "oauth",
     "header",
-    "agent",
     "sign-in",
     "tools",
+    "skill",
+    "skill.md",
+    "github package",
   ]),
 
-  // Workspace · Skills
-  entry("workspace", "skills", "Skills", undefined, ["skill", "skill.md", "agent", "github package"]),
+  entry("workspace", "superplane-mcp-server", "MCP Server", undefined, [
+    "superplane mcp",
+    "mcp client",
+    "cursor",
+    "claude code",
+    "vscode",
+    "editor",
+    "ide",
+    "connect client",
+  ]),
 
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [

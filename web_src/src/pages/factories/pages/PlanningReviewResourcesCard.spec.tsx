@@ -79,7 +79,7 @@ describe("PlanningReviewResourcesCard", () => {
     );
     expect(screen.getAllByTestId("planning-review-resources-settings")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/mcp`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent`,
     );
   });
 
@@ -94,7 +94,7 @@ describe("PlanningReviewResourcesCard", () => {
     expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
     expect(screen.getAllByTestId("planning-review-resources-manage")[0]).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/mcp`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/settings/workspace/agent`,
     );
 
     await user.click(screen.getByTestId(`planning-review-resource-${HEADER_MCP_RESOURCE.id}`));
