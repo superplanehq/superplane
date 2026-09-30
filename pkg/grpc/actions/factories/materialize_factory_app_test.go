@@ -124,6 +124,25 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, reloaded.ColumnKey)
 		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+
+		// Assert that the add-pr-activity node exists and is wired correctly
+		addPRActivityNode := findYAMLNode(t, materialized, "add-pr-activity")
+		require.NotNil(t, addPRActivityNode)
+		assert.Equal(t, "Add Pull Request Activity", addPRActivityNode.Name)
+		assert.Equal(t, "addPullRequestActivity", addPRActivityNode.Component)
+
+		// Assert that edges are correctly wired: find-pull-request -> add-pr-activity -> assess-risk
+		var findPRToActivityEdgeFound, activityToAssessEdgeFound bool
+		for _, edge := range materialized.Spec.Edges {
+			if edge.SourceId == "find-pull-request" && edge.TargetId == "add-pr-activity" && edge.Channel == "found" {
+				findPRToActivityEdgeFound = true
+			}
+			if edge.SourceId == "add-pr-activity" && edge.TargetId == "assess-risk" && edge.Channel == "default" {
+				activityToAssessEdgeFound = true
+			}
+		}
+		assert.True(t, findPRToActivityEdgeFound, "edge from find-pull-request to add-pr-activity with channel 'found' not found")
+		assert.True(t, activityToAssessEdgeFound, "edge from add-pr-activity to assess-risk with channel 'default' not found")
 	})
 
 	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
@@ -407,4 +426,15 @@ func assertNoRunnerNode(t *testing.T, canvas *yaml.Canvas) {
 		assert.NotEqual(t, models.SuperPlaneRunnerComponent, node.Component)
 		assert.NotContains(t, []string{"runnerClaudeCode", "runnerCodex", "runnerOpenRouter"}, node.Component)
 	}
+}
+
+func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {
+	t.Helper()
+	for i := range canvas.Spec.Nodes {
+		if canvas.Spec.Nodes[i].ID == id {
+			return &canvas.Spec.Nodes[i]
+		}
+	}
+	t.Fatalf("node %q not found", id)
+	return nil
 }
