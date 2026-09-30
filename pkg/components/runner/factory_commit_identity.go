@@ -120,6 +120,7 @@ signoff='Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>'
 agent_email='superplaneagent@superplane.com'
 tmp="${msg_file}.sp-identity"
 coauthors_file="${msg_file}.sp-coauthors"
+kept_file="${msg_file}.sp-kept"
 
 email_of() {
   printf '%s\n' "$1" | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
@@ -134,10 +135,11 @@ is_other_agent_email() {
   return 1
 }
 
-rm -f "$tmp" "$coauthors_file"
-trap 'rm -f "$tmp" "$coauthors_file"' EXIT
+rm -f "$tmp" "$coauthors_file" "$kept_file"
+trap 'rm -f "$tmp" "$coauthors_file" "$kept_file"' EXIT
 
 : > "$tmp"
+: > "$kept_file"
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
     'Signed-off-by:'*|'Co-authored-by:'*)
@@ -152,12 +154,21 @@ while IFS= read -r line || [ -n "$line" ]; do
             ;;
         esac
       fi
+      if ! grep -qxF "$line" "$kept_file"; then
+        printf '%s\n' "$line" >> "$kept_file"
+      fi
+      continue
       ;;
   esac
   printf '%s\n' "$line" >> "$tmp"
 done < "$msg_file"
 
 mv "$tmp" "$msg_file"
+
+while IFS= read -r trailer || [ -n "$trailer" ]; do
+  [ -n "$trailer" ] || continue
+  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$msg_file" || exit 1
+done < "$kept_file"
 
 printf '%s\n' "${COAUTHORS:-}" > "$coauthors_file"
 while IFS= read -r trailer || [ -n "$trailer" ]; do
@@ -176,11 +187,96 @@ exit 0
 }
 
 // FactoryGitWrapperScript shadows git on factory agent tasks. Commit and
-// merge use the task-local hook so a stored prepare-commit-msg cannot
-// restore a second agent identity.
+// merge keep the repository hooks and replace only prepare-commit-msg, so a
+// stored identity hook cannot add a second agent.
 func FactoryGitWrapperScript() string {
 	return `#!/bin/bash
 set -euo pipefail
+
+sh_quote() {
+  local value="$1"
+  value="${value//\'/\'\\\'\'}"
+  printf "'%s'" "$value"
+}
+
+repository_hooks_path() {
+  local configured="" work_tree="" hooks_path="" parent=""
+  configured="$("$real_git" "${global[@]}" config --get core.hooksPath 2>/dev/null || true)"
+  configured="${configured%%$'\n'*}"
+  if [[ "$configured" == "~" && -n "${HOME:-}" ]]; then
+    configured="$HOME"
+  elif [[ "$configured" == "~/"* && -n "${HOME:-}" ]]; then
+    configured="${HOME}/${configured:2}"
+  fi
+  if [[ -n "$configured" ]]; then
+    if [[ "$configured" != /* ]]; then
+      work_tree="$("$real_git" "${global[@]}" rev-parse --show-toplevel 2>/dev/null || true)"
+      work_tree="${work_tree%%$'\n'*}"
+      if [[ -z "$work_tree" ]]; then
+        return 0
+      fi
+      configured="${work_tree}/${configured}"
+    fi
+    printf '%s\n' "$configured"
+    return 0
+  fi
+
+  hooks_path="$("$real_git" "${global[@]}" rev-parse --git-path hooks 2>/dev/null || true)"
+  hooks_path="${hooks_path%%$'\n'*}"
+  if [[ -z "$hooks_path" ]]; then
+    return 0
+  fi
+  if [[ "$hooks_path" != /* ]]; then
+    parent="$(dirname "$hooks_path")"
+    if [[ ! -d "$parent" ]]; then
+      return 0
+    fi
+    hooks_path="$(cd "$parent" && pwd)/$(basename "$hooks_path")"
+  fi
+  printf '%s\n' "$hooks_path"
+}
+
+forward_repository_hooks() {
+  local source_dir="$1"
+  local active_dir="$2"
+  local hook name
+  for hook in "$source_dir"/*; do
+    [[ -e "$hook" ]] || continue
+    [[ -f "$hook" && -x "$hook" ]] || continue
+    name="$(basename "$hook")"
+    case "$name" in
+      prepare-commit-msg|*.sample) continue ;;
+    esac
+    {
+      printf '%s\n' '#!/bin/sh'
+      printf 'exec %s "$@"\n' "$(sh_quote "$hook")"
+    } > "$active_dir/$name"
+    chmod +x "$active_dir/$name"
+  done
+}
+
+write_prepare_commit_msg() {
+  local source_dir="$1"
+  local active_dir="$2"
+  local identity="$hooks_dir/prepare-commit-msg"
+  local original=""
+  local target="$active_dir/prepare-commit-msg"
+  if [[ -n "$source_dir" && -x "$source_dir/prepare-commit-msg" ]]; then
+    original="$source_dir/prepare-commit-msg"
+    if [[ "$original" -ef "$identity" ]]; then
+      original=""
+    fi
+  fi
+  {
+    printf '%s\n' '#!/bin/sh'
+    printf '%s\n' 'set -u'
+    if [[ -n "$original" ]]; then
+      printf '%s "$@" || exit $?\n' "$(sh_quote "$original")"
+    fi
+    printf 'exec %s "$@"\n' "$(sh_quote "$identity")"
+  } > "$target"
+  chmod +x "$target"
+}
 
 task_dir="${SUPERPLANE_TASK_DIR:?}"
 bin_dir="${task_dir}/bin"
@@ -326,6 +422,25 @@ if [[ "$subcommand" == "commit" && $reset_author -eq 1 && $has_reset_author -eq 
   rest+=("--reset-author")
 fi
 
-exec "$real_git" "${global[@]}" -c "core.hooksPath=${hooks_dir}" "$subcommand" "${rest[@]}"
+if [[ ! -x "$hooks_dir/prepare-commit-msg" ]]; then
+  echo "git: factory prepare-commit-msg hook is missing" >&2
+  exit 1
+fi
+
+active_hooks="$(mktemp -d "${task_dir}/git-hooks-active.XXXXXX")"
+source_hooks="$(repository_hooks_path)"
+if [[ -n "$source_hooks" && -d "$source_hooks" ]]; then
+  source_hooks="$(cd "$source_hooks" && pwd)"
+  if [[ "$source_hooks" == "$hooks_dir" ]]; then
+    source_hooks=""
+  else
+    forward_repository_hooks "$source_hooks" "$active_hooks"
+  fi
+else
+  source_hooks=""
+fi
+write_prepare_commit_msg "$source_hooks" "$active_hooks"
+
+exec "$real_git" "${global[@]}" -c "core.hooksPath=${active_hooks}" "$subcommand" "${rest[@]}"
 `
 }

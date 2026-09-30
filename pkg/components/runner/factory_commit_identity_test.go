@@ -1,6 +1,7 @@
 package runner_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,7 +148,7 @@ func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 		cmd := exec.Command(filepath.Join(taskDir, "bin", "git"), args...)
 		cmd.Env = append(withoutGitIdentity(os.Environ()),
 			"SUPERPLANE_TASK_DIR="+taskDir,
-			"PATH="+filepath.Join(taskDir, "bin")+":"+stubDir,
+			"PATH="+filepath.Join(taskDir, "bin")+string(os.PathListSeparator)+stubDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 			"COAUTHORS=Co-authored-by: Pat Example <pat@example.com>",
 		)
 		out, err := cmd.CombinedOutput()
@@ -158,7 +159,7 @@ func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 	commit := runWrapper("commit", "--no-verify", "--author", "Bad Agent <agent@superplane.com>", "-m", "feat: first")
 	assert.Contains(t, commit, "GIT_AUTHOR_EMAIL=superplaneagent@superplane.com")
 	assert.Contains(t, commit, "GIT_COMMITTER_EMAIL=superplaneagent@superplane.com")
-	assert.Contains(t, commit, "core.hooksPath="+filepath.Join(taskDir, "git-hooks"))
+	assertHooksPathUsesIdentityHook(t, taskDir, commit)
 	assert.Contains(t, commit, "--no-verify")
 	assert.NotContains(t, commit, "--author")
 	assert.Contains(t, commit, "exec="+filepath.Join(stubDir, "git"))
@@ -167,17 +168,241 @@ func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 	assert.Contains(t, amend, "--amend")
 	assert.Contains(t, amend, "--reset-author")
 	assert.NotContains(t, amend, "--author")
-	assert.Contains(t, amend, "core.hooksPath=")
+	assertHooksPathUsesIdentityHook(t, taskDir, amend)
 
 	merge := runWrapper("merge", "--no-ff", "feature", "-m", "Merge branch feature")
 	assert.Contains(t, merge, "\nmerge\n")
-	assert.Contains(t, merge, "core.hooksPath=")
+	assertHooksPathUsesIdentityHook(t, taskDir, merge)
 	assert.Contains(t, merge, "GIT_AUTHOR_NAME=SuperPlane Agent")
 	assert.NotContains(t, merge, "--reset-author")
 
 	status := runWrapper("status", "--short")
 	assert.Contains(t, status, "\nstatus\n")
 	assert.NotContains(t, status, "core.hooksPath")
+}
+
+func TestFactoryGitWrapperCommitUsesAgentIdentityAndRepositoryHooks(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+
+	t.Run("configured hooks path", func(t *testing.T) {
+		assertFactoryCommitKeepsRepositoryHooks(t, true)
+	})
+	t.Run("default hooks directory", func(t *testing.T) {
+		assertFactoryCommitKeepsRepositoryHooks(t, false)
+	})
+	t.Run("a failing repository hook stops the commit", func(t *testing.T) {
+		taskDir := t.TempDir()
+		repo := filepath.Join(taskDir, "repo")
+		logPath := filepath.Join(taskDir, "hooks.log")
+		wrapper := installFactoryGitWrapper(t, taskDir)
+		env := factoryGitCommandEnv(taskDir)
+		initRepository(t, repo, env, "")
+		writeExec(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), fmt.Sprintf("#!/bin/sh\nprintf 'pre-commit\\n' >> %q\nexit 1\n", logPath))
+		require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("hello\n"), 0o644))
+		runGit(t, repo, wrapper, env, "add", "README")
+
+		cmd := exec.Command(wrapper, "commit", "-m", "feat: blocked")
+		cmd.Dir = repo
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		require.Error(t, err, string(out))
+		assert.Contains(t, readText(t, logPath), "pre-commit")
+		head := exec.Command("git", "rev-parse", "--verify", "HEAD")
+		head.Dir = repo
+		head.Env = env
+		headOut, headErr := head.CombinedOutput()
+		require.Error(t, headErr, string(headOut))
+	})
+}
+
+func assertFactoryCommitKeepsRepositoryHooks(t *testing.T, configuredHooksPath bool) {
+	t.Helper()
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	logPath := filepath.Join(taskDir, "hooks.log")
+	wrapper := installFactoryGitWrapper(t, taskDir)
+	env := factoryGitCommandEnv(taskDir)
+
+	hooksDir := filepath.Join(repo, ".git", "hooks")
+	configured := ""
+	if configuredHooksPath {
+		hooksDir = filepath.Join(repo, ".githooks")
+		configured = ".githooks"
+	}
+	initRepository(t, repo, env, configured)
+	if configuredHooksPath {
+		writeExec(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), fmt.Sprintf("#!/bin/sh\nprintf 'decoy\\n' >> %q\n", logPath))
+	}
+	writeExec(t, filepath.Join(hooksDir, "pre-commit"), fmt.Sprintf("#!/bin/sh\nprintf 'pre-commit\\n' >> %q\n", logPath))
+	writeExec(t, filepath.Join(hooksDir, "commit-msg"), fmt.Sprintf(`#!/bin/sh
+printf 'commit-msg\n' >> %q
+if grep -q '<agent@superplane.com>' "$1"; then
+  echo 'bad agent trailer remains' >&2
+  exit 1
+fi
+if ! grep -q 'Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>' "$1"; then
+  echo 'sign-off missing before commit-msg' >&2
+  exit 1
+fi
+`, logPath))
+	writeExec(t, filepath.Join(hooksDir, "prepare-commit-msg"), fmt.Sprintf(`#!/bin/sh
+printf '\nRepository hook ran.\n' >> "$1"
+printf 'Co-authored-by: SuperPlane Agent <agent@superplane.com>\n' >> "$1"
+printf 'prepare-commit-msg\n' >> %q
+`, logPath))
+	writeExec(t, filepath.Join(hooksDir, "pre-commit.sample"), fmt.Sprintf("#!/bin/sh\nprintf 'sample\\n' >> %q\n", logPath))
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("hello\n"), 0o644))
+	messagePath := filepath.Join(taskDir, "message.txt")
+	require.NoError(t, os.WriteFile(messagePath, []byte(strings.Join([]string{
+		"feat: one identity",
+		"",
+		"The body can mention agent@superplane.com.",
+		"",
+		"Signed-off-by: SuperPlane Agent <agent@superplane.com>",
+		"Co-authored-by: OpenCode <opencode@superplane.io>",
+		"",
+	}, "\n")), 0o644))
+	runGit(t, repo, wrapper, env, "add", "README")
+	runGit(t, repo, wrapper, env, "commit", "--author", "Bad Agent <agent@superplane.com>", "-F", messagePath)
+
+	assert.Equal(t, "SuperPlane Agent", gitShow(t, repo, env, "%an"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, "SuperPlane Agent", gitShow(t, repo, env, "%cn"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	assert.Equal(t, "feat: one identity", gitShow(t, repo, env, "%s"))
+
+	body := gitShow(t, repo, env, "%B")
+	assert.Contains(t, body, "The body can mention agent@superplane.com.")
+	assert.Contains(t, body, "Repository hook ran.")
+	assert.Contains(t, body, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>")
+	assert.Contains(t, body, "Co-authored-by: Pat Example <pat@example.com>")
+	assert.NotContains(t, body, "<agent@superplane.com>")
+	assert.NotContains(t, body, "opencode@superplane.io")
+	assert.NotContains(t, body, "agent@superplane.ai")
+	assert.Equal(t, 1, strings.Count(body, "Signed-off-by:"))
+	assert.Equal(t, 1, strings.Count(body, "Co-authored-by: Pat Example <pat@example.com>"))
+
+	trailers := gitTrailers(t, repo, env)
+	assert.Contains(t, trailers, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>")
+	assert.Contains(t, trailers, "Co-authored-by: Pat Example <pat@example.com>")
+	assert.NotContains(t, trailers, "Repository hook ran.")
+	assert.NotContains(t, trailers, "agent@superplane.com")
+
+	runGit(t, repo, wrapper, env, "commit", "--amend", "--no-edit")
+	amended := gitShow(t, repo, env, "%B")
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	assert.Equal(t, 1, strings.Count(amended, "Signed-off-by:"))
+	assert.Equal(t, 1, strings.Count(amended, "Co-authored-by: Pat Example <pat@example.com>"))
+	assert.Contains(t, amended, "Repository hook ran.")
+	assert.NotContains(t, amended, "<agent@superplane.com>")
+
+	hookLog := readText(t, logPath)
+	assert.Contains(t, hookLog, "pre-commit")
+	assert.Contains(t, hookLog, "prepare-commit-msg")
+	assert.Contains(t, hookLog, "commit-msg")
+	assert.NotContains(t, hookLog, "decoy")
+	assert.NotContains(t, hookLog, "sample")
+}
+
+func installFactoryGitWrapper(t *testing.T, taskDir string) string {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "bin"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "git-hooks"), 0o755))
+	wrapper := filepath.Join(taskDir, "bin", "git")
+	require.NoError(t, os.WriteFile(wrapper, []byte(runner.FactoryGitWrapperScript()), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "git-hooks", "prepare-commit-msg"), []byte(runner.FactoryPrepareCommitMessageHook()), 0o755))
+	return wrapper
+}
+
+func factoryGitCommandEnv(taskDir string) []string {
+	return append(withoutGitIdentity(os.Environ()),
+		"SUPERPLANE_TASK_DIR="+taskDir,
+		"PATH="+filepath.Join(taskDir, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_CONFIG_SYSTEM=/dev/null",
+		"GIT_AUTHOR_NAME=Bad Agent",
+		"GIT_AUTHOR_EMAIL=agent@superplane.com",
+		"GIT_COMMITTER_NAME=Bad Agent",
+		"GIT_COMMITTER_EMAIL=agent@superplane.com",
+		"COAUTHORS=Co-authored-by: Pat Example <pat@example.com>",
+	)
+}
+
+func initRepository(t *testing.T, repo string, env []string, hooksPath string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(repo, 0o755))
+	runGit(t, repo, "git", env, "init", "-b", "main")
+	runGit(t, repo, "git", env, "config", "user.name", "Bad Agent")
+	runGit(t, repo, "git", env, "config", "user.email", "agent@superplane.com")
+	runGit(t, repo, "git", env, "config", "commit.gpgsign", "false")
+	if hooksPath != "" {
+		runGit(t, repo, "git", env, "config", "core.hooksPath", hooksPath)
+	}
+}
+
+func runGit(t *testing.T, dir, binary string, env []string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(binary, args...)
+	cmd.Dir = dir
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git %v: %s", args, out)
+	return string(out)
+}
+
+func gitShow(t *testing.T, repo string, env []string, format string) string {
+	t.Helper()
+	return strings.TrimRight(runGit(t, repo, "git", env, "log", "-1", "--format="+format), "\n")
+}
+
+func gitTrailers(t *testing.T, repo string, env []string) string {
+	t.Helper()
+	message := gitShow(t, repo, env, "%B")
+	cmd := exec.Command("git", "interpret-trailers", "--parse")
+	cmd.Dir = repo
+	cmd.Env = env
+	cmd.Stdin = strings.NewReader(message)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func writeExec(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o755))
+}
+
+func assertHooksPathUsesIdentityHook(t *testing.T, taskDir, record string) {
+	t.Helper()
+	hooksPath := hooksPathFromRecord(t, record)
+	assert.NotEqual(t, filepath.Join(taskDir, "git-hooks"), hooksPath)
+	assert.Contains(t, hooksPath, filepath.Join(taskDir, "git-hooks-active."))
+	hook := readText(t, filepath.Join(hooksPath, "prepare-commit-msg"))
+	assert.Contains(t, hook, filepath.Join(taskDir, "git-hooks", "prepare-commit-msg"))
+}
+
+func hooksPathFromRecord(t *testing.T, record string) string {
+	t.Helper()
+	lines := strings.Split(record, "\n")
+	found := ""
+	for i, line := range lines {
+		if line != "-c" || i+1 >= len(lines) {
+			continue
+		}
+		value, ok := strings.CutPrefix(lines[i+1], "core.hooksPath=")
+		if ok {
+			found = value
+		}
+	}
+	if found == "" {
+		t.Fatalf("record has no core.hooksPath: %s", record)
+	}
+	return found
 }
 
 const interpretTrailersStub = `#!/bin/sh
