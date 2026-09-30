@@ -23,18 +23,37 @@ const github = vi.hoisted(() => ({
     pendingRequests: [] as Array<{ requestId: string; accountLogin: string }>,
     synchronizing: false,
   },
+  error: null as unknown,
+  calls: [] as Array<{ organizationId: string; options?: { poll?: boolean } }>,
 }));
 
+const showErrorToast = vi.hoisted(() => vi.fn());
 const startInstallation = vi.fn().mockResolvedValue("https://github.com/apps/superplane/installations/new");
 const configureInstallation = vi.fn().mockResolvedValue("https://github.com/settings/installations/101");
 
+vi.mock("@/lib/toast", () => ({
+  showErrorToast,
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
-  useGitHubOnboarding: () => ({
-    data: github.data,
-    isPending: false,
-    error: null,
-    startInstallation: { mutateAsync: startInstallation },
-    configureInstallation: { mutateAsync: configureInstallation },
+  useGitHubOnboarding: (organizationId: string, options?: { poll?: boolean }) => {
+    github.calls.push({ organizationId, options });
+    return {
+      data: github.data,
+      isPending: false,
+      error: github.error,
+      startInstallation: { mutateAsync: startInstallation },
+      configureInstallation: { mutateAsync: configureInstallation },
+      selectIdentity: { mutateAsync: vi.fn() },
+    };
+  },
+}));
+
+vi.mock("./first-run/useFirstRunAnalysis", () => ({
+  useFirstRunAnalysis: () => ({
+    progress: { total: 0, scored: 0, ready: 0, stageIndex: 0, empty: true },
+    sourceName: "GitHub issues",
+    failed: false,
   }),
 }));
 
@@ -107,12 +126,21 @@ function renderSetup(model: OnboardingPageModel) {
   );
 }
 
+const runningDestination = {
+  organizationId: "acme",
+  factoryKey: "PAY",
+  lineId: "line-1",
+};
+
 describe("FirstRunSetup GitHub catalog", () => {
   beforeEach(() => {
     github.data.identity = undefined;
     github.data.repositories = [];
     github.data.pendingRequests = [];
     github.data.synchronizing = false;
+    github.error = null;
+    github.calls = [];
+    showErrorToast.mockReset();
   });
 
   it("shows Connect GitHub when identity is missing", () => {
@@ -187,5 +215,51 @@ describe("FirstRunSetup GitHub catalog", () => {
         expect.objectContaining({ repositoryId: "77", fullName: "acme/api" }),
       ),
     );
+  });
+
+  it("stops GitHub onboarding polling once the running workspace step is shown", () => {
+    renderSetup(pageModel({ provisionedDestination: runningDestination }));
+
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.headline)).toBeInTheDocument();
+    expect(github.calls.length).toBeGreaterThan(0);
+    expect(github.calls.every((call) => call.options?.poll === false)).toBe(true);
+  });
+
+  it("does not toast Not Found after setup finishes, and keeps the empty import", async () => {
+    const model = pageModel({ provisionedDestination: runningDestination });
+    const view = renderSetup(model);
+
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.emptyImport("GitHub issues"))).toBeInTheDocument();
+    expect(showErrorToast).not.toHaveBeenCalled();
+
+    github.error = { message: "Not Found" };
+    view.rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=vcs"]}>
+        <FirstRunSetup model={model} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(github.calls.length).toBeGreaterThan(1));
+    expect(showErrorToast).not.toHaveBeenCalled();
+    expect(screen.queryByText("Not Found")).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.emptyImport("GitHub issues"))).toBeInTheDocument();
+  });
+
+  it("does not show the raw Not Found status before setup finishes", async () => {
+    github.error = { message: "Not Found" };
+    renderSetup(pageModel());
+
+    expect(await screen.findByText("SuperPlane could not load GitHub access")).toBeInTheDocument();
+    expect(screen.queryByText("Not Found")).not.toBeInTheDocument();
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to load repositories");
+    expect(showErrorToast).not.toHaveBeenCalledWith("Not Found");
+  });
+
+  it("still shows a real GitHub access error before setup finishes", async () => {
+    github.error = { message: "GitHub token expired" };
+    renderSetup(pageModel());
+
+    expect(await screen.findByText("GitHub token expired")).toBeInTheDocument();
+    expect(showErrorToast).toHaveBeenCalledWith("GitHub token expired");
   });
 });

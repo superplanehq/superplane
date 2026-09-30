@@ -112,9 +112,9 @@ function useFirstRunBlockingAction() {
   return { action, busy: action !== null, begin, finish, setAction, run, runUntilNavigation };
 }
 
-function useGitHubConnectionState(organizationId: string) {
+function useGitHubConnectionState(organizationId: string, options?: { poll?: boolean }) {
   const [searchParams] = useSearchParams();
-  const onboarding = useGitHubOnboarding(organizationId);
+  const onboarding = useGitHubOnboarding(organizationId, options);
   const repositories = onboarding.data?.repositories ?? [];
   return {
     onboarding,
@@ -302,13 +302,21 @@ function useFirstRunCommands(args: {
   };
 }
 
-function useRepositoryErrorToast(error: unknown) {
+const ORGANIZATION_NOT_FOUND = "Not Found";
+
+function githubOnboardingMessage(error: unknown, fallback: string): string {
+  const message = getApiErrorMessage(error, fallback);
+  if (message === ORGANIZATION_NOT_FOUND) return fallback;
+  return message;
+}
+
+function useRepositoryErrorToast(error: unknown, reportErrors: boolean) {
   const reported = useRef<unknown>(null);
   useEffect(() => {
-    if (!error || reported.current === error) return;
+    if (!reportErrors || !error || reported.current === error) return;
     reported.current = error;
-    showErrorToast(getApiErrorMessage(error, "Failed to load repositories"));
-  }, [error]);
+    showErrorToast(githubOnboardingMessage(error, "Failed to load repositories"));
+  }, [error, reportErrors]);
 }
 
 export function shouldClearSavedJiraChoice(args: {
@@ -338,8 +346,9 @@ export function savedJiraChoiceBlock(args: {
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
+  const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
-  const connection = useGitHubConnectionState(organizationId);
+  const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
   const jiraFeature = useExperimentalFeature(organizationId);
   const jiraFeatureLoading = jiraFeature.isLoading;
   const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
@@ -351,7 +360,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
   const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
-  useRepositoryErrorToast(connection.onboarding.error);
+  useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms
   // the feature is off. A failed lookup has no organization data and must not
@@ -395,7 +404,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     synchronizing: connection.synchronizing,
     appConfigured: connection.appConfigured,
     connectError: connection.onboarding.error
-      ? getApiErrorMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
+      ? githubOnboardingMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
       : undefined,
     blockingAction: blocking.action,
     busy: blocking.busy || model.saving,
