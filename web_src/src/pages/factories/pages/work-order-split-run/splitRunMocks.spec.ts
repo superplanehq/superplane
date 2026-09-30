@@ -793,10 +793,101 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("failed");
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
+    expect(fixture.waitingNotes[0]?.text).toBe(
+      "This automation did not finish. Fix the error, then run this step again.",
+    );
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
+  });
+
+  it("explains a hosted credit failure when backlog analysis does not start", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "test",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      }),
+      {
+        analysisRuns: [
+          {
+            canvasId: "canvas-1",
+            workOrderId: "wo-1",
+            run: {
+              id: "run-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-09-30T14:37:29Z",
+              executions: [
+                {
+                  id: "exec-1",
+                  result: "RESULT_FAILED",
+                  resultMessage: "This organization has no hosted credit.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(fixture.phases.find((phase) => phase.name === "Analysis")?.stream[0]?.detail).toBe(
+      "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+    );
+  });
+
+  it("explains a hosted credit failure on the failed note", () => {
+    const cases = [
+      {
+        failureReason: "no_hosted_credit",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        label: "Add credits",
+      },
+      {
+        failureReason: "hosted_subscription_required",
+        text: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
+        label: "Subscribe",
+      },
+      {
+        failureReason: "workspace_budget_empty",
+        text: "This agent run is blocked. This workspace has no hosted credit budget left.",
+        label: "Open billing",
+      },
+    ] as const;
+
+    for (const credit of cases) {
+      const fixture = splitRunFixtureForWorkOrder(
+        order({
+          title: "Failed job",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            dispatch("STATE_FINISHED", [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                failureReason: credit.failureReason,
+                run: { id: "run-1", appId: "app-1" },
+              },
+            ]),
+          ],
+        }),
+      );
+
+      expect(fixture.footer.note).toMatchObject({
+        headline: "Implement did not pass",
+        text: credit.text,
+        cta: { label: credit.label, destination: "billing" },
+      });
+    }
   });
 
   it("marks a cancelled implement step as canceled, not waiting", () => {
