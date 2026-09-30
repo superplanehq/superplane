@@ -48,7 +48,7 @@ export function FirstRunChooseScreen({
   githubLogin?: string;
   githubUserId?: string;
   githubIdentities?: MeVcsProviderIdentity[];
-  /** True while the repository list loads or refreshes; hides stale entries. */
+  /** True before the initial repository list loads. */
   loading?: boolean;
   saving?: boolean;
   grantingAccess?: boolean;
