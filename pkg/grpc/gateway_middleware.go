@@ -7,6 +7,8 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 func GatewayRecoveryMiddleware() runtime.Middleware {
@@ -32,5 +34,11 @@ func SanitizedGatewayErrorHandler(
 	r *http.Request,
 	err error,
 ) {
+	//
+	// Hand the original error to the HTTP layer before it is replaced by a
+	// message the client is allowed to see, so Sentry reports the real failure.
+	//
+	telemetry.RecordServerError(r.Context(), err)
+
 	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, SanitizeError(r.Context(), err))
 }
