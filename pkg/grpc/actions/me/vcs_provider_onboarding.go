@@ -138,8 +138,16 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
+	organizationUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+	state, err := githubcommon.SignHostedAppInstallState(cfg.WebhookSecret, organizationUUID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to create GitHub App setup state")
+	}
 	return &pb.StartVCSProviderInstallationResponse{
-		Url: githubcommon.HostedAppInstallURL(cfg.Slug, "o_"+organizationID),
+		Url: githubcommon.HostedAppInstallURL(cfg.Slug, state),
 	}, nil
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,9 +26,12 @@ import (
 )
 
 func TestHandleGitHubAppSetup(t *testing.T) {
+	setGitHubAppEnvironment(t)
 	previousReconciliation := enqueueGitHubAppReconciliation
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
 	organizationID := uuid.New()
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
 	var installationIDs []int64
 	var organizationIDs []uuid.UUID
 	reconciliationCount := 0
@@ -54,7 +58,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install&state=o_"+organizationID.String(),
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install&state="+state,
 			nil,
 		))
 
@@ -69,7 +73,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
-			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update&state=o_"+organizationID.String(),
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update&state="+state,
 			nil,
 		))
 
@@ -106,10 +110,24 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 }
 
 func TestGitHubAppSetupOrganizationID(t *testing.T) {
+	setGitHubAppEnvironment(t)
 	organizationID := uuid.New()
-	assert.Equal(t, organizationID, githubAppSetupOrganizationID("o_"+organizationID.String()))
-	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("invalid"))
-	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("o_invalid"))
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
+	assert.Equal(t, organizationID, githubAppSetupOrganizationID(state))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID(state+"tampered"))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("o_"+organizationID.String()))
+}
+
+func setGitHubAppEnvironment(t *testing.T) {
+	t.Helper()
+	t.Setenv(githubcommon.EnvGitHubAppID, "12345")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+	t.Setenv(
+		githubcommon.EnvGitHubAppPrivateKey,
+		"-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+	)
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "test-webhook-secret")
 }
 
 func TestGitHubInstallationID(t *testing.T) {

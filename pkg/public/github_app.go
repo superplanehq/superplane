@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -84,11 +85,8 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 }
 
 func githubAppSetupOrganizationID(state string) uuid.UUID {
-	value, ok := strings.CutPrefix(strings.TrimSpace(state), "o_")
-	if !ok {
-		return uuid.Nil
-	}
-	organizationID, err := uuid.Parse(value)
+	cfg := config.LoadGitHubHostedAppConfig()
+	organizationID, err := common.VerifyHostedAppInstallState(cfg.WebhookSecret, state)
 	if err != nil {
 		return uuid.Nil
 	}

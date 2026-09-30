@@ -1,8 +1,10 @@
 package common
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,4 +53,22 @@ func Test__HostedAppInstallURL(t *testing.T) {
 		"https://github.com/apps/superplane/installations/new?state=abc",
 		HostedAppInstallURL("superplane", "abc"),
 	)
+}
+
+func Test__HostedAppInstallState(t *testing.T) {
+	organizationID := uuid.New()
+	state, err := SignHostedAppInstallState("setup-secret", organizationID)
+	require.NoError(t, err)
+	assert.False(t, strings.Contains(state, organizationID.String()))
+
+	parsedOrganizationID, err := VerifyHostedAppInstallState("setup-secret", state)
+	require.NoError(t, err)
+	assert.Equal(t, organizationID, parsedOrganizationID)
+
+	_, err = VerifyHostedAppInstallState("other-secret", state)
+	assert.Error(t, err)
+	_, err = VerifyHostedAppInstallState("setup-secret", state+"tampered")
+	assert.Error(t, err)
+	_, err = VerifyHostedAppInstallState("setup-secret", "o_"+organizationID.String())
+	assert.Error(t, err)
 }
