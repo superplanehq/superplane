@@ -151,8 +151,92 @@ func Test__RedeliverWebhookEventRequiresEventID(t *testing.T) {
 	require.EqualError(t, err, "webhook event id is required")
 }
 
-func Test__RedeliverWebhookEventReportsNotFound(t *testing.T) {
+func Test__ListWebhookDeliveriesReadsPayloadAPIVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id": "del_string",
+					"webhook_event": map[string]any{
+						"id":      "evt_1",
+						"payload": `{"type":"order.paid","api_version":"2026-04"}`,
+					},
+				},
+				{
+					"id": "del_object",
+					"webhook_event": map[string]any{
+						"id":      "evt_2",
+						"payload": map[string]any{"type": "order.paid", "api_version": "2026-10"},
+					},
+				},
+				{
+					"id": "del_unversioned",
+					"webhook_event": map[string]any{
+						"id":      "evt_3",
+						"payload": `{"type":"order.paid"}`,
+					},
+				},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	page, err := client.ListWebhookDeliveries(context.Background(), WebhookDeliveryFilter{})
+	require.NoError(t, err)
+	require.Len(t, page.Items, 3)
+	assert.Equal(t, "2026-04", page.Items[0].APIVersion)
+	assert.Equal(t, "2026-10", page.Items[1].APIVersion)
+	assert.Empty(t, page.Items[2].APIVersion)
+}
+
+func Test__ListWebhookEndpointsMapsEndpoints(t *testing.T) {
+	var pages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/webhooks/endpoints", r.URL.Path)
+		assert.Equal(t, "100", r.URL.Query().Get("limit"))
+		pages = append(pages, r.URL.Query().Get("page"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":          "end_1",
+					"url":         " https://app.superplane.com/api/v1/polar/webhooks ",
+					"api_version": "2026-04",
+					"format":      "raw",
+				},
+			},
+			"pagination": map[string]any{"total_count": 1, "max_page": 1},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	endpoints, err := client.ListWebhookEndpoints(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1"}, pages)
+	require.Len(t, endpoints, 1)
+	assert.Equal(t, WebhookEndpoint{
+		ID:         "end_1",
+		URL:        "https://app.superplane.com/api/v1/polar/webhooks",
+		APIVersion: "2026-04",
+		Format:     "raw",
+	}, endpoints[0])
+}
+
+func Test__ListWebhookEndpointsReportsUnauthorized(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "missing webhooks:read", http.StatusForbidden)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.ListWebhookEndpoints(context.Background())
+	require.ErrorIs(t, err, ErrUnauthorized)
+}
+
+func Test__RedeliverWebhookEventReportsNotFound(t *testing.T) {
+	server := httptest.NewServer(echoPolarVersion(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing", http.StatusNotFound)
 	}))
 	t.Cleanup(server.Close)

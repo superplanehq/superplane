@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   groupPolarWebhookEvents,
   knownDeliveryIdsForEvent,
+  mismatchedPolarWebhookEndpoints,
   POLAR_WEBHOOK_ALL_VALUE,
   POLAR_WEBHOOK_POLL_INTERVAL_MS,
   polarWebhookListQuery,
@@ -13,6 +14,7 @@ import {
   visiblePolarWebhookEvents,
   type PendingPolarRedeliver,
   type PolarWebhookDelivery,
+  type PolarWebhookEndpointsResponse,
   type PolarWebhooksResponse,
   type PolarWebhookStatusFilter,
 } from "./polarWebhookDeliveries";
@@ -93,6 +95,48 @@ async function fetchPolarWebhooksPage(
     throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook deliveries."));
   }
   return response.json();
+}
+
+async function fetchPolarWebhookEndpoints(signal: AbortSignal): Promise<PolarWebhookEndpointsResponse> {
+  const response = await fetch("/admin/api/polar/webhooks/endpoints", { credentials: "include", signal });
+  if (!response.ok) {
+    throw new Error(await readPolarAdminError(response, "SuperPlane could not load Polar webhook endpoints."));
+  }
+  return response.json();
+}
+
+function usePolarWebhookEndpoints(configured: boolean | null) {
+  const [endpoints, setEndpoints] = useState<PolarWebhookEndpointsResponse | null>(null);
+  const [checkFailed, setCheckFailed] = useState(false);
+
+  useEffect(() => {
+    if (configured !== true || endpoints !== null) {
+      return;
+    }
+    const controller = new AbortController();
+    let retryId: number | undefined;
+    const check = () => {
+      fetchPolarWebhookEndpoints(controller.signal)
+        .then((data) => {
+          setEndpoints(data);
+          setCheckFailed(false);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          setCheckFailed(true);
+          retryId = window.setTimeout(check, POLAR_WEBHOOK_POLL_INTERVAL_MS);
+        });
+    };
+    check();
+    return () => {
+      controller.abort();
+      window.clearTimeout(retryId);
+    };
+  }, [configured, endpoints]);
+
+  return { endpoints, checkFailed };
 }
 
 function usePolarWebhookList() {
@@ -186,6 +230,8 @@ function usePolarWebhookList() {
 
 export function usePolarWebhooks() {
   const list = usePolarWebhookList();
+  const { endpoints, checkFailed: versionCheckFailed } = usePolarWebhookEndpoints(list.configured);
+  const mismatchedEndpoints = useMemo(() => mismatchedPolarWebhookEndpoints(endpoints), [endpoints]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const eventGroups = useMemo(
     () => visiblePolarWebhookEvents(groupPolarWebhookEvents(list.items), list.statusFilter),
@@ -254,5 +300,8 @@ export function usePolarWebhooks() {
     failedEventIds,
     handleRedeliver,
     handleRedeliverFailed,
+    pinnedApiVersion: endpoints?.api_version ?? "",
+    mismatchedEndpoints,
+    versionCheckFailed,
   };
 }

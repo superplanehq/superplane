@@ -159,6 +159,37 @@ this phase.
 - Polar usage meters and PAYG invoices are deferred. SuperPlane remaining
   credit stays the source of truth.
 
+#### Polar API version
+
+Polar uses date-based API versions (`YYYY-MM`). See
+[Polar API versioning](https://polar.sh/docs/api-reference/current/versioning).
+Polar releases a new version in the first week of January, April, July, and
+October. Each version is supported for about nine months. After that, Polar
+rejects requests that use it with `404 Not Found`.
+
+- SuperPlane pins the version in `defaultAPIVersion` in
+  `pkg/billing/polar/client.go`. The client sends it in the `Polar-Version`
+  header on each request.
+- `POLAR_API_VERSION` overrides the pinned version. Use it only to test a new
+  version in sandbox.
+- A 404 without a `Polar-Version` response header means that Polar rejected
+  the version. The client returns `ErrUnsupportedAPIVersion`, not "not found".
+- The SuperPlane webhook endpoint in Polar has its own `api_version`. Set it to
+  the pinned version. The webhook handler logs a warning when a delivery uses
+  another version. Installation Admin > Polar Webhooks shows a warning when
+  the endpoint version is different from the pinned version.
+
+To upgrade the Polar API version before Polar removes the pinned version:
+
+1. Read the [Polar API changelog](https://polar.sh/docs/changelog/api) for the
+   new version.
+2. Set `POLAR_API_VERSION` to the new version in sandbox. Test checkout, the
+   billing portal, subscriptions, and webhook apply.
+3. Change `defaultAPIVersion` and update the tests for changed fields.
+4. Set the new `api_version` on the sandbox and production webhook endpoints
+   in Polar. This change applies only to new events.
+5. Deploy. Make sure that the logs do not show Polar API version warnings.
+
 ### Phase 6 — Workspace budgets
 
 Per-factory hosted spend limit against the org wallet. Null means no factory

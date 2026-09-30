@@ -6,6 +6,7 @@ import React from "react";
 
 import {
   formatPolarPayload,
+  isPolarApiVersionMismatch,
   polarWebhookAttemptLabel,
   polarWebhookEventStatusLabel,
   polarWebhookGroupStatus,
@@ -41,12 +42,14 @@ function PolarStatusBadge({ label, className, testId }: { label: string; classNa
 
 export function PolarWebhooksTable({
   groups,
+  pinnedApiVersion,
   expandedIds,
   redelivering,
   onToggle,
   onRedeliver,
 }: {
   groups: PolarWebhookEventGroup[];
+  pinnedApiVersion: string;
   expandedIds: Set<string>;
   redelivering: Set<string>;
   onToggle: (eventId: string) => void;
@@ -72,6 +75,7 @@ export function PolarWebhooksTable({
             <PolarWebhookEventRow
               key={group.eventId}
               group={group}
+              pinnedApiVersion={pinnedApiVersion}
               expanded={expandedIds.has(group.eventId)}
               pendingEventIds={redelivering}
               onToggle={onToggle}
@@ -86,12 +90,14 @@ export function PolarWebhooksTable({
 
 function PolarWebhookEventRow({
   group,
+  pinnedApiVersion,
   expanded,
   pendingEventIds,
   onToggle,
   onRedeliver,
 }: {
   group: PolarWebhookEventGroup;
+  pinnedApiVersion: string;
   expanded: boolean;
   pendingEventIds: ReadonlySet<string>;
   onToggle: (eventId: string) => void;
@@ -153,11 +159,28 @@ function PolarWebhookEventRow({
       {expanded ? (
         <tr className="border-b border-slate-50 bg-slate-50/70 dark:border-gray-800/70 dark:bg-gray-950/40">
           <td colSpan={8} className="px-6 py-3">
+            <PolarWebhookApiVersion version={latest.api_version} pinnedVersion={pinnedApiVersion} />
             <PolarWebhookAttempts deliveries={group.deliveries} payload={latest.payload} />
           </td>
         </tr>
       ) : null}
     </React.Fragment>
+  );
+}
+
+function PolarWebhookApiVersion({ version, pinnedVersion }: { version?: string; pinnedVersion: string }) {
+  if (!version) {
+    return null;
+  }
+  const mismatch = isPolarApiVersionMismatch(version, pinnedVersion);
+  return (
+    <Text
+      data-testid="polar-webhook-api-version"
+      className={`mb-3 text-xs ${mismatch ? "text-amber-700 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}
+    >
+      API version: <span className="font-mono">{version}</span>
+      {mismatch ? ` (SuperPlane uses ${pinnedVersion})` : null}
+    </Text>
   );
 }
 
