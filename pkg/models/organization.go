@@ -115,15 +115,17 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 
 	taskCountsQuery := tx.
 		Table("factory_work_orders").
-		Select("organization_id, COUNT(*) AS count").
-		Group("organization_id")
+		Select("factory_work_orders.organization_id, COUNT(*) AS count").
+		Joins("JOIN factories ON factories.id = factory_work_orders.factory_id AND factories.deleted_at IS NULL").
+		Group("factory_work_orders.organization_id")
 
 	doneTaskCountsQuery := tx.
 		Table("factory_work_orders").
-		Select("organization_id, COUNT(*) AS count").
-		Where("state = ?", FactoryWorkOrderStateClosed).
-		Where("result IN ?", []string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed}).
-		Group("organization_id")
+		Select("factory_work_orders.organization_id, COUNT(*) AS count").
+		Joins("JOIN factories ON factories.id = factory_work_orders.factory_id AND factories.deleted_at IS NULL").
+		Where("factory_work_orders.state = ?", FactoryWorkOrderStateClosed).
+		Where("factory_work_orders.result IN ?", []string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed}).
+		Group("factory_work_orders.organization_id")
 
 	memberCountsQuery := tx.
 		Table("users").

@@ -123,11 +123,12 @@ func TestListAllOrganizations(t *testing.T) {
 		midCount, err := CreateOrganization("Mid Tasks", "")
 		require.NoError(t, err)
 
-		createTestTasks(t, lowCount.ID, 1)
-		createTestTasks(t, highCount.ID, 3)
-		createTestTasks(t, midCount.ID, 2)
+		db := database.DB(t.Context())
+		createTestTasks(t, db, lowCount.ID, 1)
+		createTestTasks(t, db, highCount.ID, 3)
+		createTestTasks(t, db, midCount.ID, 2)
 
-		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "task_count", "desc")
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "task_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -150,11 +151,12 @@ func TestListAllOrganizations(t *testing.T) {
 		someDone, err := CreateOrganization("Some Done", "")
 		require.NoError(t, err)
 
-		createTestTasks(t, noneDone.ID, 2)
-		createTestDoneTasks(t, mostDone.ID, 2, 1, 1)
-		createTestDoneTasks(t, someDone.ID, 1, 0, 1)
+		db := database.DB(t.Context())
+		createTestTasks(t, db, noneDone.ID, 2)
+		createTestDoneTasks(t, db, mostDone.ID, 2, 1, 1)
+		createTestDoneTasks(t, db, someDone.ID, 1, 0, 1)
 
-		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "done_task_count", "desc")
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "done_task_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -281,6 +283,22 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 		assert.Equal(t, int64(1), found.MemberCount)
 	})
 
+	t.Run("excludes tasks from a deleted factory", func(t *testing.T) {
+		org, err := CreateOrganization("Deleted Factory Org", "")
+		require.NoError(t, err)
+		db := database.DB(t.Context())
+		factory, err := CreateFactory(db, org.ID, "Factory", "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateWorkOrder(db, "Task 1", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, factory.SoftDelete(db))
+
+		found, err := FindOrganizationWithCounts(db, org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), found.TaskCount)
+		assert.Equal(t, int64(0), found.DoneTaskCount)
+	})
+
 	t.Run("returns not found for deleted organization", func(t *testing.T) {
 		org, err := CreateOrganization("Soon Deleted", "")
 		require.NoError(t, err)
@@ -292,28 +310,28 @@ func TestFindOrganizationWithCounts(t *testing.T) {
 	})
 }
 
-func createTestTasks(t *testing.T, organizationID uuid.UUID, count int) {
+func createTestTasks(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, count int) {
 	t.Helper()
 
-	factory, err := CreateFactory(database.Conn(), organizationID, "Factory", "", "")
+	factory, err := CreateFactory(tx, organizationID, "Factory", "", "")
 	require.NoError(t, err)
 	for i := 0; i < count; i++ {
-		_, err := factory.CreateWorkOrder(database.Conn(), fmt.Sprintf("Task %d", i+1), "", nil, nil, nil)
+		_, err := factory.CreateWorkOrder(tx, fmt.Sprintf("Task %d", i+1), "", nil, nil, nil)
 		require.NoError(t, err)
 	}
 }
 
-func createTestDoneTasks(t *testing.T, organizationID uuid.UUID, completed, failed, rejected int) {
+func createTestDoneTasks(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, completed, failed, rejected int) {
 	t.Helper()
 
-	factory, err := CreateFactory(database.Conn(), organizationID, "Factory", "", "")
+	factory, err := CreateFactory(tx, organizationID, "Factory", "", "")
 	require.NoError(t, err)
 
 	createClosed := func(title, result string) {
 		t.Helper()
-		order, err := factory.CreateWorkOrder(database.Conn(), title, "", nil, nil, nil)
+		order, err := factory.CreateWorkOrder(tx, title, "", nil, nil, nil)
 		require.NoError(t, err)
-		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+		require.NoError(t, tx.Model(order).Updates(map[string]any{
 			"state":  FactoryWorkOrderStateClosed,
 			"result": result,
 		}).Error)

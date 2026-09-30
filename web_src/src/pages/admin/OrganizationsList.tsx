@@ -2,7 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import { formatDate } from "./formatDate";
@@ -85,22 +85,35 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
           {organizations.map((org) => (
             <tr
               key={org.id}
-              className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
-              onClick={() => navigate(`/admin/organizations/${org.id}`)}
+              role="link"
+              tabIndex={0}
+              aria-label={org.name || org.id}
+              className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+              onClick={(event) => {
+                const path = `/admin/organizations/${org.id}`;
+                if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                  window.open(path, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                navigate(path);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                  return;
+                }
+                event.preventDefault();
+                navigate(`/admin/organizations/${org.id}`);
+              }}
             >
               <td className="px-4 py-2.5">
-                <Link
-                  to={`/admin/organizations/${org.id}`}
-                  onClick={(event) => event.stopPropagation()}
-                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
-                >
+                <span className="flex items-center gap-2 text-gray-800 font-medium dark:text-gray-100">
                   <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
                   {org.name || (
                     <span className="text-gray-400 italic dark:text-gray-500" title={org.id}>
                       {org.id.slice(0, 8)}...
                     </span>
                   )}
-                </Link>
+                </span>
               </td>
               <td className="px-4 py-2.5">
                 <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
