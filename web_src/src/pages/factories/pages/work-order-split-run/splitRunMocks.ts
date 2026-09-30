@@ -630,12 +630,13 @@ function overviewChecks(
   if (!demoArtifacts) {
     return presented;
   }
-  const intake = phases.find((phase) => phase.id === "score")?.checks ?? [];
-  if (presented.length === 0) {
-    return phases.flatMap((phase) => phase.checks ?? []);
-  }
-  const later = intake.length > 0 ? presented.filter((check) => !isScoreCheckName(check.name)) : presented;
-  return [...intake, ...later];
+  // Deduplicate by check id: include all API checks (presented), then add
+  // any phase checks that are not already in the full list. The full list
+  // includes checks from apps not tied to line-step stages.
+  const presentedIds = new Set(presented.map((check) => check.id));
+  const phaseChecks = phases.flatMap((phase) => phase.checks ?? []);
+  const stageOnlyChecks = phaseChecks.filter((check) => !presentedIds.has(check.id));
+  return [...presented, ...stageOnlyChecks];
 }
 
 function surfaces(
