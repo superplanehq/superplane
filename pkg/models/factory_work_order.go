@@ -303,7 +303,9 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
 // can always trace an order back to the run that created it. When a
-// person opens the draft, they become the owner.
+// person opens the draft, they become the owner. When no person opens it
+// and the task has no owner, the first matched GitHub issue assignee
+// becomes the owner.
 //
 // The bool return reports whether a transition was actually recorded:
 // `true` on a real state change, `false` when SkipSame swallowed a no-op
@@ -389,6 +391,11 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
 			if err := o.assignPersonWhoOpened(tx, *update.Actor); err != nil {
+				return err
+			}
+		}
+		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor == nil {
+			if err := o.assignOwnerFromGitHubIssue(tx); err != nil {
 				return err
 			}
 		}
