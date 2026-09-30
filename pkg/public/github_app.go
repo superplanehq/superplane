@@ -49,7 +49,21 @@ var enqueueGitHubAppInstallationReconciliation = func(
 }
 
 var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID int64) (bool, error) {
-	catalog, err := appcatalog.NewCatalog(database.DB(ctx), config.LoadGitHubHostedAppConfig())
+	db := database.DB(ctx)
+	installation, err := models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
+	if err == nil {
+		return models.HasVCSProviderInstallRequestForAccount(
+			db,
+			models.ProviderGitHub,
+			installation.AccountID,
+			installation.AccountLogin,
+		)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, fmt.Errorf("find GitHub App installation %d: %w", installationID, err)
+	}
+
+	catalog, err := appcatalog.NewCatalog(db, config.LoadGitHubHostedAppConfig())
 	if err != nil {
 		return false, err
 	}
