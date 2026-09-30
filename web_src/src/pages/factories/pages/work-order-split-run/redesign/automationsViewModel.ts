@@ -114,6 +114,8 @@ export interface AutomationStage {
    */
   steps: AgentStep[];
   rawLog: string;
+  /** Board column this app sits on, when it is a column automation. */
+  columnKey?: SplitRunPhase["columnKey"];
   pullRequestActivity?: SplitRunPhase["pullRequestActivity"];
 }
 
@@ -176,13 +178,17 @@ export function allStages(groups: AutomationStageGroups): AutomationStage[] {
 export type ConsoleColumnId = "backlog" | "implement" | "verify" | "done";
 
 /**
- * Task stages sit in the column named after them. The creation stage
- * sits in Backlog even when no automation ran. Pull request activity
- * sits in Verify, except the runs of the automation that closed the
- * task: those sit in Done. A custom step name still appears, in
- * Implement, so the run does not drop off the timeline.
+ * Task stages sit in the column named after them. A column app uses the
+ * column it is installed on. The creation stage sits in Backlog even
+ * when no automation ran. Pull request activity sits in Verify, except
+ * a closer run or an app installed on another column. A custom step
+ * name still appears, in Implement, so the run does not drop off the
+ * timeline.
  */
-export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "name">): ConsoleColumnId {
+export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "name" | "columnKey">): ConsoleColumnId {
+  if (stage.columnKey) {
+    return stage.columnKey;
+  }
   if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID || stage.name === "Done") {
     return "done";
   }
@@ -248,7 +254,11 @@ export function stagesByConsoleColumn(
     columns[consoleColumnIdForStage(stage)].push(stage);
   }
   for (const stage of pullRequestStages) {
-    columns[closedBy(stage) ? "done" : "verify"].push(stage);
+    if (closedBy(stage)) {
+      columns.done.push(stage);
+      continue;
+    }
+    columns[stage.columnKey ?? "verify"].push(stage);
   }
   return columns;
 }
@@ -281,6 +291,7 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
     agentSteps,
     steps: runSteps(nodes),
     rawLog: rawLogFromSteps(agentSteps),
+    columnKey: phase.columnKey,
     pullRequestActivity: phase.pullRequestActivity,
   };
 }

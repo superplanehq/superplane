@@ -297,4 +297,99 @@ describe("console automation grouping", () => {
     expect(address?.latest.status).toBe("running");
     expect(address?.latest.id).toBe("pr-feedback-run-comment-live");
   });
+
+  it("keeps a column app run off the Address PR feedback card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      columnApps: [{ id: "app-storybook", name: "Deploys Storybook", columnKey: "verify" }],
+      prFeedbackRuns: [
+        {
+          canvasId: "app-storybook",
+          title: "Storybook deployment ready",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-storybook",
+            canvasId: "app-storybook",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:30:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-comment",
+          handlerName: "Address PR feedback",
+          title: "Address new review comment",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-comment",
+            canvasId: "canvas-comment",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    const names = automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).verify).map(
+      (automation) => automation.name,
+    );
+
+    expect(names).toContain("Deploys Storybook");
+    expect(names).toContain("Address PR feedback");
+    expect(names.filter((name) => name === "Address PR feedback")).toHaveLength(1);
+  });
+
+  it("lists a column app check as a card in that column", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-risk",
+          key: "risk-review",
+          name: "Risk score",
+          score: 2,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-risk", appName: "Risk score" },
+          runId: "run-risk",
+          updatedAt: "2026-08-26T11:10:00Z",
+        },
+      ],
+      columnApps: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-env", name: "Create env", columnKey: "done" },
+      ],
+    });
+    const columns = stagesByConsoleColumn(stagesFromFixture(fixture));
+
+    expect(automationsFromStages(columns.verify).map((automation) => automation.name)).toContain("Risk score");
+    expect(automationsFromStages(columns.done).map((automation) => automation.name)).not.toContain("Create env");
+  });
+
+  it("puts a Done-column app run in Done", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-env",
+          key: "env-ready",
+          name: "Environment",
+          score: 1,
+          maxScore: 1,
+          format: "FORMAT_BOOLEAN",
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-env", appName: "Create env" },
+          runId: "run-env",
+          updatedAt: "2026-08-26T11:10:00Z",
+        },
+      ],
+      columnApps: [{ id: "app-env", name: "Create env", columnKey: "done" }],
+    });
+
+    expect(
+      automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).done).map(
+        (automation) => automation.name,
+      ),
+    ).toContain("Create env");
+  });
 });
