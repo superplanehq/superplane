@@ -39,6 +39,7 @@ type ErrorTrackingAlertPayload struct {
 	Link            string `json:"link" mapstructure:"link"`
 	Description     string `json:"description,omitempty" mapstructure:"description"`
 	Environment     string `json:"environment,omitempty" mapstructure:"environment"`
+	ReceiptID       string `json:"superplaneReceiptId,omitempty" mapstructure:"superplaneReceiptId"`
 }
 
 func (t *OnErrorTrackingAlert) Name() string {

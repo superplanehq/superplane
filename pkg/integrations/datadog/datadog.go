@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -189,13 +191,20 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 
 	if err := verifyWebhookRequest(ctx.Integration, ctx.Request); err != nil {
 		ctx.Logger.Warnf("rejected datadog webhook: %v", err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeRejected, 0)
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	body, err := io.ReadAll(ctx.Request.Body)
+	body, err := readWebhookBody(ctx.Request.Body)
 	if err != nil {
+		if errors.Is(err, errWebhookBodyTooLarge) {
+			setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
+			ctx.Response.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
 		ctx.Logger.Errorf("failed to read datadog webhook body: %v", err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -203,22 +212,49 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 	payload := map[string]any{}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		ctx.Logger.Errorf("failed to decode datadog webhook body: %v", err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if !shouldDispatchErrorTrackingAlert(payload) {
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeIgnored, 0)
 		ctx.Response.WriteHeader(http.StatusOK)
 		return
 	}
 
-	if err := d.dispatchWebhookMessage(ctx, payload); err != nil {
+	stampWebhookReceipt(payload, ctx.Request)
+	subscriptions, err := d.dispatchWebhookMessage(ctx, payload)
+	if err != nil {
 		ctx.Logger.Errorf("failed to dispatch datadog webhook: %v", err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, subscriptions)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	outcome := models.DatadogWebhookOutcomeAccepted
+	if subscriptions == 0 {
+		outcome = models.DatadogWebhookOutcomeNoSubscription
+	}
+	setWebhookReceipt(ctx.Request, outcome, subscriptions)
 	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+var errWebhookBodyTooLarge = errors.New("webhook body is too large")
+
+func readWebhookBody(body io.Reader) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+
+	payload, err := io.ReadAll(io.LimitReader(body, int64(config.MaxWebhookPayloadSize)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(payload) > config.MaxWebhookPayloadSize {
+		return nil, errWebhookBodyTooLarge
+	}
+	return payload, nil
 }
 
 func shouldDispatchErrorTrackingAlert(payload map[string]any) bool {
@@ -237,10 +273,10 @@ func isDispatchableAlertTransition(transition string) bool {
 		strings.EqualFold(transition, AlertTransitionRetriggered)
 }
 
-func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload map[string]any) error {
+func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload map[string]any) (int, error) {
 	subscriptions, err := ctx.Integration.ListSubscriptions()
 	if err != nil {
-		return fmt.Errorf("failed to list datadog subscriptions: %w", err)
+		return 0, fmt.Errorf("failed to list datadog subscriptions: %w", err)
 	}
 
 	var sendErr error
@@ -258,9 +294,9 @@ func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload ma
 	// subscription accepted the alert, so a later retry cannot duplicate a
 	// delivery that already succeeded.
 	if delivered == 0 && sendErr != nil {
-		return sendErr
+		return len(subscriptions), sendErr
 	}
-	return nil
+	return len(subscriptions), nil
 }
 
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
