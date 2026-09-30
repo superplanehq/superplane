@@ -236,17 +236,29 @@ func assertWideKeepsCostAndMetrics(t *testing.T, svg, costLabel string) {
 	assert.Contains(t, svg, fmt.Sprintf(`width="799" height="%d"`, height-1))
 }
 
+// wideTextStyles mirrors the <style> block of the wide card, so a test can
+// measure a label that the stylesheet sizes instead of the tag.
+var wideTextStyles = map[string]struct {
+	size float64
+	bold bool
+}{
+	"wordmark": {16, true},
+	"share":    {28, true},
+	"trend":    {13, true},
+	"count":    {13, false},
+	"rate":     {13, false},
+	"cost":     {13, true},
+}
+
 func textRightEdge(t *testing.T, svg, label string) int {
 	t.Helper()
 	origin, _ := textPosition(t, svg, label)
 	tag := textTag(t, svg, label)
-	size := regexp.MustCompile(`font-size="(\d+)"`).FindStringSubmatch(tag)
-	require.Len(t, size, 2)
-	var fontSize int
-	_, err := fmt.Sscanf(size[1], "%d", &fontSize)
-	require.NoError(t, err)
-	bold := strings.Contains(tag, `font-weight="700"`) || strings.Contains(tag, `font-weight="600"`)
-	return origin + textWidth(label, float64(fontSize), bold)
+	match := regexp.MustCompile(`class="([a-z-]+)"`).FindStringSubmatch(tag)
+	require.Len(t, match, 2)
+	style, ok := wideTextStyles[match[1]]
+	require.True(t, ok, "no style for class %q", match[1])
+	return origin + textWidth(label, style.size, style.bold)
 }
 
 func textPosition(t *testing.T, svg, label string) (int, int) {

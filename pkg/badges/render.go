@@ -20,6 +20,7 @@ const (
 	colorBorder     = "#30363d"
 	colorText       = "#f0f6fc"
 	colorSubtle     = "#8b949e"
+	cardBackground  = "#0d1117"
 
 	fontFamily = "-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
 )
@@ -75,21 +76,19 @@ type metrics struct {
 	showCost    bool
 }
 
+// placedText is one text node. Font size, weight, and color come from the
+// class the template gives it, so layout only decides position and content.
 type placedText struct {
-	X      int
-	Y      int
-	Size   int
-	Weight string
-	Fill   string
-	Anchor string
-	Text   string
-	Width  int
+	X     int
+	Y     int
+	Text  string
+	Width int
+	Show  bool
 }
 
 type dayBar struct {
 	Rects []barRect
 	Label placedText
-	Show  bool
 }
 
 type barRect struct {
@@ -237,6 +236,14 @@ func escapeXML(value string) string {
 	return html.EscapeString(value)
 }
 
+func text(x, y int, value string) placedText {
+	return placedText{X: x, Y: y, Text: escapeXML(value), Show: true}
+}
+
+func swatch(x, y int, fill string) barRect {
+	return barRect{X: x, Y: y, Width: 8, Height: 8, Radius: 2, Fill: fill}
+}
+
 func textWidth(text string, fontSize float64, bold bool) int {
 	scale := 1.0
 	if bold {
@@ -274,7 +281,6 @@ func clipID() string {
 }
 
 type smallModel struct {
-	Font       string
 	Width      int
 	LeftWidth  int
 	RightWidth int
@@ -299,7 +305,6 @@ func layoutSmall(in Input) smallModel {
 	leftWidth := textWidth(left, 12, true) + pad*2
 	rightWidth := textWidth(right, 12, true) + pad*2
 	return smallModel{
-		Font:       fontFamily,
 		Width:      leftWidth + rightWidth,
 		LeftWidth:  leftWidth,
 		RightWidth: rightWidth,
@@ -313,12 +318,17 @@ func layoutSmall(in Input) smallModel {
 }
 
 type largeModel struct {
-	Font      string
 	Height    int
 	InnerH    int
 	Title     string
 	ClipID    string
-	Texts     []placedText
+	Wordmark  placedText
+	Share     placedText
+	Trend     placedText
+	Caption   placedText
+	Count     placedText
+	MergeRate placedText
+	Cost      placedText
 	BarX      int
 	BarY      int
 	BarW      int
@@ -334,99 +344,95 @@ func layoutLarge(in Input) largeModel {
 	const (
 		width = 360
 		pad   = 20
+		step  = 20
 	)
-	texts := []placedText{
-		{X: pad, Y: 28, Size: 13, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane")},
-	}
-	y := 52
-	if m.showShare {
-		shareText := fmt.Sprintf("%d%%", m.share)
-		texts = append(texts, placedText{X: pad, Y: 72, Size: 36, Weight: "700", Fill: colorSuperplane, Text: escapeXML(shareText)})
-		if m.showTrend {
-			texts = append(texts, placedText{
-				X:      pad + textWidth(shareText, 36, true) + 12,
-				Y:      64,
-				Size:   13,
-				Weight: "600",
-				Fill:   colorSubtle,
-				Text:   escapeXML(m.trend),
-			})
-		}
-		y = 96
-		texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "400", Fill: colorSubtle, Text: escapeXML("of merged PRs via SuperPlane")})
-		y += 20
-	}
-	texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "500", Fill: colorText, Text: escapeXML(countLine(in.SuperplaneMerged, in.PeriodDays, false))})
-	if m.showMerge {
-		y += 20
-		texts = append(texts, placedText{
-			X: pad, Y: y, Size: 13, Weight: "400", Fill: colorSubtle,
-			Text: escapeXML(fmt.Sprintf("%d%% of SuperPlane PRs merged", m.mergeRate)),
-		})
-	}
-	if m.showCost {
-		y += 20
-		texts = append(texts, placedText{X: pad, Y: y, Size: 13, Weight: "600", Fill: colorText, Text: escapeXML(m.cost)})
-	}
-	barY := y + 14
-	barH := 6
-	height := y + 16
-	barW := width - pad*2
-	greenW := 0
-	slateW := 0
-	if m.showShare {
-		height = barY + barH + 20
-		if m.merged > 0 {
-			greenW = barW * m.share / 100
-			slateW = barW - greenW
-			if m.share > 0 && greenW < 2 {
-				greenW = 2
-			}
-			if m.manualShare > 0 && slateW < 2 && barW > greenW+2 {
-				slateW = 2
-				greenW = barW - slateW
-			}
-		}
-	}
-	title := fmt.Sprintf("%d PRs merged via SuperPlane · last %d days", in.SuperplaneMerged, in.PeriodDays)
-	if m.showShare {
-		title = fmt.Sprintf("%d%% of merged PRs via SuperPlane vs previous %d days", m.share, in.PeriodDays)
-	}
-	return largeModel{
-		Font:      fontFamily,
-		Height:    height,
-		InnerH:    height - 1,
-		Title:     escapeXML(title),
+	out := largeModel{
 		ClipID:    clipID(),
-		Texts:     texts,
+		Title:     escapeXML(largeTitle(in, m)),
+		Wordmark:  text(pad, 28, "SuperPlane"),
 		BarX:      pad,
-		BarY:      barY,
-		BarW:      barW,
-		BarH:      barH,
-		GreenW:    greenW,
-		SlateX:    pad + greenW,
-		SlateW:    slateW,
+		BarW:      width - pad*2,
+		BarH:      6,
 		ShowTrack: m.showShare,
 	}
+
+	y := 52
+	if m.showShare {
+		share := fmt.Sprintf("%d%%", m.share)
+		out.Share = text(pad, 72, share)
+		if m.showTrend {
+			out.Trend = text(pad+textWidth(share, 36, true)+12, 64, m.trend)
+		}
+		y = 96
+		out.Caption = text(pad, y, "of merged PRs via SuperPlane")
+		y += step
+	}
+	out.Count = text(pad, y, countLine(in.SuperplaneMerged, in.PeriodDays, false))
+	if m.showMerge {
+		y += step
+		out.MergeRate = text(pad, y, fmt.Sprintf("%d%% of SuperPlane PRs merged", m.mergeRate))
+	}
+	if m.showCost {
+		y += step
+		out.Cost = text(pad, y, m.cost)
+	}
+
+	out.BarY = y + 14
+	out.Height = y + 16
+	if m.showShare {
+		out.Height = out.BarY + out.BarH + 20
+		out.GreenW, out.SlateW = splitBar(out.BarW, m)
+		out.SlateX = pad + out.GreenW
+	}
+	out.InnerH = out.Height - 1
+	return out
+}
+
+// splitBar divides the share bar. Each visible side keeps at least two
+// pixels, so a small share is still a visible sliver.
+func splitBar(barW int, m metrics) (green, slate int) {
+	if m.merged == 0 {
+		return 0, 0
+	}
+	green = barW * m.share / 100
+	slate = barW - green
+	if m.share > 0 && green < 2 {
+		green = 2
+	}
+	if m.manualShare > 0 && slate < 2 && barW > green+2 {
+		slate = 2
+		green = barW - slate
+	}
+	return green, slate
+}
+
+func largeTitle(in Input, m metrics) string {
+	if m.showShare {
+		return fmt.Sprintf("%d%% of merged PRs via SuperPlane vs previous %d days", m.share, in.PeriodDays)
+	}
+	return fmt.Sprintf("%d PRs merged via SuperPlane · last %d days", in.SuperplaneMerged, in.PeriodDays)
 }
 
 type wideModel struct {
-	Font     string
-	Height   int
-	InnerH   int
-	Title    string
-	Texts    []placedText
-	Days     []dayBar
-	Legend   []placedText
-	Squares  []barRect
-	Baseline barRect
+	Height    int
+	InnerH    int
+	Title     string
+	Wordmark  placedText
+	Share     placedText
+	Trend     placedText
+	Count     placedText
+	MergeRate placedText
+	Cost      placedText
+	Days      []dayBar
+	Legend    legendModel
+	Baseline  barRect
 }
 
 func layoutWide(in Input) wideModel {
 	m := derive(in)
 	const (
 		pad         = 28
-		maxX        = 772
+		right       = 772
 		row1Y       = 44
 		row2Y       = 76
 		chartX      = 28
@@ -436,124 +442,96 @@ func layoutWide(in Input) wideModel {
 		baseLegendY = 252
 		baseHeight  = 280
 	)
-	texts := []placedText{{
-		X: pad, Y: row1Y, Size: 16, Weight: "700", Fill: colorText, Text: escapeXML("SuperPlane"),
-	}}
+	out := wideModel{
+		Title:    escapeXML(wideTitle(in, m)),
+		Wordmark: text(pad, row1Y, "SuperPlane"),
+	}
 	if m.showShare {
-		shareText := fmt.Sprintf("%d%%", m.share)
-		texts = append(texts, placedText{
-			X:      pad + textWidth("SuperPlane", 16, true) + 16,
-			Y:      row1Y,
-			Size:   28,
-			Weight: "700",
-			Fill:   colorSuperplane,
-			Text:   escapeXML(shareText),
-		})
+		shareX := pad + textWidth("SuperPlane", 16, true) + 16
+		out.Share = text(shareX, row1Y, fmt.Sprintf("%d%%", m.share))
 	}
-	metrics := make([]headerItem, 0, 4)
+
+	var row metricRow
 	if m.showTrend {
-		metrics = append(metrics, headerItem{
-			text:   m.trend + fmt.Sprintf(" vs previous %d days", in.PeriodDays),
-			size:   13,
-			weight: "600",
-			fill:   colorSubtle,
-		})
+		row.add(&out.Trend, fmt.Sprintf("%s vs previous %d days", m.trend, in.PeriodDays), 13, true, false)
 	}
-	metrics = append(metrics, headerItem{
-		text:   countLine(in.SuperplaneMerged, in.PeriodDays, true),
-		size:   13,
-		weight: "500",
-		fill:   colorText,
-	})
+	row.add(&out.Count, countLine(in.SuperplaneMerged, in.PeriodDays, true), 13, false, false)
 	if m.showMerge {
-		metrics = append(metrics, headerItem{
-			text:   fmt.Sprintf("%d%% merge rate", m.mergeRate),
-			size:   13,
-			weight: "400",
-			fill:   colorSubtle,
-		})
+		row.add(&out.MergeRate, fmt.Sprintf("%d%% merge rate", m.mergeRate), 13, false, false)
 	}
 	if m.showCost {
-		metrics = append(metrics, headerItem{
-			text: m.cost, size: 13, weight: "600", fill: colorText, wrap: true,
-		})
+		row.add(&out.Cost, m.cost, 13, true, true)
 	}
-	metricTexts, headerExtra := placeMetricRow(metrics, pad, row2Y, maxX)
-	texts = append(texts, metricTexts...)
+	extra := row.place(pad, row2Y, right)
 
-	chartY := baseChartY + headerExtra
-	chart := layoutChart(in.Days, chartX, chartY, chartW, chartH)
-	legend, squares := layoutLegend(m, in.Updated, pad, baseLegendY+headerExtra, 772)
-	height := baseHeight + headerExtra
-	title := fmt.Sprintf("SuperPlane · %d PRs merged · last %d days", in.SuperplaneMerged, in.PeriodDays)
-	if m.showShare {
-		title = fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
-	}
-	return wideModel{
-		Font:    fontFamily,
-		Height:  height,
-		InnerH:  height - 1,
-		Title:   escapeXML(title),
-		Texts:   texts,
-		Days:    chart,
-		Legend:  legend,
-		Squares: squares,
-		Baseline: barRect{
-			X: chartX, Y: chartY + chartH, Width: chartW, Height: 1, Fill: colorBorder,
-		},
-	}
-}
-
-type headerItem struct {
-	text   string
-	size   float64
-	weight string
-	fill   string
-	wrap   bool
-}
-
-func placeMetricRow(items []headerItem, startX, y, maxX int) ([]placedText, int) {
-	if len(items) == 0 {
-		return nil, 0
-	}
-	placed := placeHeaderPass(items, startX, y)
-	if !headerOverflows(placed, maxX) {
-		return placed, 0
-	}
-	last := items[len(items)-1]
-	if !last.wrap || len(items) < 2 {
-		return placed, 0
-	}
-	head := placeHeaderPass(items[:len(items)-1], startX, y)
-	tail := placeHeaderPass(items[len(items)-1:], startX, y+22)
-	return append(head, tail...), 22
-}
-
-func placeHeaderPass(items []headerItem, startX, y int) []placedText {
-	x := startX
-	out := make([]placedText, 0, len(items))
-	for _, item := range items {
-		width := textWidth(item.text, item.size, item.weight == "700" || item.weight == "600")
-		out = append(out, placedText{
-			X:      x,
-			Y:      y,
-			Size:   int(item.size),
-			Weight: item.weight,
-			Fill:   item.fill,
-			Text:   escapeXML(item.text),
-			Width:  width,
-		})
-		x += width + 18
-	}
+	chartY := baseChartY + extra
+	out.Days = layoutChart(in.Days, chartX, chartY, chartW, chartH)
+	out.Legend = layoutLegend(m, in.Updated, pad, baseLegendY+extra, right)
+	out.Baseline = barRect{X: chartX, Y: chartY + chartH, Width: chartW, Height: 1, Fill: colorBorder}
+	out.Height = baseHeight + extra
+	out.InnerH = out.Height - 1
 	return out
 }
 
-func headerOverflows(items []placedText, maxX int) bool {
-	if len(items) == 0 {
-		return false
+func wideTitle(in Input, m metrics) string {
+	if m.showShare {
+		return fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
 	}
-	last := items[len(items)-1]
-	return last.X+last.Width > maxX
+	return fmt.Sprintf("SuperPlane · %d PRs merged · last %d days", in.SuperplaneMerged, in.PeriodDays)
+}
+
+const (
+	metricRowGap  = 18
+	metricRowStep = 22
+)
+
+// metricRow places the wide header metrics from left to right. Each entry
+// writes its position into the model field that the template renders, so
+// the template can name every metric instead of ranging over a slice.
+type metricRow struct {
+	entries []metricEntry
+}
+
+type metricEntry struct {
+	field *placedText
+	text  string
+	size  float64
+	bold  bool
+	wrap  bool
+}
+
+func (r *metricRow) add(field *placedText, value string, size float64, bold, wrap bool) {
+	r.entries = append(r.entries, metricEntry{field: field, text: value, size: size, bold: bold, wrap: wrap})
+}
+
+// place returns the extra card height the row needs. Only the last entry
+// can wrap, and only when one line runs past right.
+func (r *metricRow) place(startX, y, right int) int {
+	if len(r.entries) == 0 {
+		return 0
+	}
+	r.placeLine(r.entries, startX, y)
+	last := r.entries[len(r.entries)-1]
+	if !r.overflows(right) || !last.wrap || len(r.entries) < 2 {
+		return 0
+	}
+	r.placeLine(r.entries[:len(r.entries)-1], startX, y)
+	r.placeLine(r.entries[len(r.entries)-1:], startX, y+metricRowStep)
+	return metricRowStep
+}
+
+func (r *metricRow) placeLine(entries []metricEntry, startX, y int) {
+	x := startX
+	for _, entry := range entries {
+		width := textWidth(entry.text, entry.size, entry.bold)
+		*entry.field = placedText{X: x, Y: y, Text: escapeXML(entry.text), Width: width, Show: true}
+		x += width + metricRowGap
+	}
+}
+
+func (r *metricRow) overflows(right int) bool {
+	last := r.entries[len(r.entries)-1].field
+	return last.X+last.Width > right
 }
 
 func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
@@ -645,17 +623,7 @@ func layoutChart(days []DayPoint, chartX, chartY, chartW, chartH int) []dayBar {
 			}
 		}
 		if labelSet[i] {
-			label := dayLabel(day.Date)
-			bar.Label = placedText{
-				X:      x + barW/2,
-				Y:      bottom + 16,
-				Size:   10,
-				Weight: "400",
-				Fill:   colorSubtle,
-				Anchor: "middle",
-				Text:   escapeXML(label),
-			}
-			bar.Show = true
+			bar.Label = text(x+barW/2, bottom+16, dayLabel(day.Date))
 		}
 		out[i] = bar
 	}
@@ -676,30 +644,33 @@ func labelIndexes(n int) []int {
 	return []int{0, mid, n - 1}
 }
 
-func layoutLegend(m metrics, updated time.Time, x, y, right int) ([]placedText, []barRect) {
-	updatedLabel := "Updated " + updated.Format("Jan 2")
+// legendModel is the footer row: one swatch and label per series on the
+// left, and the render date on the right. Manual work is hidden when the
+// workspace has no people merges to compare against.
+type legendModel struct {
+	Auto         placedText
+	Manual       placedText
+	Updated      placedText
+	AutoSwatch   barRect
+	ManualSwatch barRect
+}
+
+func layoutLegend(m metrics, updated time.Time, x, y, right int) legendModel {
+	out := legendModel{
+		Updated:    text(right, y, "Updated "+updated.Format("Jan 2")),
+		AutoSwatch: swatch(x, y-8, colorSuperplane),
+	}
 	if !m.showShare {
-		texts := []placedText{
-			{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML("Automated via SuperPlane")},
-			{X: right, Y: y, Size: 11, Weight: "400", Fill: colorSubtle, Anchor: "end", Text: escapeXML(updatedLabel)},
-		}
-		squares := []barRect{
-			{X: x, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorSuperplane},
-		}
-		return texts, squares
+		out.Auto = text(x+14, y, "Automated via SuperPlane")
+		return out
 	}
+
 	auto := fmt.Sprintf("Automated via SuperPlane (%d%%)", m.share)
-	manual := fmt.Sprintf("Manual work (%d%%)", m.manualShare)
-	texts := []placedText{
-		{X: x + 14, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(auto)},
-		{X: x + 14 + textWidth(auto, 11, false) + 28, Y: y, Size: 11, Weight: "500", Fill: colorText, Text: escapeXML(manual)},
-		{X: right, Y: y, Size: 11, Weight: "400", Fill: colorSubtle, Anchor: "end", Text: escapeXML(updatedLabel)},
-	}
-	squares := []barRect{
-		{X: x, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorSuperplane},
-		{X: texts[1].X - 14, Y: y - 8, Width: 8, Height: 8, Radius: 2, Fill: colorManual},
-	}
-	return texts, squares
+	out.Auto = text(x+14, y, auto)
+	manualX := x + 14 + textWidth(auto, 11, false) + 28
+	out.Manual = text(manualX, y, fmt.Sprintf("Manual work (%d%%)", m.manualShare))
+	out.ManualSwatch = swatch(manualX-14, y-8, colorManual)
+	return out
 }
 
 var (
@@ -708,15 +679,22 @@ var (
 	wideTemplate  = template.Must(template.New("wide").Parse(wideSVG))
 )
 
+// Each card keeps type styling in one <style> block, so the markup below
+// stays readable SVG and every <text> carries only a class and a position.
+// GitHub serves the badge as an image, so an internal stylesheet applies.
+
 const smallSVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="{{.Width}}" height="28" viewBox="0 0 {{.Width}} 28" role="img">
   <title>{{.Title}}</title>
+  <style>
+    text { font-family: ` + fontFamily + `; font-size: 12px; font-weight: 600; fill: #ffffff; }
+  </style>
   <clipPath id="{{.ClipID}}"><rect width="{{.Width}}" height="28" rx="4"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
-    <rect width="{{.LeftWidth}}" height="28" fill="#0d1117"/>
-    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="#10b981"/>
-    <text x="{{.LeftTextX}}" y="19" fill="#ffffff" font-size="12" font-family="{{.Font}}" font-weight="600">{{.LeftText}}</text>
-    <text x="{{.RightTextX}}" y="19" fill="#ffffff" font-size="12" font-family="{{.Font}}" font-weight="600">{{.RightText}}</text>
+    <rect width="{{.LeftWidth}}" height="28" fill="` + cardBackground + `"/>
+    <rect x="{{.LeftWidth}}" width="{{.RightWidth}}" height="28" fill="` + colorSuperplane + `"/>
+    <text x="{{.LeftTextX}}" y="19">{{.LeftText}}</text>
+    <text x="{{.RightTextX}}" y="19">{{.RightText}}</text>
   </g>
 </svg>
 `
@@ -724,28 +702,69 @@ const smallSVG = `<?xml version="1.0" encoding="UTF-8"?>
 const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="360" height="{{.Height}}" viewBox="0 0 360 {{.Height}}" role="img">
   <title>{{.Title}}</title>
-  <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="#0d1117" stroke="#30363d"/>
-  {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}">{{.Text}}</text>
-  {{end}}{{if .ShowTrack}}<clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="3"/></clipPath>
+  <style>
+    text { font-family: ` + fontFamily + `; }
+    .wordmark { font-size: 13px; font-weight: 700; fill: ` + colorText + `; }
+    .share    { font-size: 36px; font-weight: 700; fill: ` + colorSuperplane + `; }
+    .trend    { font-size: 13px; font-weight: 600; fill: ` + colorSubtle + `; }
+    .caption  { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
+    .count    { font-size: 13px; font-weight: 500; fill: ` + colorText + `; }
+    .rate     { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
+    .cost     { font-size: 13px; font-weight: 600; fill: ` + colorText + `; }
+  </style>
+  <rect x="0.5" y="0.5" width="359" height="{{.InnerH}}" rx="12" fill="` + cardBackground + `" stroke="` + colorBorder + `"/>
+  <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
+  {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
+  {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}
+  {{if .Caption.Show}}<text class="caption" x="{{.Caption.X}}" y="{{.Caption.Y}}">{{.Caption.Text}}</text>{{end}}
+  <text class="count" x="{{.Count.X}}" y="{{.Count.Y}}">{{.Count.Text}}</text>
+  {{if .MergeRate.Show}}<text class="rate" x="{{.MergeRate.X}}" y="{{.MergeRate.Y}}">{{.MergeRate.Text}}</text>{{end}}
+  {{if .Cost.Show}}<text class="cost" x="{{.Cost.X}}" y="{{.Cost.Y}}">{{.Cost.Text}}</text>{{end}}
+  {{if .ShowTrack}}
+  <clipPath id="{{.ClipID}}"><rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" rx="3"/></clipPath>
   <g clip-path="url(#{{.ClipID}})">
     <rect x="{{.BarX}}" y="{{.BarY}}" width="{{.BarW}}" height="{{.BarH}}" fill="#21262d"/>
-    {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="#10b981"/>{{end}}
-    {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="#64748b"/>{{end}}
-  </g>{{end}}
+    {{if gt .GreenW 0}}<rect x="{{.BarX}}" y="{{.BarY}}" width="{{.GreenW}}" height="{{.BarH}}" fill="` + colorSuperplane + `"/>{{end}}
+    {{if gt .SlateW 0}}<rect x="{{.SlateX}}" y="{{.BarY}}" width="{{.SlateW}}" height="{{.BarH}}" fill="` + colorManual + `"/>{{end}}
+  </g>
+  {{end}}
 </svg>
 `
 
 const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
   <title>{{.Title}}</title>
-  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="#0d1117" stroke="#30363d"/>
-  {{range .Texts}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}"{{if .Anchor}} text-anchor="{{.Anchor}}"{{end}}>{{.Text}}</text>
-  {{end}}<rect x="{{.Baseline.X}}" y="{{.Baseline.Y}}" width="{{.Baseline.Width}}" height="{{.Baseline.Height}}" fill="{{.Baseline.Fill}}"/>
+  <style>
+    text { font-family: ` + fontFamily + `; }
+    .wordmark  { font-size: 16px; font-weight: 700; fill: ` + colorText + `; }
+    .share     { font-size: 28px; font-weight: 700; fill: ` + colorSuperplane + `; }
+    .trend     { font-size: 13px; font-weight: 600; fill: ` + colorSubtle + `; }
+    .count     { font-size: 13px; font-weight: 500; fill: ` + colorText + `; }
+    .rate      { font-size: 13px; font-weight: 400; fill: ` + colorSubtle + `; }
+    .cost      { font-size: 13px; font-weight: 600; fill: ` + colorText + `; }
+    .day-label { font-size: 10px; font-weight: 400; fill: ` + colorSubtle + `; text-anchor: middle; }
+    .legend    { font-size: 11px; font-weight: 500; fill: ` + colorText + `; }
+    .updated   { font-size: 11px; font-weight: 400; fill: ` + colorSubtle + `; text-anchor: end; }
+  </style>
+  <rect x="0.5" y="0.5" width="799" height="{{.InnerH}}" rx="12" fill="` + cardBackground + `" stroke="` + colorBorder + `"/>
+
+  <text class="wordmark" x="{{.Wordmark.X}}" y="{{.Wordmark.Y}}">{{.Wordmark.Text}}</text>
+  {{if .Share.Show}}<text class="share" x="{{.Share.X}}" y="{{.Share.Y}}">{{.Share.Text}}</text>{{end}}
+  {{if .Trend.Show}}<text class="trend" x="{{.Trend.X}}" y="{{.Trend.Y}}">{{.Trend.Text}}</text>{{end}}
+  <text class="count" x="{{.Count.X}}" y="{{.Count.Y}}">{{.Count.Text}}</text>
+  {{if .MergeRate.Show}}<text class="rate" x="{{.MergeRate.X}}" y="{{.MergeRate.Y}}">{{.MergeRate.Text}}</text>{{end}}
+  {{if .Cost.Show}}<text class="cost" x="{{.Cost.X}}" y="{{.Cost.Y}}">{{.Cost.Text}}</text>{{end}}
+
+  <rect x="{{.Baseline.X}}" y="{{.Baseline.Y}}" width="{{.Baseline.Width}}" height="{{.Baseline.Height}}" fill="{{.Baseline.Fill}}"/>
   {{range .Days}}<g class="day">
     {{range .Rects}}<rect x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}"{{if gt .Radius 0}} rx="{{.Radius}}"{{end}} fill="{{.Fill}}"/>{{end}}
-    {{if .Show}}<text x="{{.Label.X}}" y="{{.Label.Y}}" fill="{{.Label.Fill}}" font-size="{{.Label.Size}}" font-family="{{$.Font}}" text-anchor="middle">{{.Label.Text}}</text>{{end}}
+    {{if .Label.Show}}<text class="day-label" x="{{.Label.X}}" y="{{.Label.Y}}">{{.Label.Text}}</text>{{end}}
   </g>
-  {{end}}{{range .Squares}}<rect x="{{.X}}" y="{{.Y}}" width="{{.Width}}" height="{{.Height}}" rx="{{.Radius}}" fill="{{.Fill}}"/>{{end}}
-  {{range .Legend}}<text x="{{.X}}" y="{{.Y}}" fill="{{.Fill}}" font-size="{{.Size}}" font-family="{{$.Font}}" font-weight="{{.Weight}}"{{if .Anchor}} text-anchor="{{.Anchor}}"{{end}}>{{.Text}}</text>
-  {{end}}</svg>
+  {{end}}
+  {{with .Legend}}<rect x="{{.AutoSwatch.X}}" y="{{.AutoSwatch.Y}}" width="{{.AutoSwatch.Width}}" height="{{.AutoSwatch.Height}}" rx="{{.AutoSwatch.Radius}}" fill="{{.AutoSwatch.Fill}}"/>
+  <text class="legend" x="{{.Auto.X}}" y="{{.Auto.Y}}">{{.Auto.Text}}</text>
+  {{if .Manual.Show}}<rect x="{{.ManualSwatch.X}}" y="{{.ManualSwatch.Y}}" width="{{.ManualSwatch.Width}}" height="{{.ManualSwatch.Height}}" rx="{{.ManualSwatch.Radius}}" fill="{{.ManualSwatch.Fill}}"/>
+  <text class="legend" x="{{.Manual.X}}" y="{{.Manual.Y}}">{{.Manual.Text}}</text>{{end}}
+  <text class="updated" x="{{.Updated.X}}" y="{{.Updated.Y}}">{{.Updated.Text}}</text>{{end}}
+</svg>
 `
