@@ -86,23 +86,77 @@ spec:
             command: |-
               set -euo pipefail
 
-              # Identify commits as SuperPlane Agent.
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
 
-              # Shallow clone of the default branch into ./repo.
-              git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo && cd repo
+              git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo
+              cd repo
 
-              # On every commit: add DCO sign-off, then Co-authored-by from COAUTHORS.
+              git config user.email "superplaneagent@superplane.com"
+              git config user.name "SuperPlane Agent"
+              export GIT_AUTHOR_NAME="SuperPlane Agent"
+              export GIT_AUTHOR_EMAIL="superplaneagent@superplane.com"
+              export GIT_COMMITTER_NAME="SuperPlane Agent"
+              export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
-              git interpret-trailers --in-place --if-exists doNothing \
-                --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"
+              #!/bin/sh
+              set -u
 
-              printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do
-                if [ -n "$trailer" ]; then
-                  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"
+              msg_file="${1:?}"
+              signoff='Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>'
+              agent_email='superplaneagent@superplane.com'
+              tmp="${msg_file}.sp-identity"
+              coauthors_file="${msg_file}.sp-coauthors"
+
+              email_of() {
+                printf '%s\n' "$1" | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+              }
+
+              is_other_agent_email() {
+                case "$1" in
+                  agent@superplane.com|agent@superplane.ai|opencode@superplane.io)
+                    return 0
+                    ;;
+                esac
+                return 1
+              }
+
+              rm -f "$tmp" "$coauthors_file"
+              trap 'rm -f "$tmp" "$coauthors_file"' EXIT
+
+              : > "$tmp"
+              while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in
+                  'Signed-off-by:'*|'Co-authored-by:'*)
+                    email=$(email_of "$line")
+                    if is_other_agent_email "$email"; then
+                      continue
+                    fi
+                    if [ "$email" = "$agent_email" ]; then
+                      case "$line" in
+                        'Signed-off-by:'*)
+                          continue
+                          ;;
+                      esac
+                    fi
+                    ;;
+                esac
+                printf '%s\n' "$line" >> "$tmp"
+              done < "$msg_file"
+
+              mv "$tmp" "$msg_file"
+
+              printf '%s\n' "${COAUTHORS:-}" > "$coauthors_file"
+              while IFS= read -r trailer || [ -n "$trailer" ]; do
+                [ -n "$trailer" ] || continue
+                if is_other_agent_email "$(email_of "$trailer")"; then
+                  continue
                 fi
-              done
+                git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$msg_file" || exit 1
+              done < "$coauthors_file"
+
+              git interpret-trailers --in-place --if-exists addIfDifferent \
+                --trailer "$signoff" "$msg_file" || exit 1
 
               exit 0
               HOOK
@@ -131,6 +185,7 @@ spec:
               3/ Add tests where it makes sense.
               4/ For UI work, implement and wire the change into the production page or component.
               5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
+              6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
 
           - name: Commit and Push
             type: bash
