@@ -40,10 +40,7 @@ export function buildStorybookMeUser(orgId: string) {
   };
 }
 
-export type FixtureResult =
-  | { json: unknown; status?: number }
-  | { text: string; status?: number }
-  | null;
+export type FixtureResult = { json: unknown; status?: number } | { text: string; status?: number } | null;
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 

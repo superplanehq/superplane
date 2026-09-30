@@ -68,11 +68,7 @@ export const factorySettingsNarrowSectionHeaderClassName = cn(
   "pt-14",
 );
 
-export const factorySettingsNarrowSectionBodyClassName = cn(
-  factorySectionBodyClassName,
-  settingsNarrowColumn,
-  "pb-10",
-);
+export const factorySettingsNarrowSectionBodyClassName = cn(factorySectionBodyClassName, settingsNarrowColumn, "pb-10");
 
 /** Wider settings column for tables that cannot stay readable at the form measure. */
 export const factorySettingsWideSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsWideColumn, "pt-14");

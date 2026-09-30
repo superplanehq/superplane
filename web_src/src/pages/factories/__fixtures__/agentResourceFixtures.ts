@@ -173,7 +173,9 @@ function storybookMcpResource({
     ...(auth === "AUTH_HEADERS" && entry.headerName
       ? { headers: [{ name: entry.headerName, secretName: "vendor-mcp", secretKey: "token" }] }
       : {}),
-    ...(oauthStatus ? { oauthStatus, oauthConnectedAt: oauthStatus === "OAUTH_STATUS_CONNECTED" ? NOW : undefined } : {}),
+    ...(oauthStatus
+      ? { oauthStatus, oauthConnectedAt: oauthStatus === "OAUTH_STATUS_CONNECTED" ? NOW : undefined }
+      : {}),
     ...(oauthError ? { oauthError } : {}),
     createdAt: NOW,
     updatedAt: NOW,

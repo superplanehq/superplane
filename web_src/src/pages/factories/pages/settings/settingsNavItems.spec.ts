@@ -20,9 +20,9 @@ describe("factorySettingsRouteFromPathname", () => {
       "organization-models",
     );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/agent")?.id).toBe("workspace-agent");
-    expect(
-      factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/superplane-mcp-server")?.id,
-    ).toBe("workspace-superplane-mcp-server");
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/superplane-mcp-server")?.id).toBe(
+      "workspace-superplane-mcp-server",
+    );
   });
 
   it("returns undefined for a non-canonical route", () => {

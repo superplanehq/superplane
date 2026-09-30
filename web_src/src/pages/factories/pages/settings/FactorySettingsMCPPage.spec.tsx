@@ -43,7 +43,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server")).not.toBeInTheDocument();
+    expect(
+      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
+    ).not.toBeInTheDocument();
   }, 10000);
 
   it("shows the nav items when both features are on", async () => {
@@ -57,7 +59,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server")).not.toBeInTheDocument();
+    expect(
+      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
+    ).not.toBeInTheDocument();
   }, 10000);
 
   it("shows only MCP nav when only workspace_mcp is on", async () => {
@@ -71,7 +75,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server")).not.toBeInTheDocument();
+    expect(
+      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
+    ).not.toBeInTheDocument();
   }, 10000);
 
   it("shows only Skills nav when only workspace_skills is on", async () => {
@@ -85,7 +91,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server")).not.toBeInTheDocument();
+    expect(
+      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
+    ).not.toBeInTheDocument();
   }, 10000);
 
   it("redirects away from the route when the feature is off", async () => {
@@ -150,9 +158,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("agent-resources-connections-list", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText("Docs")).toBeInTheDocument();
     expect(screen.getByTestId(`agent-resource-status-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("Connected");
-    expect(screen.getByTestId(`agent-resource-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent(
-      "2/2 tools",
-    );
+    expect(screen.getByTestId(`agent-resource-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("2/2 tools");
     expect(screen.queryByText("Header")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Configure")).toBeInTheDocument();
   }, 10000);
@@ -374,7 +380,11 @@ describe("FactorySettingsMCPPage", () => {
     );
 
     expect(
-      await screen.findByText("Connect from Cursor, Claude, Codex, or any other external service.", {}, { timeout: 8000 }),
+      await screen.findByText(
+        "Connect from Cursor, Claude, Codex, or any other external service.",
+        {},
+        { timeout: 8000 },
+      ),
     ).toBeInTheDocument();
     expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toHaveTextContent(
       "No clients connected yet",

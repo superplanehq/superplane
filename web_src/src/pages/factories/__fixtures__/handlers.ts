@@ -618,10 +618,7 @@ function factoryAgentResourceListRoute(fixture: FactoriesFixture): FactoriesRout
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
     resolve: (match, method, body, url) => {
-      if (
-        method === "GET" &&
-        fixture.failAgentResourcesListForFactoryIds?.includes(match[1])
-      ) {
+      if (method === "GET" && fixture.failAgentResourcesListForFactoryIds?.includes(match[1])) {
         return { json: { message: "Storybook agent resources list failure." }, status: 503 };
       }
       const resources = ensureAgentResources(fixture, match[1]);

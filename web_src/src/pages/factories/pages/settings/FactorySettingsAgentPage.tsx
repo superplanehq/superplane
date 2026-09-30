@@ -4,7 +4,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { AgentSettingsSectionEmpty } from "./AgentSettingsSectionEmpty";

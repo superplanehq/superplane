@@ -144,10 +144,7 @@ function SuperPlaneMCPClientsTable({
   onRevoke: (client: FactoriesFactoryMcpClient) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const filteredClients = useMemo(
-    () => filterMcpClients(clients, searchQuery),
-    [clients, searchQuery],
-  );
+  const filteredClients = useMemo(() => filterMcpClients(clients, searchQuery), [clients, searchQuery]);
 
   return (
     <div className="space-y-3">
@@ -165,7 +162,10 @@ function SuperPlaneMCPClientsTable({
         />
       </div>
       {filteredClients.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-muted-foreground" data-testid="superplane-mcp-clients-search-empty">
+        <p
+          className="py-8 text-center text-[13px] text-muted-foreground"
+          data-testid="superplane-mcp-clients-search-empty"
+        >
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
@@ -196,11 +196,7 @@ function filterMcpClients(clients: FactoriesFactoryMcpClient[], query: string): 
 }
 
 function mcpClientSearchText(client: FactoriesFactoryMcpClient): string {
-  return [
-    mcpClientUserName(client),
-    client.userEmail?.trim(),
-    mcpClientDisplayName(client),
-  ]
+  return [mcpClientUserName(client), client.userEmail?.trim(), mcpClientDisplayName(client)]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -208,10 +204,7 @@ function mcpClientSearchText(client: FactoriesFactoryMcpClient): string {
 
 function SuperPlaneMCPServerEmptyState() {
   return (
-    <Empty
-      className="flex-none gap-3 border-none p-6 md:p-8"
-      data-testid="superplane-mcp-clients-empty"
-    >
+    <Empty className="flex-none gap-3 border-none p-6 md:p-8" data-testid="superplane-mcp-clients-empty">
       <EmptyHeader className="max-w-md gap-3">
         <EmptyMedia variant="default" className="mb-0">
           <SuperPlaneMCPClientsEmptyIllustration />
@@ -334,10 +327,7 @@ function SuperPlaneMCPClientRow({
   const absoluteWhen = client.createdAt ? formatTimestampInUserTimezone(client.createdAt) : undefined;
 
   return (
-    <tr
-      className="border-b border-border last:border-b-0"
-      data-testid={`superplane-mcp-client-${client.id}`}
-    >
+    <tr className="border-b border-border last:border-b-0" data-testid={`superplane-mcp-client-${client.id}`}>
       <td className="max-w-[12rem] py-2.5 pr-3">
         <div className="flex min-w-0 items-center gap-2">
           <Avatar

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import {
   useCreateFactoryAgentResource,
