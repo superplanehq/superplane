@@ -148,11 +148,13 @@ function withClosedDecision(
   if (!showClosedDecision) {
     return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
   }
-  const startTone = liveDraftReadiness({
-    clarity: analysisChat.clarity?.score,
-    confidence: analysisChat.confidence?.score,
-    isAnalyzing: analysisChat.isAnalyzing,
-  }).tone;
+  const startTone = analysisChat.creditVerdict
+    ? "blocked"
+    : liveDraftReadiness({
+        clarity: analysisChat.clarity?.score,
+        confidence: analysisChat.confidence?.score,
+        isAnalyzing: analysisChat.isAnalyzing,
+      }).tone;
   return {
     ...analysisChat,
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,

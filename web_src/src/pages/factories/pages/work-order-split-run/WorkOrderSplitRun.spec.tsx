@@ -101,6 +101,7 @@ import {
   LINE_BOARD_VERIFY_ENUM_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
@@ -1318,6 +1319,98 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose how to stop" })).not.toBeInTheDocument();
+  });
+
+  it("explains a hosted credit failure and links to billing", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder({
+        id: "wo-credit",
+        title: "Out of credit",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                failureReason: "no_hosted_credit",
+                run: { id: "run-1", appId: "app-1" },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
+    expect(
+      within(note).getByText("This agent run is blocked. The organization has no SuperPlane hosted credit."),
+    ).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+  });
+
+  it("explains a hosted credit failure when backlog analysis does not start", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          id: "wo-draft-credit",
+          title: "test",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+        {
+          analysisRuns: [
+            {
+              canvasId: "canvas-1",
+              workOrderId: "wo-draft-credit",
+              run: {
+                id: "run-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                createdAt: "2026-09-30T14:37:29Z",
+                executions: [
+                  {
+                    id: "exec-1",
+                    result: "RESULT_FAILED",
+                    resultMessage: "This organization has no hosted credit.",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ),
+    });
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "blocked");
+    expect(within(verdict).getByText("No credit")).toBeInTheDocument();
+    expect(verdict).not.toHaveTextContent("This task is ready to start");
+    expect(
+      within(verdict).getByText("This agent run is blocked. The organization has no SuperPlane hosted credit.", {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    expect(within(verdict).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
   });
 
   it("offers Reject and Rerun after a person stops the run", () => {

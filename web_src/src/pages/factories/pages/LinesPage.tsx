@@ -37,7 +37,7 @@ import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoL
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -1044,6 +1044,10 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const creditFailureLabels = useMemo(
+    () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
+    [backlogAnalysis.runsByWorkOrder],
+  );
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
     disabledIds: string[];
@@ -1134,6 +1138,7 @@ function LineDetail({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
           colorView={colorView}
@@ -1386,6 +1391,7 @@ function PhaseBoard({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  creditFailureLabels,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1414,6 +1420,7 @@ function PhaseBoard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
+  creditFailureLabels: ReadonlyMap<string, string>;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1550,6 +1557,7 @@ function PhaseBoard({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           automations={backlogAutomations}

@@ -1,6 +1,7 @@
 import type { CanvasesCanvasRun } from "@/api-client";
 import { mergeCanvasRunUpdate } from "@/hooks/canvasInfiniteCache";
 
+import { workOrderCreditFailureFromMessage, type WorkOrderCreditFailureCopy } from "./workOrderFailureReason";
 import { isActiveCanvasRun } from "./workOrderPullRequest";
 
 /**
@@ -115,6 +116,47 @@ export function analyzingWorkOrderIds(runs: BacklogAnalysisRun[]): ReadonlySet<s
 
 export function hasActiveBacklogAnalysisRun(runs: BacklogAnalysisRun[]): boolean {
   return runs.some((entry) => isActiveCanvasRun(entry.run));
+}
+
+/**
+ * Credit failure on the latest finished analysis. An in-flight run hides it.
+ * Other failures return null.
+ */
+export function backlogAnalysisCreditFailure(runs: BacklogAnalysisRun[]): WorkOrderCreditFailureCopy | null {
+  const latest = latestBacklogAnalysisRun(runs);
+  if (!latest || isActiveCanvasRun(latest.run) || latest.run.result !== "RESULT_FAILED") {
+    return null;
+  }
+  for (const execution of latest.run.executions ?? []) {
+    if (execution.result !== "RESULT_FAILED") {
+      continue;
+    }
+    const failure = workOrderCreditFailureFromMessage(execution.resultMessage);
+    if (failure) {
+      return failure;
+    }
+  }
+  return null;
+}
+
+/** Card labels for tasks whose latest analysis stopped for hosted credit. */
+export function backlogAnalysisCreditLabels(
+  runsByWorkOrder: ReadonlyMap<string, BacklogAnalysisRun[]>,
+): ReadonlyMap<string, string> {
+  const labels = new Map<string, string>();
+  for (const [workOrderId, runs] of runsByWorkOrder) {
+    const label = backlogAnalysisCreditFailure(runs)?.label;
+    if (label) {
+      labels.set(workOrderId, label);
+    }
+  }
+  return labels;
+}
+
+function latestBacklogAnalysisRun(runs: BacklogAnalysisRun[]): BacklogAnalysisRun | undefined {
+  return [...runs]
+    .sort((left, right) => (Date.parse(left.run.createdAt ?? "") || 0) - (Date.parse(right.run.createdAt ?? "") || 0))
+    .at(-1);
 }
 
 export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {

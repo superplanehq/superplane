@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import {
   availableSplitRunStopChoices,
   buildSplitRunFooter,
+  classicSplitRunFooter,
+  creditBillingHrefForNote,
   DEFAULT_SPLIT_RUN_STOP_CHOICE,
   defaultSplitRunStopChoice,
   doneFooterForStatus,
@@ -276,6 +278,59 @@ describe("buildSplitRunFooter", () => {
       headline: "This task is closed as failed",
       text: "Reopen this task to start the line again.",
     });
+  });
+
+  it("points a credit failure action at billing and drops it without a path", () => {
+    const note = {
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" as const },
+    };
+
+    expect(creditBillingHrefForNote(note, "/org/workspaces/acme/settings/organization/billing").cta).toEqual({
+      label: "Add credits",
+      href: "/org/workspaces/acme/settings/organization/billing",
+    });
+    expect(creditBillingHrefForNote(note, undefined).cta).toBeUndefined();
+    expect(creditBillingHrefForNote({ ...note, cta: { label: "Debug", icon: "bug" } }, undefined).cta).toEqual({
+      label: "Debug",
+      icon: "bug",
+    });
+  });
+
+  it("keeps a credit failure note when the draft uses the classic footer", () => {
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: {
+        key: "draft-credit",
+        headline: "Analysis did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+    });
+
+    expect(classicSplitRunFooter(footer).note?.headline).toBe("Analysis did not pass");
+  });
+
+  it("keeps a credit failure note when the draft already has scores", () => {
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: {
+        key: "draft-credit",
+        headline: "Analysis did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+      clarityScore: 4,
+      confidenceScore: 5,
+    });
+
+    expect(footer.note).toEqual({
+      headline: "Analysis did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(footer.note?.headline).not.toBe("This task is ready to start");
   });
 });
 
