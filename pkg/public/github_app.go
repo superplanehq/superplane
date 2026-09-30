@@ -72,7 +72,7 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
+		http.Redirect(w, r, githubAppInstallRedirectPath(query.Get("state")), http.StatusFound)
 	case "update":
 		if err := enqueueGitHubAppInstallationReconciliation(r.Context(), installationID, organizationID, time.Now()); err != nil {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
@@ -82,6 +82,15 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
+}
+
+// GitHub omits state when an organization admin approves an installation
+// request. A direct installation keeps the state that SuperPlane supplied.
+func githubAppInstallRedirectPath(state string) string {
+	if strings.TrimSpace(state) == "" {
+		return githubInstallApprovedPath
+	}
+	return "/"
 }
 
 func githubAppSetupOrganizationID(state string) uuid.UUID {
