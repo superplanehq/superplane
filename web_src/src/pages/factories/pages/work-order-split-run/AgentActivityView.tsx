@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
+import {
+  agentToolCommandHeadline,
+  agentToolDisplayText,
+  agentToolScriptText,
+  isCommandTool,
+} from "@/lib/agentToolLabels";
+import { normalizeTerminalOutput, shellScriptLineCount } from "@/lib/shellScript";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
@@ -234,14 +240,27 @@ function ToolLine({
   ) : (
     <ToolLabel tool={tool} tone={tone} />
   );
-  const output = tone === "log" ? tool.output.trim() : "";
-  if (!output) {
+  const output = tone === "log" ? normalizeTerminalOutput(tool.output) : "";
+  const exitCode = tone === "log" && failedTool(tool) ? tool.exitCode : undefined;
+  if (!output && exitCode === undefined) {
     return line;
   }
   return (
     <div>
       {line}
-      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{output}</pre>
+      {exitCode !== undefined ? (
+        <p className="px-1 text-[11px] leading-4 text-destructive">Exit code {exitCode}</p>
+      ) : null}
+      {output ? <CommandOutput text={output} /> : null}
+    </div>
+  );
+}
+
+function CommandOutput({ text }: { text: string }) {
+  return (
+    <div className="mt-1 px-1">
+      <p className="text-[11px] leading-4 text-muted-foreground">Output</p>
+      <pre className={cn(COMMAND_CLASSNAME, "mt-0.5 max-h-32 overflow-auto text-muted-foreground")}>{text}</pre>
     </div>
   );
 }
@@ -266,55 +285,63 @@ function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }
 }
 
 function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: boolean }) {
-  const command = agentToolDisplayText(tool);
-  if (expandable) {
+  const failed = failedTool(tool);
+  if (!expandable) {
+    const command = agentToolDisplayText(tool);
     return (
-      <ExpandableCommand
-        text={command}
-        failed={failedTool(tool)}
-        testId={`agent-tool-${tool.id}`}
-        status={tool.status}
-      />
+      <div className="flex min-w-0 items-center px-1 py-0.5">
+        <code
+          className={cn(
+            "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
+            failed && "text-destructive",
+          )}
+          data-testid={`agent-tool-${tool.id}`}
+          data-status={tool.status}
+          title={command}
+        >
+          {command}
+        </code>
+      </div>
     );
   }
+  const script = agentToolScriptText(tool);
+  const headline = agentToolCommandHeadline(tool);
   return (
-    <div className="flex min-w-0 items-center px-1 py-0.5">
-      <code
-        className={cn(
-          "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
-          failedTool(tool) && "text-destructive",
-        )}
-        data-testid={`agent-tool-${tool.id}`}
-        data-status={tool.status}
-        title={command}
-      >
-        {command}
-      </code>
-    </div>
+    <ExpandableCommand
+      script={script || headline}
+      headline={headline}
+      failed={failed}
+      testId={`agent-tool-${tool.id}`}
+      status={tool.status}
+    />
   );
 }
 
 function ExpandableCommand({
-  text,
+  script,
+  headline,
   failed,
   testId,
   status,
 }: {
-  text: string;
+  script: string;
+  headline: string;
   failed: boolean;
   testId: string;
   status: string;
 }) {
+  const multiLine = script.includes("\n");
+  const lineCount = shellScriptLineCount(script);
   const [open, setOpen] = useState(false);
   const lineRef = useRef<HTMLPreElement>(null);
-  const [overflows, setOverflows] = useState(text.includes("\n"));
+  const [overflows, setOverflows] = useState(multiLine);
   useEffect(() => {
     const node = lineRef.current;
     if (!node || overflows) {
       return;
     }
-    setOverflows(text.includes("\n") || node.scrollWidth > node.clientWidth + 1);
-  }, [overflows, text]);
+    setOverflows(node.scrollWidth > node.clientWidth + 1);
+  }, [overflows, script]);
   if (!overflows) {
     return (
       <pre
@@ -323,7 +350,7 @@ function ExpandableCommand({
         data-testid={testId}
         data-status={status}
       >
-        {text}
+        {headline}
       </pre>
     );
   }
@@ -331,21 +358,38 @@ function ExpandableCommand({
     <div className="px-1 py-0.5">
       <button
         type="button"
-        className="inline-flex max-w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[12px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        className={cn(
+          "flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[12px] leading-5 text-foreground/90 hover:bg-muted/60",
+          failed && "text-destructive",
+        )}
         aria-expanded={open}
-        aria-label={text.split("\n").find((line) => line.trim()) ?? text}
+        aria-label={headline}
         onClick={() => setOpen((current) => !current)}
       >
-        <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} aria-hidden />
-        <span className="min-w-0 truncate">{text.split("\n").find((line) => line.trim()) ?? text}</span>
+        <ChevronRight
+          className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+          aria-hidden
+        />
+        <span className="w-3 shrink-0 text-center text-muted-foreground" aria-hidden>
+          $
+        </span>
+        <span className="min-w-0 flex-1 truncate">{headline}</span>
+        {lineCount > 1 ? (
+          <span className="shrink-0 font-sans text-[11px] text-muted-foreground" aria-hidden>
+            {lineCount} lines
+          </span>
+        ) : null}
       </button>
       {open ? (
         <pre
-          className={cn(COMMAND_CLASSNAME, "mt-1", failed && "text-destructive")}
+          className={cn(
+            "mt-1 overflow-x-auto border-l border-border/60 py-1 pl-2 font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
+            failed && "text-destructive",
+          )}
           data-testid={testId}
           data-status={status}
         >
-          {text}
+          {script}
         </pre>
       ) : null}
     </div>
