@@ -137,7 +137,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /^Model/ })).not.toBeInTheDocument();
     await user.click(within(note).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith(undefined, undefined);
+    expect(onDispatch).toHaveBeenCalledWith(undefined, "medium");
   });
 
   it("does not refine a draft from the note", () => {
@@ -184,7 +184,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     await user.click(within(strip).getByRole("button", { name: "Start" }));
     await user.click(await screen.findByRole("button", { name: "Start anyway" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
-    expect(onDispatch).toHaveBeenCalledWith(undefined, undefined);
+    expect(onDispatch).toHaveBeenCalledWith(undefined, "medium");
     expect(screen.queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("popup-work-order-archive-button"));
     expect(handleArchiveMock).toHaveBeenCalledTimes(1);
@@ -283,7 +283,35 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     const actions = within(strip).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(within(actions).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", undefined);
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "medium");
+  });
+
+  it("starts a draft with the picked thinking level", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <WorkOrderSplitRunPopup
+                fixture={splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0])}
+                onDispatch={onDispatch}
+                canDispatch
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const strip = screen.getByTestId("split-run-intent-status-card");
+    await user.click(within(strip).getByRole("button", { name: "Model: Auto" }));
+    await user.hover(screen.getByTestId("split-run-draft-thinking"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
+    await user.keyboard("{Escape}");
+    await user.click(within(strip).getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledWith(undefined, "low");
   });
 
   it("reruns a failed open task from the note", async () => {

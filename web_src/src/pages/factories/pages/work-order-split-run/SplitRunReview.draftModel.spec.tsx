@@ -9,7 +9,7 @@ import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPag
 import { SplitRunReview } from "./SplitRunReview";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
-import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
+import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
@@ -59,7 +59,7 @@ function renderDraftFooter(
               factoryId="factory-1"
               lineName="ship"
               model={selectedModel}
-              thinkingLevel={DRAFT_START_THINKING_AUTO}
+              thinkingLevel={THINKING_LEVEL_MEDIUM}
               onChange={onChange}
             />
           }
@@ -103,9 +103,9 @@ describe("SplitRunReview draft model select", () => {
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
     expect(screen.getByTestId("split-run-draft-model-list")).toHaveTextContent("Auto");
-    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Auto");
+    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
-    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: DRAFT_START_THINKING_AUTO });
+    expect(onChange).toHaveBeenCalledWith({ model: "claude-opus-4-6", thinkingLevel: THINKING_LEVEL_MEDIUM });
   });
 
   it("lists thinking levels the user can pick", async () => {
@@ -114,6 +114,13 @@ describe("SplitRunReview draft model select", () => {
     renderDraftFooter(vi.fn(), DRAFT_START_MODEL_AUTO, onChange);
 
     await user.click(screen.getByRole("button", { name: "Model: Auto" }));
+    expect(screen.getByTestId("split-run-draft-thinking")).toHaveTextContent("Medium");
+    await user.hover(screen.getByTestId("split-run-draft-thinking"));
+    expect(await screen.findByRole("menuitem", { name: "Low" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "High" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Auto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Default" })).not.toBeInTheDocument();
     await selectFlyoutOption(user, "split-run-draft-thinking", "High");
     expect(onChange).toHaveBeenCalledWith({ model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
     expect(screen.getByTestId("split-run-draft-model-list")).toBeInTheDocument();
@@ -128,7 +135,7 @@ describe("SplitRunReview draft model select", () => {
     await selectFlyoutOption(user, "split-run-draft-thinking", "High");
     await selectFlyoutOption(user, "split-run-draft-model-list", "claude-opus-4-6");
     expect(onChange).toHaveBeenNthCalledWith(1, { model: DRAFT_START_MODEL_AUTO, thinkingLevel: "high" });
-    expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: DRAFT_START_THINKING_AUTO });
+    expect(onChange).toHaveBeenNthCalledWith(2, { model: "claude-opus-4-6", thinkingLevel: THINKING_LEVEL_MEDIUM });
   });
 
   it("disables the model chevron when Start is disabled", () => {
