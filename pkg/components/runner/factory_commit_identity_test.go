@@ -95,6 +95,8 @@ func TestFactoryCommitHookDropsOtherAgentTrailers(t *testing.T) {
 		"",
 		"Signed-off-by: SuperPlane Agent <agent@superplane.com>",
 		"Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>",
+		"Signed-off-by: Jane Doe <jane@example.com>",
+		"Signed-off-by: Jane Doe <jane@example.com>",
 		"Co-authored-by: SuperPlane Agent <superplaneagent@superplane.com>",
 		"Co-authored-by: André Calil <andre@superplane.com>",
 		"Co-authored-by: SuperPlane Agent <agent@superplane.com>",
@@ -123,7 +125,9 @@ func TestFactoryCommitHookDropsOtherAgentTrailers(t *testing.T) {
 	assert.Equal(t, first, second)
 	assert.Contains(t, second, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>")
 	assert.Equal(t, 1, strings.Count(second, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>"))
-	assert.Equal(t, 2, strings.Count(second, "Signed-off-by:"))
+	assert.Contains(t, second, "Signed-off-by: Jane Doe <jane@example.com>")
+	assert.Equal(t, 1, strings.Count(second, "Signed-off-by: Jane Doe <jane@example.com>"))
+	assert.Equal(t, 3, strings.Count(second, "Signed-off-by:"))
 	assert.Contains(t, second, "Co-authored-by: SuperPlane Agent <superplaneagent@superplane.com>")
 	assert.Contains(t, second, "Co-authored-by: André Calil <andre@superplane.com>")
 	assert.Contains(t, second, "Co-authored-by: Pat Example <pat@example.com>")
@@ -295,6 +299,7 @@ printf 'Co-authored-by: SuperPlane Agent <agent@superplane.com>\n' >> "$1"
 		"The body can mention agent@superplane.com.",
 		"",
 		"Signed-off-by: SuperPlane Agent <agent@superplane.com>",
+		"Signed-off-by: Jane Doe <jane@example.com>",
 		"Co-authored-by: OpenCode <opencode@superplane.io>",
 	}, "\n")), 0o644))
 	runGit(t, repo, wrapper, env, "add", "README")
@@ -311,15 +316,18 @@ printf 'Co-authored-by: SuperPlane Agent <agent@superplane.com>\n' >> "$1"
 	assert.Contains(t, body, "The old commit used this trailer:\nSigned-off-by: SuperPlane Agent <agent@superplane.com>\nThat line is an example, not a trailer.")
 	assert.Contains(t, body, "Repository hook ran.")
 	assert.Contains(t, body, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>")
+	assert.Contains(t, body, "Signed-off-by: Jane Doe <jane@example.com>")
 	assert.Contains(t, body, "Co-authored-by: Pat Example <pat@example.com>")
 	assert.Equal(t, 1, strings.Count(body, "<agent@superplane.com>"))
 	assert.NotContains(t, body, "opencode@superplane.io")
 	assert.NotContains(t, body, "agent@superplane.ai")
 	assert.Equal(t, 1, strings.Count(body, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>"))
+	assert.Equal(t, 1, strings.Count(body, "Signed-off-by: Jane Doe <jane@example.com>"))
 	assert.Equal(t, 1, strings.Count(body, "Co-authored-by: Pat Example <pat@example.com>"))
 
 	trailers := gitTrailers(t, repo, env)
 	assert.Contains(t, trailers, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>")
+	assert.Contains(t, trailers, "Signed-off-by: Jane Doe <jane@example.com>")
 	assert.Contains(t, trailers, "Co-authored-by: Pat Example <pat@example.com>")
 	assert.NotContains(t, trailers, "Repository hook ran.")
 	assert.NotContains(t, trailers, "agent@superplane.com")
@@ -329,6 +337,7 @@ printf 'Co-authored-by: SuperPlane Agent <agent@superplane.com>\n' >> "$1"
 	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
 	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
 	assert.Equal(t, 1, strings.Count(amended, "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>"))
+	assert.Equal(t, 1, strings.Count(amended, "Signed-off-by: Jane Doe <jane@example.com>"))
 	assert.Equal(t, 1, strings.Count(amended, "Co-authored-by: Pat Example <pat@example.com>"))
 	assert.Contains(t, amended, "Repository hook ran.")
 	assert.Contains(t, amended, "That line is an example, not a trailer.")

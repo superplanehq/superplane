@@ -111,13 +111,15 @@ func FactoryRepoCommitSetup() string {
 
 // FactoryPrepareCommitMessageHook drops other agent trailers from the
 // trailer block and keeps one SuperPlane Agent sign-off. A quoted trailer
-// line in the body stays. Human co-authors and the agent co-author stay.
+// line in the body stays. Human sign-offs, human co-authors, and the agent
+// co-author stay.
 func FactoryPrepareCommitMessageHook() string {
 	return `#!/bin/sh
 set -u
 
 msg_file="${1:?}"
-signoff='Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>'
+agent_email='superplaneagent@superplane.com'
+signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
 tmp="${msg_file}.sp-identity"
 coauthors_file="${msg_file}.sp-coauthors"
 kept_file="${msg_file}.sp-kept"
@@ -153,10 +155,11 @@ keep_trailer() {
       return 0
       ;;
   esac
-  if is_other_agent_email "$(email_of "$1")"; then
+  email=$(email_of "$1")
+  if is_other_agent_email "$email"; then
     return 1
   fi
-  if [ "$key" = "signed-off-by" ]; then
+  if [ "$key" = "signed-off-by" ] && [ "$email" = "$agent_email" ]; then
     return 1
   fi
   if grep -qxF "$1" "$kept_file"; then
