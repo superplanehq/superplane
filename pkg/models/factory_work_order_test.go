@@ -1599,6 +1599,11 @@ func createSourceRun(t *testing.T, orgID, ownerID uuid.UUID) uuid.UUID {
 
 func createSourceEvent(t *testing.T, orgID, ownerID uuid.UUID, payload map[string]any) uuid.UUID {
 	t.Helper()
+	return createTypedSourceEvent(t, orgID, ownerID, githubIssueEventType, payload)
+}
+
+func createTypedSourceEvent(t *testing.T, orgID, ownerID uuid.UUID, eventType string, payload map[string]any) uuid.UUID {
+	t.Helper()
 	canvas, node, versionID := createSourceCanvas(t, orgID, ownerID)
 	now := time.Now()
 	run := CanvasRun{
@@ -1616,7 +1621,7 @@ func createSourceEvent(t *testing.T, orgID, ownerID uuid.UUID, payload map[strin
 		NodeID:     node.NodeID,
 		Channel:    "default",
 		Data: NewJSONValue(map[string]any{
-			"type": "github.issue",
+			"type": eventType,
 			"data": payload,
 		}),
 		State:     CanvasEventStatePending,

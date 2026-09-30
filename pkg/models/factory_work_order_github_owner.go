@@ -1,13 +1,18 @@
 package models
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
-const githubIssueOwnerSavepoint = "github_issue_owner"
+const (
+	githubIssueOwnerSavepoint = "github_issue_owner"
+	githubIssueEventType      = "github.issue"
+)
 
 func (o *FactoryWorkOrder) assignOwnerFromGitHubIssue(tx *gorm.DB) error {
 	ownerID, ok := o.githubIssueOwner(tx)
@@ -25,15 +30,21 @@ func (o *FactoryWorkOrder) githubIssueOwner(tx *gorm.DB) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	if err := tx.SavePoint(githubIssueOwnerSavepoint).Error; err != nil {
+		o.recordGitHubIssueOwnerLookupFailure(err)
 		return uuid.Nil, false
 	}
 
 	ownerID, ok, err := o.findGitHubIssueOwner(tx)
-	if err != nil || !ok {
-		_ = tx.RollbackTo(githubIssueOwnerSavepoint)
-		return uuid.Nil, false
+	if err == nil && ok {
+		return ownerID, true
 	}
-	return ownerID, true
+	if rollbackErr := tx.RollbackTo(githubIssueOwnerSavepoint).Error; rollbackErr != nil {
+		o.recordGitHubIssueOwnerLookupFailure(rollbackErr)
+	}
+	if err != nil {
+		o.recordGitHubIssueOwnerLookupFailure(err)
+	}
+	return uuid.Nil, false
 }
 
 func (o *FactoryWorkOrder) findGitHubIssueOwner(tx *gorm.DB) (uuid.UUID, bool, error) {
@@ -49,7 +60,7 @@ func (o *FactoryWorkOrder) findGitHubIssueOwner(tx *gorm.DB) (uuid.UUID, bool, e
 	if err != nil {
 		return uuid.Nil, false, err
 	}
-	if event == nil {
+	if event == nil || !isGitHubIssueEvent(event.Data.Data()) {
 		return uuid.Nil, false, nil
 	}
 
@@ -93,6 +104,27 @@ func gitHubIssueAssigneeLogins(payload any) []string {
 		logins = append(logins, login)
 	}
 	return logins
+}
+
+func (o *FactoryWorkOrder) recordGitHubIssueOwnerLookupFailure(err error) {
+	if o == nil || err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+
+	fields := log.Fields{"work_order_id": o.ID}
+	if o.SourceRunID != nil {
+		fields["source_run_id"] = o.SourceRunID.String()
+	}
+	log.WithFields(fields).WithError(err).Warn("failed to read the GitHub issue owner; the task stays unassigned")
+}
+
+func isGitHubIssueEvent(eventData any) bool {
+	payload, ok := objectMap(eventData)
+	if !ok {
+		return false
+	}
+	eventType, _ := payload["type"].(string)
+	return eventType == githubIssueEventType
 }
 
 func isGitHubIssuePayload(payload map[string]any) bool {
