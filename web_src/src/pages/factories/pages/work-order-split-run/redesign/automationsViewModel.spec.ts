@@ -366,6 +366,43 @@ describe("console automation grouping", () => {
     expect(automationsFromStages(columns.done).map((automation) => automation.name)).not.toContain("Create env");
   });
 
+  it("keeps every check from one column app run on that card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-risk",
+          key: "risk-review",
+          name: "Risk score",
+          score: 2,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-risk", appName: "Risk score" },
+          runId: "run-risk",
+          updatedAt: "2026-08-26T11:10:00Z",
+        },
+        {
+          id: "check-diff",
+          key: "risk-diff",
+          name: "Diff size",
+          score: 1,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-risk", appName: "Risk score" },
+          runId: "run-risk",
+          updatedAt: "2026-08-26T11:11:00Z",
+        },
+      ],
+      columnApps: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
+    });
+    const risk = automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).verify).find(
+      (automation) => automation.name === "Risk score",
+    );
+
+    expect(risk?.runs).toHaveLength(1);
+    expect(risk?.latest.checks.map((check) => check.name)).toEqual(["Risk score", "Diff size"]);
+  });
+
   it("puts a Done-column app run in Done", () => {
     const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
       demoArtifacts: false,

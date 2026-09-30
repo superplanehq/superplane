@@ -892,25 +892,64 @@ function phasesForColumnAppChecks(
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
   knownPhases: SplitRunPhase[],
 ): SplitRunPhase[] {
-  const seenRunIds = new Set(knownPhases.flatMap((phase) => (phase.runId ? [phase.runId] : [])));
-  return (checks ?? []).flatMap((check) => {
-    const phase = phaseForColumnAppCheck(columnApps, check, artifacts, seenRunIds);
-    if (!phase) {
-      return [];
+  const checksByRun = columnAppChecksByRun(columnApps, checks);
+  const extras: SplitRunPhase[] = [];
+  for (const [runId, runChecks] of checksByRun) {
+    const presented = presentWorkOrderChecks(runChecks);
+    const existing = knownPhases.find((phase) => phase.runId === runId);
+    if (existing) {
+      existing.checks = uniquePresentedChecks([...(existing.checks ?? []), ...presented]);
+      continue;
     }
-    seenRunIds.add(phase.runId ?? "");
-    return [phase];
+    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts);
+    if (phase) {
+      extras.push(phase);
+    }
+  }
+  return extras;
+}
+
+function columnAppChecksByRun(
+  columnApps: SplitRunColumnApp[],
+  checks: FactoriesWorkOrderCheck[] | undefined,
+): Map<string, FactoriesWorkOrderCheck[]> {
+  const checksByRun = new Map<string, FactoriesWorkOrderCheck[]>();
+  for (const check of checks ?? []) {
+    const ref = columnAppCheckRef(check);
+    if (!ref) {
+      continue;
+    }
+    const app = columnApps.find((entry) => entry.id === ref.appId);
+    if (!app || !consoleColumnForAppKey(app.columnKey)) {
+      continue;
+    }
+    const runChecks = checksByRun.get(ref.runId) ?? [];
+    runChecks.push(check);
+    checksByRun.set(ref.runId, runChecks);
+  }
+  return checksByRun;
+}
+
+function uniquePresentedChecks(checks: WorkOrderCheckPresentation[]): WorkOrderCheckPresentation[] {
+  const seen = new Set<string>();
+  return checks.filter((check) => {
+    const key = check.id || check.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
   });
 }
 
 function phaseForColumnAppCheck(
   columnApps: SplitRunColumnApp[],
-  check: FactoriesWorkOrderCheck,
+  checks: FactoriesWorkOrderCheck[],
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
-  seenRunIds: Set<string>,
 ): SplitRunPhase | undefined {
-  const ref = columnAppCheckRef(check);
-  if (!ref || seenRunIds.has(ref.runId)) {
+  const first = checks[0];
+  const ref = first ? columnAppCheckRef(first) : undefined;
+  if (!first || !ref) {
     return undefined;
   }
   const app = columnApps.find((entry) => entry.id === ref.appId);
@@ -919,11 +958,12 @@ function phaseForColumnAppCheck(
     return undefined;
   }
   const name = phaseNameForColumn(columnKey);
-  const componentName = columnAppCheckName(app, check, name);
+  const componentName = columnAppCheckName(app, first, name);
+  const latest = checks[checks.length - 1] ?? first;
   const status: SplitRunPhaseStatus = "passed";
   const line: SplitRunStreamLine = {
     id: ref.runId,
-    at: clockLabel(check.updatedAt),
+    at: clockLabel(latest.updatedAt),
     componentName,
     status,
     duration: "",
@@ -937,10 +977,10 @@ function phaseForColumnAppCheck(
     name,
     status,
     duration: "",
-    startedAt: check.updatedAt,
+    startedAt: first.updatedAt,
     componentName,
     artifacts: artifactsForCanvasRun(artifacts, ref.runId),
-    checks: presentWorkOrderChecks([check]),
+    checks: presentWorkOrderChecks(checks),
     stream: [line],
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: ref.appId,
