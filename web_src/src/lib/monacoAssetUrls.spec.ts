@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { isMonacoWorkerAsset, monacoChunkFileName, monacoWorkerAppOriginRuntime } from "./monacoAssetUrls";
+import {
+  assetBaseMarker,
+  isMonacoWorkerAsset,
+  monacoChunkFileName,
+  monacoWorkerAppOriginRuntime,
+  renderMonacoBuiltUrl,
+} from "./monacoAssetUrls";
 
 describe("Monaco worker asset URLs", () => {
   it.each(["editor.worker", "json.worker", "css.worker", "html.worker", "ts.worker"])(
@@ -26,6 +32,43 @@ describe("Monaco worker asset URLs", () => {
 
     expect(runtime).not.toContain("assets.superplane.com");
     expect(runtime).not.toContain("/releases/");
+  });
+
+  it("keeps a release path on the page origin so an old editor can load its worker", () => {
+    const release = "0123456789abcdef0123456789abcdef01234567";
+    const assetBaseUrl = `https://assets.superplane.com/releases/${release}/`;
+    const runtime = renderMonacoBuiltUrl(
+      "assets/editor.worker-Bx123.js",
+      "web_src/src/lib/setupMonaco.ts",
+      "js",
+      assetBaseUrl,
+    );
+
+    expect(runtime).toBe(`new URL("/releases/${release}/assets/editor.worker-Bx123.js", self.location.origin).href`);
+    expect(runtime).not.toContain("assets.superplane.com");
+    expect(assetBaseMarker(assetBaseUrl)).toBe(`${assetBaseUrl}\n`);
+  });
+
+  it("keeps a worker import on the same release path", () => {
+    const release = "0123456789abcdef0123456789abcdef01234567";
+    const runtime = renderMonacoBuiltUrl(
+      "assets/chunk-Ab12.js",
+      "/app/node_modules/monaco-editor/esm/vs/editor/editor.worker.js",
+      "js",
+      `https://assets.superplane.com/releases/${release}`,
+    );
+
+    expect(runtime).toBe(`new URL("/releases/${release}/assets/chunk-Ab12.js", self.location.origin).href`);
+  });
+
+  it("leaves application imports on the configured asset base", () => {
+    const assetBaseUrl = "https://assets.superplane.com/releases/0123456789abcdef0123456789abcdef01234567/";
+
+    expect(renderMonacoBuiltUrl("assets/index-Bx123.js", "web_src/src/main.tsx", "js", assetBaseUrl)).toBeUndefined();
+    expect(
+      renderMonacoBuiltUrl("assets/editor.worker-Bx123.js", "web_src/src/main.tsx", "css", assetBaseUrl),
+    ).toBeUndefined();
+    expect(assetBaseMarker("https://cdn.example.com/static/")).toBeUndefined();
   });
 });
 
