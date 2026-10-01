@@ -133,6 +133,10 @@ describe("formatGoDurationLabel", () => {
 describe("formatDuration with { precision: 'second' }", () => {
   const seconds = (durationMs: number) => formatDuration(durationMs, { precision: "second" });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns an empty string for zero, negative, or non-finite durations", () => {
     expect(seconds(0)).toBe("");
     expect(seconds(-500)).toBe("");
