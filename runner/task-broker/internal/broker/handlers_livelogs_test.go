@@ -44,7 +44,7 @@ func TestCloudWatchLiveLogsEndAfterTerminalTaskCatchesUp(t *testing.T) {
 			s := &Server{Store: st, TaskCloudWatchLogGroup: "tasks", TaskCloudWatchRegion: "us-east-1"}
 			ts := httptest.NewServer(NewRouter(s, RouterOptions{AuthToken: "test-token"}))
 			defer ts.Close()
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/v1/tasks/task-1/live-logs", nil)
 			req.Header.Set("Authorization", "Bearer test-token")
@@ -64,6 +64,51 @@ func TestCloudWatchLiveLogsEndAfterTerminalTaskCatchesUp(t *testing.T) {
 				t.Fatalf("status=%d headers=%v", resp.StatusCode, resp.Header)
 			}
 		})
+	}
+}
+
+func TestCloudWatchLiveLogsDeliverLateLinesAfterTerminalTask(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	calls := 0
+	cw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		switch calls {
+		case 1:
+			_, _ = io.WriteString(w, `{"events":[{"message":"first"}],"nextForwardToken":"page-1"}`)
+		case 2:
+			_, _ = io.WriteString(w, `{"events":[],"nextForwardToken":"tail"}`)
+		case 3:
+			_, _ = io.WriteString(w, `{"events":[],"nextForwardToken":"tail"}`)
+		case 4:
+			_, _ = io.WriteString(w, `{"events":[{"message":"late"}],"nextForwardToken":"tail-2"}`)
+		default:
+			_, _ = io.WriteString(w, `{"events":[],"nextForwardToken":"tail-2"}`)
+		}
+	}))
+	defer cw.Close()
+	t.Setenv("AWS_ENDPOINT_URL", cw.URL)
+	st := &liveLogTaskStore{task: &models.Task{ID: "task-1", Status: models.StatusClaimed}, terminalStatus: models.StatusSucceeded}
+	s := &Server{Store: st, TaskCloudWatchLogGroup: "tasks", TaskCloudWatchRegion: "us-east-1"}
+	ts := httptest.NewServer(NewRouter(s, RouterOptions{AuthToken: "test-token"}))
+	defer ts.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/v1/tasks/task-1/live-logs", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("stream did not end cleanly: %v", err)
+	}
+	if got, want := string(body), "{\"text\":\"first\",\"type\":\"line\"}\n{\"text\":\"late\",\"type\":\"line\"}\n"; got != want {
+		t.Fatalf("body = %q, want %q", got, want)
 	}
 }
 
