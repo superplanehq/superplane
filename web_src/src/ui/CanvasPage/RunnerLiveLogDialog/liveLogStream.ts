@@ -229,6 +229,9 @@ function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStrea
 }
 
 function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
+  if (rec.type === "ping") {
+    return;
+  }
   if (rec.schema_version === 2) {
     handlers.onRecord?.(rec);
     return;

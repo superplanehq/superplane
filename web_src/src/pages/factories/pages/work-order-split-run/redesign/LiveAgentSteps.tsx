@@ -1,9 +1,14 @@
 import type { AgentPromptUsageSeries } from "@/lib/agentRunTelemetry";
+import { cn } from "@/lib/utils";
+import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Skeleton } from "@/ui/skeleton";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { LOADING_REVEAL_CLASSNAME } from "../../../lib/loadingReveal";
 import { mergeAgentActivities, type AgentActivity } from "../agentActivity";
 import { AgentLiveStatus } from "../IntentAnalysisLiveWork";
+import { AgentActivityView } from "../AgentActivityView";
 import { headerSpendFromUsageSeries } from "../planningHeaderSpend";
 import { useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import { useReportPhaseAgentUsageSeries } from "../phaseAgentUsageContext";
@@ -15,7 +20,16 @@ import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
-type RunnerLive = { notes: SplitRunStreamLine[]; activities: AgentActivity[] };
+const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
+const AGENT_LOG_SKELETON_LABEL = "Waiting for logs";
+const AGENT_LOG_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-4/5", "w-2/3"] as const;
+
+type RunnerLive = {
+  notes: SplitRunStreamLine[];
+  activities: AgentActivity[];
+  isStreaming: boolean;
+  isLoading: boolean;
+};
 
 export function LiveAgentSteps({
   stage,
@@ -35,49 +49,22 @@ export function LiveAgentSteps({
   /** When false, skip the usage chart. The card footer only charts the latest run. */
   reportUsage?: boolean;
 }) {
-  const live = useSplitRunLiveCanvas(organizationId, phase);
-  const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
-  const runners = stream.filter((line) => isRunnerComponent(line.component) && Boolean(line.executionId));
-  const [liveByLine, setLiveByLine] = useState<Record<string, RunnerLive>>({});
-  const reportLive = useCallback((lineId: string, next: RunnerLive) => {
-    setLiveByLine((current) => {
-      const previous = current[lineId];
-      if (
-        previous &&
-        noteSignature(previous.notes) === noteSignature(next.notes) &&
-        activitySignature(previous.activities) === activitySignature(next.activities)
-      ) {
-        return current;
-      }
-      return { ...current, [lineId]: next };
-    });
-  }, []);
-  const liveNotes = useMemo(() => runners.flatMap((line) => liveByLine[line.id]?.notes ?? []), [liveByLine, runners]);
-  const stoppedStatus = stoppedStepStatus(phase?.status, runners);
-  const liveSteps = useMemo(
-    () => settleStoppedSteps(agentStepsFromNotes(liveNotes), stoppedStatus),
-    [liveNotes, stoppedStatus],
-  );
-  const shown =
-    liveSteps.length > 0
-      ? { ...stage, agentSteps: liveSteps }
-      : { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
-
-  // A running run shows nothing until its first note streams in; the
-  // note is for finished runs whose transcript never arrives.
+  const run = useLiveAgentRun(stage, phase, organizationId);
   const note = emptyNote && stage.status !== "running" ? <p className={META_TEXT_CLASSNAME}>{emptyNote}</p> : null;
-  if (!organizationId || !phase || runners.length === 0) {
-    const settled = { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
-    return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : note;
+  if (!organizationId || !phase || run.runners.length === 0) {
+    return (
+      <SettledRunBody
+        stage={stage}
+        expandSteps={expandSteps}
+        showLogSkeleton={run.showLogSkeleton}
+        stoppedStatus={run.stoppedStatus}
+        note={note}
+      />
+    );
   }
-
-  const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
-  const running = Boolean(runningRunner);
-  const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
-
   return (
     <>
-      {runners.map((line) => (
+      {run.runners.map((line) => (
         <RunnerNotes
           key={line.id}
           line={line}
@@ -85,24 +72,181 @@ export function LiveAgentSteps({
           canvasId={phase.appId ?? ""}
           spendPhaseId={phase.id}
           reportUsage={reportUsage}
-          onLive={reportLive}
+          onLive={run.reportLive}
         />
       ))}
-      {shown.agentSteps.length > 0 ? (
+      <AgentRunBody
+        stageId={stage.id}
+        shown={run.shown}
+        showLogSkeleton={run.showLogSkeleton}
+        revealSteps={run.revealSteps}
+        expandSteps={expandSteps}
+        running={run.running}
+        liveActivity={run.liveActivity}
+        hasLiveContent={run.hasLiveContent}
+        note={note}
+      />
+    </>
+  );
+}
+
+function SettledRunBody({
+  stage,
+  expandSteps,
+  showLogSkeleton,
+  stoppedStatus,
+  note,
+}: {
+  stage: AutomationStage;
+  expandSteps: boolean;
+  showLogSkeleton: boolean;
+  stoppedStatus: SplitRunPhaseStatus | undefined;
+  note: ReactNode;
+}) {
+  if (showLogSkeleton) {
+    return <AgentLogSkeleton />;
+  }
+  const settled = { ...stage, agentSteps: settleStoppedSteps(stage.agentSteps, stoppedStatus) };
+  return settled.agentSteps.length > 0 ? <AgentStepMarkers stage={settled} expandSteps={expandSteps} /> : note;
+}
+
+function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefined, organizationId?: string) {
+  const live = useSplitRunLiveCanvas(organizationId, phase);
+  const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
+  const runners = stream.filter((line) => isRunnerComponent(line.component) && Boolean(line.executionId));
+  const [liveByLine, setLiveByLine] = useState<Record<string, RunnerLive>>({});
+  const reportLive = useCallback((lineId: string, next: RunnerLive) => {
+    setLiveByLine((current) => (sameRunnerLive(current[lineId], next) ? current : { ...current, [lineId]: next }));
+  }, []);
+  const liveNotes = useMemo(() => runners.flatMap((line) => liveByLine[line.id]?.notes ?? []), [liveByLine, runners]);
+  const transcriptNotes = useMemo(() => liveNotes.filter((note) => !isWaitingForLogsNote(note)), [liveNotes]);
+  const stoppedStatus = stoppedStepStatus(phase?.status, runners);
+  const liveSteps = useMemo(
+    () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes), stoppedStatus),
+    [transcriptNotes, stoppedStatus],
+  );
+  const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
+  const running = Boolean(runningRunner);
+  const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
+  const hasLiveContent = (liveActivity?.items.length ?? 0) > 0;
+  const pending = agentLogPending({
+    running,
+    canvasLoading: live.isLoading,
+    canAwaitNotes: Boolean(phase?.appId),
+    runners,
+    liveByLine,
+    liveNotes,
+    liveStepCount: liveSteps.length,
+    settledStepCount: stage.agentSteps.length,
+    hasLiveContent,
+  });
+  return {
+    runners,
+    reportLive,
+    running,
+    liveActivity,
+    hasLiveContent,
+    showLogSkeleton: pending.showLogSkeleton,
+    revealSteps: useRevealAfterPending(pending.showLogSkeleton),
+    shown: {
+      ...stage,
+      agentSteps: agentStepsForLiveRun(stage.agentSteps, liveSteps, pending.streamWaiting, stoppedStatus),
+    },
+    stoppedStatus,
+  };
+}
+
+function sameRunnerLive(previous: RunnerLive | undefined, next: RunnerLive): boolean {
+  return Boolean(
+    previous &&
+      previous.isStreaming === next.isStreaming &&
+      previous.isLoading === next.isLoading &&
+      noteSignature(previous.notes) === noteSignature(next.notes) &&
+      activitySignature(previous.activities) === activitySignature(next.activities),
+  );
+}
+
+function agentLogPending(input: {
+  running: boolean;
+  canvasLoading: boolean;
+  canAwaitNotes: boolean;
+  runners: SplitRunStreamLine[];
+  liveByLine: Record<string, RunnerLive>;
+  liveNotes: SplitRunStreamLine[];
+  liveStepCount: number;
+  settledStepCount: number;
+  hasLiveContent: boolean;
+}): { streamWaiting: boolean; showLogSkeleton: boolean } {
+  const awaiting = input.canAwaitNotes && input.runners.some((line) => input.liveByLine[line.id] === undefined);
+  const loadingLogs = input.runners.some((line) => input.liveByLine[line.id]?.isLoading);
+  const pendingFetch = input.canvasLoading || awaiting || loadingLogs;
+  const pendingLogs = pendingFetch || isWaitingForLogNotes(input.liveNotes);
+  const hasSteps = input.liveStepCount > 0 || input.settledStepCount > 0;
+  if (input.hasLiveContent) {
+    return { streamWaiting: false, showLogSkeleton: false };
+  }
+  if (input.running) {
+    const wait = pendingLogs && input.liveStepCount === 0;
+    return { streamWaiting: wait, showLogSkeleton: wait };
+  }
+  // A finished run can leave its log SSE open with no bytes. Do not wait
+  // on isStreaming. Show steps as soon as any runner has them.
+  return { streamWaiting: false, showLogSkeleton: pendingFetch && !hasSteps };
+}
+
+function AgentRunBody({
+  stageId,
+  shown,
+  showLogSkeleton,
+  revealSteps,
+  expandSteps,
+  running,
+  liveActivity,
+  hasLiveContent,
+  note,
+}: {
+  stageId: string;
+  shown: AutomationStage;
+  showLogSkeleton: boolean;
+  revealSteps: boolean;
+  expandSteps: boolean;
+  running: boolean;
+  liveActivity?: AgentActivity;
+  hasLiveContent: boolean;
+  note: ReactNode;
+}) {
+  if (showLogSkeleton) {
+    return <AgentLogSkeleton />;
+  }
+  if (shown.agentSteps.length > 0) {
+    return (
+      <div className={cn(revealSteps && LOADING_REVEAL_CLASSNAME)}>
         <AgentStepMarkers
           stage={shown}
           expandSteps={expandSteps}
           liveActivity={running ? liveActivity : undefined}
           liveActive={running}
         />
-      ) : running ? (
-        <div data-testid={`redesign-live-activity-${stage.id}`}>
-          <AgentLiveStatus active activity={liveActivity} startingLabel="Starting agent…" />
-        </div>
-      ) : (
-        note
-      )}
-    </>
+      </div>
+    );
+  }
+  if (!running) {
+    return note;
+  }
+  return (
+    <div data-testid={`redesign-live-activity-${stageId}`}>
+      {hasLiveContent && liveActivity ? (
+        <AgentActivityView
+          activity={liveActivity}
+          live
+          collapseCompleted={false}
+          collapseReasoning={false}
+          expandableCommands
+          tone="log"
+        />
+      ) : null}
+      <AgentLiveStatus active activity={liveActivity} startingLabel="Starting agent…" collapseReasoning={false} />
+    </div>
   );
 }
 
@@ -121,7 +265,11 @@ function RunnerNotes({
   reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
 }) {
-  const { notes, activities, spend, usageSeries } = useRunnerLiveNotes(line, organizationId, canvasId);
+  const { notes, activities, spend, usageSeries, isStreaming, isLoading } = useRunnerLiveNotes(
+    line,
+    organizationId,
+    canvasId,
+  );
   useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
@@ -130,8 +278,8 @@ function RunnerNotes({
     enabled: reportUsage && isRunnerComponent(line.component),
   });
   useEffect(() => {
-    onLive(line.id, { notes, activities });
-  }, [activities, line.id, notes, onLive]);
+    onLive(line.id, { notes, activities, isStreaming, isLoading });
+  }, [activities, isLoading, isStreaming, line.id, notes, onLive]);
   return null;
 }
 
@@ -144,15 +292,27 @@ function useRunnerLiveNotes(
   activities: AgentActivity[];
   spend: ReturnType<typeof headerSpendFromUsageSeries>;
   usageSeries: AgentPromptUsageSeries[];
+  isStreaming: boolean;
+  isLoading: boolean;
 } {
   const canStream = Boolean(canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, orphanLines, error, isStreaming, usageSeries, activityState } = useLiveLogStream(
+  const {
+    sections,
+    orphanLines,
+    error,
+    isStreaming: streamOpen,
+    isLoading: streamLoading,
+    usageSeries,
+    activityState,
+  } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     liveLogFinishState(line.status),
     null,
     { organizationId, canvasId },
   );
+  const isStreaming = canStream && streamOpen;
+  const isLoading = canStream && streamLoading;
   const notes = useMemo(() => {
     if (!canStream) {
       return [];
@@ -183,7 +343,42 @@ function useRunnerLiveNotes(
     activities,
     spend: headerSpendFromUsageSeries(usageSeries ?? []),
     usageSeries: usageSeries ?? [],
+    isStreaming,
+    isLoading,
   };
+}
+
+function AgentLogSkeleton() {
+  return (
+    <div className="flex w-full flex-col gap-2" role="status" aria-busy="true" aria-label={AGENT_LOG_SKELETON_LABEL}>
+      {AGENT_LOG_SKELETON_WIDTHS.map((width) => (
+        <Skeleton key={width} className={cn("h-4", width)} />
+      ))}
+    </div>
+  );
+}
+
+function agentStepsForLiveRun(
+  settledSteps: AutomationStage["agentSteps"],
+  liveSteps: AutomationStage["agentSteps"],
+  streamWaiting: boolean,
+  stoppedStatus: SplitRunPhaseStatus | undefined,
+) {
+  if (liveSteps.length > 0) {
+    return liveSteps;
+  }
+  if (streamWaiting) {
+    return [];
+  }
+  return settleStoppedSteps(settledSteps, stoppedStatus);
+}
+
+function isWaitingForLogsNote(note: SplitRunStreamLine): boolean {
+  return note.componentName === WAITING_FOR_LOGS_NOTE;
+}
+
+function isWaitingForLogNotes(notes: SplitRunStreamLine[]): boolean {
+  return notes.length > 0 && notes.every(isWaitingForLogsNote);
 }
 
 function stoppedStepStatus(

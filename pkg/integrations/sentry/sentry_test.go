@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +13,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -779,6 +782,102 @@ func Test__Sentry__HandleWebhook(t *testing.T) {
 	})
 
 	require.Equal(t, http.StatusOK, response.Code)
+}
+
+func Test__Sentry__HandleWebhook__ReceiptHeaderDoesNotHideDirectLog(t *testing.T) {
+	impl := &Sentry{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"baseUrl":      "https://sentry.io",
+			"userToken":    "auth-token",
+			"clientSecret": "client-secret",
+		},
+		Subscriptions: []contexts.Subscription{
+			{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+		},
+	}
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+	request.Header.Set("Sentry-Hook-Resource", "issue")
+	request.Header.Set("Sentry-Hook-Signature", computeWebhookSignature("client-secret", body))
+	request.Header.Set(HeaderWebhookReceipt, uuid.NewString())
+	response := httptest.NewRecorder()
+	logs := captureDirectSentryWebhookLogs(t)
+
+	impl.HandleRequest(core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     request,
+		Response:    response,
+		HTTP:        &contexts.HTTPContext{},
+		Integration: integrationCtx,
+	})
+
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.NotNil(t, directSentryWebhookLog(t, logs.String(), "Sentry webhook received"))
+}
+
+func Test__Sentry__HandleWebhook__HostedHandlerSkipsDuplicateLog(t *testing.T) {
+	impl := &Sentry{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"baseUrl":      "https://sentry.io",
+			"userToken":    "auth-token",
+			"clientSecret": "client-secret",
+		},
+		Subscriptions: []contexts.Subscription{
+			{Configuration: SubscriptionConfiguration{Resources: []string{"issue"}}},
+		},
+	}
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+	request = request.WithContext(WithHostedSentryWebhookLogged(request.Context()))
+	request.Header.Set("Sentry-Hook-Resource", "issue")
+	request.Header.Set("Sentry-Hook-Signature", computeWebhookSignature("client-secret", body))
+	request.Header.Set(HeaderWebhookReceipt, uuid.NewString())
+	response := httptest.NewRecorder()
+	logs := captureDirectSentryWebhookLogs(t)
+
+	impl.HandleRequest(core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     request,
+		Response:    response,
+		HTTP:        &contexts.HTTPContext{},
+		Integration: integrationCtx,
+	})
+
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Nil(t, directSentryWebhookLog(t, logs.String(), "Sentry webhook received"))
+}
+
+func captureDirectSentryWebhookLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	logger := logging.SentryWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+	return buffer
+}
+
+func directSentryWebhookLog(t *testing.T, raw string, message string) map[string]any {
+	t.Helper()
+
+	for _, line := range bytes.Split([]byte(raw), []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal(line, &payload))
+		if payload["message"] == message {
+			return payload
+		}
+	}
+	return nil
 }
 
 func Test__Sentry__HandleWebhook__HostedInstallMustMatch(t *testing.T) {

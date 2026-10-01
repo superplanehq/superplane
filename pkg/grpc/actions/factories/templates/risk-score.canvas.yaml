@@ -132,21 +132,36 @@ spec:
                 "author": "github-username",
                 "risk_score": 1,
                 "risk_level": "very_low",
-                "summary": "one sentence",
-                "concerns": ["..."]
+                "summary": "one sentence"
               }
 
               risk_score is an integer from 1 to 5. A higher score means more risk.
               risk_level must match the score:
-              1 very_low, 2 low, 3 medium, 4 high, 5 critical.
+              1 very_low (Minimal Risk), 2 low (Low Risk), 3 medium (Moderate Risk), 4 high (High Risk), 5 critical (Severe Risk).
 
               Apply these category rules. If a change matches a category, the score is at least that category score.
               If several categories match, use the highest score.
               If no category matches, judge the diff and choose a score from 1 to 5.
+              Do not invent a category. Name only categories from the rules below.
 
               {{ install_params.riskRules }}
 
-              Write each concern as a short direct sentence, ideally under 15 words.
+              summary is one sentence.
+              Start with Higher risk, Moderate risk, or Lower risk.
+              Use Higher risk for high or critical. Use Moderate risk for medium. Use Lower risk for low or very low.
+              When categories match, say the pull request is introducing the highest matching category.
+              End a Lower risk sentence with "only" when every change fits that one category.
+              Do not use "only" when the pull request also changes something outside that category.
+              Do not describe the edit in a Lower risk sentence that names a category.
+              For Moderate risk and Higher risk, add "by" and the concrete change.
+              When no category matches, say the pull request matches no configured category.
+              Then name the concrete change, including when the score is Lower risk.
+              Do not invent a category.
+              Do not repeat the score. The check shows the number beside this sentence.
+              Do not write a second sentence. Do not write a list.
+              Good lower: Lower risk because the pull request is introducing user interface changes only.
+              Good higher: Higher risk because the pull request is introducing infrastructure changes by raising the ingress body limit from 64 MB to 80 MB.
+              Good none: Moderate risk because the pull request matches no configured category and rewrites the retry loop.
           - name: Emit Review
             type: bash
             command: |-
@@ -174,15 +189,9 @@ spec:
             const review = ($["Assess Risk"] && $["Assess Risk"].data && $["Assess Risk"].data.result) || {};
             const score = clampScore(review.risk_score);
             const summary = String(review.summary || "").trim();
-            const concerns = asStrings(review.concerns);
-            const lines = [summary || "No summary."];
-            if (concerns.length > 0) {
-              lines.push("", ...concerns.map((concern) => `- ${concern}`));
-            }
             return {
               risk_score: score,
               summary: summary || `Risk ${score}/5`,
-              analysis: lines.join("\n"),
             };
           }
 
@@ -190,11 +199,6 @@ spec:
             const score = Number(value);
             if (!Number.isFinite(score)) return 1;
             return Math.max(1, Math.min(5, Math.round(score)));
-          }
-
-          function asStrings(value) {
-            if (!Array.isArray(value)) return [];
-            return value.map((item) => String(item || "").trim()).filter(Boolean);
           }
       position:
         x: 1200
@@ -215,7 +219,6 @@ spec:
         cautionAt: 3
         criticalAt: 4
         summary: '{{ $["Format Risk Review"].data.result.summary }}'
-        analysis: '{{ $["Format Risk Review"].data.result.analysis }}'
       position:
         x: 1480
         "y": 460

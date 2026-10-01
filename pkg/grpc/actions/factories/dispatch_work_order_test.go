@@ -3,9 +3,11 @@ package factories
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -631,5 +633,135 @@ func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
 			assert.Equal(t, tc.description, reloaded.Description)
 			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 		})
+	}
+}
+
+func Test__DispatchWorkOrder__ReplaceActiveLogsAdmittedRunOnItsOrder(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	logs := capturePublishedRunLogs(t)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	limit := 1
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit},
+	})
+	require.NoError(t, err)
+
+	running, err := factoryModel.CreateWorkOrder(db, "Running", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	queued, err := factoryModel.CreateWorkOrder(db, "Queued", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   running.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   queued.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	var queuedBefore int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", queued.ID).Count(&queuedBefore).Error)
+	require.Zero(t, queuedBefore, "the second order must wait for the step slot")
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId:     factoryModel.ID.String(),
+		OrderId:       running.ID.String(),
+		LineName:      line.Name,
+		ReplaceActive: true,
+	})
+	require.NoError(t, err)
+
+	var admitted models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("work_order_id = ?", queued.ID).First(&admitted).Error)
+	require.NotNil(t, admitted.RunID)
+
+	orderID, ok := logs.orderIDForRun(*admitted.RunID)
+	require.True(t, ok, "replacing a dispatch must log the admitted run")
+	assert.Equal(t, queued.ID, orderID)
+}
+
+type publishedRunLogHook struct {
+	mu      sync.Mutex
+	entries []map[string]any
+}
+
+func (h *publishedRunLogHook) Levels() []log.Level {
+	return []log.Level{log.InfoLevel, log.ErrorLevel}
+}
+
+func (h *publishedRunLogHook) Fire(entry *log.Entry) error {
+	if !strings.Contains(entry.Message, "pending canvas run") {
+		return nil
+	}
+
+	copied := make(map[string]any, len(entry.Data))
+	for key, value := range entry.Data {
+		copied[key] = value
+	}
+
+	h.mu.Lock()
+	h.entries = append(h.entries, copied)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *publishedRunLogHook) orderIDForRun(runID uuid.UUID) (uuid.UUID, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for _, entry := range h.entries {
+		loggedRun, ok := uuidField(entry["run_id"])
+		if !ok || loggedRun != runID {
+			continue
+		}
+		orderID, ok := uuidField(entry["order_id"])
+		return orderID, ok
+	}
+
+	return uuid.Nil, false
+}
+
+func capturePublishedRunLogs(t *testing.T) *publishedRunLogHook {
+	t.Helper()
+
+	hook := &publishedRunLogHook{}
+	logger := log.StandardLogger()
+	previous := logger.ReplaceHooks(make(log.LevelHooks))
+	for _, hooks := range previous {
+		for _, existing := range hooks {
+			logger.AddHook(existing)
+		}
+	}
+	logger.AddHook(hook)
+	t.Cleanup(func() {
+		logger.ReplaceHooks(previous)
+	})
+	return hook
+}
+
+func uuidField(value any) (uuid.UUID, bool) {
+	switch typed := value.(type) {
+	case uuid.UUID:
+		return typed, typed != uuid.Nil
+	case string:
+		parsed, err := uuid.Parse(typed)
+		if err != nil || parsed == uuid.Nil {
+			return uuid.Nil, false
+		}
+		return parsed, true
+	default:
+		return uuid.Nil, false
 	}
 }

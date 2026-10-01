@@ -6,6 +6,7 @@ import { displayStatusForLineStatus, durationForExecution, elapsedForDisplay } f
 
 const START = "2026-08-21T12:00:00.000Z";
 const FOUR_MINUTES = 4 * 60 * 1000;
+const LONG_RUN = 5 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000 + 12 * 60 * 1000 + 18 * 1000;
 
 describe("displayStatusForLineStatus", () => {
   it("maps line status to the card icon status", () => {
@@ -36,6 +37,16 @@ describe("elapsedForDisplay", () => {
     expect(elapsedForDisplay("completed", { createdAt: START, updatedAt })).toBe(
       formatDuration(FOUR_MINUTES, { precision: "second" }),
     );
+  });
+
+  it("rounds a running multi-day duration and keeps so far", () => {
+    const now = Date.parse(START) + LONG_RUN;
+    expect(elapsedForDisplay("running", { createdAt: START, updatedAt: START }, now)).toBe("5d 8h so far");
+  });
+
+  it("rounds a finished multi-day duration without so far", () => {
+    const updatedAt = new Date(Date.parse(START) + LONG_RUN).toISOString();
+    expect(elapsedForDisplay("completed", { createdAt: START, updatedAt })).toBe("5d 8h");
   });
 });
 
