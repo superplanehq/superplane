@@ -494,6 +494,7 @@ func serializeWorkOrder(
 		Origin:               serializeWorkOrderOrigin(order),
 		SourceRunId:          serializeWorkOrderSourceRunID(order),
 		AutoStartLineId:      serializeOptionalID(order.AutoStartLineID),
+		McpClient:            serializeWorkOrderMCPClient(order),
 	}, nil
 }
 
@@ -532,6 +533,7 @@ func serializeWorkOrderSummary(
 		TotalDurationSeconds: usage.Totals.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		McpClient:            serializeWorkOrderMCPClient(order),
 	}, nil
 }
 
@@ -621,6 +623,17 @@ func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigi
 	return &pb.WorkOrderOrigin{
 		Url:   origin.URL,
 		Label: origin.Label,
+	}
+}
+
+func serializeWorkOrderMCPClient(order *models.FactoryWorkOrder) *pb.WorkOrderMcpClient {
+	client := order.MCPClient()
+	if client == nil {
+		return nil
+	}
+	return &pb.WorkOrderMcpClient{
+		Id:   client.ID,
+		Name: client.Name,
 	}
 }
 

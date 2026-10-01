@@ -23,6 +23,8 @@ const (
 	FactoryWorkOrderResultCompleted = "completed"
 	FactoryWorkOrderResultRejected  = "rejected"
 	FactoryWorkOrderResultFailed    = "failed"
+
+	DefaultMCPClientName = "MCP client"
 )
 
 var (
@@ -76,6 +78,8 @@ type FactoryWorkOrder struct {
 	Repository      *string
 	DefaultBranch   *string
 	AutoStartLineID *uuid.UUID
+	MCPClientID     *string
+	MCPClientName   *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -88,6 +92,12 @@ type FactoryWorkOrder struct {
 
 func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
+}
+
+// WorkOrderMCPClient is the MCP OAuth client that handed this task off.
+type WorkOrderMCPClient struct {
+	ID   string
+	Name string
 }
 
 // URLPath is the canonical UI permalink of the work order, relative to the
@@ -134,6 +144,44 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 	}
 
 	return &WorkOrderOrigin{URL: url, Label: label}
+}
+
+func (o *FactoryWorkOrder) MCPClient() *WorkOrderMCPClient {
+	if o == nil {
+		return nil
+	}
+
+	id := ""
+	if o.MCPClientID != nil {
+		id = strings.TrimSpace(*o.MCPClientID)
+	}
+	name := ""
+	if o.MCPClientName != nil {
+		name = strings.TrimSpace(*o.MCPClientName)
+	}
+	if id == "" && name == "" {
+		return nil
+	}
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+	return &WorkOrderMCPClient{ID: id, Name: name}
+}
+
+func (o *FactoryWorkOrder) SetMCPClient(tx *gorm.DB, id, name string) error {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+
+	o.MCPClientID = &id
+	o.MCPClientName = &name
+	return tx.Model(o).Updates(map[string]any{
+		"mcp_client_id":   id,
+		"mcp_client_name": name,
+		"updated_at":      time.Now(),
+	}).Error
 }
 
 type FactoryWorkOrderAssignee struct {
