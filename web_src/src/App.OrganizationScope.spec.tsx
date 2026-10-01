@@ -21,26 +21,37 @@ function OrgHome() {
   return <div>Org home: {organizationId}</div>;
 }
 
-function renderScope(initialEntry: string, organization?: OrganizationsOrganization) {
-  const queryClient = new QueryClient({
+function createQueryClient() {
+  return new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { retry: false, retryOnMount: false },
       mutations: { retry: false },
     },
   });
+}
 
+function renderScope(
+  initialEntry: string,
+  organization?: OrganizationsOrganization,
+  queryClient = createQueryClient(),
+  account = accountContextValue,
+) {
   const segment = initialEntry.split("/")[1];
   if (organization !== undefined) {
     queryClient.setQueryData(organizationKeys.details(segment), organization);
+    if (organization.metadata?.slug) {
+      queryClient.setQueryData(organizationKeys.details(organization.metadata.slug), organization);
+    }
   }
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AccountContext.Provider value={accountContextValue}>
+      <AccountContext.Provider value={account}>
         <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
             <Route path="/:organizationId" element={<OrganizationScope />}>
               <Route index element={<OrgHome />} />
+              <Route path="*" element={<OrgHome />} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -50,10 +61,35 @@ function renderScope(initialEntry: string, organization?: OrganizationsOrganizat
 }
 
 describe("OrganizationScope", () => {
-  it("renders the outlet on the UID segment while the organization is still loading", () => {
+  it("waits for the organization before rendering the child route", () => {
     renderScope("/org-uid-123");
 
-    expect(screen.getByText("Org home: org-uid-123")).toBeInTheDocument();
+    expect(screen.queryByText("Org home: org-uid-123")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading organization...")).toBeInTheDocument();
+  });
+
+  it("shows organization not found without rendering the child app route", async () => {
+    const queryClient = createQueryClient();
+    await queryClient
+      .fetchQuery({
+        queryKey: organizationKeys.details("missing-org"),
+        queryFn: () => Promise.reject(new Error("Not Found")),
+      })
+      .catch(() => undefined);
+
+    renderScope("/missing-org/apps/canvas-1", undefined, queryClient);
+
+    expect(screen.getByText("Organization not found")).toBeInTheDocument();
+    expect(screen.queryByText("Org home: missing-org")).not.toBeInTheDocument();
+  });
+
+  it("renders the public guest line without waiting for an organization", () => {
+    renderScope("/demo/workspaces/newwo/lines/fb0e0e21-8d19-4b3e-ac3f-cfe1cc54f4d7", undefined, createQueryClient(), {
+      ...accountContextValue,
+      account: null,
+    });
+
+    expect(screen.getByText("Org home: demo")).toBeInTheDocument();
   });
 
   it("redirects a UID URL to the org slug once the organization resolves", () => {

@@ -3,6 +3,7 @@ import {
   NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
   isValidRunId,
+  isNotFoundError,
   prepareCanvasLogNodes,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
@@ -14,6 +15,27 @@ import type { ActionsAction } from "@/api-client";
 import { mapCanvasNodesToLogEntries } from "./utils";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
+
+describe("isNotFoundError", () => {
+  it.each([
+    "Not Found",
+    "NOT FOUND",
+    new Error("Not Found"),
+    { status: 404 },
+    { response: { status: 404 } },
+    { code: "NOT_FOUND" },
+    new Error("Request failed: 404"),
+  ])("recognizes missing resources: %p", (error) => {
+    expect(isNotFoundError(error)).toBe(true);
+  });
+
+  it.each([undefined, null, "Forbidden", new Error("Internal Server Error"), { status: 500 }])(
+    "does not classify other failures as missing resources: %p",
+    (error) => {
+      expect(isNotFoundError(error)).toBe(false);
+    },
+  );
+});
 
 describe("workflowPageHelpers run inspection", () => {
   it("clears stale run URLs after describe settles without a run", () => {

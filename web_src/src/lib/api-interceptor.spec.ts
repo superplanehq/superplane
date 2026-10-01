@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
+import { client } from "@/api-client/client.gen";
 
 describe("api-interceptor", () => {
   let originalFetch: typeof globalThis.fetch;
@@ -173,5 +174,32 @@ describe("api-interceptor", () => {
     setupApiInterceptor();
 
     expect(globalThis.fetch).toBe(wrappedFetch);
+  });
+
+  it.each([
+    ["Not Found", 404, "Not Found"],
+    [JSON.stringify({ message: "Canvas not found", code: "NOT_FOUND" }), 404, "Canvas not found"],
+    [JSON.stringify({ message: "Invalid request", code: "INVALID_ARGUMENT" }), 400, "Invalid request"],
+  ])("rejects API failure %s with an Error and preserves the status", async (body, status, message) => {
+    globalThis.fetch = mock().mockResolvedValue(new Response(body, { status }));
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+    setupApiInterceptor();
+
+    const failure = client.get({ url: "http://localhost/api/v1/canvases/missing" });
+    await expect(failure).rejects.toBeInstanceOf(Error);
+    await expect(failure).rejects.toMatchObject({ message, status });
+    if (body.startsWith("{")) {
+      await expect(failure).rejects.toMatchObject({ code: JSON.parse(body).code });
+    }
+    expect(locationHref).toBe("http://localhost/dashboard?tab=overview");
+  });
+
+  it("preserves an existing network Error", async () => {
+    const error = new Error("Network unavailable");
+    globalThis.fetch = mock().mockRejectedValue(error);
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+    setupApiInterceptor();
+
+    await expect(client.get({ url: "http://localhost/api/v1/canvases/missing" })).rejects.toBe(error);
   });
 });
