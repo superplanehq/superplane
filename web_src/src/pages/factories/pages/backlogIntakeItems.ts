@@ -41,6 +41,7 @@ export interface BacklogIntakeItem {
   key: string;
   title: string;
   body: string;
+  createdAt?: string;
 }
 
 export interface BacklogIntakeItemCatalog {

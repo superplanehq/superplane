@@ -312,14 +312,15 @@ func approvalCreatedTime(approval Approval) (time.Time, bool) {
 		if !ok {
 			continue
 		}
-		if t, ok := parseJiraDateTime(raw); ok {
+		if t, ok := ParseJiraDateTime(raw); ok {
 			return t, true
 		}
 	}
 	return time.Time{}, false
 }
 
-func parseJiraDateTime(raw string) (time.Time, bool) {
+// ParseJiraDateTime parses timestamps returned by Jira APIs.
+func ParseJiraDateTime(raw string) (time.Time, bool) {
 	raw = strings.TrimSpace(raw)
 	layouts := []string{
 		time.RFC3339Nano,
