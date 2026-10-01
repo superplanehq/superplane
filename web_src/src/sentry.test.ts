@@ -38,6 +38,13 @@ describe("isIgnoredConsoleMessage", () => {
     ).toBe(true);
   });
 
+  it("ignores Monaco unknown-touch gesture warnings", () => {
+    expect(isIgnoredConsoleMessage("end of an UNKNOWN touch")).toBe(true);
+    expect(isIgnoredConsoleMessage("end of an UNKNOWN touch [object Touch]")).toBe(true);
+    expect(isIgnoredConsoleMessage("move of an UNKNOWN touch")).toBe(true);
+    expect(isIgnoredConsoleMessage("move of an UNKNOWN touch [object Touch]")).toBe(true);
+  });
+
   it("keeps genuine application console messages", () => {
     expect(isIgnoredConsoleMessage("Something actually broke")).toBe(false);
     expect(isIgnoredConsoleMessage("Unexpected token in JSON")).toBe(false);
