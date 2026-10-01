@@ -344,19 +344,20 @@ func planningScoreLevel(score float64) string {
 }
 
 func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
+	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
 	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
 	if err != nil {
-		return "Call propose_clarity and propose_confidence every turn. "
+		return "Publish the specification and the scores only when this turn updates the plan. " + updateCue
 	}
 	switch {
 	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
-		return "Call propose_clarity and propose_confidence every turn. "
+		return "Publish the specification and the scores only when this turn updates the plan. " + updateCue
 	case factoryModel.PlanningClarity:
-		return "Call propose_clarity every turn. "
+		return "Publish the specification and the Clarity score only when this turn updates the plan. " + updateCue
 	case factoryModel.PlanningConfidence:
-		return "Call propose_confidence every turn. "
+		return "Publish the specification and the Confidence score only when this turn updates the plan. " + updateCue
 	default:
-		return ""
+		return "Publish the specification only when this turn updates the plan. " + updateCue
 	}
 }
 

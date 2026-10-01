@@ -327,7 +327,7 @@ const TOOLS = [
   {
     name: "propose_clarity",
     description:
-      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this only when this turn updates the plan or the score would change. Do not call it on a question turn. An unchanged score stays on the card. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -346,7 +346,7 @@ const TOOLS = [
   {
     name: "propose_confidence",
     description:
-      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this every turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this only when this turn updates the plan or the score would change. Do not call it on a question turn. An unchanged score stays on the card. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
