@@ -74,7 +74,7 @@ func ImportFactoryIntakeItem(
 		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
-	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
+	origin := models.OriginFromImportedIntakeItem(item.URL, item.Title)
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
