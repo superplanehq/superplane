@@ -91,6 +91,7 @@ describe("notesFromLiveLogSections", () => {
 
     expect(notes.map((note) => note.componentType)).toEqual(["bash", "prompt", "note", "read"]);
     expect(notes[0]?.componentName).toBe("Set Up Git User");
+    expect(notes[0]?.duration).toBe("<1s");
     expect(notes[0]?.detail).toContain('echo "Using superplaneagent@superplane.com"');
     expect(notes[0]?.detail).toContain("Using superplaneagent");
     expect(notes[1]?.componentName).toBe("Implementation");

@@ -1,21 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import {
-  agentToolCommandHeadline,
-  agentToolDisplayText,
-  agentToolScriptText,
-  isCommandTool,
-} from "@/lib/agentToolLabels";
-import { normalizeTerminalOutput, shellScriptLineCount } from "@/lib/shellScript";
+import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
+import { normalizeTerminalOutput } from "@/lib/shellScript";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
 
 import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem } from "./agentActivity";
+import { CommandLine } from "./AgentCommandLine";
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
   activitySummaryLabel,
   completedActivitySummaryLabel,
+  flattenCommandToolGroups,
   groupToolRuns,
   type ToolActivityGroup,
 } from "./agentActivitySummary";
@@ -129,7 +126,8 @@ function ActivityEntries({
   collapseReasoning?: boolean;
   expandableCommands?: boolean;
 }) {
-  const displayEntries = groupTools ? groupToolRuns(entries) : entries;
+  const grouped = groupTools ? groupToolRuns(entries) : entries;
+  const displayEntries = groupTools && tone === "log" ? flattenCommandToolGroups(grouped) : grouped;
   return (
     <>
       {displayEntries.map((item) => {
@@ -235,24 +233,24 @@ function ToolLine({
   tone: "chat" | "log";
   expandableCommands: boolean;
 }) {
-  const line = isCommandTool(tool) ? (
+  const command = isCommandTool(tool);
+  const line = command ? (
     <CommandLine tool={tool} expandable={expandableCommands} />
   ) : (
     <ToolLabel tool={tool} tone={tone} />
   );
   if (tone !== "log") return line;
-  const output = isCommandTool(tool) ? normalizeTerminalOutput(tool.output) : tool.output.trim();
-  const exitCode = failedTool(tool) ? tool.exitCode : undefined;
-  if (!output && exitCode === undefined) {
+  if (command && failedTool(tool)) {
+    return line;
+  }
+  const output = command ? normalizeTerminalOutput(tool.output) : tool.output.trim();
+  if (!output) {
     return line;
   }
   return (
     <div>
       {line}
-      {exitCode !== undefined ? (
-        <p className="px-1 text-[11px] leading-4 text-destructive">Exit code {exitCode}</p>
-      ) : null}
-      {output ? <ToolOutput command={isCommandTool(tool)} text={output} /> : null}
+      <ToolOutput command={command} text={output} />
     </div>
   );
 }
@@ -286,119 +284,6 @@ function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }
       <span className="min-w-0 flex-1 truncate" title={label}>
         {label}
       </span>
-    </div>
-  );
-}
-
-function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: boolean }) {
-  const failed = failedTool(tool);
-  if (!expandable) {
-    const command = agentToolDisplayText(tool);
-    return (
-      <div className="flex min-w-0 items-center px-1 py-0.5">
-        <code
-          className={cn(
-            "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
-            failed && "text-destructive",
-          )}
-          data-testid={`agent-tool-${tool.id}`}
-          data-status={tool.status}
-          title={command}
-        >
-          {command}
-        </code>
-      </div>
-    );
-  }
-  const script = agentToolScriptText(tool);
-  const headline = agentToolCommandHeadline(tool);
-  return (
-    <ExpandableCommand
-      script={script || headline}
-      headline={headline}
-      failed={failed}
-      testId={`agent-tool-${tool.id}`}
-      status={tool.status}
-    />
-  );
-}
-
-function ExpandableCommand({
-  script,
-  headline,
-  failed,
-  testId,
-  status,
-}: {
-  script: string;
-  headline: string;
-  failed: boolean;
-  testId: string;
-  status: string;
-}) {
-  const multiLine = script.includes("\n");
-  const hidesRest = script.trim() !== headline;
-  const lineCount = shellScriptLineCount(script);
-  const [open, setOpen] = useState(false);
-  const lineRef = useRef<HTMLPreElement>(null);
-  const [overflows, setOverflows] = useState(multiLine || hidesRest);
-  useEffect(() => {
-    const node = lineRef.current;
-    if (!node || overflows) {
-      return;
-    }
-    setOverflows(node.scrollWidth > node.clientWidth + 1);
-  }, [overflows, script]);
-  if (!overflows) {
-    return (
-      <pre
-        className={cn(COMMAND_CLASSNAME, "truncate px-1 py-0.5", failed && "text-destructive")}
-        ref={lineRef}
-        data-testid={testId}
-        data-status={status}
-      >
-        {headline}
-      </pre>
-    );
-  }
-  return (
-    <div className="px-1 py-0.5">
-      <button
-        type="button"
-        className={cn(
-          "flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[12px] leading-5 text-foreground/90 hover:bg-muted/60",
-          failed && "text-destructive",
-        )}
-        aria-expanded={open}
-        aria-label={headline}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <ChevronRight
-          className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
-          aria-hidden
-        />
-        <span className="w-3 shrink-0 text-center text-muted-foreground" aria-hidden>
-          $
-        </span>
-        <span className="min-w-0 flex-1 truncate">{headline}</span>
-        {lineCount > 1 ? (
-          <span className="shrink-0 font-sans text-[11px] text-muted-foreground" aria-hidden>
-            {lineCount} lines
-          </span>
-        ) : null}
-      </button>
-      {open ? (
-        <pre
-          className={cn(
-            "mt-1 overflow-x-auto border-l border-border/60 py-1 pl-2 font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
-            failed && "text-destructive",
-          )}
-          data-testid={testId}
-          data-status={status}
-        >
-          {script}
-        </pre>
-      ) : null}
     </div>
   );
 }
