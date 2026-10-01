@@ -308,7 +308,7 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 	stop := stopReleaseCallWhenRequestEnds(r.Context(), leave)
 	defer stop()
 
-	value, err, _ := h.releaseGroup.Do(key, func() (any, error) {
+	value, err := h.awaitReleaseAsset(r.Context(), key, func() (any, error) {
 		return h.loadReleaseAsset(shared, asset, r.Method)
 	})
 	if err != nil {
@@ -321,6 +321,23 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 	}
 
 	writeReleaseAsset(w, r, asset, value.(cachedReleaseAsset))
+}
+
+func (h *AssetHandler) awaitReleaseAsset(requestCtx context.Context, key string, load func() (any, error)) (any, error) {
+	if err := requestCtx.Err(); err != nil {
+		return nil, err
+	}
+
+	results := h.releaseGroup.DoChan(key, load)
+	select {
+	case <-requestCtx.Done():
+		return nil, requestCtx.Err()
+	case result := <-results:
+		if err := requestCtx.Err(); err != nil {
+			return nil, err
+		}
+		return result.Val, result.Err
+	}
 }
 
 func (h *AssetHandler) joinReleaseCall(key string) (context.Context, func()) {

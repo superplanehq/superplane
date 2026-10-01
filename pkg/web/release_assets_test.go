@@ -292,12 +292,12 @@ func TestReleaseAssetKeepsSharedDownloadWhenCallerLeaves(t *testing.T) {
 	path := releaseWorkerPath("editor.worker-old.js")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	firstDone := make(chan int, 1)
+	firstDone := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		recorder := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, path, nil).WithContext(ctx)
 		handler.ServeHTTP(recorder, req)
-		firstDone <- recorder.Code
+		firstDone <- recorder
 	}()
 
 	select {
@@ -314,6 +314,15 @@ func TestReleaseAssetKeepsSharedDownloadWhenCallerLeaves(t *testing.T) {
 	}()
 	time.Sleep(100 * time.Millisecond)
 	cancel()
+
+	select {
+	case recorder := <-firstDone:
+		if recorder.Body.Len() != 0 || recorder.Header().Get("Content-Type") != "" {
+			t.Fatalf("canceled caller wrote a response: %d %q", recorder.Code, recorder.Body.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("canceled caller kept waiting for the shared download")
+	}
 
 	select {
 	case recorder := <-secondDone:
@@ -335,12 +344,6 @@ func TestReleaseAssetKeepsSharedDownloadWhenCallerLeaves(t *testing.T) {
 	}
 	if transport.calls != 1 {
 		t.Fatalf("expected the canceled caller not to force another fetch, got %d", transport.calls)
-	}
-
-	select {
-	case <-firstDone:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for the canceled caller")
 	}
 }
 
