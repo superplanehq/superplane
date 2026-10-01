@@ -46,6 +46,7 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
+			w.releaseRetiredDatadogMonitors()
 
 			webhooks, err := models.ListDeletedWebhooks()
 			if err != nil {

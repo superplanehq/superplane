@@ -19,6 +19,8 @@ type OnErrorTrackingAlert struct{}
 
 type OnErrorTrackingAlertMetadata struct {
 	SubscriptionID string `json:"subscriptionId,omitempty" mapstructure:"subscriptionId"`
+	MonitorID      string `json:"monitorId,omitempty" mapstructure:"monitorId"`
+	MonitorService string `json:"monitorService,omitempty" mapstructure:"monitorService"`
 }
 
 type OnErrorTrackingAlertConfiguration struct {
@@ -61,9 +63,9 @@ func (t *OnErrorTrackingAlert) Documentation() string {
 
 ## Setup
 
-Connect Datadog in SuperPlane. SuperPlane creates a webhook named ` + "`superplane`" + `. Add ` + "`@webhook-superplane`" + ` to the notification message of an Error Tracking New Issue monitor.
+Connect Datadog in SuperPlane. SuperPlane creates a webhook named ` + "`superplane`" + `. When you select a service, SuperPlane creates an Error Tracking monitor for that service.
 
-Select a service to keep alerts of that service. Set the Error Tracking monitor query to ` + "`service:<name>`" + `.
+Select a service to keep alerts of that service.
 
 Select the alert transitions to keep. Empty keeps Triggered. A Re-Triggered alert can create a second task for the same issue.
 
@@ -135,16 +137,30 @@ func (t *OnErrorTrackingAlert) Setup(ctx core.TriggerContext) error {
 		}
 	}
 
-	if metadata.SubscriptionID != "" {
-		return nil
+	if ctx.Metadata == nil {
+		return fmt.Errorf("trigger metadata is required")
 	}
 
-	subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{})
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to datadog alerts: %w", err)
+	if metadata.SubscriptionID == "" {
+		if ctx.Integration == nil {
+			return fmt.Errorf("integration is required")
+		}
+		subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{})
+		if err != nil {
+			return fmt.Errorf("failed to subscribe to datadog alerts: %w", err)
+		}
+		metadata.SubscriptionID = subscriptionID.String()
 	}
 
-	metadata.SubscriptionID = subscriptionID.String()
+	config := OnErrorTrackingAlertConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if err := reconcileIntakeMonitor(ctx, &metadata, config.Service); err != nil {
+		return err
+	}
+
 	return ctx.Metadata.Set(metadata)
 }
 
@@ -233,7 +249,19 @@ func datadogIdentityField(fields log.Fields, key string) string {
 }
 
 func (t *OnErrorTrackingAlert) Cleanup(ctx core.TriggerContext) error {
-	return nil
+	metadata := OnErrorTrackingAlertMetadata{}
+	if ctx.Metadata != nil {
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode metadata: %w", err)
+		}
+	}
+
+	config := OnErrorTrackingAlertConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	return monitorPermissionError(releaseOwnedMonitor(ctx, &metadata, config.Service, true))
 }
 
 type SubscriptionConfiguration struct{}
