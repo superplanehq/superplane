@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -23,6 +23,7 @@ type CanvasQueryLike = {
   data: { metadata?: { factoryId?: string } } | undefined;
   isLoading: boolean;
   error?: unknown;
+  refetch?: () => void;
 };
 
 let mockCanvasQuery: CanvasQueryLike = { data: undefined, isLoading: false };
@@ -114,15 +115,21 @@ describe("AppDefaultTabGate — missing canvas", () => {
     expect(screen.getByTestId("org-home")).toBeInTheDocument();
   });
 
-  it("leaves the loading screen when the canvas request fails", () => {
-    mockCanvasQuery = { data: undefined, isLoading: false, error: new Error("unavailable") };
+  it("shows the request failure and does not mount the app page", () => {
+    const refetch = vi.fn();
+    mockCanvasQuery = { data: undefined, isLoading: false, error: new Error("unavailable"), refetch };
     mockConsoleQuery = consoleLoading;
     renderGate({ initialEntry: "/org-1/apps/canvas-1" });
 
     expect(screen.queryByTestId("app-default-tab-gate-skeleton")).toBeNull();
-    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("app-page")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not load this canvas");
+    expect(screen.queryByText("Canvas not found")).toBeNull();
     expect(getLocation().pathname).toBe("/org-1/apps/canvas-1");
     expect(getLocation().search).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
 

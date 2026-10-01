@@ -5,6 +5,7 @@ import { useCanvas, useCanvasConsole } from "@/hooks/useCanvasData";
 import { readLastVisitedAppTab, type AppTabId } from "@/lib/lastVisitedAppTab";
 import { Skeleton } from "@/ui/skeleton";
 
+import { CanvasRequestFailure } from "./CanvasRequestFailure";
 import { AppPage } from "./index";
 import { decideAppDefaultTabGate } from "./appDefaultTabGateDecision";
 import { useClassicAppRouteRedirect } from "./classicAppRouteRedirect";
@@ -29,6 +30,7 @@ import { isNotFoundError } from "./workflowPageHelpers";
  * 3. If localStorage records a last-visited tab, redirect there via Navigate.
  * 4. Otherwise consult the live console; redirect to Console if the app has
  *    panels, else render AppPage on Canvas.
+ * 5. A failed canvas read shows the request failure. It does not open the app.
  *
  * Once we hand off to AppPage for a canvas, we do not re-resolve for that
  * canvas: in-page URL changes (opening a run, switching tabs, closing a run
@@ -74,6 +76,7 @@ export function AppDefaultTabGate() {
     data: canvas,
     isLoading: canvasLoading,
     error: canvasError,
+    refetch: refetchCanvas,
   } = useCanvas(organizationId ?? "", canvasId, {
     enabled: canvasQueryEnabled,
     staleTime: 30_000,
@@ -99,7 +102,7 @@ export function AppDefaultTabGate() {
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
   // stored tab do not pay for an unused read. Factory apps never use Console.
   // A missing canvas must not start that read. A failed canvas read has no
-  // payload, so the gate settles on Canvas instead of waiting for console.
+  // payload, so the gate shows that failure instead of a missing app.
   const canvasRequestFailed =
     canvasQueryEnabled && !canvasLoading && canvas === undefined && canvasError != null && !canvasNotFound;
   const consoleQueryEnabled =
@@ -128,20 +131,56 @@ export function AppDefaultTabGate() {
     canvasLoading,
     canvasUndefined: canvas === undefined,
     storedTab,
-    resolution: canvasRequestFailed
-      ? { settled: true, redirectTo: null }
-      : resolveDefaultTab({ storedTab, liveConsoleQuery }),
+    resolution: resolveDefaultTab({ storedTab, liveConsoleQuery }),
     classicSurface,
   });
 
+  return renderCanvasGate({
+    canvasNotFound,
+    canvasRequestFailed,
+    organizationId,
+    onRetry: () => void refetchCanvas(),
+    decision,
+    currentUrlTab,
+    searchParams,
+    pathname: location.pathname,
+    commit,
+  });
+}
+
+function renderCanvasGate({
+  canvasNotFound,
+  canvasRequestFailed,
+  organizationId,
+  onRetry,
+  decision,
+  currentUrlTab,
+  searchParams,
+  pathname,
+  commit,
+}: {
+  canvasNotFound: boolean;
+  canvasRequestFailed: boolean;
+  organizationId?: string;
+  onRetry: () => void;
+  decision: ReturnType<typeof decideAppDefaultTabGate>;
+  currentUrlTab: AppTabId | null;
+  searchParams: URLSearchParams;
+  pathname: string;
+  commit: () => ReactElement;
+}): ReactElement {
   if (canvasNotFound) {
     return <Navigate to={organizationId ? `/${organizationId}` : "/"} replace />;
+  }
+
+  if (canvasRequestFailed) {
+    return <CanvasRequestFailure onRetry={onRetry} />;
   }
 
   return renderAppDefaultTabGateDecision(decision, {
     currentUrlTab,
     searchParams,
-    pathname: location.pathname,
+    pathname,
     commit,
   });
 }
