@@ -540,6 +540,28 @@ describe("MarkdownContent GitHub attachments", () => {
     expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
   });
 
+  it("keeps a formatted GitHub attachment label as a link", () => {
+    render(<MarkdownContent content={`See [**Watch clip**](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps a repository file under assets as a link", () => {
+    const file = "https://github.com/superplanehq/superplane/blob/main/docs/assets/diagram.png";
+    render(<MarkdownContent content={`See ${file}`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: file })).toHaveAttribute("href", file);
+  });
+
+  it("plays a repository attachment autolink as video", () => {
+    const repoAttachment = "https://github.com/acme/app/assets/1/2";
+    render(<MarkdownContent content={repoAttachment} />);
+
+    expect(document.querySelector("video")).toHaveAttribute("src", repoAttachment);
+  });
+
   it("keeps regular GitHub issue links as links", () => {
     render(<MarkdownContent content="See https://github.com/superplanehq/superplane/issues/8004" />);
 

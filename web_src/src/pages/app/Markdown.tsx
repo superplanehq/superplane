@@ -426,12 +426,16 @@ function MarkdownBlockquote({ children, node: _node, ...props }: ComponentProps<
 }
 
 function markdownAnchorLabel(children: ReactNode): string {
-  if (typeof children === "string" || typeof children === "number") {
-    return String(children);
-  }
-
   return Children.toArray(children)
-    .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") {
+        return String(child);
+      }
+      if (isValidElement<{ children?: ReactNode }>(child)) {
+        return markdownAnchorLabel(child.props.children);
+      }
+      return "";
+    })
     .join("");
 }
 

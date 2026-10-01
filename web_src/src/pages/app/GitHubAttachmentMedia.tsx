@@ -3,6 +3,10 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function GitHubAttachmentMedia({ src, alt, className }: { src: string; alt?: string; className?: string }) {
+  return <GitHubAttachmentPlayer key={src} src={src} alt={alt} className={className} />;
+}
+
+function GitHubAttachmentPlayer({ src, alt, className }: { src: string; alt?: string; className?: string }) {
   const [mode, setMode] = useState<"video" | "image" | "link">("video");
   const label = alt?.trim() || "Attachment";
   const mediaClassName = cn("max-w-full", className);
