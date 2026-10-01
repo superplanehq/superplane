@@ -367,6 +367,47 @@ func TestDatadogIntakeItemSource_GetIncludesSampleAndRelatedLogs(t *testing.T) {
 	assert.Contains(t, item.Body, "POST /checkout -> 500 (0.2ms)")
 }
 
+func TestDatadogIntakeItemSource_SearchKeepsFirstSeen(t *testing.T) {
+	const firstSeenMillis int64 = 1671612804001
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/api/v2/error-tracking/issues/search" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{
+			"data": [{
+				"id": "issue-1",
+				"type": "error_tracking_search_result",
+				"relationships": {"issue": {"data": {"id": "issue-1", "type": "issue"}}}
+			}],
+			"included": [{
+				"id": "issue-1",
+				"type": "issue",
+				"attributes": {
+					"error_type": "TimeoutError",
+					"error_message": "checkout timed out",
+					"service": "checkout",
+					"first_seen": 1671612804001
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := datadog.NewClient(server.Client(), &contexts.IntegrationContext{
+		Configuration: map[string]any{"site": "datadoghq.eu", "apiKey": "api-key", "appKey": "app-key"},
+	})
+	require.NoError(t, err)
+	client.BaseURL = server.URL
+
+	source := &datadogIntakeItemSource{datadog: client, service: "checkout"}
+	items, err := source.Search(t.Context(), "timeout", 5)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "issue-1", items[0].ID)
+	assert.True(t, time.UnixMilli(firstSeenMillis).UTC().Equal(items[0].CreatedAt))
+}
+
 func TestDatadogIssueItem_UsesServiceAndAppURL(t *testing.T) {
 	createdAt := time.Now().UTC()
 	client := &datadog.Client{Site: "datadoghq.eu"}
