@@ -84,8 +84,10 @@ type AgentModelSource = {
   onSelect: (choice: OnboardingAgentCredentialChoice) => void;
 };
 
-function agentScreenBody(modelSource: AgentModelSource): string {
-  if (modelSource.choice === "own-key") return FIRST_RUN_COPY.agent.ownKeyBody;
+function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
+  if (modelSource.choice === "own-key") {
+    return customProvider ? FIRST_RUN_COPY.agent.ownKeyBodyWithCustom : FIRST_RUN_COPY.agent.ownKeyBody;
+  }
   if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
   return AGENT_STEP.purpose;
 }
@@ -98,6 +100,7 @@ function AgentScreen({
   saving,
   loading,
   hostedAgentReady,
+  showCustomProvider,
   modelSource,
   onRequestConnect,
   onContinue,
@@ -109,6 +112,7 @@ function AgentScreen({
   saving: boolean;
   loading: boolean;
   hostedAgentReady: boolean;
+  showCustomProvider: boolean;
   modelSource: AgentModelSource;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
@@ -124,7 +128,7 @@ function AgentScreen({
   return (
     <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource)}</p>
+        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
@@ -138,6 +142,7 @@ function AgentScreen({
             <FirstRunModelSourceChoice
               disabled={saving || loading}
               modelSource={modelSource.choice}
+              ownKeyHelper={showCustomProvider ? FIRST_RUN_COPY.agent.ownKeyHelperWithCustom : undefined}
               onSelectModelSource={modelSource.onSelect}
             />
           </FirstRunPanel>
@@ -149,6 +154,7 @@ function AgentScreen({
                 organizationId={organizationId}
                 setup={setup}
                 showHostedCredit={modelSource.choice !== "own-key"}
+                showCustomProvider={showCustomProvider}
                 onRequestConnect={onRequestConnect}
               />
             </FirstRunPanel>
@@ -344,6 +350,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      showCustomProvider={model.customProvider}
       modelSource={{
         offered: flow.agentBeforeTickets,
         choice: flow.credentialChoice,

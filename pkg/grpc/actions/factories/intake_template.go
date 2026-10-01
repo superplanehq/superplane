@@ -530,6 +530,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 	if model := agent.model(); model != "" {
 		configuration["model"] = model
 	}
+	agent.applyLLMProvider(configuration)
 
 	return configuration
 }

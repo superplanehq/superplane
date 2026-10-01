@@ -119,6 +119,7 @@ export type FactoryAgentRewrite = {
   model: string;
   planningModel?: string;
   credentials?: { source: "integration"; name: string };
+  llmProvider?: "custom";
 };
 
 export function factoryAppTemplateAgentFromRewrite(rewrite: FactoryAgentRewrite) {
@@ -142,6 +143,7 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
       delete configuration.credentials;
       delete configuration.model;
       delete configuration.maxTurns;
+      delete configuration.llmProvider;
       continue;
     }
     if (rewrite.credentials?.source === "integration") {
@@ -151,6 +153,11 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
       };
     }
     configuration.model = planningAgentModel(node.id, rewrite);
+    if (rewrite.llmProvider === "custom") {
+      configuration.llmProvider = "custom";
+    } else {
+      delete configuration.llmProvider;
+    }
   }
 }
 
