@@ -3,6 +3,7 @@ import type { ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import * as path from "path";
+import { monacoChunkFileName, monacoWorkerAppOriginRuntime } from "./src/lib/monacoAssetUrls.ts";
 
 // Plugin that sets HMR port to be the same as server port
 // This is useful when you can't use WebSockets in your proxy
@@ -33,6 +34,20 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
     // Empty env vars are common in Docker ARG defaults; ?? alone would yield base: "".
     base: assetBaseUrl ? assetBaseUrl : "/",
+    experimental: {
+      renderBuiltUrl(filename, { hostType }) {
+        if (hostType !== "js") {
+          return undefined;
+        }
+
+        const runtime = monacoWorkerAppOriginRuntime(filename);
+        if (!runtime) {
+          return undefined;
+        }
+
+        return { runtime };
+      },
+    },
     server: {
       port: devPort,
       strictPort: true,
@@ -91,6 +106,23 @@ export default defineConfig(() => {
       emptyOutDir: true,
       sourcemap: true,
       manifest: false, // do not generate manifest.json
+      rolldownOptions: {
+        output: {
+          chunkFileNames(chunkInfo) {
+            return monacoChunkFileName(chunkInfo);
+          },
+          codeSplitting: {
+            groups: [
+              {
+                name: "monaco-editor",
+                test: /[\\/]node_modules[\\/]monaco-editor[\\/]/,
+                priority: 20,
+                includeDependenciesRecursively: false,
+              },
+            ],
+          },
+        },
+      },
       // rollupOptions: {
       //   input: {
       //     app: path.resolve('./src/main.tsx'),

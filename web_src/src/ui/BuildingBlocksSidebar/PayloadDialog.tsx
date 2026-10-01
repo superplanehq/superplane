@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import Editor from "@monaco-editor/react";
+import Editor from "@/ui/MonacoEditor";
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "@/contexts/useTheme";

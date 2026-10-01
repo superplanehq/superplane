@@ -1,6 +1,6 @@
 import Tippy from "@tippyjs/react/headless";
 import type { ReactElement } from "react";
-import Editor from "@monaco-editor/react";
+import Editor from "@/ui/MonacoEditor";
 import { useTheme } from "@/contexts/useTheme";
 import "tippy.js/dist/tippy.css";
 

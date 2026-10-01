@@ -7,7 +7,7 @@ import { CodeBlockWidget } from "./CodeBlockWidget";
 // Stub Monaco so the test doesn't try to spin up a real editor and so we can
 // count how many times the inner editor mounts.
 const editorMountSpy = vi.fn();
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   default: ({ value }: { value?: string }) => {
     editorMountSpy();
     return <pre data-testid="monaco-stub">{value}</pre>;
