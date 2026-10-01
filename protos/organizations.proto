@@ -185,6 +185,29 @@ service Organizations {
     };
   }
 
+  rpc ListOrganizationHostedLLMModels(ListOrganizationHostedLLMModelsRequest) returns (ListOrganizationHostedLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization hosted models";
+      description: "Returns installation model candidates and the organization selection for every hosted provider";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateOrganizationHostedLLMModels(UpdateOrganizationHostedLLMModelsRequest) returns (UpdateOrganizationHostedLLMModelsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/hosted-models"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update organization hosted models";
+      description: "Replaces the organization selection for every hosted provider";
+      tags: "Organization";
+    };
+  }
+
   rpc ListHostedCreditProducts(ListHostedCreditProductsRequest) returns (ListHostedCreditProductsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/hosted-credit-products"
@@ -683,6 +706,32 @@ message UpdateBYOKLLMModelsRequest {
 
 message UpdateBYOKLLMModelsResponse {
   repeated HostedLLMModel selected = 1;
+}
+
+message OrganizationHostedLLMModel {
+  string key = 1;
+  string label = 2;
+  string provider = 3;
+}
+
+message ListOrganizationHostedLLMModelsRequest {
+  string id = 1;
+}
+
+message ListOrganizationHostedLLMModelsResponse {
+  repeated OrganizationHostedLLMModel candidates = 1;
+  // Effective organization selection, including inherited candidates for unsaved providers.
+  repeated OrganizationHostedLLMModel selected = 2;
+}
+
+message UpdateOrganizationHostedLLMModelsRequest {
+  string id = 1;
+  // Selectable keys from the installation candidates. An empty list disables all hosted models.
+  repeated string allowed_models = 2;
+}
+
+message UpdateOrganizationHostedLLMModelsResponse {
+  repeated OrganizationHostedLLMModel selected = 1;
 }
 
 message ListHostedCreditProductsRequest {
