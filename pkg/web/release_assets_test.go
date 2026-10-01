@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -213,7 +214,6 @@ func TestReleaseAssetLimitsRepeatedFetches(t *testing.T) {
 		if !handler.releaseLimiter.beginFetch(now) {
 			t.Fatalf("expected fetch %d to be allowed", i+1)
 		}
-		handler.releaseLimiter.endFetch()
 	}
 	if handler.releaseLimiter.beginFetch(now) {
 		t.Fatal("expected fetch past the burst to be denied")
@@ -234,7 +234,7 @@ func TestReleaseAssetLimitsRepeatedFetches(t *testing.T) {
 	}
 }
 
-func TestReleaseAssetLimitsConcurrentFetches(t *testing.T) {
+func TestReleaseAssetWaitsForBusyFetchSlot(t *testing.T) {
 	block := make(chan struct{})
 	started := make(chan struct{}, releaseFetchInflight+1)
 	transport := &releaseCDNTransport{block: block, started: started}
@@ -245,7 +245,7 @@ func TestReleaseAssetLimitsConcurrentFetches(t *testing.T) {
 		go func(i int) {
 			recorder := httptest.NewRecorder()
 			path := releaseWorkerPath(fmt.Sprintf("editor.worker-%d.js", i))
-			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodHead, path, nil))
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 			results <- recorder.Code
 		}(i)
 	}
@@ -261,34 +261,86 @@ func TestReleaseAssetLimitsConcurrentFetches(t *testing.T) {
 		}
 	}
 
-	denied := 0
-	waitDeadline := time.After(2 * time.Second)
-	for denied == 0 {
-		select {
-		case code := <-results:
-			if code == http.StatusTooManyRequests {
-				denied++
-			}
-		case <-waitDeadline:
-			t.Fatal("timed out waiting for the extra fetch to be denied")
-		}
+	select {
+	case code := <-results:
+		t.Fatalf("request finished before a fetch slot was free: %d", code)
+	case <-time.After(300 * time.Millisecond):
 	}
 	close(block)
 
-	for completed := denied; completed < releaseFetchInflight+1; completed++ {
+	waitDeadline := time.After(2 * time.Second)
+	for completed := 0; completed < releaseFetchInflight+1; completed++ {
 		select {
 		case code := <-results:
-			if code == http.StatusTooManyRequests {
-				denied++
-			} else if code != http.StatusOK {
+			if code != http.StatusOK {
 				t.Fatalf("expected status %d, got %d", http.StatusOK, code)
 			}
 		case <-waitDeadline:
-			t.Fatal("timed out waiting for blocked fetches")
+			t.Fatal("timed out waiting for queued fetch")
 		}
 	}
-	if denied != 1 || transport.calls != releaseFetchInflight || transport.reads != 0 {
-		t.Fatalf("expected one denial and %d unread HEAD calls, got denials=%d calls=%d reads=%d", releaseFetchInflight, denied, transport.calls, transport.reads)
+	if transport.calls != releaseFetchInflight+1 {
+		t.Fatalf("expected %d CDN calls, got %d", releaseFetchInflight+1, transport.calls)
+	}
+}
+
+func TestReleaseAssetKeepsSharedDownloadWhenCallerLeaves(t *testing.T) {
+	block := make(chan struct{})
+	started := make(chan struct{}, 1)
+	transport := &releaseCDNTransport{block: block, started: started}
+	handler := releaseAssetHandler(transport)
+	path := releaseWorkerPath("editor.worker-old.js")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan int, 1)
+	go func() {
+		recorder := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil).WithContext(ctx)
+		handler.ServeHTTP(recorder, req)
+		firstDone <- recorder.Code
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for shared CDN fetch")
+	}
+
+	secondDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		secondDone <- recorder
+	}()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case recorder := <-secondDone:
+		t.Fatalf("second caller finished before the shared download: %d %q", recorder.Code, recorder.Body.String())
+	case <-time.After(200 * time.Millisecond):
+	}
+	if transport.calls != 1 {
+		t.Fatalf("expected one shared CDN fetch, got %d", transport.calls)
+	}
+	close(block)
+
+	select {
+	case recorder := <-secondDone:
+		if recorder.Code != http.StatusOK || recorder.Body.String() != "old-worker" {
+			t.Fatalf("expected shared worker body, got %d %q", recorder.Code, recorder.Body.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the second caller")
+	}
+	if transport.calls != 1 {
+		t.Fatalf("expected the canceled caller not to force another fetch, got %d", transport.calls)
+	}
+
+	select {
+	case <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the canceled caller")
 	}
 }
 
@@ -352,7 +404,11 @@ func (t *releaseCDNTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		t.started <- struct{}{}
 	}
 	if t.block != nil {
-		<-t.block
+		select {
+		case <-t.block:
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		}
 	}
 
 	body := io.NopCloser(strings.NewReader("old-worker"))

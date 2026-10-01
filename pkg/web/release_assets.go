@@ -20,6 +20,8 @@ const releaseAssetMaxBytes int64 = 32 << 20
 const releaseFetchRate = 10
 const releaseFetchBurst = 40
 const releaseFetchInflight = 8
+const releaseFetchTimeout = 15 * time.Second
+const releaseFetchWait = 30 * time.Second
 const releaseCacheTTL = 15 * time.Minute
 const releaseCacheEntries = 128
 const releaseCacheMaxBytes = 16 << 20
@@ -48,10 +50,10 @@ type releaseAssetCache struct {
 }
 
 type releaseFetchLimiter struct {
-	mu       sync.Mutex
-	tokens   float64
-	updated  time.Time
-	inflight int
+	mu      sync.Mutex
+	tokens  float64
+	updated time.Time
+	slots   chan struct{}
 }
 
 func newReleaseAssetCache() *releaseAssetCache {
@@ -62,6 +64,7 @@ func newReleaseFetchLimiter() *releaseFetchLimiter {
 	return &releaseFetchLimiter{
 		tokens:  releaseFetchBurst,
 		updated: time.Now(),
+		slots:   make(chan struct{}, releaseFetchInflight),
 	}
 }
 
@@ -129,27 +132,39 @@ func (l *releaseFetchLimiter) beginFetch(now time.Time) bool {
 		}
 		l.updated = now
 	}
-	if l.inflight >= releaseFetchInflight || l.tokens < 1 {
+	if l.tokens < 1 {
 		return false
 	}
 
 	l.tokens--
-	l.inflight++
 	return true
 }
 
-func (l *releaseFetchLimiter) endFetch() {
+func (l *releaseFetchLimiter) refundFetch() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.inflight > 0 {
-		l.inflight--
+	if l.tokens < releaseFetchBurst {
+		l.tokens++
 	}
+}
+
+func (l *releaseFetchLimiter) waitSlot(ctx context.Context) error {
+	select {
+	case l.slots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (l *releaseFetchLimiter) releaseSlot() {
+	<-l.slots
 }
 
 func newAssetCDNClient() *http.Client {
 	return &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: releaseFetchTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -240,15 +255,7 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 	}
 
 	value, err, _ := h.releaseGroup.Do(r.Method+" "+asset.path, func() (any, error) {
-		if item, ok := h.releaseCache.get(asset.path, r.Method, time.Now()); ok {
-			return item, nil
-		}
-		if !h.releaseLimiter.beginFetch(time.Now()) {
-			return cachedReleaseAsset{status: http.StatusTooManyRequests}, nil
-		}
-		defer h.releaseLimiter.endFetch()
-
-		return h.fetchReleaseAsset(r.Context(), asset, r.Method)
+		return h.loadReleaseAsset(context.WithoutCancel(r.Context()), asset, r.Method)
 	})
 	if err != nil {
 		log.Warnf("release asset proxy failed: %v", err)
@@ -257,6 +264,27 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 	}
 
 	writeReleaseAsset(w, r, asset, value.(cachedReleaseAsset))
+}
+
+func (h *AssetHandler) loadReleaseAsset(ctx context.Context, asset releaseAsset, method string) (cachedReleaseAsset, error) {
+	if item, ok := h.releaseCache.get(asset.path, method, time.Now()); ok {
+		return item, nil
+	}
+	if !h.releaseLimiter.beginFetch(time.Now()) {
+		return cachedReleaseAsset{status: http.StatusTooManyRequests}, nil
+	}
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), releaseFetchWait)
+	defer waitCancel()
+	if err := h.releaseLimiter.waitSlot(waitCtx); err != nil {
+		h.releaseLimiter.refundFetch()
+		return cachedReleaseAsset{status: http.StatusTooManyRequests}, nil
+	}
+	defer h.releaseLimiter.releaseSlot()
+
+	fetchCtx, fetchCancel := context.WithTimeout(ctx, releaseFetchTimeout)
+	defer fetchCancel()
+	return h.fetchReleaseAsset(fetchCtx, asset, method)
 }
 
 func (h *AssetHandler) fetchReleaseAsset(ctx context.Context, asset releaseAsset, method string) (cachedReleaseAsset, error) {
