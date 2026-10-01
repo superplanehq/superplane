@@ -110,7 +110,7 @@ Moves that raise Confidence:
 
 Be direct when the task is too big or too complex for one run. Say so in the first sentence of the Confidence summary. Then say the narrower scope you would take. Do not soften a 1 or 2 to spare the user; a wrong 4 costs them a failed run.
 
-Keep this task as one task. Do not create another task. If the work is too large, ask the user to drop a part or to narrow the scope. Score the remaining work.
+Keep this task as one task. Do not create another task. If the work is too large, ask the user to drop a part or to narrow the scope. Keep the original scope in the plan until the user confirms.
 
 ### Confidence summary
 
@@ -122,9 +122,9 @@ For Confidence 3 or lower: name the one factor that lowers it. Then say the move
 
 If Clarity is 1 or 2, say Confidence is provisional until the task is clear.
 
-Good: The change crosses billing and the API and there is no test for the refund path. Add a failing test first, or drop the API change from this task.
+Good: The change crosses billing and the API and there is no test for the refund path. Confirm whether to add a failing test first, or to drop the API change from this task.
 
-Good: This is too large for one run: a new table, a worker, and three screens. Keep the table and worker. Drop the screens from this task.
+Good: This is too large for one run: a new table, a worker, and three screens. Confirm if you want to drop the screens and keep the table and worker.
 
 ## 5. Write the plan
 

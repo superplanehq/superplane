@@ -277,6 +277,33 @@ describe("AgentActivityView", () => {
     expect(screen.getByRole("button", { name: "Prepared task" })).toBeInTheDocument();
   });
 
+  it("labels leftover create_task calls from older refine transcripts", () => {
+    render(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          completedTool("mcp-1", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+          completedTool("mcp-2", "create_task", "mcp_tool_call"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Created 2 tasks" })).toBeInTheDocument();
+  });
+
+  it("folds leftover created tasks into the completed summary", () => {
+    render(
+      <AgentActivityView
+        activity={activityWithItems([
+          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
+          completedTool("mcp-2", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Prepared task, created tasks" })).toBeInTheDocument();
+  });
+
   it("keeps chronological tool batches collapsed inside a completed turn", async () => {
     const user = userEvent.setup();
     render(

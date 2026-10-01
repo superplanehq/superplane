@@ -128,6 +128,8 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.doesNotMatch(pack, /create_task/);
   assert.match(pack, /Keep this task as one task/);
   assert.match(pack, /Do not create another task/);
+  assert.match(pack, /Keep the original scope in the plan until the user confirms/);
+  assert.doesNotMatch(pack, /Drop the screens from this task/);
   assert.match(pack, /Do not use contractions/);
   assert.doesNotMatch(pack, /Contractions are fine/);
   assert.doesNotMatch(pack, /### A part of a split/);
