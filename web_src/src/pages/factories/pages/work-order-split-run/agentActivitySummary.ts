@@ -9,7 +9,7 @@ export type ToolActivityGroup = {
   tools: AgentToolItem[];
 };
 
-export type ActivityEntry = Exclude<AgentActivityItem, AgentToolItem> | ToolActivityGroup;
+export type ActivityEntry = AgentActivityItem | ToolActivityGroup;
 
 type ActivityCount = {
   count: number;

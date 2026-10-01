@@ -14,7 +14,8 @@ export function CommandLine({ tool, expandable }: { tool: AgentToolItem; expanda
   const failed = tool.status === "failed" || tool.status === "timed_out";
   const script = agentToolScriptText(tool);
   const headline = agentToolCommandHeadline(tool) || agentToolDisplayText(tool);
-  const error = failedCommandError(tool, failed);
+  const output = failedCommandOutput(tool, failed);
+  const exitLabel = failedExitLabel(tool, failed);
   if (!expandable) {
     return (
       <CommandRow
@@ -32,7 +33,8 @@ export function CommandLine({ tool, expandable }: { tool: AgentToolItem; expanda
       script={script || headline}
       headline={headline}
       failed={failed}
-      error={error}
+      output={output}
+      exitLabel={exitLabel}
       testId={`agent-tool-${tool.id}`}
       status={tool.status}
       meta={commandMetaLabel(tool)}
@@ -45,7 +47,8 @@ function ExpandableCommand({
   script,
   headline,
   failed,
-  error,
+  output,
+  exitLabel,
   testId,
   status,
   meta,
@@ -54,7 +57,8 @@ function ExpandableCommand({
   script: string;
   headline: string;
   failed: boolean;
-  error?: string;
+  output?: string;
+  exitLabel?: string;
   testId: string;
   status: string;
   meta?: string;
@@ -73,12 +77,13 @@ function ExpandableCommand({
     }
     setOverflows(node.scrollWidth > node.clientWidth + 1);
   }, [overflows, script]);
-  const canExpand = overflows || Boolean(error);
+  const canExpand = overflows || Boolean(output || exitLabel);
   if (!canExpand) {
     return (
       <CommandRow
         headline={headline}
         failed={failed}
+        exitLabel={exitLabel}
         testId={testId}
         status={status}
         meta={meta}
@@ -92,6 +97,7 @@ function ExpandableCommand({
       <CommandRow
         headline={headline}
         failed={failed}
+        exitLabel={exitLabel}
         status={status}
         meta={meta}
         duration={duration}
@@ -100,40 +106,54 @@ function ExpandableCommand({
         lineCount={lineCount}
         onToggle={() => setOpen((current) => !current)}
       />
-      {open ? (
-        <div className="mt-1 border-l border-border/60 py-1 pl-2">
-          {error ? <p className="text-[11px] leading-4 text-destructive">{error}</p> : null}
-          <pre
-            className={cn(
-              "overflow-x-auto font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
-              failed && "text-destructive",
-            )}
-            data-testid={testId}
-            data-status={status}
-          >
-            {script}
-          </pre>
-        </div>
-      ) : null}
+      <CommandDetails open={open} output={output} script={script} failed={failed} testId={testId} status={status} />
     </div>
   );
 }
 
-function CommandRow({
-  headline,
+function CommandDetails({
+  open,
+  output,
+  script,
   failed,
   testId,
   status,
-  meta,
-  expandable = false,
-  open = false,
-  lineCount,
-  duration,
-  lineRef,
-  onToggle,
 }: {
+  open: boolean;
+  output?: string;
+  script: string;
+  failed: boolean;
+  testId: string;
+  status: string;
+}) {
+  if (!open) {
+    return null;
+  }
+  return (
+    <div className="mt-1 border-l border-border/60 py-1 pl-2">
+      {output ? (
+        <pre className="overflow-x-auto font-mono text-[12px] leading-5 whitespace-pre text-destructive [tab-size:2]">
+          {output}
+        </pre>
+      ) : null}
+      <pre
+        className={cn(
+          "overflow-x-auto font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
+          failed && "text-destructive",
+        )}
+        data-testid={testId}
+        data-status={status}
+      >
+        {script}
+      </pre>
+    </div>
+  );
+}
+
+type CommandRowProps = {
   headline: string;
   failed: boolean;
+  exitLabel?: string;
   testId?: string;
   status: string;
   meta?: string;
@@ -143,8 +163,40 @@ function CommandRow({
   duration?: string;
   lineRef?: Ref<HTMLElement>;
   onToggle?: () => void;
-}) {
-  const row = (
+};
+
+function CommandRow({ headline, meta, expandable = false, open = false, onToggle, ...row }: CommandRowProps) {
+  const body = expandable ? (
+    <button type="button" className="w-full" aria-expanded={open} aria-label={headline} onClick={onToggle}>
+      <CommandRowBody headline={headline} expandable open={open} {...row} />
+    </button>
+  ) : (
+    <CommandRowBody headline={headline} {...row} />
+  );
+  if (!meta) {
+    return body;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{expandable ? body : <div>{body}</div>}</TooltipTrigger>
+      <TooltipContent side="top">{meta}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function CommandRowBody({
+  headline,
+  failed,
+  exitLabel,
+  testId,
+  status,
+  expandable = false,
+  open = false,
+  lineCount,
+  duration,
+  lineRef,
+}: Omit<CommandRowProps, "meta" | "onToggle">) {
+  return (
     <div
       className={cn(
         "group flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 font-mono text-[12px] leading-5 text-foreground/90",
@@ -159,6 +211,7 @@ function CommandRow({
       </span>
       <code
         ref={lineRef}
+        title={headline}
         className={cn(
           "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap",
           failed && "text-destructive",
@@ -168,6 +221,7 @@ function CommandRow({
       >
         {headline}
       </code>
+      {exitLabel ? <span className="shrink-0 font-sans text-[11px] text-destructive">{exitLabel}</span> : null}
       {lineCount && lineCount > 1 ? (
         <span className="shrink-0 font-sans text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100">
           {lineCount} lines
@@ -181,22 +235,6 @@ function CommandRow({
       <SquareTerminal className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100" aria-hidden />
       {failed ? <CircleX className="size-3.5 shrink-0 text-destructive" aria-label="failed" /> : null}
     </div>
-  );
-  const body = expandable ? (
-    <button type="button" className="w-full" aria-expanded={open} aria-label={headline} onClick={onToggle}>
-      {row}
-    </button>
-  ) : (
-    row
-  );
-  if (!meta) {
-    return body;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{expandable ? body : <div>{body}</div>}</TooltipTrigger>
-      <TooltipContent side="top">{meta}</TooltipContent>
-    </Tooltip>
   );
 }
 
@@ -222,13 +260,16 @@ function commandMetaLabel(tool: AgentToolItem): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-function failedCommandError(tool: AgentToolItem, failed: boolean): string | undefined {
+function failedCommandOutput(tool: AgentToolItem, failed: boolean): string | undefined {
   if (!failed) {
     return undefined;
   }
-  const output = normalizeTerminalOutput(tool.output);
-  if (tool.exitCode !== undefined) {
-    return output ? `Exit code ${tool.exitCode}. ${output}` : `Exit code ${tool.exitCode}`;
+  return normalizeTerminalOutput(tool.output) || undefined;
+}
+
+function failedExitLabel(tool: AgentToolItem, failed: boolean): string | undefined {
+  if (!failed || tool.exitCode === undefined) {
+    return undefined;
   }
-  return output || undefined;
+  return `Exit code ${tool.exitCode}`;
 }

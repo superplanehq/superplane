@@ -162,14 +162,17 @@ describe("AgentActivityView console", () => {
           input: "false",
           status: "failed",
           exitCode: 1,
+          output: "permission denied\nremote rejected",
         })}
       />,
     );
 
     expect(screen.queryByRole("button", { name: "Used terminal" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("failed")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "false" }));
     expect(screen.getByText("Exit code 1")).toBeInTheDocument();
+    expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "false" }));
+    expect(screen.getByText(/permission denied/).textContent).toBe("permission denied\nremote rejected");
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
