@@ -125,6 +125,9 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 	if o.OriginLabel != nil {
 		label = strings.TrimSpace(*o.OriginLabel)
 	}
+	if title := datadogWorkOrderOriginLabel(url, label, o.Title); title != "" {
+		label = title
+	}
 	if label == "" {
 		label = OriginLabelFromURL(url)
 	}
