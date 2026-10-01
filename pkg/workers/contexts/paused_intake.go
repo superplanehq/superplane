@@ -9,12 +9,17 @@ import (
 )
 
 func SkipPausedIntakeFeed(tx *gorm.DB, canvasID uuid.UUID) (bool, error) {
+	_, skip, err := intakeForFeed(tx, canvasID)
+	return skip, err
+}
+
+func intakeForFeed(tx *gorm.DB, canvasID uuid.UUID) (*models.FactoryIntake, bool, error) {
 	intake, err := models.FindFactoryIntakeByCanvasID(tx, canvasID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryIntakeNotFound) {
-			return false, nil
+			return nil, false, nil
 		}
-		return false, err
+		return nil, false, err
 	}
-	return intake.Paused(), nil
+	return intake, intake.Paused(), nil
 }
