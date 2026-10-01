@@ -472,6 +472,22 @@ function MarkdownLink({
     return <span>{children}</span>;
   }
 
+  return (
+    <MarkdownHref href={href} label={label} openInNewTab={openInNewTab} target={target} rel={rel} {...props}>
+      {children}
+    </MarkdownHref>
+  );
+}
+
+function MarkdownHref({
+  href,
+  label,
+  children,
+  openInNewTab,
+  target,
+  rel,
+  ...props
+}: ComponentProps<"a"> & { label: string; openInNewTab: boolean }) {
   if (href && isGitHubAttachmentAutolink(href, label)) {
     return <GitHubAttachmentMedia src={href} alt={label} />;
   }

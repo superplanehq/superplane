@@ -45,25 +45,7 @@ import { StageStatusGlyph } from "./redesignShared";
  * Columns the task has not reached read "Not started". A sticky Frame
  * holds the task status, spend, checks, and outputs.
  */
-export function AutomationsConsoleVariant({
-  fixture,
-  organizationId,
-  factoryId,
-  orderId,
-  taskDescription,
-  canEditDescription = false,
-  descriptionBusy = false,
-  onDescriptionSave,
-  source,
-  files,
-  pullRequests,
-  artifacts,
-  panelReview,
-  canStopRun = false,
-  actionBusy = false,
-  onStopRun,
-  onRerunStep,
-}: {
+type AutomationsConsoleVariantProps = {
   fixture: SplitRunFixture;
   organizationId?: string;
   factoryId?: string;
@@ -90,7 +72,27 @@ export function AutomationsConsoleVariant({
   onStopRun?: (run: { appId: string; runId: string }) => void;
   /** Reruns a failed line step. The card footer Retry uses this. */
   onRerunStep?: (phase: SplitRunPhase) => void;
-}) {
+};
+
+export function AutomationsConsoleVariant({
+  fixture,
+  organizationId,
+  factoryId,
+  orderId,
+  taskDescription,
+  canEditDescription = false,
+  descriptionBusy = false,
+  onDescriptionSave,
+  source,
+  files,
+  pullRequests,
+  artifacts,
+  panelReview,
+  canStopRun = false,
+  actionBusy = false,
+  onStopRun,
+  onRerunStep,
+}: AutomationsConsoleVariantProps) {
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);
   const stages = allStages(groups);
