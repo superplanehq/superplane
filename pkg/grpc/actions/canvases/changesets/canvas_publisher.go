@@ -224,7 +224,7 @@ func (p *CanvasPublisher) processChange(ctx context.Context, change *Change) err
 	case ChangeTypeAddNode:
 		return p.addNode(ctx, change)
 	case ChangeTypeDeleteNode:
-		return p.deleteNode(change)
+		return p.deleteNode(ctx, change)
 	case ChangeTypeUpdateNode:
 		return p.updateNode(ctx, change)
 	}
@@ -461,10 +461,14 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 	return nil
 }
 
-func (p *CanvasPublisher) deleteNode(change *Change) error {
+func (p *CanvasPublisher) deleteNode(ctx context.Context, change *Change) error {
 	existingNode, exists := p.allNodes[change.Node.ID]
 	if !exists {
 		return nil
+	}
+
+	if err := p.cleanupRemovedTrigger(ctx, &existingNode); err != nil {
+		return err
 	}
 
 	delete(p.allNodes, existingNode.NodeID)
@@ -570,6 +574,44 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		return err
 	}
 
+	triggerCtx, err := p.triggerContext(ctx, node)
+	if err != nil {
+		return err
+	}
+	if triggerCtx.Integration != nil && triggerCtx.Logger != nil {
+		triggerCtx.Logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
+	}
+
+	return trigger.Setup(triggerCtx)
+}
+
+func (p *CanvasPublisher) cleanupRemovedTrigger(ctx context.Context, node *models.CanvasNode) error {
+	if node.Type != models.NodeTypeTrigger {
+		return nil
+	}
+
+	ref := node.Ref.Data()
+	if ref.Trigger == nil || ref.Trigger.Name != "datadog.onErrorTrackingAlert" {
+		return nil
+	}
+	if p.options.Registry == nil {
+		return fmt.Errorf("failed to clean up trigger: registry is not configured")
+	}
+
+	trigger, err := p.options.Registry.GetTrigger(ref.Trigger.Name)
+	if err != nil {
+		return fmt.Errorf("failed to clean up trigger: %w", err)
+	}
+
+	triggerCtx, err := p.triggerContext(ctx, node)
+	if err != nil {
+		return err
+	}
+
+	return trigger.Cleanup(triggerCtx)
+}
+
+func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.CanvasNode) (core.TriggerContext, error) {
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration: node.Configuration.Data(),
@@ -584,7 +626,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(p.tx, *node.AppInstallationID)
 		if err != nil {
-			return fmt.Errorf("failed to find app installation: %v", err)
+			return core.TriggerContext{}, fmt.Errorf("failed to find app installation: %v", err)
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -596,11 +638,10 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
-		logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
 	}
 
 	triggerCtx.Logger = logger
-	return trigger.Setup(triggerCtx)
+	return triggerCtx, nil
 }
 
 func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {

@@ -113,6 +113,8 @@ type IntegrationContext struct {
 	ResyncRequests    []time.Duration
 	ActionRequests    []ActionRequest
 	Subscriptions     []Subscription
+	// NodeConfigurations is what ListNodeConfigurations returns.
+	NodeConfigurations []any
 	// ScheduleActionCallErr, when set, is returned from ScheduleActionCall after recording the request.
 	ScheduleActionCallErr error
 }
@@ -222,6 +224,13 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 		return c.ScheduleActionCallErr
 	}
 	return nil
+}
+
+func (c *IntegrationContext) ListNodeConfigurations() ([]any, error) {
+	if c.NodeConfigurations == nil {
+		return nil, nil
+	}
+	return c.NodeConfigurations, nil
 }
 
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
