@@ -1813,6 +1813,20 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if strings.EqualFold(strings.TrimSpace(eventType), "issues") {
+		if code, err := factoryactions.ArchiveDraftWorkOrdersFromGitHubIssueClosed(
+			r.Context(),
+			s.encryptor,
+			webhook,
+			eventType,
+			r.Header,
+			body,
+		); err != nil {
+			http.Error(w, "invalid signature", code)
+			return
+		}
+	}
+
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
