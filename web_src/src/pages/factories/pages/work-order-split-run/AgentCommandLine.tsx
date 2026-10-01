@@ -169,7 +169,7 @@ function CommandRow({
         {headline}
       </code>
       {lineCount && lineCount > 1 ? (
-        <span className="shrink-0 font-sans text-[11px] text-muted-foreground" aria-hidden>
+        <span className="shrink-0 font-sans text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100">
           {lineCount} lines
         </span>
       ) : null}
