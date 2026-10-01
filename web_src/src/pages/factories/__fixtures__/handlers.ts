@@ -1243,6 +1243,22 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
+function organizationHostedModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const candidates = storybookSelectableLlmModels({})
+    .filter((model) => model.source.id === "hosted")
+    .map((model) => ({ key: model.key, label: model.label, provider: model.provider.id }));
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-models"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        fixture.hostedSelectedKeys = stringArrayOrEmpty(((body ?? {}) as { allowedModels?: unknown }).allowedModels);
+      }
+      const selected = candidates.filter((model) => fixture.hostedSelectedKeys?.includes(model.key) ?? true);
+      return { json: { candidates, selected } };
+    },
+  };
+}
+
 function byokSelectedModelIds(fixture: FactoriesFixture, provider: string): string[] {
   const catalogIds =
     fixture.byokCandidatesByProvider?.[provider] ?? storybookHostedLlmModels(provider).models.map((model) => model.id);
@@ -1498,6 +1514,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     organizationSpendingReportRoute(fixture),
     organizationCreditGrantsRoute(fixture),
     hostedLlmModelsRoute(),
+    organizationHostedModelsRoute(fixture),
     selectableLlmModelsRoute(fixture),
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
