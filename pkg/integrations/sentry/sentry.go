@@ -1,6 +1,7 @@
 package sentry
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -152,6 +153,26 @@ const (
 	// SuperplaneReceiptField is the canvas payload key for that receipt ID.
 	SuperplaneReceiptField = "superplaneReceiptId"
 )
+
+type hostedSentryWebhookLoggedKey struct{}
+
+// WithHostedSentryWebhookLogged marks a request the public Sentry app
+// handler already logged. A client cannot set this mark with a header.
+func WithHostedSentryWebhookLogged(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, hostedSentryWebhookLoggedKey{}, true)
+}
+
+// hostedSentryWebhookLogged reports that mark.
+func hostedSentryWebhookLogged(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	logged, _ := ctx.Value(hostedSentryWebhookLoggedKey{}).(bool)
+	return logged
+}
 
 type WebhookMessage struct {
 	Resource     string              `json:"resource" mapstructure:"resource"`
@@ -735,9 +756,9 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	// The hosted app endpoint already logged this body. A direct webhook has
-	// no receipt header, so this is the incoming line for that call.
-	if strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)) == "" {
+	// The hosted app handler logs the body before it calls this handler.
+	// A receipt header on a direct webhook is not that call.
+	if !hostedSentryWebhookLogged(ctx.Request.Context()) {
 		logging.LogSentryWebhookInfo("Sentry webhook received", logging.WithWebhookPayload(logrus.Fields{
 			"hook_resource":     resource,
 			"action":            payload.Action,
