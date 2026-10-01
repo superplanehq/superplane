@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func SearchFactoryIntakeItems(
@@ -53,11 +54,15 @@ func SearchFactoryIntakeItems(
 }
 
 func serializeFactoryIntakeItem(item IntakeItem) *pb.FactoryIntakeItem {
-	return &pb.FactoryIntakeItem{
+	serialized := &pb.FactoryIntakeItem{
 		Id:    item.ID,
 		Key:   item.Key,
 		Title: item.Title,
 		Body:  item.Body,
 		Url:   item.URL,
 	}
+	if !item.CreatedAt.IsZero() {
+		serialized.CreatedAt = timestamppb.New(item.CreatedAt)
+	}
+	return serialized
 }

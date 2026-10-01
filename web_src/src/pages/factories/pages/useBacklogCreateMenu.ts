@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactoryIntakeItem, FactoriesWorkOrder } from "@/api-client";
 import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import {
   useFactoryIntakes,
@@ -134,7 +134,7 @@ export function useBacklogCreateMenu(
 
 function liveBacklogItems(
   intakeId: string | null,
-  items: { id?: string; key?: string; title?: string; body?: string }[] | undefined,
+  items: FactoriesFactoryIntakeItem[] | undefined,
 ): BacklogIntakeItem[] {
   if (!intakeId) {
     return [];
@@ -145,6 +145,7 @@ function liveBacklogItems(
     key: item.key ?? "",
     title: item.title ?? "",
     body: item.body ?? "",
+    createdAt: item.createdAt,
   }));
 }
 

@@ -277,6 +277,7 @@ spec:
               4/ For UI work, implement and wire the change into the production page or component.
               5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
               6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              7/ Do not invent a token budget, a time budget, a step limit, or a remaining context size. The application does not set one unless the task text sets one. Do not stop early, skip work, or change the setup because of an imagined limit. If the task text sets a limit, follow that limit.
 
           - name: Commit and Push
             type: bash
