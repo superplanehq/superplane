@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState, type RefObject } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import Editor, { type Monaco } from "@monaco-editor/react";
+import Editor, { type Monaco } from "@/ui/MonacoEditor";
 import type { editor as MonacoEditor } from "monaco-editor";
 
 import { Button } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Editor } from "@monaco-editor/react";
+import { Editor } from "@/ui/MonacoEditor";
 import { AlertCircle, Copy, Download, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

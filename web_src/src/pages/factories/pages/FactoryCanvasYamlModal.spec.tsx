@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   Editor: ({ value }: { value?: string }) => <pre data-testid="monaco-editor">{value}</pre>,
 }));
 

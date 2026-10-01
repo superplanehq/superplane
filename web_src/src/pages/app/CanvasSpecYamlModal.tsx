@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Editor } from "@monaco-editor/react";
+import { Editor } from "@/ui/MonacoEditor";
 import { Copy, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
