@@ -731,11 +731,11 @@ func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWo
 	}
 
 	return &factoryWorkOrderUpdate{
-			factoryID: pullRequest.FactoryID,
-			orderID:   pullRequest.WorkOrderID,
-		}, &factoryPullRequestMergeabilityRefresh{
-			organizationID: pullRequest.OrganizationID,
-			factoryID:      pullRequest.FactoryID,
-			pullRequestID:  pullRequest.ID,
-		}, nil
+		factoryID: pullRequest.FactoryID,
+		orderID:   pullRequest.WorkOrderID,
+	}, &factoryPullRequestMergeabilityRefresh{
+		organizationID: pullRequest.OrganizationID,
+		factoryID:      pullRequest.FactoryID,
+		pullRequestID:  pullRequest.ID,
+	}, nil
 }

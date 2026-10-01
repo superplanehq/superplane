@@ -180,7 +180,7 @@ blocks:
     task:
       prologue:
         commands:
-          - sem-version go 1.25
+          - sem-version go 1.27
           - cache restore go-mod-runner-$(checksum runner/go.sum),go-mod-runner
           - (cd runner && go mod download)
           - cache store go-mod-runner-$(checksum runner/go.sum),go-mod-runner
