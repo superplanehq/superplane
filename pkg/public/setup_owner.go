@@ -98,12 +98,6 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
-		if err := models.CreateDefaultInstallationRunnerFleets(
-			tx,
-			models.DefaultRunnerVersion,
-		); err != nil {
-			return err
-		}
 		if err := models.EnableExperimentalFeatureInTransaction(
 			tx,
 			organization.ID,

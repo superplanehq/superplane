@@ -84,6 +84,6 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	require.NoError(t, database.Conn().
 		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
 		Find(&fleets).Error)
-	require.Len(t, fleets, 4)
+	require.Empty(t, fleets)
 	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }

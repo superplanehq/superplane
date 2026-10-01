@@ -95,6 +95,7 @@ func main() {
 			reconcile.Config{
 				FleetID:             fleet.ID,
 				WarmCapacity:        fleet.WarmCapacity,
+				MaxCapacity:         fleet.MaxCapacity,
 				OperatingSystem:     "linux",
 				Architecture:        architecture,
 				CapacityWaitSeconds: 30,

@@ -126,13 +126,12 @@ func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
 	support.Setup(t)
 	service := newTestRunnerService()
 	spec := &pb.FleetSpec{
-		OperatingSystem:            "linux",
-		Architecture:               "amd64",
-		CpuMillicores:              8000,
-		MemoryMb:                   32768,
-		DiskGb:                     30,
-		Capabilities:               []string{"docker"},
-		MaxExecutionTimeoutSeconds: 3600,
+		OperatingSystem: "linux",
+		Architecture:    "amd64",
+		CpuMillicores:   8000,
+		MemoryMb:        32768,
+		DiskGb:          30,
+		Capabilities:    []string{"docker"},
 	}
 
 	response, err := service.CreateFleet(t.Context(), &pb.CreateFleetRequest{
@@ -200,13 +199,12 @@ func TestUpdateFleetReplacesSpec(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	spec := &pb.FleetSpec{
-		OperatingSystem:            "linux",
-		Architecture:               "arm64",
-		CpuMillicores:              4000,
-		MemoryMb:                   8192,
-		DiskGb:                     50,
-		Capabilities:               []string{"docker"},
-		MaxExecutionTimeoutSeconds: 7200,
+		OperatingSystem: "linux",
+		Architecture:    "arm64",
+		CpuMillicores:   4000,
+		MemoryMb:        8192,
+		DiskGb:          50,
+		Capabilities:    []string{"docker"},
 	}
 
 	service := newTestRunnerService()

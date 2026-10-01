@@ -13,13 +13,12 @@ func serializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
 		Id:      fleet.Slug,
 		Enabled: fleet.Enabled,
 		Spec: &pb.FleetSpec{
-			OperatingSystem:            spec.OperatingSystem,
-			Architecture:               spec.Architecture,
-			CpuMillicores:              spec.CPUMillicores,
-			MemoryMb:                   spec.MemoryMB,
-			DiskGb:                     spec.DiskGB,
-			Capabilities:               append([]string(nil), spec.Capabilities...),
-			MaxExecutionTimeoutSeconds: spec.MaxExecutionTimeoutSeconds,
+			OperatingSystem: spec.OperatingSystem,
+			Architecture:    spec.Architecture,
+			CpuMillicores:   spec.CPUMillicores,
+			MemoryMb:        spec.MemoryMB,
+			DiskGb:          spec.DiskGB,
+			Capabilities:    append([]string(nil), spec.Capabilities...),
 		},
 		RunnerVersion: fleet.RunnerVersion,
 		CreatedAt:     timestamppb.New(fleet.CreatedAt),
@@ -29,13 +28,12 @@ func serializeFleet(fleet *models.RunnerFleet) *pb.Fleet {
 
 func fleetSpecFromProto(spec *pb.FleetSpec) models.RunnerFleetSpec {
 	return models.RunnerFleetSpec{
-		OperatingSystem:            spec.GetOperatingSystem(),
-		Architecture:               spec.GetArchitecture(),
-		CPUMillicores:              spec.GetCpuMillicores(),
-		MemoryMB:                   spec.GetMemoryMb(),
-		DiskGB:                     spec.GetDiskGb(),
-		Capabilities:               append([]string(nil), spec.GetCapabilities()...),
-		MaxExecutionTimeoutSeconds: spec.GetMaxExecutionTimeoutSeconds(),
+		OperatingSystem: spec.GetOperatingSystem(),
+		Architecture:    spec.GetArchitecture(),
+		CPUMillicores:   spec.GetCpuMillicores(),
+		MemoryMB:        spec.GetMemoryMb(),
+		DiskGB:          spec.GetDiskGb(),
+		Capabilities:    append([]string(nil), spec.GetCapabilities()...),
 	}
 }
 

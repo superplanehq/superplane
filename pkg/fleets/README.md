@@ -10,13 +10,13 @@ Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
 their short-lived registration token.
 
-AWS fleets require `runner_release_base_url`. Fleet Manager selects a release
+AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
 from this layout:
 
 ```text
-<runner_release_base_url>/<version>/runner-linux-amd64.tar.gz
-<runner_release_base_url>/<version>/runner-linux-arm64.tar.gz
-<runner_release_base_url>/<version>/checksums.txt
+<runnerReleaseBaseUrl>/<version>/runner-linux-amd64.tar.gz
+<runnerReleaseBaseUrl>/<version>/runner-linux-arm64.tar.gz
+<runnerReleaseBaseUrl>/<version>/checksums.txt
 ```
 
 Each archive contains the runner binary and `install.sh`. Fleet Manager reads
@@ -29,5 +29,8 @@ The local development configuration uses the tool-rich
 
 Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
 next queued task. The target capacity is the number of queued tasks plus
-`warm_capacity`. Set `warm_capacity` to the number of idle runners that the
-fleet must keep when no tasks are queued.
+`warmCapacity`. Set `warmCapacity` to the number of idle runners that the
+fleet must keep when no tasks are queued. Set `maxCapacity` to limit the total
+number of pending, idle, and busy runners. A value of `0`, or no value, permits
+unlimited capacity. Set `warmCapacity` and `maxCapacity` to the same positive
+value for a fixed-size fleet.

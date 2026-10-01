@@ -9,18 +9,19 @@ import (
 
 func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	body := `{
-		"superplane_url":"https://superplane.example",
-		"installation_admin_token":"personal-token",
-		"runner_release_base_url":"https://downloads.example/runner/",
-		"aws_region":"us-east-1",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
+		"awsRegion":"us-east-1",
 		"fleets":[{
 			"id":"linux-amd64",
-			"warm_capacity":1,
+			"warmCapacity":1,
+			"maxCapacity":2,
 			"aws":{
 				"ami":"ami-123",
 				"architecture":"amd64",
-				"subnet_ids":["subnet-a"],
-				"security_group_ids":["sg-a"]
+				"subnetIds":["subnet-a"],
+				"securityGroupIds":["sg-a"]
 			}
 		}]
 	}`
@@ -31,6 +32,9 @@ func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	if config.Fleets[0].AWS.InstanceType != "t3.micro" ||
 		config.Fleets[0].AWS.VolumeSizeGB != 30 {
 		t.Fatalf("defaults were not applied: %#v", config.Fleets[0].AWS)
+	}
+	if config.Fleets[0].MaxCapacity != 2 {
+		t.Fatalf("maximum capacity = %d", config.Fleets[0].MaxCapacity)
 	}
 	if config.RunnerReleaseBaseURL != "https://downloads.example/runner" {
 		t.Fatalf("runner release base URL = %q", config.RunnerReleaseBaseURL)
@@ -53,9 +57,39 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsSnakeCaseFields(t *testing.T) {
+	_, err := Load(writeConfig(t, `{"superplane_url":"https://superplane.example"}`))
+	if err == nil || !strings.Contains(err.Error(), `unknown field "superplane_url"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
-	_, err := Load(writeConfig(t, `{"fleets":[{"task_specific":true}]}`))
-	if err == nil || !strings.Contains(err.Error(), `unknown field "task_specific"`) {
+	_, err := Load(writeConfig(t, `{"fleets":[{"taskSpecific":true}]}`))
+	if err == nil || !strings.Contains(err.Error(), `unknown field "taskSpecific"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
+	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
+	_, err := Load(writeConfig(t, `{
+		"superplaneUrl":"http://app:8000",
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"warmCapacity":2,
+			"maxCapacity":1,
+			"docker":{
+				"image":"runner:dev",
+				"architecture":"amd64"
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"fleets[0].warmCapacity must not exceed maxCapacity",
+	) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -63,15 +97,15 @@ func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
 func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	config, err := Load(writeConfig(t, `{
-		"superplane_url":"http://app:8000",
-		"installation_admin_token":"",
+		"superplaneUrl":"http://app:8000",
+		"installationAdminToken":"",
 		"fleets":[{
 			"id":"e1-large-amd64",
 			"provider":"docker",
 			"docker":{
 				"image":"runner:dev",
 				"architecture":"amd64",
-				"runner_api_url":"http://app:8000",
+				"runnerApiUrl":"http://app:8000",
 				"network":"superplane_default"
 			}
 		}]

@@ -104,10 +104,11 @@ Run these three steps once, in order:
    `superplane_test` (E2E; backend CI sets this via the environment).
 3. `make dev.server` — starts the API (Go hot-reload via `air`), the Vite
    dev server, and the Docker Fleet Manager. UI at http://localhost:8000;
-   health check at http://localhost:8000/health. Owner setup creates the
-   standard installation fleets. Set `INSTALLATION_ADMIN_TOKEN` to an
-   installation administrator personal API token so Fleet Manager can start.
-   Use `make dev.server.fg` for foreground logs.
+   health check at http://localhost:8000/health. After owner setup, create the
+   required installation fleets through the admin API or admin CLI. Set
+   `INSTALLATION_ADMIN_TOKEN` to an installation administrator personal API
+   token so Fleet Manager can start. Use `make dev.server.fg` for foreground
+   logs.
 
 Factory workspace onboarding needs a public SuperPlane GitHub App on a
 stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory

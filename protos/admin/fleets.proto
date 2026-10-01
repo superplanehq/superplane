@@ -88,7 +88,6 @@ message FleetSpec {
   int32 memory_mb = 4;
   int32 disk_gb = 5;
   repeated string capabilities = 6;
-  int32 max_execution_timeout_seconds = 7;
 }
 
 message Runner {

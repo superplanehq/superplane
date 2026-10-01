@@ -10,13 +10,12 @@ const (
 )
 
 type FleetSpec struct {
-	OperatingSystem            string   `json:"operatingSystem"`
-	Architecture               string   `json:"architecture"`
-	CPUMillicores              int32    `json:"cpuMillicores"`
-	MemoryMB                   int32    `json:"memoryMb"`
-	DiskGB                     int32    `json:"diskGb"`
-	Capabilities               []string `json:"capabilities"`
-	MaxExecutionTimeoutSeconds int32    `json:"maxExecutionTimeoutSeconds"`
+	OperatingSystem string   `json:"operatingSystem"`
+	Architecture    string   `json:"architecture"`
+	CPUMillicores   int32    `json:"cpuMillicores"`
+	MemoryMB        int32    `json:"memoryMb"`
+	DiskGB          int32    `json:"diskGb"`
+	Capabilities    []string `json:"capabilities"`
 }
 
 type Fleet struct {

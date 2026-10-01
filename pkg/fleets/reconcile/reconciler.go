@@ -38,6 +38,7 @@ type ArtifactResolver interface {
 type Config struct {
 	FleetID             string
 	WarmCapacity        int
+	MaxCapacity         int
 	OperatingSystem     string
 	Architecture        string
 	CapacityWaitSeconds int
@@ -73,6 +74,10 @@ func New(
 		return nil, fmt.Errorf("fleet ID is required")
 	case config.WarmCapacity < 0:
 		return nil, fmt.Errorf("warm capacity must not be negative")
+	case config.MaxCapacity < 0:
+		return nil, fmt.Errorf("maximum capacity must not be negative")
+	case config.MaxCapacity > 0 && config.WarmCapacity > config.MaxCapacity:
+		return nil, fmt.Errorf("warm capacity must not exceed maximum capacity")
 	case config.OperatingSystem == "":
 		return nil, fmt.Errorf("operating system is required")
 	case config.Architecture == "":
@@ -179,6 +184,7 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		slog.Int64("busy_runners", capacity.BusyRunners),
 		slog.Int64("terminated_runners", capacity.TerminatedRunners),
 		slog.Int("provider_resources", len(resources)),
+		slog.Int("max_capacity", r.config.MaxCapacity),
 	)
 	return nil
 }
@@ -239,10 +245,11 @@ func (r *Reconciler) reconcileCapacity(
 	activeRunners []adminclient.Runner,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
-	target := int(capacity.RunnableTasks) + r.config.WarmCapacity
-	if len(activeRunners) < target {
+	target := targetActiveRunners(capacity, r.config.WarmCapacity, r.config.MaxCapacity)
+	active := int(capacity.PendingRunners + capacity.IdleRunners)
+	if active < target {
 		var provisionErrors []error
-		for range target - len(activeRunners) {
+		for range target - active {
 			if err := r.provision(
 				ctx,
 				fleet,
@@ -254,14 +261,29 @@ func (r *Reconciler) reconcileCapacity(
 		}
 		return errors.Join(provisionErrors...)
 	}
-	if len(activeRunners) == target {
+	if active == target {
 		return nil
 	}
 	return r.terminateRunners(
 		ctx,
-		oldestRunners(activeRunners, len(activeRunners)-target),
+		oldestRunners(activeRunners, active-target),
 		resourcesByRunner,
 	)
+}
+
+func targetActiveRunners(
+	capacity adminclient.Capacity,
+	warmCapacity, maxCapacity int,
+) int {
+	target := int(capacity.RunnableTasks) + warmCapacity
+	if maxCapacity == 0 {
+		return target
+	}
+	available := maxCapacity - int(capacity.BusyRunners)
+	if available <= 0 {
+		return 0
+	}
+	return min(target, available)
 }
 
 func (r *Reconciler) provision(

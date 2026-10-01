@@ -28,13 +28,12 @@ var (
 )
 
 type RunnerFleetSpec struct {
-	OperatingSystem            string   `json:"operating_system,omitempty"`
-	Architecture               string   `json:"architecture,omitempty"`
-	CPUMillicores              int32    `json:"cpu_millicores,omitempty"`
-	MemoryMB                   int32    `json:"memory_mb,omitempty"`
-	DiskGB                     int32    `json:"disk_gb,omitempty"`
-	Capabilities               []string `json:"capabilities,omitempty"`
-	MaxExecutionTimeoutSeconds int32    `json:"max_execution_timeout_seconds,omitempty"`
+	OperatingSystem string   `json:"operating_system,omitempty"`
+	Architecture    string   `json:"architecture,omitempty"`
+	CPUMillicores   int32    `json:"cpu_millicores,omitempty"`
+	MemoryMB        int32    `json:"memory_mb,omitempty"`
+	DiskGB          int32    `json:"disk_gb,omitempty"`
+	Capabilities    []string `json:"capabilities,omitempty"`
 }
 
 /*
@@ -114,38 +113,16 @@ func defaultInstallationRunnerFleet(
 		Enabled:       true,
 		RunnerVersion: runnerVersion,
 		Spec: datatypes.NewJSONType(RunnerFleetSpec{
-			OperatingSystem:            "linux",
-			Architecture:               architecture,
-			CPUMillicores:              cpuMillicores,
-			MemoryMB:                   memoryMB,
-			DiskGB:                     30,
-			Capabilities:               []string{"docker"},
-			MaxExecutionTimeoutSeconds: 3600,
+			OperatingSystem: "linux",
+			Architecture:    architecture,
+			CPUMillicores:   cpuMillicores,
+			MemoryMB:        memoryMB,
+			DiskGB:          30,
+			Capabilities:    []string{"docker"},
 		}),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-}
-
-// CreateDefaultInstallationRunnerFleets inserts missing defaults without
-// changing fleets that an installation administrator already configured.
-func CreateDefaultInstallationRunnerFleets(
-	tx *gorm.DB,
-	runnerVersion string,
-) error {
-	for _, fleet := range DefaultInstallationRunnerFleets(runnerVersion) {
-		existing, err := FindInstallationRunnerFleet(tx, fleet.Slug)
-		if err == nil && existing != nil {
-			continue
-		}
-		if !errors.Is(err, ErrRunnerFleetNotFound) {
-			return err
-		}
-		if err := fleet.Create(tx); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 /*

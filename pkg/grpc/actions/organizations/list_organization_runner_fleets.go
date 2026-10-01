@@ -49,13 +49,12 @@ func serializeOrganizationRunnerFleet(fleet models.RunnerFleet) *pb.Organization
 		Id:    fleet.Slug,
 		Scope: fleet.ScopeType,
 		Spec: &pb.OrganizationRunnerFleetSpec{
-			OperatingSystem:            spec.OperatingSystem,
-			Architecture:               spec.Architecture,
-			CpuMillicores:              spec.CPUMillicores,
-			MemoryMb:                   spec.MemoryMB,
-			DiskGb:                     spec.DiskGB,
-			Capabilities:               spec.Capabilities,
-			MaxExecutionTimeoutSeconds: spec.MaxExecutionTimeoutSeconds,
+			OperatingSystem: spec.OperatingSystem,
+			Architecture:    spec.Architecture,
+			CpuMillicores:   spec.CPUMillicores,
+			MemoryMb:        spec.MemoryMB,
+			DiskGb:          spec.DiskGB,
+			Capabilities:    spec.Capabilities,
 		},
 	}
 }

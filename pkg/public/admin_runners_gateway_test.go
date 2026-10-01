@@ -76,13 +76,12 @@ func TestAdminRunnersGatewayCreatesInstallationFleet(t *testing.T) {
 		"fleetId":       "aws-large-amd64",
 		"runnerVersion": "v0.0.1",
 		"spec": map[string]any{
-			"operatingSystem":            "linux",
-			"architecture":               "amd64",
-			"cpuMillicores":              8000,
-			"memoryMb":                   32768,
-			"diskGb":                     30,
-			"capabilities":               []string{"docker"},
-			"maxExecutionTimeoutSeconds": 3600,
+			"operatingSystem": "linux",
+			"architecture":    "amd64",
+			"cpuMillicores":   8000,
+			"memoryMb":        32768,
+			"diskGb":          30,
+			"capabilities":    []string{"docker"},
 		},
 	})
 	require.NoError(t, err)

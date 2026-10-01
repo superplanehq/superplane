@@ -276,7 +276,7 @@ func renderFleet(stdout io.Writer, fleet *openapi_client.RunnersFleet) error {
 	spec := fleet.GetSpec()
 	_, err := fmt.Fprintf(
 		stdout,
-		"ID: %s\nEnabled: %t\nRunner version: %s\nOperating system: %s\nArchitecture: %s\nCPU: %s\nMemory: %s\nDisk: %s\nCapabilities: %s\nMaximum execution timeout: %s\nCreated: %s\nUpdated: %s\n",
+		"ID: %s\nEnabled: %t\nRunner version: %s\nOperating system: %s\nArchitecture: %s\nCPU: %s\nMemory: %s\nDisk: %s\nCapabilities: %s\nCreated: %s\nUpdated: %s\n",
 		fleet.GetId(),
 		fleet.GetEnabled(),
 		valueOrDash(fleet.GetRunnerVersion()),
@@ -286,7 +286,6 @@ func renderFleet(stdout io.Writer, fleet *openapi_client.RunnersFleet) error {
 		formatMemory(spec.GetMemoryMb()),
 		formatDisk(spec.GetDiskGb()),
 		valueOrDash(strings.Join(spec.GetCapabilities(), ", ")),
-		formatDuration(spec.GetMaxExecutionTimeoutSeconds()),
 		formatTime(fleet.CreatedAt),
 		formatTime(fleet.UpdatedAt),
 	)
@@ -319,13 +318,6 @@ func formatDisk(value int32) string {
 		return "-"
 	}
 	return fmt.Sprintf("%d GB", value)
-}
-
-func formatDuration(seconds int32) string {
-	if seconds == 0 {
-		return "-"
-	}
-	return (time.Duration(seconds) * time.Second).String()
 }
 
 func formatTime(value *time.Time) string {

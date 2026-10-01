@@ -66,11 +66,12 @@ need a fresh `npm install`, codegen, or migrations.
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-Owner setup creates the standard installation fleets. Create a personal API
-token for the installation administrator and set `INSTALLATION_ADMIN_TOKEN` in
-`.env`. The Docker Fleet Manager then creates an ephemeral runner for each
-integrated task. For an existing organization, enable the `new_runners`
-experimental feature before you dispatch a runner task.
+After owner setup, create the required installation fleets through the admin
+API or admin CLI. Create a personal API token for the installation
+administrator and set `INSTALLATION_ADMIN_TOKEN` in `.env`. The Docker Fleet
+Manager then creates an ephemeral runner for each integrated task. For an
+existing organization, enable the `new_runners` experimental feature before
+you dispatch a runner task.
 
 A local dump lets you create a new environment without owner setup or GitHub
 connection. This is the intended path when a script or agent creates local

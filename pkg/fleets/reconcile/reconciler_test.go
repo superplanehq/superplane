@@ -140,6 +140,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	admin := newFakeAdmin()
 	admin.events = &events
 	admin.capacity.RunnableTasks = 1
+	admin.capacity.IdleRunners = 1
 	admin.activeRunners = []adminclient.Runner{{
 		ID:      "runner-idle",
 		FleetID: "fleet-a",
@@ -147,7 +148,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	}}
 	resourceProvider := &fakeProvider{events: &events}
 	resolver := &fakeArtifactResolver{}
-	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, 1)
+	reconciler := newTestReconciler(t, admin, resolver, resourceProvider, 1, 0)
 
 	if err := reconciler.Reconcile(context.Background()); err != nil {
 		t.Fatal(err)
@@ -185,6 +186,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 
 func TestWarmRunnerRemainsWhenNoTasksAreQueued(t *testing.T) {
 	admin := newFakeAdmin()
+	admin.capacity.IdleRunners = 1
 	admin.activeRunners = []adminclient.Runner{{
 		ID:      "runner-idle",
 		FleetID: "fleet-a",
@@ -196,6 +198,7 @@ func TestWarmRunnerRemainsWhenNoTasksAreQueued(t *testing.T) {
 		&fakeArtifactResolver{},
 		&fakeProvider{},
 		1,
+		0,
 	)
 
 	if err := reconciler.Reconcile(context.Background()); err != nil {
@@ -219,6 +222,7 @@ func TestProviderCreationFailureTerminatesLogicalRunner(t *testing.T) {
 		admin,
 		&fakeArtifactResolver{},
 		resourceProvider,
+		0,
 		0,
 	)
 
@@ -250,6 +254,7 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 		&fakeArtifactResolver{},
 		resourceProvider,
 		0,
+		0,
 	)
 
 	if err := reconciler.Reconcile(context.Background()); err != nil {
@@ -258,6 +263,83 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 	if len(resourceProvider.deleted) != 1 ||
 		resourceProvider.deleted[0].ID != "resource-terminated" {
 		t.Fatalf("deleted resources = %#v", resourceProvider.deleted)
+	}
+}
+
+func TestMaximumCapacityIncludesBusyRunners(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 2
+	admin.capacity.BusyRunners = 2
+	reconciler := newTestReconciler(
+		t,
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		0,
+		2,
+	)
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 0 {
+		t.Fatalf("create requests = %#v", admin.createRequests)
+	}
+}
+
+func TestEqualWarmAndMaximumCapacityKeepsFleetFixedSize(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.BusyRunners = 1
+	admin.capacity.IdleRunners = 1
+	admin.activeRunners = []adminclient.Runner{{
+		ID:      "runner-idle",
+		FleetID: "fleet-a",
+		State:   adminclient.RunnerStateIdle,
+	}}
+	reconciler := newTestReconciler(
+		t,
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		2,
+		2,
+	)
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.createRequests) != 0 || len(admin.deletedRunnerIDs) != 0 {
+		t.Fatalf(
+			"create requests = %#v, deleted runners = %#v",
+			admin.createRequests,
+			admin.deletedRunnerIDs,
+		)
+	}
+}
+
+func TestMaximumCapacityTerminatesExcessIdleRunners(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.IdleRunners = 2
+	admin.activeRunners = []adminclient.Runner{
+		{ID: "runner-oldest", State: adminclient.RunnerStateIdle},
+		{ID: "runner-newest", State: adminclient.RunnerStateIdle},
+	}
+	admin.activeRunners[0].CreatedAt = admin.activeRunners[1].CreatedAt.Add(-1)
+	reconciler := newTestReconciler(
+		t,
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		1,
+		1,
+	)
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.deletedRunnerIDs) != 1 ||
+		admin.deletedRunnerIDs[0] != "runner-oldest" {
+		t.Fatalf("deleted runners = %#v", admin.deletedRunnerIDs)
 	}
 }
 
@@ -293,11 +375,13 @@ func newTestReconciler(
 	resolver ArtifactResolver,
 	resourceProvider provider.Provider,
 	warmCapacity int,
+	maxCapacity int,
 ) *Reconciler {
 	t.Helper()
 	reconciler, err := New(admin, resolver, resourceProvider, Config{
 		FleetID:             "fleet-a",
 		WarmCapacity:        warmCapacity,
+		MaxCapacity:         maxCapacity,
 		OperatingSystem:     "linux",
 		Architecture:        "amd64",
 		CapacityWaitSeconds: 0,

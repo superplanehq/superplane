@@ -1,29 +1,30 @@
 {
-  "superplane_url": "https://superplane.example",
-  "installation_admin_token": "replace-with-personal-api-token",
-  "runner_release_base_url": "https://superplanehq-releases.s3.amazonaws.com/runner",
-  "aws_region": "us-east-1",
-  "reconcile_interval_seconds": 15,
-  "request_timeout_seconds": 90,
+  "superplaneUrl": "https://superplane.example",
+  "installationAdminToken": "replace-with-personal-api-token",
+  "runnerReleaseBaseUrl": "https://superplanehq-releases.s3.amazonaws.com/runner",
+  "awsRegion": "us-east-1",
+  "reconcileIntervalSeconds": 15,
+  "requestTimeoutSeconds": 90,
   "fleets": [
     {
       "id": "linux-amd64",
-      "warm_capacity": 1,
+      "warmCapacity": 1,
+      "maxCapacity": 10,
       "aws": {
         "ami": "ami-00000000000000000",
-        "instance_type": "t3.micro",
+        "instanceType": "t3.micro",
         "architecture": "amd64",
-        "subnet_ids": [
+        "subnetIds": [
           "subnet-00000000000000000"
         ],
-        "security_group_ids": [
+        "securityGroupIds": [
           "sg-00000000000000000"
         ],
-        "iam_instance_profile": "",
-        "key_name": "",
-        "volume_size_gb": 30,
-        "volume_iops": 0,
-        "volume_throughput_mbps": 0
+        "iamInstanceProfile": "",
+        "keyName": "",
+        "volumeSizeGb": 30,
+        "volumeIops": 0,
+        "volumeThroughputMbps": 0
       }
     }
   ]

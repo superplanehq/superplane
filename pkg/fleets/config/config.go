@@ -19,18 +19,19 @@ const (
 )
 
 type Config struct {
-	SuperPlaneURL            string  `json:"superplane_url"`
-	InstallationAdminToken   string  `json:"installation_admin_token"`
-	RunnerReleaseBaseURL     string  `json:"runner_release_base_url"`
-	AWSRegion                string  `json:"aws_region"`
-	ReconcileIntervalSeconds int     `json:"reconcile_interval_seconds"`
-	RequestTimeoutSeconds    int     `json:"request_timeout_seconds"`
+	SuperPlaneURL            string  `json:"superplaneUrl"`
+	InstallationAdminToken   string  `json:"installationAdminToken"`
+	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
+	AWSRegion                string  `json:"awsRegion"`
+	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
+	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
 	Fleets                   []Fleet `json:"fleets"`
 }
 
 type Fleet struct {
 	ID           string `json:"id"`
-	WarmCapacity int    `json:"warm_capacity"`
+	WarmCapacity int    `json:"warmCapacity"`
+	MaxCapacity  int    `json:"maxCapacity"`
 	Provider     string `json:"provider"`
 	AWS          AWS    `json:"aws"`
 	Docker       Docker `json:"docker"`
@@ -38,24 +39,24 @@ type Fleet struct {
 
 type AWS struct {
 	AMI                  string   `json:"ami"`
-	InstanceType         string   `json:"instance_type"`
+	InstanceType         string   `json:"instanceType"`
 	Architecture         string   `json:"architecture"`
-	SubnetIDs            []string `json:"subnet_ids"`
-	SecurityGroupIDs     []string `json:"security_group_ids"`
-	IAMInstanceProfile   string   `json:"iam_instance_profile"`
-	KeyName              string   `json:"key_name"`
-	VolumeSizeGB         int32    `json:"volume_size_gb"`
-	VolumeIOPS           int32    `json:"volume_iops"`
-	VolumeThroughputMBps int32    `json:"volume_throughput_mbps"`
+	SubnetIDs            []string `json:"subnetIds"`
+	SecurityGroupIDs     []string `json:"securityGroupIds"`
+	IAMInstanceProfile   string   `json:"iamInstanceProfile"`
+	KeyName              string   `json:"keyName"`
+	VolumeSizeGB         int32    `json:"volumeSizeGb"`
+	VolumeIOPS           int32    `json:"volumeIops"`
+	VolumeThroughputMBps int32    `json:"volumeThroughputMbps"`
 }
 
 type Docker struct {
 	Image        string   `json:"image"`
 	Architecture string   `json:"architecture"`
-	RunnerAPIURL string   `json:"runner_api_url"`
+	RunnerAPIURL string   `json:"runnerApiUrl"`
 	Network      string   `json:"network"`
 	Volumes      []string `json:"volumes"`
-	ExtraHosts   []string `json:"extra_hosts"`
+	ExtraHosts   []string `json:"extraHosts"`
 }
 
 func Load(path string) (*Config, error) {
@@ -137,27 +138,27 @@ func (c *Config) applyDefaults() {
 func (c *Config) validate() error {
 	switch {
 	case strings.TrimSpace(c.SuperPlaneURL) == "":
-		return fmt.Errorf("superplane_url is required")
+		return fmt.Errorf("superplaneUrl is required")
 	case strings.TrimSpace(c.InstallationAdminToken) == "":
-		return fmt.Errorf("installation_admin_token is required")
+		return fmt.Errorf("installationAdminToken is required")
 	case c.ReconcileIntervalSeconds < 1:
-		return fmt.Errorf("reconcile_interval_seconds must be positive")
+		return fmt.Errorf("reconcileIntervalSeconds must be positive")
 	case c.RequestTimeoutSeconds < 1:
-		return fmt.Errorf("request_timeout_seconds must be positive")
+		return fmt.Errorf("requestTimeoutSeconds must be positive")
 	case len(c.Fleets) == 0:
 		return fmt.Errorf("fleets must contain at least one fleet")
 	}
 	if c.hasProvider(ProviderAWS) {
 		switch {
 		case c.RunnerReleaseBaseURL == "":
-			return fmt.Errorf("runner_release_base_url is required")
+			return fmt.Errorf("runnerReleaseBaseUrl is required")
 		case strings.Contains(
 			strings.ToLower(c.RunnerReleaseBaseURL),
 			"latest",
 		):
-			return fmt.Errorf("runner_release_base_url must not use latest")
+			return fmt.Errorf("runnerReleaseBaseUrl must not use latest")
 		case strings.TrimSpace(c.AWSRegion) == "":
-			return fmt.Errorf("aws_region is required")
+			return fmt.Errorf("awsRegion is required")
 		}
 	}
 
@@ -168,7 +169,14 @@ func (c *Config) validate() error {
 		case fleet.ID == "":
 			return fmt.Errorf("%s.id is required", prefix)
 		case fleet.WarmCapacity < 0:
-			return fmt.Errorf("%s.warm_capacity must not be negative", prefix)
+			return fmt.Errorf("%s.warmCapacity must not be negative", prefix)
+		case fleet.MaxCapacity < 0:
+			return fmt.Errorf("%s.maxCapacity must not be negative", prefix)
+		case fleet.MaxCapacity > 0 && fleet.WarmCapacity > fleet.MaxCapacity:
+			return fmt.Errorf(
+				"%s.warmCapacity must not exceed maxCapacity",
+				prefix,
+			)
 		case fleet.Provider != ProviderAWS &&
 			fleet.Provider != ProviderDocker:
 			return fmt.Errorf("%s.provider is invalid", prefix)
@@ -189,15 +197,15 @@ func (c *Config) validate() error {
 		case fleet.AWS.Architecture != "amd64" && fleet.AWS.Architecture != "arm64":
 			return fmt.Errorf("%s.aws.architecture must be amd64 or arm64", prefix)
 		case len(fleet.AWS.SubnetIDs) == 0:
-			return fmt.Errorf("%s.aws.subnet_ids must not be empty", prefix)
+			return fmt.Errorf("%s.aws.subnetIds must not be empty", prefix)
 		case len(fleet.AWS.SecurityGroupIDs) == 0:
-			return fmt.Errorf("%s.aws.security_group_ids must not be empty", prefix)
+			return fmt.Errorf("%s.aws.securityGroupIds must not be empty", prefix)
 		case fleet.AWS.VolumeSizeGB < 1:
-			return fmt.Errorf("%s.aws.volume_size_gb must be positive", prefix)
+			return fmt.Errorf("%s.aws.volumeSizeGb must be positive", prefix)
 		case fleet.AWS.VolumeIOPS < 0:
-			return fmt.Errorf("%s.aws.volume_iops must not be negative", prefix)
+			return fmt.Errorf("%s.aws.volumeIops must not be negative", prefix)
 		case fleet.AWS.VolumeThroughputMBps < 0:
-			return fmt.Errorf("%s.aws.volume_throughput_mbps must not be negative", prefix)
+			return fmt.Errorf("%s.aws.volumeThroughputMbps must not be negative", prefix)
 		}
 		if _, exists := seen[fleet.ID]; exists {
 			return fmt.Errorf("fleet ID %q is duplicated", fleet.ID)
