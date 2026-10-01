@@ -40,6 +40,7 @@ To configure Datadog to work with SuperPlane:
 - ` + "`create_webhooks`" + ` creates the SuperPlane webhook.
 - ` + "`manage_integrations`" + ` updates and removes that webhook.
 - ` + "`error_tracking_read`" + ` lists Error Tracking issues and reads issue details for an alert.
+- ` + "`monitors_read`" + ` finds an existing Error Tracking monitor for a service.
 - ` + "`monitors_write`" + ` creates and removes the Error Tracking monitor for a service.
 
 Grant these optional permissions to add the error sample and related logs to each task:
@@ -120,7 +121,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.",
+			Description: "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.",
 		},
 	}
 }

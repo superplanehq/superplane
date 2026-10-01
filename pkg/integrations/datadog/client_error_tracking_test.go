@@ -180,6 +180,7 @@ func Test__Datadog__Instructions__NamesApplicationKeyScopes(t *testing.T) {
 	assert.Contains(t, instructions, "create_webhooks")
 	assert.Contains(t, instructions, "manage_integrations")
 	assert.Contains(t, instructions, "error_tracking_read")
+	assert.Contains(t, instructions, "monitors_read")
 	assert.Contains(t, instructions, "monitors_write")
 	assert.NotContains(t, instructions, "Add the webhook to a monitor")
 	assert.Contains(t, instructions, "apm_read")
@@ -194,5 +195,5 @@ func Test__Datadog__Instructions__NamesApplicationKeyScopes(t *testing.T) {
 			appKeyDescription = field.Description
 		}
 	}
-	assert.Equal(t, "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.", appKeyDescription)
+	assert.Equal(t, "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.", appKeyDescription)
 }

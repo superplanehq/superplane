@@ -2,7 +2,7 @@ export const DATADOG_INTAKE_SETUP_COPY = {
   pageTitle: "How should Datadog errors become tasks?",
   wizardStepConnect: "Connect Datadog",
   wizardStepConnectHelper:
-    "Enter the API key and an application key. The API key has no scopes. A restricted application key needs create_webhooks, manage_integrations, error_tracking_read, and monitors_write.",
+    "Enter the API key and an application key. The API key has no scopes. A restricted application key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write.",
   wizardStepConnectExisting: "Choose the Datadog account that SuperPlane will monitor.",
   wizardStepService: "Which Datadog service should create tasks?",
   wizardStepServiceHelper:
