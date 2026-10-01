@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
+import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
+
+import { notesFromLiveLogSections } from "../streamNotesFromLiveLog";
 import { activityFromAgentStep, activityFromTranscript } from "./activityFromAgentStep";
-import type { AgentStep } from "./automationsViewModel";
+import { agentStepsFromNotes, type AgentStep } from "./automationsViewModel";
 
 function step(overrides: Partial<AgentStep>): AgentStep {
   return {
@@ -25,6 +28,7 @@ describe("activityFromAgentStep", () => {
         type: "tool",
         kind: "bash",
         input: "git clone https://example.com/repo.git",
+        output: "",
       }),
     ]);
   });
@@ -77,7 +81,7 @@ describe("activityFromAgentStep", () => {
     );
 
     expect(activity?.items).toEqual([
-      expect.objectContaining({ type: "tool", input: "git clone https://example.com/repo.git" }),
+      expect.objectContaining({ type: "tool", input: "git clone https://example.com/repo.git", output: "" }),
       expect.objectContaining({ type: "content", text: "Cloned the repository." }),
     ]);
   });
@@ -105,5 +109,65 @@ describe("activityFromAgentStep", () => {
       "First I inspect the host.",
       "Then I install bun.",
     ]);
+  });
+
+  it("keeps a multi-line bash script apart from its stdout", () => {
+    const script = ["set -euo pipefail", "", 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo'].join(
+      "\n",
+    );
+    const stdout = ["Cloning into 'repo'...", "remote: Enumerating objects: 9384, done."].join("\n");
+    const section: CommandSection = {
+      index: 1,
+      text: "Clone Repo",
+      kind: "bash",
+      preview: script,
+      lines: stdout.split("\n"),
+      events: [],
+      status: "failed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section]))[0];
+    const command = activityFromAgentStep(step!)?.items[0];
+
+    expect(step?.output).toBe(`${script}\n\n${stdout}`);
+    expect(command).toEqual(
+      expect.objectContaining({
+        type: "tool",
+        kind: "bash",
+        input: script,
+        output: stdout,
+        status: "failed",
+      }),
+    );
+  });
+
+  it("keeps an unnamed bash preview as the script when it matches the title", () => {
+    const script = ["git clone --depth 1 https://example.com/repo.git", "cd repo"].join("\n");
+    const stdout = ["Cloning into 'repo'...", "done."].join("\n");
+    const section: CommandSection = {
+      index: 1,
+      text: script,
+      kind: "bash",
+      preview: script,
+      lines: stdout.split("\n"),
+      events: [],
+      status: "passed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section]))[0];
+    const command = activityFromAgentStep(step!)?.items[0];
+
+    expect(command).toEqual(
+      expect.objectContaining({
+        type: "tool",
+        kind: "bash",
+        input: script,
+        output: stdout,
+      }),
+    );
   });
 });
