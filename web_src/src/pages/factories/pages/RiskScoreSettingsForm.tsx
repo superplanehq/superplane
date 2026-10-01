@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
+import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 import {
   draftWithRiskScoreCategories,
@@ -15,13 +16,18 @@ import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
 export function RiskScoreSettingsForm({
   draft,
   onSave,
+  onDelete,
+  deletePending = false,
 }: {
   draft: PlanningReviewDraft;
   onSave: (next: PlanningReviewDraft) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
 }) {
   const savedRules = formatRiskScoreRules(riskScoreCategoriesFromDraft(draft) ?? []);
   const [categories, setCategories] = useState(() => riskScoreCategoriesFromDraft(draft) ?? []);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     setCategories(parseRiskScoreRules(savedRules) ?? []);
@@ -55,16 +61,79 @@ export function RiskScoreSettingsForm({
           <RiskScoreCategoryEditor categories={categories} onChange={setCategories} />
         </div>
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+      <RiskScoreSettingsFooter
+        saving={saving}
+        saveDisabled={categories.length === 0}
+        onSave={() => void save()}
+        onDelete={onDelete}
+        deletePending={deletePending}
+        confirmDelete={confirmDelete}
+        onConfirmDelete={setConfirmDelete}
+      />
+    </>
+  );
+}
+
+function RiskScoreSettingsFooter({
+  saving,
+  saveDisabled,
+  onSave,
+  onDelete,
+  deletePending,
+  confirmDelete,
+  onConfirmDelete,
+}: {
+  saving: boolean;
+  saveDisabled: boolean;
+  onSave: () => void;
+  onDelete?: () => Promise<void> | void;
+  deletePending: boolean;
+  confirmDelete: boolean;
+  onConfirmDelete: (next: boolean) => void;
+}) {
+  if (confirmDelete && onDelete) {
+    return (
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <p className="workspace-body-text text-destructive" role="alert">
+          {COLUMN_AUTOMATIONS_COPY.confirmDelete}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
+            {COLUMN_AUTOMATIONS_COPY.keepLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={deletePending}
+            onClick={() => void onDelete()}
+            data-testid="risk-score-settings-delete-confirm"
+          >
+            {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
+          </Button>
+        </div>
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+      {onDelete ? (
         <Button
           type="button"
-          disabled={saving || categories.length === 0}
-          onClick={() => void save()}
-          data-testid="risk-score-settings-save"
+          variant="ghost"
+          size="sm"
+          onClick={() => onConfirmDelete(true)}
+          data-testid="risk-score-settings-delete"
         >
-          {saving ? RISK_SCORE_SETUP_COPY.saving : RISK_SCORE_SETUP_COPY.save}
+          {COLUMN_AUTOMATIONS_COPY.deleteLabel}
         </Button>
-      </footer>
-    </>
+      ) : (
+        <span />
+      )}
+      <Button type="button" disabled={saving || saveDisabled} onClick={onSave} data-testid="risk-score-settings-save">
+        {saving ? RISK_SCORE_SETUP_COPY.saving : RISK_SCORE_SETUP_COPY.save}
+      </Button>
+    </footer>
   );
 }

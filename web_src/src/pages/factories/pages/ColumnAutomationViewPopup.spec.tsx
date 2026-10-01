@@ -11,7 +11,9 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
-import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
+import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
+import { formatRiskScoreRules } from "./riskScoreCategories";
+import { RiskScoreSettingsForm } from "./RiskScoreSettingsForm";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
@@ -85,6 +87,30 @@ function implementGraph(): IntakeAutomationGraph {
     edges,
     factoryId: "factory-1",
     specNodes: [{ id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "webhook" }],
+  };
+}
+
+function riskScoreDraft(): PlanningReviewDraft {
+  return {
+    title: "Assess Risk",
+    components: [
+      {
+        id: "assess-risk",
+        title: "Assess Risk",
+        description: "",
+        expanded: true,
+        configuration: {
+          steps: [
+            {
+              name: "Review Pull Request",
+              type: "prompt",
+              prompt: formatRiskScoreRules([{ name: "Authorization changes", score: 4 }]),
+            },
+          ],
+        },
+        concurrency: { max: "1", key: "" },
+      },
+    ],
   };
 }
 
@@ -245,5 +271,43 @@ describe("ColumnAutomationViewPopup", () => {
     const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
     expect(tabs).toEqual(["General", "Agent", "Automation"]);
     expect(screen.getByTestId("column-automation-view-general")).toBeInTheDocument();
+  });
+
+  it("hides the shared delete footer when the general body owns it", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    renderPopup({
+      title: "Risk score",
+      general: <RiskScoreSettingsForm draft={riskScoreDraft()} onSave={vi.fn()} onDelete={onDelete} />,
+      agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
+      initialTab: "general",
+      generalOwnsFooter: true,
+      onDelete,
+    });
+
+    const footer = screen.getByTestId("risk-score-settings-save").closest("footer");
+    expect(footer).not.toBeNull();
+    expect(footer).toContainElement(screen.getByTestId("risk-score-settings-delete"));
+    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("column-automation-view-tab-agent"));
+    expect(screen.getByTestId("column-automation-view-delete")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save categories" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
+
+    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
+    expect(screen.getByTestId("column-automation-view-delete")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save categories" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the shared delete footer for a general body that does not own it", () => {
+    renderPopup({
+      general: <p data-testid="column-automation-view-general">Name and filters</p>,
+      initialTab: "general",
+      onDelete: vi.fn(),
+    });
+
+    expect(screen.getByTestId("column-automation-view-delete")).toBeInTheDocument();
+    expect(screen.queryByTestId("risk-score-settings-delete")).not.toBeInTheDocument();
   });
 });
