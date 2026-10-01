@@ -420,12 +420,12 @@ export function isNotFoundError(error: unknown): boolean {
     return true;
   }
 
-  const message = readErrorField(error, "message");
+  const message = typeof error === "string" ? error : readErrorField(error, "message");
   if (typeof message !== "string") {
     return false;
   }
 
-  return message.includes("not found") || message.includes("404");
+  return message.toLowerCase().includes("not found") || message.includes("404");
 }
 
 /**
