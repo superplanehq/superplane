@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -78,6 +79,24 @@ func TestProductiveWebhookWarning_JSONUsesWarningLevel(t *testing.T) {
 	assert.Equal(t, "no activity", payloads[0]["error"])
 }
 
+func TestWithWebhookPayload_KeepsJSONAndCutsOversizedBodies(t *testing.T) {
+	fields := WithWebhookPayload(log.Fields{"component": ComponentWebhookSentry}, []byte(`{"action":"created"}`))
+	raw, ok := fields["payload"].(json.RawMessage)
+	require.True(t, ok)
+	payload := map[string]any{}
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	assert.Equal(t, "created", payload["action"])
+
+	oversized := bytes.Repeat([]byte("a"), webhookLogPayloadLimit+1)
+	cut := WithWebhookPayload(log.Fields{}, oversized)
+	logged, ok := cut["payload"].(string)
+	require.True(t, ok)
+	assert.True(t, strings.HasSuffix(logged, webhookPayloadTruncated))
+	assert.Len(t, logged, webhookLogPayloadLimit+len(webhookPayloadTruncated))
+
+	assert.Nil(t, WithWebhookPayload(nil, nil))
+}
+
 func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
 	logger := SentryWebhookLogger()
 	previous := logger.Out
@@ -95,12 +114,16 @@ func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
 
 	payloads := decodeJSONLines(t, buffer.String())
 	require.Len(t, payloads, 1)
-	assert.Equal(t, "info", payloads[0]["level"])
-	assert.Equal(t, "Sentry app webhook received", payloads[0]["msg"])
+	assert.Equal(t, "INFO", payloads[0]["severity"])
+	assert.Equal(t, "Sentry app webhook received", payloads[0]["message"])
 	assert.Equal(t, ComponentWebhookSentry, payloads[0]["component"])
 	assert.Equal(t, "issue", payloads[0]["hook_resource"])
 	assert.Equal(t, "created", payloads[0]["action"])
 	assert.Equal(t, "install-1", payloads[0]["installation_uuid"])
+	_, hasLevel := payloads[0]["level"]
+	assert.False(t, hasLevel)
+	_, hasMsg := payloads[0]["msg"]
+	assert.False(t, hasMsg)
 
 	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
 	assert.True(t, processIsText)

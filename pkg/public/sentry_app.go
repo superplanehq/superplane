@@ -96,10 +96,10 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := sentryintegration.VerifyWebhookSignature(r.Header.Get("Sentry-Hook-Signature"), body, []byte(app.ClientSecret)); err != nil {
-		logging.LogSentryWebhookWarn("Sentry app webhook was rejected", log.Fields{
+		logging.LogSentryWebhookWarn("Sentry app webhook was rejected", logging.WithWebhookPayload(log.Fields{
 			"hook_resource": strings.TrimSpace(r.Header.Get("Sentry-Hook-Resource")),
 			"status":        http.StatusBadRequest,
-		})
+		}, body))
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
@@ -121,6 +121,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			summary.Action,
 			installationUUID,
 			nil,
+			body,
 		), err)
 		captureSentryWebhookErrorToSentry(
 			r,
@@ -137,6 +138,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		summary.Action,
 		installationUUID,
 		integrationIDs(integrations),
+		body,
 	))
 
 	if len(integrations) == 0 {
@@ -163,6 +165,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 				summary.Action,
 				installationUUID,
 				integrationIDs(integrations),
+				body,
 			), err)
 			s.finishSentryWebhook(r, receiptID, summary, http.StatusInternalServerError, models.SentryWebhookOutcomeFailed, len(integrations))
 			http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -349,14 +352,14 @@ func isHostedSentryApp(integration *models.Integration) bool {
 	return metadata.HostedApp
 }
 
-func sentryAppWebhookFields(resource, action, installationUUID string, integrationIDs []string) log.Fields {
-	return log.Fields{
+func sentryAppWebhookFields(resource, action, installationUUID string, integrationIDs []string, body []byte) log.Fields {
+	return logging.WithWebhookPayload(log.Fields{
 		"hook_resource":     strings.TrimSpace(resource),
 		"action":            action,
 		"installation_uuid": installationUUID,
 		"integration_count": len(integrationIDs),
 		"integration_ids":   strings.Join(integrationIDs, ","),
-	}
+	}, body)
 }
 
 func integrationIDs(integrations []models.Integration) []string {

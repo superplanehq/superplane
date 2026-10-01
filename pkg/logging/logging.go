@@ -2,8 +2,10 @@ package logging
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -28,6 +30,11 @@ const (
 	webhookTypeUnknown              = "unknown"
 	productiveTaskCreated           = "task.created"
 	productiveTaskUpdated           = "task.updated"
+
+	// webhookLogPayloadLimit keeps one webhook log under Cloud Logging's
+	// 256 KB entry limit after the other fields are added.
+	webhookLogPayloadLimit  = 128 * 1024
+	webhookPayloadTruncated = "...(truncated)"
 )
 
 // WebhookNodeFields are the canvas and webhook ids added to a node logger
@@ -54,6 +61,12 @@ func newJSONLineLogger() *log.Logger {
 	return logger
 }
 
+func newCloudLoggingLineLogger() *log.Logger {
+	logger := newJSONLineLogger()
+	logger.SetFormatter(NewCloudLoggingFormatter())
+	return logger
+}
+
 func newProductiveWebhookLogger() *log.Logger {
 	return newJSONLineLogger()
 }
@@ -62,7 +75,9 @@ func newProductiveWebhookLogger() *log.Logger {
 var productiveWebhookLogger = newProductiveWebhookLogger()
 
 // sentryWebhookLogger writes one JSON object per hosted Sentry webhook log.
-var sentryWebhookLogger = newJSONLineLogger()
+// message and severity are the Cloud Logging summary fields. The other fields
+// stay in the JSON payload.
+var sentryWebhookLogger = newCloudLoggingLineLogger()
 
 // datadogWebhookLogger writes one JSON object per Datadog webhook log.
 var datadogWebhookLogger = newJSONLineLogger()
@@ -175,6 +190,20 @@ func WithCanvas(logger *log.Entry, canvas models.Canvas) *log.Entry {
 	})
 }
 
+// WithCanvasWorkspace adds organization_id and factory_id when the canvas
+// belongs to a workspace. factory_id is the workspace UUID. A canvas outside
+// a workspace is left unchanged.
+func WithCanvasWorkspace(logger *log.Entry, canvas *models.Canvas) *log.Entry {
+	if logger == nil || canvas == nil || canvas.FactoryID == nil || *canvas.FactoryID == uuid.Nil {
+		return logger
+	}
+
+	return logger.WithFields(log.Fields{
+		"organization_id": canvas.OrganizationID,
+		"factory_id":      *canvas.FactoryID,
+	})
+}
+
 // WithWebhookNode adds the SuperPlane organization, canvas, and webhook ids
 // to the logger passed into a webhook handler.
 func WithWebhookNode(logger *log.Entry, fields WebhookNodeFields) *log.Entry {
@@ -222,6 +251,33 @@ func LogProductiveWebhookFailure(event string, fields log.Fields, err error) {
 // task webhook that succeeded with less data than expected.
 func LogProductiveWebhookWarning(event string, message string, fields log.Fields, err error) {
 	productiveWebhookEntry(event, fields, err).Warn(message)
+}
+
+// WithWebhookPayload adds the incoming webhook body to a log line.
+// Valid JSON stays an object. A body over the limit is cut.
+func WithWebhookPayload(fields log.Fields, body []byte) log.Fields {
+	payload := webhookLogPayload(body)
+	if payload == nil {
+		return fields
+	}
+	if fields == nil {
+		fields = log.Fields{}
+	}
+	fields["payload"] = payload
+	return fields
+}
+
+func webhookLogPayload(body []byte) any {
+	if len(body) == 0 {
+		return nil
+	}
+	if len(body) > webhookLogPayloadLimit {
+		return string(body[:webhookLogPayloadLimit]) + webhookPayloadTruncated
+	}
+	if json.Valid(body) {
+		return json.RawMessage(body)
+	}
+	return string(body)
 }
 
 // LogSentryWebhookInfo writes one JSON info line for a hosted Sentry webhook.

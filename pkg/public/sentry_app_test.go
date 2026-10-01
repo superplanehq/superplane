@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -79,10 +81,15 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 	t.Run("a delivered event is accepted", func(t *testing.T) {
 		body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
 		rec := httptest.NewRecorder()
+		logs := captureSentryWebhookLogs(t)
 
 		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+		received := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook received")
+		payload, ok := received["payload"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "created", payload["action"])
 
 		var receipts []models.SentryWebhookReceipt
 		require.NoError(t, database.Conn().Where("installation_uuid = ? AND issue_id = ?", "install-1", "1").Find(&receipts).Error)
@@ -225,6 +232,36 @@ func sentryWebhookRequest(body []byte, resource string) *http.Request {
 	request.Header.Set("Sentry-Hook-Signature", hex.EncodeToString(mac.Sum(nil)))
 	request.Header.Set("Sentry-Hook-Resource", resource)
 	return request
+}
+
+func captureSentryWebhookLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	logger := logging.SentryWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+	return buffer
+}
+
+func sentryWebhookLogLine(t *testing.T, raw string, message string) map[string]any {
+	t.Helper()
+
+	for _, line := range bytes.Split([]byte(raw), []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal(line, &payload))
+		if payload["message"] == message {
+			return payload
+		}
+	}
+	t.Fatalf("missing Sentry webhook log %q", message)
+	return nil
 }
 
 func Test__isHostedSentryAppBrowserCallback(t *testing.T) {
