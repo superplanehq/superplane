@@ -111,6 +111,57 @@ func Test__ExpiredWelcomeSpendDoesNotReducePurchasedCredit(t *testing.T) {
 	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
 }
 
+func Test__ExpiredWelcomeSpendDoesNotReduceAdminGrant(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
+
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Greater(t, before.BilledMicros, int64(0))
+	require.Greater(t, before.RemainingMicros, int64(0))
+
+	expiredAt := expireWelcomeGrant(t, db, r.Organization.ID)
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", r.Organization.ID, models.UsageFundingSourceHosted, models.UsageKindModel).
+		Update("occurred_at", expiredAt.Add(-time.Second)).Error)
+
+	const adminCents = int64(2000)
+	_, err = models.AddAdminLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(adminCents), "support", &r.Account.ID)
+	require.NoError(t, err)
+	recordHostedPromptUsage(t, db, r.Organization.ID, requireExecutionRunID(t, execution))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	postExpirySpend := summary.BilledMicros - before.BilledMicros
+	require.Greater(t, postExpirySpend, int64(0))
+	expected := models.CentsToMicros(adminCents) - postExpirySpend
+	require.Greater(t, expected, int64(0))
+	assert.Equal(t, int64(0), summary.WelcomeRemainingMicros)
+	assert.Equal(t, expected, summary.AdminRemainingMicros)
+	assert.Equal(t, expected, summary.RemainingMicros)
+
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	require.NoError(t, models.AssertHostedRunAllowed(db, r.Organization.ID, nil))
+}
+
+func recordHostedPromptUsage(t *testing.T, db *gorm.DB, orgID, runID uuid.UUID) {
+	t.Helper()
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  orgID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+}
+
 func Test__ExpiredUnusedWelcomeDoesNotShieldLaterPurchasedSpend(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
