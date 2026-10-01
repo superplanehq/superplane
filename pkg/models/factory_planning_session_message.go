@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -177,6 +178,81 @@ func (s *FactoryPlanningSession) deliverUserMessage(tx *gorm.DB, message Plannin
 	}
 	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: sessionWaitText(tx, s, message.Text, refined)})
 	return nil
+}
+
+const PlanningSurveyCloseOption = "Close the task"
+
+func IsPlanningSurveyCloseOption(option string) bool {
+	return strings.EqualFold(strings.TrimSpace(option), PlanningSurveyCloseOption)
+}
+
+// SurveyReplyClosesTask reports that the user chose the close option from the
+// survey that is open now. A later chat message with the same words does not
+// close the task.
+func SurveyReplyClosesTask(survey PlanningSessionSurvey, text string) bool {
+	if !surveyOffersClose(survey) {
+		return false
+	}
+	for _, line := range surveyReplyLines(text) {
+		for _, question := range survey.Questions {
+			if surveyLineClosesTask(line, question) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ReplySelectsCloseOption reports that a stored survey reply chose close.
+// Use it only to ignore a repeat submit after the task is already closed.
+func ReplySelectsCloseOption(text string) bool {
+	option := strings.ToLower(PlanningSurveyCloseOption)
+	for _, line := range surveyReplyLines(text) {
+		lower := strings.ToLower(line)
+		if lower == option || strings.HasSuffix(lower, " "+option) {
+			return true
+		}
+	}
+	return false
+}
+
+func surveyOffersClose(survey PlanningSessionSurvey) bool {
+	for _, question := range survey.Questions {
+		if questionOffersClose(question) {
+			return true
+		}
+	}
+	return false
+}
+
+func questionOffersClose(question PlanningSessionSurveyQuestion) bool {
+	return slices.ContainsFunc(question.Options, IsPlanningSurveyCloseOption)
+}
+
+func surveyLineClosesTask(line string, question PlanningSessionSurveyQuestion) bool {
+	if !questionOffersClose(question) {
+		return false
+	}
+	if IsPlanningSurveyCloseOption(line) {
+		return true
+	}
+	prefix := strings.TrimSpace(question.Prompt) + " "
+	if !strings.HasPrefix(line, prefix) {
+		return false
+	}
+	return IsPlanningSurveyCloseOption(strings.TrimPrefix(line, prefix))
+}
+
+func surveyReplyLines(text string) []string {
+	lines := make([]string, 0)
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 func normalizePlanningSurvey(survey PlanningSessionSurvey) (PlanningSessionSurvey, error) {

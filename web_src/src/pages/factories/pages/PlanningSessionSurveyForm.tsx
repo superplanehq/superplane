@@ -6,7 +6,7 @@ import { useState, type KeyboardEvent } from "react";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentSurvey } from "./createWithAgentTypes";
-import { formatPlanningSurveyReply } from "./planningSessionSurvey";
+import { formatPlanningSurveyReply, isPlanningSurveyCloseOption } from "./planningSessionSurvey";
 
 export function PlanningSessionSurveyForm({
   survey,
@@ -60,6 +60,12 @@ export function PlanningSessionSurveyForm({
                       : "border-border bg-background text-foreground hover:bg-muted",
                   )}
                   onClick={() => {
+                    if (isPlanningSurveyCloseOption(option)) {
+                      onSubmit(
+                        formatPlanningSurveyReply(survey.questions, replaceAtIndex(answers, currentIndex, option)),
+                      );
+                      return;
+                    }
                     setAnswers((current) => replaceAtIndex(current, currentIndex, selected ? null : option));
                   }}
                 >

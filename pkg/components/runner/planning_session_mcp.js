@@ -365,7 +365,7 @@ const TOOLS = [
   {
     name: "survey",
     description:
-      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. Then stop and wait. Do not ask the same question in chat.",
+      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. The option Close the task closes this task when the user chooses it. Use that exact text when the work is already done. Then stop and wait. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
