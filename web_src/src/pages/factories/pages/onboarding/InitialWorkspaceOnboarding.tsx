@@ -125,14 +125,18 @@ function useInitialWorkspaceScreen(organizationId: string, factoryKey: string): 
     factoriesQuery.isLoading || factoriesQuery.isFetching,
   );
   const openWorkspace = useRef<OpenWorkspace | null>(null);
-  const openHere = openWorkspaceFor(openWorkspace.current, organizationId, factoryKey);
-  const describeId = resolution.factory?.id ?? openHere?.factoryId ?? "";
+  const matched = openWorkspaceFor(openWorkspace.current, organizationId, factoryKey);
+  const describeId = resolution.factory?.id ?? matched?.factoryId ?? "";
   const factoryQuery = useFactory(organizationId, describeId);
+  const nextReady =
+    !factoriesQuery.isError && resolution.status === "found" && Boolean(factoryQuery.data) && !factoryQuery.isError;
+  const held = matched ?? (nextReady ? null : openWorkspace.current);
   const decision = useInitialWorkspaceLookupRecovery(
-    lookupFromQueries(describeId, factoriesQuery, resolution.status, factoryQuery, Boolean(openHere)),
+    lookupFromQueries(describeId, factoriesQuery, resolution.status, factoryQuery, Boolean(held)),
     () => refetchInitialWorkspaceLookup(describeId, factoriesQuery, factoryQuery),
+    `${organizationId}:${factoryKey}`,
   );
-  const factory = factoryQuery.data ?? openHere?.factory;
+  const factory = factoryQuery.data ?? held?.factory;
   rememberOpenWorkspace(openWorkspace, decision.phase, {
     organizationId,
     factoryKey,
@@ -144,14 +148,15 @@ function useInitialWorkspaceScreen(organizationId: string, factoryKey: string): 
   return {
     view: decision.view,
     factory: decision.view === "setup" ? factory : undefined,
-    factoryKey: resolution.factory?.key ?? openHere?.factoryKey ?? factoryKey,
-    factories: factoriesForOpenWorkspace(factoriesQuery.data, openHere),
+    factoryKey: resolution.factory?.key ?? held?.factoryKey ?? factoryKey,
+    factories: factoriesForOpenWorkspace(factoriesQuery.data, held),
   };
 }
 
 function useInitialWorkspaceLookupRecovery(
   lookup: Omit<InitialWorkspaceLookup, "reresolveRunning" | "reresolveAttempted">,
   refetch: () => Promise<unknown>,
+  identity: string,
 ): InitialWorkspaceOnboardingDecision {
   const reresolve = useOnboardingWorkspaceResolution();
   const reresolveRef = useRef<OnboardingWorkspaceResolution | null>(reresolve);
@@ -160,12 +165,20 @@ function useInitialWorkspaceLookupRecovery(
   refetchRef.current = refetch;
   const [running, setRunning] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [seenIdentity, setSeenIdentity] = useState(identity);
   const started = useRef(false);
   const attempt = useRef(0);
+  if (seenIdentity !== identity) {
+    setSeenIdentity(identity);
+    setRunning(false);
+    setAttempted(false);
+    started.current = false;
+    attempt.current += 1;
+  }
   const decision = decideInitialWorkspaceOnboarding({
     ...lookup,
-    reresolveRunning: running,
-    reresolveAttempted: attempted,
+    reresolveRunning: seenIdentity === identity ? running : false,
+    reresolveAttempted: seenIdentity === identity ? attempted : false,
   });
 
   useEffect(() => {
@@ -231,9 +244,11 @@ function ResolvedInitialWorkspaceOnboarding({
   factories: FactoriesFactory[];
 }) {
   const permissions = usePermissions();
-  if (permissions.isLoading) {
+  const opened = useRef(false);
+  if (permissions.isLoading && !opened.current) {
     return <FactoriesLayoutLoading />;
   }
+  opened.current = true;
 
   return (
     <FactoriesLayoutContext.Provider

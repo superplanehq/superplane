@@ -112,7 +112,7 @@ export async function afterWorkspaceProvisioned(args: {
     }
   }
   if (organizationId !== args.organizationId && args.reresolveWorkspace) {
-    await args.reresolveWorkspace();
+    await args.reresolveWorkspace().catch(() => undefined);
   }
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);

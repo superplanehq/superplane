@@ -43,6 +43,6 @@ function initialWorkspaceView(
   workspaceOpen: boolean,
 ): InitialWorkspaceOnboardingView {
   if (phase === "error") return "error";
-  if (phase === "ready" || (phase === "reresolve" && workspaceOpen)) return "setup";
+  if (phase === "ready" || workspaceOpen) return "setup";
   return "loading";
 }

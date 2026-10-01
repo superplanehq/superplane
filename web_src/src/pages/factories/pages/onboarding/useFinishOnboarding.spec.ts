@@ -292,6 +292,30 @@ describe("afterWorkspaceProvisioned", () => {
       lineId: "line-1",
     });
   });
+
+  it("continues finish when the extra lookup fails after the organization rename", async () => {
+    const onProvisioned = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization: vi.fn().mockResolvedValue("acme-org"),
+      invalidateAccountOrganizations: vi.fn(),
+      navigate: vi.fn(),
+      onProvisioned,
+      reresolveWorkspace: vi.fn().mockRejectedValue(new Error("lookup failed")),
+    });
+
+    expect(onProvisioned).toHaveBeenCalledWith({
+      organizationId: "acme-org",
+      factoryKey: "SP",
+      lineId: "line-1",
+    });
+  });
 });
 
 describe("afterOnboardingPath", () => {

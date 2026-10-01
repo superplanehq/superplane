@@ -152,6 +152,14 @@ describe("decideInitialWorkspaceOnboarding", () => {
     ).toEqual({ phase: "error", view: "error" });
   });
 
+  it("keeps an open workspace on screen while a list refresh is still fetching", () => {
+    expect(
+      decideInitialWorkspaceOnboarding(
+        readyLookup({ resolution: "loading", describeReady: false, workspaceOpen: true }),
+      ),
+    ).toEqual({ phase: "loading", view: "setup" });
+  });
+
   it("lets the lookup proceed after the organization slug or workspace key changes", () => {
     expect(
       decideInitialWorkspaceOnboarding(
@@ -251,5 +259,37 @@ describe("InitialWorkspaceOnboarding", () => {
     expect(screen.getByTestId("workspace-loading")).toBeInTheDocument();
     await waitFor(() => expect(store.reresolve).toHaveBeenCalledTimes(1));
     expect(await screen.findByTestId("workspace-setup")).toBeInTheDocument();
+  });
+
+  it("keeps setup on screen while a list refresh is still fetching", async () => {
+    store.factories.data = [workspace];
+    store.factory.data = workspace;
+
+    render(<Harness />);
+    expect(await screen.findByTestId("workspace-setup")).toBeInTheDocument();
+
+    store.factories.data = [];
+    store.factories.isFetching = true;
+    store.publish();
+
+    expect(screen.getByTestId("workspace-setup")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-layout-error")).not.toBeInTheDocument();
+  });
+
+  it("keeps setup mounted when the organization slug changes before the new lookup is ready", async () => {
+    store.factories.data = [workspace];
+    store.factory.data = workspace;
+
+    const { rerender } = render(<Harness />);
+    expect(await screen.findByTestId("workspace-setup")).toBeInTheDocument();
+
+    store.factories.data = [];
+    store.factories.isLoading = true;
+    store.factory.data = undefined;
+    rerender(<Harness organizationId="acme-org" />);
+
+    expect(screen.getByTestId("workspace-setup")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-loading")).not.toBeInTheDocument();
   });
 });
