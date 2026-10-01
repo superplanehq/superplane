@@ -38,12 +38,26 @@ func (w *WebhookCleanupWorker) releaseRetiredDatadogMonitors() {
 
 func (w *WebhookCleanupWorker) releaseRetiredDatadogMonitor(node models.CanvasNode) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Lock the canvas before the node. Canvas cleanup locks the canvas
+		// first, and the reverse order can deadlock.
+		canvas, err := models.LockUnscopedCanvas(tx, node.WorkflowID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+
 		locked, err := models.LockUnscopedCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
 			return err
+		}
+
+		if !locked.DeletedAt.Valid && !canvas.DeletedAt.Valid {
+			return nil
 		}
 
 		metadata := locked.Metadata.Data()

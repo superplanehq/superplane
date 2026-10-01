@@ -187,6 +187,33 @@ func Test__OnErrorTrackingAlert__Setup__LeavesCustomWebhookMonitor(t *testing.T)
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
 
+func Test__OnErrorTrackingAlert__Setup__LeavesAnotherConnectionsMonitor(t *testing.T) {
+	otherTag := intakeOwnerTag("11111111-1111-1111-1111-111111111111")
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, `{"monitors":[{"id":7,"name":"SuperPlane checkout"}]}`),
+			jsonResponse(http.StatusOK, monitorJSON(7, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false, otherTag)),
+			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+		},
+	}
+	metadata := &contexts.MetadataContext{}
+	integration := datadogIntegration()
+
+	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+		Configuration: map[string]any{"service": "checkout"},
+		HTTP:          httpContext,
+		Integration:   integration,
+		Metadata:      metadata,
+	})
+
+	require.NoError(t, err)
+	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	assert.Equal(t, "42", saved.MonitorID)
+	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
+	post := monitorRequest(t, httpContext, http.MethodPost)
+	assert.Equal(t, []string{intakeOwnerTag(integration.ID().String())}, readMonitorBody(t, post).Tags)
+}
+
 func Test__OnErrorTrackingAlert__Setup__MissingMonitorsWrite(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -270,11 +297,13 @@ func Test__Datadog__Cleanup__DeletesOnlyOwnedMonitors(t *testing.T) {
 			jsonResponse(http.StatusOK, monitorJSON(3, "New issue to review", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
 			jsonResponse(http.StatusOK, `{"monitors":[
 				{"id":4,"name":"SuperPlane billing"},
+				{"id":6,"name":"SuperPlane checkout"},
 				{"id":2,"name":"Disk usage"},
 				{"id":5,"name":"SuperPlane dashboard"}
 			]}`),
 			jsonResponse(http.StatusOK, monitorJSON(4, "SuperPlane billing", billingMonitorQuery, intakeMonitorMessage, 0, false)),
 			jsonResponse(http.StatusOK, `{}`),
+			jsonResponse(http.StatusOK, monitorJSON(6, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false, "superplane_integration:11111111-1111-1111-1111-111111111111")),
 			jsonResponse(http.StatusOK, monitorJSON(2, "Disk usage", "avg(last_5m):avg:system.disk.in_use{*} > 0.9", "disk", 0, false)),
 			jsonResponse(http.StatusOK, monitorJSON(5, "SuperPlane dashboard", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
 		},
@@ -296,6 +325,7 @@ func Test__Datadog__Cleanup__DeletesOnlyOwnedMonitors(t *testing.T) {
 	assert.NotContains(t, deleted, "/api/v1/monitor/2")
 	assert.NotContains(t, deleted, "/api/v1/monitor/3")
 	assert.NotContains(t, deleted, "/api/v1/monitor/5")
+	assert.NotContains(t, deleted, "/api/v1/monitor/6")
 }
 
 func Test__Datadog__Cleanup__ReturnsMonitorDeleteError(t *testing.T) {

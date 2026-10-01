@@ -433,7 +433,12 @@ func deleteIntakeMonitors(client *Client, integrationID string) error {
 		return err
 	}
 
-	return deleteMatchingMonitors(client, "title:SuperPlane", deleted, exactGeneratedMonitor)
+	return deleteMatchingMonitors(client, "title:SuperPlane", deleted, func(monitor Monitor) bool {
+		if monitorTaggedForOtherIntegration(monitor, integrationID) {
+			return false
+		}
+		return exactGeneratedMonitor(monitor)
+	})
 }
 
 func deleteMatchingMonitors(client *Client, query string, deleted map[int64]struct{}, owned func(Monitor) bool) error {
@@ -469,10 +474,26 @@ func monitorOwnedBy(monitor Monitor, integrationID, service string) bool {
 	if tag := intakeOwnerTag(integrationID); tag != "" && slices.Contains(monitor.Tags, tag) {
 		return true
 	}
+	// An untagged generated monitor is a legacy monitor from before owner
+	// tags. A tag for another connection means that connection owns it.
+	if monitorTaggedForOtherIntegration(monitor, integrationID) {
+		return false
+	}
 	if strings.TrimSpace(service) == "" {
 		return false
 	}
 	return exactGeneratedMonitorForService(monitor, service)
+}
+
+func monitorTaggedForOtherIntegration(monitor Monitor, integrationID string) bool {
+	own := intakeOwnerTag(integrationID)
+	prefix := intakeMonitorTagKey + ":"
+	for _, tag := range monitor.Tags {
+		if strings.HasPrefix(tag, prefix) && tag != own {
+			return true
+		}
+	}
+	return false
 }
 
 func exactGeneratedMonitor(monitor Monitor) bool {
