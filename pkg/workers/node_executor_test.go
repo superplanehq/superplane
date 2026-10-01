@@ -481,6 +481,7 @@ func Test__NodeExecutor_RecordsHostedCreditFailureReasonOnFactoryStep(t *testing
 			assert.Equal(t, step.OrganizationID.String(), failure["organization_id"])
 			assert.Equal(t, step.FactoryID.String(), failure["factory_id"])
 			assert.Equal(t, step.WorkOrderID.String(), failure["order_id"])
+			assertRejectedHostedCredit(t, failure, step.OrganizationID, tc.err)
 
 			updatedExecution, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
 			require.NoError(t, err)
@@ -585,6 +586,24 @@ func createFactoryStepNodeExecution(
 
 func stringPointer(value string) *string {
 	return &value
+}
+
+func assertRejectedHostedCredit(t *testing.T, failure map[string]any, orgID uuid.UUID, err error) {
+	t.Helper()
+
+	if !errors.Is(err, models.ErrHostedCreditEmpty) {
+		_, present := failure["remaining_micros"]
+		assert.False(t, present)
+		return
+	}
+
+	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	require.NoError(t, describeErr)
+	assert.Equal(t, float64(summary.RemainingMicros), failure["remaining_micros"])
+	assert.Equal(t, float64(summary.WelcomeRemainingMicros), failure["welcome_remaining_micros"])
+	assert.Equal(t, float64(summary.IncludedRemainingMicros), failure["included_remaining_micros"])
+	assert.Equal(t, float64(summary.PurchasedRemainingMicros), failure["topup_remaining_micros"])
+	assert.Equal(t, float64(summary.AdminRemainingMicros), failure["admin_remaining_micros"])
 }
 
 func captureExecutorLogs(executor *NodeExecutor) *bytes.Buffer {
