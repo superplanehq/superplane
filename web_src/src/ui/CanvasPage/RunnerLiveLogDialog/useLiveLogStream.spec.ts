@@ -286,10 +286,10 @@ describe("useLiveLogStream", () => {
     expect(pumpMock).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["network error", "Failed to fetch"] as const)(
+  it.each(["network error", "Failed to fetch", "NetworkError when attempting to fetch resource."] as const)(
     "reconnects an in-progress browser drop (%s) without a failure or report",
     async (message) => {
-      const failure = message === "network error" ? new TypeError(message) : new Error(message);
+      const failure = message === "Failed to fetch" ? new Error(message) : new TypeError(message);
       pumpMock.mockImplementationOnce(
         async (handlers: {
           onOpen?: () => void;

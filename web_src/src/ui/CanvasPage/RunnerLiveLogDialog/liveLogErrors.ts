@@ -7,6 +7,7 @@ const BROWSER_TRANSPORT_FAILURE_MESSAGES = new Set([
   "network error",
   "Failed to fetch",
   "NetworkError when attempting to fetch resource",
+  "NetworkError when attempting to fetch resource.",
   "Load failed",
 ]);
 

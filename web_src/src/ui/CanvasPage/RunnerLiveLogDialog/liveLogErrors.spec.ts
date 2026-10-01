@@ -62,13 +62,16 @@ describe("live log wait detection", () => {
 });
 
 describe("browser transport failure detection", () => {
-  it.each(["network error", "Failed to fetch", "NetworkError when attempting to fetch resource", "Load failed"])(
-    "matches a browser transport message: %s",
-    (message) => {
-      expect(isBrowserTransportFailure(new TypeError(message))).toBe(true);
-      expect(isBrowserTransportFailure(new Error(message))).toBe(true);
-    },
-  );
+  it.each([
+    "network error",
+    "Failed to fetch",
+    "NetworkError when attempting to fetch resource",
+    "NetworkError when attempting to fetch resource.",
+    "Load failed",
+  ])("matches a browser transport message: %s", (message) => {
+    expect(isBrowserTransportFailure(new TypeError(message))).toBe(true);
+    expect(isBrowserTransportFailure(new Error(message))).toBe(true);
+  });
 
   it("does not match an HTTP error response with the same text", () => {
     expect(isBrowserTransportFailure(new LiveLogRequestError("Failed to fetch"))).toBe(false);
