@@ -76,10 +76,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
 	assertImplementCloneResolvesMissingBranch(t, cloneCommand)
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
+	assert.Contains(t, result.canvasYAML, "base: $base")
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
-	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
+	assert.Equal(t, `{{ $["Implement From Task Description"].data.result.base }}`, createPR.Configuration["base"])
+	findPR := findYAMLNode(t, canvas, "find-pr")
+	assert.Equal(t, `{{ $["Implement From Task Description"].data.result.base }}`, findPR.Configuration["base"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
 
 	body, ok := createPR.Configuration["body"].(string)

@@ -105,6 +105,7 @@ spec:
                 fi
               done < <(printf '%s\n' "$heads")
 
+              resolved_base="$named_branch"
               if [ "$named_present" -eq 1 ]; then
                 if ! git clone --depth 1 --branch "$named_branch" "${REPO_URL}" repo; then
                   echo "clone failed" >&2
@@ -139,10 +140,19 @@ spec:
                   echo "clone failed: remote default branch is missing" >&2
                   exit 1
                 fi
+                resolved_base="$default_branch"
                 if ! git clone --depth 1 --branch "$default_branch" "${REPO_URL}" repo; then
                   echo "clone failed" >&2
                   exit 1
                 fi
+              fi
+              if [ -z "${SUPERPLANE_TASK_DIR:-}" ]; then
+                echo "clone failed: SUPERPLANE_TASK_DIR is required" >&2
+                exit 1
+              fi
+              if ! printf '%s\n' "$resolved_base" > "$SUPERPLANE_TASK_DIR/resolved-base"; then
+                echo "clone failed: could not record the resolved base branch" >&2
+                exit 1
               fi
 
               if ! cd repo; then
@@ -314,7 +324,7 @@ spec:
             type: prompt
             workingDirectory: repo
             prompt: |-
-              You are implementing a SuperPlane task. The repository is cloned in the current working directory on {{ task().default_branch }}.
+              You are implementing a SuperPlane task. The repository is cloned in the current working directory. The base branch is the first line of $SUPERPLANE_TASK_DIR/resolved-base.
 
               Repository: {{ task().repository }}
               Task title: {{ task().title }}
@@ -322,7 +332,7 @@ spec:
               Task description:
               {{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}
 
-              1/ Create a new branch. Do not commit on {{ task().default_branch }}.
+              1/ Create a new branch from that base branch. Do not commit on the base branch.
               2/ Implement the task. Keep the change focused.
               3/ Commit on the working branch with clear messages.
               4/ Do not create or open the pull request. Only commit and push to the working branch. The automation opens or updates the pull request after you finish.
@@ -349,8 +359,21 @@ spec:
                 git commit -s -m "fix: implement task via SuperPlane"
               fi
 
-              # Fail if this branch has no commits ahead of the default branch.
-              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+              # Fail when this branch has no commits ahead of the resolved base.
+              if [ ! -s "${SUPERPLANE_TASK_DIR:-}/resolved-base" ]; then
+                echo "clone base is missing" >&2
+                exit 1
+              fi
+              base_ref="$(sed -n '1s/[[:space:]]*$//p' "$SUPERPLANE_TASK_DIR/resolved-base")"
+              if [ -z "$base_ref" ]; then
+                echo "clone base is missing" >&2
+                exit 1
+              fi
+              if ! ahead="$(git rev-list --count "origin/${base_ref}..HEAD")"; then
+                echo "clone base is missing" >&2
+                exit 1
+              fi
+              if [ "$ahead" -eq 0 ]; then
                 echo "No commits to push" >&2
                 exit 1
               fi
@@ -364,7 +387,7 @@ spec:
 
               Task title: {{ task().title }}
 
-              1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
+              1/ Compare the current branch with the base branch in $SUPERPLANE_TASK_DIR/resolved-base and review the commits you made.
               2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
               3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
               4/ Do not add GitHub closing keywords (Closes, Fixes, Resolves). The automation adds them.
@@ -388,6 +411,15 @@ spec:
 
               echo "Title and description found. Using as output"
               BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+              if [ ! -s "${SUPERPLANE_TASK_DIR:-}/resolved-base" ]; then
+                echo "clone base is missing" >&2
+                exit 1
+              fi
+              BASE_REF="$(sed -n '1s/[[:space:]]*$//p' "$SUPERPLANE_TASK_DIR/resolved-base")"
+              if [ -z "$BASE_REF" ]; then
+                echo "clone base is missing" >&2
+                exit 1
+              fi
 
               EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"
               if [ ! -s "$EVIDENCE_FILE" ]; then
@@ -407,12 +439,14 @@ spec:
               ' "$EVIDENCE_FILE")"
               jq -n \
                 --arg branch "$BRANCH" \
+                --arg base "$BASE_REF" \
                 --rawfile title /tmp/TITLE \
                 --rawfile description /tmp/DESCRIPTION.md \
                 --slurpfile evidence "$EVIDENCE_FILE" \
                 --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \
                 '{
                   branch: $branch,
+                  base: $base,
                   title: ($title | gsub("[\\r\\n]"; "") | @base64),
                   description: ($description | @base64),
                   visualEvidence: {
@@ -452,7 +486,7 @@ spec:
       configuration:
         repository: "{{ task().repository }}"
         head: '{{ $["Implement From Task Description"].data.result.branch }}'
-        base: "{{ task().default_branch }}"
+        base: '{{ $["Implement From Task Description"].data.result.base }}'
         state: open
       position:
         x: 1442
@@ -465,7 +499,7 @@ spec:
       concurrency:
         max: 100
       configuration:
-        base: "{{ task().default_branch }}"
+        base: '{{ $["Implement From Task Description"].data.result.base }}'
         body: |-
           {{ task().origin != nil ? "Closes " + task().origin.label : "" }}
 

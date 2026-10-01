@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,6 +110,50 @@ func TestIntakeCloneUsesRemoteDefaultWhenNamedBranchIsMissing(t *testing.T) {
 	assert.Error(t, statErr)
 }
 
+func TestImplementResolvedBaseFeedsPullRequest(t *testing.T) {
+	requireGit(t)
+	remote := templateCloneRemote(t, []string{"develop"}, "develop")
+	dir := t.TempDir()
+	taskDir := t.TempDir()
+
+	output, err := runTemplateCloneIn(t, dir, taskDir, implementCloneCommand(t), remote, "main")
+	require.NoError(t, err, output)
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, "develop", templateCloneBranch(t, repo))
+	assert.Equal(t, "develop", readResolvedBase(t, taskDir))
+	missingMain := exec.Command("git", "rev-parse", "--verify", "refs/remotes/origin/main")
+	missingMain.Dir = repo
+	require.Error(t, missingMain.Run())
+
+	runTemplateGit(t, repo, "checkout", "-b", "fix/resolved-base")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "CHANGE"), []byte("work\n"), 0o644))
+
+	commitOut, commitErr := runCanvasStep(t, repo, taskDir, "", implementStepCommand(t, "Commit and Push"))
+	require.NoError(t, commitErr, commitOut)
+	pushed := exec.Command("git", "rev-parse", "--verify", "refs/heads/fix/resolved-base")
+	pushed.Dir = remote
+	require.NoError(t, pushed.Run())
+	if _, jqErr := exec.LookPath("jq"); jqErr != nil {
+		return
+	}
+	titlePath := filepath.Join(t.TempDir(), "TITLE")
+	descriptionPath := filepath.Join(t.TempDir(), "DESCRIPTION.md")
+	require.NoError(t, os.WriteFile(titlePath, []byte("fix: Use the resolved base\n"), 0o644))
+	require.NoError(t, os.WriteFile(descriptionPath, []byte("The pull request targets the cloned base.\n"), 0o644))
+	resultFile := filepath.Join(taskDir, "result.json")
+	pushCommand := strings.ReplaceAll(implementStepCommand(t, "Push output"), "/tmp/TITLE", titlePath)
+	pushCommand = strings.ReplaceAll(pushCommand, "/tmp/DESCRIPTION.md", descriptionPath)
+	pushOut, pushErr := runCanvasStep(t, repo, taskDir, resultFile, pushCommand)
+	require.NoError(t, pushErr, pushOut)
+
+	body, readErr := os.ReadFile(resultFile)
+	require.NoError(t, readErr, pushOut)
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(body, &result), string(body))
+	assert.Equal(t, "develop", result["base"])
+	assert.Equal(t, "fix/resolved-base", result["branch"])
+}
+
 func requireGit(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -116,7 +161,7 @@ func requireGit(t *testing.T) {
 	}
 }
 
-func implementCloneCommand(t *testing.T) string {
+func implementCanvas(t *testing.T) *yaml.Canvas {
 	t.Helper()
 	result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
 		appID:   "app-1",
@@ -125,28 +170,53 @@ func implementCloneCommand(t *testing.T) string {
 	require.NoError(t, err)
 	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
-	command, ok := implementationStep(t, findYAMLNode(t, canvas, "implementation-agent-no-issue"), "Clone Repo")["command"].(string)
+	return canvas
+}
+
+func implementCloneCommand(t *testing.T) string {
+	t.Helper()
+	command, ok := implementationStep(t, findYAMLNode(t, implementCanvas(t), "implementation-agent-no-issue"), "Clone Repo")["command"].(string)
+	require.True(t, ok)
+	return command
+}
+
+func implementStepCommand(t *testing.T, name string) string {
+	t.Helper()
+	command, ok := implementationStep(t, findYAMLNode(t, implementCanvas(t), "implementation-agent-no-issue"), name)["command"].(string)
 	require.True(t, ok)
 	return command
 }
 
 func runTemplateClone(t *testing.T, dir, command, remote, base string) (string, error) {
 	t.Helper()
+	return runTemplateCloneIn(t, dir, t.TempDir(), command, remote, base)
+}
+
+func runTemplateCloneIn(t *testing.T, dir, taskDir, command, remote, base string) (string, error) {
+	t.Helper()
+	return runCanvasStep(t, dir, taskDir, "", command, "REPO_URL="+remote, "BASE="+base)
+}
+
+func runCanvasStep(t *testing.T, dir, taskDir, resultFile, command string, extraEnv ...string) (string, error) {
+	t.Helper()
 	requireGit(t)
 	wrapped := "status=0\n{\n" + command + "\n} || status=$?\nexit \"$status\"\n"
 	cmd := exec.Command("bash", "-c", wrapped)
 	cmd.Dir = dir
 	home := t.TempDir()
-	cmd.Env = []string{
+	if resultFile == "" {
+		resultFile = filepath.Join(taskDir, "unused-result.json")
+	}
+	cmd.Env = append([]string{
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + home,
 		"GIT_CONFIG_GLOBAL=" + filepath.Join(home, "gitconfig"),
 		"GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_TERMINAL_PROMPT=0",
-		"REPO_URL=" + remote,
-		"BASE=" + base,
+		"SUPERPLANE_TASK_DIR=" + taskDir,
+		"SUPERPLANE_RESULT_FILE=" + resultFile,
 		"GITHUB_TOKEN=test-token",
-	}
+	}, extraEnv...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
@@ -196,6 +266,13 @@ func runTemplateGit(t *testing.T, dir string, args ...string) {
 	}
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
+}
+
+func readResolvedBase(t *testing.T, taskDir string) string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(taskDir, runner.FactoryResolvedBaseFile))
+	require.NoError(t, err)
+	return strings.TrimSpace(string(body))
 }
 
 func templateCloneBranch(t *testing.T, repo string) string {
