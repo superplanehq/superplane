@@ -223,6 +223,75 @@ describe("afterWorkspaceProvisioned", () => {
       lineId: "line-1",
     });
   });
+
+  it("awaits re-resolve when the organization slug changes before analysis continues", async () => {
+    let release = () => undefined;
+    const reresolveWorkspace = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const onProvisioned = vi.fn();
+    const started = new Promise<void>((resolve) => {
+      reresolveWorkspace.mockImplementation(() => {
+        resolve();
+        return new Promise<void>((done) => {
+          release = done;
+        });
+      });
+    });
+
+    const pending = afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization: vi.fn().mockResolvedValue("acme-org"),
+      invalidateAccountOrganizations: vi.fn(),
+      navigate: vi.fn(),
+      onProvisioned,
+      reresolveWorkspace,
+    });
+
+    await started;
+    expect(onProvisioned).not.toHaveBeenCalled();
+    release();
+    await pending;
+    expect(onProvisioned).toHaveBeenCalledWith({
+      organizationId: "acme-org",
+      factoryKey: "SP",
+      lineId: "line-1",
+    });
+  });
+
+  it("does not re-resolve when the organization slug stays the same", async () => {
+    const reresolveWorkspace = vi.fn();
+    const onProvisioned = vi.fn();
+
+    await afterWorkspaceProvisioned({
+      factory: { onboarding: { initial: true } },
+      owner: "Acme Org",
+      organizationId: "test-test",
+      factoryId: "factory-1",
+      factoryKey: "SP",
+      lineId: "line-1",
+      updateOrganization: vi.fn().mockResolvedValue("test-test"),
+      invalidateAccountOrganizations: vi.fn(),
+      navigate: vi.fn(),
+      onProvisioned,
+      reresolveWorkspace,
+    });
+
+    expect(reresolveWorkspace).not.toHaveBeenCalled();
+    expect(onProvisioned).toHaveBeenCalledWith({
+      organizationId: "test-test",
+      factoryKey: "SP",
+      lineId: "line-1",
+    });
+  });
 });
 
 describe("afterOnboardingPath", () => {

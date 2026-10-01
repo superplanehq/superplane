@@ -8,7 +8,6 @@ import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
 import { useGithubAppAvailability } from "./useGithubAppAvailability";
 import { useOnboardingEntryPath } from "./useOnboardingEntryPath";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
-import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
 
 export function OnboardingPage() {
   const layout = useFactoriesLayout();
@@ -17,10 +16,9 @@ export function OnboardingPage() {
 
 function WorkspaceOnboardingPage({ layout }: { layout: FactoriesLayoutContextValue }) {
   const onboardingEntryPath = useOnboardingEntryPath();
-  const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
   const githubApp = useGithubAppAvailability(layout.organizationId);
-  const model = useOnboardingPageModel({ ...layout, onboardingEntryPath, reresolveWorkspace });
+  const model = useOnboardingPageModel({ ...layout, onboardingEntryPath });
 
   if (!githubApp.resolved) {
     return (

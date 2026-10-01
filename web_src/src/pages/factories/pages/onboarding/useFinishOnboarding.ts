@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 
 import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganization";
+import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
@@ -35,6 +36,7 @@ import {
 import { apiIssuesSource } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
+import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function finishOnboardingError(args: {
@@ -94,6 +96,7 @@ export async function afterWorkspaceProvisioned(args: {
   invalidateAccountOrganizations: () => void;
   navigate: ReturnType<typeof useNavigate>;
   onProvisioned?: (destination: OnboardingDestination) => void;
+  reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }): Promise<void> {
   let organizationId = args.organizationId;
   if (args.updateOrganization) {
@@ -107,6 +110,9 @@ export async function afterWorkspaceProvisioned(args: {
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
     }
+  }
+  if (organizationId !== args.organizationId && args.reresolveWorkspace) {
+    await args.reresolveWorkspace();
   }
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
@@ -250,6 +256,7 @@ export function useFinishOnboarding(args: {
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const reresolveWorkspace = useOnboardingWorkspaceResolution();
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -313,6 +320,7 @@ export function useFinishOnboarding(args: {
         },
         navigate,
         onProvisioned: args.onProvisioned,
+        reresolveWorkspace,
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));

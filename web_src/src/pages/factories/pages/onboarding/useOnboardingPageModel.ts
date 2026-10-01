@@ -24,7 +24,6 @@ import { describeGitHubInstallationName, githubIntegrationSelection } from "./gi
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
-import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -182,7 +181,6 @@ type OnboardingGithubSavesAndFinishArgs = {
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
-  reresolveWorkspace: OnboardingWorkspaceResolution | null;
   setup: OnboardingSetupApi;
   integrations: ReturnType<typeof useIntegrationSelections>;
   connect: ReturnType<typeof useIntegrationConnectDialog>;
@@ -282,7 +280,6 @@ export function useOnboardingPageModel(args: {
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
-  reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }) {
   const { canAct } = usePermissions();
   const bringYourOwnKey = useExperimentalFeature(args.organizationId);
@@ -321,7 +318,6 @@ export function useOnboardingPageModel(args: {
   const mutations = useOnboardingMutations(args.organizationId, args.factoryId);
   const wired = useOnboardingGithubSavesAndFinish({
     ...args,
-    reresolveWorkspace: args.reresolveWorkspace ?? null,
     setup,
     integrations,
     connect,
