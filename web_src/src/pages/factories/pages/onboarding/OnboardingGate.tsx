@@ -33,7 +33,8 @@ function pathAfterSetup(organizationId: string, factoryKey: string, factory: Fac
 export function OnboardingGate({ children }: { children?: ReactNode }) {
   const onboarding = useOnboardingStorybook();
   const location = useLocation();
-  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factoryKey, factory } = useFactoriesLayout();
+  const workspaceSegment = routeSegment || factoryKey;
 
   const storybookPending = onboarding?.pending;
   const isSetupRoute = isWorkspaceSetupRoute(location.pathname);
@@ -59,7 +60,7 @@ export function OnboardingGate({ children }: { children?: ReactNode }) {
       return outlet;
     }
     if (isSetupRoute) {
-      return <Navigate to={pathAfterSetup(organizationId, routeSegment, factory)} replace />;
+      return <Navigate to={pathAfterSetup(organizationId, workspaceSegment, factory)} replace />;
     }
     return outlet;
   }
@@ -72,5 +73,5 @@ export function OnboardingGate({ children }: { children?: ReactNode }) {
     return outlet;
   }
 
-  return <Navigate to={factorySetupPath(organizationId, routeSegment)} replace />;
+  return <Navigate to={factorySetupPath(organizationId, workspaceSegment)} replace />;
 }
