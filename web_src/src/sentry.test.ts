@@ -87,6 +87,24 @@ describe("isMonacoCanceledEvent", () => {
     expect(isMonacoCanceledEvent(event)).toBe(false);
   });
 
+  it("ignores a Canceled rejection from a bundled non-worker monaco chunk", () => {
+    const event = buildEvent("Canceled", [
+      "https://assets.superplane.com/releases/abc/assets/monaco-editor-editor.main-Bx123.js",
+      "https://app.superplane.com/assets/monaco-editor-cssMode-Bx123.js",
+    ]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(true);
+  });
+
+  it("keeps a Canceled rejection that mixes a bundled editor chunk with an application frame", () => {
+    const event = buildEvent("Canceled", [
+      "https://assets.superplane.com/releases/abc/assets/monaco-editor-Bx123.js",
+      "https://app.superplane.com/assets/TextFieldRenderer-App123.js",
+    ]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(false);
+  });
+
   it.each(["editor.worker", "json.worker", "css.worker", "html.worker", "ts.worker"])(
     "ignores a Canceled rejection from a bundled %s chunk",
     (worker) => {
