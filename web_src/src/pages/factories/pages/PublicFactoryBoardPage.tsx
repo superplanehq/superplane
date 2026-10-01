@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 
 import { Link } from "@/components/Link/link";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
@@ -10,7 +10,7 @@ import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline"
 import type { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
-import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
+import { factoryRouteSegment, replaceFactoryKeySegment } from "../lib/factoryKeyResolution";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
@@ -57,6 +57,8 @@ export function PublicFactoryBoardPage({
     factoryKey: string;
     lineId: string;
   }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [load, setLoad] = useState<BoardLoad>({ status: "loading" });
   const listState = useWorkOrderListState(`${organizationId}:${factoryKey}:${lineId}`);
   const signedInRef = useRef(signedIn);
@@ -102,6 +104,18 @@ export function PublicFactoryBoardPage({
       cancelled = true;
     };
   }, [organizationId, factoryKey, lineId]);
+
+  useEffect(() => {
+    if (load.status !== "ready" || !load.board.urlId || !load.board.workspaceKey) {
+      return;
+    }
+    const canonical = factoryRouteSegment({ key: load.board.workspaceKey, urlId: load.board.urlId });
+    if (!canonical || canonical === factoryKey) {
+      return;
+    }
+    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, canonical);
+    navigate(`${target}${location.search}`, { replace: true });
+  }, [factoryKey, load, location.pathname, location.search, navigate, organizationId]);
 
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 

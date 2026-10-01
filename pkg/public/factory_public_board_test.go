@@ -66,7 +66,9 @@ func TestPublicFactoryBoardReturnsDisplayFieldsOnly(t *testing.T) {
 	assert.NotContains(t, body, hidden.ID.String())
 
 	var board struct {
-		Columns []struct {
+		WorkspaceKey string `json:"workspaceKey"`
+		UrlId        string `json:"urlId"`
+		Columns      []struct {
 			Cards []struct {
 				Title string `json:"title"`
 			} `json:"cards"`
@@ -75,6 +77,22 @@ func TestPublicFactoryBoardReturnsDisplayFieldsOnly(t *testing.T) {
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &board))
 	require.NotEmpty(t, board.Columns)
 	assert.Equal(t, "Ship the board", board.Columns[0].Cards[0].Title)
+	assert.Equal(t, factory.Key, board.WorkspaceKey)
+	assert.Equal(t, factory.URLID, board.UrlId)
+}
+
+func TestPublicFactoryBoardAcceptsCurrentWorkspaceKey(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, _, _ := setupTestServer(r, t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+
+	factory, line := openPublicLine(t, r, true)
+	response := execRequest(server, requestParams{
+		method: http.MethodGet,
+		path:   "/api/v1/public/organizations/" + r.Organization.Slug + "/workspaces/" + factory.Key + "/lines/" + line.ID.String() + "/board",
+	})
+	require.Equal(t, http.StatusOK, response.Code)
 }
 
 func TestAnonymousFactoryOrderRoutesStayUnauthorized(t *testing.T) {
@@ -263,9 +281,9 @@ func openPublicLine(t *testing.T, r *support.ResourceRegistry, public bool) (*mo
 }
 
 func publicBoardPath(r *support.ResourceRegistry, factory *models.Factory, line *models.FactoryLine) string {
-	return "/api/v1/public/organizations/" + r.Organization.Slug + "/workspaces/" + factory.Key + "/lines/" + line.ID.String() + "/board"
+	return "/api/v1/public/organizations/" + r.Organization.Slug + "/workspaces/" + factory.RouteSegment() + "/lines/" + line.ID.String() + "/board"
 }
 
 func publicBoardSocketPath(r *support.ResourceRegistry, factory *models.Factory, line *models.FactoryLine) string {
-	return "/ws/public/organizations/" + r.Organization.Slug + "/workspaces/" + factory.Key + "/lines/" + line.ID.String()
+	return "/ws/public/organizations/" + r.Organization.Slug + "/workspaces/" + factory.RouteSegment() + "/lines/" + line.ID.String()
 }

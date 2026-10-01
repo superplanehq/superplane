@@ -9,7 +9,7 @@ import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useRecordLastLocation } from "@/hooks/useRecordLastLocation";
 import { recordLastVisitedOrganization } from "@/lib/lastVisitedOrganization";
 
-import { resolveFactoryByKey } from "../../lib/factoryKeyResolution";
+import { factoryRouteSegment, resolveFactoryByKey } from "../../lib/factoryKeyResolution";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactoriesLayoutError, FactoriesLayoutLoading } from "../../layout/FactoriesLayout";
 import { FactoriesLayoutContext } from "../../layout/factoriesLayoutContext";
@@ -42,7 +42,7 @@ export function InitialWorkspaceOnboarding({
       <ResolvedInitialWorkspaceOnboarding
         organizationId={organizationId}
         factoryId={resolution.factory.id}
-        factoryKey={resolution.factory.key ?? factoryKey}
+        factoryKey={factoryRouteSegment(resolution.factory) || factoryKey}
         factories={factories.data ?? []}
       />
     </PermissionsProvider>

@@ -36,6 +36,7 @@ var errPublicBoardNotFound = errors.New("public board not found")
 type publicBoard struct {
 	WorkspaceName  string         `json:"workspaceName"`
 	WorkspaceKey   string         `json:"workspaceKey"`
+	UrlId          string         `json:"urlId"`
 	ShowClarity    bool           `json:"showClarity"`
 	ShowConfidence bool           `json:"showConfidence"`
 	LineName       string         `json:"lineName"`
@@ -205,7 +206,7 @@ func authorizePublicFactoryLine(ctx context.Context, vars map[string]string) (*m
 		return nil, nil, errPublicBoardNotFound
 	}
 
-	factory, err := models.FindFactoryByKey(db, org.ID, models.NormalizeFactoryKey(vars["key"]))
+	factory, err := models.FindFactoryByRef(db, org.ID, vars["key"])
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryNotFound) {
 			return nil, nil, errPublicBoardNotFound
@@ -384,6 +385,7 @@ func assemblePublicBoard(
 	return &publicBoard{
 		WorkspaceName:  factory.Name,
 		WorkspaceKey:   factory.Key,
+		UrlId:          factory.URLID,
 		ShowClarity:    planning.Clarity,
 		ShowConfidence: planning.Confidence,
 		LineName:       line.Name,

@@ -1,12 +1,16 @@
 import type { FactoriesFactory } from "@/api-client";
 import { createContext, useContext } from "react";
 
+import { factoryRouteSegment } from "../lib/factoryKeyResolution";
+
 export interface FactoriesLayoutContextValue {
   organizationId: string;
   /** Real database id — use for API calls, mutations, and the websocket subscription. */
   factoryId: string;
-  /** Canonical workspace key (e.g. `SP`) — use for building links. */
+  /** Canonical workspace key (e.g. `SP`) — use for task identifiers. */
   factoryKey: string;
+  /** Canonical workspace URL segment (`sp-k7m2xqab`) — use for building links. */
+  routeSegment?: string;
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
   openCreateWorkOrder: () => void;
@@ -14,14 +18,27 @@ export interface FactoriesLayoutContextValue {
 
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);
 
-export function useFactoriesLayout(): FactoriesLayoutContextValue {
+function withRouteSegment(
+  context: FactoriesLayoutContextValue,
+): FactoriesLayoutContextValue & { routeSegment: string } {
+  return {
+    ...context,
+    routeSegment: context.routeSegment || factoryRouteSegment(context.factory) || context.factoryKey,
+  };
+}
+
+export function useFactoriesLayout(): FactoriesLayoutContextValue & { routeSegment: string } {
   const context = useOptionalFactoriesLayout();
   if (!context) {
     throw new Error("useFactoriesLayout must be used within FactoriesLayout");
   }
-  return context;
+  return withRouteSegment(context);
 }
 
-export function useOptionalFactoriesLayout(): FactoriesLayoutContextValue | null {
-  return useContext(FactoriesLayoutContext);
+export function useOptionalFactoriesLayout(): (FactoriesLayoutContextValue & { routeSegment: string }) | null {
+  const context = useContext(FactoriesLayoutContext);
+  if (!context) {
+    return null;
+  }
+  return withRouteSegment(context);
 }

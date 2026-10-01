@@ -56,11 +56,11 @@ function resolvePRFeedbackSetupModel(
     source: PRFeedbackSource;
   };
 } {
-  const { organizationId, factoryId, factoryKey, factory } = layout;
+  const { organizationId, factoryId, routeSegment, factory } = layout;
   const bindings = factoryPRFeedbackSetupBindings(factory);
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = bindings.lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
   const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
   const titleParts = [prFeedbackSetupPageTitle(kind), bindings.workspaceName];
   const redirectTo = prFeedbackSetupRedirect({

@@ -13,6 +13,7 @@ import { Navigate, Outlet, useLocation, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
+  factoryRouteSegment,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
@@ -88,7 +89,12 @@ function FactoriesLayoutResolver({
   const resolution = resolveFactoryByKey(factories, factoryKey, factoriesLoading || factoriesFetching);
 
   if (factoryRouteNeedsCanonicalRedirect(resolution, factoryKey)) {
-    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, resolution.factory!.key!);
+    const target = replaceFactoryKeySegment(
+      location.pathname,
+      organizationId,
+      factoryKey,
+      factoryRouteSegment(resolution.factory),
+    );
     return <Navigate to={`${target}${location.search}`} replace />;
   }
 
@@ -130,10 +136,12 @@ function FactoriesLayoutContent({
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
+  const slug = factory?.key ?? factoryKey;
+  const routeSegment = factoryRouteSegment(factory) || factoryKey;
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(
       organizationId,
-      factoryKey,
+      routeSegment,
       canAct("work_orders", "create"),
       firstFactoryLineId(factory),
     );
@@ -173,12 +181,13 @@ function FactoriesLayoutContent({
     () => ({
       organizationId,
       factoryId,
-      factoryKey,
+      factoryKey: slug,
+      routeSegment,
       factory: factory ?? null,
       factories,
       openCreateWorkOrder,
     }),
-    [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
+    [organizationId, factoryId, slug, routeSegment, factory, factories, openCreateWorkOrder],
   );
 
   if (factoryError) {
@@ -205,7 +214,7 @@ function FactoriesLayoutContent({
         {hideSidebar ? null : (
           <FactoriesSidebar
             organizationId={organizationId}
-            factoryKey={factoryKey}
+            factoryKey={routeSegment}
             factory={factory}
             factories={factories}
           />

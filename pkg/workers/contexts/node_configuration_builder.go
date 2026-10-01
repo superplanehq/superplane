@@ -1127,7 +1127,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 			return nil, fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
 		}
 		if usesURL {
-			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.Key)
+			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.RouteSegment())
 		}
 		if usesKey {
 			payload["key"] = owningFactory.WorkOrderKey(order.Number)

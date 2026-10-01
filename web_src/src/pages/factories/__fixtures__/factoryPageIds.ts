@@ -7,12 +7,15 @@ export const PRIMARY_FACTORY_ID = "factory-refunds";
 export const EMPTY_FACTORY_ID = "factory-payments";
 export const ACME_ONBOARDING_FACTORY_ID = "factory-acme-onboarding";
 
-/** Workspace key for `PRIMARY_FACTORY_ID` — routes use this, not the raw id. */
+/** Workspace key for `PRIMARY_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const PRIMARY_FACTORY_KEY = "RF";
-/** Workspace key for `EMPTY_FACTORY_ID` — routes use this, not the raw id. */
+export const PRIMARY_FACTORY_URL_ID = "k7m2xqab";
+/** Workspace key for `EMPTY_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const EMPTY_FACTORY_KEY = "PF";
-/** Workspace key for `ACME_ONBOARDING_FACTORY_ID` — routes use this, not the raw id. */
+export const EMPTY_FACTORY_URL_ID = "p8n3wrcd";
+/** Workspace key for `ACME_ONBOARDING_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const ACME_ONBOARDING_FACTORY_KEY = "AO";
+export const ACME_ONBOARDING_FACTORY_URL_ID = "a1b2c3d4";
 
 export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Leonardo DiCaprio";

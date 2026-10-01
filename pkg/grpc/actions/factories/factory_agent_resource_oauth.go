@@ -228,7 +228,7 @@ func CompleteFactoryAgentResourceOAuth(
 	if err != nil {
 		return "", 404, "organization not found"
 	}
-	redirectPath = FactoryAgentResourceSettingsPath(org.Slug, factory.Key)
+	redirectPath = FactoryAgentResourceSettingsPath(org.Slug, factory.RouteSegment())
 
 	if oauthError != "" {
 		_ = resource.ClearOAuthPending(db)

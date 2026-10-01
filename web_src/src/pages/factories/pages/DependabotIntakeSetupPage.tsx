@@ -44,12 +44,12 @@ function resolveDependabotIntakeSetupModel(
   returnHref: string;
   dialog?: { organizationId: string; factoryId: string; repository: string; setupReady: boolean };
 } {
-  const { organizationId, factoryId, factoryKey, factory } = layout;
+  const { organizationId, factoryId, routeSegment, factory } = layout;
   const workspaceName = factory?.name ?? "Workspace";
   const lines = factory?.lines ?? [];
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
   const titleParts = [DEPENDABOT_INTAKE_SETUP_COPY.pageTitle, workspaceName];
 
   if (!canUpdate || !lineId || (factory && !line)) {
