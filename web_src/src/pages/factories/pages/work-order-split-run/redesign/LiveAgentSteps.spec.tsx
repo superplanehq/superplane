@@ -62,6 +62,7 @@ function idleStream(overrides: Record<string, unknown> = {}) {
     orphanLines: [],
     error: null,
     isStreaming: true,
+    isLoading: false,
     usageSeries: [],
     activityState: emptyAgentActivityState,
     ...overrides,
@@ -441,7 +442,7 @@ describe("LiveAgentSteps", () => {
     expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
   });
 
-  it("holds the log skeleton until a finished transcript fetch settles", async () => {
+  it("shows finished steps while the log stream stays open", async () => {
     vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
       enabled: true,
       isError: false,
@@ -452,41 +453,7 @@ describe("LiveAgentSteps", () => {
     vi.mocked(useLiveLogStream).mockReturnValue(
       idleStream({
         isStreaming: true,
-        sections: [
-          {
-            index: 1,
-            text: "Implementation",
-            kind: "prompt",
-            preview: "",
-            lines: [],
-            events: [{ kind: "note", text: "I will download the bun zip and extract it." }],
-            status: "passed",
-            duration_ms: 40,
-            started_at: 2,
-            collapsed: false,
-          },
-        ],
-      }),
-    );
-    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
-
-    const view = render(
-      <LiveAgentSteps
-        stage={stage}
-        phase={implementPhase()}
-        organizationId="org-1"
-        emptyNote="No steps for this run."
-      />,
-    );
-
-    expect(screen.getByRole("status", { name: "Waiting for logs" })).toBeInTheDocument();
-    expect(screen.queryByText("Implementation")).not.toBeInTheDocument();
-    expect(screen.queryByText("I will download the bun zip and extract it.")).not.toBeInTheDocument();
-    expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
-
-    vi.mocked(useLiveLogStream).mockReturnValue(
-      idleStream({
-        isStreaming: false,
+        isLoading: false,
         sections: [
           {
             index: 1,
@@ -515,7 +482,9 @@ describe("LiveAgentSteps", () => {
         ],
       }),
     );
-    view.rerender(
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+
+    render(
       <LiveAgentSteps
         stage={stage}
         phase={implementPhase()}
@@ -527,7 +496,31 @@ describe("LiveAgentSteps", () => {
     expect(await screen.findByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByText("Implementation")).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
-    expect(screen.queryByText("I will download the bun zip and extract it.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+  });
+
+  it("does not keep the log skeleton on an idle open stream with no transcript", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true, isLoading: false }));
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={implementPhase()}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByText("No steps for this run.")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
   });
 
   it("shows the log skeleton while a finished run still fetches its transcript", async () => {
@@ -538,7 +531,7 @@ describe("LiveAgentSteps", () => {
       canvas: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
-    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true }));
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true, isLoading: true }));
     const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
 
     render(

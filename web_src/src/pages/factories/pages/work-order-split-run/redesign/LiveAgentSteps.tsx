@@ -24,7 +24,12 @@ const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
 const AGENT_LOG_SKELETON_LABEL = "Waiting for logs";
 const AGENT_LOG_SKELETON_WIDTHS = ["w-full", "w-11/12", "w-4/5", "w-2/3"] as const;
 
-type RunnerLive = { notes: SplitRunStreamLine[]; activities: AgentActivity[]; isStreaming: boolean };
+type RunnerLive = {
+  notes: SplitRunStreamLine[];
+  activities: AgentActivity[];
+  isStreaming: boolean;
+  isLoading: boolean;
+};
 
 export function LiveAgentSteps({
   stage,
@@ -155,6 +160,7 @@ function sameRunnerLive(previous: RunnerLive | undefined, next: RunnerLive): boo
   return Boolean(
     previous &&
       previous.isStreaming === next.isStreaming &&
+      previous.isLoading === next.isLoading &&
       noteSignature(previous.notes) === noteSignature(next.notes) &&
       activitySignature(previous.activities) === activitySignature(next.activities),
   );
@@ -172,9 +178,9 @@ function agentLogPending(input: {
   hasLiveContent: boolean;
 }): { streamWaiting: boolean; showLogSkeleton: boolean } {
   const awaiting = input.canAwaitNotes && input.runners.some((line) => input.liveByLine[line.id] === undefined);
-  const streaming = input.runners.some((line) => input.liveByLine[line.id]?.isStreaming);
-  const pendingLogs = input.canvasLoading || awaiting || isWaitingForLogNotes(input.liveNotes);
-  const finishedPending = !input.running && (input.canvasLoading || awaiting || streaming);
+  const loadingLogs = input.runners.some((line) => input.liveByLine[line.id]?.isLoading);
+  const pendingFetch = input.canvasLoading || awaiting || loadingLogs;
+  const pendingLogs = pendingFetch || isWaitingForLogNotes(input.liveNotes);
   if (input.hasLiveContent) {
     return { streamWaiting: false, showLogSkeleton: false };
   }
@@ -182,7 +188,9 @@ function agentLogPending(input: {
     const wait = pendingLogs && input.liveStepCount === 0;
     return { streamWaiting: wait, showLogSkeleton: wait };
   }
-  return { streamWaiting: false, showLogSkeleton: finishedPending && input.settledStepCount === 0 };
+  // A finished run can leave its log SSE open with no bytes. Do not wait
+  // on isStreaming. Skeleton only while the canvas or session still loads.
+  return { streamWaiting: false, showLogSkeleton: pendingFetch && input.settledStepCount === 0 };
 }
 
 function AgentRunBody({
@@ -256,7 +264,11 @@ function RunnerNotes({
   reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
 }) {
-  const { notes, activities, spend, usageSeries, isStreaming } = useRunnerLiveNotes(line, organizationId, canvasId);
+  const { notes, activities, spend, usageSeries, isStreaming, isLoading } = useRunnerLiveNotes(
+    line,
+    organizationId,
+    canvasId,
+  );
   useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
@@ -265,8 +277,8 @@ function RunnerNotes({
     enabled: reportUsage && isRunnerComponent(line.component),
   });
   useEffect(() => {
-    onLive(line.id, { notes, activities, isStreaming });
-  }, [activities, isStreaming, line.id, notes, onLive]);
+    onLive(line.id, { notes, activities, isStreaming, isLoading });
+  }, [activities, isLoading, isStreaming, line.id, notes, onLive]);
   return null;
 }
 
@@ -280,6 +292,7 @@ function useRunnerLiveNotes(
   spend: ReturnType<typeof headerSpendFromUsageSeries>;
   usageSeries: AgentPromptUsageSeries[];
   isStreaming: boolean;
+  isLoading: boolean;
 } {
   const canStream = Boolean(canvasId && line.executionId && isRunnerComponent(line.component));
   const {
@@ -287,6 +300,7 @@ function useRunnerLiveNotes(
     orphanLines,
     error,
     isStreaming: streamOpen,
+    isLoading: streamLoading,
     usageSeries,
     activityState,
   } = useLiveLogStream(
@@ -297,6 +311,7 @@ function useRunnerLiveNotes(
     { organizationId, canvasId },
   );
   const isStreaming = canStream && streamOpen;
+  const isLoading = canStream && streamLoading;
   const notes = useMemo(() => {
     if (!canStream) {
       return [];
@@ -328,6 +343,7 @@ function useRunnerLiveNotes(
     spend: headerSpendFromUsageSeries(usageSeries ?? []),
     usageSeries: usageSeries ?? [],
     isStreaming,
+    isLoading,
   };
 }
 
