@@ -170,6 +170,8 @@ func (f *Factory) RouteSegment() string {
 	return strings.ToLower(f.Key) + "-" + f.URLID
 }
 
+var newFactoryURLID = generateFactoryURLID
+
 func generateFactoryURLID() (string, error) {
 	raw := make([]byte, FactoryURLIDLength)
 	if _, err := rand.Read(raw); err != nil {
@@ -216,24 +218,47 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		UpdatedAt:              now,
 	}
 
-	for attempt := 0; attempt < maxFactoryURLIDAttempts; attempt++ {
-		urlID, err := generateFactoryURLID()
-		if err != nil {
-			return nil, err
-		}
-		factory.URLID = urlID
-		err = tx.Clauses(clause.Returning{}).Create(factory).Error
-		if err == nil {
-			return factory, nil
-		}
-		mapped := MapFactoryConstraintError(err)
-		if errors.Is(mapped, ErrFactoryURLIDAlreadyExists) {
-			continue
-		}
-		return nil, mapped
-	}
+	return insertFactoryWithUniqueURLID(tx, factory)
+}
 
-	return nil, fmt.Errorf("could not allocate a unique workspace url id")
+func insertFactoryWithUniqueURLID(tx *gorm.DB, factory *Factory) (*Factory, error) {
+	var created *Factory
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		for attempt := 0; attempt < maxFactoryURLIDAttempts; attempt++ {
+			savepoint := fmt.Sprintf("factory_url_id_%d", attempt)
+			if err := inner.SavePoint(savepoint).Error; err != nil {
+				return fmt.Errorf("factory url id savepoint: %w", err)
+			}
+
+			urlID, err := newFactoryURLID()
+			if err != nil {
+				return err
+			}
+			factory.URLID = urlID
+			err = inner.Clauses(clause.Returning{}).Create(factory).Error
+			if err == nil {
+				created = factory
+				return nil
+			}
+
+			mapped := MapFactoryConstraintError(err)
+			if !errors.Is(mapped, ErrFactoryURLIDAlreadyExists) {
+				return mapped
+			}
+			// GORM stores the unique-violation on inner.Error and then skips
+			// later statements. Clear it so ROLLBACK TO SAVEPOINT can run.
+			inner.Error = nil
+			if rollbackErr := inner.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return fmt.Errorf("rollback factory url id: %w", rollbackErr)
+			}
+		}
+
+		return fmt.Errorf("could not allocate a unique workspace url id")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 // GenerateUniqueFactoryKey picks a key that is unique among active
