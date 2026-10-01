@@ -148,6 +148,15 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.queryByText("claude-opus-4-6")).not.toBeInTheDocument();
   });
 
+  it("keeps the organization hosted model list when the workspace uses its own key", () => {
+    setConnected("anthropic", ["claude-opus-4-6"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    expect(screen.getByTestId("llm-models-source-badge")).toHaveTextContent("Your key");
+    expect(screen.getByTestId("llm-models-hosted")).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(screen.getByTestId("llm-models-provider-anthropic")).toBeInTheDocument();
+  });
+
   it("shows only models from connected keys and links to the key integration", () => {
     setConnected("anthropic", ["claude-opus-4-6", "claude-sonnet-4-6"]);
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
@@ -280,10 +289,11 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     setConnected("openrouter", ["anthropic/claude-sonnet-4-6", "openai/gpt-5"], ["anthropic/claude-sonnet-4-6"]);
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
 
-    const save = screen.getByRole("button", { name: "Save models" });
+    const provider = screen.getByTestId("llm-models-provider-openrouter");
+    const save = within(provider).getByRole("button", { name: "Save models" });
     expect(save).toBeDisabled();
 
-    await user.click(screen.getByText("openai/gpt-5"));
+    await user.click(within(provider).getByText("openai/gpt-5"));
     await user.click(save);
 
     expect(saveModels).toHaveBeenCalledWith({
@@ -297,7 +307,10 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     setConnected("openrouter", ["anthropic/claude-sonnet-4-6"]);
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
 
-    expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
+    expect(
+      within(screen.getByTestId("llm-models-provider-openrouter")).getByRole("button", { name: "Save models" }),
+    ).toBeDisabled();
+    expect(within(screen.getByTestId("llm-models-hosted")).getByRole("button", { name: "Save models" })).toBeDisabled();
   });
 
   it("offers Connect on the hosted page and asks for a key only after confirm", async () => {
@@ -340,9 +353,10 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     setConnected("anthropic", ["claude-opus-4-6", "claude-sonnet-4-6"], ["claude-opus-4-6"]);
     renderPage("AGENT_HARNESS_CLAUDE_CODE");
 
-    expect(screen.getByRole("button", { name: "Save models" })).toBeDisabled();
-    await user.click(screen.getByText("claude-sonnet-4-6"));
-    await user.click(screen.getByRole("button", { name: "Save models" }));
+    const provider = screen.getByTestId("llm-models-provider-anthropic");
+    expect(within(provider).getByRole("button", { name: "Save models" })).toBeDisabled();
+    await user.click(within(provider).getByText("claude-sonnet-4-6"));
+    await user.click(within(provider).getByRole("button", { name: "Save models" }));
     expect(saveModels).toHaveBeenCalledWith({
       provider: "anthropic",
       allowedModels: ["claude-opus-4-6", "claude-sonnet-4-6"],

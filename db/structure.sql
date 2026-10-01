@@ -4631,6 +4631,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_hosted_model_allowlists
+    ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 

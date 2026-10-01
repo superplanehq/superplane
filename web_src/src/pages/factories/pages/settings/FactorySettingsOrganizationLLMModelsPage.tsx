@@ -133,6 +133,9 @@ export function FactorySettingsOrganizationLLMModelsPage() {
               ) : (
                 <NoProviderNotice integrationsHref={integrationsHref} />
               )}
+              <div className="border-t border-border pt-4">
+                <HostedModelAllowlist organizationId={organizationId} canUpdate={canUpdate} />
+              </div>
               <ChangeModelSource current={currentProvider} onChoose={choose} disabled={!canUpdate} />
             </div>
           )}

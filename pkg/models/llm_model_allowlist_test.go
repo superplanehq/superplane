@@ -146,6 +146,29 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	assert.False(t, allowed)
 }
 
+func Test__OrganizationHostedModelAllowlist__RemovedWhenOrganizationIsDeleted(t *testing.T) {
+	db := database.Conn()
+	organization, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.Exec("DELETE FROM organization_hosted_model_allowlists WHERE organization_id = ?", organization.ID)
+		_ = db.Exec("DELETE FROM organization_invite_links WHERE organization_id = ?", organization.ID)
+		_ = db.Exec("DELETE FROM organization_billing_plans WHERE organization_id = ?", organization.ID)
+		_ = db.Unscoped().Delete(organization)
+	})
+
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Exec("DELETE FROM organization_invite_links WHERE organization_id = ?", organization.ID).Error)
+	require.NoError(t, db.Exec("DELETE FROM organization_billing_plans WHERE organization_id = ?", organization.ID).Error)
+	require.NoError(t, db.Unscoped().Delete(organization).Error)
+
+	row, err := models.FindOrganizationHostedModelAllowlist(db, organization.ID, models.UsageProviderAnthropic)
+	require.NoError(t, err)
+	assert.Nil(t, row)
+}
+
 func Test__CompactModelIDs(t *testing.T) {
 	assert.Equal(t, []string{"gpt-4o", "gpt-4.1"}, models.CompactModelIDs([]string{" gpt-4o ", "", "gpt-4o", "gpt-4.1"}))
 }
