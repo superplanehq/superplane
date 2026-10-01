@@ -21,7 +21,7 @@ function step(overrides: Partial<AgentStep>): AgentStep {
 
 describe("activityFromAgentStep", () => {
   it("turns a bash step output into a command tool", () => {
-    const activity = activityFromAgentStep(step({ output: "git clone https://example.com/repo.git" }));
+    const activity = activityFromAgentStep(step({ output: "git clone https://example.com/repo.git", duration: "2s" }));
 
     expect(activity?.items).toEqual([
       expect.objectContaining({
@@ -29,6 +29,7 @@ describe("activityFromAgentStep", () => {
         kind: "bash",
         input: "git clone https://example.com/repo.git",
         output: "",
+        durationMs: 2_000,
       }),
     ]);
   });

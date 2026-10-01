@@ -308,6 +308,22 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 	return &canvas, nil
 }
 
+// LockUnscopedCanvas locks a canvas row whether or not it is soft-deleted.
+// Callers that decide cleanup from deleted_at must lock first, because a
+// restore can clear that timestamp after an unlocked read.
+func LockUnscopedCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		First(&canvas).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &canvas, nil
+}
+
 func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
 	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID)
 

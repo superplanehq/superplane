@@ -1063,7 +1063,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-check-risk-review"));
 
-    expect(screen.getByRole("heading", { name: "Risk score" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Blast radius" })).toBeInTheDocument();
     expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
   });
 
@@ -1142,6 +1142,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(menu).getByRole("menuitem", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Checks separate from the pull request review", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks: VERIFY_STEP_CHECKS }),
+    });
+
+    const summary = screen.getByTestId("redesign-console-summary");
+    const note = within(summary).getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
+    const checks = within(summary).getByTestId("redesign-console-checks");
+    expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(note).queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
   it("enables merge on the pull request review strip when mergeability is true", async () => {
@@ -1886,7 +1900,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
-    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Risk score")).toBeInTheDocument();
+    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Blast radius")).toBeInTheDocument();
   });
 
   it("shows the console when a GitHub automation created the draft", () => {

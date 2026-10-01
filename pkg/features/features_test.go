@@ -92,8 +92,8 @@ func Test__Get(t *testing.T) {
 		f, ok := Get(FeatureFactoryRiskScore)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
-		assert.Equal(t, "Factory Risk Score", f.Label)
-		assert.Equal(t, "Add a risk score automation to the Verify column", f.Description)
+		assert.Equal(t, "Factory Merge Confidence", f.Label)
+		assert.Equal(t, "Add a merge confidence automation to the Verify column", f.Description)
 		assert.Nil(t, f.Released)
 	})
 

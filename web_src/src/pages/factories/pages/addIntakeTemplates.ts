@@ -1,4 +1,5 @@
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
@@ -45,7 +46,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     id: "dependabot-alerts",
     name: "Dependabot alerts",
     description: "Creates tasks from Dependabot alerts.",
-    iconSrc: githubIcon,
+    iconSrc: dependabotIcon,
     featureId: FEATURE_FACTORY_DEPENDABOT_INTAKE,
   },
   {

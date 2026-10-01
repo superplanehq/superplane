@@ -390,8 +390,8 @@ type errorTrackingIncludedResource struct {
 }
 
 // SearchErrorTrackingIssues searches open and acknowledged Error Tracking
-// issues from about the last 30 days. Empty query means "*". Limit is capped
-// at 100.
+// issues from about the last 30 days. Empty query means "*". Results are the
+// newest created issues, first-seen time descending. Limit is capped at 100.
 func (c *Client) SearchErrorTrackingIssues(query string, limit int) ([]ErrorTrackingIssue, error) {
 	if limit <= 0 {
 		limit = maxErrorTrackingSearchLimit
@@ -443,7 +443,7 @@ func (c *Client) SearchErrorTrackingIssues(query string, limit int) ([]ErrorTrac
 		byID[included.ID] = errorTrackingIssueFromResource(included)
 	}
 
-	issues := make([]ErrorTrackingIssue, 0, limit)
+	issues := make([]ErrorTrackingIssue, 0, len(response.Data))
 	seen := map[string]bool{}
 	for _, result := range response.Data {
 		issueID := strings.TrimSpace(result.Relationships.Issue.Data.ID)
@@ -460,12 +460,12 @@ func (c *Client) SearchErrorTrackingIssues(query string, limit int) ([]ErrorTrac
 		} else {
 			issues = append(issues, ErrorTrackingIssue{ID: issueID})
 		}
-		if len(issues) >= limit {
-			break
-		}
 	}
 
-	return issues, nil
+	if len(issues) == 0 {
+		return issues, nil
+	}
+	return NewestCreatedErrorTrackingIssues(issues, limit), nil
 }
 
 // GetErrorTrackingIssue loads one Error Tracking issue by id.

@@ -132,8 +132,10 @@ export function SplitRunReview({
   modelSelect,
   compact = false,
   actionsOnly = false,
+  ctaOnly = false,
   confirmUnclearStart = false,
   startTone,
+  children,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -155,9 +157,12 @@ export function SplitRunReview({
   /** `"stacked"` is the compact note in a narrow column: full-width text, actions below. */
   compact?: boolean | "stacked";
   actionsOnly?: boolean;
+  /** Pull request title, then optional scores, then the review action. */
+  ctaOnly?: boolean;
   confirmUnclearStart?: boolean;
   /** Verdict that sets the Start weight on the refine strip. Defaults to the footer scores. */
   startTone?: DraftReadinessTone;
+  children?: ReactNode;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [backlogConfirmOpen, setBacklogConfirmOpen] = useState(false);
@@ -195,7 +200,7 @@ export function SplitRunReview({
 
   return (
     <div
-      className={cn(compact && !actionsOnly ? "min-w-0 flex-1" : "shrink-0", className)}
+      className={cn(compact && !actionsOnly && !ctaOnly ? "min-w-0 flex-1" : "shrink-0", className)}
       data-testid={actionsOnly ? undefined : "split-run-review"}
     >
       <SplitRunAttentionNote
@@ -210,6 +215,7 @@ export function SplitRunReview({
         compact={Boolean(compact)}
         stacked={compact === "stacked"}
         actionsOnly={actionsOnly}
+        ctaOnly={ctaOnly}
         startEmphasis={startEmphasis}
         organizationId={organizationId}
         factoryId={factoryId}
@@ -217,7 +223,9 @@ export function SplitRunReview({
         pullRequests={pullRequests}
         canAct={canAct}
         onAction={handleAction}
-      />
+      >
+        {children}
+      </SplitRunAttentionNote>
       {confirmUnclearStart ? (
         <StartConfirmDialog
           open={confirmOpen}

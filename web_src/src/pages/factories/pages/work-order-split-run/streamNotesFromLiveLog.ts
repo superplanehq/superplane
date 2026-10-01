@@ -1,6 +1,7 @@
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "@/lib/agentActivity";
 import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import { agentToolDisplayText, isCommandKind } from "@/lib/agentToolLabels";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
@@ -76,8 +77,16 @@ function noteFromCommandSection(
     detail: detail || undefined,
     commandScript: bashScript || undefined,
     commandStdout: bashScript ? output || undefined : undefined,
+    duration: commandSectionDuration(section.duration_ms),
     ...orderKeyProps(orderKey),
   };
+}
+
+function commandSectionDuration(durationMs: number | null): string | undefined {
+  if (durationMs === null || durationMs <= 0) {
+    return undefined;
+  }
+  return formatMinutesSecondsDuration(durationMs) || undefined;
 }
 
 function notesFromSectionEvents(

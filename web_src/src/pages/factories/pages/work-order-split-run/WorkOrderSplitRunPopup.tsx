@@ -350,6 +350,7 @@ function analysisPopupReview(args: {
   canDispatch: boolean;
   compact: boolean | "stacked";
   actionsOnly?: boolean;
+  ctaOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
 }) {
@@ -372,6 +373,7 @@ function analysisPopupReview(args: {
       startDisabled={!args.canDispatch}
       compact={args.compact}
       actionsOnly={args.actionsOnly}
+      ctaOnly={args.ctaOnly}
       confirmUnclearStart={args.confirmUnclearStart}
       modelSelect={args.modelSelect}
     />

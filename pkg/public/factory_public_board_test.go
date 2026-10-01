@@ -259,7 +259,7 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	}, automationsNamed(board, "phase-0"))
 	assert.Equal(t, []publicAutomation{
 		{ID: "feedback-0", Kind: "pr-discussion", Name: "Pull request comments", CatalogID: "pr-discussion", Icon: "github", Health: "healthy"},
-		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Icon: "github", Health: "healthy"},
+		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Health: "healthy"},
 	}, automationsNamed(board, "verify"))
 	assert.Equal(t, []publicAutomation{
 		{ID: "closure", Kind: "pr-closure", Name: "PR Closure", CatalogID: "pr-closure", Icon: "github", Health: "healthy"},
@@ -268,6 +268,34 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	body, err := json.Marshal(board)
 	require.NoError(t, err)
 	assert.NotContains(t, string(body), appID.String())
+}
+
+func TestPublicBoardDependabotIntakeUsesDependabotIcon(t *testing.T) {
+	factory := &models.Factory{Name: "Instabot", Key: "NEWWO"}
+	line := &models.FactoryLine{Name: "implement"}
+	board := assemblePublicBoard(
+		factory,
+		line,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		[]models.FactoryIntake{{Source: models.FactoryIntakeSourceDependabotAlerts}},
+		nil,
+	)
+
+	assert.Equal(t, []publicAutomation{
+		{
+			ID:        "intake-0",
+			Kind:      "intake",
+			Name:      "Dependabot alerts",
+			CatalogID: "dependabot-alerts",
+			Icon:      "dependabot",
+			Health:    "healthy",
+		},
+	}, automationsNamed(board, "backlog"))
 }
 
 func automationsNamed(board *publicBoard, key string) []publicAutomation {

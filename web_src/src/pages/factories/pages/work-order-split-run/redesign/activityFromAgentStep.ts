@@ -1,3 +1,5 @@
+import { durationLabelMs } from "@/lib/duration";
+
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "../agentActivity";
 import { isThinkingPlaceholder } from "../streamNotesFromLiveLog";
 import type { AgentStep } from "./automationsViewModel";
@@ -18,6 +20,7 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
       output: command.stdout,
       outputStreams: [],
       status,
+      durationMs: stepDurationMs(step.duration),
       truncated: false,
     });
   }
@@ -101,6 +104,17 @@ function bashCommandFromStep(step: AgentStep): { script: string; stdout: string 
     return undefined;
   }
   return { script: step.output, stdout: "" };
+}
+
+function stepDurationMs(label?: string): number | undefined {
+  if (!label?.trim()) {
+    return undefined;
+  }
+  if (/^<\s*1s$/i.test(label.trim())) {
+    return 500;
+  }
+  const ms = durationLabelMs(label);
+  return ms > 0 ? ms : undefined;
 }
 
 function activityStatus(status: string): AgentActivityStatus {
