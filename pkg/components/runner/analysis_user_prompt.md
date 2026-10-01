@@ -29,7 +29,7 @@ Ask about:
 - Include vs skip a behavior.
 - Two real implementations with different trade-offs.
 - What done means, when that changes the work.
-- Whether to drop a part, split the task, or take the simpler path, when that would raise Confidence.
+- Whether to drop a part or take the simpler path, when that would raise Confidence.
 
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
@@ -94,36 +94,23 @@ Start at 4 for a bounded change that has a pattern in the repository. Move up to
 - 5: fits one run, a pattern exists, done is proven by a test or command, easy to undo.
 - 4: fits one run, a pattern exists or the change is contained, one part of done needs a human look.
 - 3: fits one run but expect one round of steering: the change crosses areas with different context, or done cannot be shown by a command, or one judgment call is open.
-- 2: does not fit one run, or depends on unwritten context, or checking the result costs more than doing it. Propose a split or a narrower scope.
-- 1: not a fit for one run. Irreversible actions, security-sensitive code, or done cannot be shown. Propose a split or a human step.
+- 2: does not fit one run, or depends on unwritten context, or checking the result costs more than doing it. Propose a narrower scope.
+- 1: not a fit for one run. Irreversible actions, security-sensitive code, or done cannot be shown. Propose a narrower scope or a human step.
 
 ### Raise Confidence through refinement
 
-Confidence is not fixed. When you see a way to raise it, propose it. Most tasks get more agent-friendly when the scope narrows, the work splits, or a missing fact gets written down. Use chat or a survey question for this the same way you would for Clarity.
+Confidence is not fixed. When you see a way to raise it, propose it. Most tasks get more agent-friendly when the scope narrows or a missing fact gets written down. Use chat or a survey question for this the same way you would for Clarity.
 
 Moves that raise Confidence:
 - Drop a part that adds risk but not value to this task.
-- Split into two or three tasks that each fit one run. Name the split.
+- Narrow the scope so the remaining work fits one run.
 - Add a failing test first so done is provable.
 - Turn an open judgment call into a decision in the plan.
 - Put the risky step behind a human review, and keep the rest for the agent.
 
-Be direct when the task is too big or too complex for one run. Say so in the first sentence of the Confidence summary. Then say the split or the narrower scope you would take. Do not soften a 1 or 2 to spare the user; a wrong 4 costs them a failed run.
+Be direct when the task is too big or too complex for one run. Say so in the first sentence of the Confidence summary. Then say the narrower scope you would take. Do not soften a 1 or 2 to spare the user; a wrong 4 costs them a failed run.
 
-### Split the task
-
-When a split would raise Confidence, propose it in a survey question. Name the parts in the options so the user can see the shape: the first option is the split you recommend, another keeps the task whole. Keep the split to two or three tasks. Each part must fit one run and stand on its own.
-
-Good question: This is three changes: a new table, a worker, and the screens. Split it?
-Good options: Split: table and worker first, screens second | Keep it as one task
-
-When the user confirms, create the other parts as new tasks. This task stays as the first part. Write each new task the way a good colleague writes a ticket: a short imperative title, then a description with the goal, what is in and out of scope, and what done looks like. Do not refer to this conversation or to this task by name; the new task must stand alone. Then narrow this task's plan to the part that stays, and score it again on that smaller scope. Confidence should rise; say why in the summary.
-
-Do not create a task the user did not confirm. Do not create the same part twice. If the user keeps the task whole, score the whole and say what the risk is.
-
-### A part of a split
-
-When the task description says another task owns a dependency, or the session context names the other parts of a split, that boundary is decided. The other part is not missing work and not an open question. Do not ask how to handle it. Do not propose a stub for it. Do not lower Confidence because it is not in the repository yet. Plan against the interface the description gives, and say once in chat which part you depend on. Score only the work this task owns.
+Keep this task as one task. Do not create another task. If the work is too large, ask the user to drop a part or to narrow the scope. Score the remaining work.
 
 ### Confidence summary
 
@@ -131,13 +118,13 @@ Use you. Use two short sentences or fewer. Do not name missing decisions here; t
 
 For Confidence 4 or 5: say in one sentence why an agent can do this in one run.
 
-For Confidence 3 or lower: name the one factor that lowers it. Then say the move that would raise it: a split, a narrower scope, a test first, or a human step.
+For Confidence 3 or lower: name the one factor that lowers it. Then say the move that would raise it: a narrower scope, a test first, or a human step.
 
 If Clarity is 1 or 2, say Confidence is provisional until the task is clear.
 
-Good: The change crosses billing and the API and there is no test for the refund path. Add a failing test first, or split the API change into its own task.
+Good: The change crosses billing and the API and there is no test for the refund path. Add a failing test first, or drop the API change from this task.
 
-Good: This is too large for one run: a new table, a worker, and three screens. Split the table and worker into a first task and the screens into a second.
+Good: This is too large for one run: a new table, a worker, and three screens. Keep the table and worker. Drop the screens from this task.
 
 ## 5. Write the plan
 
@@ -162,6 +149,6 @@ Do not start the new task. Do not copy comments or run history.
 
 Add '## Diagram' after Constraints only when one Mermaid diagram makes a UI flow or architecture easier to understand.
 
-Follow the spec summary with the build spec. Do not repeat the goal, Problem, Proposed outcome, or Constraints. Use these headings in this order: '## Scope', '## Approach', '## Acceptance', and '## Risks'. Scope states what is in and what is out. Approach tells the implementer what to do, in order, and names existing files and seams. Acceptance includes tests and known commands. Skip Risks only when Clarity is 5 and Confidence is 4 or higher. For Clarity 3 or 4, Risks must state what is uncertain and why. For Confidence 3 or lower, Risks must name where the implementer will need a human decision or review, and the split or narrower scope you proposed.
+Follow the spec summary with the build spec. Do not repeat the goal, Problem, Proposed outcome, or Constraints. Use these headings in this order: '## Scope', '## Approach', '## Acceptance', and '## Risks'. Scope states what is in and what is out. Approach tells the implementer what to do, in order, and names existing files and seams. Acceptance includes tests and known commands. Skip Risks only when Clarity is 5 and Confidence is 4 or higher. For Clarity 3 or 4, Risks must state what is uncertain and why. For Confidence 3 or lower, Risks must name where the implementer will need a human decision or review, and the narrower scope you proposed.
 
 Use American English. Do not explain the repository or product. Do not write I or you in the specification.

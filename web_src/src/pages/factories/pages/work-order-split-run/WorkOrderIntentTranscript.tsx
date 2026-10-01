@@ -15,7 +15,6 @@ import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
 import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity } from "./agentActivity";
-import { CreatedTaskCard, type CreatedTaskHref } from "./CreatedTaskCard";
 import {
   SENDER_ROW_CLASSNAME,
   SURVEY_PICK_CLASSNAME,
@@ -33,15 +32,12 @@ export function WorkOrderIntentTranscript({
   streaming = false,
   files,
   activities = [],
-  taskHref,
 }: {
   messages: CreateWithAgentMessage[];
   organizationId: string;
   streaming?: boolean;
   files?: FilesFile[];
   activities?: AgentActivity[];
-  /** Permalink for a task the agent created. Without it the card has no Open link. */
-  taskHref?: CreatedTaskHref;
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const visible = messages.filter((message) => message.kind !== "plan");
@@ -86,7 +82,6 @@ export function WorkOrderIntentTranscript({
               adjacentUserAbove={visible[index - 1]?.role === "user"}
               adjacentUserBelow={visible[index + 1]?.role === "user"}
               sameSenderAbove={sameUserSender(visible[index - 1], message)}
-              taskHref={taskHref}
             />
           </div>
         );
@@ -106,7 +101,6 @@ function TranscriptMessage({
   adjacentUserAbove,
   adjacentUserBelow,
   sameSenderAbove,
-  taskHref,
 }: {
   message: CreateWithAgentMessage;
   resolveUser: OrgUserDisplayLookup;
@@ -115,13 +109,9 @@ function TranscriptMessage({
   adjacentUserAbove: boolean;
   adjacentUserBelow: boolean;
   sameSenderAbove: boolean;
-  taskHref?: CreatedTaskHref;
 }) {
   if (message.kind === "plan") {
     return null;
-  }
-  if (message.kind === "task") {
-    return <CreatedTaskCard task={message} href={taskHref?.(message)} />;
   }
   if (message.role === "user") {
     const frameClassName = userMessageFrameClass(adjacentUserAbove, adjacentUserBelow);

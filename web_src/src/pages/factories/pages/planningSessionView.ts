@@ -1,7 +1,6 @@
 import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
-import { planningTaskMessageFromPayload } from "./planningTaskMessage";
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "./work-order-split-run/agentActivity";
 import { composerChipsWorking } from "./work-order-split-run/planChipStatus";
 
@@ -191,12 +190,7 @@ function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAg
 }
 
 function planningSessionMessagesFromPayload(session: PlanningSessionPayload): CreateWithAgentMessage[] {
-  const createdByID = new Map(createdOrdersFromSession(session).map((order) => [order.id, order]));
-  return (session.messages ?? []).flatMap((message) =>
-    message.role === "task"
-      ? planningTaskMessageFromPayload(message, createdByID)
-      : planningSessionMessageFromPayload(message),
-  );
+  return (session.messages ?? []).flatMap(planningSessionMessageFromPayload);
 }
 
 function planningSessionRightPane(

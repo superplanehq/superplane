@@ -386,6 +386,27 @@ describe("createWithAgentViewFromSession", () => {
     ]);
   });
 
+  it("omits leftover task-role messages from the transcript", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "agent-1", role: "agent", text: "I found the retry seam." },
+          {
+            id: "msg-task",
+            role: "task",
+            text: JSON.stringify({ work_order_id: "wo-2", key: "NEW-2", title: "Add the retry table" }),
+          },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([{ id: "agent-1", kind: "text", role: "agent", text: "I found the retry seam." }]);
+  });
+
   it("hides Refine protocol notes from the transcript", () => {
     const view = createWithAgentViewFromSession(
       {
