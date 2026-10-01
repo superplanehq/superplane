@@ -31,8 +31,9 @@ const (
 	productiveTaskCreated           = "task.created"
 	productiveTaskUpdated           = "task.updated"
 
-	// webhookLogPayloadLimit keeps one webhook log under Cloud Logging's
-	// 256 KB entry limit after the other fields are added.
+	// webhookLogPayloadLimit is the maximum JSON-encoded size of the
+	// payload field. That leaves room for the other fields under Cloud
+	// Logging's 256 KB entry limit.
 	webhookLogPayloadLimit  = 128 * 1024
 	webhookPayloadTruncated = "...(truncated)"
 )
@@ -271,13 +272,46 @@ func webhookLogPayload(body []byte) any {
 	if len(body) == 0 {
 		return nil
 	}
-	if len(body) > webhookLogPayloadLimit {
-		return string(body[:webhookLogPayloadLimit]) + webhookPayloadTruncated
-	}
-	if json.Valid(body) {
+	if len(body) <= webhookLogPayloadLimit && json.Valid(body) {
 		return json.RawMessage(body)
 	}
-	return string(body)
+	if webhookStringEncodedSize(string(body)) <= webhookLogPayloadLimit {
+		return string(body)
+	}
+	return truncateWebhookPayload(body)
+}
+
+// truncateWebhookPayload cuts the body until its JSON string encoding fits
+// the payload limit. A raw byte count is not enough: one backslash or
+// control byte can encode as several characters.
+func truncateWebhookPayload(body []byte) string {
+	low := 0
+	high := len(body)
+	if high > webhookLogPayloadLimit {
+		high = webhookLogPayloadLimit
+	}
+
+	best := 0
+	for low <= high {
+		mid := low + (high-low)/2
+		candidate := string(body[:mid]) + webhookPayloadTruncated
+		if webhookStringEncodedSize(candidate) <= webhookLogPayloadLimit {
+			best = mid
+			low = mid + 1
+			continue
+		}
+		high = mid - 1
+	}
+
+	return string(body[:best]) + webhookPayloadTruncated
+}
+
+func webhookStringEncodedSize(value string) int {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return webhookLogPayloadLimit + 1
+	}
+	return len(encoded)
 }
 
 // LogSentryWebhookInfo writes one JSON info line for a hosted Sentry webhook.

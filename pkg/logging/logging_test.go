@@ -88,13 +88,31 @@ func TestWithWebhookPayload_KeepsJSONAndCutsOversizedBodies(t *testing.T) {
 	assert.Equal(t, "created", payload["action"])
 
 	oversized := bytes.Repeat([]byte("a"), webhookLogPayloadLimit+1)
-	cut := WithWebhookPayload(log.Fields{}, oversized)
-	logged, ok := cut["payload"].(string)
-	require.True(t, ok)
-	assert.True(t, strings.HasSuffix(logged, webhookPayloadTruncated))
-	assert.Len(t, logged, webhookLogPayloadLimit+len(webhookPayloadTruncated))
+	logged := webhookPayloadString(t, WithWebhookPayload(log.Fields{}, oversized))
+	assertWebhookPayloadFits(t, logged)
+
+	slashes := bytes.Repeat([]byte{'\\'}, webhookLogPayloadLimit+1)
+	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, slashes)))
+
+	controls := bytes.Repeat([]byte{0}, webhookLogPayloadLimit/2)
+	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, controls)))
 
 	assert.Nil(t, WithWebhookPayload(nil, nil))
+}
+
+func webhookPayloadString(t *testing.T, fields log.Fields) string {
+	t.Helper()
+	logged, ok := fields["payload"].(string)
+	require.True(t, ok)
+	return logged
+}
+
+func assertWebhookPayloadFits(t *testing.T, logged string) {
+	t.Helper()
+	assert.True(t, strings.HasSuffix(logged, webhookPayloadTruncated))
+	encoded, err := json.Marshal(logged)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(encoded), webhookLogPayloadLimit)
 }
 
 func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
