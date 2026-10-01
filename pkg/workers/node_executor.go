@@ -437,6 +437,8 @@ func (w *NodeExecutor) executeActionNode(
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	logger = logging.WithCanvasWorkspace(logger, workflow)
+
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
@@ -500,6 +502,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
+		logger = withFactoryOrder(logger, tx, execution.RunID)
 		logger.Errorf("failed to execute action: %v", err)
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
@@ -507,6 +510,17 @@ func (w *NodeExecutor) executeActionNode(
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+// withFactoryOrder adds order_id when the run belongs to a factory step.
+// Runs outside a factory step keep the logger unchanged.
+func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entry {
+	step, err := models.FindWorkOrderExecutionForRun(tx, runID)
+	if err != nil {
+		return logger
+	}
+
+	return logger.WithField("order_id", step.WorkOrderID)
 }
 
 // failNodeExecution fails the node execution with the action error. A
