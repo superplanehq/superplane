@@ -3,6 +3,8 @@ package models_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
@@ -57,6 +59,7 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	t.Cleanup(func() {
 		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 		_ = database.Conn().Where("factory_id = ?", factory.ID).Delete(&models.FactoryLLMModelAllowlist{})
 	})
 
@@ -86,6 +89,36 @@ func Test__ResolveSelectableLLMModels(t *testing.T) {
 	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"claude-sonnet-4-6"}, hosted)
+
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
+	require.NoError(t, err)
+	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, &factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
+	require.NoError(t, err)
+	assert.Empty(t, hosted)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+	require.ErrorIs(t, err, models.ErrModelNotInParentList)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	for _, factoryID := range []*uuid.UUID{nil, &factory.ID, &otherFactory.ID} {
+		allowed, err := models.ModelIsSelectable(db, r.Organization.ID, factoryID, models.UsageProviderAnthropic, models.UsageFundingSourceHosted, "claude-sonnet-4-6")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+	}
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderAnthropic, Enabled: true, APIKey: []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6", "new-model"},
+	})
+	require.NoError(t, err)
+	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, nil, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"claude-opus-4-6"}, hosted)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+	require.NoError(t, err)
+	hosted, err = models.ResolveSelectableLLMModels(db, r.Organization.ID, nil, models.UsageProviderAnthropic, models.UsageFundingSourceHosted)
+	require.NoError(t, err)
+	assert.Empty(t, hosted)
 
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{
 		"gpt-4.1",
