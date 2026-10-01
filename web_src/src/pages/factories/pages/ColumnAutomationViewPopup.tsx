@@ -14,6 +14,7 @@ import {
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import type { PlanningReviewDraft } from "./planningReviewMockup";
 import { riskScoreCategoriesFromDraft } from "./riskScoreCategories";
 import { RiskScoreSettingsForm } from "./RiskScoreSettingsForm";
 import {
@@ -39,6 +40,7 @@ interface ColumnAutomationViewPopupProps {
   initialTab?: ColumnAutomationViewTab;
   onDelete?: () => Promise<void> | void;
   deletePending?: boolean;
+  generalOwnsFooter?: boolean;
 }
 
 /** Read-only automation canvas in the board popup. Edit opens the full editor. */
@@ -57,6 +59,7 @@ export function ColumnAutomationViewPopup({
   initialTab,
   onDelete,
   deletePending = false,
+  generalOwnsFooter = false,
 }: ColumnAutomationViewPopupProps) {
   const hasGeneral = Boolean(general);
   const hasAgent = Boolean(agent);
@@ -86,7 +89,7 @@ export function ColumnAutomationViewPopup({
         general={general}
         agent={agent}
       />
-      {onDelete ? (
+      {onDelete && !(generalOwnsFooter && tab === "general") ? (
         <ColumnAutomationViewFooter
           confirmDelete={confirmDelete}
           deletePending={deletePending}
@@ -269,10 +272,15 @@ export function ColumnAutomationViewHost({
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
   const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
-  const riskScoreGeneral =
-    allowRiskScore && isRiskScoreCanvas && agent.draft && riskScoreCategoriesFromDraft(agent.draft) ? (
-      <RiskScoreSettingsForm draft={agent.draft} onSave={agent.save} />
-    ) : undefined;
+  const riskScoreGeneral = riskScoreSettingsGeneral({
+    allowRiskScore,
+    isRiskScoreCanvas,
+    suppliedGeneral: general,
+    draft: agent.draft,
+    onSave: agent.save,
+    onDelete,
+    deletePending,
+  });
   return (
     <ColumnAutomationViewPopup
       title={automation.name?.trim() || title}
@@ -301,8 +309,35 @@ export function ColumnAutomationViewHost({
       initialTab={initialTab}
       onDelete={onDelete}
       deletePending={deletePending}
+      generalOwnsFooter={Boolean(riskScoreGeneral)}
     />
   );
+}
+
+function riskScoreSettingsGeneral({
+  allowRiskScore,
+  isRiskScoreCanvas,
+  suppliedGeneral,
+  draft,
+  onSave,
+  onDelete,
+  deletePending,
+}: {
+  allowRiskScore: boolean;
+  isRiskScoreCanvas: boolean;
+  suppliedGeneral?: ReactNode;
+  draft: PlanningReviewDraft | null;
+  onSave: (next: PlanningReviewDraft) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
+}): ReactNode | undefined {
+  if (suppliedGeneral != null || !allowRiskScore || !isRiskScoreCanvas || !draft) {
+    return undefined;
+  }
+  if (!riskScoreCategoriesFromDraft(draft)) {
+    return undefined;
+  }
+  return <RiskScoreSettingsForm draft={draft} onSave={onSave} onDelete={onDelete} deletePending={deletePending} />;
 }
 
 function AutomationViewBody({
