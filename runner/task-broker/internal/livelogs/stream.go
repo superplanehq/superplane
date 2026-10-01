@@ -16,6 +16,8 @@ import (
 )
 
 const (
+	// HeartbeatInterval bounds quiet periods on live-log responses.
+	HeartbeatInterval = 15 * time.Second
 	// pageSize is the max events per GetLogEvents call (CloudWatch allows up to 10_000).
 	pageSize int32 = 10_000
 	// pollQuiet waits when tailing and no new events have arrived.
@@ -25,8 +27,9 @@ const (
 )
 
 type ndjsonWriter struct {
-	w io.Writer
-	f http.Flusher
+	w         io.Writer
+	f         http.Flusher
+	lastFlush time.Time
 }
 
 func (n *ndjsonWriter) writeRecord(rec map[string]any) error {
@@ -42,12 +45,25 @@ func (n *ndjsonWriter) flush() {
 	if n.f != nil {
 		n.f.Flush()
 	}
+	n.lastFlush = time.Now()
+}
+
+func (n *ndjsonWriter) pingIfQuiet() error {
+	if time.Since(n.lastFlush) < HeartbeatInterval {
+		return nil
+	}
+	if err := n.writeRecord(map[string]any{"type": "ping"}); err != nil {
+		return err
+	}
+	n.flush()
+	return nil
 }
 
 // StreamCloudWatchLogToNDJSON tails a CloudWatch Logs stream and writes newline-delimited JSON records:
 // {"type":"line","text":"..."} for regular lines, {"type":"cmd_start"...}/{"type":"cmd_end"...}
-// for runner command boundaries, and {"type":"error","message":"..."} on fatal errors.
-func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string) error {
+// for runner command boundaries, {"type":"ping"} during quiet periods, and
+// {"type":"error","message":"..."} on fatal errors. A terminal task ends after catch-up.
+func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string, isTaskTerminal func(context.Context) (bool, error)) error {
 	group = strings.TrimSpace(group)
 	stream = strings.TrimSpace(stream)
 	if group == "" || stream == "" {
@@ -71,12 +87,18 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 	}
 
 	client := cloudwatchlogs.NewFromConfig(awscfg)
-	nw := ndjsonWriter{w: w, f: flusher}
+	nw := ndjsonWriter{w: w, f: flusher, lastFlush: time.Now()}
 
 	var nextForward *string
 	var lastToken string
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := nw.pingIfQuiet(); err != nil {
+			return err
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -100,14 +122,11 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 		token := awsToString(out.NextForwardToken)
 		nextForward = out.NextForwardToken
 
-		if len(out.Events) == 0 {
-			if token != "" && token == lastToken {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(pollQuiet):
-				}
-				continue
+		caughtUp := len(out.Events) == 0 && token != "" && token == lastToken
+		if caughtUp && isTaskTerminal != nil {
+			terminal, err := isTaskTerminal(ctx)
+			if err == nil && terminal {
+				return nil
 			}
 		}
 
@@ -127,10 +146,16 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			continue
 		}
 
+		delay := pollActive
+		if caughtUp {
+			delay = pollQuiet
+		}
+		// Wake at the heartbeat deadline even when it falls between polls.
+		delay = min(delay, max(0, HeartbeatInterval-time.Since(nw.lastFlush)))
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(pollActive):
+		case <-time.After(delay):
 		}
 	}
 }

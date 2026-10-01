@@ -23,6 +23,16 @@ function handlers(overrides: Partial<LiveLogStreamHandlers> = {}): LiveLogStream
 }
 
 describe("consumeLiveLogNdjsonLine", () => {
+  it("ignores heartbeat records before activity dispatch", () => {
+    const next = handlers({ onRecord: vi.fn() });
+    consumeLiveLogNdjsonLine('{"type":"ping"}', next);
+    consumeLiveLogNdjsonLine('{"type":"ping","schema_version":2}', next);
+
+    expect(next.onLogLine).not.toHaveBeenCalled();
+    expect(next.onStreamError).not.toHaveBeenCalled();
+    expect(next.onRecord).not.toHaveBeenCalled();
+    expect(next.onTurn).not.toHaveBeenCalled();
+  });
   it("routes a structured turn record to onTurn", () => {
     const next = handlers();
     consumeLiveLogNdjsonLine('{"type":"turn","turn":3,"usage":{"input_tokens":10,"output_tokens":2}}', next);
@@ -157,6 +167,35 @@ describe("consumeLiveLogNdjsonLine", () => {
 describe("LiveLogStream session errors", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("resolves after a heartbeat and clean EOF without a stream error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
+        .mockResolvedValueOnce(new Response('{"type":"ping"}\n{"type":"line","text":"done"}\n')),
+    );
+    const next = handlers();
+    await new LiveLogStream("organization-1", "canvas-1", "execution-1").pump(next);
+
+    expect(next.onLogLine).toHaveBeenCalledTimes(1);
+    expect(next.onLogLine).toHaveBeenCalledWith("done");
+    expect(next.onStreamError).not.toHaveBeenCalled();
+  });
+
+  it("preserves a real stream network failure", async () => {
+    const failure = new TypeError("network error");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
+        .mockResolvedValueOnce(new Response(new ReadableStream({ start: (controller) => controller.error(failure) }))),
+    );
+
+    await expect(new LiveLogStream("organization-1", "canvas-1", "execution-1").pump(handlers())).rejects.toBe(failure);
   });
 
   it("preserves the not-ready session code from the response header", async () => {
