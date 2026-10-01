@@ -6,11 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
+
+func TestIntakeAnalysisCloneResolvesMissingBranch(t *testing.T) {
+	assertImplementCloneResolvesMissingBranch(t, intakeAnalysisCloneCommand())
+	assert.NotContains(t, intakeAnalysisCloneCommand(), runner.FactoryRepoCommitSetup())
+}
 
 func Test__BuildIntakeCanvas(t *testing.T) {
 	t.Run("each source listens with its own trigger", func(t *testing.T) {

@@ -547,7 +547,7 @@ func intakeAnalysisCloneCommand() string {
 		"fi",
 		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
 		"rm -rf repo",
-		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+		runner.FactoryRepoCloneCommand(),
 	}, "\n")
 }
 

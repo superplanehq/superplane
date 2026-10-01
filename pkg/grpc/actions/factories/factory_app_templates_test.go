@@ -74,6 +74,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
 	require.True(t, ok)
 	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
+	assertImplementCloneResolvesMissingBranch(t, cloneCommand)
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -584,6 +585,25 @@ func agentPrompt(t *testing.T, agent *yaml.Node) string {
 	require.True(t, ok)
 	return prompt
 }
+
+func assertImplementCloneResolvesMissingBranch(t *testing.T, command string) {
+	t.Helper()
+	assert.Contains(t, command, runner.FactoryRepoCloneCommand())
+	assert.NotContains(t, command, `git clone --depth 1 --branch "${BASE:-main}"`)
+	cloneAt := strings.Index(command, runner.FactoryRepoCloneCommand())
+	require.GreaterOrEqual(t, cloneAt, 0)
+	if strings.Contains(command, runner.FactoryRepoCommitSetup()) {
+		enterAt := strings.Index(command, factoryRepoEnterClone)
+		setupAt := strings.Index(command, runner.FactoryRepoCommitSetup())
+		assert.Greater(t, enterAt, cloneAt)
+		assert.Greater(t, setupAt, enterAt)
+	}
+}
+
+const factoryRepoEnterClone = `if ! cd repo; then
+  echo "clone failed: repository directory is missing" >&2
+  exit 1
+fi`
 
 func implementationStep(t *testing.T, agent *yaml.Node, name string) map[string]any {
 	t.Helper()
