@@ -62,8 +62,14 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
+	search = strings.TrimSpace(search)
 	if search != "" {
-		query = query.Where("organizations.name ILIKE ?", "%"+search+"%")
+		pattern := "%" + search + "%"
+		query = query.Where(
+			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+			pattern,
+			pattern,
+		)
 	}
 
 	var total int64
