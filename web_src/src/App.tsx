@@ -77,6 +77,7 @@ import {
   LegacyOrganizationSettingsRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
 import { factorySettingsSectionRoutes } from "./pages/factories/pages/settings/factorySettingsSectionRoutes";
+import { isNotFoundError } from "./pages/app/workflowPageHelpers";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
@@ -317,7 +318,10 @@ export function OrganizationScope() {
   // once here and self-correct any UID URL to the slug below. Every other
   // in-app link reuses this same `:organizationId` URL segment, so fixing
   // it at this single boundary keeps the rest of the app slug-only.
-  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+  const { data: organization, error: organizationError } = useOrganization(
+    segment ?? "",
+    !isReserved && !!segment && !guestLine,
+  );
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -352,6 +356,10 @@ export function OrganizationScope() {
 
   if (guestLine) {
     return <Outlet />;
+  }
+
+  if (isNotFoundError(organizationError)) {
+    return <Navigate to="/" replace />;
   }
 
   return (

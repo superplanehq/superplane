@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"google.golang.org/grpc/codes"
 )
 
 type contextKey string
@@ -265,7 +267,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 					return
 				}
 				if err.Error() == OrganizationNotFoundError {
-					http.Error(w, "Not Found", http.StatusNotFound)
+					writeOrganizationNotFound(w)
 					return
 				}
 
@@ -288,6 +290,24 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+type gatewayStatus struct {
+	Code    int32      `json:"code"`
+	Message string     `json:"message"`
+	Details []struct{} `json:"details"`
+}
+
+func writeOrganizationNotFound(w http.ResponseWriter) {
+	body, _ := json.Marshal(gatewayStatus{
+		Code:    int32(codes.NotFound),
+		Message: "Not found",
+		Details: []struct{}{},
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write(body)
 }
 
 func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
