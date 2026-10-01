@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import type { AgentActivity } from "../agentActivity";
 import { LiveAgentSteps } from "./LiveAgentSteps";
 import {
   idleStream,

@@ -1,6 +1,6 @@
 import { emptyAgentActivityState, type AgentActivity } from "../agentActivity";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
-import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import type { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 import { stagesFromFixture } from "./automationsViewModel";
 
 export const RUNNING_RUNNER = {
