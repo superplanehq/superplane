@@ -3,23 +3,30 @@ package factories
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"net/http"
 	"slices"
 	"strings"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
 
 var (
-	errFactoryPullRequestNotGitHub             = errors.New("only GitHub pull requests can merge from SuperPlane")
-	errFactoryPullRequestMissing               = errors.New("GitHub did not return the pull request")
-	errFactoryPullRequestNotOpen               = errors.New("the pull request is not open")
-	errFactoryPullRequestNotMergeable          = errors.New("the pull request cannot merge")
-	errFactoryPullRequestMergeMethodNotAllowed = errors.New("the repository does not allow this merge method")
-	errFactoryPullRequestHeadMoved             = errors.New("the pull request head changed")
+	errFactoryPullRequestNotGitHub               = errors.New("only GitHub pull requests can merge from SuperPlane")
+	errFactoryPullRequestMissing                 = errors.New("GitHub did not return the pull request")
+	errFactoryPullRequestNotOpen                 = errors.New("the pull request is not open")
+	errFactoryPullRequestNotMergeable            = errors.New("the pull request cannot merge")
+	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
+	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
+	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
+	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
 )
 
 const (
@@ -29,6 +36,7 @@ const (
 	mergeBlockedDraft              = "The pull request is a draft."
 	mergeBlockedConflicting        = "The pull request has conflicts."
 	mergeBlockedMissingIntegration = "GitHub is not connected."
+	mergeBlockedUnavailable        = "Merge status is unavailable right now."
 )
 
 type factoryPullRequestMergeability struct {
@@ -39,6 +47,7 @@ type factoryPullRequestMergeability struct {
 	HeadSHA        string
 	PullRequest    *models.FactoryPullRequest
 	Client         factoryGitHubAPI
+	canRetry       bool
 }
 
 func loadFactoryPullRequestForMerge(
@@ -84,7 +93,7 @@ func evaluateFactoryPullRequestMergeability(
 		if errors.Is(err, errFactoryGitHubNotConnected) {
 			return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION, mergeBlockedMissingIntegration), nil
 		}
-		return nil, err
+		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("create GitHub client: %w", err))
 	}
 	result.Client = client
 
@@ -98,7 +107,7 @@ func evaluateFactoryPullRequestMergeability(
 
 	githubPR, _, err := client.GetPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number))
 	if err != nil {
-		return nil, err
+		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("get pull request: %w", err))
 	}
 	if githubPR == nil {
 		return nil, errFactoryPullRequestMissing
@@ -117,7 +126,7 @@ func evaluateFactoryPullRequestMergeability(
 
 	unfinished, failed, err := evaluatePullRequestChecks(ctx, client, pullRequest.Repository, result.HeadSHA)
 	if err != nil {
-		return nil, err
+		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("evaluate pull request checks: %w", err))
 	}
 	if unfinished {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, mergeBlockedChecksUnfinished), nil
@@ -128,7 +137,7 @@ func evaluateFactoryPullRequestMergeability(
 
 	repository, err := client.FindRepository(pullRequest.Repository)
 	if err != nil {
-		return nil, err
+		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("find repository: %w", err))
 	}
 	result.AllowedMethods = allowedMergeMethods(repository)
 	if len(result.AllowedMethods) == 0 {
@@ -137,6 +146,78 @@ func evaluateFactoryPullRequestMergeability(
 
 	result.CanMerge = true
 	return result, nil
+}
+
+func recoverFactoryPullRequestMergeability(
+	ctx context.Context,
+	factory *models.Factory,
+	result *factoryPullRequestMergeability,
+	err error,
+) (*factoryPullRequestMergeability, error) {
+	if !isRecoverableGitHubMergeabilityError(ctx, err) {
+		return nil, err
+	}
+	recordFactoryPullRequestMergeabilityError(ctx, factory.ID.String(), result.PullRequest.ID.String(), result.PullRequest.Repository, err)
+	result.canRetry = isRetryableGitHubMergeabilityError(err)
+	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, mergeBlockedUnavailable), nil
+}
+
+func isRetryableGitHubMergeabilityError(err error) bool {
+	if isDeniedOrLimitedGitHubMergeabilityError(err) {
+		return false
+	}
+	status := ghcommon.StatusCode(err)
+	if status == http.StatusRequestTimeout || status >= http.StatusInternalServerError {
+		return true
+	}
+	if status != 0 {
+		return false
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func isDeniedOrLimitedGitHubMergeabilityError(err error) bool {
+	var rateLimitErr *github.RateLimitError
+	var abuseRateLimitErr *github.AbuseRateLimitError
+	if errors.As(err, &rateLimitErr) || errors.As(err, &abuseRateLimitErr) {
+		return true
+	}
+	switch ghcommon.StatusCode(err) {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+func unavailableFactoryPullRequestMergeabilityError(pullRequestID uuid.UUID, canRetry bool) error {
+	err := fmt.Errorf(
+		"failed to refresh pull request %s: %w",
+		pullRequestID,
+		errFactoryPullRequestMergeabilityUnavailable,
+	)
+	if !canRetry {
+		return err
+	}
+	return fmt.Errorf("%w: %w", err, errFactoryPullRequestMergeabilityTemporary)
+}
+
+func isRecoverableGitHubMergeabilityError(ctx context.Context, err error) bool {
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	if ghcommon.StatusCode(err) != 0 {
+		return true
+	}
+	var githubErr *github.ErrorResponse
+	var installationErr *ghinstallation.HTTPError
+	var rateLimitErr *github.RateLimitError
+	var abuseRateLimitErr *github.AbuseRateLimitError
+	var networkErr net.Error
+	return errors.As(err, &githubErr) || errors.As(err, &installationErr) ||
+		errors.As(err, &rateLimitErr) || errors.As(err, &abuseRateLimitErr) ||
+		errors.As(err, &networkErr) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func persistFactoryPullRequestMergeability(
@@ -148,7 +229,8 @@ func persistFactoryPullRequestMergeability(
 		return nil
 	}
 	if result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
-		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION ||
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
 		return nil
 	}
 	return pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
@@ -206,7 +288,8 @@ func mergeabilityFromCache(
 	}
 	reason := mergeabilityBlockedReasonFromName(pullRequest.MergeBlockedReason)
 	if reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
-		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION {
+		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION ||
+		reason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
 		return result, false, nil
 	}
 	if pullRequest.Mergeable {
@@ -274,6 +357,8 @@ func mergeabilityBlockedReasonName(reason pb.FactoryPullRequestMergeability_Bloc
 		return "CONFLICTING"
 	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION:
 		return "MISSING_INTEGRATION"
+	case pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE:
+		return "UNAVAILABLE"
 	default:
 		return ""
 	}
@@ -293,6 +378,8 @@ func mergeabilityBlockedReasonFromName(name string) pb.FactoryPullRequestMergeab
 		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING
 	case "MISSING_INTEGRATION":
 		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION
+	case "UNAVAILABLE":
+		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE
 	default:
 		return pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED
 	}
@@ -373,7 +460,7 @@ func evaluateCombinedStatuses(
 	for {
 		combined, response, err := client.GetCombinedStatus(ctx, repository, sha, opts)
 		if err != nil {
-			return false, false, err
+			return false, false, fmt.Errorf("get combined status: %w", err)
 		}
 		pageUnfinished, pageFailed := combinedStatusGate(combined)
 		unfinished = unfinished || pageUnfinished
@@ -398,7 +485,7 @@ func evaluateCheckRuns(
 	for {
 		checks, response, err := client.ListCheckRunsForRef(ctx, repository, sha, opts)
 		if err != nil {
-			return false, false, err
+			return false, false, fmt.Errorf("list check runs: %w", err)
 		}
 		pageUnfinished, pageFailed := checkRunGate(checks)
 		unfinished = unfinished || pageUnfinished
