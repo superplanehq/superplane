@@ -7,9 +7,11 @@ import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { factoryRouteSegment } from "../lib/factoryKeyResolution";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LinesPage } from "./LinesPage";
@@ -33,7 +35,7 @@ export function LocationProbe({ navigateTo }: { navigateTo?: string } = {}) {
 }
 
 export function LinesBoardSpecHarness({
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
   openCreateWorkOrder = () => {},
   factory = REFUND_FACTORY,
   previewFlags = null,
@@ -56,6 +58,7 @@ export function LinesBoardSpecHarness({
                   organizationId: "org-1",
                   factoryId: factory.id ?? PRIMARY_FACTORY_ID,
                   factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                  routeSegment: factoryRouteSegment(factory) || PRIMARY_FACTORY_ROUTE_SEGMENT,
                   factory,
                   factories: [factory],
                   openCreateWorkOrder,

@@ -1,12 +1,15 @@
 package factories
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,6 +153,151 @@ func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, http.StatusForbidden, code)
 	})
+}
+
+func TestRefreshFactoryPullRequestMergeabilityReportsUnavailable(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 96)
+	const headSHA = "abc123def456"
+	require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      true,
+		HeadSHA:        headSHA,
+		AllowedMethods: "SQUASH",
+	}))
+	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	stubFactoryGitHub(t, &fakeFactoryGitHub{
+		getPullErr: &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}},
+	})
+
+	err = refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+	require.ErrorIs(t, err, errFactoryPullRequestMergeabilityUnavailable)
+
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.True(t, stored.Mergeable)
+	assert.Empty(t, stored.MergeBlockedReason)
+	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+}
+
+func TestRefreshFactoryPullRequestMergeabilityFromGitHubEventRetriesUnavailableLookup(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 97)
+	const headSHA = "abc123def456"
+	require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      true,
+		HeadSHA:        headSHA,
+		AllowedMethods: "SQUASH,MERGE,REBASE",
+	}))
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	combined, _ := successChecks()
+	githubAPI := &failingThenReadyGitHub{
+		factoryGitHubAPI: &fakeFactoryGitHub{
+			pullRequest: mergeableGitHubPullRequest(headSHA),
+			combined:    combined,
+			checkRuns: &github.ListCheckRunsResults{CheckRuns: []*github.CheckRun{{
+				Status:     github.Ptr("completed"),
+				Conclusion: github.Ptr("failure"),
+			}}},
+			repository: allMethodsRepository(),
+		},
+		failures: 1,
+		err:      &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}},
+	}
+	stubFactoryGitHub(t, githubAPI)
+	original := publishFactoryWorkOrderUpdated
+	publishFactoryWorkOrderUpdated = func(string, string, string) error { return nil }
+	t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+
+	RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+		t.Context(),
+		IntakeDependencies{},
+		&models.Webhook{AppInstallationID: &integration.ID},
+		"check_run",
+		[]byte(`{
+			"repository": {"full_name": "acme/app"},
+			"check_run": {"head_sha": "abc123def456", "pull_requests": [{"number": 97}]}
+		}`),
+	)
+
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+	require.NoError(t, err)
+	assert.False(t, stored.Mergeable)
+	assert.Equal(t, "CHECK_FAILED", stored.MergeBlockedReason)
+	assert.Equal(t, "A check failed.", stored.MergeBlockedMessage)
+	assert.Greater(t, githubAPI.calls, 1)
+}
+
+func TestRefreshFactoryPullRequestMergeabilityWithRetryStopsWhenLookupCannotClear(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "forbidden",
+			err:  &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}},
+		},
+		{
+			name: "installation unauthorized",
+			err:  &ghinstallation.HTTPError{Response: &http.Response{StatusCode: http.StatusUnauthorized}},
+		},
+		{
+			name: "primary rate limit",
+			err:  &github.RateLimitError{Response: githubRateLimitedResponse(), Message: "rate limit exceeded"},
+		},
+		{
+			name: "secondary rate limit",
+			err:  &github.AbuseRateLimitError{Response: githubRateLimitedResponse(), Message: "secondary rate limit"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 98)
+			githubAPI := &failingThenReadyGitHub{
+				factoryGitHubAPI: &fakeFactoryGitHub{},
+				failures:         factoryMergeabilityRefreshAttempts,
+				err:              test.err,
+			}
+			stubFactoryGitHub(t, githubAPI)
+
+			err := refreshFactoryPullRequestMergeabilityWithRetry(
+				t.Context(),
+				db,
+				IntakeDependencies{},
+				factory,
+				pullRequest,
+			)
+			require.ErrorIs(t, err, errFactoryPullRequestMergeabilityUnavailable)
+			assert.NotErrorIs(t, err, errFactoryPullRequestMergeabilityTemporary)
+			assert.Equal(t, 1, githubAPI.calls)
+		})
+	}
+}
+
+type failingThenReadyGitHub struct {
+	factoryGitHubAPI
+	failures int
+	calls    int
+	err      error
+}
+
+func (f *failingThenReadyGitHub) GetPullRequest(ctx context.Context, repository string, number int) (*github.PullRequest, *github.Response, error) {
+	f.calls++
+	if f.calls <= f.failures {
+		return nil, nil, f.err
+	}
+	return f.factoryGitHubAPI.GetPullRequest(ctx, repository, number)
 }
 
 func TestRefreshFactoryPullRequestMergeabilityAtRecordTime(t *testing.T) {

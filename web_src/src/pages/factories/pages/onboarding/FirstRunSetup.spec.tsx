@@ -62,6 +62,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     organizationId: "org-1",
     factoryId: "factory-1",
     factoryKey: "PAY",
+    routeSegment: "pay",
     factory: { id: "factory-1", key: "PAY", name: "Payments" },
     factories: [{ id: "factory-1", key: "PAY", name: "Payments" }],
   }),

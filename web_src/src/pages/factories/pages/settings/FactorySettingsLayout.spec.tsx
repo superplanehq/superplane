@@ -7,7 +7,7 @@ import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   ACME_ONBOARDING_FACTORY_ID,
-  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
   defaultFactoriesFixture,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
@@ -438,9 +438,7 @@ describe("FactorySettingsLayout sidebar", () => {
       );
       expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
         "href",
-        expect.stringContaining(
-          `/workspaces/${ACME_ONBOARDING_FACTORY_KEY.toLowerCase()}/settings/organization/general`,
-        ),
+        expect.stringContaining(`/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}/settings/organization/general`),
       );
       expect(screen.queryByTestId("lines-detail-page")).not.toBeInTheDocument();
       expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();

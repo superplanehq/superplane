@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
@@ -46,7 +47,7 @@ function renderSetup(lineId: string) {
 }
 
 describe("PlanningSetupPage", () => {
-  const boardHref = factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY));
+  const boardHref = factoryHomePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, firstFactoryLineId(REFUND_FACTORY));
 
   beforeEach(() => {
     canUpdate = true;
@@ -56,7 +57,7 @@ describe("PlanningSetupPage", () => {
     renderSetup(REFUND_LINE_PLAN_ID);
 
     expect(screen.getByTestId("planning-setup-location")).toHaveTextContent(
-      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 

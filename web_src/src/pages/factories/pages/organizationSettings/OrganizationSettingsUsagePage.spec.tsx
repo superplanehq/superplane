@@ -9,6 +9,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   defaultFactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
 import {
@@ -62,7 +63,7 @@ describe("OrganizationSettingsUsagePage", () => {
     expect(rows[0]).toHaveTextContent("Leonardo DiCaprio");
     expect(within(rows[0]).getByRole("link", { name: "RF-101" })).toHaveAttribute(
       "href",
-      workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "101"),
+      workOrderDetailPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "101"),
     );
 
     expect(rows[1]).toHaveTextContent("RF-103");

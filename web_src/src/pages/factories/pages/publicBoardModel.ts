@@ -55,6 +55,7 @@ export interface PublicBoardColumn {
 export interface PublicBoard {
   workspaceName: string;
   workspaceKey?: string;
+  urlId?: string;
   lineName: string;
   showClarity: boolean;
   showConfidence: boolean;

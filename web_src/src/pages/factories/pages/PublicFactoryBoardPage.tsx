@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 
 import { Link } from "@/components/Link/link";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
@@ -8,6 +8,7 @@ import { PublicFactoriesSidebar } from "../layout/FactoriesSidebar";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
 import type { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
+import { factoryRouteSegment, replaceFactoryKeySegment } from "../lib/factoryKeyResolution";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
@@ -103,6 +104,7 @@ export function PublicFactoryBoardPage({
     };
   }, [organizationId, factoryKey, lineId]);
 
+  usePublicBoardCanonicalRedirect(organizationId, factoryKey, load);
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
@@ -151,6 +153,22 @@ export function PublicFactoryBoardPage({
       narrowed={listState.search.trim().length > 0 || listState.filterCount > 0}
     />
   );
+}
+
+function usePublicBoardCanonicalRedirect(organizationId: string, factoryKey: string, load: BoardLoad) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (load.status !== "ready" || !load.board.urlId || !load.board.workspaceKey) {
+      return;
+    }
+    const canonical = factoryRouteSegment({ key: load.board.workspaceKey, urlId: load.board.urlId });
+    if (!canonical || canonical === factoryKey) {
+      return;
+    }
+    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, canonical);
+    navigate(`${target}${location.search}`, { replace: true });
+  }, [factoryKey, load, location.pathname, location.search, navigate, organizationId]);
 }
 
 function usePublicBoardSocket(
