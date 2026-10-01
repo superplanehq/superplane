@@ -24,7 +24,6 @@ func Test__OnErrorTrackingAlert__Setup__CreatesMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
-			jsonResponse(http.StatusOK, `{"monitors":[]}`),
 			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 		},
 	}
@@ -55,6 +54,7 @@ func Test__OnErrorTrackingAlert__Setup__CreatesMonitor(t *testing.T) {
 	assert.False(t, body.Options.GroupbySimpleMonitor)
 	assert.Equal(t, 0, body.Options.NewHostDelay)
 	assert.Equal(t, float64(0), body.Options.Thresholds.Critical)
+	assert.Equal(t, []string{intakeOwnerTag(integration.ID().String())}, body.Tags)
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodPut))
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
 }
@@ -97,8 +97,8 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeDeletesUnusedMonitor(t *tes
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
-			jsonResponse(http.StatusOK, `{"monitors":[]}`),
 			jsonResponse(http.StatusOK, monitorJSON(8, "SuperPlane billing", billingMonitorQuery, intakeMonitorMessage, 0, false)),
+			jsonResponse(http.StatusOK, monitorJSON(7, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 			jsonResponse(http.StatusOK, `{}`),
 		},
 	}
@@ -132,8 +132,8 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeKeepsSharedMonitor(t *testi
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
-			jsonResponse(http.StatusOK, `{"monitors":[]}`),
 			jsonResponse(http.StatusOK, monitorJSON(8, "SuperPlane billing", billingMonitorQuery, intakeMonitorMessage, 0, false)),
+			jsonResponse(http.StatusOK, monitorJSON(7, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 		},
 	}
 	integration := datadogIntegration()
@@ -160,12 +160,12 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeKeepsSharedMonitor(t *testi
 	assert.Equal(t, "billing", saved.MonitorService)
 }
 
-func Test__OnErrorTrackingAlert__Setup__AdoptsExistingWebhookMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__Setup__LeavesCustomWebhookMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			jsonResponse(http.StatusOK, `{"monitors":[]}`),
-			jsonResponse(http.StatusOK, `{"monitors":[{"id":125,"name":"New issue to review"}]}`),
-			jsonResponse(http.StatusOK, monitorJSON(125, "New issue to review", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
+			jsonResponse(http.StatusOK, `{"monitors":[{"id":125,"name":"SuperPlane checkout"}]}`),
+			jsonResponse(http.StatusOK, monitorJSON(125, "SuperPlane checkout", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
+			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 		},
 	}
 	metadata := &contexts.MetadataContext{}
@@ -178,10 +178,12 @@ func Test__OnErrorTrackingAlert__Setup__AdoptsExistingWebhookMonitor(t *testing.
 	})
 
 	require.NoError(t, err)
-	assert.Empty(t, requestsWithMethod(httpContext, http.MethodPost))
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodPut))
+	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
+	post := monitorRequest(t, httpContext, http.MethodPost)
+	assert.Equal(t, "https://api.datadoghq.eu/api/v1/monitor", post.URL.String())
 	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
-	assert.Equal(t, "125", saved.MonitorID)
+	assert.Equal(t, "42", saved.MonitorID)
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
 
@@ -206,7 +208,10 @@ func Test__OnErrorTrackingAlert__Setup__MissingMonitorsWrite(t *testing.T) {
 
 func Test__OnErrorTrackingAlert__Cleanup__DeletesLastMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{jsonResponse(http.StatusOK, `{}`)},
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, monitorJSON(9, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+			jsonResponse(http.StatusOK, `{}`),
+		},
 	}
 	integration := datadogIntegration()
 	integration.NodeConfigurations = []any{map[string]any{"service": "checkout"}}
@@ -227,7 +232,11 @@ func Test__OnErrorTrackingAlert__Cleanup__DeletesLastMonitor(t *testing.T) {
 }
 
 func Test__OnErrorTrackingAlert__Cleanup__KeepsSharedMonitor(t *testing.T) {
-	httpContext := &contexts.HTTPContext{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, monitorJSON(9, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+		},
+	}
 	integration := datadogIntegration()
 	integration.NodeConfigurations = []any{
 		map[string]any{"service": "checkout"},
@@ -245,26 +254,35 @@ func Test__OnErrorTrackingAlert__Cleanup__KeepsSharedMonitor(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Empty(t, httpContext.Requests)
+	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
+	assert.Len(t, requestsWithMethod(httpContext, http.MethodGet), 1)
 }
 
-func Test__Datadog__Cleanup__DeletesIntakeMonitors(t *testing.T) {
+func Test__Datadog__Cleanup__DeletesOnlyOwnedMonitors(t *testing.T) {
+	integration := datadogIntegration()
+	tag := intakeOwnerTag(integration.ID().String())
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{}`),
-			jsonResponse(http.StatusOK, `[
-				{"id":1,"name":"SuperPlane checkout","type":"error-tracking alert","query":"q","message":"owned","options":{"groupby_simple_monitor":false,"new_host_delay":0,"thresholds":{"critical":0}}},
-				{"id":2,"name":"Disk usage","type":"query alert","query":"q","message":"disk","options":{"groupby_simple_monitor":false,"new_host_delay":0,"thresholds":{"critical":0}}},
-				{"id":3,"name":"New issue to review","type":"error-tracking alert","query":"q","message":"Alert @webhook-superplane","options":{"groupby_simple_monitor":false,"new_host_delay":0,"thresholds":{"critical":0}}}
-			]`),
+			jsonResponse(http.StatusOK, `{"monitors":[{"id":1,"name":"SuperPlane checkout"},{"id":3,"name":"New issue to review"}]}`),
+			jsonResponse(http.StatusOK, monitorJSON(1, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false, tag)),
 			jsonResponse(http.StatusOK, `{}`),
+			jsonResponse(http.StatusOK, monitorJSON(3, "New issue to review", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
+			jsonResponse(http.StatusOK, `{"monitors":[
+				{"id":4,"name":"SuperPlane billing"},
+				{"id":2,"name":"Disk usage"},
+				{"id":5,"name":"SuperPlane dashboard"}
+			]}`),
+			jsonResponse(http.StatusOK, monitorJSON(4, "SuperPlane billing", billingMonitorQuery, intakeMonitorMessage, 0, false)),
 			jsonResponse(http.StatusOK, `{}`),
+			jsonResponse(http.StatusOK, monitorJSON(2, "Disk usage", "avg(last_5m):avg:system.disk.in_use{*} > 0.9", "disk", 0, false)),
+			jsonResponse(http.StatusOK, monitorJSON(5, "SuperPlane dashboard", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
 		},
 	}
 
 	err := (&Datadog{}).Cleanup(core.IntegrationCleanupContext{
 		HTTP:        httpContext,
-		Integration: datadogIntegration(),
+		Integration: integration,
 	})
 
 	require.NoError(t, err)
@@ -274,8 +292,134 @@ func Test__Datadog__Cleanup__DeletesIntakeMonitors(t *testing.T) {
 			deleted = append(deleted, request.URL.Path)
 		}
 	}
-	assert.Equal(t, []string{"/api/v1/monitor/1", "/api/v1/monitor/3"}, deleted)
-	assert.NotContains(t, requestPaths(httpContext), "/api/v1/monitor/2")
+	assert.Equal(t, []string{"/api/v1/monitor/1", "/api/v1/monitor/4"}, deleted)
+	assert.NotContains(t, deleted, "/api/v1/monitor/2")
+	assert.NotContains(t, deleted, "/api/v1/monitor/3")
+	assert.NotContains(t, deleted, "/api/v1/monitor/5")
+}
+
+func Test__Datadog__Cleanup__ReturnsMonitorDeleteError(t *testing.T) {
+	integration := datadogIntegration()
+	tag := intakeOwnerTag(integration.ID().String())
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, `{}`),
+			jsonResponse(http.StatusOK, `{"monitors":[{"id":1,"name":"SuperPlane checkout"}]}`),
+			jsonResponse(http.StatusOK, monitorJSON(1, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false, tag)),
+			jsonResponse(http.StatusInternalServerError, `{"errors":["unavailable"]}`),
+		},
+	}
+
+	err := (&Datadog{}).Cleanup(core.IntegrationCleanupContext{
+		HTTP:        httpContext,
+		Integration: integration,
+	})
+
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "monitors_write")
+}
+
+func Test__ReleaseRetiredIntakeMonitor__DeletesOwnedMonitor(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, monitorJSON(9, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+			jsonResponse(http.StatusOK, `{}`),
+		},
+	}
+
+	err := ReleaseRetiredIntakeMonitor(core.TriggerContext{
+		Configuration: map[string]any{"service": "checkout"},
+		HTTP:          httpContext,
+		Integration:   datadogIntegration(),
+		Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+			"monitorId":      "9",
+			"monitorService": "checkout",
+		}},
+	})
+
+	require.NoError(t, err)
+	deleted := monitorRequest(t, httpContext, http.MethodDelete)
+	assert.Equal(t, "https://api.datadoghq.eu/api/v1/monitor/9", deleted.URL.String())
+}
+
+func Test__ReleaseRetiredIntakeMonitor__KeepsSharedMonitor(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, monitorJSON(9, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+		},
+	}
+	integration := datadogIntegration()
+	integration.NodeConfigurations = []any{map[string]any{"service": "checkout"}}
+
+	err := ReleaseRetiredIntakeMonitor(core.TriggerContext{
+		Configuration: map[string]any{"service": "checkout"},
+		HTTP:          httpContext,
+		Integration:   integration,
+		Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+			"monitorId":      "9",
+			"monitorService": "checkout",
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
+}
+
+func Test__ReleaseRetiredIntakeMonitor__LeavesCustomMonitor(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, monitorJSON(9, "New issue to review", checkoutMonitorQuery, "Alert\n\n@webhook-superplane", 0, false)),
+		},
+	}
+
+	err := ReleaseRetiredIntakeMonitor(core.TriggerContext{
+		Configuration: map[string]any{"service": "checkout"},
+		HTTP:          httpContext,
+		Integration:   datadogIntegration(),
+		Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+			"monitorId":      "9",
+			"monitorService": "checkout",
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
+}
+
+func Test__Client__SearchMonitors__ReadsEveryPage(t *testing.T) {
+	const fullPages = 21
+	responses := make([]*http.Response, 0, fullPages+1)
+	for page := 0; page < fullPages; page++ {
+		responses = append(responses, jsonResponse(http.StatusOK, monitorSearchPage(monitorPageSize, page*monitorPageSize)))
+	}
+	responses = append(responses, jsonResponse(http.StatusOK, monitorSearchPage(1, fullPages*monitorPageSize)))
+	httpContext := &contexts.HTTPContext{Responses: responses}
+	client, err := NewClient(httpContext, datadogIntegration())
+	require.NoError(t, err)
+
+	monitors, err := client.SearchMonitors("tag:superplane_integration:test")
+
+	require.NoError(t, err)
+	assert.Len(t, monitors, fullPages*monitorPageSize+1)
+	assert.Len(t, httpContext.Requests, fullPages+1)
+	assert.Equal(t, int64(0), monitors[0].ID)
+	assert.Equal(t, int64(fullPages*monitorPageSize), monitors[len(monitors)-1].ID)
+}
+
+func Test__Client__SearchMonitors__StopsWhenPageRepeats(t *testing.T) {
+	page := monitorSearchPage(monitorPageSize, 0)
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(http.StatusOK, page),
+			jsonResponse(http.StatusOK, page),
+		},
+	}
+	client, err := NewClient(httpContext, datadogIntegration())
+	require.NoError(t, err)
+
+	_, err = client.SearchMonitors("title:SuperPlane")
+
+	require.ErrorContains(t, err, "repeated page")
 }
 
 func datadogIntegration() *contexts.IntegrationContext {
@@ -295,11 +439,32 @@ func jsonResponse(status int, body string) *http.Response {
 	}
 }
 
-func monitorJSON(id int64, name, query, message string, delay int, simple bool) string {
+func monitorJSON(id int64, name, query, message string, delay int, simple bool, tags ...string) string {
+	if tags == nil {
+		tags = []string{}
+	}
+	encodedTags, err := json.Marshal(tags)
+	if err != nil {
+		encodedTags = []byte("[]")
+	}
 	return fmt.Sprintf(
-		`{"id":%d,"name":%q,"type":"error-tracking alert","query":%q,"message":%q,"options":{"groupby_simple_monitor":%t,"new_host_delay":%d,"thresholds":{"critical":0}}}`,
-		id, name, query, message, simple, delay,
+		`{"id":%d,"name":%q,"type":"error-tracking alert","query":%q,"message":%q,"tags":%s,"options":{"groupby_simple_monitor":%t,"new_host_delay":%d,"thresholds":{"critical":0}}}`,
+		id, name, query, message, encodedTags, simple, delay,
 	)
+}
+
+func monitorSearchPage(count, startID int) string {
+	monitors := make([]Monitor, 0, count)
+	for i := 0; i < count; i++ {
+		monitors = append(monitors, Monitor{ID: int64(startID + i), Name: fmt.Sprintf("SuperPlane %d", startID+i)})
+	}
+	body, err := json.Marshal(struct {
+		Monitors []Monitor `json:"monitors"`
+	}{Monitors: monitors})
+	if err != nil {
+		return `{"monitors":[]}`
+	}
+	return string(body)
 }
 
 func monitorRequest(t *testing.T, httpContext *contexts.HTTPContext, method string) *http.Request {

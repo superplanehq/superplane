@@ -151,8 +151,15 @@ func (d *Datadog) Cleanup(ctx core.IntegrationCleanupContext) error {
 		ctx.Logger.Warnf("failed to delete datadog webhook during cleanup: %v", err)
 	}
 
-	if err := deleteIntakeMonitors(client); err != nil && ctx.Logger != nil {
-		ctx.Logger.Warnf("failed to delete datadog intake monitors during cleanup: %v", monitorPermissionError(err))
+	if ctx.Integration == nil {
+		return fmt.Errorf("integration is required to delete datadog intake monitors")
+	}
+	if err := deleteIntakeMonitors(client, ctx.Integration.ID().String()); err != nil {
+		wrapped := monitorPermissionError(err)
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to delete datadog intake monitors during cleanup: %v", wrapped)
+		}
+		return wrapped
 	}
 
 	return nil

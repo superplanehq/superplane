@@ -224,7 +224,7 @@ func (p *CanvasPublisher) processChange(ctx context.Context, change *Change) err
 	case ChangeTypeAddNode:
 		return p.addNode(ctx, change)
 	case ChangeTypeDeleteNode:
-		return p.deleteNode(ctx, change)
+		return p.deleteNode(change)
 	case ChangeTypeUpdateNode:
 		return p.updateNode(ctx, change)
 	}
@@ -461,15 +461,16 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 	return nil
 }
 
-func (p *CanvasPublisher) deleteNode(ctx context.Context, change *Change) error {
+func (p *CanvasPublisher) deleteNode(change *Change) error {
 	existingNode, exists := p.allNodes[change.Node.ID]
 	if !exists {
 		return nil
 	}
 
-	if err := p.cleanupRemovedTrigger(ctx, &existingNode); err != nil {
-		return err
-	}
+	// Do not call Datadog here. This method runs inside the publish
+	// transaction. A later failure restores the intake, but Datadog
+	// would not restore a monitor deleted now. The cleanup worker
+	// deletes the monitor after the removal is committed.
 
 	delete(p.allNodes, existingNode.NodeID)
 	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
@@ -583,32 +584,6 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	}
 
 	return trigger.Setup(triggerCtx)
-}
-
-func (p *CanvasPublisher) cleanupRemovedTrigger(ctx context.Context, node *models.CanvasNode) error {
-	if node.Type != models.NodeTypeTrigger {
-		return nil
-	}
-
-	ref := node.Ref.Data()
-	if ref.Trigger == nil || ref.Trigger.Name != "datadog.onErrorTrackingAlert" {
-		return nil
-	}
-	if p.options.Registry == nil {
-		return fmt.Errorf("failed to clean up trigger: registry is not configured")
-	}
-
-	trigger, err := p.options.Registry.GetTrigger(ref.Trigger.Name)
-	if err != nil {
-		return fmt.Errorf("failed to clean up trigger: %w", err)
-	}
-
-	triggerCtx, err := p.triggerContext(ctx, node)
-	if err != nil {
-		return err
-	}
-
-	return trigger.Cleanup(triggerCtx)
 }
 
 func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.CanvasNode) (core.TriggerContext, error) {
