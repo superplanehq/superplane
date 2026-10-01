@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -143,6 +144,16 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 }
 
 func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	session, factoryModel, userID, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	if models.SurveyReplyClosesTask(session.CurrentSurvey(), req.GetText()) {
+		return closeDraftFromSurveyAnswer(ctx, session, factoryModel, userID, req.GetText())
+	}
+	if session.State == models.PlanningSessionStateEnded && models.ReplySelectsCloseOption(req.GetText()) {
+		return planningSurveyAnswer(ctx, factoryModel, session)
+	}
 	response, err := SendPlanningSessionMessage(ctx, organizationID, &pb.SendPlanningSessionMessageRequest{
 		FactoryId: req.GetFactoryId(),
 		SessionId: req.GetSessionId(),
@@ -152,6 +163,106 @@ func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req
 		return nil, err
 	}
 	return &pb.AnswerPlanningSessionSurveyResponse{Session: response.Session}, nil
+}
+
+var errPlanningSurveyNoLongerCloses = errors.New("the survey no longer offers close")
+
+// closeDraftFromSurveyAnswer closes the draft when the locked session still
+// offers the close option. An ended session or a replaced survey does not
+// close an open task.
+func closeDraftFromSurveyAnswer(
+	ctx context.Context,
+	session *models.FactoryPlanningSession,
+	factoryModel *models.Factory,
+	userID uuid.UUID,
+	text string,
+) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	if session.DraftWorkOrderID == nil {
+		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionInvalid, "failed to close task")
+	}
+	orderID := *session.DraftWorkOrderID
+	db := database.DB(ctx)
+	var fromState string
+	var assigned bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := session.LockForUpdate(tx); err != nil {
+			return err
+		}
+		order, err := factoryModel.FindWorkOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+		fromState = order.State
+		if !models.SurveyReplyClosesTask(session.CurrentSurvey(), text) {
+			if order.IsClosed() && models.ReplySelectsCloseOption(text) {
+				return nil
+			}
+			return errPlanningSurveyNoLongerCloses
+		}
+		if session.State == models.PlanningSessionStateEnded {
+			if order.IsClosed() {
+				return nil
+			}
+			return models.ErrFactoryPlanningSessionEnded
+		}
+		if err := session.SendUserMessage(tx, text, userID); err != nil {
+			return err
+		}
+		order, err = factoryModel.FindWorkOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+		fromState = order.State
+		if order.IsClosed() {
+			return nil
+		}
+		if assigned, err = order.AddAssignee(tx, userID, userID); err != nil {
+			return err
+		}
+		_, err = order.Close(tx, models.FactoryWorkOrderResultRejected, &userID)
+		return err
+	})
+	if errors.Is(err, errPlanningSurveyNoLongerCloses) {
+		return nil, grpcerrors.FailedPrecondition(err, "the survey no longer offers close")
+	}
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close task")
+	}
+
+	order, err := factoryModel.FindWorkOrder(db, orderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close task")
+	}
+	publishWorkOrderClosed(
+		session.OrganizationID,
+		factoryModel,
+		order,
+		&userID,
+		fromState,
+		models.FactoryWorkOrderResultRejected,
+		fromState == models.FactoryWorkOrderStateClosed,
+	)
+	if assigned {
+		publishDraftAssigneesUpdated(session)
+	}
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close task")
+	}
+	messages.PublishPlanningBoardStatus(reloaded)
+	return planningSurveyAnswer(ctx, factoryModel, reloaded)
+}
+
+func planningSurveyAnswer(
+	ctx context.Context,
+	factoryModel *models.Factory,
+	session *models.FactoryPlanningSession,
+) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to answer planning session survey")
+	}
+	return &pb.AnswerPlanningSessionSurveyResponse{Session: serialized}, nil
 }
 
 // publishDraftAssigneesUpdated tells open boards that the draft has a new owner.

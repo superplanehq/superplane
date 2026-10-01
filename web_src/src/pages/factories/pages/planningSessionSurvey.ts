@@ -1,6 +1,12 @@
 import type { CreateWithAgentSurvey, CreateWithAgentSurveyQuestion } from "./createWithAgentTypes";
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 
+export const PLANNING_SURVEY_CLOSE_OPTION = "Close the task";
+
+export function isPlanningSurveyCloseOption(option: string): boolean {
+  return option.trim().toLowerCase() === PLANNING_SURVEY_CLOSE_OPTION.toLowerCase();
+}
+
 export function parsePlanningSurvey(raw: string | undefined): CreateWithAgentSurvey | undefined {
   if (!raw?.trim()) {
     return undefined;

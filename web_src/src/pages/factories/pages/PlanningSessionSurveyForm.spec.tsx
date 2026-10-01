@@ -150,6 +150,23 @@ describe("PlanningSessionSurveyForm", () => {
     expect(onSubmit).toHaveBeenCalledWith("What is the priority? High\nWhat is the scope? One file");
   });
 
+  it("closes the task when the user chooses Close the task", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <PlanningSessionSurveyForm
+        survey={{
+          questions: [{ prompt: "Nothing is left. Close this task?", options: ["Close the task", "Keep it open"] }],
+        }}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Close the task/ }));
+
+    expect(onSubmit).toHaveBeenCalledWith("Nothing is left. Close this task? Close the task");
+  });
+
   it("resets pages when a new survey mounts", () => {
     const { rerender } = render(<PlanningSessionSurveyForm key="old" survey={twoQuestions} onSubmit={vi.fn()} />);
     rerender(

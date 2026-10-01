@@ -92,6 +92,22 @@ func Tools() []Tool {
 				"required": []string{"title"},
 			},
 		},
+		{
+			Name:        "close_task",
+			Description: "Close a task after the user asks you to close it. Call this when the user chooses Close the task. Omit result to close a draft as rejected, or an open task as completed.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"task": map[string]any{"type": "string", "description": "Task id, number, or key."},
+					"result": map[string]any{
+						"type":        "string",
+						"enum":        []string{"completed", "rejected", "failed"},
+						"description": "Close result. Omit to use the default for the task state.",
+					},
+				},
+				"required": []string{"task"},
+			},
+		},
 	}
 }
 
@@ -112,6 +128,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.sendTaskMessage(ctx, claims, args)
 	case "create_task":
 		return rt.createTask(ctx, claims, args)
+	case "close_task":
+		return rt.closeTask(ctx, claims, args)
 	default:
 		return ToolResult{}, ToolError("Unknown tool: " + name)
 	}
@@ -315,6 +333,87 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 		"title": order.GetTitle(),
 		"state": protoStateName(order.GetState()),
 	})), nil
+}
+
+func (rt *Runtime) closeTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
+	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
+		return ToolResult{}, err
+	}
+	task, err := stringArg(args, "task")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	orderID, err := resolveTaskID(ctx, claims, task)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	result, err := closeTaskResult(ctx, claims, orderID, args["result"])
+	if err != nil {
+		return ToolResult{}, err
+	}
+	resp, err := factories.CloseWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.CloseWorkOrderRequest{
+		FactoryId: claims.FactoryID.String(),
+		OrderId:   orderID,
+		Result:    result,
+	})
+	if err != nil {
+		return ToolResult{}, actionError(err)
+	}
+	order := resp.GetOrder()
+	return TextResult(mustJSON(map[string]any{
+		"id":     order.GetId(),
+		"key":    order.GetKey(),
+		"title":  order.GetTitle(),
+		"state":  protoStateName(order.GetState()),
+		"result": protoResultName(order.GetResult()),
+	})), nil
+}
+
+func closeTaskResult(ctx context.Context, claims *AccessClaims, orderID string, raw any) (pb.WorkOrder_Result, error) {
+	if name, _ := raw.(string); strings.TrimSpace(name) != "" {
+		result, ok := closeResultByName(name)
+		if !ok {
+			return pb.WorkOrder_RESULT_UNSPECIFIED, ToolError("result must be completed, rejected, or failed")
+		}
+		return result, nil
+	}
+	described, err := factories.DescribeWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: claims.FactoryID.String(),
+		OrderId:   orderID,
+	})
+	if err != nil {
+		return pb.WorkOrder_RESULT_UNSPECIFIED, actionError(err)
+	}
+	if described.GetOrder().GetState() == pb.WorkOrder_STATE_DRAFT {
+		return pb.WorkOrder_RESULT_REJECTED, nil
+	}
+	return pb.WorkOrder_RESULT_COMPLETED, nil
+}
+
+func closeResultByName(name string) (pb.WorkOrder_Result, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "completed":
+		return pb.WorkOrder_RESULT_COMPLETED, true
+	case "rejected":
+		return pb.WorkOrder_RESULT_REJECTED, true
+	case "failed":
+		return pb.WorkOrder_RESULT_FAILED, true
+	default:
+		return pb.WorkOrder_RESULT_UNSPECIFIED, false
+	}
+}
+
+func protoResultName(result pb.WorkOrder_Result) string {
+	switch result {
+	case pb.WorkOrder_RESULT_COMPLETED:
+		return "completed"
+	case pb.WorkOrder_RESULT_REJECTED:
+		return "rejected"
+	case pb.WorkOrder_RESULT_FAILED:
+		return "failed"
+	default:
+		return ""
+	}
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {

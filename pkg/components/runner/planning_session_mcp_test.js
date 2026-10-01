@@ -80,7 +80,8 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
     /\{"questions":\[\{"prompt":"Your question","options":\["First option","Second option"\]\}\]\}/,
   );
   assert.match(pack, /Do not use XML tags/);
-  assert.match(pack, /If the survey tool is unavailable or fails, do not put the questions in chat/);
+  assert.match(pack, /The option "Close the task" closes this task when the user chooses it/);
+  assert.match(pack, /Use that exact option when the task prompt says the work is already done/);
   assert.match(pack, /You may update the score without rewriting the specification/);
   assert.match(pack, /this is a continuation/);
   assert.match(pack, /does not publish the specification or the score/);
@@ -134,6 +135,10 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /Do not create a task the user did not confirm/);
   assert.match(pack, /Do not use contractions/);
   assert.doesNotMatch(pack, /Contractions are fine/);
+  assert.match(pack, /### Close a task that is already done/);
+  assert.match(pack, /The first option must be the exact text: Close the task/);
+  assert.match(pack, /Choosing Close the task closes the task/);
+  assert.match(pack, /Do not write a plan for work that is already done/);
   assert.match(pack, /### A part of a split/);
   assert.match(pack, /that boundary is decided/);
   assert.match(pack, /Do not lower Confidence because it is not in the repository yet/);
@@ -368,6 +373,7 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.deepEqual(confidence.inputSchema.required, ["score", "summary"]);
   assert.match(survey.description, /short everyday options/);
   assert.match(survey.description, /task prompt says to ask/);
+  assert.match(survey.description, /Close the task closes this task when the user chooses it/);
   assert.match(survey.inputSchema.properties.questions.description, /JSON array/);
   assert.equal(survey.inputSchema.additionalProperties, undefined);
   assert.equal(survey.inputSchema.properties.questions.items.additionalProperties, undefined);
