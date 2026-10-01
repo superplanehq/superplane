@@ -115,7 +115,8 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 						return
 					}
 
-					w.logger.Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
+					logging.WithCanvasWorkspace(w.logger, canvasForLog(execution.WorkflowID)).
+						Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
 				}(execution)
 			}
 
@@ -186,8 +187,24 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	w.logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
+	logger := w.logger
+	if canvasID, parseErr := uuid.Parse(data.CanvasId); parseErr == nil {
+		logger = logging.WithCanvasWorkspace(logger, canvasForLog(canvasID))
+	}
+	logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
 	return err
+}
+
+func canvasForLog(canvasID uuid.UUID) *models.Canvas {
+	return unscopedCanvas(database.Conn(), canvasID)
+}
+
+func unscopedCanvas(tx *gorm.DB, canvasID uuid.UUID) *models.Canvas {
+	canvas, err := models.FindUnscopedCanvasInTransaction(tx, canvasID)
+	if err != nil {
+		return nil
+	}
+	return canvas
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
@@ -403,7 +420,14 @@ func (w *NodeExecutor) executeActionNode(
 		execution,
 	)
 
-	err := execution.StartInTransaction(tx)
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		logger.Errorf("failed to find workflow: %v", err)
+		return fmt.Errorf("failed to find workflow: %v", err)
+	}
+	logger = logging.WithCanvasWorkspace(logger, workflow)
+
+	err = execution.StartInTransaction(tx)
 	if err != nil {
 		logger.Errorf("failed to start execution: %v", err)
 		return fmt.Errorf("failed to start execution: %w", err)
@@ -430,14 +454,6 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	input := inputEvent.Data.Data()
-
-	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
-	if err != nil {
-		logger.Errorf("failed to find workflow: %v", err)
-		return fmt.Errorf("failed to find workflow: %v", err)
-	}
-
-	logger = logging.WithCanvasWorkspace(logger, workflow)
 
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
@@ -503,6 +519,7 @@ func (w *NodeExecutor) executeActionNode(
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger = withFactoryOrder(logger, tx, execution.RunID)
+		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
@@ -521,6 +538,27 @@ func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entr
 	}
 
 	return logger.WithField("order_id", step.WorkOrderID)
+}
+
+// withRejectedHostedCredit adds the credit buckets that made the hosted
+// check fail. The next log line can then be compared with the billing page.
+func withRejectedHostedCredit(logger *log.Entry, orgID uuid.UUID, err error) *log.Entry {
+	if logger == nil || !errors.Is(err, models.ErrHostedCreditEmpty) || orgID == uuid.Nil {
+		return logger
+	}
+
+	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	if describeErr != nil {
+		return logger.WithField("hosted_credit_lookup_error", describeErr.Error())
+	}
+
+	return logger.WithFields(log.Fields{
+		"remaining_micros":          summary.RemainingMicros,
+		"welcome_remaining_micros":  summary.WelcomeRemainingMicros,
+		"included_remaining_micros": summary.IncludedRemainingMicros,
+		"topup_remaining_micros":    summary.PurchasedRemainingMicros,
+		"admin_remaining_micros":    summary.AdminRemainingMicros,
+	})
 }
 
 // failNodeExecution fails the node execution with the action error. A

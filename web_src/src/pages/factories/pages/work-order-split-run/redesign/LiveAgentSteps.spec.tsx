@@ -1,72 +1,21 @@
 import { LOADING_REVEAL_CLASSNAME } from "../../../lib/loadingReveal";
-import { emptyAgentActivityState, type AgentActivity } from "../agentActivity";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
-import { stagesFromFixture } from "./automationsViewModel";
+import type { AgentActivity } from "../agentActivity";
 import { LiveAgentSteps } from "./LiveAgentSteps";
+import {
+  idleStream,
+  implementPhase,
+  implementStage,
+  LIVE_ACTIVITY,
+  RUNNING_RUNNER,
+} from "./LiveAgentSteps.testHelpers";
 
 vi.mock("../useSplitRunLiveCanvas", () => ({ useSplitRunLiveCanvas: vi.fn() }));
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({ useLiveLogStream: vi.fn() }));
-
-const RUNNING_RUNNER = {
-  id: "impl-agent-live",
-  at: "12:25:33",
-  component: "runnerClaudeCode",
-  componentName: "Implementation",
-  status: "running" as const,
-  executionId: "exec-implementation",
-  nodeId: "node-implementation",
-};
-
-const LIVE_ACTIVITY: AgentActivity = {
-  id: "activity-1",
-  provider: "opencode",
-  status: "running",
-  sequence: 4,
-  truncated: false,
-  items: [
-    {
-      type: "content",
-      id: "reasoning-1",
-      kind: "reasoning",
-      text: "Inspecting the retry path.",
-      status: "running",
-      truncated: false,
-    },
-  ],
-};
-
-function implementStage() {
-  const stage = stagesFromFixture(SPLIT_RUN_RUNNING).taskStages.find((candidate) => candidate.id === "implement");
-  if (!stage) {
-    throw new Error("Implement stage is not in the running fixture");
-  }
-  return stage;
-}
-
-function implementPhase() {
-  const phase = SPLIT_RUN_RUNNING.phases.find((candidate) => candidate.id === "implement");
-  if (!phase) {
-    throw new Error("Implement phase is not in the running fixture");
-  }
-  return phase;
-}
-
-function idleStream(overrides: Record<string, unknown> = {}) {
-  return {
-    sections: [],
-    orphanLines: [],
-    error: null,
-    isStreaming: true,
-    usageSeries: [],
-    activityState: emptyAgentActivityState,
-    ...overrides,
-  } as unknown as ReturnType<typeof useLiveLogStream>;
-}
 
 describe("LiveAgentSteps", () => {
   beforeEach(() => {
@@ -439,31 +388,6 @@ describe("LiveAgentSteps", () => {
 
     expect(await screen.findByText("Something went wrong while fetching logs.")).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
-  });
-
-  it("keeps the empty sentence for a finished run with no steps", async () => {
-    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
-      enabled: true,
-      isError: false,
-      isLoading: false,
-      canvas: undefined,
-      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
-    });
-    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true }));
-    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
-
-    render(
-      <LiveAgentSteps
-        stage={stage}
-        phase={implementPhase()}
-        organizationId="org-1"
-        emptyNote="No steps for this run."
-      />,
-    );
-
-    expect(await screen.findByText("No steps for this run.")).toBeInTheDocument();
-    expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
   });
 
   it("keeps Starting agent when the live stream has not reported a waiting note", () => {

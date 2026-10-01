@@ -191,18 +191,25 @@ func WithCanvas(logger *log.Entry, canvas models.Canvas) *log.Entry {
 	})
 }
 
-// WithCanvasWorkspace adds organization_id and factory_id when the canvas
-// belongs to a workspace. factory_id is the workspace UUID. A canvas outside
-// a workspace is left unchanged.
+// WithCanvasWorkspace adds organization_id for every canvas, and factory_id
+// when the canvas belongs to a workspace. factory_id is the workspace UUID.
 func WithCanvasWorkspace(logger *log.Entry, canvas *models.Canvas) *log.Entry {
-	if logger == nil || canvas == nil || canvas.FactoryID == nil || *canvas.FactoryID == uuid.Nil {
+	if logger == nil || canvas == nil {
 		return logger
 	}
 
-	return logger.WithFields(log.Fields{
-		"organization_id": canvas.OrganizationID,
-		"factory_id":      *canvas.FactoryID,
-	})
+	fields := log.Fields{}
+	if canvas.OrganizationID != uuid.Nil {
+		fields["organization_id"] = canvas.OrganizationID
+	}
+	if canvas.FactoryID != nil && *canvas.FactoryID != uuid.Nil {
+		fields["factory_id"] = *canvas.FactoryID
+	}
+	if len(fields) == 0 {
+		return logger
+	}
+
+	return logger.WithFields(fields)
 }
 
 // WithWebhookNode adds the SuperPlane organization, canvas, and webhook ids

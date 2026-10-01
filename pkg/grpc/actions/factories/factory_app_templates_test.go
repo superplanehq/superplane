@@ -70,6 +70,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, implementationPrompt, runner.FactoryCommitIdentityPrompt)
+	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
 	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
 	require.True(t, ok)
 	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())

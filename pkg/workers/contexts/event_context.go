@@ -71,7 +71,11 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	err = s.tx.Create(&event).Error
 	if err != nil {
 		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			logging.ForNode(*s.node).
+			canvas, findErr := models.FindUnscopedCanvasInTransaction(s.tx, s.node.WorkflowID)
+			if findErr != nil {
+				canvas = nil
+			}
+			logging.WithCanvasWorkspace(logging.ForNode(*s.node), canvas).
 				Warnf("skipping event %s: canvas %s cannot start a run", payloadType, s.node.WorkflowID)
 			return nil
 		}

@@ -10,6 +10,20 @@ import { WorkOrderDescriptionEditor } from "../../WorkOrderDescriptionEditor";
 
 const MAX_DESCRIPTION_LENGTH = 20000;
 
+type WorkOrderSplitRunDescriptionProps = {
+  description: string;
+  canEdit?: boolean;
+  busy?: boolean;
+  collapsible?: boolean;
+  previewHeight?: number;
+  fadeClassName?: string;
+  onSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+};
+
 /**
  * Description on the split-run Description tab. Drafts can switch the
  * markdown into the work-order editor without leaving the popup.
@@ -19,22 +33,14 @@ export function WorkOrderSplitRunDescription({
   canEdit = false,
   busy = false,
   collapsible = true,
+  previewHeight,
+  fadeClassName,
   onSave,
   files,
   organizationId,
   factoryId,
   orderId,
-}: {
-  description: string;
-  canEdit?: boolean;
-  busy?: boolean;
-  collapsible?: boolean;
-  onSave?: (next: string) => void | Promise<void>;
-  files?: FilesFile[];
-  organizationId?: string;
-  factoryId?: string;
-  orderId?: string;
-}) {
+}: WorkOrderSplitRunDescriptionProps) {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(description);
   const [draft, setDraft] = useState(description);
@@ -68,7 +74,13 @@ export function WorkOrderSplitRunDescription({
   };
 
   const body = saved.trim() ? (
-    <WorkOrderDescription description={saved} files={files} collapsible={collapsible} />
+    <WorkOrderDescription
+      description={saved}
+      files={files}
+      collapsible={collapsible}
+      previewHeight={previewHeight}
+      fadeClassName={fadeClassName}
+    />
   ) : (
     <p className="text-[13px] text-muted-foreground">No description yet.</p>
   );
