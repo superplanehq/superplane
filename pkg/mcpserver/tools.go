@@ -3,14 +3,19 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 )
 
 type Runtime struct {
@@ -82,12 +87,33 @@ func Tools() []Tool {
 		},
 		{
 			Name:        "create_task",
-			Description: "Create a draft task in this workspace. The creator is the signed-in user. Refinement starts when the workspace backlog app is on. The result is the new task. It does not wait for an agent session.",
+			Description: "Create a task in this workspace. The creator is the signed-in user. By default, the task is a draft in backlog, and refinement starts when the workspace backlog app is on. Optional arguments allow you to hand off the task to a later line column: use line to name the target line (required when a factory has multiple lines), start_step to name or index the starting column (resolved against the line's step names or numeric position), and pull_request to attach an existing pull request so automations have a target. When you provide start_step, the task is dispatched from that step and earlier steps are skipped. The result is the new task. It does not wait for an agent session.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"title":       map[string]any{"type": "string", "description": "Short task title."},
 					"description": map[string]any{"type": "string", "description": "Task description in markdown."},
+					"line": map[string]any{
+						"type":        "string",
+						"description": "Optional line name for handoff. When provided, the task is dispatched to this line at start_step. Required when the factory has more than one line and start_step is given.",
+					},
+					"start_step": map[string]any{
+						"type":        "string",
+						"description": "Optional starting step for handoff. Accepts a step name (e.g. 'Verify', case-insensitive) or zero-based numeric index as a string (e.g. '2'). When provided, the task is dispatched from this step and earlier steps are skipped.",
+					},
+					"pull_request": map[string]any{
+						"type":        "object",
+						"description": "Optional existing pull request to attach. Used to record the PR so automations have a target.",
+						"properties": map[string]any{
+							"repository": map[string]any{"type": "string", "description": "Repository owner and name (e.g., 'octocat/Hello-World')."},
+							"number":     map[string]any{"type": "integer", "description": "Pull request number."},
+							"url":        map[string]any{"type": "string", "description": "Pull request URL."},
+							"title":      map[string]any{"type": "string", "description": "Pull request title."},
+							"state":      map[string]any{"type": "string", "description": "Pull request state (e.g., 'open', 'closed', 'merged')."},
+							"provider":   map[string]any{"type": "string", "description": "Provider name (defaults to 'github')."},
+						},
+						"required": []string{"repository", "number", "url", "title", "state"},
+					},
 				},
 				"required": []string{"title"},
 			},
@@ -309,12 +335,166 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 		return ToolResult{}, actionError(err)
 	}
 	order := resp.GetOrder()
+	orderID := order.GetId()
+
+	// Handle optional pull request attachment
+	if err := rt.attachPullRequestIfProvided(ctx, claims, args, orderID); err != nil {
+		return ToolResult{}, err
+	}
+
+	// Handle optional dispatch to a specific step
+	if err := rt.dispatchIfStartStepProvided(ctx, claims, args, orderID, order); err != nil {
+		return ToolResult{}, err
+	}
+
 	return TextResult(mustJSON(map[string]any{
 		"id":    order.GetId(),
 		"key":   order.GetKey(),
 		"title": order.GetTitle(),
 		"state": protoStateName(order.GetState()),
 	})), nil
+}
+
+func (rt *Runtime) attachPullRequestIfProvided(ctx context.Context, claims *AccessClaims, args map[string]any, orderID string) error {
+	prRaw, ok := args["pull_request"]
+	if !ok || prRaw == nil {
+		return nil
+	}
+
+	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
+		return err
+	}
+
+	prMap, ok := prRaw.(map[string]any)
+	if !ok {
+		return ToolError("pull_request must be an object")
+	}
+
+	// Extract required pull request fields
+	repository, _ := prMap["repository"].(string)
+	number, _ := prMap["number"].(float64)
+	url, _ := prMap["url"].(string)
+	prTitle, _ := prMap["title"].(string)
+	state, _ := prMap["state"].(string)
+	provider, _ := prMap["provider"].(string)
+
+	// Validate required fields
+	if strings.TrimSpace(repository) == "" {
+		return ToolError("pull_request.repository is required")
+	}
+	if number == 0 || number < 0 {
+		return ToolError("pull_request.number is required and must be positive")
+	}
+	if strings.TrimSpace(url) == "" {
+		return ToolError("pull_request.url is required")
+	}
+	if strings.TrimSpace(prTitle) == "" {
+		return ToolError("pull_request.title is required")
+	}
+	if strings.TrimSpace(state) == "" {
+		return ToolError("pull_request.state is required")
+	}
+
+	// Default provider to github
+	if strings.TrimSpace(provider) == "" {
+		provider = "github"
+	}
+
+	// Map state name to proto value
+	protoState := pullRequestStateToProto(strings.ToLower(strings.TrimSpace(state)))
+
+	_, err := factories.CreateFactoryPullRequest(toolContext(ctx, claims), factories.IntakeDependencies{}, claims.OrgID.String(), &pb.CreateFactoryPullRequestRequest{
+		FactoryId:   claims.FactoryID.String(),
+		WorkOrderId: orderID,
+		Provider:    pullRequestProviderToProto(strings.ToLower(strings.TrimSpace(provider))),
+		Repository:  strings.TrimSpace(repository),
+		Number:      int32(number),
+		Url:         strings.TrimSpace(url),
+		Title:       strings.TrimSpace(prTitle),
+		State:       protoState,
+	})
+	if err != nil {
+		return actionError(err)
+	}
+
+	return nil
+}
+
+func (rt *Runtime) dispatchIfStartStepProvided(ctx context.Context, claims *AccessClaims, args map[string]any, orderID string, order *pb.WorkOrder) error {
+	startStep, ok := args["start_step"].(string)
+	if !ok || strings.TrimSpace(startStep) == "" {
+		return nil
+	}
+
+	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
+		return err
+	}
+
+	startStep = strings.TrimSpace(startStep)
+	db := database.DB(ctx)
+
+	// Get the factory to access lines
+	factory, err := findFactoryForDispatch(db, claims.OrgID.String(), claims.FactoryID.String())
+	if err != nil {
+		return actionError(err)
+	}
+
+	// Resolve the target line
+	lines, err := factory.ListLines(db)
+	if err != nil {
+		return actionError(err)
+	}
+
+	lineName, ok := args["line"].(string)
+	lineName = strings.TrimSpace(lineName)
+
+	// If no line is specified, require exactly one line
+	if lineName == "" {
+		if len(lines) != 1 {
+			lineNames := make([]string, 0, len(lines))
+			for _, line := range lines {
+				lineNames = append(lineNames, line.Name)
+			}
+			return ToolError("multiple lines exist; specify 'line' argument with one of: " + strings.Join(lineNames, ", "))
+		}
+		lineName = lines[0].Name
+	}
+
+	// Find the target line
+	var targetLine *models.FactoryLine
+	for i := range lines {
+		if lines[i].Name == lineName {
+			targetLine = &lines[i]
+			break
+		}
+	}
+	if targetLine == nil {
+		lineNames := make([]string, 0, len(lines))
+		for _, line := range lines {
+			lineNames = append(lineNames, line.Name)
+		}
+		return ToolError("line '" + lineName + "' not found; available lines: " + strings.Join(lineNames, ", "))
+	}
+
+	// Resolve start step to an index
+	startStepIndex, err := resolveStartStepIndex(db, startStep, targetLine, claims.OrgID)
+	if err != nil {
+		return err
+	}
+
+	// Dispatch the work order
+	_, err = factories.DispatchWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId:      claims.FactoryID.String(),
+		OrderId:        orderID,
+		LineName:       lineName,
+		StartStepIndex: int32(startStepIndex),
+		ReplaceActive:  false,
+	})
+	if err != nil {
+		return actionError(err)
+	}
+
+	return nil
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {
@@ -440,4 +620,93 @@ func mustJSON(value any) string {
 		return "{}"
 	}
 	return string(raw)
+}
+
+func findFactoryForDispatch(tx *gorm.DB, organizationID, factoryID string) (*models.Factory, error) {
+	orgID, err := parseOrganizationID(organizationID)
+	if err != nil {
+		return nil, err
+	}
+	factory, err := models.FindFactory(tx, orgID, parseUUID(factoryID))
+	if err != nil {
+		return nil, err
+	}
+	return factory, nil
+}
+
+func parseOrganizationID(organizationID string) (uuid.UUID, error) {
+	return uuid.Parse(organizationID)
+}
+
+func parseUUID(id string) uuid.UUID {
+	parsed, _ := uuid.Parse(id)
+	return parsed
+}
+
+func resolveStartStepIndex(tx *gorm.DB, startStep string, line *models.FactoryLine, orgID uuid.UUID) (int, error) {
+	// Try parsing as integer first
+	if index, err := parseInt(startStep); err == nil && index >= 0 && index < len(line.Steps) {
+		return index, nil
+	}
+
+	// Try matching against step names (canvas names)
+	startStepLower := strings.ToLower(startStep)
+	for i, step := range line.Steps {
+		// Load canvas name for this step
+		canvasName, err := getCanvasName(tx, orgID, step.AppID)
+		if err == nil && strings.ToLower(canvasName) == startStepLower {
+			return i, nil
+		}
+	}
+
+	// Build error message with available steps
+	stepNames := make([]string, 0, len(line.Steps))
+	for i, step := range line.Steps {
+		canvasName, err := getCanvasName(tx, orgID, step.AppID)
+		if err == nil && canvasName != "" {
+			stepNames = append(stepNames, canvasName)
+		} else {
+			stepNames = append(stepNames, fmt.Sprintf("step_%d", i))
+		}
+	}
+
+	return 0, ToolError("start_step '" + startStep + "' not found; available steps: " + strings.Join(stepNames, ", "))
+}
+
+func parseInt(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	index := 0
+	_, err := fmt.Sscanf(s, "%d", &index)
+	return index, err
+}
+
+func getCanvasName(tx *gorm.DB, orgID, appID uuid.UUID) (string, error) {
+	// Load the canvas from the database
+	canvas, err := models.FindCanvasInTransaction(tx, orgID, appID)
+	if err != nil {
+		return "", err
+	}
+	return canvas.Name, nil
+}
+
+func pullRequestProviderToProto(provider string) pb.FactoryPullRequest_Provider {
+	switch strings.ToLower(provider) {
+	case "github":
+		return pb.FactoryPullRequest_PROVIDER_GITHUB
+	default:
+		return pb.FactoryPullRequest_PROVIDER_GITHUB
+	}
+}
+
+func pullRequestStateToProto(state string) pb.FactoryPullRequest_State {
+	switch strings.ToLower(state) {
+	case "open":
+		return pb.FactoryPullRequest_STATE_OPEN
+	case "closed":
+		return pb.FactoryPullRequest_STATE_CLOSED
+	case "merged":
+		return pb.FactoryPullRequest_STATE_MERGED
+	default:
+		return pb.FactoryPullRequest_STATE_UNSPECIFIED
+	}
 }

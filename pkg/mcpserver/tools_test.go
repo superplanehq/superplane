@@ -285,3 +285,228 @@ func createOnWorkOrderCanvasForMCP(t *testing.T, r *support.ResourceRegistry, fa
 	}))
 	return canvas
 }
+
+func TestCreateTaskWithStartStepByName(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Handoff", "", "HND")
+	require.NoError(t, err)
+
+	// Create two canvases for the line steps
+	verifyCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	verifyCanvas.Name = "Verify"
+	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
+
+	doneCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	doneCanvas.Name = "Done"
+	require.NoError(t, db.Model(doneCanvas).Update("name", "Done").Error)
+
+	// Create a line with two steps
+	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: doneCanvas.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":      "Hand off to Verify",
+		"description": "Skip backlog and plan",
+		"line":        "main",
+		"start_step": "Verify",
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "Hand off to Verify", payload["title"])
+	assert.Equal(t, "open", payload["state"])
+	require.NotEmpty(t, payload["id"])
+
+	// Verify the task is dispatched to the correct step
+	orderID := payload["id"].(string)
+	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
+	require.NoError(t, err)
+	activeDispatch, err := workOrder.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, "main", activeDispatch.LineName)
+	assert.Equal(t, 1, len(activeDispatch.Steps))
+	require.Len(t, activeDispatch.StepResults, 1)
+	assert.Equal(t, 0, activeDispatch.StepResults[0].StepIndex)
+}
+
+func TestCreateTaskWithStartStepByIndex(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Index", "", "IDX")
+	require.NoError(t, err)
+
+	// Create two canvases for the line steps
+	backlogCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	backlogCanvas.Name = "Backlog"
+	require.NoError(t, db.Model(backlogCanvas).Update("name", "Backlog").Error)
+
+	verifyCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	verifyCanvas.Name = "Verify"
+	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
+
+	// Create a line with two steps
+	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: backlogCanvas.ID, Entrypoint: "start"},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":       "Hand off at index",
+		"line":        "main",
+		"start_step": "1",
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "Hand off at index", payload["title"])
+
+	// Verify the task is dispatched to step index 1
+	orderID := payload["id"].(string)
+	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
+	require.NoError(t, err)
+	activeDispatch, err := workOrder.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	require.Len(t, activeDispatch.StepResults, 1)
+	assert.Equal(t, 1, activeDispatch.StepResults[0].StepIndex)
+}
+
+func TestCreateTaskWithInvalidStartStep(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Bad Step", "", "BAD")
+	require.NoError(t, err)
+
+	verifyCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	verifyCanvas.Name = "Verify"
+	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
+
+	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":      "Hand off",
+		"line":       "main",
+		"start_step": "NonExistent",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestCreateTaskWithMultipleLinesRequiresLineArg(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Multi Line", "", "MUL")
+	require.NoError(t, err)
+
+	// Create two lines
+	canvas1 := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	canvas1.Name = "Step1"
+	require.NoError(t, db.Model(canvas1).Update("name", "Step1").Error)
+
+	canvas2 := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
+	canvas2.Name = "Step2"
+	require.NoError(t, db.Model(canvas2).Update("name", "Step2").Error)
+
+	_, err = factoryModel.CreateLine(db, "line1", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: canvas1.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	_, err = factoryModel.CreateLine(db, "line2", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: canvas2.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":      "Hand off",
+		"start_step": "Step1",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple lines exist")
+	assert.Contains(t, err.Error(), "line1")
+	assert.Contains(t, err.Error(), "line2")
+}
+
+func TestCreateTaskWithPullRequest(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP PR", "", "PRR")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":       "Feature with PR",
+		"pull_request": map[string]any{
+			"repository": "octocat/Hello-World",
+			"number":     float64(42),
+			"url":        "https://github.com/octocat/Hello-World/pull/42",
+			"title":      "Fix bug",
+			"state":      "open",
+			"provider":   "github",
+		},
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "Feature with PR", payload["title"])
+
+	// Verify the PR was attached
+	orderID := payload["id"].(string)
+	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
+	require.NoError(t, err)
+	prs, err := workOrder.FindPullRequests(db)
+	require.NoError(t, err)
+	require.Len(t, prs, 1)
+	assert.Equal(t, "octocat/Hello-World", prs[0].Repository)
+	assert.Equal(t, int32(42), prs[0].Number)
+}
+
+func TestCreateTaskWithMissingPullRequestField(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+
+	factoryModel, err := models.CreateFactory(database.DB(ctx), r.Organization.ID, "MCP Bad PR", "", "BPR")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":       "Feature with bad PR",
+		"pull_request": map[string]any{
+			"repository": "octocat/Hello-World",
+			"number":     float64(42),
+			"url":        "https://github.com/octocat/Hello-World/pull/42",
+			// Missing title and state
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+}
+
+func parseUUID(id string) uuid.UUID {
+	parsed, _ := uuid.Parse(id)
+	return parsed
+}
