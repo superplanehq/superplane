@@ -277,6 +277,94 @@ func Test__ResolveRunnableHostedLLMModel__UsesAllowedModelWhenDefaultIsExcluded(
 	assert.ErrorIs(t, err, models.ErrSuperPlaneRunnerModelNotAllowed)
 }
 
+func Test__ResolveRunnableHostedLLMModel__SkipsOpenRouterWithoutProvisioningKey(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
+		_ = db.Where("provider IN ?", []string{models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter}).Delete(&models.HostedLLMProvider{})
+	})
+
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenAI,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"gpt-5"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: stringPtr("anthropic"),
+		DefaultHostedModel:    stringPtr("claude-sonnet-4-6"),
+	})
+	require.NoError(t, err)
+
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openai/gpt-4.1"})
+	require.NoError(t, err)
+
+	err = models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil)
+	assert.ErrorIs(t, err, models.ErrSuperPlaneRunnerModelNotAllowed)
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		ManagementKey: []byte("test-provisioning-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1"},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil))
+	runnable, err := models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "openrouter", Model: "openai/gpt-4.1"}, runnable)
+
+	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderOpenRouter,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1", "openai/gpt-4.1-mini"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-5"})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openai/gpt-4.1-mini"})
+	require.NoError(t, err)
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: stringPtr("openrouter"),
+		DefaultHostedModel:    stringPtr("openai/gpt-4.1"),
+	})
+	require.NoError(t, err)
+
+	runnable, err = models.ResolveRunnableHostedLLMModel(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "openai", Model: "gpt-5"}, runnable)
+}
+
 func Test__AnnotateSuperPlaneRunnerNodes(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)

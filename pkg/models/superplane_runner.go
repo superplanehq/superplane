@@ -226,6 +226,13 @@ func ResolveRunnableHostedLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 
 func firstSelectableHostedLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, preferredProvider string) (DefaultHostedLLMModel, bool, error) {
 	for _, provider := range hostedModelProviderOrder(preferredProvider) {
+		canRun, err := hostedProviderCanRun(tx, provider)
+		if err != nil {
+			return DefaultHostedLLMModel{}, false, err
+		}
+		if !canRun {
+			continue
+		}
 		modelIDs, err := ResolveSelectableLLMModels(tx, orgID, factoryID, provider, UsageFundingSourceHosted)
 		if err != nil {
 			return DefaultHostedLLMModel{}, false, err
@@ -236,6 +243,17 @@ func firstSelectableHostedLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 		return DefaultHostedLLMModel{Provider: provider, Model: modelIDs[0]}, true, nil
 	}
 	return DefaultHostedLLMModel{}, false, nil
+}
+
+func hostedProviderCanRun(tx *gorm.DB, provider string) (bool, error) {
+	row, err := FindHostedLLMProvider(tx, provider)
+	if err != nil {
+		if errors.Is(err, ErrHostedLLMProviderNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return row.CanRunHosted(), nil
 }
 
 func hostedModelProviderOrder(preferredProvider string) []string {
