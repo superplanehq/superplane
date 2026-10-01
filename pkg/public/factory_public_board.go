@@ -922,6 +922,7 @@ func intakeSourceName(source string) string {
 
 const (
 	publicIconGitHub     = "github"
+	publicIconDependabot = "dependabot"
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
 	publicIconPagerDuty  = "pagerduty"
@@ -931,8 +932,10 @@ const (
 
 func intakeIcon(source string) string {
 	switch source {
-	case models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceDependabotAlerts:
+	case models.FactoryIntakeSourceGitHubIssues:
 		return publicIconGitHub
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return publicIconDependabot
 	case models.FactoryIntakeSourceSentryExceptions:
 		return publicIconSentry
 	case models.FactoryIntakeSourceJiraIssues:

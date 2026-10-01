@@ -6,6 +6,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -108,8 +109,8 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     id: "dependabot-alerts",
     name: "Dependabot alerts",
     description: "Creates tasks from Dependabot alerts.",
-    iconSrc: githubIcon,
-    iconAlt: "GitHub",
+    iconSrc: dependabotIcon,
+    iconAlt: "Dependabot",
     tabLabel: "Dependabot",
     listen: {
       kind: "webhook",
