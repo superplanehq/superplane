@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -181,6 +184,66 @@ func TestLoggingMiddleware_ServerErrorUsesErrorLevel(t *testing.T) {
 	assert.Equal(t, "error", payload["level"])
 	assert.Equal(t, "handled request /api/v1/organizations/devzero-inc", payload["msg"])
 	assert.EqualValues(t, http.StatusInternalServerError, payload["status"])
+}
+
+func TestLoggingMiddleware_ServerErrorWithoutCauseKeepsStatusMessage(t *testing.T) {
+	transport := bindMiddlewareSentryHub(t)
+	logger, _ := newJSONLogger()
+	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/missing", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	events := transport.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, "HTTP 502 /api/v1/webhooks/missing", events[0].Message)
+	assert.Empty(t, events[0].Exception)
+	assert.Equal(t, "502", events[0].Tags["status"])
+}
+
+func bindMiddlewareSentryHub(t *testing.T) *memorySentryTransport {
+	t.Helper()
+	transport := &memorySentryTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://public@localhost/1",
+		Transport: transport,
+	})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	previous := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() {
+		hub.BindClient(previous)
+	})
+	return transport
+}
+
+type memorySentryTransport struct {
+	mu     sync.Mutex
+	events []*sentry.Event
+}
+
+func (t *memorySentryTransport) Configure(sentry.ClientOptions) {}
+
+func (t *memorySentryTransport) Flush(time.Duration) bool { return true }
+
+func (t *memorySentryTransport) SendEvent(event *sentry.Event) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	clone := *event
+	t.events = append(t.events, &clone)
+}
+
+func (t *memorySentryTransport) Events() []*sentry.Event {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]*sentry.Event, len(t.events))
+	copy(out, t.events)
+	return out
 }
 
 func newJSONLogger() (*log.Logger, *bytes.Buffer) {
