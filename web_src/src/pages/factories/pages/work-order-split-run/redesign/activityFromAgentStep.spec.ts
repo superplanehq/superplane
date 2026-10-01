@@ -142,4 +142,32 @@ describe("activityFromAgentStep", () => {
       }),
     );
   });
+
+  it("keeps an unnamed bash preview as the script when it matches the title", () => {
+    const script = ["git clone --depth 1 https://example.com/repo.git", "cd repo"].join("\n");
+    const stdout = ["Cloning into 'repo'...", "done."].join("\n");
+    const section: CommandSection = {
+      index: 1,
+      text: script,
+      kind: "bash",
+      preview: script,
+      lines: stdout.split("\n"),
+      events: [],
+      status: "passed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section]))[0];
+    const command = activityFromAgentStep(step!)?.items[0];
+
+    expect(command).toEqual(
+      expect.objectContaining({
+        type: "tool",
+        kind: "bash",
+        input: script,
+        output: stdout,
+      }),
+    );
+  });
 });

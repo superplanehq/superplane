@@ -62,9 +62,9 @@ function noteFromCommandSection(
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
   const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);
-  const command = preview && preview !== name ? preview : "";
-  const detail = [command, output].filter(Boolean).join("\n\n");
-  const bashScript = section.kind === "bash" ? command : "";
+  const distinctPreview = preview !== name ? preview : "";
+  const detail = [distinctPreview, output].filter(Boolean).join("\n\n");
+  const bashScript = section.kind === "bash" ? preview : "";
   return {
     id: stepId,
     nodeId,
