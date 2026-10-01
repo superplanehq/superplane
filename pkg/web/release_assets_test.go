@@ -344,6 +344,126 @@ func TestReleaseAssetKeepsSharedDownloadWhenCallerLeaves(t *testing.T) {
 	}
 }
 
+func TestReleaseAssetStopsQueuedFetchWhenCallerLeaves(t *testing.T) {
+	block := make(chan struct{})
+	transport := &releaseCDNTransport{block: block, started: make(chan struct{}, 16)}
+	handler := releaseAssetHandler(transport)
+	release := func() {
+		select {
+		case <-block:
+		default:
+			close(block)
+		}
+	}
+	t.Cleanup(release)
+	occupyReleaseFetchSlots(t, handler, transport)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		recorder := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, releaseWorkerPath("editor.worker-queued.js"), nil).WithContext(ctx)
+		handler.ServeHTTP(recorder, req)
+	}()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("queued fetch continued after the caller left")
+	}
+	if transport.callCount() != releaseFetchInflight {
+		t.Fatalf("expected no CDN fetch for a caller that left, got %d", transport.callCount())
+	}
+
+	liveDone := make(chan int, 1)
+	go func() {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, releaseWorkerPath("editor.worker-live.js"), nil))
+		liveDone <- recorder.Code
+	}()
+	select {
+	case code := <-liveDone:
+		t.Fatalf("live fetch finished before a slot was free: %d", code)
+	case <-time.After(200 * time.Millisecond):
+	}
+	release()
+
+	select {
+	case code := <-liveDone:
+		if code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d", http.StatusOK, code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the live fetch")
+	}
+	if transport.callCount() != releaseFetchInflight+1 {
+		t.Fatalf("expected one live CDN fetch, got %d", transport.callCount())
+	}
+}
+
+func TestReleaseAssetKeepsQueuedFetchForRemainingCaller(t *testing.T) {
+	block := make(chan struct{})
+	transport := &releaseCDNTransport{block: block, started: make(chan struct{}, 16)}
+	handler := releaseAssetHandler(transport)
+	t.Cleanup(func() {
+		select {
+		case <-block:
+		default:
+			close(block)
+		}
+	})
+	occupyReleaseFetchSlots(t, handler, transport)
+
+	path := releaseWorkerPath("editor.worker-queued.js")
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan struct{})
+	go func() {
+		defer close(firstDone)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil).WithContext(ctx))
+	}()
+
+	secondDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		secondDone <- recorder
+	}()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case recorder := <-secondDone:
+		t.Fatalf("remaining caller finished before a fetch slot was free: %d %q", recorder.Code, recorder.Body.String())
+	case <-time.After(200 * time.Millisecond):
+	}
+	if transport.callCount() != releaseFetchInflight {
+		t.Fatalf("expected the queued fetch to stay shared, got %d CDN calls", transport.callCount())
+	}
+	close(block)
+
+	select {
+	case recorder := <-secondDone:
+		if recorder.Code != http.StatusOK || recorder.Body.String() != "old-worker" {
+			t.Fatalf("expected queued worker body, got %d %q", recorder.Code, recorder.Body.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the remaining caller")
+	}
+	if transport.callCount() != releaseFetchInflight+1 {
+		t.Fatalf("expected one shared CDN fetch, got %d", transport.callCount())
+	}
+
+	select {
+	case <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the canceled caller")
+	}
+}
+
 func TestReleaseAssetIgnoresNonReleaseAssetBase(t *testing.T) {
 	cdnHits := 0
 	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -380,6 +500,26 @@ func releaseWorkerPath(name string) string {
 	return "/releases/" + releaseSHA + "/assets/" + name
 }
 
+func occupyReleaseFetchSlots(t *testing.T, handler http.Handler, transport *releaseCDNTransport) {
+	t.Helper()
+	for i := 0; i < releaseFetchInflight; i++ {
+		go func(i int) {
+			recorder := httptest.NewRecorder()
+			path := releaseWorkerPath(fmt.Sprintf("editor.worker-busy-%d.js", i))
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		}(i)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for seen := 0; seen < releaseFetchInflight; seen++ {
+		select {
+		case <-transport.started:
+		case <-deadline:
+			t.Fatalf("timed out after %d CDN calls", seen)
+		}
+	}
+}
+
 func releaseAssetHandler(transport http.RoundTripper) http.Handler {
 	handler := NewAssetHandler(http.FS(releaseAssetFS("https://assets.example", "current-worker")), "").(*AssetHandler)
 	handler.assetCDNClient = &http.Client{Transport: transport}
@@ -393,6 +533,12 @@ type releaseCDNTransport struct {
 	methods []string
 	block   <-chan struct{}
 	started chan struct{}
+}
+
+func (t *releaseCDNTransport) callCount() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.calls
 }
 
 func (t *releaseCDNTransport) RoundTrip(req *http.Request) (*http.Response, error) {

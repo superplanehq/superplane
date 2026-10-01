@@ -27,6 +27,7 @@ type AssetHandler struct {
 	releaseMaxBytes int64
 	releaseCache    *releaseAssetCache
 	releaseLimiter  *releaseFetchLimiter
+	releaseCallers  *releaseCallerSet
 	releaseGroup    singleflight.Group
 }
 
@@ -45,6 +46,7 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 		releaseMaxBytes: releaseAssetMaxBytes,
 		releaseCache:    newReleaseAssetCache(),
 		releaseLimiter:  newReleaseFetchLimiter(),
+		releaseCallers:  newReleaseCallerSet(),
 	}
 }
 

@@ -162,6 +162,55 @@ func (l *releaseFetchLimiter) releaseSlot() {
 	<-l.slots
 }
 
+type releaseCall struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	n      int
+}
+
+type releaseCallerSet struct {
+	mu    sync.Mutex
+	calls map[string]*releaseCall
+}
+
+func newReleaseCallerSet() *releaseCallerSet {
+	return &releaseCallerSet{calls: make(map[string]*releaseCall)}
+}
+
+func (s *releaseCallerSet) join(key string, onEmpty func()) (context.Context, func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	call := s.calls[key]
+	if call == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		call = &releaseCall{ctx: ctx, cancel: cancel}
+		s.calls[key] = call
+	}
+	call.n++
+
+	return call.ctx, func() {
+		s.leave(key, call, onEmpty)
+	}
+}
+
+func (s *releaseCallerSet) leave(key string, call *releaseCall, onEmpty func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.calls[key] != call {
+		return
+	}
+	call.n--
+	if call.n > 0 {
+		return
+	}
+
+	call.cancel()
+	delete(s.calls, key)
+	onEmpty()
+}
+
 func newAssetCDNClient() *http.Client {
 	return &http.Client{
 		Timeout: releaseFetchTimeout,
@@ -254,10 +303,18 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	value, err, _ := h.releaseGroup.Do(r.Method+" "+asset.path, func() (any, error) {
-		return h.loadReleaseAsset(context.WithoutCancel(r.Context()), asset, r.Method)
+	key := r.Method + " " + asset.path
+	shared, leave := h.joinReleaseCall(key)
+	stop := stopReleaseCallWhenRequestEnds(r.Context(), leave)
+	defer stop()
+
+	value, err, _ := h.releaseGroup.Do(key, func() (any, error) {
+		return h.loadReleaseAsset(shared, asset, r.Method)
 	})
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		log.Warnf("release asset proxy failed: %v", err)
 		http.Error(w, "release asset unavailable", http.StatusBadGateway)
 		return
@@ -266,7 +323,28 @@ func (h *AssetHandler) proxyReleaseAsset(w http.ResponseWriter, r *http.Request,
 	writeReleaseAsset(w, r, asset, value.(cachedReleaseAsset))
 }
 
+func (h *AssetHandler) joinReleaseCall(key string) (context.Context, func()) {
+	return h.releaseCallers.join(key, func() {
+		h.releaseGroup.Forget(key)
+	})
+}
+
+func stopReleaseCallWhenRequestEnds(requestCtx context.Context, leave func()) func() {
+	var once sync.Once
+	leaveOnce := func() {
+		once.Do(leave)
+	}
+	stopWatch := context.AfterFunc(requestCtx, leaveOnce)
+	return func() {
+		stopWatch()
+		leaveOnce()
+	}
+}
+
 func (h *AssetHandler) loadReleaseAsset(ctx context.Context, asset releaseAsset, method string) (cachedReleaseAsset, error) {
+	if err := ctx.Err(); err != nil {
+		return cachedReleaseAsset{}, err
+	}
 	if item, ok := h.releaseCache.get(asset.path, method, time.Now()); ok {
 		return item, nil
 	}
@@ -274,13 +352,21 @@ func (h *AssetHandler) loadReleaseAsset(ctx context.Context, asset releaseAsset,
 		return cachedReleaseAsset{status: http.StatusTooManyRequests}, nil
 	}
 
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), releaseFetchWait)
+	waitCtx, waitCancel := context.WithTimeout(ctx, releaseFetchWait)
 	defer waitCancel()
 	if err := h.releaseLimiter.waitSlot(waitCtx); err != nil {
 		h.releaseLimiter.refundFetch()
+		if ctx.Err() != nil {
+			return cachedReleaseAsset{}, ctx.Err()
+		}
 		return cachedReleaseAsset{status: http.StatusTooManyRequests}, nil
 	}
 	defer h.releaseLimiter.releaseSlot()
+
+	if err := ctx.Err(); err != nil {
+		h.releaseLimiter.refundFetch()
+		return cachedReleaseAsset{}, err
+	}
 
 	fetchCtx, fetchCancel := context.WithTimeout(ctx, releaseFetchTimeout)
 	defer fetchCancel()
