@@ -6,6 +6,7 @@ import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
   usesHostedJiraOAuth,
+  usesHostedLinearOAuth,
   usesPrivateGitHubAppWizard,
 } from "./integrations";
 
@@ -24,6 +25,15 @@ describe("usesHostedJiraOAuth", () => {
     expect(usesHostedJiraOAuth({ name: "jira", hostedAppInstall: false })).toBe(false);
     expect(usesHostedJiraOAuth({ name: "github", hostedAppInstall: true })).toBe(false);
     expect(usesHostedJiraOAuth(undefined)).toBe(false);
+  });
+});
+
+describe("usesHostedLinearOAuth", () => {
+  it("is true only for Linear with hostedAppInstall", () => {
+    expect(usesHostedLinearOAuth({ name: "linear", hostedAppInstall: true })).toBe(true);
+    expect(usesHostedLinearOAuth({ name: "linear", hostedAppInstall: false })).toBe(false);
+    expect(usesHostedLinearOAuth({ name: "jira", hostedAppInstall: true })).toBe(false);
+    expect(usesHostedLinearOAuth(undefined)).toBe(false);
   });
 });
 

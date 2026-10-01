@@ -1,6 +1,7 @@
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -8,6 +9,7 @@ import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
 
@@ -74,6 +76,13 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     description: "Creates tasks from Datadog Error Tracking alerts.",
     iconSrc: datadogIcon,
     featureId: FEATURE_FACTORY_DATADOG_INTAKE,
+  },
+  {
+    id: "linear-issues",
+    name: "Linear issues",
+    description: "Create a task when a Linear issue is added to a selected project.",
+    iconSrc: linearIcon,
+    featureId: FEATURE_FACTORY_LINEAR_INTAKE,
   },
   {
     id: "notion",

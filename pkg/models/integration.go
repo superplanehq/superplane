@@ -521,6 +521,52 @@ func ClaimHostedJiraOAuthState(tx *gorm.DB, state string) (*Integration, error) 
 	return &integration, nil
 }
 
+// ClaimHostedLinearOAuthState finds the pending hosted Linear connection for
+// this CSRF state and removes that state in the same transaction. A later
+// callback with the same state then fails to find the connection. The
+// returned integration still holds the claimed state in memory so this
+// request can finish authorization.
+func ClaimHostedLinearOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("app_name = ? AND metadata->>'state' = ?", "linear", state).
+			First(&integration).Error; err != nil {
+			return err
+		}
+
+		data := maps.Clone(integration.Metadata.Data())
+		if data == nil {
+			return gorm.ErrRecordNotFound
+		}
+		hosted, _ := data["hostedOAuth"].(bool)
+		current, _ := data["state"].(string)
+		if !hosted || current == "" || current != state {
+			return gorm.ErrRecordNotFound
+		}
+
+		persisted := maps.Clone(data)
+		delete(persisted, "state")
+		integration.Metadata = datatypes.NewJSONType(persisted)
+		if err := inner.Save(&integration).Error; err != nil {
+			return err
+		}
+
+		data["state"] = state
+		integration.Metadata = datatypes.NewJSONType(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
 // ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a
 // GitHub App installation. One installation can belong to more than one
 // SuperPlane organization.
