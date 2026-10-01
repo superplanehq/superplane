@@ -407,6 +407,10 @@ function readErrorField(error: unknown, key: string): unknown {
  * draft-version id into a graceful recovery instead of an opaque error.
  */
 export function isNotFoundError(error: unknown): boolean {
+  if (typeof error === "string") {
+    return isNotFoundMessage(error);
+  }
+
   if (readErrorField(error, "status") === 404) {
     return true;
   }
@@ -425,7 +429,12 @@ export function isNotFoundError(error: unknown): boolean {
     return false;
   }
 
-  return message.includes("not found") || message.includes("404");
+  return isNotFoundMessage(message);
+}
+
+function isNotFoundMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return normalized.includes("not found") || normalized.includes("404");
 }
 
 /**

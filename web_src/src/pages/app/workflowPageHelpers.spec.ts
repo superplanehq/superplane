@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "bun:test";
 import {
   NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
+  isNotFoundError,
   isValidRunId,
   prepareCanvasLogNodes,
   shouldClearRunDetailNode,
@@ -14,6 +15,22 @@ import type { ActionsAction } from "@/api-client";
 import { mapCanvasNodesToLogEntries } from "./utils";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
+
+describe("isNotFoundError", () => {
+  it("matches a raw Not Found reason, including a trailing newline", () => {
+    expect(isNotFoundError("Not Found")).toBe(true);
+    expect(isNotFoundError("Not Found\n")).toBe(true);
+  });
+
+  it("matches an error message case-insensitively", () => {
+    expect(isNotFoundError({ message: "Not found" })).toBe(true);
+    expect(isNotFoundError(new Error("resource not found"))).toBe(true);
+  });
+
+  it("does not match an unrelated failure", () => {
+    expect(isNotFoundError(new Error("unauthorized"))).toBe(false);
+  });
+});
 
 describe("workflowPageHelpers run inspection", () => {
   it("clears stale run URLs after describe settles without a run", () => {

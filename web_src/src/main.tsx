@@ -5,6 +5,7 @@ import "./index.css";
 import "@xyflow/react/dist/style.css";
 import App from "./App.tsx";
 import { setupApiInterceptor } from "./lib/api-interceptor.ts";
+import { setupApiClientErrorInterceptor } from "./lib/api-client-error-interceptor.ts";
 import { Sentry } from "./sentry.ts";
 import "./posthog.ts";
 import { ErrorPage } from "./components/ErrorPage.tsx";
@@ -15,6 +16,7 @@ initGoogleTagManager();
 
 // Setup the API interceptor to handle 401 responses
 setupApiInterceptor();
+setupApiClientErrorInterceptor();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
