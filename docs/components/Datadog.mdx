@@ -29,6 +29,7 @@ To configure Datadog to work with SuperPlane:
 - `create_webhooks` creates the SuperPlane webhook.
 - `manage_integrations` updates and removes that webhook.
 - `error_tracking_read` lists Error Tracking issues and reads issue details for an alert.
+- `monitors_write` creates and removes the Error Tracking monitor for a service.
 
 Grant these optional permissions to add the error sample and related logs to each task:
 
@@ -39,7 +40,7 @@ Grant these optional permissions to add the error sample and related logs to eac
 An unrestricted application key also works.
 4. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
 5. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
-6. **Add the webhook to a monitor**: In an Error Tracking New Issue monitor, add `@webhook-superplane` to the notification message
+6. **Select a service**: SuperPlane creates an Error Tracking monitor for that service when you save an intake.
 
 <a id="on-error-tracking-alert"></a>
 
@@ -51,9 +52,9 @@ The On Error Tracking Alert trigger starts a workflow when Datadog sends a Trigg
 
 ### Setup
 
-Connect Datadog in SuperPlane. SuperPlane creates a webhook named `superplane`. Add `@webhook-superplane` to the notification message of an Error Tracking New Issue monitor.
+Connect Datadog in SuperPlane. SuperPlane creates a webhook named `superplane`. When you select a service, SuperPlane creates an Error Tracking monitor for that service.
 
-Select a service to keep alerts of that service. Set the Error Tracking monitor query to `service:<name>`.
+Select a service to keep alerts of that service.
 
 Select the alert transitions to keep. Empty keeps Triggered. A Re-Triggered alert can create a second task for the same issue.
 
