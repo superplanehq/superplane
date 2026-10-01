@@ -1,7 +1,8 @@
-import type * as Sentry from "@sentry/react";
 import { describe, expect, it } from "bun:test";
 
 import {
+  IGNORED_CONSOLE_MESSAGES,
+  Sentry,
   isIgnoredConsoleMessage,
   isMonacoCanceledEvent,
   normalizeApiRouteTemplate,
@@ -179,5 +180,47 @@ describe("normalizeSentryFingerprint", () => {
     const normalized = normalizeSentryFingerprint(event);
 
     expect(normalized.fingerprint).toEqual(["custom"]);
+  });
+});
+
+function unknownTouch(): object {
+  return Object.defineProperty({}, Symbol.toStringTag, { value: "Touch" });
+}
+
+describe("captureConsole unknown-touch warnings", () => {
+  it("drops the warning Sentry builds from a two-argument console call", async () => {
+    const captured: string[] = [];
+    const client = Sentry.init({
+      dsn: "https://public@o0.ingest.sentry.io/0",
+      autoSessionTracking: false,
+      sendClientReports: false,
+      ignoreErrors: IGNORED_CONSOLE_MESSAGES,
+      beforeSend(event) {
+        if (event.message) {
+          captured.push(event.message);
+        }
+        return null;
+      },
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ["warn", "error"],
+        }),
+      ],
+    });
+
+    expect(client).toBeDefined();
+
+    try {
+      const touch = unknownTouch();
+      console.warn("move of an UNKNOWN touch", touch);
+      console.warn("end of an UNKNOWN touch", touch);
+      console.warn("Something actually broke");
+
+      await Sentry.flush(2000);
+
+      expect(captured).toEqual(["Something actually broke"]);
+    } finally {
+      await client?.close(0);
+    }
   });
 });
