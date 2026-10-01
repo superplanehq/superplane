@@ -902,24 +902,30 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
-  it("expands a console card from the whole summary row", async () => {
+  it("shows the original task above the timeline before the Backlog card opens", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(description).toHaveTextContent("Users see duplicate refund entries");
+    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
     const backlog = screen.getByTestId("redesign-console-column-backlog");
+    expect(description.compareDocumentPosition(backlog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
+
     const header = within(backlog).getAllByTestId(/^redesign-console-card-header-/)[0];
-    const card = header.closest("[data-testid^='redesign-console-automation-']");
-    expect(card).not.toBeNull();
-    expect(within(card as HTMLElement).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
+    const card = header.closest("[data-testid^='redesign-console-automation-']") as HTMLElement;
+    expect(within(card).queryByText("1 artifact")).not.toBeInTheDocument();
+    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
 
     await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
-    // The task text is the description.md document; Artifacts is the only
-    // page, so there is no tab bar.
-    expect(within(card as HTMLElement).queryByRole("tab")).not.toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("button", { name: "description.md" })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole("button", { name: "Download description.md" })).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText(/^\d+(\.\d+)? (B|KB|MB|GB)$/)).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByTestId("redesign-console-task-description")).toBeInTheDocument();
+
+    expect(within(card).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Download description.md" })).not.toBeInTheDocument();
+    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
+    expect(within(card).getByTestId("redesign-console-card-source")).toBeInTheDocument();
+    const summary = screen.getByTestId("redesign-console-summary");
+    expect(within(summary).getByRole("button", { name: "description.md" })).toBeInTheDocument();
+    expect(within(summary).getByText("Source")).toBeInTheDocument();
   });
 
   it("opens produced artifacts on the card's Artifacts page", async () => {
