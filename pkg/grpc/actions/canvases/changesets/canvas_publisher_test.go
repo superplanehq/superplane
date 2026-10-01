@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
@@ -1342,6 +1344,98 @@ func canvasPublisherOptions(r *support.ResourceRegistry) CanvasPublisherOptions 
 		Encryptor:      r.Encryptor,
 		AuthService:    r.AuthService,
 		WebhookBaseURL: "https://example.com/webhooks",
+	}
+}
+
+func Test__CanvasPublisher__DatadogMonitorSurvivesFailedPublish(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{datadogIntakeNode("intake")},
+		nil,
+	)
+
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(
+		database.Conn(),
+		canvas.ID,
+		r.User,
+		"Remove intake",
+		[]models.Node{},
+		nil,
+	)
+	require.NoError(t, err)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		publisher, err := NewCanvasPublisher(tx, canvas, draft, liveVersion, canvasPublisherOptions(r))
+		if err != nil {
+			return err
+		}
+		if err := publisher.Publish(context.Background()); err != nil {
+			return err
+		}
+		return errors.New("stop publish")
+	})
+
+	require.ErrorContains(t, err, "stop publish")
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, "intake")
+	require.NoError(t, err)
+	require.Equal(t, "9", node.Metadata.Data()["monitorId"])
+}
+
+func Test__CanvasPublisher__DeletedDatadogIntakeKeepsMonitorID(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{datadogIntakeNode("intake")},
+		nil,
+	)
+
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(
+		database.Conn(),
+		canvas.ID,
+		r.User,
+		"Remove intake",
+		[]models.Node{},
+		nil,
+	)
+	require.NoError(t, err)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+	require.NoError(t, err)
+	publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
+	require.NoError(t, err)
+
+	require.NoError(t, publisher.Publish(context.Background()))
+
+	_, err = models.FindCanvasNode(database.Conn(), canvas.ID, "intake")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	retired, err := models.FindUnscopedCanvasNode(database.Conn(), canvas.ID, "intake")
+	require.NoError(t, err)
+	require.Equal(t, "9", retired.Metadata.Data()["monitorId"])
+
+	nodes, err := models.ListRetiredTriggerNodes(database.Conn(), "datadog.onErrorTrackingAlert", "monitorId")
+	require.NoError(t, err)
+	require.True(t, slices.ContainsFunc(nodes, func(node models.CanvasNode) bool {
+		return node.WorkflowID == canvas.ID && node.NodeID == "intake"
+	}))
+}
+
+func datadogIntakeNode(nodeID string) models.CanvasNode {
+	return models.CanvasNode{
+		NodeID: nodeID,
+		Name:   "Datadog",
+		Type:   models.NodeTypeTrigger,
+		Ref: datatypes.NewJSONType(models.NodeRef{
+			Trigger: &models.TriggerRef{Name: "datadog.onErrorTrackingAlert"},
+		}),
+		Configuration: datatypes.NewJSONType(map[string]any{"service": "checkout"}),
+		Metadata:      datatypes.NewJSONType(map[string]any{"monitorId": "9", "monitorService": "checkout"}),
+		Position:      datatypes.NewJSONType(models.Position{X: 10, Y: 20}),
 	}
 }
 

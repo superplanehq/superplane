@@ -434,6 +434,44 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 	return &node, nil
 }
 
+// LockUnscopedCanvasNode locks a node even when the node or its canvas is
+// already soft-deleted. SKIP LOCKED returns ErrRecordNotFound when another
+// worker holds the row.
+func LockUnscopedCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNode, error) {
+	var node CanvasNode
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		First(&node).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
+// ListRetiredTriggerNodes returns trigger nodes whose removal is committed.
+// A node is retired when the node itself is soft-deleted or its canvas is
+// soft-deleted. metadataIDKey selects nodes that still store an external id.
+func ListRetiredTriggerNodes(tx *gorm.DB, triggerName, metadataIDKey string) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := tx.Unscoped().
+		Model(&CanvasNode{}).
+		Select("workflow_nodes.*").
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflow_nodes.type = ?", NodeTypeTrigger).
+		Where("workflow_nodes.ref->'trigger'->>'name' = ?", triggerName).
+		Where("COALESCE(workflow_nodes.metadata->>?, '') <> ''", metadataIDKey).
+		Where("workflow_nodes.deleted_at IS NOT NULL OR workflows.deleted_at IS NOT NULL").
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
 func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNode, error) {
 	var node CanvasNode
 
