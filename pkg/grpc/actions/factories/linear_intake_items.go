@@ -50,6 +50,10 @@ func (s *linearIntakeItemSource) Search(_ context.Context, query string, limit i
 	return items, nil
 }
 
+func (s *linearIntakeItemSource) IssueFiles(ctx context.Context, issueID, description string) ([]linear.IssueFile, []linear.IssueLink, error) {
+	return s.linear.IssueFiles(ctx, issueID, description)
+}
+
 func (s *linearIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
 	issueID := strings.TrimSpace(id)
 	if issueID == "" {

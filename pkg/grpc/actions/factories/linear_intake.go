@@ -32,6 +32,20 @@ func normalizeLinearValues(values []string) []string {
 	return normalized
 }
 
+// withLinearSeedLabels copies the selected labels onto the binding. Create
+// resolves the binding from projects only. The seed reads labels from that
+// binding, so they have to be present before the first import.
+func withLinearSeedLabels(binding *intakeBinding, labels []string) *intakeBinding {
+	if binding == nil {
+		return nil
+	}
+	if binding.Configuration == nil {
+		binding.Configuration = map[string]any{}
+	}
+	binding.Configuration["labels"] = linearLabelPredicates(labels)
+	return binding
+}
+
 func linearLabelPredicates(labels []string) []any {
 	predicates := make([]any, 0, len(labels))
 	for _, label := range labels {

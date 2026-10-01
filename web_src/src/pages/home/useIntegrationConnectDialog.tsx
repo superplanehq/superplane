@@ -148,14 +148,7 @@ export function useIntegrationConnectDialog({
       setConfigureIntegrationId,
     });
 
-  const connectHostedJira = useHostedJiraConnect({
-    organizationId,
-    returnTo,
-    connected,
-    existingIntegrationNames,
-    createIntegration: createIntegrationMutation.mutateAsync,
-  });
-  const connectHostedLinear = useHostedLinearConnect({
+  const hostedConnect = useHostedIssueConnect({
     organizationId,
     returnTo,
     connected,
@@ -201,10 +194,10 @@ export function useIntegrationConnectDialog({
       return true;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
-      return connectHostedJira();
+      return hostedConnect.jira();
     }
     if (integrationName === "linear" && isHostedLinear(availableIntegrations)) {
-      return connectHostedLinear();
+      return hostedConnect.linear();
     }
     openConnectDialog(integrationName);
     return false;
@@ -216,11 +209,11 @@ export function useIntegrationConnectDialog({
       return;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
-      void connectHostedJira(true);
+      void hostedConnect.jira(true);
       return;
     }
     if (integrationName === "linear" && isHostedLinear(availableIntegrations)) {
-      void connectHostedLinear(true);
+      void hostedConnect.linear(true);
       return;
     }
     openCreateIntegrationModal(integrationName);
@@ -304,6 +297,23 @@ function isHostedJira(availableIntegrations: IntegrationsIntegrationDefinition[]
 
 function isHostedLinear(availableIntegrations: IntegrationsIntegrationDefinition[]) {
   return usesHostedLinearOAuth(availableIntegrations.find((item) => item.name === "linear"));
+}
+
+function useHostedIssueConnect(args: {
+  organizationId: string;
+  returnTo?: string;
+  connected: OrganizationsIntegration[];
+  existingIntegrationNames: Set<string>;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  return {
+    jira: useHostedJiraConnect(args),
+    linear: useHostedLinearConnect(args),
+  };
 }
 
 export function useHostedJiraConnect({

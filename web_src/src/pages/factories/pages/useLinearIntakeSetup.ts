@@ -36,40 +36,19 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     enabled: Boolean(integrationId),
   });
 
-  useEffect(() => {
-    pickedReturnedConnection.current = false;
-  }, [selectIntegrationId]);
-
-  useEffect(() => {
-    if (!selectIntegrationId || pickedReturnedConnection.current) {
-      return;
-    }
-
-    const returned = linearConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
-    if (!returned || returned.status?.state !== "ready") {
-      return;
-    }
-
-    pickedReturnedConnection.current = true;
-    setIntegrationId(selectIntegrationId);
-    setConnectOpen(false);
-    setStep("project");
-    void connectedQuery.refetch();
-  }, [selectIntegrationId, linearConnections, connectedQuery]);
-
-  useEffect(() => {
-    if (stayOnConnection || step !== "connection" || selectIntegrationId) {
-      return;
-    }
-    const readyId = readyLinearConnectionId(linearIntegrations, integrationId);
-    if (!readyId) {
-      return;
-    }
-    setIntegrationId(readyId);
-    setConnectOpen(false);
-    setStep("project");
-    void connectedQuery.refetch();
-  }, [stayOnConnection, step, selectIntegrationId, linearIntegrations, integrationId, connectedQuery]);
+  useAdvanceLinearSetup({
+    selectIntegrationId,
+    pickedReturnedConnection,
+    linearConnections,
+    linearIntegrations,
+    integrationId,
+    stayOnConnection,
+    step,
+    connectedQuery,
+    setIntegrationId,
+    setConnectOpen,
+    setStep,
+  });
 
   const toggleProject = (id: string) => {
     setProjectIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -149,6 +128,85 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     connectLinear,
     createBoundIntake,
   };
+}
+
+function useAdvanceLinearSetup({
+  selectIntegrationId,
+  pickedReturnedConnection,
+  linearConnections,
+  linearIntegrations,
+  integrationId,
+  stayOnConnection,
+  step,
+  connectedQuery,
+  setIntegrationId,
+  setConnectOpen,
+  setStep,
+}: {
+  selectIntegrationId: string;
+  pickedReturnedConnection: { current: boolean };
+  linearConnections: Array<{ metadata?: { id?: string }; status?: { state?: string } }>;
+  linearIntegrations: Array<{ metadata?: { id?: string } }>;
+  integrationId: string;
+  stayOnConnection: boolean;
+  step: LinearSetupStep;
+  connectedQuery: { refetch: () => Promise<unknown> };
+  setIntegrationId: (id: string) => void;
+  setConnectOpen: (open: boolean) => void;
+  setStep: (step: LinearSetupStep) => void;
+}) {
+  useEffect(() => {
+    pickedReturnedConnection.current = false;
+  }, [selectIntegrationId, pickedReturnedConnection]);
+
+  useEffect(() => {
+    if (!selectIntegrationId || pickedReturnedConnection.current) {
+      return;
+    }
+
+    const returned = linearConnections.find((integration) => integration.metadata?.id === selectIntegrationId);
+    if (!returned || returned.status?.state !== "ready") {
+      return;
+    }
+
+    pickedReturnedConnection.current = true;
+    setIntegrationId(selectIntegrationId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [
+    selectIntegrationId,
+    linearConnections,
+    connectedQuery,
+    pickedReturnedConnection,
+    setIntegrationId,
+    setConnectOpen,
+    setStep,
+  ]);
+
+  useEffect(() => {
+    if (stayOnConnection || step !== "connection" || selectIntegrationId) {
+      return;
+    }
+    const readyId = readyLinearConnectionId(linearIntegrations, integrationId);
+    if (!readyId) {
+      return;
+    }
+    setIntegrationId(readyId);
+    setConnectOpen(false);
+    setStep("project");
+    void connectedQuery.refetch();
+  }, [
+    stayOnConnection,
+    step,
+    selectIntegrationId,
+    linearIntegrations,
+    integrationId,
+    connectedQuery,
+    setIntegrationId,
+    setConnectOpen,
+    setStep,
+  ]);
 }
 
 export function readyLinearConnectionId(

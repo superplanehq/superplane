@@ -65,14 +65,7 @@ func (c *FactoryContext) ingestLinearFiles(order *models.FactoryWorkOrder) {
 		return
 	}
 
-	description := order.Description
-	if section := linear.LinkSectionMarkdown(links); section != "" && !strings.Contains(description, section) {
-		if strings.TrimSpace(description) == "" {
-			description = section
-		} else {
-			description = description + "\n\n" + section
-		}
-	}
+	description := linear.DescriptionWithLinks(order.Description, links)
 
 	if len(issueFiles) == 0 {
 		if description == order.Description {

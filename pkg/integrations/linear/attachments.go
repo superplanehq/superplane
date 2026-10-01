@@ -42,12 +42,11 @@ type IssueLink struct {
 }
 
 // IsLinearUploadURL reports whether raw points at Linear's private file storage.
+// Only HTTPS is accepted. The download sends the OAuth bearer token, so an
+// http://uploads.linear.app link must not be fetched.
 func IsLinearUploadURL(raw string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Host == "" {
-		return false
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+	if err != nil || parsed.Host == "" || parsed.Scheme != "https" {
 		return false
 	}
 	return strings.EqualFold(parsed.Hostname(), linearUploadHost)
@@ -96,6 +95,19 @@ func linkAttachments(attachments []Attachment) []IssueLink {
 		links = append(links, IssueLink{Title: title, URL: rawURL})
 	}
 	return links
+}
+
+// DescriptionWithLinks appends link attachments to description. A description
+// that already contains the section is left unchanged.
+func DescriptionWithLinks(description string, links []IssueLink) string {
+	section := LinkSectionMarkdown(links)
+	if section == "" || strings.Contains(description, section) {
+		return description
+	}
+	if strings.TrimSpace(description) == "" {
+		return section
+	}
+	return description + "\n\n" + section
 }
 
 // LinkSectionMarkdown renders link attachments as a markdown list. An empty
@@ -201,7 +213,7 @@ func (c *Client) fetchLinearUpload(ctx context.Context, rawURL string) ([]byte, 
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, rawURL, nil)
-	if err != nil {
+	if err != nil || req.URL == nil || req.URL.Scheme != "https" {
 		return nil, "", false
 	}
 	req.Header.Set("Authorization", "Bearer "+c.AccessToken)

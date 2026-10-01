@@ -273,6 +273,9 @@ func applyIntakeSettingsToGraph(
 ) ([]models.Node, []models.Edge, error) {
 	current := intakeSettingsFromGraph(source, graph, spec)
 	updated := parseIntakeSettings(current, settings)
+	if source == models.FactoryIntakeSourceLinearIssues && len(updated.LinearProjectIDs) == 0 {
+		return nil, nil, invalidArgument("at least one Linear project is required")
+	}
 	if intakeSourceHasFilterNode(source) &&
 		intakeSettingsChangeTrigger(source, current, updated) &&
 		graph.TriggerNodeID == "" {

@@ -24,6 +24,7 @@ import {
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
+import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -473,5 +474,21 @@ describe("IntakeSourceSettingsPopup", () => {
         jiraCompletionColumn: "QA",
       }),
     );
+  });
+
+  it("does not save a Linear intake with no project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearProjectIds: [] },
+      onSave,
+    });
+
+    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

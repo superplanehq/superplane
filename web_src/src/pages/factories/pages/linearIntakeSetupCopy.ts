@@ -24,6 +24,7 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   wizardRetry: "Try again",
   wizardCreateError: "SuperPlane could not create the Linear intake.",
   wizardConnectionsLoading: "Loading Linear connections...",
+  projectsRequired: "Select at least one Linear project.",
   projectsLabel: "Projects",
   labelsLabel: "Labels",
   labelsHelper: "Leave this empty to include every label.",

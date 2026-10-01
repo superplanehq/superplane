@@ -129,6 +129,9 @@ func CreateFactoryIntake(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		binding = withLinearSeedLabels(binding, settings.LinearLabels)
+	}
 
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,

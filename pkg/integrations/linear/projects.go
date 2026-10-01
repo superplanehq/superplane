@@ -78,9 +78,9 @@ query ProjectsByID($ids: [ID!]!, $first: Int!, $after: String) {
 }`
 
 // ProjectTeamIDs returns the teams that own the given projects. The result
-// is sorted and has no duplicates. A project the token cannot read is
-// omitted. An empty result is an error, so a webhook is not registered for
-// the wrong scope.
+// is sorted and has no duplicates. Every requested project must be readable.
+// A project the token cannot read is an error, so setup does not register
+// webhooks for only part of the intake.
 func (c *Client) ProjectTeamIDs(projectIDs []string) ([]string, error) {
 	ids := normalizeIDs(projectIDs)
 	if len(ids) == 0 {
@@ -95,12 +95,23 @@ func (c *Client) ProjectTeamIDs(projectIDs []string) ([]string, error) {
 		return nil, err
 	}
 
+	found := map[string]struct{}{}
 	teamIDs := []string{}
 	for _, project := range workspaceProjectsFromNodes(nodes) {
+		id := strings.TrimSpace(project.ID)
+		if id == "" {
+			continue
+		}
+		found[id] = struct{}{}
 		for _, teamID := range project.TeamIDs {
 			if !slices.Contains(teamIDs, teamID) {
 				teamIDs = append(teamIDs, teamID)
 			}
+		}
+	}
+	for _, id := range ids {
+		if _, ok := found[id]; !ok {
+			return nil, fmt.Errorf("selected projects were not found")
 		}
 	}
 	if len(teamIDs) == 0 {
