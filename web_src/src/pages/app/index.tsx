@@ -2,7 +2,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
@@ -174,6 +174,7 @@ import {
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { runPositionAutoSave } from "./runPositionAutoSave";
 import { syncRunInspectionViewportTransition } from "./lib/run-inspection-viewport";
+import { EarlyCanvasView } from "./CanvasRequestFailure";
 import {
   clearRunDetailNodeSearchParams,
   buildCanvasLogEntries,
@@ -386,6 +387,7 @@ export function AppPage({
     isLoading: canvasLoading,
     isFetching: canvasFetching,
     error: canvasError,
+    refetch: refetchCanvas,
   } = useCanvas(organizationId!, canvasId!, {
     enabled: true,
     staleTime: 30_000,
@@ -3591,31 +3593,17 @@ export function AppPage({
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
-  if (isInitialCanvasBootstrapLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="text-sm text-gray-500">Loading canvas...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!canvas && !canvasLoading && !showDraftCanvasLoadingOverlay) {
-    // Workflow not found after loading - could be deleted or doesn't exist
-    // Show a brief message then redirect (handled by the error useEffect above)
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <h1 className="text-4xl font-bold text-gray-700">404</h1>
-          <p className="text-sm text-gray-500">Canvas not found</p>
-          <p className="text-sm text-gray-400">
-            This canvas may have been deleted or you may not have permission to view it.
-          </p>
-        </div>
-      </div>
-    );
+  // A failed canvas read shows the request failure, not a missing canvas.
+  const earlyCanvasView = EarlyCanvasView({
+    canvas,
+    canvasLoading,
+    canvasError,
+    bootstrapLoading: isInitialCanvasBootstrapLoading,
+    showDraftCanvasLoadingOverlay,
+    onRetry: () => void refetchCanvas(),
+  });
+  if (earlyCanvasView) {
+    return earlyCanvasView;
   }
 
   const handleReloadRemoteCanvas = async () => {
