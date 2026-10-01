@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -235,6 +236,53 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEventRetriesUnavailableL
 	assert.Equal(t, "CHECK_FAILED", stored.MergeBlockedReason)
 	assert.Equal(t, "A check failed.", stored.MergeBlockedMessage)
 	assert.Greater(t, githubAPI.calls, 1)
+}
+
+func TestRefreshFactoryPullRequestMergeabilityWithRetryStopsWhenLookupCannotClear(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "forbidden",
+			err:  &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}},
+		},
+		{
+			name: "installation unauthorized",
+			err:  &ghinstallation.HTTPError{Response: &http.Response{StatusCode: http.StatusUnauthorized}},
+		},
+		{
+			name: "primary rate limit",
+			err:  &github.RateLimitError{Response: githubRateLimitedResponse(), Message: "rate limit exceeded"},
+		},
+		{
+			name: "secondary rate limit",
+			err:  &github.AbuseRateLimitError{Response: githubRateLimitedResponse(), Message: "secondary rate limit"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 98)
+			githubAPI := &failingThenReadyGitHub{
+				factoryGitHubAPI: &fakeFactoryGitHub{},
+				failures:         factoryMergeabilityRefreshAttempts,
+				err:              test.err,
+			}
+			stubFactoryGitHub(t, githubAPI)
+
+			err := refreshFactoryPullRequestMergeabilityWithRetry(
+				t.Context(),
+				db,
+				IntakeDependencies{},
+				factory,
+				pullRequest,
+			)
+			require.ErrorIs(t, err, errFactoryPullRequestMergeabilityUnavailable)
+			assert.NotErrorIs(t, err, errFactoryPullRequestMergeabilityTemporary)
+			assert.Equal(t, 1, githubAPI.calls)
+		})
+	}
 }
 
 type failingThenReadyGitHub struct {

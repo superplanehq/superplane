@@ -128,6 +128,10 @@ func retryFactoryPullRequestMergeabilityRefresh(
 			attempt,
 			pullRequestID,
 		)
+		if errors.Is(err, errFactoryPullRequestMergeabilityUnavailable) &&
+			!errors.Is(err, errFactoryPullRequestMergeabilityTemporary) {
+			return
+		}
 		if attempt < factoryMergeabilityRefreshAttempts && !waitForFactoryMergeabilityRefresh(ctx, attempt) {
 			return
 		}
@@ -144,7 +148,7 @@ func refreshFactoryPullRequestMergeabilityWithRetry(
 	var err error
 	for attempt := 1; attempt <= factoryMergeabilityRefreshAttempts; attempt++ {
 		err = refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-		if err == nil || !errors.Is(err, errFactoryPullRequestMergeabilityUnavailable) {
+		if err == nil || !errors.Is(err, errFactoryPullRequestMergeabilityTemporary) {
 			return err
 		}
 		log.WithError(err).Warnf(
@@ -209,7 +213,7 @@ func refreshFactoryPullRequestMergeability(
 		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
 	}
 	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
-		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, errFactoryPullRequestMergeabilityUnavailable)
+		return unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
 	}
 	if storedFactoryPullRequestMergeability(pullRequest) == before {
 		return nil

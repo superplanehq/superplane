@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"slices"
 	"strings"
 
@@ -25,6 +26,7 @@ var (
 	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
 	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
 	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
+	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
 )
 
 const (
@@ -45,6 +47,7 @@ type factoryPullRequestMergeability struct {
 	HeadSHA        string
 	PullRequest    *models.FactoryPullRequest
 	Client         factoryGitHubAPI
+	canRetry       bool
 }
 
 func loadFactoryPullRequestForMerge(
@@ -155,7 +158,49 @@ func recoverFactoryPullRequestMergeability(
 		return nil, err
 	}
 	recordFactoryPullRequestMergeabilityError(ctx, factory.ID.String(), result.PullRequest.ID.String(), result.PullRequest.Repository, err)
+	result.canRetry = isRetryableGitHubMergeabilityError(err)
 	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, mergeBlockedUnavailable), nil
+}
+
+func isRetryableGitHubMergeabilityError(err error) bool {
+	if isDeniedOrLimitedGitHubMergeabilityError(err) {
+		return false
+	}
+	status := ghcommon.StatusCode(err)
+	if status == http.StatusRequestTimeout || status >= http.StatusInternalServerError {
+		return true
+	}
+	if status != 0 {
+		return false
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func isDeniedOrLimitedGitHubMergeabilityError(err error) bool {
+	var rateLimitErr *github.RateLimitError
+	var abuseRateLimitErr *github.AbuseRateLimitError
+	if errors.As(err, &rateLimitErr) || errors.As(err, &abuseRateLimitErr) {
+		return true
+	}
+	switch ghcommon.StatusCode(err) {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+func unavailableFactoryPullRequestMergeabilityError(pullRequestID uuid.UUID, canRetry bool) error {
+	err := fmt.Errorf(
+		"failed to refresh pull request %s: %w",
+		pullRequestID,
+		errFactoryPullRequestMergeabilityUnavailable,
+	)
+	if !canRetry {
+		return err
+	}
+	return fmt.Errorf("%w: %w", err, errFactoryPullRequestMergeabilityTemporary)
 }
 
 func isRecoverableGitHubMergeabilityError(ctx context.Context, err error) bool {
