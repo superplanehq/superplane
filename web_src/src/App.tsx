@@ -313,7 +313,8 @@ export function OrganizationScope() {
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
-  const guestLine = isPublicFactoryLinePath(location.pathname) && (accountLoading || !account);
+  const publicLine = isPublicFactoryLinePath(location.pathname);
+  const guestLine = publicLine && (accountLoading || !account);
   // The route param accepts either the org slug or its UID, so resolve it
   // once here and self-correct any UID URL to the slug below. Every other
   // in-app link reuses this same `:organizationId` URL segment, so fixing
@@ -367,7 +368,7 @@ export function OrganizationScope() {
     );
   }
 
-  if (isNotFoundError(organizationError)) {
+  if (isNotFoundError(organizationError) && !publicLine) {
     return (
       <div className="flex justify-center items-center h-screen">
         <p className="text-gray-500 dark:text-gray-400">Organization not found</p>
