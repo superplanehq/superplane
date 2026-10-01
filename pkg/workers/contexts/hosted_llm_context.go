@@ -91,12 +91,12 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 }
 
 func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
-	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(c.tx)
+	runnable, err := models.ResolveRunnableHostedLLMModel(c.tx, c.organizationID, c.factoryID)
 	if err != nil {
 		return core.DefaultHostedLLMModel{}, err
 	}
 	return core.DefaultHostedLLMModel{
-		Provider: defaultModel.Provider,
-		Model:    defaultModel.Model,
+		Provider: runnable.Provider,
+		Model:    runnable.Model,
 	}, nil
 }
