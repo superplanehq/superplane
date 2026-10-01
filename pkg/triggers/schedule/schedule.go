@@ -3,7 +3,6 @@ package schedule
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -656,13 +655,12 @@ func parseTimezone(timezoneStr *string) *time.Location {
 		return time.UTC
 	}
 
-	offsetHours, err := strconv.ParseFloat(*timezoneStr, 64)
+	location, err := configuration.LoadTimezone(*timezoneStr)
 	if err != nil {
 		return time.UTC
 	}
-	offsetSeconds := int(offsetHours * 3600)
 
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	return location
 }
 
 func nextHoursTrigger(interval int, minute int, now time.Time) (*time.Time, error) {

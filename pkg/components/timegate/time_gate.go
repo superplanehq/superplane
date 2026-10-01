@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -371,13 +370,12 @@ func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
 		return time.Local
 	}
 
-	offsetHours, err := strconv.ParseFloat(timezoneStr, 64)
+	location, err := configuration.LoadTimezone(timezoneStr)
 	if err != nil {
 		return time.UTC
 	}
-	offsetSeconds := int(offsetHours * 3600)
 
-	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+	return location
 }
 
 func parseTimeString(timeStr string) (int, error) {
