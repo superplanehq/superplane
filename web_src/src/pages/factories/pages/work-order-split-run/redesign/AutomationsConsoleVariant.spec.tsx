@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -314,6 +314,89 @@ describe("AutomationsConsoleVariant summary strip", () => {
     expect(screen.queryByTestId("redesign-console-waiting-note")).not.toBeInTheDocument();
   });
 });
+
+function cardHeader(name: string) {
+  const header = screen
+    .getByRole("button", { name: `Toggle ${name} details` })
+    .closest("[data-testid^='redesign-console-card-header-']");
+  if (!header) {
+    throw new Error(`Header for ${name} is missing`);
+  }
+  return header as HTMLElement;
+}
+
+describe("AutomationsConsoleVariant running card timer", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("advances the running header once a second", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    renderConsole(SPLIT_RUN_RUNNING);
+
+    const header = cardHeader("Implementation");
+    expect(within(header).getByText("4m so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(within(header).getByText("4m 1s so far")).toBeInTheDocument();
+  });
+
+  it("keeps a finished header time fixed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    renderConsole(SPLIT_RUN_RUNNING);
+
+    const header = cardHeader("Ingest");
+    expect(within(header).getByText("2s")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(within(header).getByText("2s")).toBeInTheDocument();
+    expect(within(header).queryByText(/so far/)).not.toBeInTheDocument();
+  });
+
+  it("starts a new run at its own duration when the text matches the previous run", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    const running = implementRun("run-1", "running", "<1s");
+    const view = renderConsole(running);
+
+    expect(within(cardHeader("Implementation")).getByText("<1s so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(within(cardHeader("Implementation")).getByText("2s so far")).toBeInTheDocument();
+
+    view.rerenderConsole(implementRun("run-1", "passed", "<1s"));
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    view.rerenderConsole(implementRun("run-2", "running", "<1s"));
+    expect(within(cardHeader("Implementation")).getByText("<1s so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(within(cardHeader("Implementation")).getByText("1s so far")).toBeInTheDocument();
+  });
+});
+
+function implementRun(runId: string, status: "running" | "passed", duration: string) {
+  return {
+    ...SPLIT_RUN_RUNNING,
+    phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+      phase.id === "implement" ? { ...phase, status, duration, runId } : phase,
+    ),
+  };
+}
 
 describe("AutomationsConsoleVariant run footer", () => {
   it("shows recorded spend and model on the open card footer", () => {

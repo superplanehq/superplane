@@ -9,6 +9,7 @@ import {
   runFooterSpendLabel,
   runMetaLine,
   stepOutputSummary,
+  tickingRunMetaLine,
 } from "./consoleCardText";
 
 function runningStage(id: string) {
@@ -47,6 +48,39 @@ describe("runMetaLine", () => {
     const stage = { ...runningStage("implement"), status: "running" as const, duration: "10m 56s" };
 
     expect(runMetaLine(stage)).toBe("10m 56s so far");
+  });
+});
+
+describe("tickingRunMetaLine", () => {
+  const sampledAt = 1_000;
+
+  it("adds one second to a running duration and keeps the words", () => {
+    const stage = { ...runningStage("implement"), status: "running" as const, duration: "5m 55s" };
+
+    expect(tickingRunMetaLine(stage, sampledAt, sampledAt)).toBe("5m 55s so far");
+    expect(tickingRunMetaLine(stage, sampledAt, sampledAt + 1_000)).toBe("5m 56s so far");
+  });
+
+  it("does not add seconds or the so far suffix when the stage is not running", () => {
+    const stage = { ...runningStage("implement"), status: "passed" as const, duration: "5m 55s" };
+
+    expect(tickingRunMetaLine(stage, sampledAt, sampledAt + 1_000)).toBe("5m 55s");
+  });
+
+  it("does not tick a label that is not a duration", () => {
+    const running = { ...runningStage("implement"), status: "running" as const, duration: "Running" };
+    const dash = { ...runningStage("implement"), status: "running" as const, duration: "—" };
+    const empty = { ...runningStage("implement"), status: "running" as const, duration: "" };
+
+    expect(tickingRunMetaLine(running, sampledAt, sampledAt + 1_000)).toBe("Running so far");
+    expect(tickingRunMetaLine(dash, sampledAt, sampledAt + 1_000)).toBe("— so far");
+    expect(tickingRunMetaLine(empty, sampledAt, sampledAt + 1_000)).toBe("");
+  });
+
+  it("strips a trailing so far before it adds seconds", () => {
+    const stage = { ...runningStage("implement"), status: "running" as const, duration: "5m 55s so far" };
+
+    expect(tickingRunMetaLine(stage, sampledAt, sampledAt + 1_000)).toBe("5m 56s so far");
   });
 });
 
