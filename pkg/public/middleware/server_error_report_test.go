@@ -14,12 +14,52 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+func TestLoggingMiddleware_StoresWrappedCauseThroughGatewayRoute(t *testing.T) {
+	const (
+		path        = "/api/v1/server-error-cause/1"
+		safeMessage = "failed to describe work order"
+		causeText   = "db down"
+	)
+
+	transport := bindCaptureTransport(t)
+	logger, buffer := newJSONLogger()
+	mux := gatewayRouteMux()
+	require.NoError(t, mux.HandlePath(http.MethodGet, "/api/v1/server-error-cause/{id}", func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
+		forwardHandlerError(mux, w, r, grpcerrors.Internal(errors.New(causeText), safeMessage))
+	}))
+
+	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cloned := CloneGatewayRequest(r)
+		TraceGatewayServe(r.Context(), w, mux, cloned.WithContext(r.Context()))
+	}))
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), safeMessage)
+	assert.NotContains(t, recorder.Body.String(), causeText)
+
+	payload := decodeLogLine(t, buffer.String())
+	assert.Equal(t, "error", payload["level"])
+	assert.Equal(t, causeText, payload["error"])
+
+	events := transport.Events()
+	require.Len(t, events, 1)
+	event := events[0]
+	assert.Equal(t, []string{causeText}, exceptionValues(event))
+	assert.NotContains(t, event.Message, statusReport(http.StatusInternalServerError, path))
+	assert.Equal(t, "500", event.Tags["status"])
+	assert.Equal(t, safeMessage, event.Extra["handler_message"])
+}
 
 func TestLoggingMiddleware_StoresWrappedServerErrorCause(t *testing.T) {
 	const (
@@ -191,6 +231,38 @@ func TestLoggingMiddleware_DoesNotStoreClientError(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, recorder.Code)
 	assert.Empty(t, transport.Events())
+}
+
+func gatewayRouteMux() *runtime.ServeMux {
+	return runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, gatewayJSONMarshaler()),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
+		runtime.WithMiddlewares(
+			grpc.GatewayRecoveryMiddleware(),
+			grpc.GatewayAuthorizationMiddleware(authorization.NewGatewayAuthorizer(nil)),
+		),
+	)
+}
+
+func forwardHandlerError(mux *runtime.ServeMux, w http.ResponseWriter, r *http.Request, err error) {
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	_, outbound := runtime.MarshalerForRequest(mux, r)
+	annotated, annotateErr := runtime.AnnotateIncomingContext(
+		ctx,
+		mux,
+		r,
+		"/superplane.factories.Factories/DescribeWorkOrder",
+		runtime.WithHTTPPathPattern("/api/v1/factories/{factory_id}/orders/{order_id}"),
+	)
+	if annotateErr != nil {
+		runtime.HTTPError(ctx, mux, outbound, w, r, annotateErr)
+		return
+	}
+
+	annotated = runtime.NewServerMetadataContext(annotated, runtime.ServerMetadata{})
+	runtime.HTTPError(annotated, mux, outbound, w, r, err)
 }
 
 func gatewayJSONMarshaler() runtime.Marshaler {
