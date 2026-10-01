@@ -392,3 +392,63 @@ func Test__SwitchFactoryModelSource__CustomProviderRewritesAgents(t *testing.T) 
 	assert.Equal(t, "https://models.example/v1", saved.Configuration.Data()["baseURL"])
 	assert.Equal(t, "openai-compatible", saved.Configuration.Data()["apiType"])
 }
+
+func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	stubProviderModels(r.Registry, models.CustomLLMAppName, []string{"alpha-model"})
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"token",
+		"https://models.example/v1",
+		"openai-compatible",
+	)
+	require.NoError(t, err)
+
+	var saved models.Integration
+	require.NoError(t, db.Where("organization_id = ? AND app_name = ?", r.Organization.ID, models.CustomLLMAppName).First(&saved).Error)
+	keptKey := saved.Configuration.Data()["apiKey"]
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"",
+		"https://other.example/v1",
+		"openai-compatible",
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+	require.NoError(t, db.First(&saved, "id = ?", saved.ID).Error)
+	assert.Equal(t, "https://models.example/v1", saved.Configuration.Data()["baseURL"])
+	assert.Equal(t, keptKey, saved.Configuration.Data()["apiKey"])
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"replacement-token",
+		"https://other.example/v1",
+		"openai",
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&saved, "id = ?", saved.ID).Error)
+	assert.Equal(t, "https://other.example/v1", saved.Configuration.Data()["baseURL"])
+	assert.Equal(t, "openai", saved.Configuration.Data()["apiType"])
+	assert.NotEqual(t, keptKey, saved.Configuration.Data()["apiKey"])
+}

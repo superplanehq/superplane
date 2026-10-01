@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -82,6 +83,8 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
 		agentID := createReadyOnboardingIntegration(t, organization.ID, models.CustomLLMAppName)
+		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOK))
+		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOKCustomProvider))
 		_, err := models.UpsertOrganizationBYOKModelAllowlist(
 			db,
 			organization.ID,

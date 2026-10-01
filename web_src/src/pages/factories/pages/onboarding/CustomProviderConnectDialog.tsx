@@ -1,4 +1,8 @@
 import type { OrganizationsIntegration } from "@/api-client";
+import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,13 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateIntegration } from "@/hooks/useIntegrations";
+import { integrationKeys, useCreateIntegration } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
-import { selectionFromInstance, type IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { CUSTOM_LLM_API_TYPES } from "@/pages/factories/pages/settings/organizationLLMModelsCopy";
-import { useState, type ReactNode } from "react";
+import { selectionFromInstance, type IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
+import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 
 const CUSTOM_LLM_INTEGRATION = "customLlm";
 
@@ -37,6 +41,7 @@ export function CustomProviderConnectDialog({
   onClose: () => void;
 }) {
   const createIntegration = useCreateIntegration(organizationId, "install_wizard");
+  const queryClient = useQueryClient();
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiType, setApiType] = useState("");
@@ -63,6 +68,11 @@ export function CustomProviderConnectDialog({
       });
       const integration = response.data?.integration;
       if (integration?.status?.state !== "ready") {
+        try {
+          await discardUnreadyCustomConnection(queryClient, organizationId, integration);
+        } catch {
+          // Keep the provider error. A delete failure must not hide it.
+        }
         showErrorToast(connectError(integration));
         return;
       }
@@ -205,6 +215,26 @@ export function OnboardingConnectDialogs({
       />
     </>
   );
+}
+
+async function discardUnreadyCustomConnection(
+  queryClient: QueryClient,
+  organizationId: string,
+  integration: OrganizationsIntegration | undefined,
+): Promise<void> {
+  const integrationId = integration?.metadata?.id?.trim();
+  if (!integrationId) {
+    return;
+  }
+
+  await organizationsDeleteIntegration(
+    withOrganizationHeader({
+      organizationId,
+      path: { id: organizationId, integrationId },
+    }),
+  );
+  await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+  queryClient.removeQueries({ queryKey: integrationKeys.integration(organizationId, integrationId) });
 }
 
 function connectError(integration: OrganizationsIntegration | undefined): string {

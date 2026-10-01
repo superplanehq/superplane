@@ -428,6 +428,11 @@ func updateCustomProviderIntegration(
 	if data == nil {
 		data = map[string]any{}
 	}
+	// A saved token is bound to the previous host. Sending it to a new URL
+	// would disclose the credential. Require a replacement token first.
+	if customProviderURLChanged(data, baseURL) && strings.TrimSpace(apiKey) == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "Enter a new API token when you change the provider URL.")
+	}
 	if apiKey != "" {
 		encrypted, err := encryptAPIKey(ctx, encryptor, existing.ID, apiKey)
 		if err != nil {
@@ -444,6 +449,15 @@ func updateCustomProviderIntegration(
 		return nil, err
 	}
 	return existing, nil
+}
+
+func customProviderURLChanged(data map[string]any, baseURL string) bool {
+	previous, _ := data["baseURL"].(string)
+	return normalizeCustomProviderURL(previous) != normalizeCustomProviderURL(baseURL)
+}
+
+func normalizeCustomProviderURL(value string) string {
+	return strings.TrimRight(strings.TrimSpace(value), "/")
 }
 
 func encryptAPIKey(ctx context.Context, encryptor crypto.Encryptor, integrationID uuid.UUID, apiKey string) (string, error) {

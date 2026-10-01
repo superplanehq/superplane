@@ -250,7 +250,10 @@ function planForConnectedProvider(
   customModels: string[],
 ): OnboardingAgentPlan | undefined {
   if (providerId === "customLlm") {
-    const model = [...customModels].map((id) => id.trim()).filter(Boolean).sort()[0];
+    const model = [...customModels]
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .sort()[0];
     if (!model) return undefined;
     return {
       providerId,

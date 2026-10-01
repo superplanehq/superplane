@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -83,6 +84,8 @@ func Test__ListLineRunnerModels__CustomProviderUsesItsAllowlistOnOpenCode(t *tes
 	require.NoError(t, err)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{"zeta-model", "alpha-model"})
 	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
 
 	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerOpenRouter, "integration", "zeta-model")
 	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
