@@ -427,6 +427,36 @@ func TestBuildAgentBrokerTaskRewritesPlanningImagePaths(t *testing.T) {
 	assert.NotContains(t, prompt, "sp-file://")
 }
 
+func TestBuildAgentBrokerTaskPreviewOmitsDispatchOnlyImaginedLimit(t *testing.T) {
+	t.Parallel()
+
+	original := "Stop after 20 minutes. Token budget is 10000."
+	steps := []AgentStep{{Name: "Implement", Type: AgentStepPrompt, Prompt: &original}}
+	dispatched := appendImaginedLimitPrompt(steps)
+
+	commands, files := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:     "Prepare",
+		PrepareScript:   NodePrepareScript("", "", ""),
+		RunScriptName:   "run.js",
+		RunScript:       "echo run",
+		Steps:           steps,
+		DispatchedSteps: dispatched,
+		Model:           "openai/gpt-6-astra",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.GreaterOrEqual(t, len(commands), 2)
+	assert.Equal(t, original, commands[1].Preview)
+	assert.NotContains(t, commands[1].Preview, FactoryImaginedLimitPrompt)
+	promptFile := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
+	assert.Contains(t, promptFile, "Stop after 20 minutes.")
+	assert.Contains(t, promptFile, "Token budget is 10000.")
+	assert.Contains(t, promptFile, FactoryImaginedLimitPrompt)
+	assert.Equal(t, original, *steps[0].Prompt)
+}
+
 func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {
 	t.Parallel()
 
