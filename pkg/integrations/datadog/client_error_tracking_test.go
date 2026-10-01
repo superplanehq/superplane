@@ -150,6 +150,32 @@ func Test__Client__SearchErrorTrackingIssues__Forbidden(t *testing.T) {
 	require.ErrorIs(t, err, ErrErrorTrackingForbidden)
 }
 
+func Test__Client__SearchErrorTrackingIssues__NewestCreatedFirst(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{"id": "older", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "older", "type": "issue"}}}},
+				{"id": "newest", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "newest", "type": "issue"}}}},
+				{"id": "middle", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "middle", "type": "issue"}}}}
+			],
+			"included": [
+				{"id": "older", "type": "issue", "attributes": {"first_seen": 1000, "service": "intake-test"}},
+				{"id": "newest", "type": "issue", "attributes": {"first_seen": 3000, "service": "intake-test"}},
+				{"id": "middle", "type": "issue", "attributes": {"first_seen": 2000, "service": "intake-test"}}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL, http: server.Client()}
+	issues, err := client.SearchErrorTrackingIssues("service:intake-test", 2)
+	require.NoError(t, err)
+	require.Len(t, issues, 2)
+	assert.Equal(t, "newest", issues[0].ID)
+	assert.Equal(t, "middle", issues[1].ID)
+}
+
 func Test__Client__SearchErrorTrackingIssues__EmptyQueryUsesStar(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
