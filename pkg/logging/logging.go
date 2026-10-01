@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -15,6 +16,13 @@ const (
 	// ComponentWebhookSentry is the Cloud Logging component for a hosted
 	// Sentry webhook. Filter: jsonPayload.component="webhook.sentry"
 	ComponentWebhookSentry = "webhook.sentry"
+
+	// WebhookLogType is the Cloud Logging type for an integration webhook.
+	// Filter: jsonPayload.type="webhook"
+	WebhookLogType = "webhook"
+	// DatadogIntegration is the Cloud Logging integration for a Datadog webhook.
+	// Filter: jsonPayload.integration="datadog"
+	DatadogIntegration = "datadog"
 
 	productiveWebhookFailureMessage = "error handling webhook"
 	webhookTypeUnknown              = "unknown"
@@ -56,9 +64,17 @@ var productiveWebhookLogger = newProductiveWebhookLogger()
 // sentryWebhookLogger writes one JSON object per hosted Sentry webhook log.
 var sentryWebhookLogger = newJSONLineLogger()
 
+// datadogWebhookLogger writes one JSON object per Datadog webhook log.
+var datadogWebhookLogger = newJSONLineLogger()
+
 // SentryWebhookLogger returns the JSON logger used for hosted Sentry webhooks.
 func SentryWebhookLogger() *log.Logger {
 	return sentryWebhookLogger
+}
+
+// DatadogWebhookLogger returns the JSON logger used for Datadog webhooks.
+func DatadogWebhookLogger() *log.Logger {
+	return datadogWebhookLogger
 }
 
 // ProductiveWebhookLogger returns the JSON logger used for Productive webhook failures.
@@ -230,6 +246,70 @@ func sentryWebhookEntry(fields log.Fields, err error) *log.Entry {
 		entry = entry.WithFields(fields)
 	}
 	entry = entry.WithField("component", ComponentWebhookSentry)
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	return entry
+}
+
+// LogDatadogWebhookInfo writes one JSON info line for a Datadog webhook.
+// type and integration stay set when fields repeat them.
+func LogDatadogWebhookInfo(message string, fields log.Fields, err error) {
+	datadogWebhookEntry(fields, err).Info(message)
+}
+
+// LogDatadogWebhookWarn writes one JSON warning line for a Datadog webhook.
+// type and integration stay set when fields repeat them.
+func LogDatadogWebhookWarn(message string, fields log.Fields, err error) {
+	datadogWebhookEntry(fields, err).Warn(message)
+}
+
+// LogDatadogWebhookError writes one JSON error line for a Datadog webhook.
+// type and integration stay set when fields repeat them.
+func LogDatadogWebhookError(message string, fields log.Fields, err error) {
+	datadogWebhookEntry(fields, err).Error(message)
+}
+
+type datadogWebhookIdentityKey struct{}
+
+// WithDatadogWebhookIdentity stores a resolver on the logger.
+// The caller runs the resolver only when a delivery line needs the fields.
+func WithDatadogWebhookIdentity(logger *log.Entry, resolve func() log.Fields) *log.Entry {
+	if logger == nil {
+		return nil
+	}
+
+	parent := logger.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+	return logger.WithContext(context.WithValue(parent, datadogWebhookIdentityKey{}, resolve))
+}
+
+// DatadogWebhookIdentity returns fields from a resolver attached by
+// WithDatadogWebhookIdentity. It returns nil when the logger has no resolver.
+func DatadogWebhookIdentity(logger *log.Entry) log.Fields {
+	if logger == nil || logger.Context == nil {
+		return nil
+	}
+
+	resolve, ok := logger.Context.Value(datadogWebhookIdentityKey{}).(func() log.Fields)
+	if !ok || resolve == nil {
+		return nil
+	}
+	return resolve()
+}
+
+func datadogWebhookEntry(fields log.Fields, err error) *log.Entry {
+	datadogWebhookLogger.SetLevel(log.StandardLogger().GetLevel())
+	entry := log.NewEntry(datadogWebhookLogger)
+	if len(fields) > 0 {
+		entry = entry.WithFields(fields)
+	}
+	entry = entry.WithFields(log.Fields{
+		"type":        WebhookLogType,
+		"integration": DatadogIntegration,
+	})
 	if err != nil {
 		entry = entry.WithError(err)
 	}
