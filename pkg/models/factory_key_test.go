@@ -115,6 +115,46 @@ func TestFindFactoryByRef(t *testing.T) {
 	})
 }
 
+func TestCreateFactory_AssignsURLID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Stable", "", "ST")
+	require.NoError(t, err)
+	assert.Regexp(t, `^[a-z0-9]{8}$`, factory.URLID)
+	assert.Equal(t, "st-"+factory.URLID, factory.RouteSegment())
+}
+
+func TestFindFactoryByRef_ResolvesRouteSegmentAfterKeyChange(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Rename me", "", "NEWWO")
+	require.NoError(t, err)
+	urlID := factory.URLID
+	require.NotEmpty(t, urlID)
+
+	found, err := models.FindFactoryByRef(db, r.Organization.ID, "NEWWO")
+	require.NoError(t, err)
+	assert.Equal(t, factory.ID, found.ID)
+
+	newKey := "ENG"
+	require.NoError(t, factory.Update(db, nil, nil, &newKey))
+	assert.Equal(t, urlID, factory.URLID)
+	assert.Equal(t, "eng-"+urlID, factory.RouteSegment())
+
+	found, err = models.FindFactoryByRef(db, r.Organization.ID, "newwo-"+urlID)
+	require.NoError(t, err)
+	assert.Equal(t, factory.ID, found.ID)
+
+	found, err = models.FindFactoryByRef(db, r.Organization.ID, "ENG")
+	require.NoError(t, err)
+	assert.Equal(t, factory.ID, found.ID)
+
+	_, err = models.FindFactoryByRef(db, r.Organization.ID, "NEWWO")
+	assert.ErrorIs(t, err, models.ErrFactoryNotFound)
+}
+
 func TestFindWorkOrderByRef(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

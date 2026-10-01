@@ -1,7 +1,7 @@
 import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { Loader2 } from "lucide-react";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { FirstRunShell } from "./first-run/FirstRunShell";
 import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
@@ -15,12 +15,17 @@ export function OnboardingPage() {
   return <WorkspaceOnboardingPage key={layout.factoryId} layout={layout} />;
 }
 
-function WorkspaceOnboardingPage({ layout }: { layout: FactoriesLayoutContextValue }) {
+function WorkspaceOnboardingPage({ layout }: { layout: ResolvedFactoriesLayout }) {
   const onboardingEntryPath = useOnboardingEntryPath();
   const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
   const githubApp = useGithubAppAvailability(layout.organizationId);
-  const model = useOnboardingPageModel({ ...layout, onboardingEntryPath, reresolveWorkspace });
+  const model = useOnboardingPageModel({
+    ...layout,
+    factoryKey: layout.routeSegment,
+    onboardingEntryPath,
+    reresolveWorkspace,
+  });
 
   if (!githubApp.resolved) {
     return (

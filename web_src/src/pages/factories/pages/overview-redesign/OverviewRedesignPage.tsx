@@ -51,7 +51,7 @@ import type {
  * stay workspace-wide.
  */
 export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
-  const { organizationId, factoryKey } = useFactoriesLayout();
+  const { organizationId, routeSegment } = useFactoriesLayout();
   const [scope, setScope] = useState<OverviewScope>("all");
 
   const attention = scopeItems(data.attention, scope);
@@ -68,7 +68,7 @@ export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
             <BriefingLine
               counts={{ attention: attention.length, inFlight: inFlight.length }}
               organizationId={organizationId}
-              factoryKey={factoryKey}
+              factoryKey={routeSegment}
             />
           ) : (
             "Your workspace at a glance."
@@ -78,29 +78,29 @@ export function OverviewRedesignPage({ data }: { data: OverviewRedesignData }) {
       />
 
       <div className={factorySectionBodyClassName}>
-        <HealthScorecards metrics={data.health} velocityHref={factoryVelocityPath(organizationId, factoryKey)} />
+        <HealthScorecards metrics={data.health} velocityHref={factoryVelocityPath(organizationId, routeSegment)} />
 
         <div className="mt-6 flex min-w-0 flex-col gap-6">
           <WaitingCard
             items={attention}
             organizationId={organizationId}
-            factoryKey={factoryKey}
-            viewAllHref={workOrdersPath(organizationId, factoryKey)}
+            factoryKey={routeSegment}
+            viewAllHref={workOrdersPath(organizationId, routeSegment)}
           />
           <InFlightCard
             items={inFlight}
             organizationId={organizationId}
-            factoryKey={factoryKey}
-            viewAllHref={workOrdersPath(organizationId, factoryKey)}
-            newWorkOrderHref={createWorkOrderPath(organizationId, factoryKey)}
+            factoryKey={routeSegment}
+            viewAllHref={workOrdersPath(organizationId, routeSegment)}
+            newWorkOrderHref={createWorkOrderPath(organizationId, routeSegment)}
           />
           <div className="grid gap-6 lg:grid-cols-2">
             <SuggestionsCard suggestions={data.suggestions} />
             <RecentlyShippedCard
               items={shipped}
               organizationId={organizationId}
-              factoryKey={factoryKey}
-              viewAllHref={workOrdersPath(organizationId, factoryKey)}
+              factoryKey={routeSegment}
+              viewAllHref={workOrdersPath(organizationId, routeSegment)}
             />
           </div>
           <ImprovementsCard proposals={data.improvements} readiness={data.readiness} />

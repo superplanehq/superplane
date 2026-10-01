@@ -1,4 +1,6 @@
-import { replaceFactoryKeySegment } from "./factoryKeyResolution";
+import { factoryRouteSegment, replaceFactoryKeySegment } from "./factoryKeyResolution";
+
+export { factoryRouteSegment, workspaceRouteSegment } from "./factoryKeyResolution";
 
 export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
@@ -11,9 +13,9 @@ export function newFactoryPath(organizationId: string) {
 
 /**
  * Every workspace-scoped path is built from this function, so lowercasing the
- * key here makes lowercase the canonical URL form everywhere: the stored
- * `factory.key` (and the settings page that displays it) stay uppercase —
- * only the URL segment is lowercased.
+ * segment here makes lowercase the canonical URL form everywhere. Pass the
+ * workspace route segment (`key-urlId`) from `factoryRouteSegment`. The stored
+ * `factory.key` (and the settings page that displays it) stay uppercase.
  */
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
   return `${factoryListPath(organizationId)}/${factoryKey.toLowerCase()}`;
@@ -72,24 +74,21 @@ export function pathAfterWorkspaceSwitch({
   pathname: string;
   organizationId: string;
   currentFactoryKey: string;
-  nextFactory: { key?: string; lines?: Array<{ id?: string }> | null };
+  nextFactory: { key?: string; urlId?: string; lines?: Array<{ id?: string }> | null };
 }): string {
-  const nextKey = nextFactory.key;
-  if (!nextKey) {
+  const nextSegment = factoryRouteSegment(nextFactory);
+  if (!nextSegment) {
     return pathname;
   }
 
-  // `currentFactoryKey` (from `factory.key`) is always uppercase, but the
-  // `pathname` segment is the canonical (lowercase) URL form — normalize
-  // before comparing so the prefix match doesn't fail on case alone.
   const currentKeySegment = currentFactoryKey.toLowerCase();
   const prefix = `/${organizationId}/workspaces/${currentKeySegment}`;
-  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+  const rest = pathname === prefix || pathname.startsWith(`${prefix}/`) ? pathname.slice(prefix.length) : "";
   if (workspacePageToKeep(rest)) {
-    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextKey);
+    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextSegment);
   }
 
-  return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
+  return factoryHomePath(organizationId, nextSegment, firstFactoryLineId(nextFactory));
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */

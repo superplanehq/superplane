@@ -12,7 +12,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { factoriesExportFactoryWorkOrderRunUsage } from "@/api-client";
 import type { FactoriesWorkOrderRunUsageRow } from "@/api-client";
 
-import { workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { factoryRouteSegment, workOrderDetailPath } from "../../lib/factoryPagePaths";
 import {
   formatUsageDuration,
   formatUsageMachineTypes,
@@ -38,7 +38,7 @@ import { SpendingPeriodControls } from "./spending-redesign/SpendingPeriodContro
 
 export function OrganizationSettingsUsagePage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
-  const factoryKey = factory.key ?? "";
+  const factoryKey = factoryRouteSegment(factory);
   const [period, setPeriod] = useState<SpendingPeriodPreset>("month");
   const [customRange, setCustomRange] = useState<SpendingDateRange | undefined>();
   const [customOpen, setCustomOpen] = useState(false);

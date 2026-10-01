@@ -8,6 +8,7 @@ import {
   defaultFactoriesFixture,
   FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
 } from "../__fixtures__/factoryPageResponses";
 import {
   EXPIRED_TRIAL_ORGANIZATION_BILLING,
@@ -47,7 +48,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
-      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
   }, 10000);
 
@@ -104,7 +105,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
-      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
   }, 10000);
 
@@ -146,7 +147,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
-      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
   }, 10000);
 
@@ -169,7 +170,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(screen.queryByTestId("hosted-credit-empty-banner")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Subscribe" })).toHaveAttribute(
       "href",
-      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "billing"),
     );
   }, 10000);
 });
@@ -213,7 +214,7 @@ describe("WorkOrdersPage broken integrations banner", () => {
     expect(banner).toHaveTextContent("App was uninstalled");
     expect(screen.getByRole("link", { name: "Reinstall app" })).toHaveAttribute(
       "href",
-      `${factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "integrations")}/gh-1`,
+      `${factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "integrations")}/gh-1`,
     );
   }, 10000);
 
