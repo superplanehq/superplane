@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
-import { stagesFromFixture } from "./automationsViewModel";
+import { stagesFromFixture, type AutomationStage } from "./automationsViewModel";
 import {
   outputCountLabel,
   runFooterLine,
@@ -28,6 +28,23 @@ describe("stepOutputSummary", () => {
       artifactCount: implement.outputs.artifacts.length,
       checkCount: implement.checks.length,
     });
+  });
+
+  it("does not count the task document as a Backlog artifact", () => {
+    const backlog = runningStage("backlog");
+    const withExtra: AutomationStage = {
+      ...backlog,
+      outputs: {
+        ...backlog.outputs,
+        artifacts: [
+          ...backlog.outputs.artifacts,
+          { id: "art-log", type: "TYPE_FILE", data: { filename: "trace.log" } },
+        ],
+      },
+    };
+
+    expect(stepOutputSummary(backlog).artifactCount).toBe(0);
+    expect(stepOutputSummary(withExtra).artifactCount).toBe(1);
   });
 
   it("labels a count with the singular or plural noun", () => {

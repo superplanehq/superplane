@@ -12,6 +12,7 @@ import { IntegrationButton } from "@/components/AgentSidebar/widgets/Integration
 import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
+import { isGitHubAttachmentAutolink, isGitHubUserAttachmentUrl } from "@/lib/githubAttachments";
 import {
   isReachableWorkOrderFileUrl,
   isWorkOrderMediaSource,
@@ -37,6 +38,7 @@ import { MarkdownSection } from "./markdownSection";
 import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import { highlightMentionChildren } from "./markdownMentionHighlight";
+import { GitHubAttachmentMedia } from "./GitHubAttachmentMedia";
 import { WorkOrderVideo } from "./WorkOrderVideo";
 import {
   MARKDOWN_TABLE_CLASSES,
@@ -423,6 +425,16 @@ function MarkdownBlockquote({ children, node: _node, ...props }: ComponentProps<
   return <blockquote {...props}>{children}</blockquote>;
 }
 
+function markdownAnchorLabel(children: ReactNode): string {
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children);
+  }
+
+  return Children.toArray(children)
+    .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+    .join("");
+}
+
 function MarkdownLink({
   href,
   children,
@@ -433,22 +445,31 @@ function MarkdownLink({
   rel,
   ...props
 }: ComponentProps<"a"> & { canvasId?: string; organizationId?: string; openInNewTab?: boolean }) {
-  const label = typeof children === "string" ? children : undefined;
+  const label = markdownAnchorLabel(children);
 
   const integrationMatch = href?.match(/^integration:(.+)$/);
   if (integrationMatch) {
-    return <IntegrationButton integrationRef={integrationMatch[1]} label={label} />;
+    return <IntegrationButton integrationRef={integrationMatch[1]} label={label || undefined} />;
   }
 
   const nodeMatch = href?.match(/^node:(.+)$/);
   if (nodeMatch && canvasId && organizationId) {
     return (
-      <NodeChipFromLink nodeId={nodeMatch[1]} rawLabel={label} canvasId={canvasId} organizationId={organizationId} />
+      <NodeChipFromLink
+        nodeId={nodeMatch[1]}
+        rawLabel={label || undefined}
+        canvasId={canvasId}
+        organizationId={organizationId}
+      />
     );
   }
 
   if (!isReachableWorkOrderFileUrl(href) && parseWorkOrderFileId(href)) {
     return <span>{children}</span>;
+  }
+
+  if (href && isGitHubAttachmentAutolink(href, label)) {
+    return <GitHubAttachmentMedia src={href} alt={label} />;
   }
 
   return (
@@ -485,6 +506,9 @@ function MarkdownImage({
   const contentType = workOrderFileContentTypeForSrc(src, files) ?? workOrderFileContentTypeForSrc(resolved, files);
   if (isWorkOrderMediaSource({ contentType, src: resolved, alt })) {
     return <WorkOrderVideo src={resolved} alt={alt} className={className} contentType={contentType} />;
+  }
+  if (!contentType && isGitHubUserAttachmentUrl(resolved)) {
+    return <GitHubAttachmentMedia src={resolved} alt={alt} className={className} />;
   }
   if (hideUntilLoaded) {
     return <WorkspaceMarkdownImage src={resolved} alt={alt} className={className} {...props} />;
