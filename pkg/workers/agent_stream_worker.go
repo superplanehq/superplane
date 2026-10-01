@@ -274,6 +274,7 @@ func (w *AgentStreamWorker) rescheduleLockedRequest(ctx context.Context, body []
 	if err != nil {
 		return fmt.Errorf("agent stream: create retry publisher: %w", err)
 	}
+	publisher.SetLogger(logging.NewQuietPublisherLogger())
 	defer publisher.Close()
 
 	queueName := (&tackle.Options{
