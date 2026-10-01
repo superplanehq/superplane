@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -251,6 +252,7 @@ func TestAdminDatadogWebhooks(t *testing.T) {
 		integrationContext := contexts.NewIntegrationContext(database.Conn(), nil, integration, server.encryptor, server.registry, nil)
 		require.NoError(t, integrationContext.SetSecret(datadog.WebhookSecretName, []byte("webhook-token")))
 
+		logs := captureDatadogWebhookLogs(t)
 		response := execRequest(server, requestParams{
 			method: "POST",
 			path:   "/integrations/" + integration.ID.String() + "/events",
@@ -264,6 +266,18 @@ func TestAdminDatadogWebhooks(t *testing.T) {
 		var stored int64
 		require.NoError(t, database.Conn().Model(&models.DatadogWebhookReceipt{}).Where("integration_id = ?", integration.ID).Count(&stored).Error)
 		assert.Equal(t, int64(0), stored)
+
+		lines := datadogWebhookLogLines(t, logs.String())
+		require.Len(t, lines, 1)
+		assert.Equal(t, "error", lines[0]["level"])
+		assert.Equal(t, "Datadog webhook failed", lines[0]["msg"])
+		assert.Equal(t, logging.WebhookLogType, lines[0]["type"])
+		assert.Equal(t, logging.DatadogIntegration, lines[0]["integration"])
+		assert.Equal(t, models.DatadogWebhookOutcomeFailed, lines[0]["outcome"])
+		assert.Equal(t, "unknown", lines[0]["event_type"])
+		assert.Equal(t, registry.Organization.ID.String(), lines[0]["organization_id"])
+		assert.Equal(t, integration.ID.String(), lines[0]["integration_id"])
+		assert.Contains(t, lines[0]["error"], "request body is too large")
 	})
 }
 
@@ -277,6 +291,34 @@ func TestRejectedDatadogReceiptLimitCache(t *testing.T) {
 	assert.True(t, cache.blocked(id, now))
 	assert.False(t, cache.blocked(id, now.Add(2*time.Minute)))
 	assert.False(t, cache.blocked(id, now.Add(2*time.Minute)))
+}
+
+func captureDatadogWebhookLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	logger := logging.DatadogWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+	return buffer
+}
+
+func datadogWebhookLogLines(t *testing.T, raw string) []map[string]any {
+	t.Helper()
+
+	lines := []map[string]any{}
+	for _, line := range bytes.Split([]byte(raw), []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal(line, &payload))
+		lines = append(lines, payload)
+	}
+	return lines
 }
 
 type readFailReader struct {

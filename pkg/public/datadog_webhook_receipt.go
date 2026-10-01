@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -102,6 +103,7 @@ func (s *Server) trackDatadogWebhook(r *http.Request, w http.ResponseWriter, int
 
 	body, err := readAndRestoreBody(r, MaxEventSize)
 	if errors.Is(err, errRequestBodyTooLarge) {
+		logOversizedDatadogWebhook(integration, err)
 		http.Error(
 			w,
 			fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
@@ -234,6 +236,32 @@ func datadogEventRequest(r *http.Request, integration *models.Integration) bool 
 		return false
 	}
 	return r.Method == http.MethodPost && r.URL != nil && strings.HasSuffix(r.URL.Path, "/events")
+}
+
+func logOversizedDatadogWebhook(integration *models.Integration, err error) {
+	organizationID := ""
+	integrationID := ""
+	if integration != nil {
+		if integration.OrganizationID != uuid.Nil {
+			organizationID = integration.OrganizationID.String()
+		}
+		if integration.ID != uuid.Nil {
+			integrationID = integration.ID.String()
+		}
+	}
+
+	logging.LogDatadogWebhookError("Datadog webhook failed", log.Fields{
+		"outcome":           models.DatadogWebhookOutcomeFailed,
+		"event_type":        "unknown",
+		"alert_transition":  "",
+		"organization_id":   organizationID,
+		"organization_name": "",
+		"integration_id":    integrationID,
+		"workspace_id":      "",
+		"workspace_name":    "",
+		"intake_id":         "",
+		"intake_name":       "",
+	}, err)
 }
 
 func datadogOutcomeFromStatus(status int) string {

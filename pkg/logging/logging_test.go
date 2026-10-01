@@ -106,6 +106,60 @@ func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
 	assert.True(t, processIsText)
 }
 
+func TestLogDatadogWebhookInfo_JSONKeepsTypeAndIntegration(t *testing.T) {
+	previousOutput := log.StandardLogger().Out
+	previousFormatter := log.StandardLogger().Formatter
+	standardOutput := &bytes.Buffer{}
+	log.StandardLogger().SetOutput(standardOutput)
+	t.Cleanup(func() {
+		log.StandardLogger().SetOutput(previousOutput)
+		log.StandardLogger().SetFormatter(previousFormatter)
+	})
+
+	logger := DatadogWebhookLogger()
+	previousLoggerOutput := logger.Out
+	logger.SetOutput(standardLogWriter{})
+	t.Cleanup(func() {
+		logger.SetOutput(previousLoggerOutput)
+	})
+
+	LogDatadogWebhookInfo("Datadog webhook received", log.Fields{
+		"type":        "event",
+		"integration": "sentry",
+		"outcome":     "received",
+	}, nil)
+
+	payloads := decodeJSONLines(t, standardOutput.String())
+	require.Len(t, payloads, 1)
+	assert.Equal(t, "info", payloads[0]["level"])
+	assert.Equal(t, "Datadog webhook received", payloads[0]["msg"])
+	assert.Equal(t, WebhookLogType, payloads[0]["type"])
+	assert.Equal(t, DatadogIntegration, payloads[0]["integration"])
+	assert.Equal(t, "received", payloads[0]["outcome"])
+
+	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
+	assert.True(t, processIsText)
+	_, webhookIsJSON := logger.Formatter.(*log.JSONFormatter)
+	assert.True(t, webhookIsJSON)
+}
+
+func TestDatadogWebhookIdentity_ResolvesOnlyWhenAsked(t *testing.T) {
+	calls := 0
+	logger := WithDatadogWebhookIdentity(log.NewEntry(log.New()), func() log.Fields {
+		calls++
+		return log.Fields{"workspace_id": "ws-1"}
+	})
+
+	assert.Zero(t, calls)
+	assert.Equal(t, "ws-1", DatadogWebhookIdentity(logger)["workspace_id"])
+	assert.Equal(t, 1, calls)
+	assert.Nil(t, DatadogWebhookIdentity(nil))
+	assert.Nil(t, DatadogWebhookIdentity(log.NewEntry(log.New())))
+	assert.Nil(t, WithDatadogWebhookIdentity(nil, func() log.Fields {
+		return log.Fields{}
+	}))
+}
+
 func TestWithWebhookNode_AddsOrganizationCanvasAndWebhook(t *testing.T) {
 	entry := WithWebhookNode(log.NewEntry(log.New()), WebhookNodeFields{
 		OrganizationID: "org-1",
