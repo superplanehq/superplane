@@ -167,4 +167,79 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 		assert.Equal(t, core.IntegrationCapabilityStateEnabled, stored.Capabilities[0].State)
 		assert.Equal(t, "feat", stored.Capabilities[0].Name)
 	})
+
+	t.Run("new capability can be requested by existing integration", func(t *testing.T) {
+		resp, err := CreateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			"http://localhost",
+			"http://localhost",
+			r.Organization.ID.String(),
+			"dummy",
+			support.RandomName("installation"),
+			nil,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, resp.Integration)
+
+		stored, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
+		require.NoError(t, err)
+		stored.Capabilities = datatypes.NewJSONSlice([]models.CapabilityState{
+			{Name: "feat", State: core.IntegrationCapabilityStateEnabled},
+		})
+		require.NoError(t, database.Conn().Save(stored).Error)
+
+		capabilityUpdateCalled := false
+		r.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
+			CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{
+				{Name: "feat"},
+				{Name: "new-feat"},
+			}}},
+			OnCapabilityUpdate: func(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
+				capabilityUpdateCalled = true
+				assert.Equal(t, []string{"new-feat"}, ctx.Changes[core.IntegrationCapabilityStateRequested])
+				ctx.Capabilities.Enable("new-feat")
+				return nil, nil
+			},
+		})
+
+		describeResponse, err := DescribeIntegration(
+			ctx,
+			r.Registry,
+			r.Organization.ID.String(),
+			resp.Integration.Metadata.Id,
+		)
+		require.NoError(t, err)
+
+		states := map[string]pb.Integration_CapabilityState_State{}
+		for _, capability := range describeResponse.Integration.Status.Capabilities {
+			states[capability.Name] = capability.State
+		}
+		assert.Equal(t, pb.Integration_CapabilityState_STATE_ENABLED, states["feat"])
+		assert.Equal(t, pb.Integration_CapabilityState_STATE_AVAILABLE, states["new-feat"])
+
+		updateResponse, err := UpdateIntegrationCapabilities(
+			ctx,
+			r.Registry,
+			r.Organization.ID.String(),
+			resp.Integration.Metadata.Id,
+			[]*pb.Integration_CapabilityState{
+				{Name: "new-feat", State: pb.Integration_CapabilityState_STATE_REQUESTED},
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, capabilityUpdateCalled)
+
+		states = map[string]pb.Integration_CapabilityState_State{}
+		for _, capability := range updateResponse.Integration.Status.Capabilities {
+			states[capability.Name] = capability.State
+		}
+		assert.Equal(t, pb.Integration_CapabilityState_STATE_ENABLED, states["feat"])
+		assert.Equal(t, pb.Integration_CapabilityState_STATE_ENABLED, states["new-feat"])
+
+		stored, err = models.FindIntegration(r.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
+		require.NoError(t, err)
+		require.Len(t, stored.Capabilities, 2)
+	})
 }
