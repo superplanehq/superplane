@@ -119,7 +119,8 @@ func DispatchWorkOrderOnLine(
 			return err
 		}
 
-		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order).
+			WithField("organization_id", factory.OrganizationID)
 		if !order.IsDispatchable() {
 			return models.ErrFactoryWorkOrderNotDispatchable
 		}
@@ -211,9 +212,12 @@ func publishDispatchedWorkOrder(
 	startedSteps []*models.FactoryLineStepResult,
 ) {
 	for _, pendingRun := range pendingRuns {
+		runLogger := logger.WithField("run_id", pendingRun.ID)
 		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
-			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
+			runLogger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
+			continue
 		}
+		runLogger.Info("Published pending canvas run")
 	}
 
 	publishedOrders := map[uuid.UUID]struct{}{order.ID: {}}
