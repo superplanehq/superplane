@@ -316,11 +316,18 @@ describe("AutomationsConsoleVariant summary strip", () => {
 });
 
 describe("AutomationsConsoleVariant task description", () => {
-  it("hides an empty description when edit is not allowed", () => {
+  it("keeps the source and hides the empty sentence when edit is not allowed", () => {
     renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "   ", canEditDescription: false });
 
-    expect(screen.queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
     expect(screen.queryByText("No description yet.")).not.toBeInTheDocument();
+  });
+
+  it("hides the task frame when there is no source and edit is not allowed", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "   ", canEditDescription: false, source: undefined });
+
+    expect(screen.queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
   });
 
   it("keeps the empty state and edit control when edit is allowed", () => {
@@ -329,10 +336,19 @@ describe("AutomationsConsoleVariant task description", () => {
     const description = screen.getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("No description yet.");
     expect(within(description).getByTestId("split-run-description-edit")).toBeInTheDocument();
+    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
     expect(
       description.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows the source above a written description", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
+
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(description).toHaveTextContent("Users see duplicate refund entries.");
   });
 });
 

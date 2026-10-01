@@ -1,4 +1,4 @@
-import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
+import { Frame, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
 import {
   Timeline,
   TimelineContent,
@@ -19,6 +19,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile
 import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
 import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
+import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { StepOutputCounts } from "./consoleOutputChips";
@@ -109,6 +110,7 @@ export function AutomationsConsoleVariant({
           canEdit={canEditDescription}
           busy={descriptionBusy}
           onSave={onDescriptionSave}
+          source={source}
           files={files}
           organizationId={organizationId}
           factoryId={factoryId}
@@ -278,11 +280,15 @@ function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; col
   );
 }
 
+/** Preview height so the timeline stays on screen. Show more reveals the rest. */
+const TASK_DESCRIPTION_PREVIEW_PX = 160;
+
 function TimelineTaskDescription({
   description,
   canEdit,
   busy,
   onSave,
+  source,
   files,
   organizationId,
   factoryId,
@@ -292,28 +298,48 @@ function TimelineTaskDescription({
   canEdit: boolean;
   busy: boolean;
   onSave?: (next: string) => void | Promise<void>;
+  source?: SplitRunSource;
   files?: FilesFile[];
   organizationId?: string;
   factoryId?: string;
   orderId?: string;
 }) {
-  if (!description?.trim() && !canEdit) {
+  const hasBody = Boolean(description?.trim()) || canEdit;
+  if (!hasBody && !source) {
     return null;
   }
   return (
-    <div data-testid="redesign-console-task-description">
-      <WorkOrderSplitRunDescription
-        description={description ?? ""}
-        canEdit={canEdit}
-        busy={busy}
-        collapsible={false}
-        onSave={onSave}
-        files={files}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        orderId={orderId}
-      />
-    </div>
+    <Frame
+      variant="default"
+      spacing="sm"
+      stacked
+      className="[--frame-radius:var(--radius-lg)]"
+      data-testid="redesign-console-task-description"
+    >
+      <FrameHeader className="flex flex-row items-center justify-between gap-2">
+        {source ? (
+          <WorkOrderSplitRunSource compact source={source} />
+        ) : (
+          <FrameTitle className="text-[13px] font-medium">Task</FrameTitle>
+        )}
+      </FrameHeader>
+      {hasBody ? (
+        <FramePanel>
+          <WorkOrderSplitRunDescription
+            description={description ?? ""}
+            canEdit={canEdit}
+            busy={busy}
+            previewHeight={TASK_DESCRIPTION_PREVIEW_PX}
+            fadeClassName="from-card via-card/90"
+            onSave={onSave}
+            files={files}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
+          />
+        </FramePanel>
+      ) : null}
+    </Frame>
   );
 }
 

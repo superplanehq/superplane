@@ -908,6 +908,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const description = screen.getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("Users see duplicate refund entries");
+    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
     const backlog = screen.getByTestId("redesign-console-column-backlog");
     expect(description.compareDocumentPosition(backlog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
 

@@ -19,6 +19,8 @@ export function WorkOrderSplitRunDescription({
   canEdit = false,
   busy = false,
   collapsible = true,
+  previewHeight,
+  fadeClassName,
   onSave,
   files,
   organizationId,
@@ -29,6 +31,8 @@ export function WorkOrderSplitRunDescription({
   canEdit?: boolean;
   busy?: boolean;
   collapsible?: boolean;
+  previewHeight?: number;
+  fadeClassName?: string;
   onSave?: (next: string) => void | Promise<void>;
   files?: FilesFile[];
   organizationId?: string;
@@ -68,7 +72,13 @@ export function WorkOrderSplitRunDescription({
   };
 
   const body = saved.trim() ? (
-    <WorkOrderDescription description={saved} files={files} collapsible={collapsible} />
+    <WorkOrderDescription
+      description={saved}
+      files={files}
+      collapsible={collapsible}
+      previewHeight={previewHeight}
+      fadeClassName={fadeClassName}
+    />
   ) : (
     <p className="text-[13px] text-muted-foreground">No description yet.</p>
   );
