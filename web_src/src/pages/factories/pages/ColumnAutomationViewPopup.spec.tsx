@@ -18,7 +18,7 @@ const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
 }));
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),

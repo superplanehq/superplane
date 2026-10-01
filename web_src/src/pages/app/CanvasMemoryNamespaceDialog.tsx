@@ -1,4 +1,4 @@
-import { Editor } from "@monaco-editor/react";
+import { Editor } from "@/ui/MonacoEditor";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";

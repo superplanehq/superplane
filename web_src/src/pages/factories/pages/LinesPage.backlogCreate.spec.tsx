@@ -6,7 +6,7 @@ import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, Fact
 import type * as canvasData from "@/hooks/useCanvasData";
 import { unmockedSrc } from "@/test/unmockedModule";
 
-vi.mock("@monaco-editor/react", () => {
+vi.mock("@/ui/MonacoEditor", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
     return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
   }
