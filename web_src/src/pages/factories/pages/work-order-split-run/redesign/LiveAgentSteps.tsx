@@ -181,6 +181,7 @@ function agentLogPending(input: {
   const loadingLogs = input.runners.some((line) => input.liveByLine[line.id]?.isLoading);
   const pendingFetch = input.canvasLoading || awaiting || loadingLogs;
   const pendingLogs = pendingFetch || isWaitingForLogNotes(input.liveNotes);
+  const hasSteps = input.liveStepCount > 0 || input.settledStepCount > 0;
   if (input.hasLiveContent) {
     return { streamWaiting: false, showLogSkeleton: false };
   }
@@ -189,8 +190,8 @@ function agentLogPending(input: {
     return { streamWaiting: wait, showLogSkeleton: wait };
   }
   // A finished run can leave its log SSE open with no bytes. Do not wait
-  // on isStreaming. Skeleton only while the canvas or session still loads.
-  return { streamWaiting: false, showLogSkeleton: pendingFetch && input.settledStepCount === 0 };
+  // on isStreaming. Show steps as soon as any runner has them.
+  return { streamWaiting: false, showLogSkeleton: pendingFetch && !hasSteps };
 }
 
 function AgentRunBody({
