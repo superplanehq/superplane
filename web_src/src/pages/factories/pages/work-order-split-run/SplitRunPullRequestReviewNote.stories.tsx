@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { http, HttpResponse } from "msw";
 
 import { ComponentStoryShell } from "../../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
@@ -60,6 +61,54 @@ export const ReadOnly: Story = {
     <PopupShell>
       {footer.note ? <SplitRunAttentionNote note={footer.note} tone="waiting" actions={[]} /> : null}
     </PopupShell>
+  ),
+};
+
+export const MergeUnavailable: Story = {
+  name: "Merge status is unavailable",
+  parameters: {
+    msw: {
+      handlers: [
+        http.get("*/account/experimental-features", () =>
+          HttpResponse.json({ features: [{ id: "factory_pull_request_merge", released: true }] }),
+        ),
+        http.get("*/api/v1/organizations/org-1", () =>
+          HttpResponse.json({ organization: { metadata: { id: "org-1" } } }),
+        ),
+        http.get("*/api/v1/factories/factory-1/prs/pr-6812/mergeability", () =>
+          HttpResponse.json({
+            mergeability: {
+              canMerge: false,
+              blockedReason: "BLOCKED_REASON_UNAVAILABLE",
+              message: "Merge status is unavailable right now.",
+            },
+          }),
+        ),
+      ],
+    },
+  },
+  render: () => (
+    <div className="max-w-[750px] overflow-hidden rounded-lg border border-border bg-background">
+      <SplitRunAttentionNote
+        note={{
+          headline: "Waiting for user review",
+          text: "The pull request is open.",
+          cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+        }}
+        organizationId="org-1"
+        factoryId="factory-1"
+        orderId="wo-1"
+        pullRequests={[
+          {
+            id: "pr-6812",
+            provider: "PROVIDER_GITHUB",
+            state: "STATE_OPEN",
+            url: "https://github.com/acme/payments/pull/6812",
+            number: "6812",
+          },
+        ]}
+      />
+    </div>
   ),
 };
 
