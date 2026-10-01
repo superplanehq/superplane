@@ -118,10 +118,11 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 		var before int64
 		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
 
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader([]byte(`{"action":"created"}`)))
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader([]byte(`{"action":"created","secret":"caller-chosen"}`)))
 		request.Header.Set("Sentry-Hook-Signature", "not-a-signature")
 		request.Header.Set("Sentry-Hook-Resource", "issue")
 		rec := httptest.NewRecorder()
+		logs := captureSentryWebhookLogs(t)
 
 		server.HandleSentryAppWebhook(rec, request)
 
@@ -129,6 +130,11 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 		var after int64
 		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
 		assert.Equal(t, before, after)
+
+		rejected := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook was rejected")
+		_, hasPayload := rejected["payload"]
+		assert.False(t, hasPayload)
+		assert.Equal(t, "issue", rejected["hook_resource"])
 	})
 }
 

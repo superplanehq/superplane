@@ -96,10 +96,10 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := sentryintegration.VerifyWebhookSignature(r.Header.Get("Sentry-Hook-Signature"), body, []byte(app.ClientSecret)); err != nil {
-		logging.LogSentryWebhookWarn("Sentry app webhook was rejected", logging.WithWebhookPayload(log.Fields{
+		logging.LogSentryWebhookWarn("Sentry app webhook was rejected", log.Fields{
 			"hook_resource": strings.TrimSpace(r.Header.Get("Sentry-Hook-Resource")),
 			"status":        http.StatusBadRequest,
-		}, body))
+		})
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
@@ -140,6 +140,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		integrationIDs(integrations),
 		body,
 	))
+	r = r.WithContext(sentryintegration.WithHostedSentryWebhookLogged(r.Context()))
 
 	if len(integrations) == 0 {
 		s.claimPendingHostedSentryInstall(r, app, body)
