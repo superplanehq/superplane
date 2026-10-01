@@ -21,7 +21,7 @@ import type { SplitRunSource } from "../splitRunSource";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { StepOutputCounts } from "./consoleOutputChips";
-import { runMetaLine } from "./consoleCardText";
+import { runMetaLine, tickingRunMetaLine } from "./consoleCardText";
 import {
   allStages,
   automationsFromStages,
@@ -331,6 +331,9 @@ function ConsoleAutomationCard({
       setOpen(false);
     }
   }, [anyLive, expandIdle, live]);
+  const ticking = shownStatus === "running";
+  const { now, sampledAt } = useRunningCardClock(ticking, latest.duration);
+  const metaLine = ticking ? tickingRunMetaLine(latest, sampledAt, now) : runMetaLine(latest);
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
       ? () => {
@@ -363,7 +366,7 @@ function ConsoleAutomationCard({
           <StageStatusGlyph status={shownStatus} />
           <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
           <StepOutputCounts stage={latest} phase={shownPhase} runs={automation.runs} />
-          <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
+          <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{metaLine}</span>
           <ChevronRight
             className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
             aria-hidden
@@ -393,6 +396,22 @@ function ConsoleAutomationCard({
       </Collapsible>
     </Frame>
   );
+}
+
+function useRunningCardClock(active: boolean, duration: string) {
+  const [now, setNow] = useState(() => Date.now());
+  const sampleRef = useRef({ duration, at: Date.now() });
+  if (sampleRef.current.duration !== duration) {
+    sampleRef.current = { duration, at: Date.now() };
+  }
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return { now, sampledAt: sampleRef.current.at };
 }
 
 function useStopRequested(status: SplitRunPhaseStatus, actionBusy: boolean) {

@@ -1,3 +1,4 @@
+import { durationLabelMs, formatMinutesSecondsDuration } from "@/lib/duration";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
@@ -62,6 +63,39 @@ export function runMetaLine(stage: AutomationStage): string {
     return `${stage.duration} so far`;
   }
   return stage.duration ?? "";
+}
+
+const NON_DURATION_LABELS = new Set(["—", "-", "Running", "Waiting", "Pending"]);
+
+function parseCardDurationMs(label: string): number | null {
+  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  if (!trimmed || NON_DURATION_LABELS.has(trimmed)) {
+    return null;
+  }
+  if (/^<\s*1s$/i.test(trimmed)) {
+    return 0;
+  }
+  if (!/^(\d+\s*[hms]\b\s*)+$/i.test(trimmed)) {
+    return null;
+  }
+  return durationLabelMs(trimmed);
+}
+
+export function tickingRunMetaLine(stage: AutomationStage, sampledAtMs: number, nowMs: number): string {
+  if (stage.status !== "running") {
+    return runMetaLine(stage);
+  }
+  const baseMs = parseCardDurationMs(stage.duration);
+  if (baseMs === null) {
+    return runMetaLine(stage);
+  }
+  const elapsedMs = Math.max(0, nowMs - sampledAtMs);
+  const totalMs = baseMs + Math.floor(elapsedMs / 1000) * 1000;
+  const label = formatMinutesSecondsDuration(totalMs) || (totalMs < 1000 ? "<1s" : "");
+  if (!label) {
+    return runMetaLine(stage);
+  }
+  return `${label} so far`;
 }
 
 /**
