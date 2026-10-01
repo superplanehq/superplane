@@ -18,11 +18,11 @@ const (
 	nodeRequestCleanupDeleteBatchSize     = 500
 	nodeRequestCleanupMaxDeletesPerTick   = 5000
 	nodeRequestCleanupPauseBetweenBatches = 50 * time.Millisecond
-	sentryWebhookReceiptCleanupBatch      = 500
+	webhookReceiptCleanupBatch            = 500
 )
 
 // NodeRequestCleanupWorker deletes old rows that otherwise grow without bound.
-// It removes completed workflow node requests and expired Sentry webhook receipts.
+// It removes completed workflow node requests and expired webhook receipts.
 type NodeRequestCleanupWorker struct {
 	logger              *log.Entry
 	retentionDays       int
@@ -61,6 +61,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	}
 
 	w.deleteExpiredSentryWebhookReceipts()
+	w.deleteExpiredDatadogWebhookReceipts()
 
 	startedAt := time.Now()
 	olderThan := startedAt.AddDate(0, 0, -w.retentionDays)
@@ -90,7 +91,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 
 func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {
 	cutoff := time.Now().UTC().Add(-models.SentryWebhookReceiptRetention)
-	deleted, err := models.DeleteExpiredSentryWebhookReceipts(database.Conn(), cutoff, sentryWebhookReceiptCleanupBatch)
+	deleted, err := models.DeleteExpiredSentryWebhookReceipts(database.Conn(), cutoff, webhookReceiptCleanupBatch)
 	if err != nil {
 		w.logger.Errorf("Error cleaning Sentry webhook receipts: %v", err)
 		return
@@ -103,6 +104,23 @@ func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {
 		"deleted":    deleted,
 		"older_than": cutoff.Format(time.RFC3339),
 	}).Info("Deleted expired Sentry webhook receipts")
+}
+
+func (w *NodeRequestCleanupWorker) deleteExpiredDatadogWebhookReceipts() {
+	cutoff := time.Now().UTC().Add(-models.DatadogWebhookReceiptRetention)
+	deleted, err := models.DeleteExpiredDatadogWebhookReceipts(database.Conn(), cutoff, webhookReceiptCleanupBatch)
+	if err != nil {
+		w.logger.Errorf("Error cleaning Datadog webhook receipts: %v", err)
+		return
+	}
+	if deleted == 0 {
+		return
+	}
+
+	w.logger.WithFields(log.Fields{
+		"deleted":    deleted,
+		"older_than": cutoff.Format(time.RFC3339),
+	}).Info("Deleted expired Datadog webhook receipts")
 }
 
 func (w *NodeRequestCleanupWorker) cleanCompletedRequests(olderThan time.Time, limit int) (int64, error) {

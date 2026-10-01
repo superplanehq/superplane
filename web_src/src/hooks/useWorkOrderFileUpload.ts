@@ -11,6 +11,7 @@ import {
   resolveWorkOrderFileMimeType,
   setWorkOrderFilePreviewUrl,
   workOrderFileRef,
+  workOrderFileTooLargeMessage,
 } from "@/lib/workOrderFiles";
 import { useCallback, useState } from "react";
 
@@ -79,7 +80,7 @@ async function uploadOneWorkOrderFile(
     return null;
   }
   if (file.size > MAX_WORK_ORDER_FILE_BYTES) {
-    showErrorToast("Each file must be 50 MB or smaller.");
+    showErrorToast(workOrderFileTooLargeMessage());
     return null;
   }
 

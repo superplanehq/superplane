@@ -22,7 +22,7 @@ const (
 	FilePurposeAttachment = "attachment"
 	FilePurposeArtifact   = "artifact"
 
-	MaxFileBytes             = 50 << 20
+	MaxFileBytes             = 70 << 20
 	MaxArtifactFileBytes     = 100 << 20
 	MaxFilesPerWorkOrder     = 20
 	MaxOrganizationFileBytes = 10 << 30

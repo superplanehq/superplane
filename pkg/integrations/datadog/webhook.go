@@ -119,6 +119,14 @@ func deleteWebhook(client *Client) error {
 	return client.DeleteWebhook(IntegrationWebhookName)
 }
 
+// WebhookRequestAuthenticated reports whether the request carries this integration's webhook token.
+func WebhookRequestAuthenticated(integration core.IntegrationContext, request *http.Request) bool {
+	if integration == nil || request == nil {
+		return false
+	}
+	return verifyWebhookRequest(integration, request) == nil
+}
+
 func verifyWebhookRequest(integration core.IntegrationContext, request *http.Request) error {
 	expected, err := webhookToken(integration)
 	if err != nil {

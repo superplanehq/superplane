@@ -101,6 +101,7 @@ import {
   LINE_BOARD_VERIFY_ENUM_ORDER,
 } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { OPEN_WORK_ORDER_CHECKS, VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { idleLiveLogStream } from "./PhaseLogCard.testHelpers";
@@ -837,6 +838,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const expand = screen.getByRole("button", { name: "Open full screen" });
     const close = screen.getByRole("button", { name: "Close" });
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
     expect(expand.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(expand).toHaveClass("h-6", "w-6", "rounded-full");
     expect(close).toHaveClass("h-6", "w-6", "rounded-full");
@@ -850,6 +852,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const fullPage = screen.getByTestId("work-order-split-run");
     expect(fullPage.className).toContain("h-full");
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
     expect(fullPage.className).toContain("w-full");
     expect(fullPage.className).not.toContain("w-[min(72rem");
     expect(fullPage.parentElement).toHaveClass("fixed");
@@ -1318,6 +1321,147 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose how to stop" })).not.toBeInTheDocument();
+  });
+
+  it("explains a hosted credit failure and links to billing", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder({
+        id: "wo-credit",
+        title: "Out of credit",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                failureReason: "no_hosted_credit",
+                run: { id: "run-1", appId: "app-1" },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
+    expect(
+      within(note).getByText("This agent run is blocked. The organization has no SuperPlane hosted credit."),
+    ).toBeInTheDocument();
+    expect(within(note).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+  });
+
+  it("explains a hosted credit failure when backlog analysis does not start", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          id: "wo-draft-credit",
+          title: "test",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+        {
+          analysisRuns: [
+            {
+              canvasId: "canvas-1",
+              workOrderId: "wo-draft-credit",
+              run: {
+                id: "run-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                createdAt: "2026-09-30T14:37:29Z",
+                executions: [
+                  {
+                    id: "exec-1",
+                    result: "RESULT_FAILED",
+                    resultMessage: "This organization has no hosted credit.",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ),
+    });
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "blocked");
+    expect(within(verdict).getByText("No credit")).toBeInTheDocument();
+    expect(verdict).not.toHaveTextContent("This task is ready to start");
+    expect(
+      within(verdict).getByText("This agent run is blocked. The organization has no SuperPlane hosted credit.", {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    expect(within(verdict).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
+  });
+
+  it("keeps the billing link when a scored draft fails analysis for credit", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          id: "wo-draft-credit-scored",
+          title: "test",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+        {
+          demoArtifacts: false,
+          checks: [
+            { id: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+            { id: "confidence", name: "Confidence score", score: 5, maxScore: 5 },
+          ],
+          analysisRuns: [
+            {
+              canvasId: "canvas-1",
+              workOrderId: "wo-draft-credit-scored",
+              run: {
+                id: "run-1",
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                createdAt: "2026-09-30T14:37:29Z",
+                executions: [
+                  {
+                    id: "exec-1",
+                    result: "RESULT_FAILED",
+                    resultMessage: "This organization has no hosted credit.",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ),
+    });
+
+    const verdict = screen.getByTestId("split-run-intent-verdict");
+    expect(verdict).toHaveAttribute("data-tone", "blocked");
+    expect(verdict).not.toHaveTextContent("This task is ready to start");
+    expect(within(verdict).getByRole("link", { name: "Add credits" })).toHaveAttribute(
+      "href",
+      factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
+    );
   });
 
   it("offers Reject and Rerun after a person stops the run", () => {
@@ -1919,7 +2063,7 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.getByRole("heading", { name: "Implement job" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "RF-101 Implement job" })).toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stream-implement-0")).not.toBeInTheDocument();
@@ -1962,13 +2106,40 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
 
+    const heading = screen.getByRole("heading", { name: "RF-105 Draft: rework refund telemetry" });
+    expect(within(heading).getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("popup-work-order-title"));
     const titleInput = await screen.findByTestId("popup-work-order-title-input");
+    expect(titleInput).toHaveValue("Draft: rework refund telemetry");
+    expect(within(heading).getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
     await user.clear(titleInput);
     await user.type(titleInput, "Renamed draft");
     await user.keyboard("{Enter}");
     expect(screen.getByTestId("popup-work-order-title")).toHaveTextContent("Renamed draft");
+    expect(screen.getByTestId("popup-work-order-title")).not.toHaveTextContent("RF-105");
+    expect(screen.getByRole("heading", { name: "RF-105 Renamed draft" })).toBeInTheDocument();
+    expect(screen.getByTestId("popup-work-order-key")).toHaveTextContent("RF-105");
+  });
+
+  it("shows the title alone when the task has no key and no number", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({ ...DRAFT_WORK_ORDER, key: "", number: "" }),
+    });
+
+    expect(screen.getByRole("heading", { name: "Draft: rework refund telemetry" })).toBeInTheDocument();
+    expect(screen.queryByTestId("popup-work-order-key")).not.toBeInTheDocument();
+  });
+
+  it("builds the heading key from the workspace key and task number", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({ ...OPEN_WORK_ORDER, key: "" }),
+      factoryKey: "RF",
+      orderNumber: "101",
+    });
+
+    expect(screen.getByTestId("popup-work-order-key")).toHaveTextContent("RF-101");
+    expect(screen.getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" })).toBeInTheDocument();
   });
 
   it("does not let you edit a completed task", () => {

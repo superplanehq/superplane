@@ -247,13 +247,19 @@ func TestFileContentUploadAcceptsExactMaxContentLength(t *testing.T) {
 	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("exact")))
-	req.ContentLength = models.MaxFileBytes
+	body := bytes.Repeat([]byte{'a'}, int(models.MaxFileBytes))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader(body))
+	require.Equal(t, int64(models.MaxFileBytes), req.ContentLength)
 	req.Header.Set("x-organization-id", r.Organization.ID.String())
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNoContent, rec.Code)
+
+	ready, err := models.FindFile(database.Conn(), file.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FileStateReady, ready.State)
+	assert.Equal(t, int64(models.MaxFileBytes), ready.SizeBytes)
 }
 
 func TestParseBytesRange(t *testing.T) {

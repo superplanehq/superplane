@@ -1,11 +1,9 @@
 package public
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,15 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"github.com/superplanehq/superplane/test/support/impl"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -175,114 +168,6 @@ func TestGitHubInstallationID(t *testing.T) {
 
 	_, ok = githubInstallationID([]byte(`{"repository":{"id":7}}`))
 	assert.False(t, ok)
-}
-
-func TestVCSProviderRepositoryEvent(t *testing.T) {
-	assert.False(t, githubAppRepositoryEvent(&gh.InstallationEvent{}))
-	assert.False(t, githubAppRepositoryEvent(&gh.InstallationRepositoriesEvent{}))
-	assert.False(t, githubAppRepositoryEvent(&gh.MemberEvent{}))
-	assert.True(t, githubAppRepositoryEvent(&gh.PushEvent{}))
-	assert.True(t, githubAppRepositoryEvent(&gh.PullRequestEvent{}))
-}
-
-func TestDispatchGitHubAppWebhookToEveryMatchingIntegrationWebhook(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	const triggerName = "github-app-fanout"
-	deliveries := 0
-	r.Registry.Triggers[triggerName] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
-		Name: triggerName,
-		HandleWebhookFunc: func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-			deliveries++
-			assert.JSONEq(t, `{"repository":{"id":201,"name":"api","full_name":"acme/api"}}`, string(ctx.Body))
-			signature := strings.TrimPrefix(ctx.Headers.Get("X-Hub-Signature-256"), "sha256=")
-			require.NoError(t, crypto.VerifySignature([]byte("local-webhook-secret"), ctx.Body, signature))
-			return http.StatusOK, nil, nil
-		},
-	})
-
-	server, err := NewServer(
-		r.Encryptor,
-		r.Registry,
-		jwt.NewSigner("test"),
-		support.NewOIDCProvider(),
-		"",
-		"http://localhost",
-		"http://localhost",
-		"test",
-		"/app/templates",
-		r.AuthService,
-		false,
-	)
-	require.NoError(t, err)
-
-	integration, err := models.CreateIntegration(
-		uuid.New(),
-		r.Organization.ID,
-		"github",
-		"hosted",
-		map[string]any{},
-	)
-	require.NoError(t, err)
-	integration.State = models.IntegrationStateReady
-	integration.Metadata = datatypes.NewJSONType(map[string]any{"hostedApp": true})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	for i := range 3 {
-		webhookID := uuid.New()
-		repository := "acme/api"
-		if i == 2 {
-			repository = "acme/other"
-		}
-		encryptedSecret, encryptErr := r.Encryptor.Encrypt(
-			t.Context(),
-			[]byte("local-webhook-secret"),
-			[]byte(webhookID.String()),
-		)
-		require.NoError(t, encryptErr)
-		webhook := models.Webhook{
-			ID:     webhookID,
-			State:  models.WebhookStateReady,
-			Secret: encryptedSecret,
-			Configuration: datatypes.NewJSONType[any](map[string]any{
-				"eventType":  "push",
-				"repository": repository,
-			}),
-			AppInstallationID: &integration.ID,
-		}
-		require.NoError(t, database.Conn().Create(&webhook).Error)
-
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
-			NodeID: "trigger-" + string(rune('a'+i)),
-			Type:   models.NodeTypeTrigger,
-			Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
-		}}, nil)
-		require.NoError(t, database.Conn().Model(&models.CanvasNode{}).
-			Where("workflow_id = ?", canvas.ID).
-			Updates(map[string]any{
-				"webhook_id":          webhook.ID,
-				"app_installation_id": integration.ID,
-			}).Error)
-	}
-
-	payload := []byte(`{"repository":{"id":201,"name":"api","full_name":"acme/api"}}`)
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/github/app/webhook", bytes.NewReader(payload))
-	request.Header.Set("X-GitHub-Event", "push")
-	require.NoError(t, server.dispatchGitHubAppWebhook(request, payload, integration))
-	assert.Equal(t, 2, deliveries)
-}
-
-func TestGitHubAppWebhookMatchesEventAndRepository(t *testing.T) {
-	webhook := &models.Webhook{Configuration: datatypes.NewJSONType[any](map[string]any{
-		"eventTypes": []string{"push", "create"},
-		"repository": "acme/api",
-	})}
-	payload := []byte(`{"repository":{"id":201,"name":"api","full_name":"acme/api"}}`)
-
-	assert.True(t, githubAppWebhookMatches(webhook, "push", payload))
-	assert.False(t, githubAppWebhookMatches(webhook, "issues", payload))
-	assert.False(t, githubAppWebhookMatches(webhook, "push", []byte(`{"repository":{"full_name":"acme/other"}}`)))
 }
 
 func TestApplyGitHubCatalogWebhook(t *testing.T) {

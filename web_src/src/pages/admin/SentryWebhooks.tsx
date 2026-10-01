@@ -8,7 +8,6 @@ import {
   SENTRY_WEBHOOKS_EMPTY,
   SENTRY_WEBHOOKS_HELP,
   SENTRY_WEBHOOKS_PAGE_EMPTY,
-  SENTRY_WEBHOOKS_TITLE,
   sentryWebhookIssueLabel,
   sentryWebhookOutcomeLabel,
   type SentryWebhookReceipt,
@@ -29,11 +28,8 @@ export function SentryWebhooks() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{SENTRY_WEBHOOKS_TITLE}</h1>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">{SENTRY_WEBHOOKS_HELP}</Text>
-      </div>
+    <div className="space-y-4">
+      <Text className="text-sm text-gray-500 dark:text-gray-400">{SENTRY_WEBHOOKS_HELP}</Text>
       <SentryWebhooksBody pageState={pageState} />
     </div>
   );

@@ -44,18 +44,7 @@ func (SentryWebhookReceipt) TableName() string {
 }
 
 func (r SentryWebhookReceipt) TaskIDList() []string {
-	if strings.TrimSpace(r.TaskIDs) == "" {
-		return nil
-	}
-	parts := strings.Split(r.TaskIDs, ",")
-	ids := make([]string, 0, len(parts))
-	for _, part := range parts {
-		id := strings.TrimSpace(part)
-		if id != "" {
-			ids = append(ids, id)
-		}
-	}
-	return ids
+	return splitCommaIDs(r.TaskIDs)
 }
 
 func CreateSentryWebhookReceipt(tx *gorm.DB, receipt SentryWebhookReceipt) (uuid.UUID, error) {

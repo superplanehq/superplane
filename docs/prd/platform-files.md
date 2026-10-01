@@ -91,7 +91,7 @@ States: `pending` → `ready` or `failed`.
 
 Limits:
 
-- Max file size: 50 MiB
+- Max file size: 70 MiB
 - Max files per task: 20 (`pending` plus `ready` on create)
 - Max ready bytes per organization: 10 GiB
 - Max filename: 255 runes
@@ -145,7 +145,7 @@ There is no create or list RPC for `app` or `organization` scopes.
 
 1. Create a pending catalog row (`workspace` or `task`).
 2. Stream bytes with `PUT /api/v1/files/{id}/content`.
-   The handler rejects `Content-Length` above 50 MiB, wraps the body
+   The handler rejects `Content-Length` above 70 MiB, wraps the body
    with `http.MaxBytesReader`, and uses a 15-minute request timeout.
 3. SuperPlane writes the object, runs `Head`, and marks `ready`.
 

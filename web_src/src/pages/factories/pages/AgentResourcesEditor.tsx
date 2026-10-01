@@ -92,7 +92,7 @@ function MCPAutomationSection({
   compact: boolean;
 }) {
   const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "mcp");
+  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
   const resources = connections.data ?? [];
   return (
     <section
@@ -227,7 +227,7 @@ function SkillsAutomationSection({
   compact: boolean;
 }) {
   const skills = useFactoryAgentResources(organizationId, factoryId, "KIND_SKILL");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "skills");
+  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
   const resources = skills.data ?? [];
   return (
     <section

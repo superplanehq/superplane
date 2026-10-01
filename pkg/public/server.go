@@ -770,6 +770,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
+	adminRoute.HandleFunc("/datadog/webhooks", s.adminListDatadogWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
@@ -875,10 +876,15 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	)
 
 	logging.ForIntegration(*integrationInstance).WithField("source", "oauth_callback").Info("Integration operation may write secrets")
+	request, response, finishReceipt, deliver := s.trackDatadogWebhook(r, w, integrationInstance)
+	defer finishReceipt()
+	if !deliver {
+		return
+	}
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:           logging.ForIntegration(*integrationInstance),
-		Request:          r,
-		Response:         w,
+		Request:          request,
+		Response:         response,
 		BaseURL:          s.BaseURL,
 		WebhooksBaseURL:  s.WebhooksBaseURL,
 		OrganizationID:   integrationInstance.OrganizationID.String(),

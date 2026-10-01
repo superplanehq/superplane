@@ -44,6 +44,7 @@ import {
   getWorkOrderDisplayStatusMeta,
   type WorkOrderDisplayStatus,
 } from "../../lib/workOrderProgress";
+import { workOrderExecutionCreditFailure } from "../../lib/workOrderFailureReason";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import {
   parseWorkOrderMetric,
@@ -53,7 +54,11 @@ import {
 import { joinRunnerModels } from "./draftStartModel";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import { analysisResultDeliveredForRun, statusForAnalysisRun } from "../../lib/analysisOutcome";
-import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import {
+  backlogAnalysisCreditFailure,
+  hasActiveBacklogAnalysisRun,
+  type BacklogAnalysisRun,
+} from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
@@ -207,6 +212,8 @@ export type SplitRunIntakeCanvasKey = "intake" | "sentry" | "slack";
 
 export interface SplitRunFixture {
   title: string;
+  /** Stored task key, for example `RF-101`. Empty when the order has no key. */
+  identifier?: string;
   /** Work-order description field. Artifact markdown is a fallback. */
   descriptionText?: string;
   owner: OrgUserDisplay;
@@ -262,11 +269,12 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
 
 function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
   const step = current?.step?.trim();
+  const credit = workOrderExecutionCreditFailure(current);
   return {
     key: "step-failed",
     headline: step ? `${step} did not pass` : "The run did not pass",
-    text: SPLIT_RUN_FAILED_NOTE_TEXT,
-    cta: { label: "Debug", icon: "bug" },
+    text: credit?.message ?? SPLIT_RUN_FAILED_NOTE_TEXT,
+    cta: credit ? { label: credit.actionLabel, destination: "billing" } : { label: "Debug", icon: "bug" },
   };
 }
 
@@ -292,6 +300,17 @@ const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
  * and confidence. Other drafts tell the person to review the details and
  * start. The log holds the source line.
  */
+function draftCreditFooterNote(
+  credit: NonNullable<ReturnType<typeof backlogAnalysisCreditFailure>>,
+): WorkOrderStatusNotePresentation {
+  return {
+    key: "draft-credit",
+    headline: credit.label,
+    text: credit.message,
+    cta: { label: credit.actionLabel, destination: "billing" },
+  };
+}
+
 function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresentation {
   const candidate = reviewCandidateForWorkOrderId(order.id);
   if (candidate) {
@@ -428,6 +447,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
+    identifier: order.key?.trim() ?? "",
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order, options?.resolveUser),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
@@ -491,18 +511,7 @@ function reviewSurfaces(
   const checks = overviewChecks(input.phases, input.apiChecks, demoArtifacts);
 
   if (displayStatus === "draft") {
-    return surfaces(
-      buildSplitRunFooter({
-        kind: "draft",
-        note: draftFooterNote(order),
-        status: displayStatus,
-        isAnalyzing: draftIsAnalyzing(input),
-        clarityScore: clarityScoreFromChecks(checks),
-        confidenceScore: confidenceScoreFromChecks(checks),
-      }),
-      [],
-      checks,
-    );
+    return draftReviewSurface(order, checks, input);
   }
   if (displayStatus === "completed" || displayStatus === "rejected") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
@@ -538,6 +547,26 @@ function reviewSurfaces(
  */
 function draftIsAnalyzing(input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] }): boolean {
   return Boolean(input.isAnalyzing) || hasActiveBacklogAnalysisRun(input.analysisRuns ?? []);
+}
+
+function draftReviewSurface(
+  order: FactoriesWorkOrder,
+  checks: WorkOrderCheckPresentation[],
+  input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] },
+): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
+  const credit = backlogAnalysisCreditFailure(input.analysisRuns ?? []);
+  return surfaces(
+    buildSplitRunFooter({
+      kind: "draft",
+      note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
+      status: "draft",
+      isAnalyzing: credit ? false : draftIsAnalyzing(input),
+      clarityScore: clarityScoreFromChecks(checks),
+      confidenceScore: confidenceScoreFromChecks(checks),
+    }),
+    [],
+    checks,
+  );
 }
 
 function stoppedReviewSurface(
@@ -811,6 +840,7 @@ function analysisAttemptsToPhase(
   }
 
   const status = statusForAnalysisRun(latest.run, statusForCanvasRun(latest.run), delivered);
+  const credit = backlogAnalysisCreditFailure([latest]);
   const durationRunning = latest.run.state === "STATE_STARTED";
   // The card title is the Backlog automation. The score stays on the check.
   const componentName = "Backlog";
@@ -825,6 +855,7 @@ function analysisAttemptsToPhase(
     kind: "action",
     componentType: componentName,
     action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    ...(credit ? { detail: credit.message } : {}),
     iconSlug: "box",
   };
   return {

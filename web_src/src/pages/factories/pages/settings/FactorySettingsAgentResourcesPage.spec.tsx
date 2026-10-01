@@ -5,6 +5,14 @@ import { beforeAll, describe, expect, it, vi } from "bun:test";
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
+
+const DISABLED_SKILL = {
+  ...INLINE_SKILL,
+  id: "resource-disabled-skill",
+  name: "disabled-skill",
+  enabled: false,
+  markdown: "---\nname: disabled-skill\ntitle: Disabled skill\ndescription: Off for workspace.\n---\n\nBody.",
+};
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -18,7 +26,8 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-const skillsPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const skillsEditorPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 describe("FactorySettingsSkillsPage", () => {
@@ -30,7 +39,7 @@ describe("FactorySettingsSkillsPage", () => {
   it("shows the skills empty state", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={skillsPath}
+        pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -46,7 +55,7 @@ describe("FactorySettingsSkillsPage", () => {
   it("opens the full-page skill editor", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`${skillsPath}/new`}
+        pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -62,7 +71,7 @@ describe("FactorySettingsSkillsPage", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${skillsPath}/new`}
+        pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -76,7 +85,7 @@ describe("FactorySettingsSkillsPage", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`${skillsPath}/new`}
+        pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
         experimentalFeatures={mcpAndSkills}
       />,
@@ -91,7 +100,7 @@ describe("FactorySettingsSkillsPage", () => {
   it("lists an inline skill", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={skillsPath}
+        pathSuffix={agentPath}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
@@ -102,15 +111,15 @@ describe("FactorySettingsSkillsPage", () => {
 
     expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText("Review copy")).toBeInTheDocument();
-    expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
-    expect(screen.queryByText("SKILL.md")).not.toBeInTheDocument();
+    expect(screen.queryByText("Review UI copy.")).not.toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-configure-${INLINE_SKILL.id}`)).toBeInTheDocument();
   }, 10000);
 
   it("opens edit when the skill name is clicked", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={skillsPath}
+        pathSuffix={agentPath}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
@@ -124,10 +133,29 @@ describe("FactorySettingsSkillsPage", () => {
     expect(screen.getByTestId("agent-resource-skill-name")).toHaveValue("Review copy");
   }, 10000);
 
+  it("re-enables a disabled skill from the editor", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${skillsEditorPath}/${DISABLED_SKILL.id}`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [DISABLED_SKILL] },
+        }}
+        experimentalFeatures={mcpAndSkills}
+      />,
+    );
+
+    const enabledSwitch = await screen.findByTestId("skill-editor-enabled", {}, { timeout: 8000 });
+    expect(enabledSwitch).not.toBeChecked();
+    await user.click(enabledSwitch);
+    expect(enabledSwitch).toBeChecked();
+  }, 10000);
+
   it("lists a GitHub skill package", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={skillsPath}
+        pathSuffix={agentPath}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [UI_UX_PRO_MAX_SKILL] },
@@ -138,6 +166,6 @@ describe("FactorySettingsSkillsPage", () => {
 
     expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText("ui-ux-pro-max")).toBeInTheDocument();
-    expect(screen.getByText("nextlevelbuilder/ui-ux-pro-max-skill@v1.2.0")).toBeInTheDocument();
+    expect(screen.queryByText("nextlevelbuilder/ui-ux-pro-max-skill@v1.2.0")).not.toBeInTheDocument();
   }, 10000);
 });

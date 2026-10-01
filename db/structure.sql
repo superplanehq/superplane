@@ -323,6 +323,27 @@ CREATE TABLE public.data_migrations (
 
 
 --
+-- Name: datadog_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.datadog_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    event_type text DEFAULT ''::text NOT NULL,
+    alert_transition text DEFAULT ''::text NOT NULL,
+    alert_id text DEFAULT ''::text NOT NULL,
+    service text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    subscription_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: email_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -786,7 +807,8 @@ CREATE TABLE public.factory_work_order_executions (
     total_tokens bigint DEFAULT 0 NOT NULL,
     cost_cents bigint DEFAULT 0 NOT NULL,
     line_dispatch_id uuid NOT NULL,
-    duration_seconds bigint DEFAULT 0 NOT NULL
+    duration_seconds bigint DEFAULT 0 NOT NULL,
+    failure_reason text
 );
 
 
@@ -1912,6 +1934,14 @@ ALTER TABLE ONLY public.data_migrations
 
 
 --
+-- Name: datadog_webhook_receipts datadog_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.datadog_webhook_receipts
+    ADD CONSTRAINT datadog_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2892,6 +2922,13 @@ CREATE INDEX idx_casbin_rule_v1 ON public.casbin_rule USING btree (v1);
 --
 
 CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
+
+
+--
+-- Name: idx_datadog_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_datadog_webhook_receipts_received_at ON public.datadog_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -5060,7 +5097,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930113318	f
+20260930155842	f
 \.
 
 
