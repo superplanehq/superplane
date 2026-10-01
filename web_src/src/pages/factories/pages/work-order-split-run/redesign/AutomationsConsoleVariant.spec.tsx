@@ -315,6 +315,27 @@ describe("AutomationsConsoleVariant summary strip", () => {
   });
 });
 
+describe("AutomationsConsoleVariant task description", () => {
+  it("hides an empty description when edit is not allowed", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "   ", canEditDescription: false });
+
+    expect(screen.queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
+    expect(screen.queryByText("No description yet.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the empty state and edit control when edit is allowed", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "", canEditDescription: true });
+
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(description).toHaveTextContent("No description yet.");
+    expect(within(description).getByTestId("split-run-description-edit")).toBeInTheDocument();
+    expect(
+      description.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeGreaterThan(0);
+  });
+});
+
 describe("AutomationsConsoleVariant run footer", () => {
   it("shows recorded spend and model on the open card footer", () => {
     renderConsole({

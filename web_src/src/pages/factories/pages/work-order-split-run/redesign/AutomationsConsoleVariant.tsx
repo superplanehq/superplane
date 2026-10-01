@@ -18,6 +18,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile
 
 import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
+import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { StepOutputCounts } from "./consoleOutputChips";
@@ -69,7 +70,7 @@ export function AutomationsConsoleVariant({
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
-  /** Task description markdown for the creation card body. */
+  /** Task description markdown shown above the timeline. */
   taskDescription?: string;
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
@@ -103,6 +104,16 @@ export function AutomationsConsoleVariant({
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="redesign-console-variant">
       <section className="flex min-w-0 flex-col gap-4">
+        <TimelineTaskDescription
+          description={taskDescription}
+          canEdit={canEditDescription}
+          busy={descriptionBusy}
+          onSave={onDescriptionSave}
+          files={files}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          orderId={orderId}
+        />
         <Timeline value={reachedColumnCount(markers)} className="pl-1">
           {columns.map((column, index) => (
             <TimelineItem key={column.id} step={index + 1} data-testid={`redesign-console-column-${column.id}`}>
@@ -127,14 +138,7 @@ export function AutomationsConsoleVariant({
                       phase={fixture.phases.find((phase) => phase.id === automation.latest.id)}
                       phases={fixture.phases}
                       organizationId={organizationId}
-                      factoryId={factoryId}
-                      orderId={orderId}
-                      taskDescription={taskDescription}
-                      canEditDescription={canEditDescription}
-                      descriptionBusy={descriptionBusy}
-                      onDescriptionSave={onDescriptionSave}
                       source={source}
-                      files={files}
                       expandIdle={expandIdleCards && index + 1 === currentColumn}
                       anyLive={anyLive}
                       canStopRun={canStopRun}
@@ -274,19 +278,51 @@ function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; col
   );
 }
 
+function TimelineTaskDescription({
+  description,
+  canEdit,
+  busy,
+  onSave,
+  files,
+  organizationId,
+  factoryId,
+  orderId,
+}: {
+  description?: string;
+  canEdit: boolean;
+  busy: boolean;
+  onSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+}) {
+  if (!description?.trim() && !canEdit) {
+    return null;
+  }
+  return (
+    <div data-testid="redesign-console-task-description">
+      <WorkOrderSplitRunDescription
+        description={description ?? ""}
+        canEdit={canEdit}
+        busy={busy}
+        collapsible={false}
+        onSave={onSave}
+        files={files}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+      />
+    </div>
+  );
+}
+
 function ConsoleAutomationCard({
   automation,
   phase,
   phases,
   organizationId,
-  factoryId,
-  orderId,
-  taskDescription,
-  canEditDescription,
-  descriptionBusy,
-  onDescriptionSave,
   source,
-  files,
   expandIdle,
   anyLive,
   canStopRun,
@@ -298,15 +334,8 @@ function ConsoleAutomationCard({
   phase?: SplitRunPhase;
   phases: SplitRunPhase[];
   organizationId?: string;
-  factoryId?: string;
-  orderId?: string;
-  taskDescription?: string;
-  canEditDescription?: boolean;
-  descriptionBusy?: boolean;
-  onDescriptionSave?: (next: string) => void | Promise<void>;
   /** Where the task came from. The Backlog creation card shows it. */
   source?: SplitRunSource;
-  files?: FilesFile[];
   /** True for the current-column card on a draft that has not started a run. */
   expandIdle: boolean;
   /** True when any automation on this task is running or waiting. */
@@ -376,14 +405,7 @@ function ConsoleAutomationCard({
               phase={shownPhase}
               phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
               organizationId={organizationId}
-              factoryId={factoryId}
-              orderId={orderId}
-              taskDescription={taskDescription}
-              canEditDescription={canEditDescription}
-              descriptionBusy={descriptionBusy}
-              onDescriptionSave={onDescriptionSave}
               source={source}
-              files={files}
               onStop={stopRun}
               onRetry={rerunStep}
               actionBusy={actionBusy}
