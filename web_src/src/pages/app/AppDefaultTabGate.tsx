@@ -98,6 +98,10 @@ export function AppDefaultTabGate() {
   // The console query is only useful for the Console fallback (no stored tab).
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
   // stored tab do not pay for an unused read. Factory apps never use Console.
+  // A missing canvas must not start that read. A failed canvas read has no
+  // payload, so the gate settles on Canvas instead of waiting for console.
+  const canvasRequestFailed =
+    canvasQueryEnabled && !canvasLoading && canvas === undefined && canvasError != null && !canvasNotFound;
   const consoleQueryEnabled =
     shouldEnableConsoleQuery({
       alreadyCommitted,
@@ -124,7 +128,9 @@ export function AppDefaultTabGate() {
     canvasLoading,
     canvasUndefined: canvas === undefined,
     storedTab,
-    resolution: resolveDefaultTab({ storedTab, liveConsoleQuery }),
+    resolution: canvasRequestFailed
+      ? { settled: true, redirectTo: null }
+      : resolveDefaultTab({ storedTab, liveConsoleQuery }),
     classicSurface,
   });
 
