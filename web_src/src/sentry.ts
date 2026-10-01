@@ -14,6 +14,14 @@ export const IGNORED_CONSOLE_MESSAGES = [
   // Vue Devtools browser extension warns when multiple versions are installed.
   // Our app is React-only; this noise originates from the user's extensions.
   /^Another version of Vue Devtools/,
+  // Monaco Gesture in vs/base/browser/touch.js. The labels are swapped.
+  // `end of an UNKNOWN touch` is logged from onTouchMove. `move of an UNKNOWN
+  // touch` is logged from onTouchEnd. Each fires when activeTouches has no
+  // entry for that touch id. captureConsoleIntegration formats the second
+  // argument as `[object Touch]`, so the stored message is
+  // `end of an UNKNOWN touch [object Touch]`.
+  /^end of an UNKNOWN touch/,
+  /^move of an UNKNOWN touch/,
 ];
 
 // True when a console message matches a known third-party pattern we ignore.
