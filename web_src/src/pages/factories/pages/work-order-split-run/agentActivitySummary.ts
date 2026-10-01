@@ -27,7 +27,6 @@ type ActivityCounts = {
   specifications: ActivityCount;
   taskScores: ActivityCount;
   questions: ActivityCount;
-  tasksCreated: ActivityCount;
   toolCalls: ActivityCount;
   terminalUses: ActivityCount;
 };
@@ -45,7 +44,6 @@ export function activitySummaryLabel(tools: AgentToolItem[]): string {
     repeatedActionLabel(counts.specifications, "preparing specification", "prepared specification"),
     repeatedActionLabel(counts.taskScores, "scoring task", "scored task"),
     repeatedActionLabel(counts.questions, "preparing questions", "prepared questions"),
-    actionCountLabel(counts.tasksCreated, "creating", "created", "task"),
     actionCountLabel(counts.toolCalls, "using", "used", "tool"),
     repeatedActionLabel(counts.terminalUses, "using terminal", "used terminal"),
   ].filter((part): part is string => Boolean(part));
@@ -70,7 +68,6 @@ export function completedActivitySummaryLabel(tools: AgentToolItem[]): string {
       "preparing task",
       "prepared task",
     ),
-    groupedActivityLabel([counts.tasksCreated], "creating tasks", "created tasks"),
     groupedActivityLabel([counts.toolCalls], "using tools", "used tools"),
     groupedActivityLabel([counts.terminalUses], "using terminal", "used terminal"),
   ].filter((part): part is string => Boolean(part));
@@ -133,7 +130,6 @@ function emptyActivityCounts(): ActivityCounts {
     specifications: count(),
     taskScores: count(),
     questions: count(),
-    tasksCreated: count(),
     toolCalls: count(),
     terminalUses: count(),
   };
@@ -188,10 +184,6 @@ function countMCPActivity(counts: ActivityCounts, tool: AgentToolItem): void {
   }
   if (identifier.includes("survey")) {
     increment(counts.questions, tool);
-    return;
-  }
-  if (identifier.includes("create_task")) {
-    increment(counts.tasksCreated, tool);
     return;
   }
   increment(counts.toolCalls, tool);
