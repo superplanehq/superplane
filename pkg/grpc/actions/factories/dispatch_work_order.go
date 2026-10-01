@@ -96,7 +96,6 @@ func DispatchWorkOrderOnLine(
 	}
 
 	var order *models.FactoryWorkOrder
-	var pendingRuns []*models.CanvasRun
 	var startedSteps []*models.FactoryLineStepResult
 	var logger *log.Entry
 	var fromState string
@@ -166,7 +165,6 @@ func DispatchWorkOrderOnLine(
 				return err
 			}
 			startedSteps = started
-			pendingRuns = pendingRunsFromStepResults(started)
 			return nil
 		}
 
@@ -190,14 +188,13 @@ func DispatchWorkOrderOnLine(
 		}
 
 		startedSteps = append(abandoned, result)
-		pendingRuns = pendingRunsFromStepResults(startedSteps)
 		return nil
 	})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	publishDispatchedWorkOrder(logger, orgID, factoryID, order, actor, fromState, pendingRuns, startedSteps)
+	publishDispatchedWorkOrder(logger, orgID, factoryID, order, actor, fromState, startedSteps)
 	return factory, order, nil
 }
 
@@ -208,16 +205,10 @@ func publishDispatchedWorkOrder(
 	order *models.FactoryWorkOrder,
 	actor *uuid.UUID,
 	fromState string,
-	pendingRuns []*models.CanvasRun,
 	startedSteps []*models.FactoryLineStepResult,
 ) {
-	for _, pendingRun := range pendingRuns {
-		runLogger := logger.WithField("run_id", pendingRun.ID)
-		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
-			runLogger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
-			continue
-		}
-		runLogger.Info("Published pending canvas run")
+	for _, result := range startedSteps {
+		publishPendingStepRun(logger, result)
 	}
 
 	publishedOrders := map[uuid.UUID]struct{}{order.ID: {}}
@@ -264,12 +255,22 @@ func publishDispatchedWorkOrder(
 	}
 }
 
-func pendingRunsFromStepResults(results []*models.FactoryLineStepResult) []*models.CanvasRun {
-	var runs []*models.CanvasRun
-	for _, result := range results {
-		if result != nil && result.Run != nil {
-			runs = append(runs, result.Run)
-		}
+// publishPendingStepRun publishes one started step and logs that step's
+// work order. A replace or retry can also start a queued run for another
+// order, so the dispatch order on logger is not the owner of every run.
+func publishPendingStepRun(logger *log.Entry, result *models.FactoryLineStepResult) {
+	if result == nil || result.Run == nil {
+		return
 	}
-	return runs
+
+	runLogger := logger.WithField("run_id", result.Run.ID)
+	if result.Execution != nil && result.Execution.WorkOrderID != uuid.Nil {
+		runLogger = runLogger.WithField("order_id", result.Execution.WorkOrderID)
+	}
+
+	if err := messages.NewCanvasRunMessage(result.Run.WorkflowID.String(), result.Run.ID.String()).PublishPending(); err != nil {
+		runLogger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
+		return
+	}
+	runLogger.Info("Published pending canvas run")
 }
