@@ -16,7 +16,7 @@ import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
@@ -44,6 +44,7 @@ import {
   type InitialOnboardingSetupState,
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
+import { guardWorkspaceSave, useOnboardingWorkspaceSavesAllowed } from "./onboardingWorkspaceSaves";
 
 const ONBOARDING_INTEGRATIONS = ["jira", ...AGENT_PROVIDER_IDS];
 
@@ -162,15 +163,27 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 
 /** The mutation hooks the page model saves and provisions through. */
 function useOnboardingMutations(organizationId: string, factoryId: string) {
+  const savesAllowed = useRef(true);
+  savesAllowed.current = useOnboardingWorkspaceSavesAllowed();
+  const guard = <Args extends unknown[], Result>(save: (...args: Args) => Promise<Result>) =>
+    guardWorkspaceSave(() => savesAllowed.current, save);
+  const updateFactory = useUpdateFactory(organizationId, factoryId);
+  const selectGitHubRepository = useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github");
+  const updateOnboarding = useFactoryOnboarding(organizationId, factoryId);
+  const updateOrganization = useUpdateOrganization(organizationId);
+  const createLine = useCreateFactoryLine(organizationId, factoryId);
+  const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
+  const installer = useInstallFactory({ organizationId });
   return {
-    updateFactory: useUpdateFactory(organizationId, factoryId),
-    selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
-    updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
-    updateOrganization: useUpdateOrganization(organizationId),
-    createLine: useCreateFactoryLine(organizationId, factoryId),
-    createIntake: useCreateFactoryIntake(organizationId, factoryId),
-    deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
-    installer: useInstallFactory({ organizationId }),
+    updateFactory: { ...updateFactory, mutateAsync: guard(updateFactory.mutateAsync) },
+    selectGitHubRepository: { ...selectGitHubRepository, mutateAsync: guard(selectGitHubRepository.mutateAsync) },
+    updateOnboarding: { ...updateOnboarding, mutateAsync: guard(updateOnboarding.mutateAsync) },
+    updateOrganization: { ...updateOrganization, mutateAsync: guard(updateOrganization.mutateAsync) },
+    createLine: { ...createLine, mutateAsync: guard(createLine.mutateAsync) },
+    createIntake: { ...createIntake, mutateAsync: guard(createIntake.mutateAsync) },
+    deleteIntake: { ...deleteIntake, mutateAsync: guard(deleteIntake.mutateAsync) },
+    installer: { ...installer, installFactory: guard(installer.installFactory) },
   };
 }
 

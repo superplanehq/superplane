@@ -21,6 +21,7 @@ import {
 import { OnboardingPage } from "./OnboardingPage";
 import { onboardingResumePath } from "./onboardingResumePath";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
+import { OnboardingWorkspaceSavesContext } from "./onboardingWorkspaceSaves";
 import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
 
 const ignoreOpenCreateWorkOrder = () => undefined;
@@ -98,15 +99,17 @@ export function InitialWorkspaceOnboarding({
   }
 
   return (
-    <PermissionsProvider organizationId={organizationId}>
-      <ResolvedInitialWorkspaceOnboarding
-        organizationId={organizationId}
-        factoryId={screen.factory.id}
-        factoryKey={screen.factoryKey}
-        factory={screen.factory}
-        factories={screen.factories}
-      />
-    </PermissionsProvider>
+    <OnboardingWorkspaceSavesContext.Provider value={screen.savesAllowed}>
+      <PermissionsProvider organizationId={organizationId}>
+        <ResolvedInitialWorkspaceOnboarding
+          organizationId={organizationId}
+          factoryId={screen.factory.id}
+          factoryKey={screen.factoryKey}
+          factory={screen.factory}
+          factories={screen.factories}
+        />
+      </PermissionsProvider>
+    </OnboardingWorkspaceSavesContext.Provider>
   );
 }
 
@@ -115,7 +118,20 @@ type InitialWorkspaceScreen = {
   factory: FactoriesFactory | undefined;
   factoryKey: string;
   factories: FactoriesFactory[];
+  savesAllowed: boolean;
 };
+
+function lookupReady(listError: boolean, status: FactoryResolutionStatus, described: boolean, describeError: boolean) {
+  return !listError && status === "found" && described && !describeError;
+}
+
+function describeFactoryId(resolvedId: string | undefined, matchedId: string | undefined) {
+  return resolvedId ?? matchedId ?? "";
+}
+
+function heldOpenWorkspace(matched: OpenWorkspace | null, nextReady: boolean, open: OpenWorkspace | null) {
+  return matched ?? (nextReady ? null : open);
+}
 
 function useInitialWorkspaceScreen(organizationId: string, factoryKey: string): InitialWorkspaceScreen {
   const factoriesQuery = useFactories(organizationId);
@@ -126,11 +142,15 @@ function useInitialWorkspaceScreen(organizationId: string, factoryKey: string): 
   );
   const openWorkspace = useRef<OpenWorkspace | null>(null);
   const matched = openWorkspaceFor(openWorkspace.current, organizationId, factoryKey);
-  const describeId = resolution.factory?.id ?? matched?.factoryId ?? "";
+  const describeId = describeFactoryId(resolution.factory?.id, matched?.factoryId);
   const factoryQuery = useFactory(organizationId, describeId);
-  const nextReady =
-    !factoriesQuery.isError && resolution.status === "found" && Boolean(factoryQuery.data) && !factoryQuery.isError;
-  const held = matched ?? (nextReady ? null : openWorkspace.current);
+  const nextReady = lookupReady(
+    factoriesQuery.isError,
+    resolution.status,
+    Boolean(factoryQuery.data),
+    factoryQuery.isError,
+  );
+  const held = heldOpenWorkspace(matched, nextReady, openWorkspace.current);
   const decision = useInitialWorkspaceLookupRecovery(
     lookupFromQueries(describeId, factoriesQuery, resolution.status, factoryQuery, Boolean(held)),
     () => refetchInitialWorkspaceLookup(describeId, factoriesQuery, factoryQuery),
@@ -150,6 +170,7 @@ function useInitialWorkspaceScreen(organizationId: string, factoryKey: string): 
     factory: decision.view === "setup" ? factory : undefined,
     factoryKey: resolution.factory?.key ?? held?.factoryKey ?? factoryKey,
     factories: factoriesForOpenWorkspace(factoriesQuery.data, held),
+    savesAllowed: Boolean(matched) || nextReady,
   };
 }
 
@@ -199,7 +220,7 @@ function useInitialWorkspaceLookupRecovery(
       setRunning(false);
       setAttempted(true);
     });
-  }, [decision.phase]);
+  }, [decision.phase, identity]);
 
   return decision;
 }

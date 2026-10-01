@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { InitialWorkspaceOnboarding } from "./InitialWorkspaceOnboarding";
 import { decideInitialWorkspaceOnboarding, type InitialWorkspaceLookup } from "./initialWorkspaceOnboardingScreen";
 import { OnboardingWorkspaceResolutionProvider } from "./OnboardingWorkspaceResolutionProvider";
+import { useOnboardingWorkspaceSavesAllowed } from "./onboardingWorkspaceSaves";
 
 const workspace = { id: "factory-1", key: "NEWWO", name: "New workspace" };
 
@@ -68,8 +69,13 @@ vi.mock("@/hooks/useRecordLastLocation", () => ({
 }));
 
 vi.mock("./OnboardingPage", () => ({
-  OnboardingPage: () => <div data-testid="workspace-setup" />,
+  OnboardingPage: OnboardingWorkspaceSavesProbe,
 }));
+
+function OnboardingWorkspaceSavesProbe() {
+  const savesAllowed = useOnboardingWorkspaceSavesAllowed();
+  return <div data-testid="workspace-setup" data-saves-allowed={String(savesAllowed)} />;
+}
 
 function readyLookup(overrides: Partial<InitialWorkspaceLookup> = {}): InitialWorkspaceLookup {
   return {
@@ -291,5 +297,57 @@ describe("InitialWorkspaceOnboarding", () => {
 
     expect(screen.getByTestId("workspace-setup")).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-setup")).toHaveAttribute("data-saves-allowed", "false");
+  });
+
+  it("starts a new retry when the workspace key changes while the first retry is still running", async () => {
+    let releaseFirst = () => undefined;
+    store.reresolve.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+    store.factories.isError = true;
+
+    const { rerender } = render(<Harness />);
+    await waitFor(() => expect(store.reresolve).toHaveBeenCalledTimes(1));
+
+    let releaseSecond = () => undefined;
+    store.reresolve.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSecond = resolve;
+        }),
+    );
+    rerender(<Harness factoryKey="OTHER" />);
+    await waitFor(() => expect(store.reresolve).toHaveBeenCalledTimes(2));
+
+    releaseFirst();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("factories-layout-error")).not.toBeInTheDocument();
+
+    releaseSecond();
+    expect(await screen.findByTestId("factories-layout-error")).toBeInTheDocument();
+    expect(store.reresolve).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps setup visible when the workspace key changes and blocks saves to the previous workspace", async () => {
+    store.factories.data = [workspace];
+    store.factory.data = workspace;
+
+    const { rerender } = render(<Harness />);
+    expect(await screen.findByTestId("workspace-setup")).toHaveAttribute("data-saves-allowed", "true");
+
+    store.factories.data = [];
+    store.factories.isLoading = true;
+    store.factory.data = undefined;
+    rerender(<Harness factoryKey="OTHER" />);
+
+    expect(screen.getByTestId("workspace-setup")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-setup")).toHaveAttribute("data-saves-allowed", "false");
   });
 });
