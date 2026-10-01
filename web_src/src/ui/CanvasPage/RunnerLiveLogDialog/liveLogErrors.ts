@@ -3,6 +3,14 @@ export const LIVE_LOG_SESSION_NOT_READY_CODE = "live_log_session_not_ready";
 
 const BENIGN_LOG_STREAM_NOT_FOUND_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
 
+const BROWSER_TRANSPORT_FAILURE_MESSAGES = new Set([
+  "network error",
+  "Failed to fetch",
+  "NetworkError when attempting to fetch resource",
+  "NetworkError when attempting to fetch resource.",
+  "Load failed",
+]);
+
 export class LiveLogRequestError extends Error {
   readonly code: string | undefined;
 
@@ -31,4 +39,12 @@ export function isBenignLiveLogWait(error: unknown): boolean {
   }
   const message = error instanceof Error ? error.message : String(error);
   return BENIGN_LOG_STREAM_NOT_FOUND_PATTERN.test(message);
+}
+
+export function isBrowserTransportFailure(error: unknown): boolean {
+  if (error instanceof LiveLogRequestError) {
+    return false;
+  }
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return BROWSER_TRANSPORT_FAILURE_MESSAGES.has(message);
 }

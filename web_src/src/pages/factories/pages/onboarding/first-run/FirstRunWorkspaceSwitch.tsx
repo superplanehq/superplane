@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { factoriesRailControlClassName, initialsForName } from "../../../layout/factoriesRail";
-import { factoryHomePath, firstFactoryLineId } from "../../../lib/factoryPagePaths";
+import { factoryHomePath, factoryRouteSegment, firstFactoryLineId } from "../../../lib/factoryPagePaths";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunChrome, FirstRunWorkspaceOption } from "./firstRunTypes";
 
@@ -67,8 +67,9 @@ function FirstRunWorkspaceSwitchMenu({
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setOpen(false);
-                  if (isCurrent || !factory.key) return;
-                  navigate(factoryHomePath(switcher.organizationId, factory.key, firstFactoryLineId(factory)));
+                  const nextSegment = factoryRouteSegment(factory);
+                  if (isCurrent || !nextSegment) return;
+                  navigate(factoryHomePath(switcher.organizationId, nextSegment, firstFactoryLineId(factory)));
                 }}
                 data-testid={`first-run-workspace-option-${factory.id}`}
               >

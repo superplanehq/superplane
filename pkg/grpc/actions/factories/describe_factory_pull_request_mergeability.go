@@ -2,9 +2,14 @@ package factories
 
 import (
 	"context"
+	"errors"
 
+	"github.com/getsentry/sentry-go"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/grpc/codes"
 )
 
 func DescribeFactoryPullRequestMergeability(
@@ -12,7 +17,16 @@ func DescribeFactoryPullRequestMergeability(
 	deps IntakeDependencies,
 	organizationID string,
 	req *pb.DescribeFactoryPullRequestMergeabilityRequest,
-) (*pb.DescribeFactoryPullRequestMergeabilityResponse, error) {
+) (_ *pb.DescribeFactoryPullRequestMergeabilityResponse, err error) {
+	repository := ""
+	defer func() {
+		if canceled, _ := grpcerrors.StatusFromContextError(ctx, err); canceled {
+			return
+		}
+		if code, _, ok := grpcerrors.HandlerStatus(err); ok && code == codes.Internal {
+			recordFactoryPullRequestMergeabilityError(ctx, req.GetFactoryId(), req.GetPrId(), repository, errors.Unwrap(err))
+		}
+	}()
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
@@ -23,6 +37,7 @@ func DescribeFactoryPullRequestMergeability(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 	}
+	repository = pullRequest.Repository
 
 	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {
@@ -36,4 +51,28 @@ func DescribeFactoryPullRequestMergeability(
 	}
 
 	return &pb.DescribeFactoryPullRequestMergeabilityResponse{Mergeability: result.proto()}, nil
+}
+
+func recordFactoryPullRequestMergeabilityError(ctx context.Context, factoryID, pullRequestID, repository string, err error) {
+	tags := map[string]string{
+		"factory_id":      factoryID,
+		"pull_request_id": pullRequestID,
+		"repository":      repository,
+	}
+	log.WithError(err).WithFields(log.Fields{
+		"factory_id":      factoryID,
+		"pull_request_id": pullRequestID,
+		"repository":      repository,
+	}).Warn("factory pull request mergeability lookup failed")
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub()
+	}
+	if hub == nil || hub.Client() == nil {
+		return
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetTags(tags)
+		hub.CaptureException(err)
+	})
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   isBenignLiveLogWait,
+  isBrowserTransportFailure,
   LIVE_LOG_ERROR_CODE_HEADER,
   LIVE_LOG_SESSION_NOT_READY_CODE,
   LiveLogRequestError,
@@ -57,5 +58,27 @@ describe("live log wait detection", () => {
 
   it("does not treat an ordinary request failure as a wait", () => {
     expect(isBenignLiveLogWait(new LiveLogRequestError("Failed to fetch"))).toBe(false);
+  });
+});
+
+describe("browser transport failure detection", () => {
+  it.each([
+    "network error",
+    "Failed to fetch",
+    "NetworkError when attempting to fetch resource",
+    "NetworkError when attempting to fetch resource.",
+    "Load failed",
+  ])("matches a browser transport message: %s", (message) => {
+    expect(isBrowserTransportFailure(new TypeError(message))).toBe(true);
+    expect(isBrowserTransportFailure(new Error(message))).toBe(true);
+  });
+
+  it("does not match an HTTP error response with the same text", () => {
+    expect(isBrowserTransportFailure(new LiveLogRequestError("Failed to fetch"))).toBe(false);
+  });
+
+  it("does not match broker error text", () => {
+    expect(isBrowserTransportFailure(new Error("broker connection reset"))).toBe(false);
+    expect(isBrowserTransportFailure(new Error("network error: broker connection reset"))).toBe(false);
   });
 });

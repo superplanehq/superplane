@@ -45,7 +45,7 @@ import {
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
-  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
   ACME_ONBOARDING_LINE_ID,
   DEFAULT_FACTORY_PLANNING,
   DRAFT_WORK_ORDER,
@@ -55,7 +55,7 @@ import {
   GITHUB_ISSUES_INTAKE_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
-  PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
@@ -94,7 +94,7 @@ const ICON_VIEW: FactoryPreviewFlags = {
 };
 
 function renderLinesBoard(
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
   openCreateWorkOrder = vi.fn(),
   factory: FactoriesFactory = REFUND_FACTORY,
   previewFlags: FactoryPreviewFlags | null = null,
@@ -413,7 +413,9 @@ describe("LinesPage board", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     expect(screen.queryByRole("status", { name: "Loading tasks" })).not.toBeInTheDocument();
@@ -423,7 +425,7 @@ describe("LinesPage board", () => {
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
@@ -476,7 +478,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
@@ -485,7 +487,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
   });
@@ -520,20 +522,20 @@ describe("LinesPage board", () => {
 
   it("opens the split run from a task permalink", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
 
     const popup = await screen.findByTestId("work-order-split-run");
     expect(within(popup).getByTestId("popup-work-order-title")).toHaveTextContent(
       "Add retry handling to webhook delivery",
     );
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`,
     );
   });
 
   it("keeps the line board without a popup when the permalink is unknown", () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/999`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/999`);
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
@@ -542,12 +544,12 @@ describe("LinesPage board", () => {
   it("keeps the current line when a card opens from a second line", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`);
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
@@ -555,7 +557,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_HOTFIX_ID}`,
     );
   });
 
@@ -575,16 +577,16 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-test-back"));
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
   });
 
   it("redirects to the first board when a missing line id is opened", async () => {
     const user = userEvent.setup();
-    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/line-missing`;
+    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/line-missing`;
     render(
       <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
         factory={REFUND_FACTORY}
         navigateTo={missingLinePath}
       />,
@@ -595,7 +597,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-test-navigate"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY)),
+      factoryHomePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, firstFactoryLineId(REFUND_FACTORY)),
     );
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
   });
@@ -651,7 +653,7 @@ describe("LinesPage board", () => {
   it("opens intake settings on the first tab when an automation icon is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
@@ -665,14 +667,19 @@ describe("LinesPage board", () => {
   it("opens an existing phase automation in the board view popup", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     const location = screen.getByTestId("lines-test-location");
     expect(location).toHaveTextContent(
-      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-implementer"),
+      factoryColumnAutomationViewPath(
+        "org-1",
+        PRIMARY_FACTORY_ROUTE_SEGMENT,
+        REFUND_LINE_PLAN_ID,
+        "app-refund-implementer",
+      ),
     );
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
@@ -687,7 +694,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("column-automation-view-tab-automation"));
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "app-refund-implementer", {
         from: "lines",
         lineId: REFUND_LINE_PLAN_ID,
       }),
@@ -697,13 +704,13 @@ describe("LinesPage board", () => {
   it("opens Planning settings from the Task analysis row", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
@@ -713,7 +720,7 @@ describe("LinesPage board", () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
       vi.fn(),
       PLANNING_OPEN_FACTORY,
     );
@@ -722,7 +729,7 @@ describe("LinesPage board", () => {
 
     expect(screen.queryByTestId("planning-setup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
   });
@@ -763,7 +770,13 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, undefined, "handler-discussion"),
+      factoryPRFeedbackPath(
+        "org-1",
+        PRIMARY_FACTORY_ROUTE_SEGMENT,
+        REFUND_LINE_PLAN_ID,
+        undefined,
+        "handler-discussion",
+      ),
     );
 
     unmount();
@@ -771,7 +784,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-pr-closure"),
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "app-pr-closure"),
     );
   });
 
@@ -797,7 +810,7 @@ describe("LinesPage board", () => {
     await user.click(within(verify).getByTestId("lines-verify-listener-handler-checks"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
     );
   });
 
@@ -826,7 +839,7 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -840,7 +853,7 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "comments"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -961,7 +974,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "comments"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -977,7 +990,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -1046,7 +1059,7 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("add-column-automation-template-risk-score"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 
@@ -1093,7 +1106,7 @@ describe("LinesPage board extras", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-custom`,
+        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
       );
     });
   });
@@ -1140,7 +1153,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("github-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryGitHubIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryGitHubIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1221,7 +1234,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("datadog-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryDatadogIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryDatadogIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1245,7 +1258,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1261,7 +1274,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("dependabot-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1303,7 +1316,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 
@@ -1322,14 +1335,14 @@ describe("LinesPage board extras", () => {
     await user.click(productive);
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("sends a legacy Jira OAuth return to the setup page", () => {
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
       vi.fn(),
       REFUND_FACTORY,
       LANE_BANNERS,
@@ -1337,14 +1350,16 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, { integrationId: "int-new" }),
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, {
+        integrationId: "int-new",
+      }),
     );
   });
 
   it("shows only declared intakes", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}/lines/${ACME_ONBOARDING_LINE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
       LANE_BANNERS,
@@ -1367,7 +1382,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP.id!, {
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, GITHUB_ISSUES_INTAKE_APP.id!, {
         from: "lines",
         lineId: REFUND_LINE_PLAN_ID,
       }),
@@ -1394,7 +1409,7 @@ describe("LinesPage board extras", () => {
   it("does not list intake runs under the GitHub issues row", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
       vi.fn(),
       REFUND_FACTORY,
       LANE_BANNERS,
@@ -1479,7 +1494,7 @@ describe("LinesPage board editing", () => {
 
   it("opens backlog settings in a modal and does not open a canvas", async () => {
     const user = userEvent.setup();
-    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`;
+    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
@@ -1617,7 +1632,7 @@ describe("LinesPage board editing", () => {
       updateLineIsPending.value = true;
       view.rerender(
         <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
           factory={REFUND_FACTORY}
         />,
       );
@@ -1625,7 +1640,7 @@ describe("LinesPage board editing", () => {
       updateLineIsPending.value = false;
       view.rerender(
         <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
           factory={REFUND_FACTORY}
         />,
       );
@@ -2002,7 +2017,9 @@ describe("LinesPage Implement phase window", () => {
       orders[index] = dispatchDraftToImplement(drafts[index], at);
       useFactoryWorkOrders.mockReturnValue({ data: [...orders] });
       view.rerender(
-        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+        />,
       );
 
       await waitFor(() => {
@@ -2103,7 +2120,9 @@ describe("LinesPage Implement phase window", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     const pending = screen.getByTestId("lines-phase-column-scroll-0");
@@ -2119,7 +2138,9 @@ describe("LinesPage Implement phase window", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
@@ -2132,8 +2153,8 @@ describe("LinesPage Implement phase window", () => {
     const user = userEvent.setup();
     render(
       <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
-        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`}
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`}
       />,
     );
 
@@ -2145,14 +2166,14 @@ describe("LinesPage Implement phase window", () => {
     await user.click(screen.getByTestId("lines-test-navigate"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
     );
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
 
     await user.click(screen.getByTestId("lines-test-back"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(1760);
   });

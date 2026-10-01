@@ -1,4 +1,5 @@
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -55,6 +56,7 @@ export interface PublicBoardColumn {
 export interface PublicBoard {
   workspaceName: string;
   workspaceKey?: string;
+  urlId?: string;
   lineName: string;
   showClarity: boolean;
   showConfidence: boolean;
@@ -80,6 +82,7 @@ const PUBLIC_AUTOMATION_KINDS = new Set<ColumnAutomationKind>([
 
 const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
   github: { src: githubIcon, alt: "GitHub" },
+  dependabot: { src: dependabotIcon, alt: "Dependabot" },
   sentry: { src: sentryIcon, alt: "Sentry" },
   jira: { src: jiraIcon, alt: "Jira" },
   pagerduty: { src: pagerdutyIcon, alt: "PagerDuty" },

@@ -200,7 +200,7 @@ func (c *FactoryNotificationConsumer) sendWorkOrderNotificationEmails(
 				actorName,
 			)
 			applyWorkOrderEmailCard(&content.Data, order, executions, time.Now())
-			content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.Key)
+			content.Data.WorkOrderLink = c.BaseURL + order.URLPath(factoryModel.RouteSegment())
 			contentByType[recipient.notificationType] = content
 		}
 		if err := c.EmailService.SendWorkOrderNotificationEmail(recipient.email, content.Subject, content.Data); err != nil {
@@ -225,7 +225,7 @@ func (c *FactoryNotificationConsumer) publishBrowserNotifications(
 	}
 
 	contentByType := map[string]workOrderNotificationContent{}
-	urlPath := order.URLPath(factoryModel.Key)
+	urlPath := order.URLPath(factoryModel.RouteSegment())
 	orderKey := factoryModel.WorkOrderKey(order.Number)
 	for _, recipient := range recipients {
 		content, ok := contentByType[recipient.notificationType]
