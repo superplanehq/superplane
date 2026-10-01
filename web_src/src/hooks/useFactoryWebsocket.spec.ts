@@ -223,6 +223,33 @@ describe("useFactoryWebsocket", () => {
     expect(queryClient.getQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"))).toBeUndefined();
   });
 
+  it("stays quiet when a live refresh hits an expired session", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(new Error("Unauthorized"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { queryClient } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
+      { id: "order-1", title: "Still here" },
+    ]);
+    queryClient.setQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"), {
+      id: "order-1",
+      title: "Still here",
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1" },
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"))).toEqual([
+      { id: "order-1", title: "Still here" },
+    ]);
+    expect(queryClient.getQueryData(factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"))).toEqual({
+      id: "order-1",
+      title: "Still here",
+    });
+  });
+
   it("warns when a live refresh fails for another reason", async () => {
     const failure = new Error("network down");
     vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockRejectedValue(failure);
