@@ -14,7 +14,7 @@ import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 
 /** Storybook-only Tasks page with a Missions rail. */
 export function MissionsWorkOrdersPage() {
-  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const state = useWorkOrderListState(factoryId);
 
@@ -32,8 +32,8 @@ export function MissionsWorkOrdersPage() {
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
-  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
-  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
   if (workOrdersError) {
@@ -61,7 +61,7 @@ export function MissionsWorkOrdersPage() {
   return (
     <WorkOrdersLoadedView
       organizationId={organizationId}
-      factoryKey={factoryKey}
+      factoryKey={routeSegment}
       factory={factory}
       factoryLines={factory.lines ?? []}
       workOrders={workOrders}

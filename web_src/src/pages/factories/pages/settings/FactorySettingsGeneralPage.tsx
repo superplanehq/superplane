@@ -26,6 +26,7 @@ import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import {
   factoryLineDetailPath,
   factoryListPath,
+  factoryRouteSegment,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
 } from "../../lib/factoryPagePaths";
@@ -235,8 +236,8 @@ function WorkspaceDetailsSection({
             autoComplete="off"
           />
           <p className="text-[12px] text-muted-foreground">
-            Changing the slug updates every task identifier for this workspace. IDs already shared elsewhere will no
-            longer resolve.
+            Changing the slug updates every task identifier for this workspace. Links that include the workspace id keep
+            working.
           </p>
           {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
         </div>
@@ -262,7 +263,7 @@ function WorkspaceDetailsSection({
 
 function publicBoardPath(
   organizationId: string,
-  factory: { key?: string; lines?: Array<{ id?: string }> | null; public?: boolean },
+  factory: { key?: string; urlId?: string; lines?: Array<{ id?: string }> | null; public?: boolean },
 ): string | undefined {
   if (!factory.public || !factory.key) {
     return undefined;
@@ -271,7 +272,7 @@ function publicBoardPath(
   if (!lineId) {
     return undefined;
   }
-  return factoryLineDetailPath(organizationId, factory.key, lineId);
+  return factoryLineDetailPath(organizationId, factoryRouteSegment(factory), lineId);
 }
 
 interface VisibilitySectionProps {

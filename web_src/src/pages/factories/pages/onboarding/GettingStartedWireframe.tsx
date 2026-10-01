@@ -12,7 +12,7 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void }) {
-  const { organizationId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
@@ -80,7 +80,7 @@ export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void 
               Each task runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))}
+              to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))}
               onClick={onDismiss}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",

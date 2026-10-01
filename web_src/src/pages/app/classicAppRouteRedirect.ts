@@ -2,7 +2,12 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories } from "@/hooks/useFactoryData";
 import { isFactoryApp } from "@/lib/canvasFlowDirection";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { factoryAppConfigurePath, factoryAppPath, factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
+import {
+  factoryAppConfigurePath,
+  factoryAppPath,
+  factoryListPath,
+  factoryRouteSegment,
+} from "@/pages/factories/lib/factoryPagePaths";
 
 export type ClassicAppRouteRedirect = { kind: "none" } | { kind: "wait" } | { kind: "redirect"; to: string };
 
@@ -15,13 +20,15 @@ export type ClassicAppPinnedSearch = {
 };
 
 export function factoryKeyForId(
-  factories: Array<{ id?: string; key?: string }>,
+  factories: Array<{ id?: string; key?: string; urlId?: string }>,
   factoryId?: string | null,
 ): string | undefined {
   if (!factoryId) {
     return undefined;
   }
-  return factories.find((factory) => factory.id === factoryId)?.key;
+  const factory = factories.find((entry) => entry.id === factoryId);
+  const segment = factoryRouteSegment(factory);
+  return segment || undefined;
 }
 
 export function pinnedSearchFromParams(searchParams: URLSearchParams): ClassicAppPinnedSearch {

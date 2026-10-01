@@ -18,13 +18,17 @@ import (
 )
 
 const (
-	factoryNameUniqueConstraint = "factories_organization_id_name_key"
-	factoryKeyUniqueConstraint  = "factories_organization_id_key_active_key"
+	factoryNameUniqueConstraint  = "factories_organization_id_name_key"
+	factoryKeyUniqueConstraint   = "factories_organization_id_key_active_key"
+	factoryURLIDUniqueConstraint = "factories_url_id_key"
 
 	FactoryKeyMinLength = 2
 	FactoryKeyMaxLength = 5
+	FactoryURLIDLength  = 8
 
 	DefaultFactoryWorkOrderListLimit = 100
+	maxFactoryURLIDAttempts          = 8
+	factoryURLIDAlphabet             = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
@@ -34,17 +38,23 @@ var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
+var ErrFactoryURLIDAlreadyExists = errors.New("factory url id already exists")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
 var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
+var factoryURLIDPattern = regexp.MustCompile(`^[a-z0-9]{8}$`)
+var factoryRouteSegmentPattern = regexp.MustCompile(`^[A-Za-z]{2,5}-([a-z0-9]{8})$`)
 
 type Factory struct {
-	ID                      uuid.UUID
-	OrganizationID          uuid.UUID
-	Name                    string
-	Description             string
-	Key                     string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+	Description    string
+	Key            string
+	// URLID is the stable workspace id used in URLs. It does not change when
+	// the workspace key changes.
+	URLID                   string `gorm:"column:url_id"`
 	NextWorkOrderNumber     int64
 	OnboardingConfig        datatypes.JSONType[FactoryOnboardingConfig]
 	OnboardingCompletedAt   *time.Time
@@ -130,6 +140,8 @@ func MapFactoryConstraintError(err error) error {
 			return ErrFactoryNameAlreadyExists
 		case factoryKeyUniqueConstraint:
 			return ErrFactoryKeyAlreadyExists
+		case factoryURLIDUniqueConstraint:
+			return ErrFactoryURLIDAlreadyExists
 		}
 	}
 
@@ -147,6 +159,29 @@ func MapFactoryNameUniqueConstraintError(err error) error {
 // `SP-42`).
 func (f *Factory) WorkOrderKey(number int64) string {
 	return fmt.Sprintf("%s-%d", f.Key, number)
+}
+
+// RouteSegment is the canonical workspace URL segment: lowercase key, hyphen,
+// then the stable url id. Example: `eng-k7m2xqab`.
+func (f *Factory) RouteSegment() string {
+	if f == nil || f.Key == "" || f.URLID == "" {
+		return ""
+	}
+	return strings.ToLower(f.Key) + "-" + f.URLID
+}
+
+var newFactoryURLID = generateFactoryURLID
+
+func generateFactoryURLID() (string, error) {
+	raw := make([]byte, FactoryURLIDLength)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	out := make([]byte, FactoryURLIDLength)
+	for i, b := range raw {
+		out[i] = factoryURLIDAlphabet[int(b)%len(factoryURLIDAlphabet)]
+	}
+	return string(out), nil
 }
 
 func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key string) (*Factory, error) {
@@ -183,11 +218,47 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		UpdatedAt:              now,
 	}
 
-	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
-		return nil, MapFactoryConstraintError(err)
-	}
+	return insertFactoryWithUniqueURLID(tx, factory)
+}
 
-	return factory, nil
+func insertFactoryWithUniqueURLID(tx *gorm.DB, factory *Factory) (*Factory, error) {
+	var created *Factory
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		for attempt := 0; attempt < maxFactoryURLIDAttempts; attempt++ {
+			savepoint := fmt.Sprintf("factory_url_id_%d", attempt)
+			if err := inner.SavePoint(savepoint).Error; err != nil {
+				return fmt.Errorf("factory url id savepoint: %w", err)
+			}
+
+			urlID, err := newFactoryURLID()
+			if err != nil {
+				return err
+			}
+			factory.URLID = urlID
+			err = inner.Clauses(clause.Returning{}).Create(factory).Error
+			if err == nil {
+				created = factory
+				return nil
+			}
+
+			mapped := MapFactoryConstraintError(err)
+			if !errors.Is(mapped, ErrFactoryURLIDAlreadyExists) {
+				return mapped
+			}
+			// GORM stores the unique-violation on inner.Error and then skips
+			// later statements. Clear it so ROLLBACK TO SAVEPOINT can run.
+			inner.Error = nil
+			if rollbackErr := inner.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return fmt.Errorf("rollback factory url id: %w", rollbackErr)
+			}
+		}
+
+		return fmt.Errorf("could not allocate a unique workspace url id")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 // GenerateUniqueFactoryKey picks a key that is unique among active
@@ -315,8 +386,36 @@ func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Facto
 	return &factory, nil
 }
 
-// FindFactoryByRef resolves ref to a factory. ref is a UUID or a workspace
-// key. Workspace names are not accepted.
+func FindFactoryByURLID(tx *gorm.DB, organizationID uuid.UUID, urlID string) (*Factory, error) {
+	if !factoryURLIDPattern.MatchString(urlID) {
+		return nil, ErrFactoryNotFound
+	}
+
+	var factory Factory
+	err := tx.
+		Where("organization_id = ? AND url_id = ?", organizationID, urlID).
+		First(&factory).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func FactoryURLIDFromRouteSegment(segment string) (string, bool) {
+	matches := factoryRouteSegmentPattern.FindStringSubmatch(strings.TrimSpace(segment))
+	if matches == nil {
+		return "", false
+	}
+	return matches[1], true
+}
+
+// FindFactoryByRef resolves ref to a factory. ref is a UUID, a workspace
+// key, or a `key-urlId` route segment. Workspace names are not accepted.
 //
 // Names can contain spaces, so they do not belong in `/factories/{id}`.
 // Names are also not unique in an organization.
@@ -327,6 +426,9 @@ func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Facto
 	}
 	if id, err := uuid.Parse(trimmed); err == nil {
 		return FindFactory(tx, organizationID, id)
+	}
+	if urlID, ok := FactoryURLIDFromRouteSegment(trimmed); ok {
+		return FindFactoryByURLID(tx, organizationID, urlID)
 	}
 
 	return FindFactoryByKey(tx, organizationID, trimmed)

@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useParams, useSearchParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
+  factoryRouteSegment,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
@@ -103,7 +104,12 @@ function FactorySettingsLayoutResolver({ organizationId, factoryKey }: { organiz
   const resolution = resolveFactoryByKey(factories, factoryKey, factoriesLoading || factoriesFetching);
 
   if (factoryRouteNeedsCanonicalRedirect(resolution, factoryKey)) {
-    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, resolution.factory!.key!);
+    const target = replaceFactoryKeySegment(
+      location.pathname,
+      organizationId,
+      factoryKey,
+      factoryRouteSegment(resolution.factory),
+    );
     return <Navigate to={`${target}${location.search}`} replace />;
   }
 
@@ -123,7 +129,7 @@ function FactorySettingsLayoutResolver({ organizationId, factoryKey }: { organiz
     <FactorySettingsLayoutContent
       organizationId={organizationId}
       factoryId={resolution.factory.id}
-      factoryKey={resolution.factory.key ?? factoryKey}
+      factoryKey={factoryRouteSegment(resolution.factory) || resolution.factory.key || factoryKey}
       factories={factories}
     />
   );

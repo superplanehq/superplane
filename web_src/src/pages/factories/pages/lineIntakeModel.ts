@@ -15,6 +15,7 @@ import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
+import { parseWorkspaceRouteSegment } from "../lib/factoryKeyResolution";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -239,7 +240,12 @@ export function lineIntakeSourceForApiSource(apiSource: string | undefined): Lin
 }
 
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
-  return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
+  if (!factoryKey) {
+    return false;
+  }
+  const parsed = parseWorkspaceRouteSegment(factoryKey);
+  const key = (parsed?.prefix ?? factoryKey).toUpperCase();
+  return key === ACME_ONBOARDING_FACTORY_KEY;
 }
 
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
