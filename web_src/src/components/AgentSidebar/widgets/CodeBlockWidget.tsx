@@ -1,6 +1,6 @@
 import { Check, Copy, Maximize2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
-import Editor from "@monaco-editor/react";
+import Editor from "@/ui/MonacoEditor";
 
 import { useTheme } from "@/contexts/useTheme";
 import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";

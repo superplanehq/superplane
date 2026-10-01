@@ -1,5 +1,5 @@
 import React from "react";
-import Editor from "@monaco-editor/react";
+import Editor from "@/ui/MonacoEditor";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/lib/toast";
