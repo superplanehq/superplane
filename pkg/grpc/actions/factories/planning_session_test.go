@@ -350,6 +350,58 @@ func Test__SendPlanningSessionMessage__AssignsSenderAndKeepsOtherOwners(t *testi
 	assert.ElementsMatch(t, []uuid.UUID{other.ID, r.User}, draftAssigneeIDs(t, db, session))
 }
 
+func Test__AnswerPlanningSessionSurvey__ClosesTaskWhenUserChoosesClose(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{{
+			Prompt:  "Nothing is left. Close this task?",
+			Options: []string{models.PlanningSurveyCloseOption, "Keep it open"},
+		}},
+	}))
+
+	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Nothing is left. Close this task? Close the task",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, answered.Session.State)
+	require.Len(t, answered.Session.Messages, 1)
+	assert.Equal(t, "Nothing is left. Close this task? Close the task", answered.Session.Messages[0].Text)
+
+	order := planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, order.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, order.Result)
+	assert.Equal(t, []uuid.UUID{r.User}, draftAssigneeIDs(t, db, session))
+}
+
+func Test__AnswerPlanningSessionSurvey__KeepsTaskOpenForAnotherOption(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{{
+			Prompt:  "Nothing is left. Close this task?",
+			Options: []string{models.PlanningSurveyCloseOption, "Keep it open"},
+		}},
+	}))
+
+	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Nothing is left. Close this task? Keep it open",
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, models.PlanningSessionStateEnded, answered.Session.State)
+
+	order := planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+}
+
 func Test__AnswerPlanningSessionSurvey__AssignsSender(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

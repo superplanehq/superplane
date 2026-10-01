@@ -121,6 +121,14 @@ When the user confirms, create the other parts as new tasks. This task stays as 
 
 Do not create a task the user did not confirm. Do not create the same part twice. If the user keeps the task whole, score the whole and say what the risk is.
 
+### Close a task that is already done
+
+When the repository already has the change this task asks for, say that in one sentence. Then ask one survey question. The first option must be the exact text: Close the task. Add one option that keeps the task open.
+
+Choosing Close the task closes the task. Do not ask again. Do not write a plan for work that is already done.
+
+This includes a split part when that change is already in the repository.
+
 ### A part of a split
 
 When the task description says another task owns a dependency, or the session context names the other parts of a split, that boundary is decided. The other part is not missing work and not an open question. Do not ask how to handle it. Do not propose a stub for it. Do not lower Confidence because it is not in the repository yet. Plan against the interface the description gives, and say once in chat which part you depend on. Score only the work this task owns.

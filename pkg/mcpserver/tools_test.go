@@ -118,6 +118,55 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 	require.NotEmpty(t, payload["id"])
 }
 
+func TestCloseTaskClosesDraftAsRejected(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Close", "", "CLS")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Already done", "The first task shipped this.", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "close_task", map[string]any{
+		"task": order.ID.String(),
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "closed", payload["state"])
+	assert.Equal(t, "rejected", payload["result"])
+
+	reloaded, err := factoryModel.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+}
+
+func TestCloseTaskClosesOpenTaskAsCompleted(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Close Open", "", "CLO")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Running task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "close_task", map[string]any{
+		"task": factoryModel.WorkOrderKey(order.Number),
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "closed", payload["state"])
+	assert.Equal(t, "completed", payload["result"])
+}
+
 func TestCallToolRejectsWithoutMCPServerFlag(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
