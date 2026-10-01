@@ -39,7 +39,7 @@ export function FactoryLineStepEditor({
         <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-app-${index}`}>Automation</Label>
           <Select
-            value={step.appId || undefined}
+            value={step.appId}
             onValueChange={(appId) => onChange({ ...step, appId, entrypoint: "" })}
           >
             <SelectTrigger id={`factory-line-step-app-${index}`} className={stepFieldClassName}>
@@ -58,7 +58,7 @@ export function FactoryLineStepEditor({
         <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-entrypoint-${index}`}>Trigger</Label>
           <Select
-            value={step.entrypoint || undefined}
+            value={step.entrypoint}
             onValueChange={(entrypoint) => onChange({ ...step, entrypoint })}
             disabled={!step.appId || canvasLoading}
           >
