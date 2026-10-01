@@ -10,7 +10,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PLANNING_REVIEW_DRAFT, type PlanningReviewStep } from "./planningReviewMockup";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
   ),

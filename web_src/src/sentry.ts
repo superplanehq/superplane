@@ -27,9 +27,12 @@ export function isIgnoredConsoleMessage(message: unknown): boolean {
 }
 
 // True when the event is the known-benign monaco-editor "Canceled"
-// unhandled rejection. monaco-editor (CDN-loaded) rejects a DeferredPromise
+// unhandled rejection. monaco-editor rejects a DeferredPromise
 // with no .catch() when a WebKit clipboard-write is superseded by a new copy
 // action. This is upstream noise, not a bug in our code.
+//
+// Bundled editor frames use the monaco-editor chunk name. Hashed worker
+// frames use the worker entry name. Application frames stay reportable.
 export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   const exception = event.exception?.values?.[0];
   if (exception?.value !== "Canceled") {
@@ -37,9 +40,18 @@ export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   }
 
   const frames = exception.stacktrace?.frames ?? [];
+  return frames.length > 0 && frames.every((frame) => isMonacoCanceledFrame(frame.filename));
+}
+
+function isMonacoCanceledFrame(filename: string | undefined): boolean {
+  if (!filename) {
+    return false;
+  }
+
   return (
-    frames.length > 0 &&
-    frames.every((frame) => frame.filename?.includes("monaco-editor") || frame.filename?.includes("@sentry"))
+    filename.includes("monaco-editor") ||
+    filename.includes("@sentry") ||
+    /(?:editor|json|css|html|ts)\.worker/.test(filename)
   );
 }
 

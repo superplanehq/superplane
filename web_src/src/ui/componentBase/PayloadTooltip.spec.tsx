@@ -9,7 +9,7 @@ vi.mock("@/contexts/useTheme", () => ({
   useTheme: () => ({ preference: "dark", resolvedTheme: "dark", setPreference: () => undefined }),
 }));
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   default: ({ theme, value }: { theme?: string; value?: string }) => {
     monacoThemes.push(theme ?? "");
     return <pre data-testid="monaco-editor">{value}</pre>;
