@@ -149,13 +149,18 @@ spec:
               summary is one sentence.
               Start with Higher risk, Moderate risk, or Lower risk.
               Use Higher risk for high or critical. Use Moderate risk for medium. Use Lower risk for low or very low.
-              Then say the pull request is introducing the highest matching category.
-              For Lower risk, stop after the category and end with "only". Do not describe the edit.
+              When a category matches, say the pull request is introducing that category.
+              End a Lower risk sentence with "only" when every change fits that one category.
+              Do not use "only" when the pull request also changes something outside that category.
+              Do not describe the edit in a Lower risk sentence.
               For Moderate risk and Higher risk, add "by" and the concrete change.
+              When no category matches, say the pull request matches no configured category.
+              Then name the concrete change. Do not invent a category.
               Do not repeat the score. The check shows the number beside this sentence.
               Do not write a second sentence. Do not write a list.
               Good lower: Lower risk because the pull request is introducing user interface changes only.
               Good higher: Higher risk because the pull request is introducing infrastructure changes by raising the ingress body limit from 64 MB to 80 MB.
+              Good none: Moderate risk because the pull request matches no configured category and rewrites the retry loop.
           - name: Emit Review
             type: bash
             command: |-
