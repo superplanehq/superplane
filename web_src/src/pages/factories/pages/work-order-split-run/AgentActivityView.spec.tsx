@@ -304,6 +304,23 @@ describe("AgentActivityView", () => {
     expect(screen.getByRole("button", { name: "Prepared task, created tasks" })).toBeInTheDocument();
   });
 
+  it("does not label a failed leftover create_task as created", () => {
+    render(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          {
+            ...completedTool("mcp-1", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+            status: "failed",
+          },
+          completedTool("mcp-2", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Created 1 task, used 1 tool" })).toBeInTheDocument();
+  });
+
   it("keeps chronological tool batches collapsed inside a completed turn", async () => {
     const user = userEvent.setup();
     render(
