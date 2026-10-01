@@ -1131,17 +1131,22 @@ CREATE TABLE public.runner_registrations (
 
 
 --
--- Name: runner_task_log_uploads; Type: TABLE; Schema: public; Owner: -
+-- Name: runner_task_log_lifecycles; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.runner_task_log_uploads (
+CREATE TABLE public.runner_task_log_lifecycles (
     task_id uuid NOT NULL,
-    next_chunk_sequence bigint DEFAULT 0 NOT NULL,
-    total_bytes bigint DEFAULT 0 NOT NULL,
-    finalizing_at timestamp with time zone,
+    active_store text DEFAULT 'postgres'::text NOT NULL,
+    state character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    final_object_key text,
+    final_cursor text,
+    truncated boolean DEFAULT false NOT NULL,
+    cleanup_after timestamp with time zone,
     processing_until timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT runner_task_log_uploads_values_check CHECK (((next_chunk_sequence >= 0) AND (total_bytes >= 0)))
+    CONSTRAINT runner_task_log_lifecycles_active_store_check CHECK ((active_store <> ''::text)),
+    CONSTRAINT runner_task_log_lifecycles_state_check CHECK (((state)::text = ANY ((ARRAY['active'::character varying, 'archivable'::character varying, 'archiving'::character varying, 'archived'::character varying])::text[])))
 );
 
 
@@ -1159,6 +1164,8 @@ CREATE TABLE public.runner_tasks (
     payload_ciphertext bytea NOT NULL,
     result jsonb,
     exit_code integer,
+    error_message text,
+    completion_hash text,
     cancel_requested_at timestamp with time zone,
     queued_at timestamp with time zone DEFAULT now() NOT NULL,
     reserved_at timestamp with time zone,
@@ -1166,8 +1173,6 @@ CREATE TABLE public.runner_tasks (
     finished_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    error_message text,
-    completion_hash text,
     CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
     CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
 );
@@ -2229,11 +2234,11 @@ ALTER TABLE ONLY public.runner_registrations
 
 
 --
--- Name: runner_task_log_uploads runner_task_log_uploads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: runner_task_log_lifecycles runner_task_log_lifecycles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.runner_task_log_uploads
-    ADD CONSTRAINT runner_task_log_uploads_pkey PRIMARY KEY (task_id);
+ALTER TABLE ONLY public.runner_task_log_lifecycles
+    ADD CONSTRAINT runner_task_log_lifecycles_pkey PRIMARY KEY (task_id);
 
 
 --
@@ -3556,6 +3561,13 @@ CREATE INDEX runner_registrations_expiry_idx ON public.runner_registrations USIN
 
 
 --
+-- Name: runner_task_log_lifecycles_archiving_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_log_lifecycles_archiving_idx ON public.runner_task_log_lifecycles USING btree (state, updated_at) WHERE ((state)::text = ANY ((ARRAY['archivable'::character varying, 'archiving'::character varying, 'archived'::character varying])::text[]));
+
+
+--
 -- Name: runner_tasks_fleet_state_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4377,11 +4389,11 @@ ALTER TABLE ONLY public.runner_registrations
 
 
 --
--- Name: runner_task_log_uploads runner_task_log_uploads_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: runner_task_log_lifecycles runner_task_log_lifecycles_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.runner_task_log_uploads
-    ADD CONSTRAINT runner_task_log_uploads_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.runner_task_log_lifecycles
+    ADD CONSTRAINT runner_task_log_lifecycles_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
 
 
 --
@@ -4808,7 +4820,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260927134533	f
+20260926140823	f
 \.
 
 

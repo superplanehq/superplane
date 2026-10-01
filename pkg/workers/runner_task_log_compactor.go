@@ -1,26 +1,33 @@
 package workers
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
-	runnerTaskLogFinalizationBatchSize = 25
-	runnerTaskLogProcessingLease       = 15 * time.Minute
+	runnerTaskLogArchivingBatchSize = 25
+	runnerTaskLogProcessingLease    = 15 * time.Minute
 )
 
 type RunnerTaskLogCompactor struct {
 	provider        blob.Provider
+	activeStore     runnerlogs.Store
+	installationID  string
 	interval        time.Duration
 	liveReaderGrace time.Duration
 	logger          *log.Entry
@@ -28,11 +35,15 @@ type RunnerTaskLogCompactor struct {
 
 func NewRunnerTaskLogCompactor(
 	provider blob.Provider,
+	activeStore runnerlogs.Store,
+	installationID string,
 	interval time.Duration,
 	liveReaderGrace time.Duration,
 ) *RunnerTaskLogCompactor {
 	return &RunnerTaskLogCompactor{
 		provider:        provider,
+		activeStore:     activeStore,
+		installationID:  installationID,
 		interval:        interval,
 		liveReaderGrace: liveReaderGrace,
 		logger:          log.WithField("worker", "RunnerTaskLogCompactor"),
@@ -56,12 +67,18 @@ func (w *RunnerTaskLogCompactor) Start(ctx context.Context) {
 }
 
 func (w *RunnerTaskLogCompactor) Process(ctx context.Context) error {
-	for range runnerTaskLogFinalizationBatchSize {
+	_, err := w.activeStore.DeleteExpired(
+		ctx,
+		time.Now().Add(-runnerlogs.SafetyExpiration),
+	)
+	if err != nil {
+		return err
+	}
+	for range runnerTaskLogArchivingBatchSize {
 		now := time.Now()
-		candidate, err := models.ClaimTaskLogFinalization(
-			database.Conn(),
+		candidate, err := claimLogArchiving(
+			database.DB(ctx),
 			now,
-			now.Add(-w.liveReaderGrace),
 			now.Add(runnerTaskLogProcessingLease),
 		)
 		if err != nil {
@@ -75,12 +92,7 @@ func (w *RunnerTaskLogCompactor) Process(ctx context.Context) error {
 		err = w.processTask(taskCtx, *candidate)
 		cancel()
 		if err != nil {
-			releaseErr := models.ReleaseTaskLogFinalization(
-				database.Conn(),
-				candidate.TaskID,
-				candidate.ProcessingUntil,
-				time.Now(),
-			)
+			releaseErr := candidate.release(database.DB(ctx), time.Now())
 			w.logger.WithError(err).
 				WithField("task_id", candidate.TaskID).
 				Error("Failed to compact task logs")
@@ -95,47 +107,56 @@ func (w *RunnerTaskLogCompactor) Process(ctx context.Context) error {
 	return nil
 }
 
-func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate models.TaskLogFinalization) error {
-	if candidate.FinalizingAt == nil {
-		if err := w.writeFinalObject(ctx, candidate); err != nil {
+func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate LogArchivingCandidate) error {
+	if candidate.ActiveStore != w.activeStore.Name() {
+		return fmt.Errorf("active log store %q is unavailable", candidate.ActiveStore)
+	}
+	if candidate.State == models.RunnerTaskLogStateArchived {
+		err := w.activeStore.Delete(ctx, candidate.TaskID)
+		if err != nil {
 			return err
 		}
-		return models.MarkTaskLogFinalizing(
-			database.Conn(),
-			candidate.TaskID,
-			candidate.ProcessingUntil,
-			time.Now(),
-		)
+		return candidate.finishCleanup(database.DB(ctx), time.Now())
 	}
 
-	for sequence := int64(0); sequence < candidate.NextChunkSequence; sequence++ {
-		if err := ctx.Err(); err != nil {
-			return err
+	active, err := w.activeStore.ReadAfter(ctx, candidate.TaskID, "")
+	if errors.Is(err, runnerlogs.ErrNotFound) {
+		active = &runnerlogs.ReadResult{
+			Content: io.NopCloser(bytes.NewReader(nil)),
+			Cursor:  "0",
 		}
-		if err := w.provider.Delete(
-			ctx,
-			runnerlogs.ChunkKey(candidate.OrganizationID, candidate.TaskID, sequence),
-		); err != nil {
-			return fmt.Errorf("delete chunk %d: %w", sequence, err)
-		}
+	} else if err != nil {
+		return err
 	}
-	return models.DeleteClaimedTaskLogUpload(
-		database.Conn(),
-		candidate.TaskID,
-		candidate.ProcessingUntil,
+	defer active.Content.Close()
+	if err := candidate.recordFinalCursor(database.DB(ctx), active.Cursor, time.Now()); err != nil {
+		return err
+	}
+
+	key := runnerlogs.FinalKey(w.installationID, candidate.OrganizationID, candidate.TaskID)
+	if err := w.writeFinalObject(ctx, key, active.Content); err != nil {
+		return err
+	}
+	now := time.Now()
+	return candidate.markArchived(
+		database.DB(ctx),
+		key,
+		active.Truncated,
+		now.Add(w.liveReaderGrace),
+		now,
 	)
 }
 
-func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, candidate models.TaskLogFinalization) error {
+func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, key string, active io.Reader) error {
 	reader, writer := io.Pipe()
 	writeDone := make(chan error, 1)
 	go func() {
-		writeDone <- w.writeGzipStream(ctx, writer, candidate)
+		writeDone <- writeGzipStream(writer, active)
 	}()
 
 	err := w.provider.Put(
 		ctx,
-		runnerlogs.FinalKey(candidate.OrganizationID, candidate.TaskID),
+		key,
 		reader,
 		blob.PutOptions{
 			ContentType:     "application/x-ndjson",
@@ -153,27 +174,11 @@ func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, candidate
 	return nil
 }
 
-func (w *RunnerTaskLogCompactor) writeGzipStream(ctx context.Context, writer *io.PipeWriter, candidate models.TaskLogFinalization) error {
+func writeGzipStream(writer *io.PipeWriter, active io.Reader) error {
 	gzipWriter := gzip.NewWriter(writer)
-	for sequence := int64(0); sequence < candidate.NextChunkSequence; sequence++ {
-		chunk, err := w.provider.Get(
-			ctx,
-			runnerlogs.ChunkKey(candidate.OrganizationID, candidate.TaskID, sequence),
-		)
-		if err != nil {
-			_ = writer.CloseWithError(err)
-			return fmt.Errorf("read chunk %d: %w", sequence, err)
-		}
-		_, copyErr := io.Copy(gzipWriter, chunk)
-		closeErr := chunk.Close()
-		if copyErr != nil {
-			_ = writer.CloseWithError(copyErr)
-			return fmt.Errorf("copy chunk %d: %w", sequence, copyErr)
-		}
-		if closeErr != nil {
-			_ = writer.CloseWithError(closeErr)
-			return fmt.Errorf("close chunk %d: %w", sequence, closeErr)
-		}
+	if _, err := io.Copy(gzipWriter, active); err != nil {
+		_ = writer.CloseWithError(err)
+		return fmt.Errorf("copy active task log: %w", err)
 	}
 	if err := gzipWriter.Close(); err != nil {
 		_ = writer.CloseWithError(err)
@@ -183,4 +188,166 @@ func (w *RunnerTaskLogCompactor) writeGzipStream(ctx context.Context, writer *io
 		return fmt.Errorf("close final log stream: %w", err)
 	}
 	return nil
+}
+
+type LogArchivingCandidate struct {
+	TaskID          uuid.UUID
+	OrganizationID  uuid.UUID
+	ActiveStore     string
+	State           string
+	ProcessingUntil time.Time
+}
+
+/*
+ * claimLogArchiving holds a row lock only while it records a lease.
+ */
+func claimLogArchiving(tx *gorm.DB, now, processingUntil time.Time) (*LogArchivingCandidate, error) {
+	var candidate LogArchivingCandidate
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		err := tx.Table("runner_task_log_lifecycles AS lifecycles").
+			Select(
+				"lifecycles.task_id, tasks.organization_id, "+
+					"lifecycles.active_store, lifecycles.state",
+			).
+			Joins("JOIN runner_tasks AS tasks ON tasks.id = lifecycles.task_id").
+			Clauses(clause.Locking{
+				Strength: "UPDATE",
+				Table:    clause.Table{Name: "lifecycles"},
+				Options:  "SKIP LOCKED",
+			}).
+			Where("lifecycles.state IN ?", []string{
+				models.RunnerTaskLogStateArchivable,
+				models.RunnerTaskLogStateArchiving,
+				models.RunnerTaskLogStateArchived,
+			}).
+			Where("lifecycles.processing_until IS NULL OR lifecycles.processing_until <= ?", now).
+			Where(
+				"lifecycles.state <> ? OR lifecycles.cleanup_after <= ?",
+				models.RunnerTaskLogStateArchived,
+				now,
+			).
+			Order("lifecycles.updated_at ASC").
+			Take(&candidate).
+			Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		updates := map[string]any{
+			"processing_until": processingUntil,
+			"updated_at":       now,
+		}
+		if candidate.State == models.RunnerTaskLogStateArchivable {
+			updates["state"] = models.RunnerTaskLogStateArchiving
+		}
+		result := tx.Model(&models.RunnerTaskLogLifecycle{}).
+			Where("task_id = ?", candidate.TaskID).
+			Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return models.ErrTaskLogLifecycleNotFound
+		}
+		candidate.ProcessingUntil = processingUntil
+		if candidate.State == models.RunnerTaskLogStateArchivable {
+			candidate.State = models.RunnerTaskLogStateArchiving
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if candidate.TaskID == uuid.Nil {
+		return nil, nil
+	}
+	return &candidate, nil
+}
+
+func (f *LogArchivingCandidate) recordFinalCursor(tx *gorm.DB, finalCursor string, now time.Time) error {
+	result := tx.Model(&models.RunnerTaskLogLifecycle{}).
+		Where(
+			"task_id = ? AND processing_until = ? AND state = ?",
+			f.TaskID,
+			f.ProcessingUntil,
+			models.RunnerTaskLogStateArchiving,
+		).
+		Updates(map[string]any{
+			"final_cursor": finalCursor,
+			"updated_at":   now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return models.ErrTaskLogLifecycleNotFound
+	}
+	return nil
+}
+
+func (f *LogArchivingCandidate) markArchived(
+	tx *gorm.DB,
+	finalObjectKey string,
+	truncated bool,
+	cleanupAfter, now time.Time,
+) error {
+	result := tx.Model(&models.RunnerTaskLogLifecycle{}).
+		Where(
+			"task_id = ? AND processing_until = ? AND state = ?",
+			f.TaskID,
+			f.ProcessingUntil,
+			models.RunnerTaskLogStateArchiving,
+		).
+		Updates(map[string]any{
+			"state":            models.RunnerTaskLogStateArchived,
+			"final_object_key": finalObjectKey,
+			"truncated":        truncated,
+			"cleanup_after":    cleanupAfter,
+			"processing_until": nil,
+			"updated_at":       now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return models.ErrTaskLogLifecycleNotFound
+	}
+	f.State = models.RunnerTaskLogStateArchived
+	return nil
+}
+
+func (f *LogArchivingCandidate) finishCleanup(tx *gorm.DB, now time.Time) error {
+	result := tx.Model(&models.RunnerTaskLogLifecycle{}).
+		Where(
+			"task_id = ? AND processing_until = ? AND state = ?",
+			f.TaskID,
+			f.ProcessingUntil,
+			models.RunnerTaskLogStateArchived,
+		).
+		Updates(map[string]any{
+			"processing_until": nil,
+			"cleanup_after":    nil,
+			"updated_at":       now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return models.ErrTaskLogLifecycleNotFound
+	}
+	f.ProcessingUntil = time.Time{}
+	return nil
+}
+
+func (f *LogArchivingCandidate) release(tx *gorm.DB, now time.Time) error {
+	return tx.Model(&models.RunnerTaskLogLifecycle{}).
+		Where("task_id = ? AND processing_until = ?", f.TaskID, f.ProcessingUntil).
+		Updates(map[string]any{
+			"processing_until": nil,
+			"updated_at":       now,
+		}).
+		Error
 }

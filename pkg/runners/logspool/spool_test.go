@@ -11,6 +11,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 )
 
 func TestSpoolUploadsSequentialNDJSONAndWaitsForAcknowledgement(t *testing.T) {
@@ -90,6 +94,50 @@ func TestSpoolUploadsSequentialNDJSONAndWaitsForAcknowledgement(t *testing.T) {
 				t.Fatalf("chunk %d contains invalid NDJSON line %q", i, line)
 			}
 		}
+	}
+}
+
+func TestSpoolSplitsLargeLinesWithinUploadLimit(t *testing.T) {
+	const targetChunkBytes int64 = 128
+	policy := runnerapi.LogUploadPolicy{TargetChunkBytes: targetChunkBytes}
+	maxUploadBytes := policy.MaxUploadBytes()
+
+	var mu sync.Mutex
+	var chunkSizes []int64
+	server := httptest.NewServer(logHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		content, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		chunkSizes = append(chunkSizes, int64(len(content)))
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	defer server.Close()
+
+	spool, err := New(Config{
+		Directory:   t.TempDir(),
+		TaskID:      "large-line",
+		BaseURL:     server.URL,
+		AccessToken: "access-token",
+		ChunkBytes:  targetChunkBytes,
+		MaxBytes:    16 * 1024,
+		RetryDelay:  10 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	_, err = spool.Write([]byte(strings.Repeat(`"`, 4096) + "\n"))
+	require.NoError(t, err)
+	require.NoError(t, spool.Close())
+	require.NoError(t, spool.Wait(t.Context()))
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Greater(t, len(chunkSizes), 1)
+	for _, size := range chunkSizes {
+		assert.LessOrEqual(t, size, maxUploadBytes)
 	}
 }
 
@@ -177,14 +225,56 @@ func TestSpoolDefaultFlushIntervalUsesJitterRange(t *testing.T) {
 	spool := &Spool{}
 	for range 100 {
 		interval := spool.nextFlushInterval()
-		if interval < defaultFlushIntervalMin || interval > defaultFlushIntervalMax {
+		if interval < defaultMinimumFlushInterval || interval > defaultMaximumFlushInterval {
 			t.Fatalf(
 				"flush interval = %s, want between %s and %s",
 				interval,
-				defaultFlushIntervalMin,
-				defaultFlushIntervalMax,
+				defaultMinimumFlushInterval,
+				defaultMaximumFlushInterval,
 			)
 		}
+	}
+}
+
+func TestSpoolStopsAndDiscardsPendingChunks(t *testing.T) {
+	var mu sync.Mutex
+	uploads := 0
+	server := httptest.NewServer(logHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		uploads++
+		mu.Unlock()
+		w.Header().Set(runnerapi.HeaderLogUploadAction, runnerapi.LogUploadActionStop)
+		w.Header().Set(runnerapi.HeaderLogTargetChunkBytes, "16")
+		w.Header().Set(runnerapi.HeaderLogFlushMinimumMS, "10")
+		w.Header().Set(runnerapi.HeaderLogFlushMaximumMS, "20")
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	defer server.Close()
+
+	spool, err := New(Config{
+		Directory:   t.TempDir(),
+		TaskID:      "task-stop",
+		BaseURL:     server.URL,
+		AccessToken: "access-token",
+		ChunkBytes:  32,
+		MaxBytes:    4096,
+		RetryDelay:  10 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	_, _ = spool.Write([]byte(strings.Repeat("output\n", 100)))
+	if err := spool.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := spool.Wait(t.Context()); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if uploads != 1 {
+		t.Fatalf("uploads = %d, want 1", uploads)
 	}
 }
 

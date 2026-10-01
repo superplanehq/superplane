@@ -1,23 +1,22 @@
 package workers
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	logpostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/test/support"
+	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
 )
 
@@ -26,6 +25,14 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 	db := database.DB(t.Context())
 	provider, err := filesystem.New(t.TempDir())
 	require.NoError(t, err)
+	installationID, err := models.GetInstallationID(db)
+	require.NoError(t, err)
+	activeStore := logpostgres.New()
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      db,
+		MeterProvider: otel.GetMeterProvider(),
+	}))
 
 	fleet := models.RunnerFleet{
 		ID:            uuid.New(),
@@ -49,32 +56,37 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 		UpdatedAt:         time.Now(),
 	}
 	require.NoError(t, db.Create(&task).Error)
-	require.NoError(t, db.Create(&models.TaskLogUpload{
-		TaskID:            task.ID,
-		NextChunkSequence: 2,
-		TotalBytes:        13,
-		UpdatedAt:         time.Now(),
+	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
+		TaskID:      task.ID,
+		ActiveStore: runnerlogs.StorePostgres,
+		State:       models.RunnerTaskLogStateArchivable,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}).Error)
 
-	putLogChunk(t, provider, task, 0, "first\n")
-	putLogChunk(t, provider, task, 1, "second\n")
+	_, err = activeStore.Append(t.Context(), task.ID, 0, []byte("first\n"))
+	require.NoError(t, err)
+	_, err = activeStore.Append(t.Context(), task.ID, 1, []byte("second\n"))
+	require.NoError(t, err)
 
-	compactor := NewRunnerTaskLogCompactor(provider, time.Second, time.Minute)
+	compactor := NewRunnerTaskLogCompactor(provider, activeStore, installationID, time.Second, time.Minute)
 	require.NoError(t, compactor.Process(context.Background()))
 
-	var upload models.TaskLogUpload
-	require.NoError(t, db.Where("task_id = ?", task.ID).First(&upload).Error)
-	require.NotNil(t, upload.FinalizingAt)
+	var lifecycle models.RunnerTaskLogLifecycle
+	require.NoError(t, db.Where("task_id = ?", task.ID).First(&lifecycle).Error)
+	assert.Equal(t, models.RunnerTaskLogStateArchived, lifecycle.State)
+	require.NotNil(t, lifecycle.FinalCursor)
+	require.NotNil(t, lifecycle.CleanupAfter)
 
 	_, err = provider.Head(
 		context.Background(),
-		runnerlogs.FinalKey(task.OrganizationID, task.ID),
+		runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID),
 	)
 	require.NoError(t, err)
 
 	finalReader, err := provider.Get(
 		context.Background(),
-		runnerlogs.FinalKey(task.OrganizationID, task.ID),
+		runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID),
 	)
 	require.NoError(t, err)
 	gzipReader, err := gzip.NewReader(finalReader)
@@ -85,16 +97,91 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 	require.NoError(t, finalReader.Close())
 	assert.Equal(t, "first\nsecond\n", string(content))
 
-	cleanupCompactor := NewRunnerTaskLogCompactor(provider, time.Second, 0)
+	require.NoError(t, db.Model(&models.RunnerTaskLogLifecycle{}).
+		Where("task_id = ?", task.ID).
+		Update("cleanup_after", time.Now().Add(-time.Second)).
+		Error)
+	cleanupCompactor := NewRunnerTaskLogCompactor(provider, activeStore, installationID, time.Second, 0)
 	require.NoError(t, cleanupCompactor.Process(context.Background()))
-	assert.Error(t, db.Where("task_id = ?", task.ID).First(&upload).Error)
-	for sequence := int64(0); sequence < 2; sequence++ {
-		_, err := provider.Head(
-			context.Background(),
-			runnerlogs.ChunkKey(task.OrganizationID, task.ID, sequence),
-		)
-		assert.ErrorIs(t, err, blob.ErrNotFound)
+	var cleanedLifecycle models.RunnerTaskLogLifecycle
+	require.NoError(t, db.Where("task_id = ?", task.ID).First(&cleanedLifecycle).Error)
+	assert.Equal(t, models.RunnerTaskLogStateArchived, cleanedLifecycle.State)
+	assert.Nil(t, cleanedLifecycle.CleanupAfter)
+	_, err = activeStore.ReadAfter(t.Context(), task.ID, "")
+	assert.ErrorIs(t, err, runnerlogs.ErrNotFound)
+}
+
+func TestRunnerTaskLogCompactorArchivesTaskWithoutChunks(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	installationID, err := models.GetInstallationID(db)
+	require.NoError(t, err)
+	activeStore := logpostgres.New()
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      db,
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+
+	fleet := models.RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          "test-empty-log-compaction",
+		ScopeType:     models.RunnerFleetScopeInstallation,
+		Enabled:       true,
+		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+		RunnerVersion: "0.1.0",
 	}
+	require.NoError(t, fleet.Create(db))
+
+	task := models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateSucceeded,
+		PayloadCiphertext: []byte("{}"),
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	require.NoError(t, db.Create(&task).Error)
+	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
+		TaskID:      task.ID,
+		ActiveStore: runnerlogs.StorePostgres,
+		State:       models.RunnerTaskLogStateArchivable,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}).Error)
+
+	compactor := NewRunnerTaskLogCompactor(
+		provider,
+		activeStore,
+		installationID,
+		time.Second,
+		time.Minute,
+	)
+	require.NoError(t, compactor.Process(t.Context()))
+
+	var lifecycle models.RunnerTaskLogLifecycle
+	require.NoError(t, db.Where("task_id = ?", task.ID).First(&lifecycle).Error)
+	assert.Equal(t, models.RunnerTaskLogStateArchived, lifecycle.State)
+	require.NotNil(t, lifecycle.FinalCursor)
+	assert.Equal(t, "0", *lifecycle.FinalCursor)
+
+	finalReader, err := provider.Get(
+		t.Context(),
+		runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID),
+	)
+	require.NoError(t, err)
+	gzipReader, err := gzip.NewReader(finalReader)
+	require.NoError(t, err)
+	content, err := io.ReadAll(gzipReader)
+	require.NoError(t, err)
+	require.NoError(t, gzipReader.Close())
+	require.NoError(t, finalReader.Close())
+	assert.Empty(t, content)
 }
 
 func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
@@ -102,6 +189,14 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	db := database.DB(t.Context())
 	store, err := filesystem.New(t.TempDir())
 	require.NoError(t, err)
+	installationID, err := models.GetInstallationID(db)
+	require.NoError(t, err)
+	activeStore := logpostgres.New()
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      db,
+		MeterProvider: otel.GetMeterProvider(),
+	}))
 
 	fleet := models.RunnerFleet{
 		ID:            uuid.New(),
@@ -125,23 +220,25 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 		UpdatedAt:         time.Now(),
 	}
 	require.NoError(t, db.Create(&task).Error)
-	require.NoError(t, db.Create(&models.TaskLogUpload{
-		TaskID:            task.ID,
-		NextChunkSequence: 1,
-		TotalBytes:        6,
-		UpdatedAt:         time.Now(),
+	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
+		TaskID:      task.ID,
+		ActiveStore: runnerlogs.StorePostgres,
+		State:       models.RunnerTaskLogStateArchivable,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}).Error)
-	putLogChunk(t, store, task, 0, "first\n")
+	_, err = activeStore.Append(t.Context(), task.ID, 0, []byte("first\n"))
+	require.NoError(t, err)
 
 	provider := newBlockingFinalPutProvider(
 		store,
-		runnerlogs.FinalKey(task.OrganizationID, task.ID),
+		runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID),
 	)
 	t.Cleanup(func() {
 		close(provider.release)
 	})
-	first := NewRunnerTaskLogCompactor(provider, time.Second, time.Minute)
-	second := NewRunnerTaskLogCompactor(provider, time.Second, time.Minute)
+	first := NewRunnerTaskLogCompactor(provider, activeStore, installationID, time.Second, time.Minute)
+	second := NewRunnerTaskLogCompactor(provider, activeStore, installationID, time.Second, time.Minute)
 
 	firstDone := make(chan error, 1)
 	go func() {
@@ -152,6 +249,9 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("first compactor did not start final upload")
 	}
+	var lifecycle models.RunnerTaskLogLifecycle
+	require.NoError(t, db.Where("task_id = ?", task.ID).First(&lifecycle).Error)
+	assert.Equal(t, models.RunnerTaskLogStateArchiving, lifecycle.State)
 
 	secondDone := make(chan error, 1)
 	go func() {
@@ -168,59 +268,4 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	provider.release <- struct{}{}
 	require.NoError(t, <-firstDone)
 	assert.Equal(t, int32(1), provider.finalPuts.Load())
-}
-
-type blockingFinalPutProvider struct {
-	blob.Provider
-	finalKey  string
-	started   chan struct{}
-	release   chan struct{}
-	finalPuts atomic.Int32
-}
-
-func newBlockingFinalPutProvider(
-	provider blob.Provider,
-	finalKey string,
-) *blockingFinalPutProvider {
-	return &blockingFinalPutProvider{
-		Provider: provider,
-		finalKey: finalKey,
-		started:  make(chan struct{}),
-		release:  make(chan struct{}, 1),
-	}
-}
-
-func (p *blockingFinalPutProvider) Put(
-	ctx context.Context,
-	key string,
-	reader io.Reader,
-	options blob.PutOptions,
-) error {
-	if key == p.finalKey {
-		if p.finalPuts.Add(1) == 1 {
-			close(p.started)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-p.release:
-			}
-		}
-	}
-	return p.Provider.Put(ctx, key, reader, options)
-}
-
-func putLogChunk(
-	t *testing.T,
-	provider blob.Provider,
-	task models.RunnerTask,
-	sequence int64,
-	content string,
-) {
-	t.Helper()
-	require.NoError(t, provider.Put(
-		context.Background(),
-		runnerlogs.ChunkKey(task.OrganizationID, task.ID, sequence),
-		bytes.NewBufferString(content),
-		blob.PutOptions{ContentType: "application/x-ndjson"},
-	))
 }

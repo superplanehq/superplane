@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -55,7 +56,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 		&task.ID,
 	)
 	require.NoError(t, err)
-	server, err := NewServer(signer, crypto.NewNoOpEncryptor())
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StorePostgres)
 	require.NoError(t, err)
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
@@ -108,6 +109,10 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerTaskStateSucceeded, reloadedTask.State)
 	assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
+	lifecycle, err := reloadedTask.FindLifecycle(db)
+	require.NoError(t, err)
+	assert.Equal(t, runnerlogs.StorePostgres, lifecycle.ActiveStore)
+	assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
 
 	reloadedRunner, err := models.FindRunner(db, runner.ID)
 	require.NoError(t, err)

@@ -2,11 +2,13 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const runnerRegistrationCleanupBatchSize = 100
@@ -52,7 +54,17 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, id := range ids {
-		if err := models.ExpirePendingRunner(database.Conn(), id, now); err != nil {
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			runner, err := models.LockRunner(tx, id)
+			if errors.Is(err, models.ErrRunnerNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			return runner.Expire(tx, now)
+		})
+		if err != nil {
 			w.logger.WithError(err).
 				WithField("runner_id", id).
 				Error("Failed to expire runner registration")
@@ -67,12 +79,17 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, id := range staleIDs {
-		if err := models.MarkRunnerConnectionLost(
-			database.Conn(),
-			id,
-			now.Add(-runnerConnectionLossTimeout),
-			now,
-		); err != nil {
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			runner, err := models.LockRunner(tx, id)
+			if errors.Is(err, models.ErrRunnerNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			return runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+		})
+		if err != nil {
 			w.logger.WithError(err).
 				WithField("runner_id", id).
 				Error("Failed to mark disconnected runner as lost")

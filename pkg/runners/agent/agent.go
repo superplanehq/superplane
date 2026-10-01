@@ -46,7 +46,7 @@ func DefaultConfig() Config {
 	return Config{
 		MaxOutputBytes:   512 * 1024,
 		LogChunkBytes:    64 * 1024,
-		LogSpoolMaxBytes: 64 * 1024 * 1024,
+		LogSpoolMaxBytes: 10 * 1024 * 1024,
 		ReconnectMin:     time.Second,
 		ReconnectMax:     5 * time.Second,
 	}
@@ -183,15 +183,26 @@ func (a *Agent) runTask(
 		}
 	}()
 
+	chunkBytes := a.Config.LogChunkBytes
+	flushMinimum := time.Duration(0)
+	flushMaximum := time.Duration(0)
+	if task.LogUploadPolicy != nil {
+		policy := api.NormalizeLogUploadPolicy(task.LogUploadPolicy)
+		chunkBytes = policy.TargetChunkBytes
+		flushMinimum = time.Duration(policy.PartialFlushMinimumMS) * time.Millisecond
+		flushMaximum = time.Duration(policy.PartialFlushMaximumMS) * time.Millisecond
+	}
 	spool, err := logspool.New(logspool.Config{
-		Directory:   a.Config.LogSpoolDirectory,
-		TaskID:      task.ID,
-		BaseURL:     a.Config.BaseURL,
-		AccessToken: a.Config.Registration.AccessToken,
-		ChunkBytes:  a.Config.LogChunkBytes,
-		MaxBytes:    a.Config.LogSpoolMaxBytes,
-		HTTPClient:  a.HTTP,
-		Log:         log,
+		Directory:        a.Config.LogSpoolDirectory,
+		TaskID:           task.ID,
+		BaseURL:          a.Config.BaseURL,
+		AccessToken:      a.Config.Registration.AccessToken,
+		ChunkBytes:       chunkBytes,
+		MaxBytes:         a.Config.LogSpoolMaxBytes,
+		FlushIntervalMin: flushMinimum,
+		FlushIntervalMax: flushMaximum,
+		HTTPClient:       a.HTTP,
+		Log:              log,
 	})
 	if err != nil {
 		return fmt.Errorf("create task log spool: %w", err)

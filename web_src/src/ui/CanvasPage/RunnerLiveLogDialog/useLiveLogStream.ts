@@ -181,6 +181,11 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       }
       setState((prev) => logStateAfterStreamOpen(prev, reconnecting, resetParsedLogs));
     },
+    onReset: () => {
+      commandCursor.index = undefined;
+      setUsage(emptyPromptUsageState());
+      setState({ ...initialLogState, isStreaming: true });
+    },
     onRecord: (record) => {
       if (record.schema_version !== 2) {
         return;
@@ -371,12 +376,12 @@ async function pumpLiveLogConnection(
   params: LiveLogSessionParams,
   reconnecting: boolean,
   reportFailure: (source: LiveLogFailureSource, error: Error) => void,
-): Promise<"aborted" | "open"> {
+): Promise<"aborted" | "final" | "open"> {
   const { organizationId, canvasId, executionId, sessionAbort, setState, setUsage, setActiveStream } = params;
   const stream = new LiveLogStream(organizationId, canvasId, executionId);
   setActiveStream(stream);
   try {
-    await stream.pump(
+    const final = await stream.pump(
       createStreamHandlers({
         reconnecting,
         resetParsedLogs: !reconnecting && params.resetParsedLogs,
@@ -387,6 +392,9 @@ async function pumpLiveLogConnection(
         onFailure: (message) => reportFailure("broker", new Error(message)),
       }),
     );
+    if (final) {
+      return "final";
+    }
   } catch (error) {
     const streamError = errorFromUnknown(error);
     if (streamError.name === "AbortError") {
@@ -419,7 +427,7 @@ async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
 
   while (!sessionAbort.signal.aborted) {
     const result = await pumpLiveLogConnection(params, reconnecting, reportFailure);
-    if (result === "aborted") {
+    if (result === "aborted" || result === "final") {
       return;
     }
     if (!executionInFlight) {

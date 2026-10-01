@@ -21,6 +21,11 @@ const (
 	RunnerTaskStateFailed    = "failed"
 	RunnerTaskStateCanceled  = "canceled"
 	RunnerTaskStateLost      = "lost"
+
+	RunnerTaskLogStateActive     = "active"
+	RunnerTaskLogStateArchivable = "archivable"
+	RunnerTaskLogStateArchiving  = "archiving"
+	RunnerTaskLogStateArchived   = "archived"
 )
 
 var (
@@ -31,11 +36,11 @@ var (
 	ErrRunnerTaskAlreadyAssigned    = errors.New("runner task already has a runner")
 	ErrRunnerTaskNotStartable       = errors.New("runner task is not available to start")
 	ErrRunnerTaskNotCompletable     = errors.New("runner task is not available to complete")
+	ErrRunnerTaskLogStoreRequired   = errors.New("runner task active log store is required")
 	ErrRunnerTaskCompletionConflict = errors.New("runner task has a different terminal result")
-	ErrTaskLogUploadNotFound        = errors.New("runner task log upload not found")
+	ErrTaskLogLifecycleNotFound     = errors.New("runner task log lifecycle not found")
 	ErrTaskLogChunkSequenceConflict = errors.New("runner task log chunk sequence is not next")
-	ErrTaskLogUploadFinalizing      = errors.New("runner task log upload is finalizing")
-	ErrTaskLogUploadClosed          = errors.New("runner task log upload is closed")
+	ErrTaskLogLifecycleClosed       = errors.New("runner task log lifecycle is closed")
 )
 
 /*
@@ -170,12 +175,6 @@ func (t *RunnerTask) Reserve(tx *gorm.DB, runnerID uuid.UUID) error {
 	if result.RowsAffected == 0 {
 		return ErrRunnerTaskNotReservable
 	}
-	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&TaskLogUpload{
-		TaskID:    t.ID,
-		UpdatedAt: now,
-	}).Error; err != nil {
-		return err
-	}
 
 	t.RunnerID = &runnerID
 	t.State = RunnerTaskStateReserved
@@ -226,9 +225,12 @@ func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
 	return &task, nil
 }
 
-func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, now time.Time) error {
+func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, now time.Time) error {
 	if t.RunnerID == nil || *t.RunnerID != runner.ID || t.State != RunnerTaskStateReserved {
 		return ErrRunnerTaskNotStartable
+	}
+	if activeLogStore == "" {
+		return ErrRunnerTaskLogStoreRequired
 	}
 
 	taskResult := tx.Model(t).
@@ -256,6 +258,15 @@ func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, now time.Time) error {
 	}
 	if runnerResult.RowsAffected != 1 {
 		return ErrRunnerTaskNotStartable
+	}
+	if err := tx.Create(&RunnerTaskLogLifecycle{
+		TaskID:      t.ID,
+		ActiveStore: activeLogStore,
+		State:       RunnerTaskLogStateActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}).Error; err != nil {
+		return err
 	}
 
 	t.State = RunnerTaskStateRunning
@@ -321,6 +332,9 @@ func (t *RunnerTask) Complete(
 	if taskResult.Error != nil {
 		return taskResult.Error
 	}
+	if err := t.markLogsArchivable(tx, now); err != nil {
+		return err
+	}
 
 	runnerUpdates := map[string]any{
 		"updated_at": now,
@@ -360,197 +374,66 @@ func (t *RunnerTask) Complete(
 }
 
 /*
- * TaskLogUpload tracks only an active task log upload.
- * It provides the next accepted chunk sequence and byte count while SuperPlane receives or compacts chunks.
- * SuperPlane removes this transient row after it publishes the final compressed log object.
+ * RunnerTaskLogLifecycle coordinates an active store with final blob storage.
+ * RunnerTask.Start creates this record when a reserved task starts running.
+ *
+ * Its state transitions are:
+ *   - active: the runner can append chunks to the selected active store.
+ *   - archivable: task completion moves the record to this state after the
+ *     runner receives acknowledgements for all retained chunks. A running task
+ *     that loses its runner also moves to this state.
+ *   - archiving: the compactor claimed the record and is writing the final
+ *     blob object.
+ *   - archived: the final blob is available. CleanupAfter controls when the
+ *     compactor deletes the now-redundant active-store data.
+ *
+ * After active-store cleanup, the record remains archived, FinalObjectKey
+ * continues to identify the blob, and CleanupAfter is cleared.
+ *
+ * The selected active store owns append-frequency metadata such as the next
+ * sequence, retained byte count, and authoritative truncation state. This
+ * record can keep a low-frequency lifecycle summary, but the append path must
+ * not update it for each chunk. When an external active store is selected,
+ * accepting a new chunk must not cause a write to the application PostgreSQL
+ * database.
  */
-type TaskLogUpload struct {
-	TaskID            uuid.UUID `gorm:"primaryKey"`
-	NextChunkSequence int64
-	TotalBytes        int64
-	FinalizingAt      *time.Time
-	UpdatedAt         time.Time
-
-	/*
-	 * ProcessingUntil is a short-lived worker claim.
-	 * Workers acquire it with FOR UPDATE SKIP LOCKED before blob I/O and can reclaim it after expiry.
-	 */
+type RunnerTaskLogLifecycle struct {
+	TaskID          uuid.UUID `gorm:"primaryKey"`
+	ActiveStore     string
+	State           string
+	FinalObjectKey  *string
+	FinalCursor     *string
+	Truncated       bool
+	CleanupAfter    *time.Time
 	ProcessingUntil *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
-func (TaskLogUpload) TableName() string {
-	return "runner_task_log_uploads"
-}
-
-func FindTaskLogUpload(tx *gorm.DB, taskID uuid.UUID) (*TaskLogUpload, error) {
-	var upload TaskLogUpload
-	err := tx.Where("task_id = ?", taskID).First(&upload).Error
+func (t *RunnerTask) FindLifecycle(tx *gorm.DB) (*RunnerTaskLogLifecycle, error) {
+	var lifecycle RunnerTaskLogLifecycle
+	err := tx.Where("task_id = ?", t.ID).First(&lifecycle).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrTaskLogUploadNotFound
+		return nil, ErrTaskLogLifecycleNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &upload, nil
+	return &lifecycle, nil
 }
 
-type TaskLogFinalization struct {
-	TaskID            uuid.UUID
-	OrganizationID    uuid.UUID
-	NextChunkSequence int64
-	FinalizingAt      *time.Time
-	ProcessingUntil   time.Time
-}
-
-/*
- * ClaimTaskLogFinalization uses FOR UPDATE SKIP LOCKED only while it records a processing lease.
- * The transaction then closes before the worker starts blob I/O, so compaction does not hold a
- * database connection or row lock for the duration of a potentially slow upload.
- * Another worker can reclaim the row if the lease expires after a crash.
- */
-func ClaimTaskLogFinalization(tx *gorm.DB, now, cleanupBefore, processingUntil time.Time) (*TaskLogFinalization, error) {
-	var candidate TaskLogFinalization
-	err := tx.Transaction(func(tx *gorm.DB) error {
-		err := tx.Table("runner_task_log_uploads AS uploads").
-			Select(
-				"uploads.task_id, tasks.organization_id, uploads.next_chunk_sequence, uploads.finalizing_at",
-			).
-			Joins("JOIN runner_tasks AS tasks ON tasks.id = uploads.task_id").
-			Clauses(clause.Locking{
-				Strength: "UPDATE",
-				Table:    clause.Table{Name: "uploads"},
-				Options:  "SKIP LOCKED",
-			}).
-			Where("tasks.state IN ?", []string{
-				RunnerTaskStateSucceeded,
-				RunnerTaskStateFailed,
-				RunnerTaskStateCanceled,
-				RunnerTaskStateLost,
-			}).
-			Where("uploads.processing_until IS NULL OR uploads.processing_until <= ?", now).
-			Where("uploads.finalizing_at IS NULL OR uploads.finalizing_at <= ?", cleanupBefore).
-			Order("uploads.updated_at ASC").
-			Take(&candidate).
-			Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		result := tx.Model(&TaskLogUpload{}).
-			Where("task_id = ?", candidate.TaskID).
-			Updates(map[string]any{
-				"processing_until": processingUntil,
-				"updated_at":       now,
-			})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != 1 {
-			return ErrTaskLogUploadNotFound
-		}
-		candidate.ProcessingUntil = processingUntil
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if candidate.TaskID == uuid.Nil {
-		return nil, nil
-	}
-	return &candidate, nil
-}
-
-func MarkTaskLogFinalizing(tx *gorm.DB, taskID uuid.UUID, processingUntil, now time.Time) error {
-	result := tx.Model(&TaskLogUpload{}).
-		Where("task_id = ? AND processing_until = ? AND finalizing_at IS NULL", taskID, processingUntil).
+func (t *RunnerTask) markLogsArchivable(tx *gorm.DB, now time.Time) error {
+	result := tx.Model(&RunnerTaskLogLifecycle{}).
+		Where("task_id = ? AND state = ?", t.ID, RunnerTaskLogStateActive).
 		Updates(map[string]any{
-			"finalizing_at":    now,
-			"processing_until": nil,
-			"updated_at":       now,
+			"state":      RunnerTaskLogStateArchivable,
+			"updated_at": now,
 		})
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
-		return ErrTaskLogUploadNotFound
+		return ErrTaskLogLifecycleNotFound
 	}
-	return nil
-}
-
-func DeleteClaimedTaskLogUpload(tx *gorm.DB, taskID uuid.UUID, processingUntil time.Time) error {
-	return tx.
-		Where("task_id = ? AND processing_until = ?", taskID, processingUntil).
-		Delete(&TaskLogUpload{}).
-		Error
-}
-
-func DeleteTaskLogUpload(tx *gorm.DB, taskID uuid.UUID) error {
-	return tx.Where("task_id = ?", taskID).Delete(&TaskLogUpload{}).Error
-}
-
-func ReleaseTaskLogFinalization(tx *gorm.DB, taskID uuid.UUID, processingUntil, now time.Time) error {
-	return tx.Model(&TaskLogUpload{}).
-		Where("task_id = ? AND processing_until = ?", taskID, processingUntil).
-		Updates(map[string]any{
-			"processing_until": nil,
-			"updated_at":       now,
-		}).
-		Error
-}
-
-func (r *Runner) FindTaskLogUpload(tx *gorm.DB, taskID uuid.UUID) (*TaskLogUpload, *RunnerTask, error) {
-	var task RunnerTask
-	err := tx.Where("id = ? AND runner_id = ?", taskID, r.ID).First(&task).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, ErrTaskLogUploadNotFound
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var upload TaskLogUpload
-	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("task_id = ?", taskID).
-		First(&upload).
-		Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, ErrTaskLogUploadNotFound
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	return &upload, &task, nil
-}
-
-func (u *TaskLogUpload) Advance(tx *gorm.DB, sequence, size int64, now time.Time) error {
-	if u.FinalizingAt != nil {
-		return ErrTaskLogUploadFinalizing
-	}
-	if sequence < u.NextChunkSequence {
-		return nil
-	}
-	if sequence > u.NextChunkSequence {
-		return ErrTaskLogChunkSequenceConflict
-	}
-
-	result := tx.Model(u).
-		Where("next_chunk_sequence = ? AND finalizing_at IS NULL", sequence).
-		Updates(map[string]any{
-			"next_chunk_sequence": sequence + 1,
-			"total_bytes":         gorm.Expr("total_bytes + ?", size),
-			"updated_at":          now,
-		})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return ErrTaskLogChunkSequenceConflict
-	}
-	u.NextChunkSequence++
-	u.TotalBytes += size
-	u.UpdatedAt = now
 	return nil
 }

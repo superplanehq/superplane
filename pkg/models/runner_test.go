@@ -213,6 +213,8 @@ func TestRunnerTaskReservationAndRunnerTermination(t *testing.T) {
 	assert.Equal(t, models.RunnerTaskStateReserved, task.State)
 	require.NotNil(t, task.RunnerID)
 	assert.Equal(t, runner.ID, *task.RunnerID)
+	_, err := task.FindLifecycle(db)
+	require.ErrorIs(t, err, models.ErrTaskLogLifecycleNotFound)
 
 	require.NoError(t, db.Model(runner).Update("state", models.RunnerStateIdle).Error)
 	runner.State = models.RunnerStateIdle

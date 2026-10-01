@@ -26,7 +26,7 @@ func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
 
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	request := &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
@@ -54,6 +54,8 @@ func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
 	assert.Equal(t, models.RunnerTaskStateReserved, reloadedTask.State)
 	require.NotNil(t, reloadedTask.RunnerID)
 	assert.Equal(t, first.Runner.Id, reloadedTask.RunnerID.String())
+	_, err = reloadedTask.FindLifecycle(db)
+	require.ErrorIs(t, err, models.ErrTaskLogLifecycleNotFound)
 }
 
 func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
@@ -63,7 +65,7 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
 
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	request := &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
@@ -94,7 +96,7 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	request := &pb.CreateRunnerRequest{FleetId: fleet.Slug}
 
 	first, err := service.CreateRunner(t.Context(), request)
@@ -110,7 +112,7 @@ func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *tes
 func TestCreateGenericEphemeralRunner(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	response, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
 		FleetId:   fleet.Slug,
@@ -122,7 +124,7 @@ func TestCreateGenericEphemeralRunner(t *testing.T) {
 
 func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
 	support.Setup(t)
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	spec := &pb.FleetSpec{
 		OperatingSystem:            "linux",
 		Architecture:               "amd64",
@@ -157,7 +159,7 @@ func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
 func TestCreateFleetRejectsDuplicateID(t *testing.T) {
 	support.Setup(t)
 	createTestFleetWithSlug(t, "aws-large-amd64")
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	_, err := service.CreateFleet(t.Context(), &pb.CreateFleetRequest{
 		FleetId:       "aws-large-amd64",
@@ -170,7 +172,7 @@ func TestCreateFleetRejectsDuplicateID(t *testing.T) {
 
 func TestCreateFleetValidatesRequiredFields(t *testing.T) {
 	support.Setup(t)
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	requests := map[string]*pb.CreateFleetRequest{
 		"fleet ID": {
 			Spec:          &pb.FleetSpec{},
@@ -207,7 +209,7 @@ func TestUpdateFleetReplacesSpec(t *testing.T) {
 		MaxExecutionTimeoutSeconds: 7200,
 	}
 
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	response, err := service.UpdateFleet(t.Context(), &pb.UpdateFleetRequest{
 		FleetId: fleet.Slug,
 		Spec:    spec,
@@ -226,7 +228,7 @@ func TestCreateTaskSpecificRunnerRequiresIdempotencyKey(t *testing.T) {
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
 		FleetId:   fleet.Slug,
@@ -245,7 +247,7 @@ func TestCreateTaskSpecificRunnerMustBeEphemeral(t *testing.T) {
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
@@ -264,7 +266,7 @@ func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T
 	firstFleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	secondFleet := createTestFleetWithSlug(t, "other-linux-amd64")
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	_, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        firstFleet.Slug,
@@ -282,7 +284,7 @@ func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T
 func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentLifecycle(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 
 	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
@@ -304,7 +306,7 @@ func TestCreateTaskSpecificRunnerHandlesConcurrentIdempotentRequests(t *testing.
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
 
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	request := &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
@@ -359,7 +361,7 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 	}
 	require.NoError(t, db.Create(organizationRunner).Error)
 
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	response, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
 		FleetId: installationFleet.Slug,
 	})
@@ -384,7 +386,7 @@ func TestDeleteRunnerRejectsBusyRunnerWithConflict(t *testing.T) {
 	require.NoError(t, db.Create(runner).Error)
 
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	_, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
 		FleetId:  fleet.Slug,
 		RunnerId: runner.ID.String(),
@@ -400,7 +402,7 @@ func TestDeletePendingTaskRunnerReleasesReservation(t *testing.T) {
 	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
 
 	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := NewService(jwt.NewSigner("runner-registration-secret"), "https://example.com")
+	service := newTestRunnerService()
 	created, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
@@ -421,12 +423,19 @@ func TestDeletePendingTaskRunnerReleasesReservation(t *testing.T) {
 	assert.Nil(t, reloaded.RunnerID)
 	assert.Nil(t, reloaded.ReservedAt)
 
-	var uploads int64
-	require.NoError(t, db.Model(&models.TaskLogUpload{}).
+	var lifecycles int64
+	require.NoError(t, db.Model(&models.RunnerTaskLogLifecycle{}).
 		Where("task_id = ?", task.ID).
-		Count(&uploads).
+		Count(&lifecycles).
 		Error)
-	assert.Zero(t, uploads)
+	assert.Zero(t, lifecycles)
+}
+
+func newTestRunnerService() *Service {
+	return NewService(
+		jwt.NewSigner("runner-registration-secret"),
+		"https://example.com",
+	)
 }
 
 func createTestFleet(t *testing.T, scope string, scopeID *uuid.UUID) *models.RunnerFleet {

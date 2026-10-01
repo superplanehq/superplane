@@ -8,20 +8,22 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerclientapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/test/support"
+	"go.opentelemetry.io/otel"
 )
 
 func TestUploadTaskLogChunk(t *testing.T) {
@@ -46,42 +48,48 @@ func TestUploadTaskLogChunk(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, &task.ID)
 	require.NoError(t, err)
-	server, err := NewServer(signer, crypto.NewNoOpEncryptor())
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StorePostgres)
 	require.NoError(t, err)
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
 	require.Equal(t, http.StatusOK, response.Code)
 	var registrationResponse registerRunnerResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &registrationResponse))
 	accessToken := registrationResponse.AccessToken
-
-	provider, err := filesystem.New(t.TempDir())
+	runner, err = models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
-	previousProvider := blob.Current()
-	blob.SetCurrent(provider)
-	t.Cleanup(func() { blob.SetCurrent(previousProvider) })
+	require.NoError(t, task.Start(db, runner, runnerlogs.StorePostgres, time.Now()))
+
+	store := runnerlogspostgres.New()
+	require.NoError(t, store.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      db,
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+	previousStore := runnerlogs.Current()
+	runnerlogs.SetCurrent(store)
+	t.Cleanup(func() {
+		require.NoError(t, store.Delete(context.Background(), task.ID))
+		runnerlogs.SetCurrent(previousStore)
+	})
 
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
 	chunkURL := httpServer.URL + "/runner/v1/tasks/" + task.ID.String() + "/logs/chunks/"
 
+	maxUploadBytes := runnerclientapi.DefaultLogUploadPolicy().MaxUploadBytes()
+	oversized := strings.Repeat("x", int(maxUploadBytes)+1)
+	assertUploadStatus(t, chunkURL+"0", accessToken, oversized, http.StatusRequestEntityTooLarge)
 	assertUploadStatus(t, chunkURL+"1", accessToken, "out of order\n", http.StatusConflict)
 	assertUploadStatus(t, chunkURL+"0", accessToken, "first\n", http.StatusNoContent)
 	assertUploadStatus(t, chunkURL+"0", accessToken, "duplicate\n", http.StatusNoContent)
 
-	var upload models.TaskLogUpload
-	require.NoError(t, db.Where("task_id = ?", task.ID).First(&upload).Error)
-	assert.Equal(t, int64(1), upload.NextChunkSequence)
-	assert.Equal(t, int64(len("first\n")), upload.TotalBytes)
-
-	reader, err := provider.Get(
-		context.Background(),
-		runnerlogs.ChunkKey(task.OrganizationID, task.ID, 0),
-	)
+	read, err := store.ReadAfter(t.Context(), task.ID, "")
 	require.NoError(t, err)
-	defer reader.Close()
-	content, err := io.ReadAll(reader)
+	defer read.Content.Close()
+	content, err := io.ReadAll(read.Content)
 	require.NoError(t, err)
 	assert.Equal(t, "first\n", string(content))
+	assert.Equal(t, "1", read.Cursor)
 
 	for sequence := int64(1); sequence < 3; sequence++ {
 		assertUploadStatus(
@@ -92,9 +100,38 @@ func TestUploadTaskLogChunk(t *testing.T) {
 			http.StatusNoContent,
 		)
 	}
+
+	paddingSize := int(runnerlogs.MaxRetainedBytes) - 1024 - len("first\nnext\nnext\n")
+	padding := strings.Repeat("x", paddingSize-1) + "\n"
+	appendResult, err := store.Append(t.Context(), task.ID, 3, []byte(padding))
+	require.NoError(t, err)
+	require.False(t, appendResult.Truncated)
+
+	truncated := uploadChunk(t, chunkURL+"4", accessToken, strings.Repeat("x", 2048)+"\n")
+	require.Equal(t, http.StatusNoContent, truncated.StatusCode)
+	assert.Equal(t, runnerclientapi.LogUploadActionStop, truncated.Header.Get(runnerclientapi.HeaderLogUploadAction))
+	require.NoError(t, truncated.Body.Close())
+
+	stopped := uploadChunk(t, chunkURL+"5", accessToken, "ignored\n")
+	require.Equal(t, http.StatusNoContent, stopped.StatusCode)
+	assert.Equal(t, runnerclientapi.LogUploadActionStop, stopped.Header.Get(runnerclientapi.HeaderLogUploadAction))
+	require.NoError(t, stopped.Body.Close())
 }
 
 func assertUploadStatus(t *testing.T, url, token, content string, expected int) {
+	t.Helper()
+	response := uploadChunk(t, url, token, content)
+	defer response.Body.Close()
+	assert.Equal(t, expected, response.StatusCode)
+	if expected == http.StatusNoContent {
+		assert.Equal(t, runnerclientapi.LogUploadActionContinue, response.Header.Get(runnerclientapi.HeaderLogUploadAction))
+		assert.Equal(t, "65536", response.Header.Get(runnerclientapi.HeaderLogTargetChunkBytes))
+		assert.Equal(t, "2500", response.Header.Get(runnerclientapi.HeaderLogFlushMinimumMS))
+		assert.Equal(t, "5000", response.Header.Get(runnerclientapi.HeaderLogFlushMaximumMS))
+	}
+}
+
+func uploadChunk(t *testing.T, url, token, content string) *http.Response {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodPut, url, bytes.NewBufferString(content))
 	require.NoError(t, err)
@@ -102,6 +139,5 @@ func assertUploadStatus(t *testing.T, url, token, content string, expected int) 
 	request.Header.Set("Content-Type", "application/x-ndjson")
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
-	defer response.Body.Close()
-	assert.Equal(t, expected, response.StatusCode)
+	return response
 }

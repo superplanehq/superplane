@@ -86,6 +86,8 @@ CREATE TABLE runner_tasks (
   payload_ciphertext  BYTEA NOT NULL,
   result              JSONB,
   exit_code           INTEGER,
+  error_message       TEXT,
+  completion_hash     TEXT,
   cancel_requested_at TIMESTAMPTZ,
   queued_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   reserved_at         TIMESTAMPTZ,
@@ -129,16 +131,26 @@ CREATE INDEX runner_registrations_expiry_idx
   ON runner_registrations (expires_at)
   WHERE consumed_at IS NULL AND revoked_at IS NULL;
 
-CREATE TABLE runner_task_log_uploads (
-  task_id             UUID PRIMARY KEY REFERENCES runner_tasks(id) ON DELETE CASCADE,
-  next_chunk_sequence BIGINT NOT NULL DEFAULT 0,
-  total_bytes         BIGINT NOT NULL DEFAULT 0,
-  finalizing_at       TIMESTAMPTZ,
-  processing_until    TIMESTAMPTZ,
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE runner_task_log_lifecycles (
+  task_id          UUID PRIMARY KEY REFERENCES runner_tasks(id) ON DELETE CASCADE,
+  active_store     TEXT NOT NULL DEFAULT 'postgres',
+  state            VARCHAR(32) NOT NULL DEFAULT 'active',
+  final_object_key TEXT,
+  final_cursor     TEXT,
+  truncated        BOOLEAN NOT NULL DEFAULT FALSE,
+  cleanup_after    TIMESTAMPTZ,
+  processing_until TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT runner_task_log_uploads_values_check
-    CHECK (next_chunk_sequence >= 0 AND total_bytes >= 0)
+  CONSTRAINT runner_task_log_lifecycles_state_check
+    CHECK (state IN ('active', 'archivable', 'archiving', 'archived')),
+  CONSTRAINT runner_task_log_lifecycles_active_store_check
+    CHECK (active_store <> '')
 );
+
+CREATE INDEX runner_task_log_lifecycles_archiving_idx
+  ON runner_task_log_lifecycles (state, updated_at)
+  WHERE state IN ('archivable', 'archiving', 'archived');
 
 COMMIT;

@@ -3,25 +3,23 @@ package public
 import (
 	"bytes"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	logpostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/test/support"
+	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
 )
 
@@ -34,6 +32,15 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	previousProvider := blob.Current()
 	blob.SetCurrent(provider)
 	t.Cleanup(func() { blob.SetCurrent(previousProvider) })
+	activeStore := logpostgres.New()
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      database.DB(t.Context()),
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+	previousActiveStore := runnerlogs.Current()
+	runnerlogs.SetCurrent(activeStore)
+	t.Cleanup(func() { runnerlogs.SetCurrent(previousActiveStore) })
 
 	fleet := models.RunnerFleet{
 		ID:            uuid.New(),
@@ -56,24 +63,17 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 		UpdatedAt:         time.Now(),
 	}
 	require.NoError(t, database.Conn().Create(&task).Error)
-	require.NoError(t, database.Conn().Create(&models.TaskLogUpload{
-		TaskID:            task.ID,
-		NextChunkSequence: 2,
-		TotalBytes:        13,
-		UpdatedAt:         time.Now(),
+	require.NoError(t, database.Conn().Create(&models.RunnerTaskLogLifecycle{
+		TaskID:      task.ID,
+		ActiveStore: runnerlogs.StorePostgres,
+		State:       models.RunnerTaskLogStateActive,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}).Error)
-	require.NoError(t, provider.Put(
-		t.Context(),
-		runnerlogs.ChunkKey(task.OrganizationID, task.ID, 0),
-		bytes.NewBufferString("first\n"),
-		blob.PutOptions{ContentType: "application/x-ndjson"},
-	))
-	require.NoError(t, provider.Put(
-		t.Context(),
-		runnerlogs.ChunkKey(task.OrganizationID, task.ID, 1),
-		bytes.NewBufferString("second\n"),
-		blob.PutOptions{ContentType: "application/x-ndjson"},
-	))
+	_, err = activeStore.Append(t.Context(), task.ID, 0, []byte("first\n"))
+	require.NoError(t, err)
+	_, err = activeStore.Append(t.Context(), task.ID, 1, []byte("second\n"))
+	require.NoError(t, err)
 
 	canvasID, executionID := createCanvasWithComponentExecution(
 		t,
@@ -86,69 +86,62 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 		},
 	)
 
-	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, -1)
+	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusOK, live.Code)
-	assert.Equal(t, "1", live.Header().Get("X-Last-Chunk"))
+	assert.Equal(t, models.RunnerTaskLogStateActive, live.Header().Get(runnerlogs.HeaderState))
+	assert.Equal(t, "2", live.Header().Get(runnerlogs.HeaderCursor))
 	assert.Equal(t, "first\nsecond\n", live.Body.String())
 
-	require.NoError(t, database.Conn().Where("task_id = ?", task.ID).
-		Delete(&models.TaskLogUpload{}).
-		Error)
+	incremental := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "1")
+	require.Equal(t, http.StatusOK, incremental.Code)
+	assert.Equal(t, "second\n", incremental.Body.String())
+
 	var compressed bytes.Buffer
 	gzipWriter := gzip.NewWriter(&compressed)
 	_, err = gzipWriter.Write([]byte("final\n"))
 	require.NoError(t, err)
 	require.NoError(t, gzipWriter.Close())
+	installationID, err := models.GetInstallationID(database.Conn())
+	require.NoError(t, err)
+	finalKey := runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID)
 	require.NoError(t, provider.Put(
 		t.Context(),
-		runnerlogs.FinalKey(task.OrganizationID, task.ID),
+		finalKey,
 		bytes.NewReader(compressed.Bytes()),
 		blob.PutOptions{
 			ContentType:     "application/x-ndjson",
 			ContentEncoding: "gzip",
 		},
 	))
+	finalCursor := "2"
+	require.NoError(t, database.Conn().Model(&models.RunnerTaskLogLifecycle{}).
+		Where("task_id = ?", task.ID).
+		Updates(map[string]any{
+			"state":            models.RunnerTaskLogStateArchived,
+			"final_object_key": finalKey,
+			"final_cursor":     finalCursor,
+		}).
+		Error)
 
-	final := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, -1)
+	caughtUp := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, finalCursor)
+	require.Equal(t, http.StatusNoContent, caughtUp.Code)
+	assert.Equal(t, models.RunnerTaskLogStateArchived, caughtUp.Header().Get(runnerlogs.HeaderState))
+
+	require.NoError(t, activeStore.Delete(t.Context(), task.ID))
+
+	stale := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "1")
+	require.Equal(t, http.StatusConflict, stale.Code)
+	assert.Equal(t, "true", stale.Header().Get(runnerlogs.HeaderReset))
+
+	final := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusOK, final.Code)
 	assert.Equal(t, "gzip", final.Header().Get("Content-Encoding"))
+	assert.Equal(t, models.RunnerTaskLogStateArchived, final.Header().Get(runnerlogs.HeaderState))
+	assert.Equal(t, finalCursor, final.Header().Get(runnerlogs.HeaderCursor))
 	gzipReader, err := gzip.NewReader(final.Body)
 	require.NoError(t, err)
 	content, err := io.ReadAll(gzipReader)
 	require.NoError(t, err)
 	require.NoError(t, gzipReader.Close())
 	assert.Equal(t, "final\n", string(content))
-}
-
-func runnerTaskLogsGET(
-	t *testing.T,
-	server *Server,
-	signer *jwt.Signer,
-	resource *support.ResourceRegistry,
-	canvasID, executionID uuid.UUID,
-	afterChunk int64,
-) *httptest.ResponseRecorder {
-	t.Helper()
-	request := httptest.NewRequest(
-		http.MethodGet,
-		fmt.Sprintf(
-			"/api/v1/canvases/%s/node-executions/%s/runner-logs?after_chunk=%d",
-			canvasID,
-			executionID,
-			afterChunk,
-		),
-		nil,
-	)
-	request.Header.Set("x-organization-id", resource.Organization.ID.String())
-	token, err := authentication.GenerateAccountToken(
-		signer,
-		resource.Account.ID.String(),
-		time.Now(),
-		time.Hour,
-	)
-	require.NoError(t, err)
-	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-	response := httptest.NewRecorder()
-	server.Router.ServeHTTP(response, request)
-	return response
 }

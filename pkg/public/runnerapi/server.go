@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,28 +20,38 @@ import (
 )
 
 type Server struct {
-	router    *mux.Router
-	signer    *jwt.Signer
-	encryptor crypto.Encryptor
+	router             *mux.Router
+	signer             *jwt.Signer
+	encryptor          crypto.Encryptor
+	activeLogStoreName string
 
 	mu          sync.Mutex
 	httpServer  *http.Server
 	connections map[uuid.UUID]*runnerConnection
 }
 
-func NewServer(signer *jwt.Signer, encryptor crypto.Encryptor) (*Server, error) {
+func NewServer(
+	signer *jwt.Signer,
+	encryptor crypto.Encryptor,
+	activeLogStoreName string,
+) (*Server, error) {
 	if signer == nil {
 		return nil, fmt.Errorf("JWT signer is required")
 	}
 	if encryptor == nil {
 		return nil, fmt.Errorf("encryptor is required")
 	}
+	activeLogStoreName = strings.TrimSpace(activeLogStoreName)
+	if activeLogStoreName == "" {
+		return nil, fmt.Errorf("active log store is required")
+	}
 
 	server := &Server{
-		router:      mux.NewRouter(),
-		signer:      signer,
-		encryptor:   encryptor,
-		connections: map[uuid.UUID]*runnerConnection{},
+		router:             mux.NewRouter(),
+		signer:             signer,
+		encryptor:          encryptor,
+		activeLogStoreName: activeLogStoreName,
+		connections:        map[uuid.UUID]*runnerConnection{},
 	}
 	server.registerRoutes()
 	return server, nil

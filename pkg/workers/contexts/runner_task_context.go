@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
 	"gorm.io/gorm"
 )
@@ -53,8 +54,9 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	if err != nil {
 		return fmt.Errorf("invalid runner task ID: %w", err)
 	}
-	if !json.Valid(payload) {
-		return errors.New("runner task payload must be valid JSON")
+	payload, err = withDefaultLogUploadPolicy(payload)
+	if err != nil {
+		return err
 	}
 	fleet, err := models.FindEnabledRunnerFleetForOrganization(c.tx, c.organizationID, fleetID)
 	if err != nil {
@@ -86,6 +88,20 @@ func (c *RunnerTaskContext) Create(rawID, fleetID string, payload []byte) error 
 	}
 	_ = runnercontrol.Publish(runnercontrol.Notification{FleetID: fleet.Slug})
 	return nil
+}
+
+func withDefaultLogUploadPolicy(payload []byte) ([]byte, error) {
+	var task runnerapi.TaskPayload
+	if err := json.Unmarshal(payload, &task); err != nil {
+		return nil, fmt.Errorf("runner task payload must be valid JSON: %w", err)
+	}
+	policy := runnerapi.DefaultLogUploadPolicy()
+	task.LogUploadPolicy = &policy
+	payload, err := json.Marshal(task)
+	if err != nil {
+		return nil, fmt.Errorf("marshal runner task payload: %w", err)
+	}
+	return payload, nil
 }
 
 func (c *RunnerTaskContext) Find(rawID string) (*core.RunnerTask, error) {

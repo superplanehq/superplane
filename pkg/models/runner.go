@@ -127,6 +127,13 @@ func FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	return &runner, nil
 }
 
+func LockRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
+	return FindRunner(
+		tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}),
+		id,
+	)
+}
+
 func ListExpiredPendingRunnerIDs(tx *gorm.DB, now time.Time, limit int) ([]uuid.UUID, error) {
 	var ids []uuid.UUID
 	err := tx.Table("runners").
@@ -145,35 +152,26 @@ func ListExpiredPendingRunnerIDs(tx *gorm.DB, now time.Time, limit int) ([]uuid.
 	return ids, err
 }
 
-func ExpirePendingRunner(tx *gorm.DB, id uuid.UUID, now time.Time) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
-		runner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
-		if errors.Is(err, ErrRunnerNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if runner.State != RunnerStatePending {
-			return nil
-		}
+func (r *Runner) Expire(tx *gorm.DB, now time.Time) error {
+	if r.State != RunnerStatePending {
+		return nil
+	}
 
-		result := tx.Model(&RunnerRegistration{}).
-			Where(
-				"runner_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at <= ?",
-				id,
-				now,
-			).
-			Update("revoked_at", now)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return nil
-		}
+	result := tx.Model(&RunnerRegistration{}).
+		Where(
+			"runner_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at <= ?",
+			r.ID,
+			now,
+		).
+		Update("revoked_at", now)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil
+	}
 
-		return runner.Terminate(tx, RunnerTerminationRegistrationExpired)
-	})
+	return r.Terminate(tx, RunnerTerminationRegistrationExpired)
 }
 
 func RevokeTerminatedRunnerCredentials(tx *gorm.DB, terminatedBefore, now time.Time) error {
@@ -201,62 +199,6 @@ func ListStaleRunnerIDs(tx *gorm.DB, lastSeenBefore time.Time, limit int) ([]uui
 		Pluck("id", &ids).
 		Error
 	return ids, err
-}
-
-func MarkRunnerConnectionLost(tx *gorm.DB, id uuid.UUID, lastSeenBefore, now time.Time) error {
-	return tx.Transaction(func(tx *gorm.DB) error {
-		runner, err := FindRunner(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
-		if errors.Is(err, ErrRunnerNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if runner.LastSeenAt == nil ||
-			runner.LastSeenAt.After(lastSeenBefore) ||
-			(runner.State != RunnerStateIdle && runner.State != RunnerStateBusy) {
-			return nil
-		}
-
-		task, taskErr := runner.FindActiveTask(tx)
-		switch {
-		case taskErr == nil && task.State == RunnerTaskStateReserved:
-			if err := tx.Model(task).Updates(map[string]any{
-				"state":       RunnerTaskStateLost,
-				"finished_at": now,
-				"updated_at":  now,
-			}).Error; err != nil {
-				return err
-			}
-		case taskErr == nil && task.State == RunnerTaskStateRunning:
-			if err := tx.Model(task).Updates(map[string]any{
-				"state":       RunnerTaskStateLost,
-				"finished_at": now,
-				"updated_at":  now,
-			}).Error; err != nil {
-				return err
-			}
-		case taskErr != nil && !errors.Is(taskErr, ErrRunnerTaskNotFound):
-			return taskErr
-		}
-
-		reason := RunnerTerminationConnectionLost
-		if err := tx.Model(runner).Updates(map[string]any{
-			"state":                    RunnerStateTerminated,
-			"termination_reason":       reason,
-			"terminated_at":            now,
-			"updated_at":               now,
-			"current_connection_id":    nil,
-			"creation_idempotency_key": nil,
-			"creation_request_hash":    nil,
-		}).Error; err != nil {
-			return err
-		}
-		return tx.Model(&RunnerCredential{}).
-			Where("runner_id = ? AND revoked_at IS NULL", runner.ID).
-			Update("revoked_at", now).
-			Error
-	})
 }
 
 /*
@@ -563,13 +505,10 @@ func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) e
 	if err != nil {
 		return err
 	}
-	if err := tx.Model(&task).Updates(map[string]any{
+	return tx.Model(&task).Updates(map[string]any{
 		"runner_id":   nil,
 		"state":       RunnerTaskStateQueued,
 		"reserved_at": nil,
 		"updated_at":  now,
-	}).Error; err != nil {
-		return err
-	}
-	return DeleteTaskLogUpload(tx, task.ID)
+	}).Error
 }

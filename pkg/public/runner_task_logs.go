@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -17,12 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-)
-
-const (
-	runnerLogLongPollDuration = 25 * time.Second
-	runnerLogPollInterval     = 500 * time.Millisecond
-	runnerLogSignedURLTTL     = 5 * time.Minute
 )
 
 func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
@@ -78,91 +71,141 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	afterChunk := int64(-1)
-	if value := r.URL.Query().Get("after_chunk"); value != "" {
-		afterChunk, err = strconv.ParseInt(value, 10, 64)
-		if err != nil || afterChunk < -1 {
-			http.Error(w, "Invalid after_chunk", http.StatusBadRequest)
-			return
+	cursor := r.URL.Query().Get("after")
+	if cursor == "" {
+		if value := r.URL.Query().Get("after_chunk"); value != "" {
+			afterChunk, parseErr := strconv.ParseInt(value, 10, 64)
+			if parseErr != nil || afterChunk < -1 {
+				http.Error(w, "Invalid after_chunk", http.StatusBadRequest)
+				return
+			}
+			cursor = strconv.FormatInt(afterChunk+1, 10)
 		}
 	}
-	s.serveRunnerTaskLogs(w, r, task, afterChunk)
+	s.serveRunnerTaskLogs(w, r, task, cursor)
 }
 
 func (s *Server) serveRunnerTaskLogs(
 	w http.ResponseWriter,
 	r *http.Request,
 	task *models.RunnerTask,
-	afterChunk int64,
+	cursor string,
 ) {
-	deadline := time.NewTimer(runnerLogLongPollDuration)
-	defer deadline.Stop()
-	ticker := time.NewTicker(runnerLogPollInterval)
-	defer ticker.Stop()
-
-	for {
-		upload, err := models.FindTaskLogUpload(database.Conn(), task.ID)
-		switch {
-		case err == nil && upload.FinalizingAt != nil:
-			w.Header().Set("Retry-After", "1")
-			w.WriteHeader(http.StatusAccepted)
-			return
-		case err == nil && upload.NextChunkSequence > afterChunk+1:
-			s.writeRunnerLogChunks(w, r, task, afterChunk+1, upload.NextChunkSequence)
-			return
-		case err != nil && !errors.Is(err, models.ErrTaskLogUploadNotFound):
-			http.Error(w, "Could not read task logs", http.StatusInternalServerError)
-			return
-		case errors.Is(err, models.ErrTaskLogUploadNotFound):
-			s.serveFinalRunnerTaskLog(w, r, task)
+	lifecycle, err := task.FindLifecycle(database.DB(r.Context()))
+	if errors.Is(err, models.ErrTaskLogLifecycleNotFound) {
+		if cursor != "" {
+			writeRunnerLogReset(w)
 			return
 		}
+		s.serveFinalRunnerTaskLog(w, r, task, nil)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		return
+	}
 
-		select {
-		case <-r.Context().Done():
+	switch lifecycle.State {
+	case models.RunnerTaskLogStateArchived:
+		if cursor == "" {
+			s.serveFinalRunnerTaskLog(w, r, task, lifecycle)
 			return
-		case <-deadline.C:
+		}
+		if lifecycle.FinalCursor != nil && cursor == *lifecycle.FinalCursor {
+			writeRunnerLogState(w, models.RunnerTaskLogStateArchived, cursor)
 			w.WriteHeader(http.StatusNoContent)
 			return
-		case <-ticker.C:
 		}
 	}
+
+	store := runnerlogs.Current()
+	if store == nil || store.Name() != lifecycle.ActiveStore {
+		http.Error(w, "Active log storage is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	result, err := store.ReadAfter(r.Context(), task.ID, cursor)
+	if errors.Is(err, runnerlogs.ErrInvalidCursor) {
+		if lifecycle.State == models.RunnerTaskLogStateArchived {
+			writeRunnerLogReset(w)
+			return
+		}
+		http.Error(w, "Invalid log cursor", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, runnerlogs.ErrNotFound) {
+		if lifecycle.State == models.RunnerTaskLogStateActive ||
+			lifecycle.State == models.RunnerTaskLogStateArchivable ||
+			lifecycle.State == models.RunnerTaskLogStateArchiving {
+			writeRunnerLogState(w, lifecycle.State, "0")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		writeRunnerLogReset(w)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		return
+	}
+	defer result.Content.Close()
+
+	state := lifecycle.State
+	if state == models.RunnerTaskLogStateArchived && lifecycle.FinalCursor != nil &&
+		result.Cursor != *lifecycle.FinalCursor {
+		state = models.RunnerTaskLogStateArchiving
+	}
+	writeRunnerLogState(w, state, result.Cursor)
+	content, err := io.ReadAll(result.Content)
+	if err != nil {
+		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		return
+	}
+	if len(content) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	_, _ = w.Write(content)
 }
 
-func (s *Server) writeRunnerLogChunks(
-	w http.ResponseWriter,
-	r *http.Request,
-	task *models.RunnerTask,
-	first, next int64,
-) {
-	provider := blob.Current()
-	w.Header().Set("Content-Type", "application/x-ndjson")
+func writeRunnerLogState(w http.ResponseWriter, state, cursor string) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Last-Chunk", strconv.FormatInt(next-1, 10))
-	for sequence := first; sequence < next; sequence++ {
-		reader, err := provider.Get(
-			r.Context(),
-			runnerlogs.ChunkKey(task.OrganizationID, task.ID, sequence),
-		)
-		if err != nil {
-			http.Error(w, "Could not read task logs", http.StatusInternalServerError)
-			return
-		}
-		_, copyErr := io.Copy(w, reader)
-		closeErr := reader.Close()
-		if copyErr != nil || closeErr != nil {
-			return
-		}
-	}
+	w.Header().Set(runnerlogs.HeaderState, state)
+	w.Header().Set(runnerlogs.HeaderCursor, cursor)
+}
+
+func writeRunnerLogReset(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set(runnerlogs.HeaderState, models.RunnerTaskLogStateArchived)
+	w.Header().Set(runnerlogs.HeaderReset, "true")
+	w.WriteHeader(http.StatusConflict)
 }
 
 func (s *Server) serveFinalRunnerTaskLog(
 	w http.ResponseWriter,
 	r *http.Request,
 	task *models.RunnerTask,
+	lifecycle *models.RunnerTaskLogLifecycle,
 ) {
 	provider := blob.Current()
-	key := runnerlogs.FinalKey(task.OrganizationID, task.ID)
+	key := ""
+	cursor := ""
+	if lifecycle != nil {
+		if lifecycle.FinalObjectKey != nil {
+			key = *lifecycle.FinalObjectKey
+		}
+		if lifecycle.FinalCursor != nil {
+			cursor = *lifecycle.FinalCursor
+		}
+	}
+	if key == "" {
+		installationID, err := models.GetInstallationID(database.DB(r.Context()))
+		if err != nil {
+			http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+			return
+		}
+		key = runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID)
+	}
 	info, err := provider.Head(r.Context(), key)
 	if errors.Is(err, blob.ErrNotFound) {
 		http.Error(w, "Task logs not found", http.StatusNotFound)
@@ -173,22 +216,13 @@ func (s *Server) serveFinalRunnerTaskLog(
 		return
 	}
 
-	url, err := provider.SignedGetURL(r.Context(), key, runnerLogSignedURLTTL)
-	if err == nil {
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-		return
-	}
-	if !errors.Is(err, blob.ErrSignedURLUnsupported) {
-		http.Error(w, "Could not create task log URL", http.StatusInternalServerError)
-		return
-	}
-
 	reader, err := provider.Get(r.Context(), key)
 	if err != nil {
 		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
 		return
 	}
 	defer reader.Close()
+	writeRunnerLogState(w, models.RunnerTaskLogStateArchived, cursor)
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size, 10))

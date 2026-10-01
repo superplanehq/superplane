@@ -252,7 +252,7 @@ func (s *Server) reconcileRunnerConnection(
 				return errRunnerStateMismatch
 			}
 			if active.State == models.RunnerTaskStateReserved {
-				if err := active.Start(tx, runner, time.Now()); err != nil {
+				if err := active.Start(tx, runner, s.activeLogStoreName, time.Now()); err != nil {
 					return err
 				}
 			}
@@ -325,7 +325,7 @@ func (s *Server) reconcileRunnerConnection(
 			*currentRunner.CurrentConnectionID != connectionID {
 			return models.ErrRunnerConnectionReplaced
 		}
-		if err := currentTask.Start(tx, currentRunner, time.Now()); err != nil {
+		if err := currentTask.Start(tx, currentRunner, s.activeLogStoreName, time.Now()); err != nil {
 			return err
 		}
 		*runner = *currentRunner

@@ -75,6 +75,9 @@ func TestIntegratedTaskClientCreatesTypedPayload(t *testing.T) {
 		payload.ExecutionMode != ExecutionModeHost {
 		t.Fatalf("payload = %#v", payload)
 	}
+	if payload.LogUploadPolicy != nil {
+		t.Fatalf("component payload must not select a log upload policy: %#v", payload.LogUploadPolicy)
+	}
 }
 
 func TestIntegratedTaskClientMapsTerminalTaskAndCancels(t *testing.T) {

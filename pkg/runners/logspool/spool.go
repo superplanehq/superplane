@@ -18,15 +18,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 )
 
 const (
-	defaultChunkBytes       = 64 * 1024
-	defaultMaxBytes         = 64 * 1024 * 1024
-	defaultRetryDelay       = time.Second
-	defaultFlushIntervalMin = 2500 * time.Millisecond
-	defaultFlushIntervalMax = 5 * time.Second
-	maxUploadBytes          = 4 * 1024 * 1024
+	defaultChunkBytes           = 64 * 1024
+	defaultMaxBytes             = 10 * 1024 * 1024
+	defaultRetryDelay           = time.Second
+	defaultMinimumFlushInterval = 2500 * time.Millisecond
+	defaultMaximumFlushInterval = 5 * time.Second
 )
 
 var droppedRecord = []byte(
@@ -34,16 +35,18 @@ var droppedRecord = []byte(
 )
 
 type Config struct {
-	Directory     string
-	TaskID        string
-	BaseURL       string
-	AccessToken   string
-	ChunkBytes    int64
-	MaxBytes      int64
-	RetryDelay    time.Duration
-	FlushInterval time.Duration
-	HTTPClient    *http.Client
-	Log           *slog.Logger
+	Directory        string
+	TaskID           string
+	BaseURL          string
+	AccessToken      string
+	ChunkBytes       int64
+	MaxBytes         int64
+	RetryDelay       time.Duration
+	FlushInterval    time.Duration
+	FlushIntervalMin time.Duration
+	FlushIntervalMax time.Duration
+	HTTPClient       *http.Client
+	Log              *slog.Logger
 }
 
 // Spool converts process output to NDJSON and durably stages bounded chunks.
@@ -63,6 +66,7 @@ type Spool struct {
 	line           []byte
 	dropped        bool
 	closed         bool
+	stopped        bool
 	terminalErr    error
 
 	wake chan struct{}
@@ -83,6 +87,17 @@ func New(config Config) (*Spool, error) {
 	if config.RetryDelay <= 0 {
 		config.RetryDelay = defaultRetryDelay
 	}
+	if config.FlushInterval > 0 {
+		config.FlushIntervalMin = config.FlushInterval
+		config.FlushIntervalMax = config.FlushInterval
+	} else {
+		if config.FlushIntervalMin <= 0 {
+			config.FlushIntervalMin = defaultMinimumFlushInterval
+		}
+		if config.FlushIntervalMax < config.FlushIntervalMin {
+			config.FlushIntervalMax = config.FlushIntervalMin
+		}
+	}
 	if config.HTTPClient == nil {
 		config.HTTPClient = http.DefaultClient
 	}
@@ -97,8 +112,6 @@ func New(config Config) (*Spool, error) {
 		return nil, errors.New("runner access token is required")
 	case config.ChunkBytes > config.MaxBytes:
 		return nil, errors.New("log chunk size exceeds spool size")
-	case config.ChunkBytes > maxUploadBytes:
-		return nil, errors.New("log chunk size exceeds the runner API limit")
 	case config.MaxBytes < int64(len(droppedRecord)):
 		return nil, errors.New("log spool size cannot hold the dropped-log marker")
 	}
@@ -128,6 +141,9 @@ func (s *Spool) Write(content []byte) (int, error) {
 	if s.closed {
 		return 0, io.ErrClosedPipe
 	}
+	if s.stopped {
+		return len(content), nil
+	}
 	if s.terminalErr != nil {
 		return len(content), nil
 	}
@@ -136,18 +152,24 @@ func (s *Spool) Write(content []byte) (int, error) {
 	for len(content) > 0 && !s.dropped {
 		newline := bytes.IndexByte(content, '\n')
 		if newline >= 0 {
-			s.line = append(s.line, content[:newline]...)
-			s.appendLineLocked()
-			s.line = s.line[:0]
+			s.appendLineContentLocked(content[:newline])
+			if len(s.line) > 0 {
+				s.appendLineLocked()
+				s.line = s.line[:0]
+			}
 			content = content[newline+1:]
 			continue
 		}
 
-		// JSON escaping can expand one input byte to six output bytes.
-		lineLimit := int(s.config.ChunkBytes / 8)
-		if lineLimit < 1 {
-			lineLimit = 1
-		}
+		s.appendLineContentLocked(content)
+		content = nil
+	}
+	return originalLength, nil
+}
+
+func (s *Spool) appendLineContentLocked(content []byte) {
+	lineLimit := int(s.config.ChunkBytes)
+	for len(content) > 0 && !s.dropped {
 		remaining := lineLimit - len(s.line)
 		if remaining > len(content) {
 			remaining = len(content)
@@ -159,13 +181,16 @@ func (s *Spool) Write(content []byte) (int, error) {
 			s.line = s.line[:0]
 		}
 	}
-	return originalLength, nil
 }
 
 func (s *Spool) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
+		return s.terminalErr
+	}
+	if s.stopped {
+		s.closed = true
 		return s.terminalErr
 	}
 	if len(s.line) > 0 && !s.dropped {
@@ -199,11 +224,44 @@ func (s *Spool) PeakBytes() int64 {
 }
 
 func (s *Spool) appendLineLocked() {
-	record := encodeRecord(s.line)
-	if len(record) == 0 {
-		return
+	line := s.line
+	maxUploadBytes := runnerapi.LogUploadPolicy{
+		TargetChunkBytes: s.config.ChunkBytes,
+	}.MaxUploadBytes()
+	for len(line) > 0 && !s.dropped {
+		record := encodeRecord(line)
+		if len(record) == 0 {
+			return
+		}
+		if int64(len(record)) <= maxUploadBytes {
+			s.appendRecordLocked(record, false)
+			return
+		}
+		prefix := largestEncodedPrefixWithin(line, maxUploadBytes)
+		if prefix == 0 {
+			s.failLocked(errors.New("log upload limit cannot hold one encoded log record"))
+			return
+		}
+		prefixRecord := encodeRecord(line[:prefix])
+		if len(prefixRecord) > 0 {
+			s.appendRecordLocked(prefixRecord, false)
+		}
+		line = line[prefix:]
 	}
-	s.appendRecordLocked(record, false)
+}
+
+func largestEncodedPrefixWithin(line []byte, limit int64) int {
+	best := 0
+	for low, high := 1, len(line); low <= high; {
+		middle := low + (high-low)/2
+		if int64(len(encodeRecord(line[:middle]))) <= limit {
+			best = middle
+			low = middle + 1
+			continue
+		}
+		high = middle - 1
+	}
+	return best
 }
 
 func (s *Spool) appendRecordLocked(record []byte, isDroppedMarker bool) {
@@ -303,8 +361,14 @@ func (s *Spool) uploadLoop() {
 			}
 			continue
 		}
-		if err := s.upload(path); err != nil {
-			time.Sleep(s.config.RetryDelay)
+		outcome, err := s.upload(path)
+		if err != nil {
+			delay := s.retryDelay()
+			var retryErr *uploadRetryError
+			if errors.As(err, &retryErr) && retryErr.delay > 0 {
+				delay = retryErr.delay
+			}
+			time.Sleep(delay)
 			continue
 		}
 		if s.config.Log != nil {
@@ -324,17 +388,50 @@ func (s *Spool) uploadLoop() {
 		s.mu.Lock()
 		s.diskBytes -= size
 		s.uploadSequence++
+		if outcome.policy != nil {
+			s.applyPolicyLocked(*outcome.policy)
+		}
+		if outcome.stop {
+			s.stopLocked()
+			s.mu.Unlock()
+			return
+		}
 		s.mu.Unlock()
+		if outcome.policy != nil {
+			if !flushTimer.Stop() {
+				select {
+				case <-flushTimer.C:
+				default:
+				}
+			}
+			flushTimer.Reset(s.nextFlushInterval())
+		}
 	}
 }
 
 func (s *Spool) nextFlushInterval() time.Duration {
-	if s.config.FlushInterval > 0 {
-		return s.config.FlushInterval
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	minimum := s.config.FlushIntervalMin
+	maximum := s.config.FlushIntervalMax
+	if minimum <= 0 {
+		minimum = defaultMinimumFlushInterval
 	}
-	span := defaultFlushIntervalMax - defaultFlushIntervalMin
-	return defaultFlushIntervalMin +
+	if maximum < minimum {
+		maximum = defaultMaximumFlushInterval
+	}
+	if maximum < minimum {
+		maximum = minimum
+	}
+	span := maximum - minimum
+	return minimum +
 		time.Duration(rand.Int64N(int64(span)+1))
+}
+
+func (s *Spool) retryDelay() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.config.RetryDelay
 }
 
 func (s *Spool) sealOpenChunk() {
@@ -348,7 +445,7 @@ func (s *Spool) sealOpenChunk() {
 func (s *Spool) nextUpload() (string, int64, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.terminalErr != nil {
+	if s.terminalErr != nil || s.stopped {
 		return "", 0, true
 	}
 	path := filepath.Join(
@@ -369,10 +466,28 @@ func (s *Spool) nextUpload() (string, int64, bool) {
 	return "", 0, false
 }
 
-func (s *Spool) upload(path string) error {
+type uploadOutcome struct {
+	stop   bool
+	policy *runnerapi.LogUploadPolicy
+}
+
+type uploadRetryError struct {
+	delay time.Duration
+	err   error
+}
+
+func (e *uploadRetryError) Error() string {
+	return e.err.Error()
+}
+
+func (e *uploadRetryError) Unwrap() error {
+	return e.err
+}
+
+func (s *Spool) upload(path string) (uploadOutcome, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("open log spool chunk: %w", err)
+		return uploadOutcome{}, fmt.Errorf("open log spool chunk: %w", err)
 	}
 	defer file.Close()
 
@@ -381,25 +496,96 @@ func (s *Spool) upload(path string) error {
 		"/logs/chunks/" + strconv.FormatInt(s.uploadSequence, 10)
 	request, err := http.NewRequest(http.MethodPut, endpoint, file)
 	if err != nil {
-		return fmt.Errorf("create log upload request: %w", err)
+		return uploadOutcome{}, fmt.Errorf("create log upload request: %w", err)
 	}
 	request.Header.Set("Authorization", "Bearer "+s.config.AccessToken)
 	request.Header.Set("Content-Type", "application/x-ndjson")
 
 	response, err := s.config.HTTPClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("upload log chunk %d: %w", s.uploadSequence, err)
+		return uploadOutcome{}, fmt.Errorf("upload log chunk %d: %w", s.uploadSequence, err)
 	}
 	defer response.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4*1024))
 	if response.StatusCode != http.StatusNoContent {
-		return fmt.Errorf(
+		responseErr := fmt.Errorf(
 			"upload log chunk %d: status %d",
 			s.uploadSequence,
 			response.StatusCode,
 		)
+		return uploadOutcome{}, &uploadRetryError{
+			delay: retryAfter(response.Header.Get("Retry-After")),
+			err:   responseErr,
+		}
 	}
-	return nil
+	return uploadOutcome{
+		stop:   strings.EqualFold(response.Header.Get(runnerapi.HeaderLogUploadAction), runnerapi.LogUploadActionStop),
+		policy: policyFromHeaders(response.Header),
+	}, nil
+}
+
+func policyFromHeaders(header http.Header) *runnerapi.LogUploadPolicy {
+	target, targetErr := strconv.ParseInt(header.Get(runnerapi.HeaderLogTargetChunkBytes), 10, 64)
+	minimum, minimumErr := strconv.ParseInt(header.Get(runnerapi.HeaderLogFlushMinimumMS), 10, 64)
+	maximum, maximumErr := strconv.ParseInt(header.Get(runnerapi.HeaderLogFlushMaximumMS), 10, 64)
+	if targetErr != nil || minimumErr != nil || maximumErr != nil {
+		return nil
+	}
+	policy := runnerapi.NormalizeLogUploadPolicy(&runnerapi.LogUploadPolicy{
+		TargetChunkBytes:      target,
+		PartialFlushMinimumMS: minimum,
+		PartialFlushMaximumMS: maximum,
+	})
+	return &policy
+}
+
+func retryAfter(value string) time.Duration {
+	if seconds, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	if at, err := http.ParseTime(value); err == nil {
+		if delay := time.Until(at); delay > 0 {
+			return delay
+		}
+	}
+	return 0
+}
+
+func (s *Spool) applyPolicyLocked(policy runnerapi.LogUploadPolicy) {
+	s.config.ChunkBytes = policy.TargetChunkBytes
+	s.config.FlushIntervalMin = time.Duration(policy.PartialFlushMinimumMS) * time.Millisecond
+	s.config.FlushIntervalMax = time.Duration(policy.PartialFlushMaximumMS) * time.Millisecond
+	if s.current != nil && s.currentBytes >= s.config.ChunkBytes {
+		s.sealCurrentLocked()
+	}
+}
+
+func (s *Spool) stopLocked() {
+	s.stopped = true
+	s.line = nil
+	if s.current != nil {
+		_ = s.current.Close()
+		_ = os.Remove(s.currentPath)
+		s.current = nil
+		s.currentPath = ""
+		s.currentBytes = 0
+	}
+	entries, err := os.ReadDir(s.config.Directory)
+	if err != nil {
+		s.failLocked(fmt.Errorf("read stopped log spool: %w", err))
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if err := os.Remove(filepath.Join(s.config.Directory, entry.Name())); err != nil &&
+			!errors.Is(err, os.ErrNotExist) {
+			s.failLocked(fmt.Errorf("remove stopped log spool chunk: %w", err))
+			return
+		}
+	}
+	s.diskBytes = 0
 }
 
 func (s *Spool) signalUploaderLocked() {

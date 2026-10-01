@@ -40,9 +40,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
+	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 )
 
@@ -295,7 +298,17 @@ func startWorkers(
 
 	if os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
 		log.Println("Starting Runner Task Log Compactor")
-		w := workers.NewRunnerTaskLogCompactor(blob.Current(), 5*time.Second, 30*time.Second)
+		installationID, err := models.GetInstallationID(database.Conn())
+		if err != nil {
+			panic(fmt.Sprintf("failed to load installation ID: %v", err))
+		}
+		w := workers.NewRunnerTaskLogCompactor(
+			blob.Current(),
+			runnerlogs.Current(),
+			installationID,
+			5*time.Second,
+			time.Minute,
+		)
 		go w.Start(context.Background())
 	}
 
@@ -404,8 +417,8 @@ func buildGRPCServices(
 	})
 }
 
-func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor)
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
 		log.Fatalf("failed to create runner API server: %v", err)
 	}
@@ -436,8 +449,9 @@ func registerRunnerAPI(
 	publicServer *public.Server,
 	jwtSigner *jwt.Signer,
 	encryptor crypto.Encryptor,
+	activeLogStoreName string,
 ) {
-	server, err := runnerapi.NewServer(jwtSigner, encryptor)
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
 	if err != nil {
 		log.Fatalf("failed to create integrated runner API server: %v", err)
 	}
@@ -478,6 +492,7 @@ func startPublicAPI(
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
 	grpcServices *grpc.Services,
+	activeLogStoreName string,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -532,7 +547,7 @@ func startPublicAPI(
 
 	if os.Getenv("START_RUNNER_API") == "yes" {
 		log.Println("Registering Runner API routes on Public API")
-		registerRunnerAPI(server, jwtSigner, encryptor)
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -713,6 +728,26 @@ func Start() {
 	}
 	blob.SetCurrent(blobProvider)
 
+	activeLogStore, err := newRunnerActiveLogStore()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create runner active log store: %v", err))
+	}
+	if activeLogStore != nil {
+		setupContext := context.Background()
+		if err := activeLogStore.Setup(runnerlogs.SetupContext{
+			Context:       setupContext,
+			Database:      database.DB(setupContext),
+			MeterProvider: otel.GetMeterProvider(),
+		}); err != nil {
+			panic(fmt.Sprintf("failed to set up runner active log store: %v", err))
+		}
+		runnerlogs.SetCurrent(activeLogStore)
+	}
+	activeLogStoreName := ""
+	if activeLogStore != nil {
+		activeLogStoreName = activeLogStore.Name()
+	}
+
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
 		HTTP: registry.HTTPOptions{
@@ -775,9 +810,10 @@ func Start() {
 			oidcProvider,
 			authService,
 			grpcServices,
+			activeLogStoreName,
 		)
 	} else if os.Getenv("START_RUNNER_API") == "yes" {
-		go startRunnerAPI(jwtSigner, encryptorInstance)
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName)
 	}
 
 	startWorkers(
@@ -824,6 +860,25 @@ func newBlobProvider() (blob.Provider, error) {
 		return filesystem.NewProvider()
 	default:
 		return nil, fmt.Errorf("unsupported blob storage provider %q", name)
+	}
+}
+
+func newRunnerActiveLogStore() (runnerlogs.Store, error) {
+	name := strings.TrimSpace(os.Getenv("RUNNER_ACTIVE_LOG_STORE"))
+	if name == "" {
+		if os.Getenv("START_RUNNER_API") == "yes" ||
+			os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
+			return nil, fmt.Errorf("RUNNER_ACTIVE_LOG_STORE is not set")
+		}
+		return nil, nil
+	}
+
+	switch name {
+	case runnerlogs.StorePostgres:
+		log.Println("Creating PostgreSQL runner active log store")
+		return runnerlogspostgres.New(), nil
+	default:
+		return nil, fmt.Errorf("unsupported runner active log store %q", name)
 	}
 }
 

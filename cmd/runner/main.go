@@ -72,7 +72,7 @@ func run() error {
 	)
 	logSpoolMaxBytes := flag.Int64(
 		"log-spool-max-bytes",
-		envInt64("RUNNER_LOG_SPOOL_MAX_BYTES", 64*1024*1024),
+		envInt64("RUNNER_LOG_SPOOL_MAX_BYTES", 10*1024*1024),
 		"maximum unacknowledged log bytes on disk",
 	)
 	flag.Parse()

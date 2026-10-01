@@ -1,24 +1,18 @@
 package runnerapi
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerclientapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-	"gorm.io/gorm"
 )
-
-const maxLogChunkSize = 4 << 20
 
 func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
 	runner, ok := runnerFromContext(r.Context())
@@ -38,60 +32,75 @@ func (s *Server) uploadTaskLogChunk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := io.ReadAll(io.LimitReader(r.Body, maxLogChunkSize+1))
+	maxUploadBytes := runnerclientapi.DefaultLogUploadPolicy().MaxUploadBytes()
+	content, err := io.ReadAll(io.LimitReader(r.Body, maxUploadBytes+1))
 	if err != nil {
 		http.Error(w, "failed to read log chunk", http.StatusBadRequest)
 		return
 	}
-	if len(content) > maxLogChunkSize {
-		http.Error(w, "log chunk exceeds 4 MiB", http.StatusRequestEntityTooLarge)
+	if int64(len(content)) > maxUploadBytes {
+		http.Error(w, "log chunk exceeds the upload limit", http.StatusRequestEntityTooLarge)
 		return
 	}
 
-	provider := blob.Current()
-	if provider == nil {
+	store := runnerlogs.Current()
+	if store == nil {
 		http.Error(w, "log storage is unavailable", http.StatusServiceUnavailable)
 		return
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		upload, task, err := runner.FindTaskLogUpload(tx, taskID)
-		if err != nil {
-			return err
-		}
-		if task.IsTerminal() {
-			return models.ErrTaskLogUploadClosed
-		}
-		if sequence < upload.NextChunkSequence {
-			return nil
-		}
-		if sequence > upload.NextChunkSequence {
-			return models.ErrTaskLogChunkSequenceConflict
-		}
-		if upload.FinalizingAt != nil {
-			return models.ErrTaskLogUploadFinalizing
-		}
-
-		key := runnerlogs.ChunkKey(task.OrganizationID, task.ID, sequence)
-		if err := provider.Put(r.Context(), key, bytes.NewReader(content), blob.PutOptions{
-			ContentType: "application/x-ndjson",
-		}); err != nil {
-			return fmt.Errorf("store log chunk: %w", err)
-		}
-		return upload.Advance(tx, sequence, int64(len(content)), time.Now())
-	})
+	tx := database.DB(r.Context())
+	task, err := models.FindRunnerTask(tx, taskID)
+	if errors.Is(err, models.ErrRunnerTaskNotFound) ||
+		(err == nil && (task.RunnerID == nil || *task.RunnerID != runner.ID)) {
+		err = models.ErrTaskLogLifecycleNotFound
+	}
+	var lifecycle *models.RunnerTaskLogLifecycle
+	if err == nil {
+		lifecycle, err = task.FindLifecycle(tx)
+	}
+	if err == nil && lifecycle.ActiveStore != store.Name() {
+		err = models.ErrTaskLogLifecycleNotFound
+	}
+	if err == nil && (task.IsTerminal() || lifecycle.State != models.RunnerTaskLogStateActive) {
+		err = models.ErrTaskLogLifecycleClosed
+	}
+	var appendResult runnerlogs.AppendResult
+	if err == nil {
+		appendResult, err = store.Append(r.Context(), taskID, sequence, content)
+	}
 	switch {
 	case err == nil:
-		w.WriteHeader(http.StatusNoContent)
-	case errors.Is(err, models.ErrTaskLogUploadNotFound):
-		http.Error(w, "task log upload not found", http.StatusNotFound)
-	case errors.Is(err, models.ErrTaskLogChunkSequenceConflict):
+		writeLogUploadResponse(w, appendResult.Truncated)
+	case errors.Is(err, models.ErrTaskLogLifecycleNotFound):
+		http.Error(w, "task log lifecycle not found", http.StatusNotFound)
+	case errors.Is(err, runnerlogs.ErrSequenceConflict):
 		http.Error(w, "log chunk sequence is not next", http.StatusConflict)
-	case errors.Is(err, models.ErrTaskLogUploadFinalizing):
-		http.Error(w, "task log upload is finalizing", http.StatusConflict)
-	case errors.Is(err, models.ErrTaskLogUploadClosed):
-		http.Error(w, "task log upload is closed", http.StatusConflict)
+	case errors.Is(err, models.ErrTaskLogLifecycleClosed):
+		http.Error(w, "task log lifecycle is closed", http.StatusConflict)
 	default:
 		http.Error(w, "failed to upload log chunk", http.StatusInternalServerError)
 	}
+}
+
+func writeLogUploadResponse(w http.ResponseWriter, stop bool) {
+	action := runnerclientapi.LogUploadActionContinue
+	if stop {
+		action = runnerclientapi.LogUploadActionStop
+	}
+	policy := runnerclientapi.DefaultLogUploadPolicy()
+	w.Header().Set(runnerclientapi.HeaderLogUploadAction, action)
+	w.Header().Set(
+		runnerclientapi.HeaderLogTargetChunkBytes,
+		strconv.FormatInt(policy.TargetChunkBytes, 10),
+	)
+	w.Header().Set(
+		runnerclientapi.HeaderLogFlushMinimumMS,
+		strconv.FormatInt(policy.PartialFlushMinimumMS, 10),
+	)
+	w.Header().Set(
+		runnerclientapi.HeaderLogFlushMaximumMS,
+		strconv.FormatInt(policy.PartialFlushMaximumMS, 10),
+	)
+	w.WriteHeader(http.StatusNoContent)
 }

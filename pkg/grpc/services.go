@@ -96,7 +96,10 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		APIKeys: NewAPIKeysService(cfg.AuthService),
 		Agents:  NewAgentsService(cfg.AgentService),
 		AdminRunners: NewAdminRunnersService(
-			adminRunnerActions.NewService(cfg.JWTSigner, cfg.BaseURL),
+			adminRunnerActions.NewService(
+				cfg.JWTSigner,
+				cfg.BaseURL,
+			),
 		),
 	}, nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -42,7 +43,7 @@ func TestRegisterRunnerConsumesGrantAndReturnsCredential(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{})
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StorePostgres)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
@@ -81,7 +82,7 @@ func TestRegisterRunnerRejectsVersionMismatchAndTerminatesRunner(t *testing.T) {
 	runner, registration, fleet := createRegistrationFixture(t)
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{})
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StorePostgres)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, "different-version")
