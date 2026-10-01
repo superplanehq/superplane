@@ -10,7 +10,7 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { WORKSPACE_LOADING_TEST_ID } from "@/lib/workspaceLoadingCopy";
 import { unmockedSrc } from "@/test/unmockedModule";
 
-vi.mock("@monaco-editor/react", () => {
+vi.mock("@/ui/MonacoEditor", () => {
   function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
     return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
   }

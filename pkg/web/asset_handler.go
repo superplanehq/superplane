@@ -11,16 +11,24 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 )
 
 // AssetHandler serves static files from the assets filesystem
 // and handles SPA routing by serving index.html for non-asset routes.
 type AssetHandler struct {
-	assets        http.FileSystem
-	basePath      string
-	indexContent  []byte
-	indexModTime  time.Time
-	shouldNoIndex bool
+	assets          http.FileSystem
+	basePath        string
+	indexContent    []byte
+	indexModTime    time.Time
+	shouldNoIndex   bool
+	assetCDNOrigin  string
+	assetCDNClient  *http.Client
+	releaseMaxBytes int64
+	releaseCache    *releaseAssetCache
+	releaseLimiter  *releaseFetchLimiter
+	releaseCallers  *releaseCallerSet
+	releaseGroup    singleflight.Group
 }
 
 // NewAssetHandler creates a new AssetHandler with the given file system.
@@ -28,11 +36,17 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 	indexContent, indexModTime := loadIndexContent(assets)
 
 	return &AssetHandler{
-		assets:        assets,
-		basePath:      basePath,
-		indexContent:  indexContent,
-		indexModTime:  indexModTime,
-		shouldNoIndex: os.Getenv("APP_ENV") != "production",
+		assets:          assets,
+		basePath:        basePath,
+		indexContent:    indexContent,
+		indexModTime:    indexModTime,
+		shouldNoIndex:   os.Getenv("APP_ENV") != "production",
+		assetCDNOrigin:  assetCDNOrigin(assets),
+		assetCDNClient:  newAssetCDNClient(),
+		releaseMaxBytes: releaseAssetMaxBytes,
+		releaseCache:    newReleaseAssetCache(),
+		releaseLimiter:  newReleaseFetchLimiter(),
+		releaseCallers:  newReleaseCallerSet(),
 	}
 }
 
@@ -40,6 +54,10 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.shouldNoIndex {
 		w.Header().Set("X-Robots-Tag", "noindex")
+	}
+
+	if h.serveReleaseAsset(w, r) {
+		return
 	}
 
 	// Handle /assets/* paths
@@ -71,23 +89,36 @@ func (h *AssetHandler) isAssetPath(path string) bool {
 // serveAsset serves static files from the assets directory.
 func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, h.basePath)
+	if !h.serveExistingFile(w, r, path, "") {
+		http.NotFound(w, r)
+	}
+}
 
+func (h *AssetHandler) serveExistingFile(w http.ResponseWriter, r *http.Request, path string, contentType string) bool {
 	f, err := h.assets.Open(path)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		return false
 	}
 	defer f.Close()
 
-	if fi, _ := f.Stat(); fi != nil && !fi.IsDir() {
-		if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
-			w.Header().Set("Content-Type", mimeType)
-		}
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
-		http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
-	} else {
-		http.NotFound(w, r)
+	fi, err := f.Stat()
+	if err != nil || fi.IsDir() {
+		return false
 	}
+
+	seeker, ok := f.(io.ReadSeeker)
+	if !ok {
+		return false
+	}
+
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	} else if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	http.ServeContent(w, r, fi.Name(), fi.ModTime(), seeker)
+	return true
 }
 
 // serveIndex serves the index.html file for SPA routing.

@@ -10,7 +10,7 @@ import { TextFieldRenderer } from "./TextFieldRenderer";
 
 const monacoRenderValues = vi.hoisted((): string[] => []);
 
-vi.mock("@monaco-editor/react", () => {
+vi.mock("@/ui/MonacoEditor", () => {
   const { useState: useMockState } = unmockedPackage<{ useState: typeof useState }>("react");
 
   return {
