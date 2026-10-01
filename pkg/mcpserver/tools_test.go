@@ -286,6 +286,63 @@ func createOnWorkOrderCanvasForMCP(t *testing.T, r *support.ResourceRegistry, fa
 	return canvas
 }
 
+// createOnRunCanvasForMCP creates a factory-owned canvas with a single
+// onRun-triggered node, usable as a factory line step's entrypoint.
+// StartStep (and so create_task's handoff) only dispatches to onRun
+// entrypoints; createOnWorkOrderCanvasForMCP's onWorkOrder trigger is not
+// dispatchable this way.
+func createOnRunCanvasForMCP(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, name string) *models.Canvas {
+	t.Helper()
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           name,
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     "start",
+			Name:       name,
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "onRun"},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{{
+				ID:   "start",
+				Name: name,
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}},
+			}}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+	return canvas
+}
+
 func TestCreateTaskWithStartStepByName(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
@@ -295,17 +352,14 @@ func TestCreateTaskWithStartStepByName(t *testing.T) {
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Handoff", "", "HND")
 	require.NoError(t, err)
 
-	// Create two canvases for the line steps
-	verifyCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
-	verifyCanvas.Name = "Verify"
-	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
-
-	doneCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
-	doneCanvas.Name = "Done"
-	require.NoError(t, db.Model(doneCanvas).Update("name", "Done").Error)
+	// Create two canvases for the line steps. The second step is the
+	// handoff target, so a resolver that always returns the first step
+	// would fail this test.
+	verifyCanvas := createOnRunCanvasForMCP(t, r, factoryModel.ID, "Verify")
+	doneCanvas := createOnRunCanvasForMCP(t, r, factoryModel.ID, "Done")
 
 	// Create a line with two steps
-	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+	_, err = factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: doneCanvas.ID, Entrypoint: "start"},
 	})
@@ -313,14 +367,14 @@ func TestCreateTaskWithStartStepByName(t *testing.T) {
 
 	runtime := &Runtime{Auth: r.AuthService}
 	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
-		"title":      "Hand off to Verify",
-		"description": "Skip backlog and plan",
+		"title":       "Hand off to Done",
+		"description": "Skip backlog, plan, and verify",
 		"line":        "main",
-		"start_step": "Verify",
+		"start_step":  "Done",
 	})
 	require.NoError(t, err)
 	payload := decodeToolJSON(t, result)
-	assert.Equal(t, "Hand off to Verify", payload["title"])
+	assert.Equal(t, "Hand off to Done", payload["title"])
 	assert.Equal(t, "open", payload["state"])
 	require.NotEmpty(t, payload["id"])
 
@@ -331,9 +385,11 @@ func TestCreateTaskWithStartStepByName(t *testing.T) {
 	activeDispatch, err := workOrder.FindActiveLineDispatch(db)
 	require.NoError(t, err)
 	assert.Equal(t, "main", activeDispatch.LineName)
-	assert.Equal(t, 1, len(activeDispatch.Steps))
-	require.Len(t, activeDispatch.StepResults, 1)
-	assert.Equal(t, 0, activeDispatch.StepResults[0].StepIndex)
+	assert.Equal(t, 2, len(activeDispatch.Steps))
+	executions, err := models.ListFactoryWorkOrderExecutionsByLineDispatchIDs(db, []uuid.UUID{activeDispatch.ID})
+	require.NoError(t, err)
+	require.Len(t, executions[activeDispatch.ID], 1)
+	assert.Equal(t, 1, executions[activeDispatch.ID][0].StepIndex)
 }
 
 func TestCreateTaskWithStartStepByIndex(t *testing.T) {
@@ -346,16 +402,11 @@ func TestCreateTaskWithStartStepByIndex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create two canvases for the line steps
-	backlogCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
-	backlogCanvas.Name = "Backlog"
-	require.NoError(t, db.Model(backlogCanvas).Update("name", "Backlog").Error)
-
-	verifyCanvas := createOnWorkOrderCanvasForMCP(t, r, factoryModel.ID)
-	verifyCanvas.Name = "Verify"
-	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
+	backlogCanvas := createOnRunCanvasForMCP(t, r, factoryModel.ID, "Backlog")
+	verifyCanvas := createOnRunCanvasForMCP(t, r, factoryModel.ID, "Verify")
 
 	// Create a line with two steps
-	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+	_, err = factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: backlogCanvas.ID, Entrypoint: "start"},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
 	})
@@ -363,8 +414,8 @@ func TestCreateTaskWithStartStepByIndex(t *testing.T) {
 
 	runtime := &Runtime{Auth: r.AuthService}
 	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
-		"title":       "Hand off at index",
-		"line":        "main",
+		"title":      "Hand off at index",
+		"line":       "main",
 		"start_step": "1",
 	})
 	require.NoError(t, err)
@@ -377,8 +428,10 @@ func TestCreateTaskWithStartStepByIndex(t *testing.T) {
 	require.NoError(t, err)
 	activeDispatch, err := workOrder.FindActiveLineDispatch(db)
 	require.NoError(t, err)
-	require.Len(t, activeDispatch.StepResults, 1)
-	assert.Equal(t, 1, activeDispatch.StepResults[0].StepIndex)
+	executions, err := models.ListFactoryWorkOrderExecutionsByLineDispatchIDs(db, []uuid.UUID{activeDispatch.ID})
+	require.NoError(t, err)
+	require.Len(t, executions[activeDispatch.ID], 1)
+	assert.Equal(t, 1, executions[activeDispatch.ID][0].StepIndex)
 }
 
 func TestCreateTaskWithInvalidStartStep(t *testing.T) {
@@ -394,7 +447,7 @@ func TestCreateTaskWithInvalidStartStep(t *testing.T) {
 	verifyCanvas.Name = "Verify"
 	require.NoError(t, db.Model(verifyCanvas).Update("name", "Verify").Error)
 
-	line, err := factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+	_, err = factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
 	})
 	require.NoError(t, err)
@@ -407,6 +460,11 @@ func TestCreateTaskWithInvalidStartStep(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
+
+	// An invalid start_step must not leave an orphan task behind.
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 func TestCreateTaskWithMultipleLinesRequiresLineArg(t *testing.T) {
@@ -446,6 +504,11 @@ func TestCreateTaskWithMultipleLinesRequiresLineArg(t *testing.T) {
 	assert.Contains(t, err.Error(), "multiple lines exist")
 	assert.Contains(t, err.Error(), "line1")
 	assert.Contains(t, err.Error(), "line2")
+
+	// An unresolved line must not leave an orphan task behind.
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 func TestCreateTaskWithPullRequest(t *testing.T) {
@@ -459,7 +522,7 @@ func TestCreateTaskWithPullRequest(t *testing.T) {
 
 	runtime := &Runtime{Auth: r.AuthService}
 	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
-		"title":       "Feature with PR",
+		"title": "Feature with PR",
 		"pull_request": map[string]any{
 			"repository": "octocat/Hello-World",
 			"number":     float64(42),
@@ -477,24 +540,172 @@ func TestCreateTaskWithPullRequest(t *testing.T) {
 	orderID := payload["id"].(string)
 	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
 	require.NoError(t, err)
-	prs, err := workOrder.FindPullRequests(db)
+	prsByOrder, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{workOrder.ID})
 	require.NoError(t, err)
+	prs := prsByOrder[workOrder.ID]
 	require.Len(t, prs, 1)
 	assert.Equal(t, "octocat/Hello-World", prs[0].Repository)
-	assert.Equal(t, int32(42), prs[0].Number)
+	assert.Equal(t, int64(42), prs[0].Number)
+}
+
+func TestCreateTaskWithDraftPullRequestKeepsDraftState(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Draft PR", "", "DFT")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title": "Feature with draft PR",
+		"pull_request": map[string]any{
+			"repository": "octocat/Hello-World",
+			"number":     float64(7),
+			"url":        "https://github.com/octocat/Hello-World/pull/7",
+			"title":      "Work in progress",
+			"state":      "draft",
+		},
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+
+	orderID := payload["id"].(string)
+	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
+	require.NoError(t, err)
+	prsByOrder, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{workOrder.ID})
+	require.NoError(t, err)
+	prs := prsByOrder[workOrder.ID]
+	require.Len(t, prs, 1)
+	assert.Equal(t, models.FactoryPullRequestStateDraft, prs[0].State)
+}
+
+func TestCreateTaskWithBitbucketPullRequest(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Bitbucket PR", "", "BBK")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title": "Feature with Bitbucket PR",
+		"pull_request": map[string]any{
+			"repository": "team/repo",
+			"number":     float64(3),
+			"url":        "https://bitbucket.org/team/repo/pull-requests/3",
+			"title":      "Fix bug",
+			"state":      "open",
+			"provider":   "bitbucket",
+		},
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+
+	orderID := payload["id"].(string)
+	workOrder, err := models.FindUnscopedWorkOrder(db, parseUUID(orderID))
+	require.NoError(t, err)
+	prsByOrder, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{workOrder.ID})
+	require.NoError(t, err)
+	prs := prsByOrder[workOrder.ID]
+	require.Len(t, prs, 1)
+	assert.Equal(t, models.FactoryPullRequestProviderBitbucket, prs[0].Provider)
+}
+
+func TestCreateTaskRejectsFractionalPullRequestNumber(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Fractional PR", "", "FRC")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title": "Feature with fractional PR number",
+		"pull_request": map[string]any{
+			"repository": "octocat/Hello-World",
+			"number":     42.5,
+			"url":        "https://github.com/octocat/Hello-World/pull/42",
+			"title":      "Fix bug",
+			"state":      "open",
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "whole number")
+
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
+}
+
+func TestCreateTaskRejectsMistypedStartStepIndex(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Mistyped Step", "", "MST")
+	require.NoError(t, err)
+
+	verifyCanvas := createOnRunCanvasForMCP(t, r, factoryModel.ID, "Verify")
+	_, err = factoryModel.CreateLine(db, "main", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: verifyCanvas.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":      "Hand off",
+		"line":       "main",
+		"start_step": "1abc",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
+}
+
+func TestCreateTaskRejectsEmptyStartStep(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Empty Step", "", "EMP")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
+		"title":      "Hand off",
+		"start_step": "",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "start_step")
+
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 func TestCreateTaskWithMissingPullRequestField(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
 	ctx := t.Context()
+	db := database.DB(ctx)
 
-	factoryModel, err := models.CreateFactory(database.DB(ctx), r.Organization.ID, "MCP Bad PR", "", "BPR")
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Bad PR", "", "BPR")
 	require.NoError(t, err)
 
 	runtime := &Runtime{Auth: r.AuthService}
 	_, err = runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "create_task", map[string]any{
-		"title":       "Feature with bad PR",
+		"title": "Feature with bad PR",
 		"pull_request": map[string]any{
 			"repository": "octocat/Hello-World",
 			"number":     float64(42),
@@ -504,9 +715,9 @@ func TestCreateTaskWithMissingPullRequestField(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required")
-}
 
-func parseUUID(id string) uuid.UUID {
-	parsed, _ := uuid.Parse(id)
-	return parsed
+	// An invalid pull request must not leave an orphan task behind.
+	var taskCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factoryModel.ID).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }

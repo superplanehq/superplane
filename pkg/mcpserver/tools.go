@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -317,6 +319,26 @@ func (rt *Runtime) sendTaskMessage(ctx context.Context, claims *AccessClaims, ar
 	})), nil
 }
 
+// pullRequestInput is the validated form of the create_task tool's optional
+// pull_request argument. Resolving it does not write anything, so a bad
+// pull request never leaves a task behind.
+type pullRequestInput struct {
+	repository string
+	number     int64
+	url        string
+	title      string
+	state      pb.FactoryPullRequest_State
+	provider   pb.FactoryPullRequest_Provider
+}
+
+// dispatchTarget is the validated form of the create_task tool's optional
+// line and start_step arguments. Resolving it does not write anything, so
+// an unknown line or step never leaves a task behind.
+type dispatchTarget struct {
+	lineName  string
+	stepIndex int
+}
+
 func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
 	if err := rt.authorize(ctx, claims, "work_orders:create"); err != nil {
 		return ToolResult{}, err
@@ -326,6 +348,19 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 		return ToolResult{}, err
 	}
 	description, _ := args["description"].(string)
+
+	// Validate the optional handoff arguments before creating the task. A
+	// task should not be left behind in the backlog when the requested
+	// handoff cannot happen.
+	pullRequest, err := rt.resolvePullRequestInput(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	dispatch, err := rt.resolveDispatchTarget(ctx, claims, args)
+	if err != nil {
+		return ToolResult{}, err
+	}
+
 	resp, err := factories.CreateWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.CreateWorkOrderRequest{
 		FactoryId:   claims.FactoryID.String(),
 		Title:       title,
@@ -337,14 +372,20 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	order := resp.GetOrder()
 	orderID := order.GetId()
 
-	// Handle optional pull request attachment
-	if err := rt.attachPullRequestIfProvided(ctx, claims, args, orderID); err != nil {
-		return ToolResult{}, err
+	if pullRequest != nil {
+		if err := rt.attachPullRequest(ctx, claims, orderID, pullRequest); err != nil {
+			return ToolResult{}, err
+		}
 	}
 
-	// Handle optional dispatch to a specific step
-	if err := rt.dispatchIfStartStepProvided(ctx, claims, args, orderID, order); err != nil {
-		return ToolResult{}, err
+	if dispatch != nil {
+		dispatched, err := rt.dispatchWorkOrder(ctx, claims, orderID, dispatch)
+		if err != nil {
+			return ToolResult{}, err
+		}
+		// Dispatch transitions the order out of draft; use the response
+		// so the tool reports the order's actual state.
+		order = dispatched
 	}
 
 	return TextResult(mustJSON(map[string]any{
@@ -355,97 +396,127 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	})), nil
 }
 
-func (rt *Runtime) attachPullRequestIfProvided(ctx context.Context, claims *AccessClaims, args map[string]any, orderID string) error {
+// resolvePullRequestInput validates the optional pull_request argument. It
+// returns nil when the argument is absent. It performs no writes.
+func (rt *Runtime) resolvePullRequestInput(ctx context.Context, claims *AccessClaims, args map[string]any) (*pullRequestInput, error) {
 	prRaw, ok := args["pull_request"]
 	if !ok || prRaw == nil {
-		return nil
+		return nil, nil
 	}
 
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
-		return err
+		return nil, err
 	}
 
 	prMap, ok := prRaw.(map[string]any)
 	if !ok {
-		return ToolError("pull_request must be an object")
+		return nil, ToolError("pull_request must be an object")
 	}
 
-	// Extract required pull request fields
 	repository, _ := prMap["repository"].(string)
-	number, _ := prMap["number"].(float64)
 	url, _ := prMap["url"].(string)
 	prTitle, _ := prMap["title"].(string)
 	state, _ := prMap["state"].(string)
 	provider, _ := prMap["provider"].(string)
 
-	// Validate required fields
 	if strings.TrimSpace(repository) == "" {
-		return ToolError("pull_request.repository is required")
-	}
-	if number == 0 || number < 0 {
-		return ToolError("pull_request.number is required and must be positive")
+		return nil, ToolError("pull_request.repository is required")
 	}
 	if strings.TrimSpace(url) == "" {
-		return ToolError("pull_request.url is required")
+		return nil, ToolError("pull_request.url is required")
 	}
 	if strings.TrimSpace(prTitle) == "" {
-		return ToolError("pull_request.title is required")
+		return nil, ToolError("pull_request.title is required")
 	}
 	if strings.TrimSpace(state) == "" {
-		return ToolError("pull_request.state is required")
+		return nil, ToolError("pull_request.state is required")
 	}
 
-	// Default provider to github
+	number, err := parsePullRequestNumber(prMap["number"])
+	if err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(provider) == "" {
 		provider = "github"
 	}
 
-	// Map state name to proto value
-	protoState := pullRequestStateToProto(strings.ToLower(strings.TrimSpace(state)))
+	return &pullRequestInput{
+		repository: strings.TrimSpace(repository),
+		number:     number,
+		url:        strings.TrimSpace(url),
+		title:      strings.TrimSpace(prTitle),
+		state:      pullRequestStateToProto(strings.ToLower(strings.TrimSpace(state))),
+		provider:   pullRequestProviderToProto(strings.ToLower(strings.TrimSpace(provider))),
+	}, nil
+}
 
+func parsePullRequestNumber(raw any) (int64, error) {
+	number, ok := raw.(float64)
+	if !ok {
+		return 0, ToolError("pull_request.number is required and must be a positive integer")
+	}
+	if number != math.Trunc(number) {
+		return 0, ToolError("pull_request.number must be a whole number")
+	}
+	// maxSafeInteger is the largest integer a float64 (and so JSON) can
+	// represent exactly. No real pull request number comes close to it;
+	// the cap only guards against precision loss.
+	const maxSafeInteger = 1 << 53
+	if number <= 0 || number > maxSafeInteger {
+		return 0, ToolError("pull_request.number is required and must be positive")
+	}
+	return int64(number), nil
+}
+
+func (rt *Runtime) attachPullRequest(ctx context.Context, claims *AccessClaims, orderID string, pr *pullRequestInput) error {
 	_, err := factories.CreateFactoryPullRequest(toolContext(ctx, claims), factories.IntakeDependencies{}, claims.OrgID.String(), &pb.CreateFactoryPullRequestRequest{
 		FactoryId:   claims.FactoryID.String(),
 		WorkOrderId: orderID,
-		Provider:    pullRequestProviderToProto(strings.ToLower(strings.TrimSpace(provider))),
-		Repository:  strings.TrimSpace(repository),
-		Number:      int32(number),
-		Url:         strings.TrimSpace(url),
-		Title:       strings.TrimSpace(prTitle),
-		State:       protoState,
+		Provider:    pr.provider,
+		Repository:  pr.repository,
+		Number:      pr.number,
+		Url:         pr.url,
+		Title:       pr.title,
+		State:       pr.state,
 	})
 	if err != nil {
 		return actionError(err)
 	}
-
 	return nil
 }
 
-func (rt *Runtime) dispatchIfStartStepProvided(ctx context.Context, claims *AccessClaims, args map[string]any, orderID string, order *pb.WorkOrder) error {
-	startStep, ok := args["start_step"].(string)
-	if !ok || strings.TrimSpace(startStep) == "" {
-		return nil
+// resolveDispatchTarget validates the optional line and start_step
+// arguments. It returns nil when start_step is absent. It performs no
+// writes.
+func (rt *Runtime) resolveDispatchTarget(ctx context.Context, claims *AccessClaims, args map[string]any) (*dispatchTarget, error) {
+	startStepRaw, present := args["start_step"]
+	if !present {
+		return nil, nil
 	}
+	startStep, ok := startStepRaw.(string)
+	if !ok || strings.TrimSpace(startStep) == "" {
+		return nil, ToolError("start_step must be a non-empty string")
+	}
+	startStep = strings.TrimSpace(startStep)
 
 	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
-		return err
+		return nil, err
 	}
 
-	startStep = strings.TrimSpace(startStep)
 	db := database.DB(ctx)
 
-	// Get the factory to access lines
 	factory, err := findFactoryForDispatch(db, claims.OrgID.String(), claims.FactoryID.String())
 	if err != nil {
-		return actionError(err)
+		return nil, actionError(err)
 	}
 
-	// Resolve the target line
 	lines, err := factory.ListLines(db)
 	if err != nil {
-		return actionError(err)
+		return nil, actionError(err)
 	}
 
-	lineName, ok := args["line"].(string)
+	lineName, _ := args["line"].(string)
 	lineName = strings.TrimSpace(lineName)
 
 	// If no line is specified, require exactly one line
@@ -455,7 +526,7 @@ func (rt *Runtime) dispatchIfStartStepProvided(ctx context.Context, claims *Acce
 			for _, line := range lines {
 				lineNames = append(lineNames, line.Name)
 			}
-			return ToolError("multiple lines exist; specify 'line' argument with one of: " + strings.Join(lineNames, ", "))
+			return nil, ToolError("multiple lines exist; specify 'line' argument with one of: " + strings.Join(lineNames, ", "))
 		}
 		lineName = lines[0].Name
 	}
@@ -473,28 +544,29 @@ func (rt *Runtime) dispatchIfStartStepProvided(ctx context.Context, claims *Acce
 		for _, line := range lines {
 			lineNames = append(lineNames, line.Name)
 		}
-		return ToolError("line '" + lineName + "' not found; available lines: " + strings.Join(lineNames, ", "))
+		return nil, ToolError("line '" + lineName + "' not found; available lines: " + strings.Join(lineNames, ", "))
 	}
 
-	// Resolve start step to an index
 	startStepIndex, err := resolveStartStepIndex(db, startStep, targetLine, claims.OrgID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Dispatch the work order
-	_, err = factories.DispatchWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DispatchWorkOrderRequest{
+	return &dispatchTarget{lineName: lineName, stepIndex: startStepIndex}, nil
+}
+
+func (rt *Runtime) dispatchWorkOrder(ctx context.Context, claims *AccessClaims, orderID string, target *dispatchTarget) (*pb.WorkOrder, error) {
+	resp, err := factories.DispatchWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.DispatchWorkOrderRequest{
 		FactoryId:      claims.FactoryID.String(),
 		OrderId:        orderID,
-		LineName:       lineName,
-		StartStepIndex: int32(startStepIndex),
+		LineName:       target.lineName,
+		StartStepIndex: int32(target.stepIndex),
 		ReplaceActive:  false,
 	})
 	if err != nil {
-		return actionError(err)
+		return nil, actionError(err)
 	}
-
-	return nil
+	return resp.GetOrder(), nil
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {
@@ -674,10 +746,7 @@ func resolveStartStepIndex(tx *gorm.DB, startStep string, line *models.FactoryLi
 }
 
 func parseInt(s string) (int, error) {
-	s = strings.TrimSpace(s)
-	index := 0
-	_, err := fmt.Sscanf(s, "%d", &index)
-	return index, err
+	return strconv.Atoi(strings.TrimSpace(s))
 }
 
 func getCanvasName(tx *gorm.DB, orgID, appID uuid.UUID) (string, error) {
@@ -693,6 +762,8 @@ func pullRequestProviderToProto(provider string) pb.FactoryPullRequest_Provider 
 	switch strings.ToLower(provider) {
 	case "github":
 		return pb.FactoryPullRequest_PROVIDER_GITHUB
+	case "bitbucket":
+		return pb.FactoryPullRequest_PROVIDER_BITBUCKET
 	default:
 		return pb.FactoryPullRequest_PROVIDER_GITHUB
 	}
@@ -702,6 +773,8 @@ func pullRequestStateToProto(state string) pb.FactoryPullRequest_State {
 	switch strings.ToLower(state) {
 	case "open":
 		return pb.FactoryPullRequest_STATE_OPEN
+	case "draft":
+		return pb.FactoryPullRequest_STATE_DRAFT
 	case "closed":
 		return pb.FactoryPullRequest_STATE_CLOSED
 	case "merged":
