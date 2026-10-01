@@ -130,6 +130,46 @@ describe("AgentActivityView console", () => {
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
+  it("shows a multi-line bash script and its output in one block", async () => {
+    const user = userEvent.setup();
+    const script = [
+      "set -euo pipefail",
+      "",
+      "# Identify commits as SuperPlane Agent.",
+      'git config --global user.email "superplaneagent@superplane.com"',
+      'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo',
+    ].join("\n");
+    const stdout = "Cloning into 'repo'...\nremote: Enumerating objects: 9384, done.";
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: script,
+          output: stdout,
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
+    expect(screen.getByText("4 lines")).toBeInTheDocument();
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
+    );
+
+    const command = screen.getByTestId("agent-tool-command-1");
+    const output = screen.getByText(/Cloning into 'repo'/);
+    expect(command.textContent).toBe(script);
+    expect(command.textContent).not.toContain("Cloning into");
+    expect(command).toHaveClass("text-foreground/90");
+    expect(output).toHaveClass("text-muted-foreground");
+    expect(output.parentElement).toBe(command.parentElement);
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+  });
+
   it("collapses carriage-return progress into finished output lines", () => {
     render(
       <AgentActivityView
@@ -145,7 +185,7 @@ describe("AgentActivityView console", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
-    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
     expect(screen.getByText("remote: Enumerating objects: 9364, done.")).toBeInTheDocument();
     expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
   });
