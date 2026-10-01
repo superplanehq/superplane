@@ -61,6 +61,8 @@ export interface AgentStep {
   summary: string;
   toolCount: number;
   output?: string;
+  commandScript?: string;
+  commandStdout?: string;
   events: AgentStepEvent[];
   iconSlug?: string;
 }
@@ -357,6 +359,8 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     summary: "",
     toolCount: tools.length,
     output: group.line.detail?.trim() || undefined,
+    commandScript: group.line.commandScript,
+    commandStdout: group.line.commandStdout,
     events: group.events.map((event) =>
       event.kind === "note"
         ? { kind: "note", id: event.line.id, text: event.line.componentName }

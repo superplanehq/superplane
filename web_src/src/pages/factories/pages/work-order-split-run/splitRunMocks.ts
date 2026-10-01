@@ -101,6 +101,8 @@ export interface SplitRunStreamLine {
   /** Whether the displayed duration should keep ticking. Defaults to a running status. */
   durationRunning?: boolean;
   detail?: string;
+  commandScript?: string;
+  commandStdout?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
   /** Agent transcript line. No checkmark. */

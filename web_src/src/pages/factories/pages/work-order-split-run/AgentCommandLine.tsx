@@ -10,22 +10,34 @@ import { ChevronRight, CircleX, SquareTerminal } from "lucide-react";
 import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import type { AgentToolItem } from "./agentActivity";
 
-export function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: boolean }) {
+export function CommandLine({
+  tool,
+  expandable,
+  showOutput = false,
+}: {
+  tool: AgentToolItem;
+  expandable: boolean;
+  showOutput?: boolean;
+}) {
   const failed = tool.status === "failed" || tool.status === "timed_out";
   const script = agentToolScriptText(tool);
   const headline = agentToolCommandHeadline(tool) || agentToolDisplayText(tool);
   const output = failedCommandOutput(tool, failed);
+  const stdout = showOutput && !failed ? normalizeTerminalOutput(tool.output) || undefined : undefined;
   const exitLabel = failedExitLabel(tool, failed);
   if (!expandable) {
     return (
-      <CommandRow
-        headline={agentToolDisplayText(tool)}
-        failed={failed}
-        testId={`agent-tool-${tool.id}`}
-        status={tool.status}
-        meta={commandMetaLabel(tool)}
-        duration={commandDurationLabel(tool)}
-      />
+      <div className="min-w-0">
+        <CommandRow
+          headline={agentToolDisplayText(tool)}
+          failed={failed}
+          testId={`agent-tool-${tool.id}`}
+          status={tool.status}
+          meta={commandMetaLabel(tool)}
+          duration={commandDurationLabel(tool)}
+        />
+        {stdout ? <CommandStdout text={stdout} /> : null}
+      </div>
     );
   }
   return (
@@ -34,6 +46,7 @@ export function CommandLine({ tool, expandable }: { tool: AgentToolItem; expanda
       headline={headline}
       failed={failed}
       output={output}
+      stdout={stdout}
       exitLabel={exitLabel}
       testId={`agent-tool-${tool.id}`}
       status={tool.status}
@@ -48,6 +61,7 @@ function ExpandableCommand({
   headline,
   failed,
   output,
+  stdout,
   exitLabel,
   testId,
   status,
@@ -58,6 +72,7 @@ function ExpandableCommand({
   headline: string;
   failed: boolean;
   output?: string;
+  stdout?: string;
   exitLabel?: string;
   testId: string;
   status: string;
@@ -79,7 +94,7 @@ function ExpandableCommand({
   }, [overflows, script]);
   const canExpand = overflows || Boolean(output || exitLabel);
   if (!canExpand) {
-    return (
+    const row = (
       <CommandRow
         headline={headline}
         failed={failed}
@@ -90,6 +105,15 @@ function ExpandableCommand({
         duration={duration}
         lineRef={lineRef}
       />
+    );
+    if (!stdout) {
+      return row;
+    }
+    return (
+      <div className="px-1 py-0.5">
+        {row}
+        <CommandStdout text={stdout} />
+      </div>
     );
   }
   return (
@@ -106,7 +130,15 @@ function ExpandableCommand({
         lineCount={lineCount}
         onToggle={() => setOpen((current) => !current)}
       />
-      <CommandDetails open={open} output={output} script={script} failed={failed} testId={testId} status={status} />
+      <CommandDetails
+        open={open}
+        output={output}
+        stdout={stdout}
+        script={script}
+        failed={failed}
+        testId={testId}
+        status={status}
+      />
     </div>
   );
 }
@@ -114,6 +146,7 @@ function ExpandableCommand({
 function CommandDetails({
   open,
   output,
+  stdout,
   script,
   failed,
   testId,
@@ -121,13 +154,14 @@ function CommandDetails({
 }: {
   open: boolean;
   output?: string;
+  stdout?: string;
   script: string;
   failed: boolean;
   testId: string;
   status: string;
 }) {
   if (!open) {
-    return null;
+    return stdout ? <CommandStdout text={stdout} /> : null;
   }
   return (
     <div className="mt-1 border-l border-border/60 py-1 pl-2">
@@ -146,7 +180,21 @@ function CommandDetails({
       >
         {script}
       </pre>
+      {stdout ? <CommandStdout text={stdout} className="mt-1" /> : null}
     </div>
+  );
+}
+
+function CommandStdout({ text, className }: { text: string; className?: string }) {
+  return (
+    <pre
+      className={cn(
+        "max-h-32 overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-muted-foreground [tab-size:2]",
+        className,
+      )}
+    >
+      {text}
+    </pre>
   );
 }
 
