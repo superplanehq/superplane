@@ -430,9 +430,12 @@ function CommandTrail({ exitCode, output }: { exitCode?: number; output: string 
     <>
       {exitCode !== undefined ? <p className="text-[11px] leading-4 text-destructive">Exit code {exitCode}</p> : null}
       {output ? (
-        <pre className="mt-1 max-h-32 overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-muted-foreground [tab-size:2]">
-          {output}
-        </pre>
+        <>
+          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">Output</p>
+          <pre className="mt-0.5 max-h-32 overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-muted-foreground [tab-size:2]">
+            {output}
+          </pre>
+        </>
       ) : null}
     </>
   );

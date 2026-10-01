@@ -161,7 +161,7 @@ describe("AgentActivityView console", () => {
     expect(command).toHaveClass("text-foreground/90");
     expect(output).toHaveClass("text-muted-foreground");
     expect(output.parentElement).toBe(command.parentElement);
-    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    expect(screen.getByText("Output").parentElement).toBe(command.parentElement);
   });
 
   it("shows the exit code above stdout when a command fails", async () => {
@@ -183,10 +183,11 @@ describe("AgentActivityView console", () => {
 
     await user.click(screen.getByRole("button", { name: "Inspected Git" }));
     const exitCode = screen.getByText("Exit code 1");
+    const label = screen.getByText("Output");
     const output = screen.getByText("fatal: repository not found");
-    expect(exitCode.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(exitCode.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(label.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(output).toHaveClass("text-muted-foreground");
-    expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
   it("collapses carriage-return progress into finished output lines", async () => {
