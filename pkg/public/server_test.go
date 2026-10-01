@@ -303,6 +303,108 @@ func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.
 	require.Equal(t, http.StatusNotFound, rejected.Code)
 }
 
+func Test__HandleWebhook_ArchivesDraftWhenGitHubIssueCloses(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	db := database.Conn()
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "intake")
+	intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+	require.NoError(t, err)
+	require.NoError(t, intake.SetPaused(db, true))
+
+	webhookID := uuid.New()
+	secret := []byte("webhook-secret")
+	encrypted, err := r.Encryptor.Encrypt(t.Context(), secret, []byte(webhookID.String()))
+	require.NoError(t, err)
+	now := time.Now()
+	require.NoError(t, db.Create(&models.Webhook{
+		ID:            webhookID,
+		State:         models.WebhookStateReady,
+		Secret:        encrypted,
+		Configuration: datatypes.NewJSONType[any](map[string]any{}),
+		Metadata:      datatypes.NewJSONType[any](map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}).Error)
+	require.NoError(t, db.Create(&models.CanvasNode{
+		WorkflowID:    canvas.ID,
+		NodeID:        "on-issue",
+		Name:          "On Issue",
+		State:         models.CanvasNodeStateReady,
+		Type:          models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		Metadata:      datatypes.NewJSONType(map[string]any{}),
+		Position:      datatypes.NewJSONType(models.Position{}),
+		WebhookID:     &webhookID,
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}).Error)
+
+	originURL := "https://github.com/acme/payments/issues/12"
+	order, err := factory.CreateWorkOrderWithOrigin(
+		db,
+		"Closed issue",
+		"",
+		&r.User,
+		nil,
+		nil,
+		models.WorkOrderOrigin{URL: originURL, Label: models.OriginLabelFromURL(originURL)},
+	)
+	require.NoError(t, err)
+
+	body := []byte(`{
+		"action": "closed",
+		"issue": {"number": 12, "html_url": "https://github.com/acme/payments/issues/12"},
+		"repository": {"full_name": "acme/payments"}
+	}`)
+	unsigned := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event":      "issues",
+			"X-Hub-Signature-256": "sha256=deadbeef",
+		},
+	})
+	require.Equal(t, http.StatusForbidden, unsigned.Code)
+	reloaded, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+
+	accepted := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   body,
+		headers: map[string]string{
+			"X-GitHub-Event":      "issues",
+			"X-Hub-Signature-256": "sha256=" + crypto.Sign(secret, body),
+		},
+	})
+	require.Equal(t, http.StatusOK, accepted.Code)
+	reloaded, err = factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+}
+
 type canvasesGatewayStubServer struct {
 	pbCanvases.UnimplementedCanvasesServer
 	createCanvasCalled bool
