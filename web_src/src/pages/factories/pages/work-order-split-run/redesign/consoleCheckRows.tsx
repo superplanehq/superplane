@@ -80,7 +80,7 @@ function checkTone(check: WorkOrderCheckPresentation): ChecksTone | "other" {
     return "passed";
   }
   if (check.level === "critical") return "failed";
-  if (check.level === "caution") return "attention";
+  if (check.level === "caution" || check.level === "neutral") return "attention";
   if (check.level === "positive") return "passed";
   return "other";
 }
@@ -88,7 +88,7 @@ function checkTone(check: WorkOrderCheckPresentation): ChecksTone | "other" {
 function checksSummary(checks: WorkOrderCheckPresentation[]): { title: string; detail: string; tone: ChecksTone } {
   const tones = checks.map(checkTone);
   const failed = tones.filter((tone) => tone === "failed").length;
-  const attention = tones.filter((tone) => tone === "attention").length;
+  const attention = tones.filter((tone) => tone === "attention" || tone === "other").length;
   const total = checks.length;
   const title = MERGE_CONFIDENCE_SCORE_NAME;
   if (failed > 0) {

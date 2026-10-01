@@ -61,7 +61,21 @@ describe("ConsoleCheckRows", () => {
     expect(screen.queryByText("Partial")).not.toBeInTheDocument();
   });
 
-  it("describes a calm result as low caution", () => {
+  it("does not treat a neutral score as high confidence", () => {
+    render(
+      <ConsoleCheckRows
+        checks={[
+          check({ id: "drift", key: "drift-review", name: "Drift", level: "neutral" }),
+          check({ id: "performance", key: "performance-review", name: "Performance", level: "positive" }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("1 of 2 indicates higher caution")).toBeInTheDocument();
+    expect(screen.queryByText("All checks indicate high confidence")).not.toBeInTheDocument();
+  });
+
+  it("describes a calm result as high confidence", () => {
     render(
       <ConsoleCheckRows
         checks={[
