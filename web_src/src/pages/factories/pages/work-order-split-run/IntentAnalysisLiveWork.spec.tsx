@@ -154,6 +154,37 @@ describe("AnalysisLiveWork", () => {
     expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
   });
 
+  it("shows Thinking when a new thought has no text yet", () => {
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      isConnected: true,
+      hasConnectedOnce: true,
+      activities: [
+        {
+          id: "activity-1",
+          provider: "claude",
+          status: "running",
+          sequence: 2,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "thought-1",
+              kind: "reasoning",
+              text: "",
+              status: "running",
+              truncated: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AnalysisLiveWork machineStatus="running" />);
+
+    expect(screen.getByTestId("split-run-intent-thinking")).toHaveAccessibleName("Thinking");
+    expect(screen.getByRole("status", { name: "Thinking" })).toBeInTheDocument();
+  });
+
   it("keeps a finished thought visible while analysis is running", () => {
     vi.mocked(useAgentActivityStream).mockReturnValue({
       isConnected: true,

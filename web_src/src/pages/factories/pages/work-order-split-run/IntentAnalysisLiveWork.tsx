@@ -77,6 +77,7 @@ export function AgentLiveActivity({
       error={stream.hasConnectedOnce ? stream.error : undefined}
       className={className}
       testId={testId}
+      collapseReasoning={false}
     />
   );
 }
@@ -102,7 +103,7 @@ export function AgentLiveActivityFeed({
   if (!active) return null;
   return (
     <div className={cn(className)} data-testid={testId}>
-      {activity ? <AgentActivityView activity={activity} live collapseReasoning={false} /> : null}
+      {activity ? <AgentActivityView activity={activity} live collapseReasoning={collapseReasoning} /> : null}
       <AgentLiveStatus
         active
         activity={activity}
