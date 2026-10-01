@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, GitCompareArrows } from "lucide-react";
 import * as yaml from "js-yaml";
-import { Editor } from "@monaco-editor/react";
+import { Editor } from "@/ui/MonacoEditor";
 
 import { Button } from "@/components/ui/button";
 import {

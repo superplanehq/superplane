@@ -80,9 +80,30 @@ describe("isMonacoCanceledEvent", () => {
 
   it("keeps a Canceled rejection that includes an application frame", () => {
     const event = buildEvent("Canceled", [
-      "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/esm/vs/base/common/async.js",
+      "https://app.superplane.com/assets/editor.worker-Bx123.js",
       "web_src/src/components/TextFieldRenderer.tsx",
     ]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(false);
+  });
+
+  it.each(["editor.worker", "json.worker", "css.worker", "html.worker", "ts.worker"])(
+    "ignores a Canceled rejection from a bundled %s chunk",
+    (worker) => {
+      const event = buildEvent("Canceled", [
+        `https://app.superplane.com/assets/${worker}-Bx123.js`,
+        "node_modules/@sentry/browser/build/npm/esm/instrument.js",
+      ]);
+
+      expect(isMonacoCanceledEvent(event)).toBe(true);
+    },
+  );
+
+  it("keeps the workerMain.js network error", () => {
+    const event = buildEvent(
+      "Uncaught NetworkError: Failed to execute 'importScripts' on 'WorkerGlobalScope': The script at 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/base/worker/workerMain.js' failed to load.",
+      ["blob:https://app.superplane.com/5cd6ce1d-7973-45be-a5aa-46d03e5d5d41"],
+    );
 
     expect(isMonacoCanceledEvent(event)).toBe(false);
   });

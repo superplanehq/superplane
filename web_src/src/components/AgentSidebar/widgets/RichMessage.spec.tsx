@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "bun:test";
 import { RichMessage } from "./RichMessage";
 
 // Stub Monaco — irrelevant to layout-only assertions and slow to load.
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 

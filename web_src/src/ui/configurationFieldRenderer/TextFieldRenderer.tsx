@@ -1,5 +1,5 @@
 import React from "react";
-import Editor from "@monaco-editor/react";
+import Editor from "@/ui/MonacoEditor";
 import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { coerceMonacoValue } from "@/lib/monaco";
