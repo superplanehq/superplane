@@ -1667,6 +1667,7 @@ message FactoryIntakeItem {
   string title = 3;
   string body = 4;
   string url = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message SearchFactoryIntakeItemsRequest {
