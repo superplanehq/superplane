@@ -47,10 +47,12 @@ func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 	//
 	// List and count executions
 	//
-	executions, err := models.ListNodeExecutions(db, canvas.ID, nodeID, states, results, int(limit), beforeTime)
+	executions, err := models.ListNodeExecutions(db, canvas.ID, nodeID, states, results, int(limit)+1, beforeTime)
 	if err != nil {
 		return nil, err
 	}
+
+	executions, hasNext := trimPage(executions, int(limit))
 
 	totalCount, err := models.CountNodeExecutions(db, canvas.ID, nodeID, states, results)
 	if err != nil {
@@ -70,7 +72,7 @@ func ListNodeExecutions(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 	return &pb.ListNodeExecutionsResponse{
 		Executions:    serialized,
 		TotalCount:    uint32(totalCount),
-		HasNextPage:   hasNextPage(len(executions), int(limit), totalCount),
+		HasNextPage:   hasNext,
 		LastTimestamp: getLastExecutionTimestamp(executions),
 	}, nil
 }
@@ -319,8 +321,19 @@ func getBefore(before *timestamppb.Timestamp) *time.Time {
 	return &t
 }
 
-func hasNextPage(numResults, limit int, totalCount int64) bool {
-	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
+// trimPage takes a page fetched with one extra row (limit+1), drops that extra
+// row and reports whether more rows follow the page.
+//
+// Fetching the extra row is what makes the answer exact. These listings page by
+// timestamp cursor while their totals count every row, so a full page and a
+// total larger than it do not imply anything is left after the cursor: with 4
+// rows over pages of 2, the second page is full and final at the same time.
+func trimPage[T any](rows []T, limit int) ([]T, bool) {
+	if limit > 0 && len(rows) > limit {
+		return rows[:limit], true
+	}
+
+	return rows, false
 }
 
 func executionIDs(executions []models.CanvasNodeExecution) []string {

@@ -32,17 +32,19 @@ func ListCanvasVersionsPaginated(
 	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
 
-	versions, count, err := listCanvasVersionHistory(ctx, canvas.ID, int(limit), beforeTime)
+	versions, count, err := listCanvasVersionHistory(ctx, canvas.ID, int(limit)+1, beforeTime)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
+
+	versions, hasNext := trimPage(versions, int(limit))
 
 	protoVersions := serializeCanvasVersionMetadataList(ctx, versions, canvas.OrganizationID.String())
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
 		TotalCount:    uint32(count),
-		HasNextPage:   hasNextPage(len(versions), int(limit), count),
+		HasNextPage:   hasNext,
 		LastTimestamp: getLastCanvasVersionTimestamp(versions),
 	}, nil
 }
