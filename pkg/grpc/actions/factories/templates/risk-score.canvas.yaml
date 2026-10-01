@@ -41,6 +41,12 @@ spec:
     - channel: "true"
       sourceId: should-report-drift
       targetId: report-drift
+    - channel: passed
+      sourceId: format-merge-confidence
+      targetId: should-report-reversibility
+    - channel: "true"
+      sourceId: should-report-reversibility
+      targetId: report-reversibility
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -154,12 +160,13 @@ spec:
                 "risk": { "enabled": true, "score": 1, "summary": "one sentence" },
                 "performance": { "enabled": true, "score": 1, "summary": "one sentence" },
                 "security": { "enabled": true, "score": 1, "summary": "one sentence" },
-                "drift": { "enabled": true, "score": 1, "summary": "one sentence" }
+                "drift": { "enabled": true, "score": 1, "summary": "one sentence" },
+                "reversibility": { "enabled": true, "score": 1, "summary": "one sentence" }
               }
 
               Enabled checks: {{ install_params.enabledChecks }}.
 
-              Always include risk, performance, security, and drift.
+              Always include risk, performance, security, drift, and reversibility.
               Set enabled to true for every check named in Enabled checks.
               Do not set enabled to false for a named check.
               A named check stays on even when no practice in the repository applies to the diff.
@@ -228,6 +235,17 @@ spec:
               summary is one sentence.
               Say what the task asked for and what the change did.
               Do not repeat the score. Do not write a second sentence.
+
+              Reversibility. Use this section only when reversibility is enabled.
+              score is an integer from 1 to 5. A higher score means the change is easier to undo.
+              5 means a revert undoes the change and no data is lost.
+              4 means a revert undoes the change after one small manual step.
+              3 means a person must repair data or configuration to undo the change.
+              2 means part of the change stays after a revert.
+              1 means you cannot undo the change without data loss or a new change.
+              summary is one sentence.
+              Say what you must do to undo the change, or say that a revert is enough.
+              Do not repeat the score. Do not write a second sentence.
           - name: Emit Review
             type: bash
             command: |-
@@ -236,7 +254,7 @@ spec:
                 echo "Missing /tmp/merge-confidence.json" >&2
                 exit 1
               fi
-              jq -e 'has("risk") and has("performance") and has("security") and has("drift")' /tmp/merge-confidence.json >/dev/null
+              jq -e 'has("risk") and has("performance") and has("security") and has("drift") and has("reversibility")' /tmp/merge-confidence.json >/dev/null
               cp /tmp/merge-confidence.json "$SUPERPLANE_RESULT_FILE"
       position:
         x: 920
@@ -258,6 +276,7 @@ spec:
               performance: normalizeCheck(review.performance),
               security: normalizeCheck(review.security),
               drift: normalizeCheck(review.drift),
+              reversibility: normalizeCheck(review.reversibility),
             };
           }
 
@@ -297,7 +316,7 @@ spec:
       configuration:
         orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
         checkKey: risk-review
-        name: Risk score
+        name: Blast radius
         format: fraction
         score: '{{ string($["Format Merge Confidence"].data.result.risk.score) }}'
         maxScore: "5"
@@ -384,7 +403,7 @@ spec:
       configuration:
         orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
         checkKey: drift-review
-        name: Drift
+        name: Drift from Specification
         format: fraction
         score: '{{ string($["Format Merge Confidence"].data.result.drift.score) }}'
         maxScore: "5"
@@ -395,4 +414,33 @@ spec:
       position:
         x: 1760
         "y": 620
+      isCollapsed: true
+    - id: should-report-reversibility
+      name: Report Reversibility?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.reversibility.enabled == true'
+      position:
+        x: 1480
+        "y": 800
+      isCollapsed: true
+    - id: report-reversibility
+      name: Report Reversibility
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: reversibility-review
+        name: Reversibility
+        format: fraction
+        score: '{{ string($["Format Merge Confidence"].data.result.reversibility.score) }}'
+        maxScore: "5"
+        direction: higherIsBetter
+        cautionAt: 3
+        criticalAt: 2
+        summary: '{{ $["Format Merge Confidence"].data.result.reversibility.summary }}'
+      position:
+        x: 1760
+        "y": 800
       isCollapsed: true

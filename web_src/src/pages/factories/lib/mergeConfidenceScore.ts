@@ -6,6 +6,7 @@ export const MERGE_CONFIDENCE_METRIC_KEYS = [
   "performance-review",
   "security-review",
   "drift-review",
+  "reversibility-review",
 ] as const;
 
 const LOWER_IS_BETTER_KEYS = new Set<string>(["risk-review", "drift-review"]);

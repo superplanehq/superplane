@@ -35,13 +35,19 @@ function draftWithPrompt(prompt: string): PlanningReviewDraft {
 }
 
 describe("parseEnabledChecks", () => {
-  it("reads the four checks in canonical order", () => {
+  it("reads the checks in canonical order", () => {
     const prompt = promptWithSettings(
       defaultMergeConfidenceChecks(),
       formatRiskScoreRules(defaultRiskScoreCategories()),
     );
 
-    expect(parseEnabledChecks(prompt)).toEqual(["risk", "performance", "security", "drift"]);
+    expect(parseEnabledChecks(prompt)).toEqual(["risk", "performance", "security", "drift", "reversibility"]);
+    expect(parseEnabledChecks("Enabled checks: risk, performance, security, drift.\n")).toEqual([
+      "risk",
+      "performance",
+      "security",
+      "drift",
+    ]);
     expect(formatEnabledChecksValue(["drift", "risk"])).toBe("risk, drift");
   });
 

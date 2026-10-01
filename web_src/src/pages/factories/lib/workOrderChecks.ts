@@ -82,12 +82,53 @@ const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrd
   },
 };
 
-/** Clarity and Confidence use High / Medium / Low. Other checks use Healthy / Caution. */
-export function workOrderCheckStatus(check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level">) {
-  if (isScoreCheckName(check.name)) {
-    return CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)];
+/**
+ * Words for a merge-confidence result. "Healthy" does not say whether drift is
+ * small or whether the change met the performance practices.
+ */
+const CHECK_RESULT_LABEL: Record<string, Record<WorkOrderCheckLevel, string>> = {
+  "risk-review": { positive: "Low", neutral: "Moderate", caution: "Moderate", critical: "High" },
+  "performance-review": { positive: "Met", neutral: "Partial", caution: "Partial", critical: "Missed" },
+  "security-review": { positive: "Met", neutral: "Partial", caution: "Partial", critical: "Missed" },
+  "drift-review": { positive: "Close", neutral: "Moderate", caution: "Moderate", critical: "Far" },
+  "reversibility-review": { positive: "Easy", neutral: "Partial", caution: "Partial", critical: "Hard" },
+};
+
+const CHECK_RESULT_KEY_BY_NAME: Record<string, string> = {
+  "Risk score": "risk-review",
+  "Blast radius": "risk-review",
+  Performance: "performance-review",
+  Security: "security-review",
+  Drift: "drift-review",
+  "Drift from Specification": "drift-review",
+  Reversibility: "reversibility-review",
+};
+
+const CHECK_DISPLAY_NAME_BY_KEY: Record<string, string> = {
+  "risk-review": "Blast radius",
+  "drift-review": "Drift from Specification",
+  "reversibility-review": "Reversibility",
+};
+
+/** Older reports stored the previous names. The list shows the current names. */
+export function workOrderCheckDisplayName(check: { key?: string; name?: string }): string {
+  const byKey = check.key ? CHECK_DISPLAY_NAME_BY_KEY[check.key] : undefined;
+  if (byKey) {
+    return byKey;
   }
-  return LEVEL_LABEL[check.level];
+  return check.name ?? "";
+}
+
+/** Clarity and Confidence use High / Medium / Low. Other checks use a result word. */
+export function workOrderCheckStatus(
+  check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level"> & { key?: string },
+) {
+  const base = isScoreCheckName(check.name)
+    ? CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)]
+    : LEVEL_LABEL[check.level];
+  const key = check.key ?? CHECK_RESULT_KEY_BY_NAME[check.name];
+  const label = key ? CHECK_RESULT_LABEL[key]?.[check.level] : undefined;
+  return label ? { ...base, label } : base;
 }
 
 /** Verdict text for a boolean (pass/fail) check score. */
@@ -139,7 +180,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
   return {
     id: check.id ?? check.key ?? "",
     key: emptyToUndefined(check.key),
-    name: check.name ?? "",
+    name: workOrderCheckDisplayName({ key: emptyToUndefined(check.key), name: check.name ?? "" }),
     score: check.score ?? 0,
     maxScore: check.maxScore ?? 0,
     format: presentCheckFormat(check.format),

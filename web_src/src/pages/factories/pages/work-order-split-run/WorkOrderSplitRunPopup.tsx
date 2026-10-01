@@ -27,7 +27,6 @@ import {
   refinePopupShowsAutomations,
   SPLIT_RUN_POPUP_DIALOG_CLASSNAME,
 } from "./splitRunPopupModel";
-import { consoleCheckList } from "../../lib/mergeConfidenceScore";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -184,13 +183,7 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const panelReview = unified
-    ? analysisPopupReview({
-        ...reviewArgs,
-        compact: "stacked",
-        ctaOnly: isPullRequestReviewFooter(viewFixture.footer) && consoleCheckList(viewFixture.checks) != null,
-      })
-    : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
   const descriptionReview = taskConsole
     ? !unified && !showSidebarNote

@@ -28,7 +28,7 @@ var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\
 const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2 (low). User interface changes = 2 (low). Additive database changes = 3 (medium). Dependency updates = 3 (medium). API behavior changes = 3 (medium). Authorization changes = 4 (high). Authentication changes = 4 (high). Data deletion or migration = 4 (high). Infrastructure changes = 4 (high). Billing and payment changes = 5 (critical). Secrets and credentials = 5 (critical)."
 
 // defaultMergeConfidenceChecks is every check, in prompt order. "none" turns them all off.
-const defaultMergeConfidenceChecks = "risk, performance, security, drift"
+const defaultMergeConfidenceChecks = "risk, performance, security, drift, reversibility"
 
 //go:embed templates/*.yaml
 var factoryTemplateFiles embed.FS

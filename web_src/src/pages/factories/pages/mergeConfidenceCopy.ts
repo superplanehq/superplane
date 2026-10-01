@@ -7,7 +7,7 @@ export const MERGE_CONFIDENCE_CHECK_COPY: ReadonlyArray<{
 }> = [
   {
     id: "risk",
-    label: "Risk",
+    label: "Blast radius",
     helper: "Score how risky the change is. A higher score means more risk.",
   },
   {
@@ -22,8 +22,13 @@ export const MERGE_CONFIDENCE_CHECK_COPY: ReadonlyArray<{
   },
   {
     id: "drift",
-    label: "Drift",
+    label: "Drift from Specification",
     helper: "Check how far the change moved from the original task.",
+  },
+  {
+    id: "reversibility",
+    label: "Reversibility",
+    helper: "Check how safely you can undo the change. A higher score means the change is easier to undo.",
   },
 ];
 

@@ -50,7 +50,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-verify").getAttribute("data-completed")).toBeNull();
   });
 
-  it("lists merge confidence in Checks when the task has no verify step", () => {
+  it("lists Risk score in Checks when the task has no verify step", () => {
     renderConsole(
       splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, {
         checks: OPEN_WORK_ORDER_CHECKS,
@@ -59,7 +59,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     );
 
     const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
-    expect(within(checks).getByText("Merge confidence")).toBeInTheDocument();
+    expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
     expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
   });
 

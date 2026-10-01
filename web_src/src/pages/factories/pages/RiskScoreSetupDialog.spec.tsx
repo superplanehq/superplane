@@ -54,10 +54,11 @@ describe("RiskScoreSetupDialog", () => {
     renderDialog();
 
     expect(screen.getByRole("heading", { name: RISK_SCORE_SETUP_COPY.title })).toBeInTheDocument();
-    expect(screen.getByTestId("merge-confidence-setup-check-risk")).toHaveTextContent("Risk");
+    expect(screen.getByTestId("merge-confidence-setup-check-risk")).toHaveTextContent("Blast radius");
     expect(screen.getByTestId("merge-confidence-setup-check-performance")).toHaveTextContent("Performance");
     expect(screen.getByTestId("merge-confidence-setup-check-security")).toHaveTextContent("Security");
-    expect(screen.getByTestId("merge-confidence-setup-check-drift")).toHaveTextContent("Drift");
+    expect(screen.getByTestId("merge-confidence-setup-check-drift")).toHaveTextContent("Drift from Specification");
+    expect(screen.getByTestId("merge-confidence-setup-check-reversibility")).toHaveTextContent("Reversibility");
     expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
     expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("Low risk");
     expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("On task");
@@ -84,7 +85,7 @@ describe("RiskScoreSetupDialog", () => {
           backlogRepository: "acme/app",
           defaultBranch: "main",
           riskRules: formatRiskScoreRules(defaultRiskScoreCategories()),
-          enabledChecks: formatEnabledChecksValue(["risk", "performance", "security", "drift"]),
+          enabledChecks: formatEnabledChecksValue(["risk", "performance", "security", "drift", "reversibility"]),
         },
       }),
     );

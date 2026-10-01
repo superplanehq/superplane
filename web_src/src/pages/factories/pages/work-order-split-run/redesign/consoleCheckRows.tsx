@@ -1,153 +1,175 @@
 import { cn } from "@/lib/utils";
-import { Info } from "lucide-react";
+import {
+  ChevronDown,
+  Circle,
+  Gauge,
+  GitCompareArrows,
+  Shield,
+  ShieldAlert,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 
-import { consoleCheckList, MERGE_CONFIDENCE_SCORE_NAME } from "../../../lib/mergeConfidenceScore";
-import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
+import { confidenceBandForScore, isScoreCheckName } from "../../../lib/confidenceScore";
+import { MERGE_CONFIDENCE_SCORE_NAME } from "../../../lib/mergeConfidenceScore";
+import {
+  workOrderCheckDisplayName,
+  workOrderCheckStatus,
+  type WorkOrderCheckPresentation,
+} from "../../../lib/workOrderChecks";
 import { WorkOrderCheckDialog } from "../../../WorkOrderCheckDialog";
 
-/** Darker than the shared status colors so the words stay clear on the tinted panel. */
-const PIP_FILL: Record<string, string> = {
-  High: "bg-emerald-500",
-  Healthy: "bg-emerald-500",
-  Medium: "bg-orange-500",
-  Caution: "bg-amber-500",
-  Low: "bg-red-500",
-  Critical: "bg-red-500",
-  Neutral: "bg-slate-400",
-};
-
-const STATUS_TEXT: Record<string, string> = {
-  High: "text-emerald-950 dark:text-emerald-200",
-  Healthy: "text-emerald-950 dark:text-emerald-200",
-  Medium: "text-orange-950 dark:text-orange-200",
-  Caution: "text-orange-950 dark:text-orange-200",
-  Low: "text-red-950 dark:text-red-200",
-  Critical: "text-red-950 dark:text-red-200",
-  Neutral: "text-foreground",
-};
+type ChecksTone = "passed" | "attention" | "failed";
 
 /**
- * Merge confidence in the summary panel. The verdict word sits with the
- * score. A metric click opens the analysis.
+ * Checks in the summary panel. The header states the result. Each row is an
+ * icon, the check name, and three vertical bars. A row click opens the analysis.
  */
 export function ConsoleCheckRows({
   checks,
   testId = "redesign-console-checks",
-  heading = true,
 }: {
   checks: WorkOrderCheckPresentation[];
   testId?: string;
-  /** False when a pull request title already names the section. */
-  heading?: boolean;
 }) {
-  const group = consoleCheckList(checks);
-  if (!group) {
+  const [open, setOpen] = useState(true);
+  if (checks.length === 0) {
     return null;
   }
+  const summary = checksSummary(checks);
   return (
-    <ul className="flex flex-col gap-2" data-testid={testId}>
-      <MergeConfidenceCheckRow check={group.check} metrics={group.metrics} heading={heading} />
-    </ul>
+    <div data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={summary.title}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center gap-2.5 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">
+            {MERGE_CONFIDENCE_SCORE_NAME}
+          </span>
+          <span className="block truncate text-[12px] leading-4 text-muted-foreground">{summary.detail}</span>
+        </span>
+        <ResultBars tone={summary.tone} />
+        <ChevronDown
+          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open ? "" : "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <ul className="mt-3 flex flex-col border-t border-border">
+          {checks.map((check) => (
+            <li key={check.id} className="border-b border-border last:border-b-0">
+              <ConsoleCheckRow check={check} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
-function MergeConfidenceCheckRow({
-  check,
-  metrics,
-  heading,
-}: {
-  check: WorkOrderCheckPresentation;
-  metrics: WorkOrderCheckPresentation[];
-  heading: boolean;
-}) {
-  const title = heading ? (
-    <h3 className="truncate text-[14px] font-semibold leading-5 text-foreground">{MERGE_CONFIDENCE_SCORE_NAME}</h3>
-  ) : (
-    <span className="truncate text-[13px] font-medium text-foreground">{MERGE_CONFIDENCE_SCORE_NAME}</span>
-  );
+function checkTone(check: WorkOrderCheckPresentation): ChecksTone | "other" {
+  if (isScoreCheckName(check.name)) {
+    const band = confidenceBandForScore(check.score);
+    if (band === "Low") return "failed";
+    if (band === "Medium") return "attention";
+    return "passed";
+  }
+  if (check.level === "critical") return "failed";
+  if (check.level === "caution") return "attention";
+  if (check.level === "positive") return "passed";
+  return "other";
+}
+
+function checksSummary(checks: WorkOrderCheckPresentation[]): { title: string; detail: string; tone: ChecksTone } {
+  const tones = checks.map(checkTone);
+  const failed = tones.filter((tone) => tone === "failed").length;
+  const attention = tones.filter((tone) => tone === "attention").length;
+  const total = checks.length;
+  const title = MERGE_CONFIDENCE_SCORE_NAME;
+  if (failed > 0) {
+    return {
+      title,
+      detail: `${failed} of ${total} indicates high caution`,
+      tone: "failed",
+    };
+  }
+  if (attention > 0) {
+    return {
+      title,
+      detail: `${attention} of ${total} indicates higher caution`,
+      tone: "attention",
+    };
+  }
+  return {
+    title,
+    detail: "All checks indicate high confidence",
+    tone: "passed",
+  };
+}
+
+const CHECK_ICONS: Record<string, LucideIcon> = {
+  "risk-review": ShieldAlert,
+  "drift-review": GitCompareArrows,
+  "reversibility-review": Undo2,
+  "performance-review": Gauge,
+  "security-review": Shield,
+  "Risk score": ShieldAlert,
+  "Blast radius": ShieldAlert,
+  Drift: GitCompareArrows,
+  "Drift from Specification": GitCompareArrows,
+  Reversibility: Undo2,
+  Performance: Gauge,
+  Security: Shield,
+};
+
+function CheckIcon({ check }: { check: WorkOrderCheckPresentation }) {
+  const Icon = (check.key && CHECK_ICONS[check.key]) || CHECK_ICONS[check.name] || Circle;
+  return <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
+}
+
+/** More filled bars means a better result. The color matches that result. */
+function ResultBars({ tone }: { tone: ReturnType<typeof checkTone> }) {
+  const filled = tone === "passed" ? 3 : tone === "failed" ? 1 : 2;
+  const fill = tone === "failed" ? "bg-red-600" : tone === "passed" ? "bg-emerald-600" : "bg-amber-500";
   return (
-    <li data-testid="split-run-check-merge-confidence">
-      <div className="flex min-w-0 items-center justify-between gap-3 text-left">
-        {title}
-        <ScoreReadout check={check} testId="split-run-merge-confidence-meter" />
-      </div>
-      <ul className="mt-1.5 flex flex-col">
-        {metrics.map((metric) => (
-          <li key={metric.id}>
-            <ConsoleCheckRow check={metric} />
-          </li>
-        ))}
-      </ul>
-    </li>
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden data-filled={filled}>
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          data-bar-filled={index < filled ? "true" : "false"}
+          className={cn("h-3.5 w-1 rounded-[1px]", index < filled ? fill : "bg-muted-foreground/25")}
+        />
+      ))}
+    </span>
   );
 }
 
 function ConsoleCheckRow({ check }: { check: WorkOrderCheckPresentation }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { value, scale } = formatCheckScore(check);
   const status = workOrderCheckStatus(check);
-  const score = `${value}${scale}`;
+  const name = workOrderCheckDisplayName(check);
 
   return (
     <>
       <button
         type="button"
         onClick={() => setDialogOpen(true)}
-        aria-label={`${check.name}, ${status.label}, ${score}. Read the reason.`}
+        aria-label={`${name}. ${status.label}`}
         data-testid={`split-run-check-${check.id}`}
-        className="-mx-1.5 flex w-[calc(100%+0.75rem)] cursor-pointer items-center justify-between gap-3 rounded-md px-1.5 py-0.5 text-left hover:bg-black/5 dark:hover:bg-white/10"
+        className="flex w-full min-w-0 items-center justify-between gap-3 py-2 text-left"
       >
-        <span className="flex min-w-0 items-center gap-1">
-          <CheckName check={check} />
-          <Info className="size-3 shrink-0 text-foreground/55" aria-hidden />
+        <span className="flex min-w-0 items-center gap-2">
+          <CheckIcon check={check} />
+          <span className="min-w-0 truncate text-[13px] font-medium leading-5 text-foreground">{name}</span>
         </span>
-        <ScoreReadout check={check} />
+        <ResultBars tone={checkTone(check)} />
       </button>
       <WorkOrderCheckDialog open={dialogOpen} onClose={() => setDialogOpen(false)} check={check} />
     </>
-  );
-}
-
-function CheckName({ check }: { check: WorkOrderCheckPresentation }) {
-  return <span className="truncate text-[12px] font-medium text-foreground">{check.name}</span>;
-}
-
-function ScoreReadout({ check, testId }: { check: WorkOrderCheckPresentation; testId?: string }) {
-  const status = workOrderCheckStatus(check);
-  return (
-    <span className="inline-flex shrink-0 items-center gap-2">
-      <span className={cn("text-[12px] font-medium", STATUS_TEXT[status.label] ?? "text-foreground")}>
-        {status.label}
-      </span>
-      <ScorePips check={check} testId={testId} />
-    </span>
-  );
-}
-
-const PIP_COUNT = 5;
-
-function ScorePips({ check, testId }: { check: WorkOrderCheckPresentation; testId?: string }) {
-  const status = workOrderCheckStatus(check);
-  const value = Math.max(0, Math.round(check.score));
-  const filled =
-    check.maxScore > 0 ? Math.min(PIP_COUNT, Math.max(0, Math.round((check.score / check.maxScore) * PIP_COUNT))) : 0;
-  const fill = PIP_FILL[status.label] ?? "bg-slate-400";
-
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5" data-testid={testId}>
-      <span className="inline-flex items-center gap-0.5" aria-hidden>
-        {Array.from({ length: PIP_COUNT }, (_, index) => (
-          <span
-            key={index}
-            data-filled={index < filled ? "true" : "false"}
-            className={cn("h-2 w-1.5 rounded-[1px]", index < filled ? fill : "bg-muted-foreground/25")}
-          />
-        ))}
-      </span>
-      <span className={cn("text-[13px] font-semibold tabular-nums", STATUS_TEXT[status.label] ?? "text-foreground")}>
-        {value}
-      </span>
-    </span>
   );
 }

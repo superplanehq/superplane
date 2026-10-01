@@ -166,7 +166,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	prompt := agentPrompt(t, agent)
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
-	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift.")
+	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift, reversibility.")
 	assert.NotContains(t, prompt, "install_params.riskRules")
 	assert.NotContains(t, prompt, "install_params.enabledChecks")
 	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
@@ -177,6 +177,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	report := findYAMLNode(t, canvas, "report-risk-score")
 	assert.Equal(t, "risk-review", report.Configuration["checkKey"])
+	assert.Equal(t, "Blast radius", report.Configuration["name"])
 	assert.Equal(t, "5", report.Configuration["maxScore"])
 	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
 	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
@@ -194,9 +195,17 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	drift := findYAMLNode(t, canvas, "report-drift")
 	assert.Equal(t, "drift-review", drift.Configuration["checkKey"])
+	assert.Equal(t, "Drift from Specification", drift.Configuration["name"])
 	assert.Equal(t, "lowerIsBetter", drift.Configuration["direction"])
 	assert.Equal(t, float64(3), drift.Configuration["cautionAt"])
 	assert.Equal(t, float64(4), drift.Configuration["criticalAt"])
+
+	reversibility := findYAMLNode(t, canvas, "report-reversibility")
+	assert.Equal(t, "reversibility-review", reversibility.Configuration["checkKey"])
+	assert.Equal(t, "Reversibility", reversibility.Configuration["name"])
+	assert.Equal(t, "higherIsBetter", reversibility.Configuration["direction"])
+	assert.Equal(t, float64(3), reversibility.Configuration["cautionAt"])
+	assert.Equal(t, float64(2), reversibility.Configuration["criticalAt"])
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")

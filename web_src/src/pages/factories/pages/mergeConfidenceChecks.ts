@@ -1,7 +1,7 @@
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { draftWithRiskScoreCategories, parseRiskScoreRules, type RiskScoreCategory } from "./riskScoreCategories";
 
-export const MERGE_CONFIDENCE_CHECKS = ["risk", "performance", "security", "drift"] as const;
+export const MERGE_CONFIDENCE_CHECKS = ["risk", "performance", "security", "drift", "reversibility"] as const;
 
 export type MergeConfidenceCheck = (typeof MERGE_CONFIDENCE_CHECKS)[number];
 
@@ -11,7 +11,7 @@ export type MergeConfidenceSettings = {
 };
 
 const ENABLED_CHECKS_LINE =
-  /^Enabled checks: (none|(?:risk|performance|security|drift)(?:, (?:risk|performance|security|drift))*)\.$/m;
+  /^Enabled checks: (none|(?:risk|performance|security|drift|reversibility)(?:, (?:risk|performance|security|drift|reversibility))*)\.$/m;
 
 export function defaultMergeConfidenceChecks(): MergeConfidenceCheck[] {
   return [...MERGE_CONFIDENCE_CHECKS];
