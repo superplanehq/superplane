@@ -441,7 +441,96 @@ describe("LiveAgentSteps", () => {
     expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
   });
 
-  it("keeps the empty sentence for a finished run with no steps", async () => {
+  it("holds the log skeleton until a finished transcript fetch settles", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(
+      idleStream({
+        isStreaming: true,
+        sections: [
+          {
+            index: 1,
+            text: "Implementation",
+            kind: "prompt",
+            preview: "",
+            lines: [],
+            events: [{ kind: "note", text: "I will download the bun zip and extract it." }],
+            status: "passed",
+            duration_ms: 40,
+            started_at: 2,
+            collapsed: false,
+          },
+        ],
+      }),
+    );
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+
+    const view = render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={implementPhase()}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Waiting for logs" })).toBeInTheDocument();
+    expect(screen.queryByText("Implementation")).not.toBeInTheDocument();
+    expect(screen.queryByText("I will download the bun zip and extract it.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+
+    vi.mocked(useLiveLogStream).mockReturnValue(
+      idleStream({
+        isStreaming: false,
+        sections: [
+          {
+            index: 1,
+            text: "Clone Repo",
+            kind: "bash",
+            preview: "git clone",
+            lines: [],
+            events: [],
+            status: "passed",
+            duration_ms: 20,
+            started_at: 1,
+            collapsed: true,
+          },
+          {
+            index: 2,
+            text: "Implementation",
+            kind: "prompt",
+            preview: "",
+            lines: [],
+            events: [{ kind: "note", text: "I will download the bun zip and extract it." }],
+            status: "passed",
+            duration_ms: 40,
+            started_at: 2,
+            collapsed: true,
+          },
+        ],
+      }),
+    );
+    view.rerender(
+      <LiveAgentSteps
+        stage={stage}
+        phase={implementPhase()}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByText("Clone Repo")).toBeInTheDocument();
+    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
+    expect(screen.queryByText("I will download the bun zip and extract it.")).not.toBeInTheDocument();
+  });
+
+  it("shows the log skeleton while a finished run still fetches its transcript", async () => {
     vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
       enabled: true,
       isError: false,
@@ -450,6 +539,54 @@ describe("LiveAgentSteps", () => {
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true }));
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={implementPhase()}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Waiting for logs" })).toBeInTheDocument();
+    expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
+  });
+
+  it("shows the log skeleton while the finished run canvas is still loading", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: true,
+      canvas: undefined,
+      stream: [],
+    });
+    const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={implementPhase()}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByRole("status", { name: "Waiting for logs" })).toBeInTheDocument();
+    expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the empty sentence for a finished run with no steps", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false }));
     const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
 
     render(
