@@ -1713,6 +1713,36 @@ func webhookNodeLogger(node models.CanvasNode, integration *models.Integration) 
 	})
 }
 
+func storeWebhookServerError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error) {
+	if r == nil || webhook == nil || err == nil || code < http.StatusInternalServerError {
+		return
+	}
+
+	middleware.SetServerError(r.Context(), err, webhookServerErrorTags(r, webhook, node))
+}
+
+func webhookServerErrorTags(r *http.Request, webhook *models.Webhook, node models.CanvasNode) map[string]string {
+	tags := map[string]string{
+		"webhook_id": uuidTag(webhook.ID),
+		"node_id":    node.NodeID,
+		"canvas_id":  uuidTag(node.WorkflowID),
+	}
+	if organizationID := organizationIDForWebhookNode(database.DB(r.Context()), node); organizationID != "" {
+		tags["organization_id"] = organizationID
+	}
+	if deliveryID := strings.TrimSpace(r.Header.Get("X-GitHub-Delivery")); deliveryID != "" {
+		tags["github_delivery_id"] = deliveryID
+	}
+	return tags
+}
+
+func uuidTag(id uuid.UUID) string {
+	if id == uuid.Nil {
+		return ""
+	}
+	return id.String()
+}
+
 func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error) {
 	if !isProductiveOnTaskNode(node) {
 		log.WithFields(log.Fields{
@@ -1829,6 +1859,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
 			s.logWebhookError(r, webhook, node, code, err)
+			storeWebhookServerError(r, webhook, node, code, err)
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}

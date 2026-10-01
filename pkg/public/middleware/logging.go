@@ -22,6 +22,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			requestID := requestIDFromHeader(r)
 			w.Header().Set(requestIDHeader, requestID)
 			r = withRequestLogFields(r, requestID)
+			r = withServerErrorCause(r)
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
@@ -205,11 +206,42 @@ func captureHTTPError(r *http.Request, status int) {
 		return
 	}
 
+	if cause := serverErrorFrom(r.Context()); cause != nil && cause.err != nil {
+		captureStoredHTTPError(hub, r, status, cause)
+		return
+	}
+
 	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetRequest(r)
 		scope.SetTag("status", strconv.Itoa(status))
 		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
 	})
+}
+
+func captureStoredHTTPError(hub *sentry.Hub, r *http.Request, status int, cause *serverErrorCause) {
+	hub.WithScope(func(scope *sentry.Scope) {
+		scope.SetRequest(requestWithoutBody(r))
+		scope.SetTag("status", strconv.Itoa(status))
+		for key, value := range cause.tags {
+			scope.SetTag(key, value)
+		}
+		hub.CaptureException(cause.err)
+	})
+}
+
+func requestWithoutBody(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+
+	clone := r.Clone(r.Context())
+	clone.Body = http.NoBody
+	clone.GetBody = nil
+	clone.ContentLength = 0
+	clone.Form = nil
+	clone.PostForm = nil
+	clone.MultipartForm = nil
+	return clone
 }
 
 func shouldLogRequest(path string) bool {
