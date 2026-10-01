@@ -444,6 +444,7 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 		ID:                 uuid.New(),
 		Name:               "Payments",
 		Key:                "PAY",
+		URLID:              "pay1id01",
 		PlanningEnabled:    true,
 		PlanningClarity:    true,
 		PlanningConfidence: false,
@@ -455,6 +456,7 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 	assert.True(t, serialized.Planning.Clarity)
 	assert.False(t, serialized.Planning.Confidence)
 	assert.False(t, serialized.Planning.SetupCompleted)
+	assert.Equal(t, "pay1id01", serialized.UrlId)
 }
 
 func TestWorkOrderStateProtoMapping(t *testing.T) {

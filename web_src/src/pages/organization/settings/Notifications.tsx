@@ -1,6 +1,10 @@
 import { useAccount } from "@/contexts/useAccount";
 import { useFactories } from "@/hooks/useFactoryData";
-import { factoryListPath, factorySettingsSectionPath } from "@/pages/factories/lib/factoryPagePaths";
+import {
+  factoryListPath,
+  factoryRouteSegment,
+  factorySettingsSectionPath,
+} from "@/pages/factories/lib/factoryPagePaths";
 import { pickInitialFactory, readLastVisitedFactory } from "@/pages/factories/lib/lastVisitedFactory";
 import { Navigate, useParams } from "react-router";
 
@@ -28,5 +32,10 @@ export function Notifications() {
     return <Navigate to={factoryListPath(organizationId)} replace />;
   }
 
-  return <Navigate to={factorySettingsSectionPath(organizationId, factory.key, "account", "notifications")} replace />;
+  return (
+    <Navigate
+      to={factorySettingsSectionPath(organizationId, factoryRouteSegment(factory), "account", "notifications")}
+      replace
+    />
+  );
 }

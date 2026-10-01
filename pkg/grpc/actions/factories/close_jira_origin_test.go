@@ -176,10 +176,10 @@ func TestResolveJiraCloseTargetPrefersSourceRun(t *testing.T) {
 
 func TestJiraCompletionCommentFor(t *testing.T) {
 	orgID := uuid.New()
-	factory := &models.Factory{Key: "SP"}
+	factory := &models.Factory{Key: "SP", URLID: "k7m2xqab"}
 	order := &models.FactoryWorkOrder{OrganizationID: orgID, Number: 7}
 
 	comment := jiraCompletionCommentFor("https://app.example.com/", factory, order)
-	assert.Equal(t, jiraCompletionComment+" https://app.example.com"+order.URLPath("SP"), comment)
+	assert.Equal(t, jiraCompletionComment+" https://app.example.com"+order.URLPath("sp-k7m2xqab"), comment)
 	assert.Equal(t, jiraCompletionComment, jiraCompletionCommentFor("", factory, order))
 }

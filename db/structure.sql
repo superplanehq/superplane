@@ -388,8 +388,10 @@ CREATE TABLE public.factories (
     public_badge_enabled boolean DEFAULT false NOT NULL,
     public_badge_show_cost boolean DEFAULT false NOT NULL,
     public_badge_token text,
+    url_id text NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
-    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
+    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
+    CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
 );
 
 
@@ -2726,6 +2728,13 @@ CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USIN
 --
 
 CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories USING btree (organization_id, key) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: factories_url_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id);
 
 
 --
@@ -5097,7 +5106,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260930155842	f
+20260930235618	f
 \.
 
 

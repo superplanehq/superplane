@@ -8,6 +8,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
+import { factoryLineDetailPath, factoryRouteSegment, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsGeneralPage } from "./FactorySettingsGeneralPage";
 
@@ -175,7 +176,10 @@ describe("FactorySettingsGeneralPage", () => {
     renderPage({ ...REFUND_FACTORY, public: true });
 
     const link = screen.getByTestId("factory-settings-visibility-board-link");
-    expect(link).toHaveAttribute("href", "/org-1/workspaces/rf/lines/line-plan-and-implement");
+    expect(link).toHaveAttribute(
+      "href",
+      factoryLineDetailPath("org-1", factoryRouteSegment(REFUND_FACTORY), firstFactoryLineId(REFUND_FACTORY)!),
+    );
     expect(link).toHaveTextContent("View public board");
   });
 
@@ -276,6 +280,8 @@ describe("FactorySettingsGeneralPage", () => {
 
     await user.click(boardSwitch);
     const snippet = screen.getAllByTestId("factory-settings-public-badge-markdown").at(-1) as HTMLInputElement;
-    expect(snippet.value).toContain(`](${window.location.origin}/org-1/workspaces/rf/lines/line-plan-and-implement)`);
+    expect(snippet.value).toContain(
+      `](${window.location.origin}${factoryLineDetailPath("org-1", factoryRouteSegment(REFUND_FACTORY), firstFactoryLineId(REFUND_FACTORY)!)})`,
+    );
   });
 });

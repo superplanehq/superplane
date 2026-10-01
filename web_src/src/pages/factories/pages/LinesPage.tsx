@@ -154,6 +154,7 @@ import {
   factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
+  factoryRouteSegment,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
   intakeIdFromSearch,
@@ -306,7 +307,7 @@ function prFeedbackSetupHref(
 }
 
 export function LinesPage() {
-  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
@@ -395,7 +396,7 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
-  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -467,7 +468,7 @@ export function LinesPage() {
   const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
 
   if (redirectCanonical && canonicalNumber) {
-    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
+    return <Navigate to={workOrderDetailPath(organizationId, routeSegment, canonicalNumber, boardLineId)} replace />;
   }
 
   if (!selectedLine) {
@@ -478,13 +479,13 @@ export function LinesPage() {
         </div>
       );
     }
-    return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
+    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
   }
 
   if (isJiraIntakeSetupSearchOpen(search) && selectedLine.id) {
     return (
       <Navigate
-        to={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id, {
+        to={factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id, {
           integrationId: jiraIntakeIntegrationIdFromSearch(search) || undefined,
         })}
         replace
@@ -504,7 +505,7 @@ export function LinesPage() {
         sources: configuredIntakes,
         showAddIntake: showAddIntakeControl,
         onOpenSettings: (intake) =>
-          navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
+          navigate(factoryIntakePath(organizationId, routeSegment, selectedLine.id, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
@@ -523,7 +524,7 @@ export function LinesPage() {
         settingsLabel: "Open PR feedback settings",
         testId: `lines-verify-listener-${handler.id}`,
         onOpenSettings: () =>
-          navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id)),
+          navigate(factoryPRFeedbackPath(organizationId, routeSegment, selectedLine.id, undefined, handler.id)),
       },
     ];
   });
@@ -532,7 +533,7 @@ export function LinesPage() {
     if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
       return;
     }
-    const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, source.id);
+    const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, source.id);
     if (!href) {
       return;
     }
@@ -547,37 +548,37 @@ export function LinesPage() {
     }
     if (template.id === "github-issues") {
       if (selectedLine.id) {
-        navigate(factoryGitHubIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryGitHubIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
-        navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factorySentryIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "dependabot-alerts") {
       if (selectedLine.id) {
-        navigate(factoryDependabotIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryDependabotIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "productive-tasks") {
       if (selectedLine.id) {
-        navigate(factoryProductiveIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryProductiveIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "jira-issues") {
       if (selectedLine.id) {
-        navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "datadog") {
       if (selectedLine.id) {
-        navigate(factoryDatadogIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
@@ -592,7 +593,7 @@ export function LinesPage() {
           return;
         }
         navigate(
-          factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
+          factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
             from: "lines",
             lineId: selectedLine.id,
           }),
@@ -610,20 +611,20 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, factoryKey, number, selectedLine.id), {
+    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
       state: { peekOrder: target },
     });
   };
 
   const closePeek = () => {
     setPeekHint(null);
-    navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id), { replace: true });
+    navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id), { replace: true });
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
   const canDeleteViewedCustom =
     canUpdate && (viewedAutomation?.columnKey === "verify" || viewedAutomation?.columnKey === "done");
-  const closeAutomationView = () => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id));
+  const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
   const deleteViewedCustomAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
@@ -645,13 +646,13 @@ export function LinesPage() {
           key={settingsIntake.intakeId}
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           intake={settingsIntake}
           repository={factory?.onboarding?.backlogRepository}
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       <AddIntakePicker
@@ -671,7 +672,7 @@ export function LinesPage() {
         <ColumnAutomationViewHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
           title={viewedAutomation?.name?.trim() || "Automation"}
@@ -684,24 +685,24 @@ export function LinesPage() {
         <PlanningSettingsHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           githubIntegrationId={githubIntegrationId}
           repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       <div className={factoryKanbanPageClassName}>
@@ -736,7 +737,7 @@ export function LinesPage() {
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
                 openPRFeedbackSetup: (sourceId) => {
-                  const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
+                  const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, sourceId);
                   if (href) {
                     navigate(href);
                   }
@@ -754,7 +755,7 @@ export function LinesPage() {
           <LineDetail
             organizationId={organizationId}
             factoryId={factoryId}
-            factoryKey={factoryKey}
+            factoryKey={routeSegment}
             line={selectedLine}
             apps={factoryApps}
             workOrders={visibleWorkOrders}
@@ -797,7 +798,7 @@ export function LinesPage() {
             workOrderCardContext={{
               organizationId,
               factoryId,
-              factoryKey,
+              factoryKey: routeSegment,
               factoryLines: lines,
               canDispatch: canUpdateWorkOrders,
               preferredLineName: selectedLine.name,
@@ -874,7 +875,7 @@ function LineDetailHeader({
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
-  const factoryKey = factory?.key ?? "";
+  const factoryKey = factoryRouteSegment(factory);
 
   const handleRename = async (name: string) => {
     if (!line.id) {

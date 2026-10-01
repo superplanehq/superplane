@@ -5,10 +5,10 @@ import { factoryLineDetailPath, factoryOverviewPath, firstFactoryLineId } from "
 
 /** Sends the workspace index and `/lines` to the Kanban board. */
 export function FactoryHomeRedirect() {
-  const { organizationId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const lineId = firstFactoryLineId(factory);
   const pathname = lineId
-    ? factoryLineDetailPath(organizationId, factoryKey, lineId)
-    : factoryOverviewPath(organizationId, factoryKey);
+    ? factoryLineDetailPath(organizationId, routeSegment, lineId)
+    : factoryOverviewPath(organizationId, routeSegment);
   return <Navigate to={{ pathname, search: "" }} replace />;
 }

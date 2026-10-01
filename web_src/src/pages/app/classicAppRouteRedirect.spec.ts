@@ -14,8 +14,9 @@ const BASE = {
 };
 
 describe("factoryKeyForId", () => {
-  it("returns the workspace key for a matching factory id", () => {
-    expect(factoryKeyForId([{ id: "factory-1", key: "RF" }], "factory-1")).toBe("RF");
+  it("returns the workspace route segment for a matching factory id", () => {
+    expect(factoryKeyForId([{ id: "factory-1", key: "RF" }], "factory-1")).toBe("rf");
+    expect(factoryKeyForId([{ id: "factory-1", key: "RF", urlId: "k7m2xqab" }], "factory-1")).toBe("rf-k7m2xqab");
   });
 
   it("returns undefined when the factory id is missing or unknown", () => {

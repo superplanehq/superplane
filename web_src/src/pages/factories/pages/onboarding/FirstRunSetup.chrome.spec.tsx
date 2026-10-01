@@ -24,6 +24,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     organizationId: "org-1",
     factoryId: "factory-1",
     factoryKey: "PAY",
+    routeSegment: "pay",
     factory,
     factories,
   }),
