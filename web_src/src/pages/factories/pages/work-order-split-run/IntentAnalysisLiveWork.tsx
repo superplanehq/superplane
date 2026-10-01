@@ -102,7 +102,7 @@ export function AgentLiveActivityFeed({
   if (!active) return null;
   return (
     <div className={cn(className)} data-testid={testId}>
-      {activity ? <AgentActivityView activity={activity} live collapseReasoning={collapseReasoning} /> : null}
+      {activity ? <AgentActivityView activity={activity} live collapseReasoning={false} /> : null}
       <AgentLiveStatus
         active
         activity={activity}

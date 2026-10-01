@@ -154,6 +154,66 @@ describe("AnalysisLiveWork", () => {
     expect(screen.queryByTestId("split-run-intent-thinking")).not.toBeInTheDocument();
   });
 
+  it("keeps a finished thought visible while analysis is running", () => {
+    vi.mocked(useAgentActivityStream).mockReturnValue({
+      isConnected: true,
+      hasConnectedOnce: true,
+      activities: [
+        {
+          id: "activity-1",
+          provider: "claude",
+          status: "running",
+          sequence: 5,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "thought-1",
+              kind: "reasoning",
+              text: "The webhook lookup already scopes this subscription.",
+              status: "passed",
+              durationMs: 45_000,
+              truncated: false,
+            },
+            {
+              type: "tool",
+              id: "search-1",
+              kind: "grep",
+              name: "Grep",
+              input: "FindFactoryIntakeByCanvasID",
+              output: "",
+              outputStreams: [],
+              status: "passed",
+              truncated: false,
+            },
+            {
+              type: "tool",
+              id: "command-1",
+              kind: "bash",
+              name: "Bash",
+              input: "printf ok",
+              output: "",
+              outputStreams: [],
+              status: "passed",
+              truncated: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<AnalysisLiveWork machineStatus="running" />);
+
+    expect(screen.getByText("The webhook lookup already scopes this subscription.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Thought for 45 seconds" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thought briefly" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Searched code, used terminal" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByText("printf ok")).not.toBeInTheDocument();
+  });
+
   it("keeps an animated writing status until assistant text arrives", () => {
     vi.mocked(useAgentActivityStream).mockReturnValue({
       isConnected: true,
