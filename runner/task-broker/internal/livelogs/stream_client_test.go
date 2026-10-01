@@ -208,3 +208,116 @@ func (w *heartbeatRecorder) Write(p []byte) (int, error) {
 func (w *heartbeatRecorder) Flush() {
 	w.flushes++
 }
+
+func useShortHeartbeat(t *testing.T) {
+	t.Helper()
+	previous := heartbeatInterval
+	heartbeatInterval = 800 * time.Millisecond
+	t.Cleanup(func() { heartbeatInterval = previous })
+}
+
+func TestCloudWatchRepeatedTimeoutsEndStream(t *testing.T) {
+	useShortHeartbeat(t)
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_MAX_ATTEMPTS", "1")
+
+	var mu sync.Mutex
+	var calls int
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(release) })
+	t.Setenv("AWS_ENDPOINT_URL", srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var buf bytes.Buffer
+	err := StreamCloudWatchLogToNDJSON(ctx, &buf, nil, "tasks", "task-1", "us-east-1", nil)
+	if !errors.Is(err, errLogServiceTimeout) {
+		t.Fatalf("stream error: %v", err)
+	}
+	if !strings.Contains(buf.String(), `"type":"error"`) || !strings.Contains(buf.String(), errLogServiceTimeout.Error()) {
+		t.Fatalf("output = %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), `"type":"ping"`) {
+		t.Fatalf("expected a heartbeat before the timeout error: %s", buf.String())
+	}
+	mu.Lock()
+	gotCalls := calls
+	mu.Unlock()
+	if gotCalls != maxConsecutiveLogTimeouts {
+		t.Fatalf("GetLogEvents calls = %d, want %d", gotCalls, maxConsecutiveLogTimeouts)
+	}
+}
+
+func TestCloudWatchTimeoutStreakResetsAfterLogPage(t *testing.T) {
+	useShortHeartbeat(t)
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_MAX_ATTEMPTS", "1")
+
+	var mu sync.Mutex
+	var calls int
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		call := calls
+		mu.Unlock()
+		if call == maxConsecutiveLogTimeouts || call == maxConsecutiveLogTimeouts*2 {
+			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+			message := "first page"
+			if call == maxConsecutiveLogTimeouts*2 {
+				message = "second page"
+			}
+			_, _ = w.Write([]byte(`{"events":[{"message":"` + message + `","timestamp":1}],"nextForwardToken":"tok"}`))
+			return
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(release) })
+	t.Setenv("AWS_ENDPOINT_URL", srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	writer := &cancelAfterText{buf: &bytes.Buffer{}, cancel: cancel, needle: "second page"}
+	err := StreamCloudWatchLogToNDJSON(ctx, writer, nil, "tasks", "task-1", "us-east-1", nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("stream error: %v output=%s", err, writer.buf.String())
+	}
+	if !strings.Contains(writer.buf.String(), "first page") || !strings.Contains(writer.buf.String(), "second page") {
+		t.Fatalf("output = %s", writer.buf.String())
+	}
+	if strings.Contains(writer.buf.String(), `"type":"error"`) {
+		t.Fatalf("successful page did not reset the timeout streak: %s", writer.buf.String())
+	}
+}
+
+type cancelAfterText struct {
+	buf    *bytes.Buffer
+	cancel context.CancelFunc
+	needle string
+}
+
+func (c *cancelAfterText) Write(p []byte) (int, error) {
+	n, err := c.buf.Write(p)
+	if strings.Contains(c.buf.String(), c.needle) {
+		c.cancel()
+	}
+	return n, err
+}

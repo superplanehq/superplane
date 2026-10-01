@@ -4,6 +4,7 @@ package livelogs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,7 +29,16 @@ const (
 	terminalCatchUp = 10 * time.Second
 	// requestBudgetMargin leaves time to write a heartbeat before HeartbeatInterval elapses.
 	requestBudgetMargin = 500 * time.Millisecond
+	// maxConsecutiveLogTimeouts ends a stream that keeps timing out on the same page.
+	// Each attempt is bounded by HeartbeatInterval, so four timeouts are about one minute.
+	maxConsecutiveLogTimeouts = 4
 )
+
+// heartbeatInterval is the quiet-period bound used by CloudWatch live-log streams.
+var heartbeatInterval = HeartbeatInterval
+
+// errLogServiceTimeout is written when CloudWatch keeps timing out.
+var errLogServiceTimeout = errors.New("log service did not respond")
 
 type ndjsonWriter struct {
 	w         io.Writer
@@ -53,7 +63,7 @@ func (n *ndjsonWriter) flush() {
 }
 
 func (n *ndjsonWriter) pingIfDue(within time.Duration) error {
-	if time.Since(n.lastFlush)+within < HeartbeatInterval {
+	if time.Since(n.lastFlush)+within < heartbeatInterval {
 		return nil
 	}
 	if err := n.writeRecord(map[string]any{"type": "ping"}); err != nil {
@@ -64,17 +74,27 @@ func (n *ndjsonWriter) pingIfDue(within time.Duration) error {
 }
 
 func (n *ndjsonWriter) logRequestBudget() time.Duration {
-	budget := HeartbeatInterval - time.Since(n.lastFlush) - requestBudgetMargin
+	budget := heartbeatInterval - time.Since(n.lastFlush) - requestBudgetMargin
 	if budget < time.Millisecond {
 		return time.Millisecond
 	}
 	return budget
 }
 
+func (n *ndjsonWriter) writeStreamError(err error) error {
+	_ = n.writeRecord(map[string]any{
+		"type":    "error",
+		"message": err.Error(),
+	})
+	n.flush()
+	return err
+}
+
 // StreamCloudWatchLogToNDJSON tails a CloudWatch Logs stream and writes newline-delimited JSON records:
 // {"type":"line","text":"..."} for regular lines, {"type":"cmd_start"...}/{"type":"cmd_end"...}
 // for runner command boundaries, {"type":"ping"} during quiet periods, and
 // {"type":"error","message":"..."} on fatal errors. A terminal task ends after a short quiet catch-up so late log lines can arrive.
+// Repeated CloudWatch timeouts end the stream with an error record instead of retrying for the life of the connection.
 func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string, isTaskTerminal func(context.Context) (bool, error)) error {
 	group = strings.TrimSpace(group)
 	stream = strings.TrimSpace(stream)
@@ -104,6 +124,7 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 	var nextForward *string
 	var lastToken string
 	var catchUp terminalCatchUpWindow
+	var timeouts int
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -124,18 +145,18 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			Limit:         awsInt32(pageSize),
 		}, nw.logRequestBudget())
 		if retry {
+			timeouts++
+			if timeouts >= maxConsecutiveLogTimeouts {
+				return nw.writeStreamError(errLogServiceTimeout)
+			}
 			if err := nw.pingIfDue(requestBudgetMargin); err != nil {
 				return err
 			}
 			continue
 		}
+		timeouts = 0
 		if err != nil {
-			_ = nw.writeRecord(map[string]any{
-				"type":    "error",
-				"message": err.Error(),
-			})
-			nw.flush()
-			return err
+			return nw.writeStreamError(err)
 		}
 
 		token := awsToString(out.NextForwardToken)
@@ -169,7 +190,7 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			delay = pollQuiet
 		}
 		// Wake at the heartbeat deadline even when it falls between polls.
-		delay = min(delay, max(0, HeartbeatInterval-time.Since(nw.lastFlush)))
+		delay = min(delay, max(0, heartbeatInterval-time.Since(nw.lastFlush)))
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
