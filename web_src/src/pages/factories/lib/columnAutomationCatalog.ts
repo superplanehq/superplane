@@ -66,12 +66,12 @@ export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
 export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   id: RISK_SCORE_CATALOG_ID,
   kind: "risk-score",
-  name: "Risk score",
-  description: "Score the pull request diff from 1 to 5.",
+  name: "Merge confidence",
+  description: "Score risk, performance, security, and drift on a pull request.",
   trigger: "On pull request opened or updated",
-  action: "Score the change",
-  iconSrc: githubIcon,
-  iconAlt: "GitHub",
+  action: "Score merge confidence",
+  iconSrc: "",
+  iconAlt: "",
   unique: true,
 };
 

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Console
 metadata:
-  name: Risk score
+  name: Merge confidence
   canvasId: __FACTORY_CANVAS_ID__
 spec:
   panels:
@@ -10,15 +10,15 @@ spec:
       content:
         title: About this app
         body: |
-          > [!SECTION:setup] Pull request risk score
+          > [!SECTION:setup] Merge confidence
           >
           > This app is not a factory line step. It listens for pull request
           > events on the app repository.
           >
           > When a pull request opens or updates on the default branch:
-          > - The app reviews the diff and scores risk from 1 to 5.
-          > - A higher score means more risk.
-          > - The score is stored on the task.
+          > - The app reviews the diff.
+          > - It scores only the checks you turn on.
+          > - Risk, performance, security, and drift are stored on the task.
   layout:
     - i: about
       x: 0

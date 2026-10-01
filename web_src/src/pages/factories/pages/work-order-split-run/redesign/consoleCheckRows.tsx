@@ -1,23 +1,30 @@
 import { cn } from "@/lib/utils";
+import {
+  ChevronDown,
+  Circle,
+  Gauge,
+  GitCompareArrows,
+  Shield,
+  ShieldAlert,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 
-import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
+import { confidenceBandForScore, isScoreCheckName } from "../../../lib/confidenceScore";
+import { MERGE_CONFIDENCE_SCORE_NAME } from "../../../lib/mergeConfidenceScore";
+import {
+  workOrderCheckDisplayName,
+  workOrderCheckStatus,
+  type WorkOrderCheckPresentation,
+} from "../../../lib/workOrderChecks";
 import { WorkOrderCheckDialog } from "../../../WorkOrderCheckDialog";
-import { checkTickBar } from "./checkTickBar";
 
-const TICK_FILL: Record<string, string> = {
-  High: "bg-emerald-500",
-  Healthy: "bg-emerald-500",
-  Medium: "bg-orange-500",
-  Caution: "bg-amber-500",
-  Low: "bg-red-500",
-  Critical: "bg-red-500",
-  Neutral: "bg-slate-400",
-};
+type ChecksTone = "passed" | "attention" | "failed";
 
 /**
- * Checks in the summary panel: name, a full-width segmented gauge
- * (stats-13), then the score. A click opens the analysis dialog.
+ * Checks in the summary panel. The header states the result. Each row is an
+ * icon, the check name, and three vertical bars. A row click opens the analysis.
  */
 export function ConsoleCheckRows({
   checks,
@@ -26,52 +33,141 @@ export function ConsoleCheckRows({
   checks: WorkOrderCheckPresentation[];
   testId?: string;
 }) {
+  const [open, setOpen] = useState(true);
   if (checks.length === 0) {
     return null;
   }
+  const summary = checksSummary(checks);
   return (
-    <ul className="flex flex-col gap-2" data-testid={testId}>
-      {checks.map((check) => (
-        <li key={check.id}>
-          <ConsoleCheckRow check={check} />
-        </li>
+    <div data-testid={testId}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={summary.title}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center gap-2.5 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">
+            {MERGE_CONFIDENCE_SCORE_NAME}
+          </span>
+          <span className="block truncate text-[12px] leading-4 text-muted-foreground">{summary.detail}</span>
+        </span>
+        <ResultBars tone={summary.tone} />
+        <ChevronDown
+          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open ? "" : "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <ul className="mt-3 flex flex-col border-t border-border">
+          {checks.map((check) => (
+            <li key={check.id} className="border-b border-border last:border-b-0">
+              <ConsoleCheckRow check={check} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function checkTone(check: WorkOrderCheckPresentation): ChecksTone | "other" {
+  if (isScoreCheckName(check.name)) {
+    const band = confidenceBandForScore(check.score);
+    if (band === "Low") return "failed";
+    if (band === "Medium") return "attention";
+    return "passed";
+  }
+  if (check.level === "critical") return "failed";
+  if (check.level === "caution") return "attention";
+  if (check.level === "positive") return "passed";
+  return "other";
+}
+
+function checksSummary(checks: WorkOrderCheckPresentation[]): { title: string; detail: string; tone: ChecksTone } {
+  const tones = checks.map(checkTone);
+  const failed = tones.filter((tone) => tone === "failed").length;
+  const attention = tones.filter((tone) => tone === "attention").length;
+  const total = checks.length;
+  const title = MERGE_CONFIDENCE_SCORE_NAME;
+  if (failed > 0) {
+    return {
+      title,
+      detail: `${failed} of ${total} indicates high caution`,
+      tone: "failed",
+    };
+  }
+  if (attention > 0) {
+    return {
+      title,
+      detail: `${attention} of ${total} indicates higher caution`,
+      tone: "attention",
+    };
+  }
+  return {
+    title,
+    detail: "All checks indicate high confidence",
+    tone: "passed",
+  };
+}
+
+const CHECK_ICONS: Record<string, LucideIcon> = {
+  "risk-review": ShieldAlert,
+  "drift-review": GitCompareArrows,
+  "reversibility-review": Undo2,
+  "performance-review": Gauge,
+  "security-review": Shield,
+  "Risk score": ShieldAlert,
+  "Blast radius": ShieldAlert,
+  Drift: GitCompareArrows,
+  "Drift from Specification": GitCompareArrows,
+  Reversibility: Undo2,
+  Performance: Gauge,
+  Security: Shield,
+};
+
+function CheckIcon({ check }: { check: WorkOrderCheckPresentation }) {
+  const Icon = (check.key && CHECK_ICONS[check.key]) || CHECK_ICONS[check.name] || Circle;
+  return <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
+}
+
+/** More filled bars means a better result. The color matches that result. */
+function ResultBars({ tone }: { tone: ReturnType<typeof checkTone> }) {
+  const filled = tone === "passed" ? 3 : tone === "failed" ? 1 : 2;
+  const fill = tone === "failed" ? "bg-red-600" : tone === "passed" ? "bg-emerald-600" : "bg-amber-500";
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden data-filled={filled}>
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          data-bar-filled={index < filled ? "true" : "false"}
+          className={cn("h-3.5 w-1 rounded-[1px]", index < filled ? fill : "bg-muted-foreground/25")}
+        />
       ))}
-    </ul>
+    </span>
   );
 }
 
 function ConsoleCheckRow({ check }: { check: WorkOrderCheckPresentation }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { value, scale } = formatCheckScore(check);
   const status = workOrderCheckStatus(check);
-  const score = `${value}${scale}`;
-  const ticks = checkTickBar(check);
-  const fill = TICK_FILL[status.label] ?? "bg-slate-400";
+  const name = workOrderCheckDisplayName(check);
 
   return (
     <>
       <button
         type="button"
         onClick={() => setDialogOpen(true)}
-        aria-label={`${check.name} ${score}. ${status.label}`}
+        aria-label={`${name}. ${status.label}`}
         data-testid={`split-run-check-${check.id}`}
-        className="flex w-full min-w-0 flex-col gap-1.5 text-left"
+        className="flex w-full min-w-0 items-center justify-between gap-3 py-2 text-left"
       >
-        <span className="truncate text-[13px] font-medium text-foreground">{check.name}</span>
-        {ticks.total > 0 ? (
-          <span className="flex h-2 w-full gap-px" aria-hidden>
-            {Array.from({ length: ticks.total }, (_, index) => (
-              <span
-                key={index}
-                className={cn("min-w-0 flex-1 rounded-full", index < ticks.filled ? fill : "bg-muted")}
-              />
-            ))}
-          </span>
-        ) : null}
-        <span className="flex items-center justify-between gap-2 text-[12px]">
-          <span className="tabular-nums text-muted-foreground">{score}</span>
-          <span className={cn("truncate font-medium", status.className)}>{status.label}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <CheckIcon check={check} />
+          <span className="min-w-0 truncate text-[13px] font-medium leading-5 text-foreground">{name}</span>
         </span>
+        <ResultBars tone={checkTone(check)} />
       </button>
       <WorkOrderCheckDialog open={dialogOpen} onClose={() => setDialogOpen(false)} check={check} />
     </>

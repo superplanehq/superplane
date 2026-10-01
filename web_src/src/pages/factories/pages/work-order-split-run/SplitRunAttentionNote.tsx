@@ -99,6 +99,7 @@ export function SplitRunAttentionNote({
   compact = false,
   stacked = false,
   actionsOnly = false,
+  ctaOnly = false,
   startEmphasis = "filled",
   organizationId,
   factoryId,
@@ -106,6 +107,7 @@ export function SplitRunAttentionNote({
   pullRequests,
   canAct = true,
   onAction,
+  children,
 }: {
   note: SplitRunFooterNote;
   tone?: SplitRunDecisionTone;
@@ -120,6 +122,8 @@ export function SplitRunAttentionNote({
   stacked?: boolean;
   /** Refine strip: actions only, no note. The strip shows its own verdict. */
   actionsOnly?: boolean;
+  /** Pull request title, then scores, then the review action. */
+  ctaOnly?: boolean;
   /** Weight of Start on the refine strip. The verdict decides it. */
   startEmphasis?: StartEmphasis;
   organizationId?: string;
@@ -128,6 +132,7 @@ export function SplitRunAttentionNote({
   pullRequests?: FactoriesFactoryPullRequest[];
   canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
+  children?: ReactNode;
 }) {
   const pullRequestNote = WaitingPullRequestReview({
     note,
@@ -137,12 +142,14 @@ export function SplitRunAttentionNote({
     compact,
     stacked,
     actionsOnly,
+    ctaOnly,
     organizationId,
     factoryId,
     orderId,
     pullRequests,
     canAct,
     onAction,
+    children,
   });
   if (pullRequestNote) {
     return pullRequestNote;

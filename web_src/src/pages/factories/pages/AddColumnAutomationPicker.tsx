@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
-import { Workflow } from "lucide-react";
+import { Sparkles, Workflow } from "lucide-react";
 
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomationCatalogEntry } from "../lib/columnAutomations";
 
@@ -79,6 +79,9 @@ export function AddColumnAutomationPicker({
 function CatalogGlyph({ entry }: { entry: ColumnAutomationCatalogEntry }) {
   if (entry.iconSrc) {
     return <img src={entry.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(entry.iconSrc))} />;
+  }
+  if (entry.kind === "analysis" || entry.kind === "risk-score") {
+    return <Sparkles className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
   }
   return <Workflow className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
 }

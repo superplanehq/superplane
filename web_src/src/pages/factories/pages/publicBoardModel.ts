@@ -337,7 +337,7 @@ function automationIcon(
   if (source) {
     return { src: source.iconSrc, alt: source.iconAlt };
   }
-  if (kind === "pr-closure" || kind === "risk-score") {
+  if (kind === "pr-closure") {
     return { src: PR_CLOSURE_ENTRY.iconSrc, alt: PR_CLOSURE_ENTRY.iconAlt };
   }
   return PUBLIC_AUTOMATION_ICONS[icon ?? ""] ?? { src: "", alt: "" };

@@ -21,9 +21,9 @@ describe("AddColumnAutomationPicker", () => {
       "Pull request discussion",
     );
     expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
-    expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Risk score");
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
-      "Score the pull request diff from 1 to 5.",
+      "Score risk, performance, security, and drift on a pull request.",
     );
   });
 

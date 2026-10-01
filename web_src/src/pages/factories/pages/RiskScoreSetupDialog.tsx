@@ -1,10 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 
 import { factoryPageTitleClassName } from "./factoryPageLayoutStyles";
+import { MergeConfidenceCheckList } from "./MergeConfidenceCheckList";
+import { MERGE_CONFIDENCE_CHECK_COPY } from "./mergeConfidenceCopy";
+import {
+  defaultMergeConfidenceChecks,
+  formatEnabledChecksValue,
+  type MergeConfidenceCheck,
+} from "./mergeConfidenceChecks";
 import { PRFeedbackSetupPreviewPane, PRFeedbackSetupWizardShell } from "./PRFeedbackSetupWizardChrome";
 import { defaultRiskScoreCategories, formatRiskScoreRules } from "./riskScoreCategories";
 import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
@@ -23,6 +30,7 @@ interface RiskScoreSetupDialogProps {
 
 export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: props.organizationId });
+  const [checks, setChecks] = useState<MergeConfidenceCheck[]>(defaultMergeConfidenceChecks);
 
   const installationName = props.githubInstallationName.trim();
   const waitingForInstallationName = Boolean(props.githubIntegrationId) && !installationName;
@@ -42,6 +50,7 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
           backlogRepository: props.backlogRepository,
           defaultBranch: props.defaultBranch,
           riskRules: formatRiskScoreRules(defaultRiskScoreCategories()),
+          enabledChecks: formatEnabledChecksValue(checks),
         },
         startingTaskPrompt: "",
         navigateOnComplete: false,
@@ -58,7 +67,7 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
   };
 
   return (
-    <PRFeedbackSetupWizardShell testId="risk-score-setup" preview={<RiskScoreSetupPreview />}>
+    <PRFeedbackSetupWizardShell testId="risk-score-setup" preview={<RiskScoreSetupPreview checks={checks} />}>
       <header className="text-left">
         <Button
           type="button"
@@ -74,7 +83,16 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
         <h1 className={factoryPageTitleClassName}>{RISK_SCORE_SETUP_COPY.title}</h1>
         <p className="workspace-body-text mt-2 text-muted-foreground">{RISK_SCORE_SETUP_COPY.helper}</p>
       </header>
-      <RiskScale />
+      <MergeConfidenceCheckList
+        checks={checks}
+        idPrefix="merge-confidence-setup-check"
+        onToggle={(check, enabled) => {
+          setChecks((current) => {
+            const next = enabled ? [...current, check] : current.filter((item) => item !== check);
+            return defaultMergeConfidenceChecks().filter((item) => next.includes(item));
+          });
+        }}
+      />
       <footer className="flex items-center justify-end gap-3 pt-2">
         <Button
           type="button"
@@ -89,41 +107,8 @@ export function RiskScoreSetupDialog(props: RiskScoreSetupDialogProps) {
   );
 }
 
-function RiskScale() {
-  return (
-    <section>
-      <h2 className="text-[13px] font-medium text-foreground">{RISK_SCORE_SETUP_COPY.scaleHeading}</h2>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{RISK_SCORE_SETUP_COPY.scaleHelper}</p>
-      <ul className="mt-3 divide-y divide-border rounded-lg border border-border" data-testid="risk-score-setup-scale">
-        {RISK_SCORE_SETUP_COPY.scale.map((level) => (
-          <li
-            key={level.score}
-            className="flex items-center gap-3 px-3 py-2.5 text-[13px]"
-            data-testid={`risk-score-setup-scale-${level.score}`}
-          >
-            <span className="w-8 shrink-0 font-semibold tabular-nums text-foreground">{level.score}/5</span>
-            <span className="min-w-0 flex-1 truncate font-medium text-foreground">{level.label}</span>
-            <span className={cn("shrink-0 text-[12px] font-medium", scaleToneClassName(level.tone))}>
-              {level.status}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function scaleToneClassName(tone: "low" | "caution" | "critical"): string {
-  if (tone === "critical") {
-    return "text-red-600 dark:text-red-400";
-  }
-  if (tone === "caution") {
-    return "text-amber-600 dark:text-amber-400";
-  }
-  return "text-emerald-600 dark:text-emerald-400";
-}
-
-function RiskScoreSetupPreview() {
+function RiskScoreSetupPreview({ checks }: { checks: readonly MergeConfidenceCheck[] }) {
+  const visible = MERGE_CONFIDENCE_CHECK_COPY.filter((check) => checks.includes(check.id));
   return (
     <PRFeedbackSetupPreviewPane
       label={RISK_SCORE_SETUP_COPY.previewLabel}
@@ -139,22 +124,26 @@ function RiskScoreSetupPreview() {
           className="rounded-lg border border-border bg-card px-4 py-3 shadow-sm"
           data-testid="risk-score-setup-preview-card"
         >
-          <span className="block text-[12px] font-medium text-muted-foreground">
-            {RISK_SCORE_SETUP_COPY.previewCheckName}
-          </span>
-          <span className="mt-1 flex items-baseline justify-between gap-2">
-            <span className="flex items-baseline gap-0.5">
-              <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">2</span>
-              <span className="text-[12px] text-muted-foreground">/5</span>
-            </span>
-            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              {RISK_SCORE_SETUP_COPY.scale[1].status}
-            </span>
-          </span>
-          <span aria-hidden className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
-            <span className="block h-full w-2/5 rounded-full bg-emerald-500" />
-          </span>
-          <p className="mt-3 text-[12px] text-muted-foreground">{RISK_SCORE_SETUP_COPY.previewSummary}</p>
+          {visible.length === 0 ? (
+            <p className="text-[12px] text-muted-foreground">{RISK_SCORE_SETUP_COPY.previewEmpty}</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {visible.map((check) => {
+                const preview = RISK_SCORE_SETUP_COPY.previewScores[check.id];
+                return (
+                  <li key={check.id} className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                    <span className="text-[12px] font-medium text-muted-foreground">{check.label}</span>
+                    <span className="flex items-baseline gap-2">
+                      <span className="text-[13px] font-semibold tabular-nums text-foreground">{preview.score}/5</span>
+                      <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                        {preview.status}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </article>
       </div>
     </PRFeedbackSetupPreviewPane>
