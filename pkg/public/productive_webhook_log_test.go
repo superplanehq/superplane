@@ -164,8 +164,7 @@ func Test__HandleWebhook_ProductiveServerErrorReusesOrganizationLookup(t *testin
 		body:   []byte(`{"raw":"do-not-log-body"}`),
 	})
 	require.Equal(t, http.StatusInternalServerError, response.Code)
-	assert.Positive(t, lookups)
-	assert.LessOrEqual(t, lookups, 2)
+	assert.Equal(t, 1, lookups)
 
 	events := transport.Events()
 	require.Len(t, events, 1)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -90,6 +92,101 @@ func assertEventOmitsWebhookBody(t *testing.T, event *sentry.Event, encoded []by
 	require.NoError(t, err)
 	assert.NotContains(t, string(encoded), webhookSentryBody)
 	assert.NotContains(t, string(encoded), string(encodedBody))
+}
+
+func Test__HandleWebhook_ServerErrorRepliesBeforeOrganizationLookup(t *testing.T) {
+	transport := bindTestSentryHub(t)
+	resources := support.Setup(t)
+	t.Cleanup(resources.Close)
+
+	const triggerName = "dummy-webhook-sentry-reply"
+	registerFailingWebhookNode(resources, triggerName, models.NodeTypeTrigger, http.StatusInternalServerError)
+	server := newWebhookTestServer(t, resources)
+
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte(webhookSentrySecret),
+	}).Error)
+
+	nodeID := "node-1"
+	canvas, _ := support.CreateCanvas(t, resources.Organization.ID, resources.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   nodeID,
+		Type:   models.NodeTypeTrigger,
+		Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: triggerName}}),
+	}}, nil)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", nodeID).
+		Update("webhook_id", webhookID).
+		Error)
+
+	var order []string
+	db := database.Conn()
+	callbackName := "test:webhook-organization-lookup-order"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if !workflowIDLookup(tx, canvas.ID) {
+			return
+		}
+		order = append(order, "lookup")
+	}))
+	t.Cleanup(func() {
+		db.Callback().Query().Remove(callbackName)
+	})
+
+	recorder := httptest.NewRecorder()
+	writer := &flushOrderWriter{ResponseWriter: recorder, onFlush: func() {
+		order = append(order, "flush")
+	}}
+	request := httptest.NewRequest(http.MethodPost, "/webhooks/"+webhookID.String(), nil)
+	server.Router.ServeHTTP(writer, request)
+
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	flushAt := slices.Index(order, "flush")
+	lookupAt := slices.Index(order, "lookup")
+	require.NotEqual(t, -1, flushAt)
+	require.NotEqual(t, -1, lookupAt)
+	assert.Less(t, flushAt, lookupAt)
+
+	events := transport.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, resources.Organization.ID.String(), events[0].Tags["organization_id"])
+}
+
+type flushOrderWriter struct {
+	http.ResponseWriter
+	onFlush func()
+}
+
+func (w *flushOrderWriter) Flush() {
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+	if w.onFlush != nil {
+		w.onFlush()
+	}
+}
+
+func workflowIDLookup(tx *gorm.DB, workflowID uuid.UUID) bool {
+	if tx == nil || tx.Statement == nil {
+		return false
+	}
+
+	table := tx.Statement.Table
+	if table == "" && tx.Statement.Schema != nil {
+		table = tx.Statement.Schema.Table
+	}
+	if table != "workflows" {
+		return false
+	}
+
+	return slices.ContainsFunc(tx.Statement.Vars, func(value any) bool {
+		id, ok := value.(uuid.UUID)
+		return ok && id == workflowID
+	})
 }
 
 func Test__HandleWebhook_ClientErrorIsNotSentToSentry(t *testing.T) {
