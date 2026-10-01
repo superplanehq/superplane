@@ -7,8 +7,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronRight, CircleStop, RotateCw } from "lucide-react";
 import { useState } from "react";
 
-import type { FilesFile } from "@/api-client";
-
 import { formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { formatCheckScore, workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { WorkOrderCheckAnalysis } from "../../../WorkOrderCheckDialog";
@@ -20,7 +18,6 @@ import { PhaseUsageSpendButton } from "../PhaseUsageChartButton";
 import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
-import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
 import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
 import { AgentRunsPage } from "./consoleAgentRuns";
@@ -47,14 +44,7 @@ export function AutomationCardBody({
   automation,
   phase,
   organizationId,
-  factoryId,
-  orderId,
-  taskDescription,
-  canEditDescription = false,
-  descriptionBusy = false,
-  onDescriptionSave,
   source,
-  files,
   onStop,
   onRetry,
   actionBusy,
@@ -64,15 +54,8 @@ export function AutomationCardBody({
   phase?: SplitRunPhase;
   phases?: SplitRunPhase[];
   organizationId?: string;
-  factoryId?: string;
-  orderId?: string;
-  taskDescription?: string;
-  canEditDescription?: boolean;
-  descriptionBusy?: boolean;
-  onDescriptionSave?: (next: string) => void | Promise<void>;
-  /** Where the task came from. The Backlog creation card shows it under the task text. */
+  /** Where the task came from. The Backlog creation card shows it. */
   source?: SplitRunSource;
-  files?: FilesFile[];
   onStop?: () => void;
   onRetry?: () => void;
   actionBusy: boolean;
@@ -98,25 +81,7 @@ export function AutomationCardBody({
             />
           </div>
         ) : null}
-        {active === "artifacts" ? (
-          <ArtifactsPage
-            stage={latest}
-            taskDocument={
-              latest.id === "backlog" ? (
-                <CreationTaskDocument
-                  description={taskDescription}
-                  canEdit={canEditDescription}
-                  busy={descriptionBusy}
-                  onSave={onDescriptionSave}
-                  files={files}
-                  organizationId={organizationId}
-                  factoryId={factoryId}
-                  orderId={orderId}
-                />
-              ) : undefined
-            }
-          />
-        ) : null}
+        {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
         {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
         <CreationSource stageId={latest.id} source={source} />
         <CardRunFooter stage={latest} phase={phase} actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
@@ -154,42 +119,6 @@ function CardPageTabs({
         ))}
       </TabsList>
     </Tabs>
-  );
-}
-
-function CreationTaskDocument({
-  description,
-  canEdit,
-  busy,
-  onSave,
-  files,
-  organizationId,
-  factoryId,
-  orderId,
-}: {
-  description?: string;
-  canEdit: boolean;
-  busy: boolean;
-  onSave?: (next: string) => void | Promise<void>;
-  files?: FilesFile[];
-  organizationId?: string;
-  factoryId?: string;
-  orderId?: string;
-}) {
-  return (
-    <div data-testid="redesign-console-task-description">
-      <WorkOrderSplitRunDescription
-        description={description ?? ""}
-        canEdit={canEdit}
-        busy={busy}
-        collapsible={false}
-        onSave={onSave}
-        files={files}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        orderId={orderId}
-      />
-    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
+import { consoleCardArtifacts } from "./consolePages";
 
 /**
  * One line of outcome for the collapsed row. A running stage names the
@@ -83,7 +84,7 @@ export interface StepOutputSummary {
 export function stepOutputSummary(stage: AutomationStage, runCount = 0): StepOutputSummary {
   return {
     runCount,
-    artifactCount: stage.outputs.artifacts.length,
+    artifactCount: consoleCardArtifacts(stage).length,
     checkCount: stage.checks.length,
   };
 }

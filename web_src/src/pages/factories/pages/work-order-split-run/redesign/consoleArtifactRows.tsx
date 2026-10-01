@@ -20,8 +20,8 @@ import {
   artifactOpenHref,
   artifactsPageCount,
   consoleArtifactKind,
+  consoleCardArtifacts,
   isExpandableArtifact,
-  isTaskDocument,
   type ConsoleArtifactKind,
   type StageArtifact,
 } from "./consolePages";
@@ -34,8 +34,8 @@ const ARTIFACT_ROW_MAIN = "group flex min-w-0 flex-1 items-center gap-1.5 py-1 t
  * runs: divider rows, not a pill or box per artifact. Documents and
  * media expand in place. Links and other files open in a new tab.
  */
-export function ArtifactsPage({ stage, taskDocument }: { stage: AutomationStage; taskDocument?: ReactNode }) {
-  const artifacts = stage.outputs.artifacts;
+export function ArtifactsPage({ stage }: { stage: AutomationStage }) {
+  const artifacts = consoleCardArtifacts(stage);
   const single = artifactsPageCount(stage) === 1;
   return (
     <div className="flex flex-col divide-y divide-border">
@@ -45,26 +45,13 @@ export function ArtifactsPage({ stage, taskDocument }: { stage: AutomationStage;
         </div>
       ))}
       {artifacts.map((artifact) => (
-        <ArtifactRow
-          key={artifact.id ?? artifactLabel(artifact)}
-          artifact={artifact}
-          defaultOpen={single}
-          body={isTaskDocument(stage, artifact) ? taskDocument : undefined}
-        />
+        <ArtifactRow key={artifact.id ?? artifactLabel(artifact)} artifact={artifact} defaultOpen={single} />
       ))}
     </div>
   );
 }
 
-function ArtifactRow({
-  artifact,
-  defaultOpen,
-  body,
-}: {
-  artifact: StageArtifact;
-  defaultOpen: boolean;
-  body?: ReactNode;
-}) {
+function ArtifactRow({ artifact, defaultOpen }: { artifact: StageArtifact; defaultOpen: boolean }) {
   const kind = consoleArtifactKind(artifact);
   const name = artifactLabel(artifact);
   const href = safeExternalUrl(artifactOpenHref(artifact)) ?? undefined;
@@ -78,7 +65,7 @@ function ArtifactRow({
         defaultOpen={defaultOpen}
         action={<ArtifactMeta size={size}>{expandableArtifactAction(kind, name, artifact, href)}</ArtifactMeta>}
       >
-        {expandableArtifactBody(kind, name, artifact, href, body)}
+        {expandableArtifactBody(kind, name, artifact, href)}
       </ExpandableArtifactRow>
     );
   }
@@ -171,16 +158,13 @@ function expandableArtifactBody(
   name: string,
   artifact: StageArtifact,
   href: string | undefined,
-  body: ReactNode,
 ): ReactNode {
   if (kind === "markdown") {
     return (
-      body ?? (
-        <MarkdownContent
-          content={extractArtifactMarkdownBody(toArtifactDataRecord(artifact.data)) ?? ""}
-          variant="workspace"
-        />
-      )
+      <MarkdownContent
+        content={extractArtifactMarkdownBody(toArtifactDataRecord(artifact.data)) ?? ""}
+        variant="workspace"
+      />
     );
   }
   if (!href) {
