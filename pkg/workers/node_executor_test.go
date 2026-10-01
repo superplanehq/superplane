@@ -528,10 +528,9 @@ func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
 	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
 
 	failure := actionFailureLog(t, logs)
-	_, hasOrganization := failure["organization_id"]
+	assert.Equal(t, r.Organization.ID.String(), failure["organization_id"])
 	_, hasFactory := failure["factory_id"]
 	_, hasOrder := failure["order_id"]
-	assert.False(t, hasOrganization)
 	assert.False(t, hasFactory)
 	assert.False(t, hasOrder)
 
