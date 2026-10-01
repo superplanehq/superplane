@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -312,6 +312,53 @@ describe("AutomationsConsoleVariant summary strip", () => {
 
     expect(screen.getByTestId("review-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("redesign-console-waiting-note")).not.toBeInTheDocument();
+  });
+});
+
+function cardHeader(name: string) {
+  const header = screen
+    .getByRole("button", { name: `Toggle ${name} details` })
+    .closest("[data-testid^='redesign-console-card-header-']");
+  if (!header) {
+    throw new Error(`Header for ${name} is missing`);
+  }
+  return header as HTMLElement;
+}
+
+describe("AutomationsConsoleVariant running card timer", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("advances the running header once a second", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    renderConsole(SPLIT_RUN_RUNNING);
+
+    const header = cardHeader("Implementation");
+    expect(within(header).getByText("4m so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(within(header).getByText("4m 1s so far")).toBeInTheDocument();
+  });
+
+  it("keeps a finished header time fixed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    renderConsole(SPLIT_RUN_RUNNING);
+
+    const header = cardHeader("Ingest");
+    expect(within(header).getByText("2s")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(within(header).getByText("2s")).toBeInTheDocument();
+    expect(within(header).queryByText(/so far/)).not.toBeInTheDocument();
   });
 });
 
