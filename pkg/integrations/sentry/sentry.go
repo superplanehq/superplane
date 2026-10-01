@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -732,6 +733,16 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		ctx.Logger.Warn("sentry webhook installation does not match this connection")
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
+	}
+
+	// The hosted app endpoint already logged this body. A direct webhook has
+	// no receipt header, so this is the incoming line for that call.
+	if strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)) == "" {
+		logging.LogSentryWebhookInfo("Sentry webhook received", logging.WithWebhookPayload(logrus.Fields{
+			"hook_resource":     resource,
+			"action":            payload.Action,
+			"installation_uuid": payload.Installation.UUID,
+		}, body))
 	}
 
 	message := WebhookMessage{
