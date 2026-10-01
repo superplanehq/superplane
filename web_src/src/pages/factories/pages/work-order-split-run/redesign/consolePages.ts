@@ -42,16 +42,24 @@ export function consolePages(
 }
 
 /**
- * What the Artifacts page lists: artifacts plus the pull requests the run
- * opened. The count renders on the tab.
+ * What the Artifacts page lists: card artifacts plus the pull requests the
+ * run opened. The count renders on the tab.
  */
 export function artifactsPageCount(stage: AutomationStage): number {
-  return stage.outputs.artifacts.length + stage.outputs.pullRequests.length;
+  return consoleCardArtifacts(stage).length + stage.outputs.pullRequests.length;
+}
+
+/**
+ * Artifacts the card lists and counts. The creation card's task document
+ * is shown above the timeline, so it is not an artifact of that card.
+ */
+export function consoleCardArtifacts(stage: AutomationStage): StageArtifact[] {
+  return stage.outputs.artifacts.filter((artifact) => !isTaskDocument(stage, artifact));
 }
 
 /**
  * The creation card's description.md or details.md is the task text.
- * Its document row renders the editable task description, not a copy.
+ * It renders above the timeline, not as a row on the card.
  */
 export function isTaskDocument(stage: AutomationStage, artifact: StageArtifact): boolean {
   return stage.id === "backlog" && isWorkOrderDescriptionName(artifactLabel(artifact));

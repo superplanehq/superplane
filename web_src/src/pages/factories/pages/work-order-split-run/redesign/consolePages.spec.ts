@@ -7,6 +7,7 @@ import {
   artifactOpenHref,
   artifactsPageCount,
   consoleArtifactKind,
+  consoleCardArtifacts,
   consolePages,
   isExpandableArtifact,
   isTaskDocument,
@@ -31,8 +32,44 @@ function runningStage(id: string): AutomationStage {
 }
 
 describe("consolePages", () => {
-  it("gives the Backlog creation card an Artifacts page and no Agent runs", () => {
-    expect(consolePages(runningStage("backlog"))).toEqual(["artifacts"]);
+  it("omits the task document from the Backlog card and keeps other files", () => {
+    const backlog = runningStage("backlog");
+    const note: StageArtifact = {
+      id: "art-note",
+      type: "TYPE_FILE",
+      data: { filename: "trace.log", url: "https://example.com/trace.log" },
+    };
+    const withNote: AutomationStage = {
+      ...backlog,
+      outputs: { ...backlog.outputs, artifacts: [...backlog.outputs.artifacts, note] },
+    };
+    const implement = runningStage("implement");
+    const implementWithDocument: AutomationStage = {
+      ...implement,
+      outputs: {
+        ...implement.outputs,
+        artifacts: [...implement.outputs.artifacts, ...backlog.outputs.artifacts],
+      },
+    };
+
+    const detailsOnly: AutomationStage = {
+      ...backlog,
+      outputs: {
+        ...backlog.outputs,
+        artifacts: [{ id: "art-details", type: "TYPE_MARKDOWN", data: { title: "details.md", body: "x" } }],
+      },
+    };
+
+    expect(consoleCardArtifacts(backlog)).toEqual([]);
+    expect(artifactsPageCount(backlog)).toBe(0);
+    expect(artifactsPageCount(detailsOnly)).toBe(0);
+    expect(consolePages(backlog)).toEqual([]);
+    expect(consoleCardArtifacts(withNote)).toEqual([note]);
+    expect(artifactsPageCount(withNote)).toBe(1);
+    expect(consolePages(withNote)).toEqual(["artifacts"]);
+    expect(artifactsPageCount(implementWithDocument)).toBe(
+      implement.outputs.artifacts.length + backlog.outputs.artifacts.length,
+    );
   });
 
   it("starts a running canvas card on Agent runs", () => {
