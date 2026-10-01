@@ -22,7 +22,7 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID, backend string) e
 	if err := ctx.ExecutionState.SetKV(executionKVTaskBackend, backend); err != nil {
 		return fmt.Errorf("set runner task backend in kv: %w", err)
 	}
-	if err := storeRunnerFleetKV(ctx, ""); err != nil {
+	if err := storeRunnerFleetKV(ctx, "", backend); err != nil {
 		return fmt.Errorf("set runner fleet kv: %w", err)
 	}
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
