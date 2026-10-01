@@ -16,6 +16,7 @@ import {
   type DefaultTabResolution,
 } from "./defaultAppTab";
 import { getWorkflowViewFlagsFromSearchParams, isNonCanvasAppViewParam } from "./viewState";
+import { isNotFoundError } from "./workflowPageHelpers";
 
 /**
  * Route-level gate that decides which tab the user should land on for an app
@@ -69,13 +70,18 @@ export function AppDefaultTabGate() {
   const alreadyCommitted = canvasId !== "" && committedCanvasIdRef.current === canvasId;
 
   const canvasQueryEnabled = !alreadyCommitted && !!organizationId && !!canvasId;
-  const { data: canvas, isLoading: canvasLoading } = useCanvas(organizationId ?? "", canvasId, {
+  const {
+    data: canvas,
+    isLoading: canvasLoading,
+    error: canvasError,
+  } = useCanvas(organizationId ?? "", canvasId, {
     enabled: canvasQueryEnabled,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
+  const canvasNotFound = canvasQueryEnabled && !canvasLoading && isNotFoundError(canvasError);
   const { factoryOwnedApp, classicSurface } = useClassicAppRouteRedirect({
     organizationId: organizationId ?? "",
     appId: canvasId,
@@ -92,13 +98,20 @@ export function AppDefaultTabGate() {
   // The console query is only useful for the Console fallback (no stored tab).
   // Keep it disabled otherwise so bookmarks that pin navigation or restore a
   // stored tab do not pay for an unused read. Factory apps never use Console.
-  const consoleQueryEnabled = shouldEnableConsoleQuery({
-    alreadyCommitted,
-    factoryOwnedApp,
-    pinned,
-    canvasId,
-    storedTab,
-  });
+  // A missing canvas must not start that read. A failed canvas read has no
+  // payload, so the gate settles on Canvas instead of waiting for console.
+  const canvasRequestFailed =
+    canvasQueryEnabled && !canvasLoading && canvas === undefined && canvasError != null && !canvasNotFound;
+  const consoleQueryEnabled =
+    shouldEnableConsoleQuery({
+      alreadyCommitted,
+      factoryOwnedApp,
+      pinned,
+      canvasId,
+      storedTab,
+    }) &&
+    !canvasNotFound &&
+    (!canvasQueryEnabled || canvas !== undefined);
   const liveConsoleQuery = useCanvasConsole(canvasId, undefined, consoleQueryEnabled);
 
   const commit = (): ReactElement => {
@@ -115,9 +128,15 @@ export function AppDefaultTabGate() {
     canvasLoading,
     canvasUndefined: canvas === undefined,
     storedTab,
-    resolution: resolveDefaultTab({ storedTab, liveConsoleQuery }),
+    resolution: canvasRequestFailed
+      ? { settled: true, redirectTo: null }
+      : resolveDefaultTab({ storedTab, liveConsoleQuery }),
     classicSurface,
   });
+
+  if (canvasNotFound) {
+    return <Navigate to={organizationId ? `/${organizationId}` : "/"} replace />;
+  }
 
   return renderAppDefaultTabGateDecision(decision, {
     currentUrlTab,

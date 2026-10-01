@@ -22,6 +22,7 @@ const consoleErrored: ConsoleQueryLike = { isSuccess: false, isError: true, data
 type CanvasQueryLike = {
   data: { metadata?: { factoryId?: string } } | undefined;
   isLoading: boolean;
+  error?: unknown;
 };
 
 let mockCanvasQuery: CanvasQueryLike = { data: undefined, isLoading: false };
@@ -101,6 +102,28 @@ beforeEach(() => {
   featureMocks.featureLoading = false;
   featureMocks.factories = [];
   featureMocks.factoriesLoading = false;
+});
+
+describe("AppDefaultTabGate — missing canvas", () => {
+  it("redirects to the organization home and does not mount the app page", () => {
+    mockCanvasQuery = { data: undefined, isLoading: false, error: "Not Found\n" };
+    renderGate({ initialEntry: "/org-1/apps/canvas-1" });
+
+    expect(getLocation().pathname).toBe("/org-1");
+    expect(screen.queryByTestId("app-page")).toBeNull();
+    expect(screen.getByTestId("org-home")).toBeInTheDocument();
+  });
+
+  it("leaves the loading screen when the canvas request fails", () => {
+    mockCanvasQuery = { data: undefined, isLoading: false, error: new Error("unavailable") };
+    mockConsoleQuery = consoleLoading;
+    renderGate({ initialEntry: "/org-1/apps/canvas-1" });
+
+    expect(screen.queryByTestId("app-default-tab-gate-skeleton")).toBeNull();
+    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+    expect(getLocation().pathname).toBe("/org-1/apps/canvas-1");
+    expect(getLocation().search).toBe("");
+  });
 });
 
 describe("AppDefaultTabGate — pinned URLs", () => {

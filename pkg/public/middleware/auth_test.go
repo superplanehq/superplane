@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -49,7 +50,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusNotFound, res.Code)
+		assertOrganizationNotFoundJSON(t, res)
 	})
 
 	t.Run("organization without matching user returns not found", func(t *testing.T) {
@@ -60,7 +61,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusNotFound, res.Code)
+		assertOrganizationNotFoundJSON(t, res)
 	})
 
 	t.Run("valid cookie and organization reaches next handler", func(t *testing.T) {
@@ -93,7 +94,8 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)
 
-		assert.Equal(t, http.StatusNotFound, res.Code)
+		assertOrganizationNotFoundJSON(t, res)
+		assert.NotContains(t, res.Body.String(), "does-not-exist-slug")
 	})
 
 	t.Run("blocked account cookie returns contact-support message", func(t *testing.T) {
@@ -589,6 +591,23 @@ func mintTestAccountToken(t *testing.T, signer *jwt.Signer, accountID string, is
 	require.NoError(t, err)
 
 	return tokenString
+}
+
+func assertOrganizationNotFoundJSON(t *testing.T, res *httptest.ResponseRecorder) {
+	t.Helper()
+
+	assert.Equal(t, http.StatusNotFound, res.Code)
+	assert.Contains(t, res.Header().Get("Content-Type"), "application/json")
+
+	var body struct {
+		Code    int32  `json:"code"`
+		Message string `json:"message"`
+		Details []any  `json:"details"`
+	}
+	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &body))
+	assert.Equal(t, int32(5), body.Code)
+	assert.Equal(t, "Not found", body.Message)
+	assert.Empty(t, body.Details)
 }
 
 func assertImpersonationCookieCleared(t *testing.T, recorder *httptest.ResponseRecorder) {
