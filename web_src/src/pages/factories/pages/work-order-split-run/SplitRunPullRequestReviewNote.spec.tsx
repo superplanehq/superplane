@@ -174,6 +174,21 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveTextContent("You can review it now.");
   });
 
+  it("reports unavailable merge status and keeps merge disabled", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_UNAVAILABLE",
+      message: "Merge status is unavailable right now.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "Merge status is unavailable right now." })).toBeInTheDocument();
+    expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
   it("says a check failed when a pull request check fails", () => {
     mergeability.current = {
       canMerge: false,
