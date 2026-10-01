@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -12,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type intakeAvailabilitySources struct {
@@ -218,23 +216,7 @@ func archiveDraftWorkOrderIfCurrent(
 	orderID uuid.UUID,
 	archivedBy uuid.UUID,
 ) (archived bool, failed bool) {
-	var archivedOrder *models.FactoryWorkOrder
-	err := db.Transaction(func(tx *gorm.DB) error {
-		current, err := factory.FindWorkOrder(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orderID)
-		if err != nil {
-			return err
-		}
-		if current.State != models.FactoryWorkOrderStateDraft {
-			return nil
-		}
-
-		archivedOrder, err = current.Close(tx, models.FactoryWorkOrderResultRejected, &archivedBy)
-		if errors.Is(err, models.ErrFactoryWorkOrderInvalidState) {
-			archivedOrder = nil
-			return nil
-		}
-		return err
-	})
+	archivedOrder, err := closeDraftWorkOrderIfCurrent(db, factory, orderID, &archivedBy)
 	if err != nil {
 		return false, true
 	}
