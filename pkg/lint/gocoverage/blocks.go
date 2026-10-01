@@ -16,9 +16,13 @@ type Block struct {
 // A branchless function that contains a multi-line composite literal is split
 // into several blocks, and each block is given the original block's statement
 // count. Summing those blocks multiplies uncovered statements and drops package
-// coverage even when the tests did not change. Consecutive uncovered blocks
-// with that repeated count are one block. Covered runs stay unchanged so a
-// real executed path is not reduced.
+// coverage even when the tests did not change. Consecutive uncovered fragments
+// of that split are one block.
+//
+// A fragment of the split has more statements than lines, because the count
+// belongs to the original block. A separate region can share that count and
+// still fit in its own lines. That region stays, so a coverage drop is not hidden.
+// Covered runs stay unchanged so a real executed path is not reduced.
 func NormalizeBlocks(blocks []Block) []Block {
 	if len(blocks) == 0 {
 		return nil
@@ -26,12 +30,18 @@ func NormalizeBlocks(blocks []Block) []Block {
 
 	normalized := make([]Block, 0, len(blocks))
 	for index := 0; index < len(blocks); {
+		if !duplicatedFragment(blocks[index]) {
+			normalized = append(normalized, blocks[index])
+			index++
+			continue
+		}
+
 		end := index + 1
-		for end < len(blocks) && sameStatementRun(blocks[index], blocks[end]) {
+		for end < len(blocks) && continuesDuplicatedFragment(blocks[end-1], blocks[end]) {
 			end++
 		}
 		group := blocks[index:end]
-		if duplicatedStatementRun(group) && !anyCovered(group) {
+		if len(group) >= 2 && !anyCovered(group) {
 			normalized = append(normalized, group[0])
 			index = end
 			continue
@@ -44,21 +54,22 @@ func NormalizeBlocks(blocks []Block) []Block {
 	return normalized
 }
 
-func sameStatementRun(left, right Block) bool {
-	return left.File == right.File && left.Statements == right.Statements && right.StartLine >= left.StartLine
-}
-
-func duplicatedStatementRun(group []Block) bool {
-	if len(group) < 2 || group[0].Statements == 0 {
+func duplicatedFragment(block Block) bool {
+	if block.Statements == 0 || block.StartLine == block.EndLine {
 		return false
 	}
+	return block.Statements > lineSpan(block)
+}
 
-	for _, block := range group {
-		if block.Statements > lineSpan(block) {
-			return true
-		}
+func continuesDuplicatedFragment(previous, next Block) bool {
+	if previous.File != next.File || previous.Statements != next.Statements {
+		return false
 	}
-	return false
+	if !duplicatedFragment(next) || next.StartLine < previous.StartLine {
+		return false
+	}
+	// One blank line can sit between split fragments. A larger gap is another region.
+	return next.StartLine <= previous.EndLine+2
 }
 
 func anyCovered(group []Block) bool {
@@ -69,6 +80,7 @@ func anyCovered(group []Block) bool {
 	}
 	return false
 }
+
 func lineSpan(block Block) int {
 	span := block.EndLine - block.StartLine + 1
 	if span < 1 {

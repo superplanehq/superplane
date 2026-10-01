@@ -23,7 +23,28 @@ func TestNormalizeBlocksCollapsesGo127DuplicatedStatementCounts(t *testing.T) {
 	}, normalized)
 }
 
-func TestNormalizeBlocksCollapsesWideBlockThatStillRepeatsTheFunctionCount(t *testing.T) {
+func TestNormalizeBlocksKeepsSeparateRegionWithTheSameStatementCount(t *testing.T) {
+	blocks := []gocoverage.Block{
+		{File: "root.go", StartLine: 9, EndLine: 11, Statements: 5},
+		{File: "root.go", StartLine: 12, EndLine: 20, Statements: 5},
+		{File: "root.go", StartLine: 40, EndLine: 42, Statements: 5},
+		{File: "root.go", StartLine: 43, EndLine: 44, Statements: 5},
+		{File: "root.go", StartLine: 50, EndLine: 50, Statements: 5},
+		{File: "list.go", StartLine: 11, EndLine: 20, Statements: 8, Covered: true},
+	}
+
+	normalized := gocoverage.NormalizeBlocks(blocks)
+
+	require.Equal(t, []gocoverage.Block{
+		{File: "root.go", StartLine: 9, EndLine: 11, Statements: 5},
+		{File: "root.go", StartLine: 12, EndLine: 20, Statements: 5},
+		{File: "root.go", StartLine: 40, EndLine: 42, Statements: 5},
+		{File: "root.go", StartLine: 50, EndLine: 50, Statements: 5},
+		{File: "list.go", StartLine: 11, EndLine: 20, Statements: 8, Covered: true},
+	}, normalized)
+}
+
+func TestNormalizeBlocksKeepsWideRegionThatRepeatsTheStatementCount(t *testing.T) {
 	blocks := []gocoverage.Block{
 		{File: "root.go", StartLine: 9, EndLine: 16, Statements: 13},
 		{File: "root.go", StartLine: 18, EndLine: 27, Statements: 13},
@@ -36,9 +57,12 @@ func TestNormalizeBlocksCollapsesWideBlockThatStillRepeatsTheFunctionCount(t *te
 
 	require.Equal(t, []gocoverage.Block{
 		{File: "root.go", StartLine: 9, EndLine: 16, Statements: 13},
+		{File: "root.go", StartLine: 30, EndLine: 48, Statements: 13},
+		{File: "root.go", StartLine: 49, EndLine: 53, Statements: 13},
 		{File: "set.go", StartLine: 18, EndLine: 40, Statements: 12, Covered: true},
 	}, normalized)
 }
+
 func TestNormalizeBlocksLeavesCoveredRunsIntact(t *testing.T) {
 	blocks := []gocoverage.Block{
 		{File: "cmd.go", StartLine: 8, EndLine: 12, Statements: 10, Covered: true},
@@ -49,7 +73,7 @@ func TestNormalizeBlocksLeavesCoveredRunsIntact(t *testing.T) {
 	require.Equal(t, blocks, gocoverage.NormalizeBlocks(blocks))
 }
 
-func TestNormalizeBlocksCollapsesSplitBlockThatRepeatsTheOriginalCount(t *testing.T) {
+func TestNormalizeBlocksKeepsFittingRegionAfterADuplicatedFragment(t *testing.T) {
 	blocks := []gocoverage.Block{
 		{File: "staging.go", StartLine: 121, EndLine: 123, Statements: 4},
 		{File: "staging.go", StartLine: 124, EndLine: 128, Statements: 4},
@@ -60,6 +84,7 @@ func TestNormalizeBlocksCollapsesSplitBlockThatRepeatsTheOriginalCount(t *testin
 
 	require.Equal(t, []gocoverage.Block{
 		{File: "staging.go", StartLine: 121, EndLine: 123, Statements: 4},
+		{File: "staging.go", StartLine: 124, EndLine: 128, Statements: 4},
 		{File: "staging.go", StartLine: 132, EndLine: 136, Statements: 2, Covered: true},
 	}, normalized)
 }
