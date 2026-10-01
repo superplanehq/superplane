@@ -16,17 +16,24 @@ import (
 )
 
 const (
+	// HeartbeatInterval bounds quiet periods on live-log responses.
+	HeartbeatInterval = 15 * time.Second
 	// pageSize is the max events per GetLogEvents call (CloudWatch allows up to 10_000).
 	pageSize int32 = 10_000
 	// pollQuiet waits when tailing and no new events have arrived.
 	pollQuiet = 750 * time.Millisecond
 	// pollActive waits after a partial page before polling again.
 	pollActive = 300 * time.Millisecond
+	// terminalCatchUp keeps polling after a task is terminal so late CloudWatch events can arrive.
+	terminalCatchUp = 10 * time.Second
+	// requestBudgetMargin leaves time to write a heartbeat before HeartbeatInterval elapses.
+	requestBudgetMargin = 500 * time.Millisecond
 )
 
 type ndjsonWriter struct {
-	w io.Writer
-	f http.Flusher
+	w         io.Writer
+	f         http.Flusher
+	lastFlush time.Time
 }
 
 func (n *ndjsonWriter) writeRecord(rec map[string]any) error {
@@ -42,12 +49,33 @@ func (n *ndjsonWriter) flush() {
 	if n.f != nil {
 		n.f.Flush()
 	}
+	n.lastFlush = time.Now()
+}
+
+func (n *ndjsonWriter) pingIfDue(within time.Duration) error {
+	if time.Since(n.lastFlush)+within < HeartbeatInterval {
+		return nil
+	}
+	if err := n.writeRecord(map[string]any{"type": "ping"}); err != nil {
+		return err
+	}
+	n.flush()
+	return nil
+}
+
+func (n *ndjsonWriter) logRequestBudget() time.Duration {
+	budget := HeartbeatInterval - time.Since(n.lastFlush) - requestBudgetMargin
+	if budget < time.Millisecond {
+		return time.Millisecond
+	}
+	return budget
 }
 
 // StreamCloudWatchLogToNDJSON tails a CloudWatch Logs stream and writes newline-delimited JSON records:
 // {"type":"line","text":"..."} for regular lines, {"type":"cmd_start"...}/{"type":"cmd_end"...}
-// for runner command boundaries, and {"type":"error","message":"..."} on fatal errors.
-func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string) error {
+// for runner command boundaries, {"type":"ping"} during quiet periods, and
+// {"type":"error","message":"..."} on fatal errors. A terminal task ends after a short quiet catch-up so late log lines can arrive.
+func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string, isTaskTerminal func(context.Context) (bool, error)) error {
 	group = strings.TrimSpace(group)
 	stream = strings.TrimSpace(stream)
 	if group == "" || stream == "" {
@@ -71,23 +99,36 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 	}
 
 	client := cloudwatchlogs.NewFromConfig(awscfg)
-	nw := ndjsonWriter{w: w, f: flusher}
+	nw := ndjsonWriter{w: w, f: flusher, lastFlush: time.Now()}
 
 	var nextForward *string
 	var lastToken string
+	var catchUp terminalCatchUpWindow
 
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		if err := nw.pingIfDue(0); err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
-		out, err := client.GetLogEvents(ctx, &cloudwatchlogs.GetLogEventsInput{
+		out, retry, err := fetchLogEvents(ctx, client, &cloudwatchlogs.GetLogEventsInput{
 			LogGroupName:  awsString(group),
 			LogStreamName: awsString(stream),
 			NextToken:     nextForward,
 			StartFromHead: awsBool(nextForward == nil),
 			Limit:         awsInt32(pageSize),
-		})
+		}, nw.logRequestBudget())
+		if retry {
+			if err := nw.pingIfDue(requestBudgetMargin); err != nil {
+				return err
+			}
+			continue
+		}
 		if err != nil {
 			_ = nw.writeRecord(map[string]any{
 				"type":    "error",
@@ -100,15 +141,11 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 		token := awsToString(out.NextForwardToken)
 		nextForward = out.NextForwardToken
 
-		if len(out.Events) == 0 {
-			if token != "" && token == lastToken {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(pollQuiet):
-				}
-				continue
-			}
+		caughtUp := len(out.Events) == 0 && token != "" && token == lastToken
+		if len(out.Events) > 0 || !caughtUp || !taskTerminal(ctx, isTaskTerminal) {
+			catchUp.reset()
+		} else if catchUp.due(time.Now()) {
+			return nil
 		}
 
 		lastToken = token
@@ -127,10 +164,16 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			continue
 		}
 
+		delay := pollActive
+		if caughtUp {
+			delay = pollQuiet
+		}
+		// Wake at the heartbeat deadline even when it falls between polls.
+		delay = min(delay, max(0, HeartbeatInterval-time.Since(nw.lastFlush)))
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(pollActive):
+		case <-time.After(delay):
 		}
 	}
 }
@@ -279,4 +322,43 @@ func awsToString(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+type terminalCatchUpWindow struct {
+	quietSince time.Time
+}
+
+func (w *terminalCatchUpWindow) reset() {
+	w.quietSince = time.Time{}
+}
+
+func (w *terminalCatchUpWindow) due(now time.Time) bool {
+	if w.quietSince.IsZero() {
+		w.quietSince = now
+	}
+	return now.Sub(w.quietSince) >= terminalCatchUp
+}
+
+func taskTerminal(ctx context.Context, isTaskTerminal func(context.Context) (bool, error)) bool {
+	if isTaskTerminal == nil {
+		return false
+	}
+	terminal, err := isTaskTerminal(ctx)
+	return err == nil && terminal
+}
+
+func fetchLogEvents(ctx context.Context, client *cloudwatchlogs.Client, input *cloudwatchlogs.GetLogEventsInput, budget time.Duration) (*cloudwatchlogs.GetLogEventsOutput, bool, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	out, err := client.GetLogEvents(reqCtx, input)
+	if err == nil {
+		return out, false, nil
+	}
+	if ctx.Err() != nil {
+		return nil, false, ctx.Err()
+	}
+	if reqCtx.Err() != nil {
+		return nil, true, nil
+	}
+	return nil, false, err
 }

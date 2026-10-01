@@ -44,7 +44,7 @@ func TestStreamCloudWatchLogPagesEvents(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	var buf bytes.Buffer
-	err := StreamCloudWatchLogToNDJSON(ctx, cancelAfter{&buf, cancel}, nil, "tasks", "task-1", "us-east-1")
+	err := StreamCloudWatchLogToNDJSON(ctx, cancelAfter{&buf, cancel}, nil, "tasks", "task-1", "us-east-1", nil)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
@@ -68,4 +68,143 @@ func (c cancelAfter) Write(p []byte) (int, error) {
 	n, err := c.buf.Write(p)
 	c.cancel()
 	return n, err
+}
+
+func TestCloudWatchHeartbeatDuringStalledRequest(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+	requestStarted := make(chan time.Time, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case requestStarted <- time.Now():
+		default:
+		}
+		timer := time.NewTimer(16 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-r.Context().Done():
+		case <-timer.C:
+			w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+			_, _ = w.Write([]byte(`{"events":[],"nextForwardToken":"tail"}`))
+		}
+	}))
+	defer srv.Close()
+	t.Setenv("AWS_ENDPOINT_URL", srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	writer := &heartbeatRecorder{cancel: cancel}
+	err := StreamCloudWatchLogToNDJSON(ctx, writer, writer, "tasks", "task-1", "us-east-1", nil)
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("stream error: %v", err)
+	}
+	var started time.Time
+	select {
+	case started = <-requestStarted:
+	default:
+		t.Fatal("stalled request did not start")
+	}
+	if writer.pings != 1 {
+		t.Fatalf("pings=%d", writer.pings)
+	}
+	held := writer.pingAt.Sub(started)
+	if held >= HeartbeatInterval || held < HeartbeatInterval-requestBudgetMargin-time.Second {
+		t.Fatalf("stalled request delayed the heartbeat by %v", held)
+	}
+}
+
+func TestCloudWatchLogErrorEndsStream(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"__type":"InvalidParameterException","message":"bad log group"}`))
+	}))
+	defer srv.Close()
+	t.Setenv("AWS_ENDPOINT_URL", srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	var buf bytes.Buffer
+	err := StreamCloudWatchLogToNDJSON(ctx, &buf, nil, "tasks", "task-1", "us-east-1", nil)
+	if err == nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("stream error: %v", err)
+	}
+	if !strings.Contains(buf.String(), `"type":"error"`) {
+		t.Fatalf("output = %s", buf.String())
+	}
+}
+
+func TestCloudWatchHeartbeatDuringQuietTail(t *testing.T) {
+	for _, flowing := range []bool{false, true} {
+		name := "quiet"
+		if flowing {
+			name = "flowing"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("AWS_ACCESS_KEY_ID", "test")
+			t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
+			t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+				if flowing {
+					_, _ = w.Write([]byte(`{"events":[{"message":"still running"}],"nextForwardToken":"tail"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"events":[],"nextForwardToken":"tail"}`))
+			}))
+			defer srv.Close()
+			t.Setenv("AWS_ENDPOINT_URL", srv.URL)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 16*time.Second)
+			defer cancel()
+			writer := &heartbeatRecorder{cancel: cancel}
+			started := time.Now()
+			isTaskTerminal := func(context.Context) (bool, error) {
+				// A failed status lookup must not end a quiet stream.
+				return false, errors.New("task store unavailable")
+			}
+			err := StreamCloudWatchLogToNDJSON(ctx, writer, writer, "tasks", "task-1", "us-east-1", isTaskTerminal)
+			if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("stream error: %v", err)
+			}
+			if flowing {
+				if writer.pings != 0 || writer.flushes == 0 {
+					t.Fatalf("flowing stream: pings=%d flushes=%d", writer.pings, writer.flushes)
+				}
+				return
+			}
+			if writer.pings != 1 || writer.flushes != 1 {
+				t.Fatalf("quiet stream: pings=%d flushes=%d", writer.pings, writer.flushes)
+			}
+			// Allow a small scheduling margin around the 15-second heartbeat deadline.
+			if elapsed := writer.pingAt.Sub(started); elapsed < 15*time.Second || elapsed > 15*time.Second+250*time.Millisecond {
+				t.Fatalf("heartbeat after %v", elapsed)
+			}
+		})
+	}
+}
+
+type heartbeatRecorder struct {
+	cancel  context.CancelFunc
+	pings   int
+	flushes int
+	pingAt  time.Time
+}
+
+func (w *heartbeatRecorder) Write(p []byte) (int, error) {
+	if string(p) == "{\"type\":\"ping\"}\n" {
+		w.pings++
+		w.pingAt = time.Now()
+		w.cancel()
+	}
+	return len(p), nil
+}
+
+func (w *heartbeatRecorder) Flush() {
+	w.flushes++
 }
