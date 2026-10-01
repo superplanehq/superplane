@@ -43,6 +43,12 @@ func MaterializeFactoryAppTemplate(
 	input := factoryTemplateInputFromRequest(req)
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name
+	// The template names the agent integration "claude". That is a type
+	// placeholder, not an installation. An install that omits the agent uses
+	// the workspace agent, the same one the other line apps already run.
+	if input.agent == nil {
+		input.agent = factoryTemplateAgentFromIntake(resolveIntakeAgent(db, factory))
+	}
 	result, err := materializeFactoryTemplate(req.GetTemplateId(), input)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")

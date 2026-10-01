@@ -110,6 +110,30 @@ type factoryTemplateAgent struct {
 	credentialIntegrationName string
 }
 
+func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
+	if agent == nil {
+		return nil
+	}
+	if agent.Component == models.SuperPlaneRunnerComponent {
+		return &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		}
+	}
+
+	integration, _ := agent.Credentials["integration"].(map[string]any)
+	name, _ := integration["name"].(string)
+	if name == "" {
+		return nil
+	}
+	return &factoryTemplateAgent{
+		component:                 agent.component(),
+		model:                     agent.model(),
+		credentialSource:          "integration",
+		credentialIntegrationName: name,
+	}
+}
+
 type materializedFactoryTemplate struct {
 	templateID  string
 	canvasYAML  string

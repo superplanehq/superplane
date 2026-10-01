@@ -126,6 +126,72 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 	})
 
+	t.Run("risk score install uses the workspace SuperPlane agent", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+		enableInstanceSuperPlaneDefault(t)
+		factoryModel := newFactory(t)
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "risk-score",
+			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
+			Integrations: []*pb.FactoryAppTemplateIntegration{{
+				Type: "github",
+				Id:   "github-1",
+				Name: "acme-github",
+			}},
+		})
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		assertSuperPlaneRunnerNode(t, findYAMLNode(t, materialized, "assess-risk"))
+		checkout := findYAMLNode(t, materialized, "on-pr-risk")
+		assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, checkout.Integration)
+	})
+
+	t.Run("risk score install keeps an explicit agent", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+		enableInstanceSuperPlaneDefault(t)
+		factoryModel := newFactory(t)
+		harness := models.FactoryOnboardingAgentHarnessSuperPlane
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentHarness: &harness,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
+
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "risk-score",
+			AppId:      canvas.ID.String(),
+			Agent: &pb.FactoryAppTemplateAgent{
+				Component:                 "runnerClaudeCode",
+				Model:                     "claude-sonnet-4-6",
+				CredentialSource:          "integration",
+				CredentialIntegrationName: "kept-claude",
+			},
+		})
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		agent := findYAMLNode(t, materialized, "assess-risk")
+		assert.Equal(t, "runnerClaudeCode", agent.Component)
+		assert.Equal(t, map[string]any{
+			"source":      "integration",
+			"integration": map[string]any{"name": "kept-claude"},
+		}, agent.Configuration["credentials"])
+	})
+
 	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		factoryModel := newFactory(t)
