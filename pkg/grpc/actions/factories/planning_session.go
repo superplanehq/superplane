@@ -165,9 +165,11 @@ func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req
 	return &pb.AnswerPlanningSessionSurveyResponse{Session: response.Session}, nil
 }
 
-// closeDraftFromSurveyAnswer closes the draft when the user chooses the
-// close option. The choice itself closes the task. It does not wait for
-// another agent turn.
+var errPlanningSurveyNoLongerCloses = errors.New("the survey no longer offers close")
+
+// closeDraftFromSurveyAnswer closes the draft when the locked session still
+// offers the close option. An ended session or a replaced survey does not
+// close an open task.
 func closeDraftFromSurveyAnswer(
 	ctx context.Context,
 	session *models.FactoryPlanningSession,
@@ -183,10 +185,30 @@ func closeDraftFromSurveyAnswer(
 	var fromState string
 	var assigned bool
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := session.SendUserMessage(tx, text, userID); err != nil && !errors.Is(err, models.ErrFactoryPlanningSessionEnded) {
+		if err := session.LockForUpdate(tx); err != nil {
 			return err
 		}
 		order, err := factoryModel.FindWorkOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+		fromState = order.State
+		if !models.SurveyReplyClosesTask(session.CurrentSurvey(), text) {
+			if order.IsClosed() && models.ReplySelectsCloseOption(text) {
+				return nil
+			}
+			return errPlanningSurveyNoLongerCloses
+		}
+		if session.State == models.PlanningSessionStateEnded {
+			if order.IsClosed() {
+				return nil
+			}
+			return models.ErrFactoryPlanningSessionEnded
+		}
+		if err := session.SendUserMessage(tx, text, userID); err != nil {
+			return err
+		}
+		order, err = factoryModel.FindWorkOrder(tx, orderID)
 		if err != nil {
 			return err
 		}
@@ -200,6 +222,9 @@ func closeDraftFromSurveyAnswer(
 		_, err = order.Close(tx, models.FactoryWorkOrderResultRejected, &userID)
 		return err
 	})
+	if errors.Is(err, errPlanningSurveyNoLongerCloses) {
+		return nil, grpcerrors.FailedPrecondition(err, "the survey no longer offers close")
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close task")
 	}

@@ -11,9 +11,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -355,17 +357,12 @@ func Test__AnswerPlanningSessionSurvey__ClosesTaskWhenUserChoosesClose(t *testin
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	session := openAnalysisSession(t, r, db)
-	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
-		Questions: []models.PlanningSessionSurveyQuestion{{
-			Prompt:  "Nothing is left. Close this task?",
-			Options: []string{models.PlanningSurveyCloseOption, "Keep it open"},
-		}},
-	}))
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
 
 	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
 		FactoryId: session.FactoryID.String(),
 		SessionId: session.ID.String(),
-		Text:      "Nothing is left. Close this task? Close the task",
+		Text:      closeTaskSurveyReply(),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, answered.Session.State)
@@ -383,12 +380,7 @@ func Test__AnswerPlanningSessionSurvey__KeepsTaskOpenForAnotherOption(t *testing
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	session := openAnalysisSession(t, r, db)
-	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
-		Questions: []models.PlanningSessionSurveyQuestion{{
-			Prompt:  "Nothing is left. Close this task?",
-			Options: []string{models.PlanningSurveyCloseOption, "Keep it open"},
-		}},
-	}))
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
 
 	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
 		FactoryId: session.FactoryID.String(),
@@ -400,6 +392,119 @@ func Test__AnswerPlanningSessionSurvey__KeepsTaskOpenForAnotherOption(t *testing
 
 	order := planningSessionDraft(t, db, session)
 	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+}
+
+func Test__AnswerPlanningSessionSurvey__RejectsCloseAfterSessionEnds(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
+	require.NoError(t, session.End(db))
+
+	_, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      closeTaskSurveyReply(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	order := planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.Messages)
+}
+
+func Test__AnswerPlanningSessionSurvey__AcceptsCloseWhenTaskIsAlreadyClosed(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
+	order := planningSessionDraft(t, db, session)
+	_, err := order.Close(db, models.FactoryWorkOrderResultRejected, &r.User)
+	require.NoError(t, err)
+
+	answered, err := AnswerPlanningSessionSurvey(ctx, r.Organization.ID.String(), &pb.AnswerPlanningSessionSurveyRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      closeTaskSurveyReply(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, answered.Session.State)
+
+	order = planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, order.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, order.Result)
+}
+
+func Test__closeDraftFromSurveyAnswer__DoesNotCloseWhenSurveyChanged(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
+	stale := *session
+	fresh, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.NoError(t, fresh.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{{
+			Prompt:  "What should we do next?",
+			Options: []string{"Keep it open"},
+		}},
+	}))
+	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	_, err = closeDraftFromSurveyAnswer(context.Background(), &stale, factoryModel, r.User, closeTaskSurveyReply())
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	order := planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, reloaded.State)
+	assert.False(t, models.SurveyReplyClosesTask(reloaded.CurrentSurvey(), closeTaskSurveyReply()))
+	assert.Empty(t, reloaded.Messages)
+}
+
+func Test__closeDraftFromSurveyAnswer__AcceptsRepeatCloseAfterSurveyClears(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.ProposeSurvey(db, closeTaskSurvey()))
+	stale := *session
+	fresh, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.NoError(t, fresh.SendUserMessage(db, closeTaskSurveyReply(), r.User))
+	order := planningSessionDraft(t, db, session)
+	_, err = order.Close(db, models.FactoryWorkOrderResultRejected, &r.User)
+	require.NoError(t, err)
+	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	answered, err := closeDraftFromSurveyAnswer(context.Background(), &stale, factoryModel, r.User, closeTaskSurveyReply())
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, answered.Session.State)
+
+	order = planningSessionDraft(t, db, session)
+	assert.Equal(t, models.FactoryWorkOrderStateClosed, order.State)
+	assert.Equal(t, models.FactoryWorkOrderResultRejected, order.Result)
+}
+
+func closeTaskSurvey() models.PlanningSessionSurvey {
+	return models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{{
+			Prompt:  "Nothing is left. Close this task?",
+			Options: []string{models.PlanningSurveyCloseOption, "Keep it open"},
+		}},
+	}
+}
+
+func closeTaskSurveyReply() string {
+	return "Nothing is left. Close this task? Close the task"
 }
 
 func Test__AnswerPlanningSessionSurvey__AssignsSender(t *testing.T) {
