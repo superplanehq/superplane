@@ -75,13 +75,17 @@ function ResolvedInitialWorkspaceOnboarding({
       value={{
         organizationId,
         factoryId,
-        factoryKey,
+        factoryKey: factory.data.key ?? factoryKey,
+        routeSegment: factoryRouteSegment(factory.data) || factoryKey,
         factory: factory.data,
         factories,
         openCreateWorkOrder: ignoreOpenCreateWorkOrder,
       }}
     >
-      <RecordOnboardingLastLocation organizationSlug={organizationId} factoryKey={factoryKey} />
+      <RecordOnboardingLastLocation
+        organizationSlug={organizationId}
+        factoryKey={factoryRouteSegment(factory.data) || factoryKey}
+      />
       <main className="h-dvh overflow-y-auto bg-background">
         <OnboardingPage />
       </main>

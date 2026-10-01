@@ -16,18 +16,19 @@ export interface FactoriesLayoutContextValue {
   openCreateWorkOrder: () => void;
 }
 
+/** Layout after `useFactoriesLayout`, with a concrete URL segment for path builders. */
+export type ResolvedFactoriesLayout = FactoriesLayoutContextValue & { routeSegment: string };
+
 export const FactoriesLayoutContext = createContext<FactoriesLayoutContextValue | null>(null);
 
-function withRouteSegment(
-  context: FactoriesLayoutContextValue,
-): FactoriesLayoutContextValue & { routeSegment: string } {
+function withRouteSegment(context: FactoriesLayoutContextValue): ResolvedFactoriesLayout {
   return {
     ...context,
     routeSegment: context.routeSegment || factoryRouteSegment(context.factory) || context.factoryKey,
   };
 }
 
-export function useFactoriesLayout(): FactoriesLayoutContextValue & { routeSegment: string } {
+export function useFactoriesLayout(): ResolvedFactoriesLayout {
   const context = useOptionalFactoriesLayout();
   if (!context) {
     throw new Error("useFactoriesLayout must be used within FactoriesLayout");
@@ -35,7 +36,7 @@ export function useFactoriesLayout(): FactoriesLayoutContextValue & { routeSegme
   return withRouteSegment(context);
 }
 
-export function useOptionalFactoriesLayout(): (FactoriesLayoutContextValue & { routeSegment: string }) | null {
+export function useOptionalFactoriesLayout(): ResolvedFactoriesLayout | null {
   const context = useContext(FactoriesLayoutContext);
   if (!context) {
     return null;

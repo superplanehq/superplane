@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   factoryHomePath,
   factoryLineDetailPath,
@@ -40,7 +40,7 @@ export function JiraIntakeSetupPage() {
 }
 
 function resolveJiraIntakeSetupModel(
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {

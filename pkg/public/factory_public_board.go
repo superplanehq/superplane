@@ -36,7 +36,7 @@ var errPublicBoardNotFound = errors.New("public board not found")
 type publicBoard struct {
 	WorkspaceName  string         `json:"workspaceName"`
 	WorkspaceKey   string         `json:"workspaceKey"`
-	UrlId          string         `json:"urlId"`
+	URLId          string         `json:"urlId"`
 	ShowClarity    bool           `json:"showClarity"`
 	ShowConfidence bool           `json:"showConfidence"`
 	LineName       string         `json:"lineName"`
@@ -385,7 +385,7 @@ func assemblePublicBoard(
 	return &publicBoard{
 		WorkspaceName:  factory.Name,
 		WorkspaceKey:   factory.Key,
-		UrlId:          factory.URLID,
+		URLId:          factory.URLID,
 		ShowClarity:    planning.Clarity,
 		ShowConfidence: planning.Confidence,
 		LineName:       line.Name,

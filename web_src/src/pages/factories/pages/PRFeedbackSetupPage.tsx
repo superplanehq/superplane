@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
@@ -40,7 +40,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
 
 function resolvePRFeedbackSetupModel(
   kind: "comments" | "checks",
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {
@@ -93,7 +93,7 @@ function resolvePRFeedbackSetupModel(
   };
 }
 
-function factoryPRFeedbackSetupBindings(factory: FactoriesLayoutContextValue["factory"]) {
+function factoryPRFeedbackSetupBindings(factory: ResolvedFactoriesLayout["factory"]) {
   return {
     workspaceName: factory?.name ?? "Workspace",
     lines: factory?.lines ?? [],

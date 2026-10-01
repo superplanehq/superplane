@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { SentryIntakeSetupDialog } from "./SentryIntakeSetupDialog";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
@@ -33,7 +33,7 @@ export function SentryIntakeSetupPage() {
 }
 
 function resolveSentryIntakeSetupModel(
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {

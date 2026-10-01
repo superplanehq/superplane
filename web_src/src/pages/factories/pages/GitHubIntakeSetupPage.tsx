@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { GitHubIntakeSetupDialog } from "./GitHubIntakeSetupDialog";
 import { GITHUB_INTAKE_SETUP_COPY } from "./githubIntakeSetupCopy";
@@ -34,7 +34,7 @@ export function GitHubIntakeSetupPage() {
 }
 
 function resolveGitHubIntakeSetupModel(
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {

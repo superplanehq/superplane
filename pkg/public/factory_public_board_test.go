@@ -67,7 +67,7 @@ func TestPublicFactoryBoardReturnsDisplayFieldsOnly(t *testing.T) {
 
 	var board struct {
 		WorkspaceKey string `json:"workspaceKey"`
-		UrlId        string `json:"urlId"`
+		URLId        string `json:"urlId"`
 		Columns      []struct {
 			Cards []struct {
 				Title string `json:"title"`
@@ -78,7 +78,7 @@ func TestPublicFactoryBoardReturnsDisplayFieldsOnly(t *testing.T) {
 	require.NotEmpty(t, board.Columns)
 	assert.Equal(t, "Ship the board", board.Columns[0].Cards[0].Title)
 	assert.Equal(t, factory.Key, board.WorkspaceKey)
-	assert.Equal(t, factory.URLID, board.UrlId)
+	assert.Equal(t, factory.URLID, board.URLId)
 }
 
 func TestPublicFactoryBoardAcceptsCurrentWorkspaceKey(t *testing.T) {
