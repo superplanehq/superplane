@@ -52,6 +52,8 @@ func SelectableLLMProviderName(provider string) string {
 		return "OpenAI"
 	case UsageProviderOpenRouter:
 		return "OpenRouter"
+	case UsageProviderCustom:
+		return "Custom"
 	default:
 		return strings.TrimSpace(provider)
 	}
@@ -63,7 +65,7 @@ func HostedLLMTechnicalName(provider, model string) string {
 	if trimmedProvider == "" || trimmedModel == "" {
 		return trimmedModel
 	}
-	if trimmedProvider == UsageProviderOpenRouter {
+	if trimmedProvider == UsageProviderOpenRouter || trimmedProvider == UsageProviderCustom {
 		return trimmedModel
 	}
 	return trimmedProvider + "/" + trimmedModel
@@ -82,6 +84,13 @@ func ParseSelectableLLMModelKey(value string) (SelectableLLMModel, error) {
 	source, err := normalizeLLMFundingSource(parts[0])
 	if err != nil {
 		return SelectableLLMModel{}, ErrSelectableLLMModelIncomplete
+	}
+	if source == UsageFundingSourceBYOK && strings.EqualFold(strings.TrimSpace(parts[1]), UsageProviderCustom) {
+		model := strings.TrimSpace(parts[2])
+		if model == "" {
+			return SelectableLLMModel{}, ErrSelectableLLMModelIncomplete
+		}
+		return newSelectableLLMModel(source, UsageProviderCustom, model), nil
 	}
 	parsed, err := NormalizeDefaultHostedLLMModel(parts[1], parts[2])
 	if err != nil {
@@ -133,6 +142,13 @@ func ListSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID)
 			}
 		}
 	}
+	customIDs, err := ResolveSelectableLLMModels(tx, orgID, factoryID, UsageProviderCustom, UsageFundingSourceBYOK)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range customIDs {
+		out = append(out, newSelectableLLMModel(UsageFundingSourceBYOK, UsageProviderCustom, id))
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Label != out[j].Label {
 			return strings.ToLower(out[i].Label) < strings.ToLower(out[j].Label)
@@ -170,7 +186,7 @@ func SelectableLLMRunnerComponent(model SelectableLLMModel) (string, error) {
 			return "runnerClaudeCode", nil
 		case UsageProviderOpenAI:
 			return "runnerCodex", nil
-		case UsageProviderOpenRouter:
+		case UsageProviderOpenRouter, UsageProviderCustom:
 			return "runnerOpenRouter", nil
 		}
 	}

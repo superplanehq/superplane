@@ -77,7 +77,9 @@ vi.mock("react-router", () => {
 });
 
 vi.mock("./AgentStep", () => ({
-  AgentStep: () => <div data-testid="agent-step" />,
+  AgentStep: ({ showCustomProvider }: { showCustomProvider?: boolean }) => (
+    <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
+  ),
 }));
 
 function setupState(): OnboardingSetupApi {
@@ -93,6 +95,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
@@ -288,8 +291,24 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
 
     expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
-    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "no");
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("offers a custom provider on the agent card when that flag is on", async () => {
+    const user = userEvent.setup();
+    renderStatefulSetup({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      customProvider: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
+
+    expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBodyWithCustom)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyHelperWithCustom)).toBeInTheDocument();
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "yes");
   });
 
   it("sends a bring-your-own-key organization back to the model source when none is chosen", () => {

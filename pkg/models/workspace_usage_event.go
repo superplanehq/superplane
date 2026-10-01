@@ -22,6 +22,7 @@ const (
 	UsageProviderAnthropic  = "anthropic"
 	UsageProviderOpenAI     = "openai"
 	UsageProviderOpenRouter = "openrouter"
+	UsageProviderCustom     = "custom"
 	UsageProviderPerplexity = "perplexity"
 	UsageProviderRunner     = "runner"
 

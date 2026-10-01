@@ -83,6 +83,14 @@ func Test__AgentModelsForSource__UsesDefaultsWhenNoPreferredModelMatches(t *test
 	model, planning = agentModelsForSource(modelSourceAnthropic, []string{"claude-haiku-4-5"})
 	assert.Equal(t, "claude-opus-5-5", model)
 	assert.Equal(t, "claude-opus-5-5", planning)
+
+	model, planning = agentModelsForSource(modelSourceCustom, []string{"zeta-model", "alpha-model"})
+	assert.Equal(t, "alpha-model", model)
+	assert.Equal(t, "alpha-model", planning)
+
+	model, planning = agentModelsForSource(modelSourceCustom, nil)
+	assert.Empty(t, model)
+	assert.Empty(t, planning)
 }
 
 func Test__CompareModelIDs__OrdersNumericRuns(t *testing.T) {

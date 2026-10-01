@@ -216,6 +216,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 	if model := request.Agent.model(); model != "" {
 		configuration["model"] = model
 	}
+	request.Agent.applyLLMProvider(configuration)
 
 	return configuration
 }

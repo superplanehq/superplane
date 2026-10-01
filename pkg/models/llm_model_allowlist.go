@@ -13,10 +13,14 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// CustomLLMAppName is the integration app for an organization custom provider.
+const CustomLLMAppName = "customLlm"
+
 var byokIntegrationAppNames = map[string]string{
 	UsageProviderAnthropic:  "claude",
 	UsageProviderOpenAI:     "openai",
 	UsageProviderOpenRouter: "openrouter",
+	UsageProviderCustom:     CustomLLMAppName,
 }
 
 var ErrModelNotInParentList = errors.New("model is not in the parent selected-model list")
@@ -47,8 +51,16 @@ func (FactoryLLMModelAllowlist) TableName() string {
 	return "factory_llm_model_allowlists"
 }
 
+func NormalizeBYOKLLMProvider(provider string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(provider))
+	if normalized == UsageProviderCustom || slices.Contains(hostedLLMProviders, normalized) {
+		return normalized, nil
+	}
+	return "", fmt.Errorf("unsupported byok llm provider: %s", provider)
+}
+
 func BYOKIntegrationAppName(provider string) (string, error) {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return "", err
 	}
@@ -60,7 +72,7 @@ func BYOKIntegrationAppName(provider string) (string, error) {
 }
 
 func FindOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string) (*OrganizationBYOKModelAllowlist, error) {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +94,7 @@ func FindOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider s
 // OrganizationBYOKModelAllowlistExists is false until the organization saves
 // a model list for the provider. An empty saved list still counts as saved.
 func OrganizationBYOKModelAllowlistExists(tx *gorm.DB, orgID uuid.UUID, provider string) (bool, error) {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return false, err
 	}
@@ -107,7 +119,7 @@ func CreateOrganizationBYOKModelAllowlistIfAbsent(
 	provider string,
 	models datatypes.JSONSlice[string],
 ) error {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return err
 	}
@@ -135,7 +147,7 @@ func CreateOrganizationBYOKModelAllowlistIfAbsent(
 }
 
 func UpsertOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider string, models datatypes.JSONSlice[string]) (*OrganizationBYOKModelAllowlist, error) {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +176,7 @@ func UpsertOrganizationBYOKModelAllowlist(tx *gorm.DB, orgID uuid.UUID, provider
 }
 
 func FindFactoryLLMModelAllowlist(tx *gorm.DB, factoryID uuid.UUID, provider, fundingSource string) (*FactoryLLMModelAllowlist, error) {
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +200,7 @@ func UpsertFactoryLLMModelAllowlist(tx *gorm.DB, orgID, factoryID uuid.UUID, pro
 	if _, err := FindFactory(tx, orgID, factoryID); err != nil {
 		return nil, err
 	}
-	normalized, err := NormalizeHostedLLMProvider(provider)
+	normalized, err := NormalizeBYOKLLMProvider(provider)
 	if err != nil {
 		return nil, err
 	}

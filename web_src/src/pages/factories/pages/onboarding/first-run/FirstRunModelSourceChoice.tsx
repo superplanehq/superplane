@@ -9,10 +9,12 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 export function FirstRunModelSourceChoice({
   disabled,
   modelSource,
+  ownKeyHelper,
   onSelectModelSource,
 }: {
   disabled: boolean;
   modelSource: OnboardingAgentCredentialChoice | null;
+  ownKeyHelper?: string;
   onSelectModelSource: (source: OnboardingAgentCredentialChoice) => void;
 }) {
   const copy = FIRST_RUN_COPY.agent;
@@ -31,7 +33,7 @@ export function FirstRunModelSourceChoice({
         <ConnectOptionRow
           icon={<KeyRound className="size-5" aria-hidden />}
           title={copy.ownKey}
-          detail={copy.ownKeyHelper}
+          detail={ownKeyHelper ?? copy.ownKeyHelper}
           selected={modelSource === "own-key"}
           disabled={disabled}
           onSelect={() => onSelectModelSource("own-key")}
