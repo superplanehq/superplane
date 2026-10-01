@@ -132,6 +132,14 @@ func (f *fakeFactoryGitHub) EditPullRequest(_ context.Context, _ string, _ int, 
 	return pullRequest, nil, nil
 }
 
+func githubRateLimitedResponse() *http.Response {
+	request, err := http.NewRequest(http.MethodGet, "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		panic(err)
+	}
+	return &http.Response{StatusCode: http.StatusForbidden, Request: request}
+}
+
 func mergeableGitHubPullRequest(sha string) *github.PullRequest {
 	return &github.PullRequest{
 		Mergeable:      github.Ptr(true),
@@ -626,6 +634,12 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		}},
 		{"installation rejected", func(api *fakeFactoryGitHub) {
 			api.getPullErr = &ghinstallation.HTTPError{Response: &http.Response{StatusCode: http.StatusUnauthorized}}
+		}},
+		{"primary rate limit", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &github.RateLimitError{Response: githubRateLimitedResponse(), Message: "rate limit exceeded"}
+		}},
+		{"secondary rate limit", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &github.AbuseRateLimitError{Response: githubRateLimitedResponse(), Message: "secondary rate limit"}
 		}},
 	} {
 		t.Run("reports unavailable without caching for "+test.name, func(t *testing.T) {

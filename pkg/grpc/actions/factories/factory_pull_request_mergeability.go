@@ -18,12 +18,13 @@ import (
 )
 
 var (
-	errFactoryPullRequestNotGitHub             = errors.New("only GitHub pull requests can merge from SuperPlane")
-	errFactoryPullRequestMissing               = errors.New("GitHub did not return the pull request")
-	errFactoryPullRequestNotOpen               = errors.New("the pull request is not open")
-	errFactoryPullRequestNotMergeable          = errors.New("the pull request cannot merge")
-	errFactoryPullRequestMergeMethodNotAllowed = errors.New("the repository does not allow this merge method")
-	errFactoryPullRequestHeadMoved             = errors.New("the pull request head changed")
+	errFactoryPullRequestNotGitHub               = errors.New("only GitHub pull requests can merge from SuperPlane")
+	errFactoryPullRequestMissing                 = errors.New("GitHub did not return the pull request")
+	errFactoryPullRequestNotOpen                 = errors.New("the pull request is not open")
+	errFactoryPullRequestNotMergeable            = errors.New("the pull request cannot merge")
+	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
+	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
+	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
 )
 
 const (
@@ -166,8 +167,11 @@ func isRecoverableGitHubMergeabilityError(ctx context.Context, err error) bool {
 	}
 	var githubErr *github.ErrorResponse
 	var installationErr *ghinstallation.HTTPError
+	var rateLimitErr *github.RateLimitError
+	var abuseRateLimitErr *github.AbuseRateLimitError
 	var networkErr net.Error
 	return errors.As(err, &githubErr) || errors.As(err, &installationErr) ||
+		errors.As(err, &rateLimitErr) || errors.As(err, &abuseRateLimitErr) ||
 		errors.As(err, &networkErr) || errors.Is(err, context.DeadlineExceeded)
 }
 
