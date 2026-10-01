@@ -138,6 +138,7 @@ function useIntakeSettingsActions({
         intakeId: intake.intakeId,
         settings: intakeSettingsToApi(next),
         ...datadogServiceRebind(intake, next),
+        ...linearProjectRebind(intake, next),
       });
       await automationRefetch();
     },
@@ -171,4 +172,19 @@ function datadogServiceRebind(
     return {};
   }
   return { integrationId: intake.integrationId, resourceId: service };
+}
+
+function linearProjectRebind(
+  intake: ConfiguredLineIntakeSource,
+  next: IntakeSourceSettings,
+): { integrationId?: string; resourceId?: string } {
+  if (intake.source.id !== "linear-issues") {
+    return {};
+  }
+  const projects = next.linearProjectIds.join(",");
+  const current = intake.resourceId?.trim() ?? "";
+  if (!projects || projects === current || !intake.integrationId) {
+    return {};
+  }
+  return { integrationId: intake.integrationId, resourceId: projects };
 }

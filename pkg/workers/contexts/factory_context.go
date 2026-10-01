@@ -58,6 +58,9 @@ type FactoryContext struct {
 	// readJiraIssueFiles, when set, supplies Jira files without calling the
 	// Jira API.
 	readJiraIssueFiles jiraFileRead
+	// readLinearIssueFiles, when set, supplies Linear files without calling
+	// the Linear API.
+	readLinearIssueFiles linearFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -179,6 +182,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	skip, err = c.skipDuplicateProductiveWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	skip, err = c.skipDuplicateLinearWorkOrder(f)
 	if err != nil {
 		return nil, false, err
 	}
@@ -430,6 +441,7 @@ func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) e
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
 	c.ingestJiraFiles(order)
+	c.ingestLinearFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 
