@@ -360,7 +360,43 @@ describe("AutomationsConsoleVariant running card timer", () => {
     expect(within(header).getByText("2s")).toBeInTheDocument();
     expect(within(header).queryByText(/so far/)).not.toBeInTheDocument();
   });
+
+  it("starts a new run at its own duration when the text matches the previous run", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    const running = implementRun("run-1", "running", "<1s");
+    const view = renderConsole(running);
+
+    expect(within(cardHeader("Implementation")).getByText("<1s so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(within(cardHeader("Implementation")).getByText("2s so far")).toBeInTheDocument();
+
+    view.rerenderConsole(implementRun("run-1", "passed", "<1s"));
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    view.rerenderConsole(implementRun("run-2", "running", "<1s"));
+    expect(within(cardHeader("Implementation")).getByText("<1s so far")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(within(cardHeader("Implementation")).getByText("1s so far")).toBeInTheDocument();
+  });
 });
+
+function implementRun(runId: string, status: "running" | "passed", duration: string) {
+  return {
+    ...SPLIT_RUN_RUNNING,
+    phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+      phase.id === "implement" ? { ...phase, status, duration, runId } : phase,
+    ),
+  };
+}
 
 describe("AutomationsConsoleVariant run footer", () => {
   it("shows recorded spend and model on the open card footer", () => {

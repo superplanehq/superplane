@@ -332,7 +332,7 @@ function ConsoleAutomationCard({
     }
   }, [anyLive, expandIdle, live]);
   const ticking = shownStatus === "running";
-  const { now, sampledAt } = useRunningCardClock(ticking, latest.duration);
+  const { now, sampledAt } = useRunningCardClock(ticking, latest.duration, runClockKey(shownPhase, latest));
   const metaLine = ticking ? tickingRunMetaLine(latest, sampledAt, now) : runMetaLine(latest);
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
@@ -398,11 +398,15 @@ function ConsoleAutomationCard({
   );
 }
 
-function useRunningCardClock(active: boolean, duration: string) {
+function runClockKey(phase: { runId?: string } | undefined, stage: { id: string; startedAt?: string }) {
+  return [phase?.runId, stage.id, stage.startedAt].filter(Boolean).join(":");
+}
+
+function useRunningCardClock(active: boolean, duration: string, runKey: string) {
   const [now, setNow] = useState(() => Date.now());
-  const sampleRef = useRef({ duration, at: Date.now() });
-  if (sampleRef.current.duration !== duration) {
-    sampleRef.current = { duration, at: Date.now() };
+  const sampleRef = useRef({ duration, runKey, at: Date.now() });
+  if (sampleRef.current.duration !== duration || sampleRef.current.runKey !== runKey) {
+    sampleRef.current = { duration, runKey, at: Date.now() };
   }
   useEffect(() => {
     if (!active) {
