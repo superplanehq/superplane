@@ -125,7 +125,7 @@ describe("AgentActivityView console", () => {
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
-  it("shows a multi-line bash script apart from its stdout", async () => {
+  it("shows a multi-line bash script and its output in one block", async () => {
     const user = userEvent.setup();
     const script = [
       "set -euo pipefail",
@@ -155,10 +155,13 @@ describe("AgentActivityView console", () => {
     );
 
     const command = screen.getByTestId("agent-tool-command-1");
+    const output = screen.getByText(/Cloning into 'repo'/);
     expect(command.textContent).toBe(script);
     expect(command.textContent).not.toContain("Cloning into");
-    expect(screen.getByText("Output")).toBeInTheDocument();
-    expect(screen.getByText(/Cloning into 'repo'/).closest("pre")).not.toBe(command);
+    expect(command).toHaveClass("text-foreground/90");
+    expect(output).toHaveClass("text-muted-foreground");
+    expect(output.parentElement).toBe(command.parentElement);
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
   it("shows the exit code above stdout when a command fails", async () => {
@@ -180,9 +183,10 @@ describe("AgentActivityView console", () => {
 
     await user.click(screen.getByRole("button", { name: "Inspected Git" }));
     const exitCode = screen.getByText("Exit code 1");
-    const output = screen.getByText("Output");
+    const output = screen.getByText("fatal: repository not found");
     expect(exitCode.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("fatal: repository not found")).toBeInTheDocument();
+    expect(output).toHaveClass("text-muted-foreground");
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
   it("collapses carriage-return progress into finished output lines", async () => {
@@ -201,7 +205,6 @@ describe("AgentActivityView console", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Inspected Git" }));
-    expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("remote: Enumerating objects: 9364, done.")).toBeInTheDocument();
     expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
   });

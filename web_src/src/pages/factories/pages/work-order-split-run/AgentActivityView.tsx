@@ -235,15 +235,20 @@ function ToolLine({
   tone: "chat" | "log";
   expandableCommands: boolean;
 }) {
-  const line = isCommandTool(tool) ? (
-    <CommandLine tool={tool} expandable={expandableCommands} />
-  ) : (
-    <ToolLabel tool={tool} tone={tone} />
-  );
-  if (tone !== "log") return line;
   const output = isCommandTool(tool) ? normalizeTerminalOutput(tool.output) : tool.output.trim();
   const exitCode = failedTool(tool) ? tool.exitCode : undefined;
-  if (!output && exitCode === undefined) {
+  if (isCommandTool(tool)) {
+    return (
+      <CommandLine
+        tool={tool}
+        expandable={expandableCommands}
+        output={tone === "log" ? output : ""}
+        exitCode={tone === "log" ? exitCode : undefined}
+      />
+    );
+  }
+  const line = <ToolLabel tool={tool} tone={tone} />;
+  if (tone !== "log" || (!output && exitCode === undefined)) {
     return line;
   }
   return (
@@ -252,21 +257,9 @@ function ToolLine({
       {exitCode !== undefined ? (
         <p className="px-1 text-[11px] leading-4 text-destructive">Exit code {exitCode}</p>
       ) : null}
-      {output ? <ToolOutput command={isCommandTool(tool)} text={output} /> : null}
-    </div>
-  );
-}
-
-function ToolOutput({ command, text }: { command: boolean; text: string }) {
-  if (!command) {
-    return (
-      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{text}</pre>
-    );
-  }
-  return (
-    <div className="mt-1 px-1">
-      <p className="text-[11px] leading-4 text-muted-foreground">Output</p>
-      <pre className={cn(COMMAND_CLASSNAME, "mt-0.5 max-h-32 overflow-auto text-muted-foreground")}>{text}</pre>
+      {output ? (
+        <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{output}</pre>
+      ) : null}
     </div>
   );
 }
@@ -290,12 +283,22 @@ function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }
   );
 }
 
-function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: boolean }) {
+function CommandLine({
+  tool,
+  expandable,
+  output = "",
+  exitCode,
+}: {
+  tool: AgentToolItem;
+  expandable: boolean;
+  output?: string;
+  exitCode?: number;
+}) {
   const failed = failedTool(tool);
   if (!expandable) {
     const command = agentToolDisplayText(tool);
     return (
-      <div className="flex min-w-0 items-center px-1 py-0.5">
+      <div className="min-w-0 px-1 py-0.5">
         <code
           className={cn(
             "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
@@ -307,6 +310,7 @@ function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: bo
         >
           {command}
         </code>
+        <CommandTrail exitCode={exitCode} output={output} />
       </div>
     );
   }
@@ -317,6 +321,8 @@ function CommandLine({ tool, expandable }: { tool: AgentToolItem; expandable: bo
       script={script || headline}
       headline={headline}
       failed={failed}
+      output={output}
+      exitCode={exitCode}
       testId={`agent-tool-${tool.id}`}
       status={tool.status}
     />
@@ -327,12 +333,16 @@ function ExpandableCommand({
   script,
   headline,
   failed,
+  output,
+  exitCode,
   testId,
   status,
 }: {
   script: string;
   headline: string;
   failed: boolean;
+  output: string;
+  exitCode?: number;
   testId: string;
   status: string;
 }) {
@@ -349,16 +359,20 @@ function ExpandableCommand({
     }
     setOverflows(node.scrollWidth > node.clientWidth + 1);
   }, [overflows, script]);
+  const trail = <CommandTrail exitCode={exitCode} output={output} />;
   if (!overflows) {
     return (
-      <pre
-        className={cn(COMMAND_CLASSNAME, "truncate px-1 py-0.5", failed && "text-destructive")}
-        ref={lineRef}
-        data-testid={testId}
-        data-status={status}
-      >
-        {headline}
-      </pre>
+      <div className="px-1 py-0.5">
+        <pre
+          className={cn(COMMAND_CLASSNAME, "truncate", failed && "text-destructive")}
+          ref={lineRef}
+          data-testid={testId}
+          data-status={status}
+        >
+          {headline}
+        </pre>
+        {trail}
+      </div>
     );
   }
   return (
@@ -388,18 +402,39 @@ function ExpandableCommand({
         ) : null}
       </button>
       {open ? (
-        <pre
-          className={cn(
-            "mt-1 overflow-x-auto border-l border-border/60 py-1 pl-2 font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
-            failed && "text-destructive",
-          )}
-          data-testid={testId}
-          data-status={status}
-        >
-          {script}
+        <div className="mt-1 overflow-x-auto border-l border-border/60 py-1 pl-2">
+          <pre
+            className={cn(
+              "font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
+              failed && "text-destructive",
+            )}
+            data-testid={testId}
+            data-status={status}
+          >
+            {script}
+          </pre>
+          {trail}
+        </div>
+      ) : (
+        trail
+      )}
+    </div>
+  );
+}
+
+function CommandTrail({ exitCode, output }: { exitCode?: number; output: string }) {
+  if (exitCode === undefined && !output) {
+    return null;
+  }
+  return (
+    <>
+      {exitCode !== undefined ? <p className="text-[11px] leading-4 text-destructive">Exit code {exitCode}</p> : null}
+      {output ? (
+        <pre className="mt-1 max-h-32 overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-muted-foreground [tab-size:2]">
+          {output}
         </pre>
       ) : null}
-    </div>
+    </>
   );
 }
 
