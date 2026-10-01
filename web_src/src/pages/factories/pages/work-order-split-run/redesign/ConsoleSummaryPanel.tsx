@@ -8,6 +8,7 @@ import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
+import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME } from "../../../lib/confidenceScore";
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
@@ -90,8 +91,7 @@ export function ConsoleSummaryPanel({
           </FramePanel>
         ) : null}
         {panel.checks.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2 py-3">
-            <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
+          <FramePanel className="py-3">
             <ConsoleCheckRows checks={panel.checks} />
           </FramePanel>
         ) : null}
@@ -173,9 +173,12 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    // Every check on the task. A stage list would drop Risk score when
-    // no verify step ran, because only that step copies checks onto a card.
-    checks: fixture.checks,
+    // Every check on the task except Confidence score. That score belongs
+    // to planning. A stage list would drop Risk score when no verify step
+    // ran, because only that step copies checks onto a card.
+    checks: fixture.checks.filter(
+      (check) => check.key !== CONFIDENCE_CHECK_KEY && check.name !== CONFIDENCE_CHECK_NAME,
+    ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };
 }

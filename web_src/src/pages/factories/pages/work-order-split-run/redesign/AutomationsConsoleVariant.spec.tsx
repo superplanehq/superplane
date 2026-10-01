@@ -59,8 +59,8 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     );
 
     const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
-    expect(within(checks).getByText("Risk score")).toBeInTheDocument();
-    expect(within(checks).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
   });
 
   it("lists each column app that ran for the task as its own card", () => {

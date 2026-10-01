@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { formatEnabledChecksValue } from "./mergeConfidenceChecks";
 import { defaultRiskScoreCategories, formatRiskScoreRules } from "./riskScoreCategories";
 import { RiskScoreSetupDialog } from "./RiskScoreSetupDialog";
 import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
@@ -48,17 +49,22 @@ describe("RiskScoreSetupDialog", () => {
     mocks.showSuccessToast.mockReset();
   });
 
-  it("explains the 1 to 5 scale and previews the task check", () => {
+  it("lists the four checks and previews them on the task", async () => {
+    const user = userEvent.setup();
     renderDialog();
 
     expect(screen.getByRole("heading", { name: RISK_SCORE_SETUP_COPY.title })).toBeInTheDocument();
-    expect(screen.getByTestId("risk-score-setup-scale-1")).toHaveTextContent("Minimal Risk");
-    expect(screen.getByTestId("risk-score-setup-scale-2")).toHaveTextContent("Low Risk");
-    expect(screen.getByTestId("risk-score-setup-scale-3")).toHaveTextContent("Moderate Risk");
-    expect(screen.getByTestId("risk-score-setup-scale-4")).toHaveTextContent("High Risk");
-    expect(screen.getByTestId("risk-score-setup-scale-5")).toHaveTextContent("Severe Risk");
+    expect(screen.getByTestId("merge-confidence-setup-check-risk")).toHaveTextContent("Blast radius");
+    expect(screen.getByTestId("merge-confidence-setup-check-performance")).toHaveTextContent("Performance");
+    expect(screen.getByTestId("merge-confidence-setup-check-security")).toHaveTextContent("Security");
+    expect(screen.getByTestId("merge-confidence-setup-check-drift")).toHaveTextContent("Drift from Specification");
+    expect(screen.getByTestId("merge-confidence-setup-check-reversibility")).toHaveTextContent("Reversibility");
     expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
-    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("Low Risk");
+    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("Low risk");
+    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("On task");
+
+    await user.click(screen.getByRole("switch", { name: "Performance" }));
+    expect(screen.getByTestId("risk-score-setup-preview-card")).not.toHaveTextContent("Performance");
   });
 
   it("installs the risk score and returns to the board", async () => {
@@ -79,6 +85,7 @@ describe("RiskScoreSetupDialog", () => {
           backlogRepository: "acme/app",
           defaultBranch: "main",
           riskRules: formatRiskScoreRules(defaultRiskScoreCategories()),
+          enabledChecks: formatEnabledChecksValue(["risk", "performance", "security", "drift", "reversibility"]),
         },
       }),
     );

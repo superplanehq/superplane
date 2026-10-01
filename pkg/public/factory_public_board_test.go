@@ -259,7 +259,7 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	}, automationsNamed(board, "phase-0"))
 	assert.Equal(t, []publicAutomation{
 		{ID: "feedback-0", Kind: "pr-discussion", Name: "Pull request comments", CatalogID: "pr-discussion", Icon: "github", Health: "healthy"},
-		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Icon: "github", Health: "healthy"},
+		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Health: "healthy"},
 	}, automationsNamed(board, "verify"))
 	assert.Equal(t, []publicAutomation{
 		{ID: "closure", Kind: "pr-closure", Name: "PR Closure", CatalogID: "pr-closure", Icon: "github", Health: "healthy"},
