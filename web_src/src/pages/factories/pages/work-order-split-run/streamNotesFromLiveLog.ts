@@ -1,6 +1,6 @@
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "@/lib/agentActivity";
 import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
-import { agentToolDisplayText } from "@/lib/agentToolLabels";
+import { agentToolDisplayText, isCommandKind } from "@/lib/agentToolLabels";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
@@ -61,12 +61,10 @@ function noteFromCommandSection(
 ): SplitRunStreamLine {
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
-  const output =
-    section.kind === "prompt"
-      ? ""
-      : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
+  const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);
   const command = preview && preview !== name ? preview : "";
   const detail = [command, output].filter(Boolean).join("\n\n");
+  const bashScript = section.kind === "bash" ? command : "";
   return {
     id: stepId,
     nodeId,
@@ -76,6 +74,8 @@ function noteFromCommandSection(
     componentName: name || preview,
     status: streamStatus(section.status),
     detail: detail || undefined,
+    commandScript: bashScript || undefined,
+    commandStdout: bashScript ? output || undefined : undefined,
     ...orderKeyProps(orderKey),
   };
 }
@@ -117,7 +117,7 @@ function notesFromSectionEvents(
         componentType: tool.kind,
         componentName: agentToolDisplayText({ kind: tool.kind, name: tool.kind, input: tool.text }),
         status: streamStatus(tool.status),
-        detail: tool.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n") || undefined,
+        detail: visibleLogText(tool.lines) || undefined,
         ...orderKeyProps(orderKey),
       });
     }
@@ -341,7 +341,7 @@ function itemsFromSectionEvents(section: CommandSection): AgentActivityItem[] {
         kind: tool.kind,
         name: tool.kind,
         input: tool.text,
-        output: "",
+        output: isCommandKind(tool.kind) ? visibleLogText(tool.lines) : "",
         outputStreams: [],
         status: activityStatus(tool.status),
         durationMs: tool.duration_ms ?? undefined,
@@ -350,6 +350,10 @@ function itemsFromSectionEvents(section: CommandSection): AgentActivityItem[] {
     }
   }
   return items;
+}
+
+function visibleLogText(lines: string[]): string {
+  return lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
 }
 
 function activityStatus(status: string): AgentActivityStatus {

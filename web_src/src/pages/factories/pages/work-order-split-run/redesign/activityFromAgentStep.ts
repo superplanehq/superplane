@@ -7,14 +7,15 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
   const items: AgentActivityItem[] = [];
   const status = activityStatus(step.status);
 
-  if (step.output?.trim()) {
+  const command = bashCommandFromStep(step);
+  if (command) {
     items.push({
       type: "tool",
       id: `${step.id}-output`,
       kind: "bash",
       name: step.title,
-      input: step.output,
-      output: "",
+      input: command.script,
+      output: command.stdout,
       outputStreams: [],
       status,
       truncated: false,
@@ -89,6 +90,17 @@ export function activityFromTranscript(activities: AgentActivity[]): AgentActivi
     sequence: last.sequence,
     status: withItems.some((activity) => activity.status === "running") ? "running" : last.status,
   };
+}
+
+function bashCommandFromStep(step: AgentStep): { script: string; stdout: string } | undefined {
+  const script = step.commandScript?.trim() ? step.commandScript : "";
+  if (script) {
+    return { script, stdout: step.commandStdout ?? "" };
+  }
+  if (!step.output?.trim()) {
+    return undefined;
+  }
+  return { script: step.output, stdout: "" };
 }
 
 function activityStatus(status: string): AgentActivityStatus {

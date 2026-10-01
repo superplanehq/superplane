@@ -125,6 +125,66 @@ describe("AgentActivityView console", () => {
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
+  it("shows a multi-line bash script apart from its stdout", async () => {
+    const user = userEvent.setup();
+    const script = [
+      "set -euo pipefail",
+      "",
+      "# Identify commits as SuperPlane Agent.",
+      'git config --global user.email "superplaneagent@superplane.com"',
+      'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo',
+    ].join("\n");
+    const stdout = "Cloning into 'repo'...\nremote: Enumerating objects: 9384, done.";
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: script,
+          output: stdout,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
+    expect(screen.getByText("4 lines")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
+    );
+
+    const command = screen.getByTestId("agent-tool-command-1");
+    expect(command.textContent).toBe(script);
+    expect(command.textContent).not.toContain("Cloning into");
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText(/Cloning into 'repo'/).closest("pre")).not.toBe(command);
+  });
+
+  it("shows the exit code above stdout when a command fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "git clone repo",
+          output: "fatal: repository not found",
+          status: "failed",
+          exitCode: 1,
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
+    const exitCode = screen.getByText("Exit code 1");
+    const output = screen.getByText("Output");
+    expect(exitCode.compareDocumentPosition(output) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText("fatal: repository not found")).toBeInTheDocument();
+  });
+
   it("collapses carriage-return progress into finished output lines", async () => {
     const user = userEvent.setup();
     render(
