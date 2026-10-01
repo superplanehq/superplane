@@ -370,6 +370,8 @@ export interface FactoriesFixture {
   byokCandidatesByProvider?: Record<string, string[]>;
   /** Selected model ids by provider. Defaults to the candidate list when connected. */
   byokSelectedByProvider?: Record<string, string[]>;
+  /** Organization hosted selection. Omit to inherit all installation candidates. */
+  hostedSelectedKeys?: string[];
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /** Global GitHub App catalog state for Factory onboarding. */

@@ -1,6 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input, InputGroup } from "@/components/Input/input";
-import { filterModelIds } from "@/lib/hostedLLMModels";
 import { Search } from "lucide-react";
 import { useMemo } from "react";
 
@@ -13,6 +12,7 @@ export function ModelAllowlistEditor({
   disabled,
   searchLabel,
   showCount = false,
+  modelLabels,
 }: {
   modelIds: string[];
   selected: string[];
@@ -22,8 +22,12 @@ export function ModelAllowlistEditor({
   disabled: boolean;
   searchLabel: string;
   showCount?: boolean;
+  modelLabels?: Record<string, string>;
 }) {
-  const visibleModels = useMemo(() => filterModelIds(modelIds, query), [modelIds, query]);
+  const visibleModels = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return modelIds.filter((id) => (modelLabels?.[id] ?? id).toLowerCase().includes(search));
+  }, [modelIds, modelLabels, query]);
 
   return (
     <div className="space-y-3">
@@ -54,7 +58,7 @@ export function ModelAllowlistEditor({
               disabled={disabled}
               onChange={(event) => onToggle(model, event.currentTarget.checked)}
             />
-            <span className="font-mono text-xs">{model}</span>
+            <span className="font-mono text-xs">{modelLabels?.[model] ?? model}</span>
           </label>
         ))}
       </div>
