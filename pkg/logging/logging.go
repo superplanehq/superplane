@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -172,6 +173,20 @@ func WithRun(logger *log.Entry, run models.CanvasRun) *log.Entry {
 func WithCanvas(logger *log.Entry, canvas models.Canvas) *log.Entry {
 	return logger.WithFields(log.Fields{
 		"canvas_id": canvas.ID,
+	})
+}
+
+// WithCanvasWorkspace adds organization_id and factory_id when the canvas
+// belongs to a workspace. factory_id is the workspace UUID. A canvas outside
+// a workspace is left unchanged.
+func WithCanvasWorkspace(logger *log.Entry, canvas *models.Canvas) *log.Entry {
+	if logger == nil || canvas == nil || canvas.FactoryID == nil || *canvas.FactoryID == uuid.Nil {
+		return logger
+	}
+
+	return logger.WithFields(log.Fields{
+		"organization_id": canvas.OrganizationID,
+		"factory_id":      *canvas.FactoryID,
 	})
 }
 
