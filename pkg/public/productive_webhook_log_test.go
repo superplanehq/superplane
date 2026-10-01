@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__HandleWebhook_ProductiveFailureLogsJSON(t *testing.T) {
@@ -101,6 +103,95 @@ func Test__HandleWebhook_ProductiveFailureLogsJSON(t *testing.T) {
 	}
 	assert.NotContains(t, logs.String(), "do-not-log-secret")
 	assert.NotContains(t, logs.String(), "do-not-log-body")
+}
+
+func Test__HandleWebhook_ProductiveServerErrorReusesOrganizationLookup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	server := newWebhookTestServer(t, r)
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("do-not-log-secret"),
+	}).Error)
+
+	integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, nil)
+	nodeID := "on-task"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        nodeID,
+				Name:          nodeID,
+				Type:          models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: productiveOnTaskTrigger}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", nodeID).
+		Updates(map[string]any{
+			"webhook_id":          webhookID,
+			"app_installation_id": integration.ID,
+		}).
+		Error)
+
+	transport := bindTestSentryHub(t)
+	lookups := 0
+	db := database.Conn()
+	callbackName := "test:productive-organization-lookup"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if !installationLookup(tx, integration.ID) {
+			return
+		}
+		lookups++
+	}))
+	t.Cleanup(func() {
+		db.Callback().Query().Remove(callbackName)
+	})
+
+	response := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"raw":"do-not-log-body"}`),
+	})
+	require.Equal(t, http.StatusInternalServerError, response.Code)
+	assert.Positive(t, lookups)
+	assert.LessOrEqual(t, lookups, 2)
+
+	events := transport.Events()
+	require.Len(t, events, 1)
+	assert.Equal(t, r.Organization.ID.String(), events[0].Tags["organization_id"])
+	assert.Equal(t, webhookID.String(), events[0].Tags["webhook_id"])
+	assert.Equal(t, nodeID, events[0].Tags["node_id"])
+	assert.Equal(t, canvas.ID.String(), events[0].Tags["canvas_id"])
+}
+
+func installationLookup(tx *gorm.DB, installationID uuid.UUID) bool {
+	if tx == nil || tx.Statement == nil {
+		return false
+	}
+
+	table := tx.Statement.Table
+	if table == "" && tx.Statement.Schema != nil {
+		table = tx.Statement.Schema.Table
+	}
+	if table != "app_installations" {
+		return false
+	}
+
+	return slices.ContainsFunc(tx.Statement.Vars, func(value any) bool {
+		id, ok := value.(uuid.UUID)
+		return ok && id == installationID
+	})
 }
 
 func Test__HandleWebhook_OtherFailureKeepsTextLog(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,9 +74,22 @@ func Test__HandleWebhook_ServerErrorCapturesCause(t *testing.T) {
 			encoded, err := json.Marshal(event)
 			require.NoError(t, err)
 			assert.NotContains(t, string(encoded), webhookSentrySecret)
-			assert.NotContains(t, string(encoded), webhookSentryBody)
+			assertEventOmitsWebhookBody(t, event, encoded)
 		})
 	}
+}
+
+func assertEventOmitsWebhookBody(t *testing.T, event *sentry.Event, encoded []byte) {
+	t.Helper()
+
+	if event.Request != nil {
+		assert.NotContains(t, event.Request.Data, webhookSentryBody)
+	}
+
+	encodedBody, err := json.Marshal(webhookSentryBody)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), webhookSentryBody)
+	assert.NotContains(t, string(encoded), string(encodedBody))
 }
 
 func Test__HandleWebhook_ClientErrorIsNotSentToSentry(t *testing.T) {

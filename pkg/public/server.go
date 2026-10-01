@@ -1713,21 +1713,21 @@ func webhookNodeLogger(node models.CanvasNode, integration *models.Integration) 
 	})
 }
 
-func storeWebhookServerError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error) {
+func storeWebhookServerError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error, organizationID string) {
 	if r == nil || webhook == nil || err == nil || code < http.StatusInternalServerError {
 		return
 	}
 
-	middleware.SetServerError(r.Context(), err, webhookServerErrorTags(r, webhook, node))
+	middleware.SetServerError(r.Context(), err, webhookServerErrorTags(r, webhook, node, organizationID))
 }
 
-func webhookServerErrorTags(r *http.Request, webhook *models.Webhook, node models.CanvasNode) map[string]string {
+func webhookServerErrorTags(r *http.Request, webhook *models.Webhook, node models.CanvasNode, organizationID string) map[string]string {
 	tags := map[string]string{
 		"webhook_id": uuidTag(webhook.ID),
 		"node_id":    node.NodeID,
 		"canvas_id":  uuidTag(node.WorkflowID),
 	}
-	if organizationID := organizationIDForWebhookNode(database.DB(r.Context()), node); organizationID != "" {
+	if organizationID != "" {
 		tags["organization_id"] = organizationID
 	}
 	if deliveryID := strings.TrimSpace(r.Header.Get("X-GitHub-Delivery")); deliveryID != "" {
@@ -1743,7 +1743,7 @@ func uuidTag(id uuid.UUID) string {
 	return id.String()
 }
 
-func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error) {
+func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error, organizationID string) {
 	if !isProductiveOnTaskNode(node) {
 		log.WithFields(log.Fields{
 			"webhook_id": webhook.ID.String(),
@@ -1760,7 +1760,7 @@ func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node 
 		"webhook_state": webhook.State,
 		"status":        code,
 	}
-	if organizationID := organizationIDForWebhookNode(database.DB(r.Context()), node); organizationID != "" {
+	if organizationID != "" {
 		fields["organization_id"] = organizationID
 	}
 	if node.AppInstallationID != nil {
@@ -1858,8 +1858,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	for _, node := range nodes {
 		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
-			s.logWebhookError(r, webhook, node, code, err)
-			storeWebhookServerError(r, webhook, node, code, err)
+			organizationID := ""
+			if isProductiveOnTaskNode(node) || code >= http.StatusInternalServerError {
+				organizationID = organizationIDForWebhookNode(database.DB(r.Context()), node)
+			}
+			s.logWebhookError(r, webhook, node, code, err, organizationID)
+			storeWebhookServerError(r, webhook, node, code, err, organizationID)
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
