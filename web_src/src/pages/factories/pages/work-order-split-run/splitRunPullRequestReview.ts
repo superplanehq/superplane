@@ -105,6 +105,12 @@ export interface PullRequestReviewCopy {
  * calling the pull request ready.
  */
 export function pullRequestReviewCopy(mergeability?: FactoriesFactoryPullRequestMergeability): PullRequestReviewCopy {
+  if (mergeability?.blockedReason === "BLOCKED_REASON_UNAVAILABLE") {
+    return {
+      headline: "Merge status is unavailable right now.",
+      closing: PULL_REQUEST_REVIEW_COPY.closing,
+    };
+  }
   if (mergeability?.blockedReason === "BLOCKED_REASON_CHECKS_UNFINISHED") {
     return {
       headline: "The pull request waits for checks",
