@@ -19,23 +19,26 @@ import (
 )
 
 func TestGitHubIssueItem_UsesNumberKeyAndHTMLURL(t *testing.T) {
+	createdAt := time.Now().UTC()
 	number := 12
 	title := "Handle duplicate refunds"
 	body := "Retrying a refund posts twice."
 	url := "https://github.com/acme/payments/issues/12"
 	issue := &github.Issue{
-		Number:  &number,
-		Title:   &title,
-		Body:    &body,
-		HTMLURL: &url,
+		Number:    &number,
+		Title:     &title,
+		Body:      &body,
+		HTMLURL:   &url,
+		CreatedAt: &github.Timestamp{Time: createdAt},
 	}
 
 	assert.Equal(t, IntakeItem{
-		ID:    "12",
-		Key:   "#12",
-		Title: title,
-		Body:  body,
-		URL:   url,
+		ID:        "12",
+		Key:       "#12",
+		Title:     title,
+		Body:      body,
+		URL:       url,
+		CreatedAt: createdAt,
 	}, gitHubIssueItem(issue))
 }
 
@@ -226,9 +229,11 @@ func TestJiraIssueProjectKey(t *testing.T) {
 }
 
 func TestJiraIssueFromFullIssue_ReadsTheDescriptionAsText(t *testing.T) {
+	createdAt := time.Now().UTC().Truncate(time.Millisecond)
 	issue := &jira.Issue{
 		Key: "ENG-42",
 		Fields: map[string]any{
+			"created": createdAt.Format("2006-01-02T15:04:05.000-0700"),
 			"summary": "Refund retries charge twice",
 			"description": map[string]any{
 				"type":    "doc",
@@ -243,13 +248,17 @@ func TestJiraIssueFromFullIssue_ReadsTheDescriptionAsText(t *testing.T) {
 		},
 	}
 
+	item := jiraIssueFromFullIssue(issue, "https://acme.atlassian.net")
+	assert.True(t, createdAt.Equal(item.CreatedAt))
+	item.CreatedAt = item.CreatedAt.UTC()
 	assert.Equal(t, IntakeItem{
-		ID:    "ENG-42",
-		Key:   "ENG-42",
-		Title: "Refund retries charge twice",
-		Body:  "A retried refund charges twice.",
-		URL:   "https://acme.atlassian.net/browse/ENG-42",
-	}, jiraIssueFromFullIssue(issue, "https://acme.atlassian.net"))
+		ID:        "ENG-42",
+		Key:       "ENG-42",
+		Title:     "Refund retries charge twice",
+		Body:      "A retried refund charges twice.",
+		URL:       "https://acme.atlassian.net/browse/ENG-42",
+		CreatedAt: createdAt,
+	}, item)
 }
 
 func TestUnsupportedIntakeItemSource_DoesNotSearch(t *testing.T) {
@@ -261,7 +270,9 @@ func TestUnsupportedIntakeItemSource_DoesNotSearch(t *testing.T) {
 }
 
 func TestSentryIssueItem_UsesShortIDAndPermalink(t *testing.T) {
+	createdAt := time.Now().UTC().Truncate(time.Second)
 	issue := sentry.Issue{
+		FirstSeen: createdAt.Format(time.RFC3339),
 		ID:        "123",
 		ShortID:   "PAYMENTS-1",
 		Title:     "TypeError: boom",
@@ -270,10 +281,11 @@ func TestSentryIssueItem_UsesShortIDAndPermalink(t *testing.T) {
 	}
 
 	assert.Equal(t, IntakeItem{
-		ID:    "123",
-		Key:   "PAYMENTS-1",
-		Title: "TypeError: boom",
-		URL:   "https://acme.sentry.io/issues/123/",
+		ID:        "123",
+		Key:       "PAYMENTS-1",
+		Title:     "TypeError: boom",
+		URL:       "https://acme.sentry.io/issues/123/",
+		CreatedAt: createdAt,
 	}, sentryIssueItem(issue))
 }
 
@@ -356,8 +368,11 @@ func TestDatadogIntakeItemSource_GetIncludesSampleAndRelatedLogs(t *testing.T) {
 }
 
 func TestDatadogIssueItem_UsesServiceAndAppURL(t *testing.T) {
+	createdAt := time.Now().UTC()
 	client := &datadog.Client{Site: "datadoghq.eu"}
 	issue := datadog.ErrorTrackingIssue{
+		FirstSeen:    createdAt,
+		LastSeen:     createdAt.Add(time.Hour),
 		ID:           "issue-1",
 		ErrorType:    "TimeoutError",
 		ErrorMessage: "checkout timed out",
@@ -365,10 +380,41 @@ func TestDatadogIssueItem_UsesServiceAndAppURL(t *testing.T) {
 	}
 
 	assert.Equal(t, IntakeItem{
-		ID:    "issue-1",
-		Key:   "checkout",
-		Title: "TimeoutError: checkout timed out",
-		Body:  "checkout timed out",
-		URL:   "https://app.datadoghq.eu/error-tracking/issue/issue-1",
+		ID:        "issue-1",
+		Key:       "checkout",
+		Title:     "TimeoutError: checkout timed out",
+		Body:      "checkout timed out",
+		URL:       "https://app.datadoghq.eu/error-tracking/issue/issue-1",
+		CreatedAt: createdAt,
 	}, datadogIssueItem(client, issue))
+}
+
+func TestJiraIssueItem_SourceCreatedTime(t *testing.T) {
+	createdAt := time.Now().UTC().Truncate(time.Millisecond)
+	for _, raw := range []string{createdAt.Format(time.RFC3339Nano), createdAt.Format("2006-01-02T15:04:05.000-0700")} {
+		item := jiraIssueItem(jira.IssueSearchHit{Key: "ENG-42", Fields: map[string]any{"created": raw}}, "https://acme.atlassian.net")
+		assert.True(t, createdAt.Equal(item.CreatedAt))
+	}
+}
+
+func TestIntakeItems_OmitMissingOrInvalidCreatedTime(t *testing.T) {
+	items := []IntakeItem{
+		gitHubIssueItem(&github.Issue{}),
+		jiraIssueItem(jira.IssueSearchHit{}, ""),
+		jiraIssueFromFullIssue(&jira.Issue{Fields: map[string]any{"created": "invalid"}}, ""),
+		sentryIssueItem(sentry.Issue{FirstSeen: "invalid"}),
+		datadogIssueItem(&datadog.Client{}, datadog.ErrorTrackingIssue{}),
+	}
+	for _, item := range items {
+		assert.True(t, item.CreatedAt.IsZero())
+		assert.Nil(t, serializeFactoryIntakeItem(item).CreatedAt)
+	}
+}
+
+func TestSerializeFactoryIntakeItem_PreservesCreatedTime(t *testing.T) {
+	createdAt := time.Now().UTC()
+	item := serializeFactoryIntakeItem(IntakeItem{ID: "42", CreatedAt: createdAt})
+	assert.Equal(t, "42", item.Id)
+	require.NotNil(t, item.CreatedAt)
+	assert.Equal(t, createdAt, item.CreatedAt.AsTime())
 }
