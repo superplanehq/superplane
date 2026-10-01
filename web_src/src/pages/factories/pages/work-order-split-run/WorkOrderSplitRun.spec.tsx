@@ -1138,6 +1138,25 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
+  it("shows merge confidence in the pull request review section", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks: VERIFY_STEP_CHECKS }),
+    });
+
+    const section = screen.getByTestId("redesign-console-review-confidence");
+    const heading = within(section).getByRole("heading", { name: "The pull request is ready for review" });
+    const score = within(section).getByText("Merge confidence");
+    const reviewLink = within(section).getByRole("link", { name: "Review PR #6812" });
+    expect(within(section).queryByRole("heading", { name: "Merge confidence" })).not.toBeInTheDocument();
+    expect(
+      within(section).queryByText("This task closes when the pull request is merged or closed."),
+    ).not.toBeInTheDocument();
+    expect(within(section).getAllByText("Caution").length).toBeGreaterThan(0);
+    expect(within(section).getByText("Risk score")).toBeInTheDocument();
+    expect(heading.compareDocumentPosition(score) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(score.compareDocumentPosition(reviewLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("enables merge on the pull request review strip when mergeability is true", async () => {
     const user = userEvent.setup();
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
@@ -1880,7 +1899,10 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
-    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Risk score")).toBeInTheDocument();
+    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Merge confidence")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("redesign-console-summary")).queryByText("Confidence score"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the console when a GitHub automation created the draft", () => {

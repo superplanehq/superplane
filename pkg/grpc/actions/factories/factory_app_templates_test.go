@@ -124,7 +124,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
 		appID:   "app-risk",
-		appName: "Risk score",
+		appName: "Merge confidence",
 		installParams: map[string]string{
 			"appRepository": "acme/app",
 			"defaultBranch": "main",
@@ -141,7 +141,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
-	assert.Equal(t, "Risk score", canvas.Metadata.Name)
+	assert.Equal(t, "Merge confidence", canvas.Metadata.Name)
 
 	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
 	assert.Equal(t, map[string]any{
@@ -165,11 +165,13 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	prompt := agentPrompt(t, agent)
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
+	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift.")
 	assert.NotContains(t, prompt, "install_params.riskRules")
+	assert.NotContains(t, prompt, "install_params.enabledChecks")
 	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
 	assert.Contains(t, result.canvasYAML, `/compare/${base_ref}...${revision}" > /tmp/pr.diff`)
 
-	format := findYAMLNode(t, canvas, "format-risk-review")
+	format := findYAMLNode(t, canvas, "format-merge-confidence")
 	assert.Contains(t, format.Configuration["script"], "Math.min(5")
 
 	report := findYAMLNode(t, canvas, "report-risk-score")
@@ -178,6 +180,22 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
 	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
 	assert.Equal(t, float64(4), report.Configuration["criticalAt"])
+
+	performance := findYAMLNode(t, canvas, "report-performance")
+	assert.Equal(t, "performance-review", performance.Configuration["checkKey"])
+	assert.Equal(t, "higherIsBetter", performance.Configuration["direction"])
+	assert.Equal(t, float64(3), performance.Configuration["cautionAt"])
+	assert.Equal(t, float64(2), performance.Configuration["criticalAt"])
+
+	security := findYAMLNode(t, canvas, "report-security")
+	assert.Equal(t, "security-review", security.Configuration["checkKey"])
+	assert.Equal(t, "higherIsBetter", security.Configuration["direction"])
+
+	drift := findYAMLNode(t, canvas, "report-drift")
+	assert.Equal(t, "drift-review", drift.Configuration["checkKey"])
+	assert.Equal(t, "lowerIsBetter", drift.Configuration["direction"])
+	assert.Equal(t, float64(3), drift.Configuration["cautionAt"])
+	assert.Equal(t, float64(4), drift.Configuration["criticalAt"])
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")

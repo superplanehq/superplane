@@ -50,7 +50,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-verify").getAttribute("data-completed")).toBeNull();
   });
 
-  it("lists Risk score in Checks when the task has no verify step", () => {
+  it("lists merge confidence in Checks when the task has no verify step", () => {
     renderConsole(
       splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, {
         checks: OPEN_WORK_ORDER_CHECKS,
@@ -59,8 +59,8 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     );
 
     const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
-    expect(within(checks).getByText("Risk score")).toBeInTheDocument();
-    expect(within(checks).getByText("Confidence score")).toBeInTheDocument();
+    expect(within(checks).getByText("Merge confidence")).toBeInTheDocument();
+    expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
   });
 
   it("lists each column app that ran for the task as its own card", () => {

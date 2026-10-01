@@ -29,7 +29,7 @@ import (
 const publicBoardPageSize = 100
 const publicBoardMaxPages = 10
 
-var riskScoreCanvasName = regexp.MustCompile(`^Risk score \(\d+\)$`)
+var riskScoreCanvasName = regexp.MustCompile(`^(?:Merge confidence|Risk score) \(\d+\)$`)
 
 var errPublicBoardNotFound = errors.New("public board not found")
 
@@ -800,7 +800,6 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 			Kind:      "risk-score",
 			Name:      strings.TrimSpace(canvas.Name),
 			CatalogID: "risk-score",
-			Icon:      publicIconGitHub,
 			Health:    "healthy",
 		})
 	}
@@ -896,7 +895,7 @@ func isRiskScoreCanvas(canvas models.Canvas) bool {
 		return false
 	}
 	name := strings.TrimSpace(canvas.Name)
-	return name == "Risk score" || riskScoreCanvasName.MatchString(name)
+	return name == "Merge confidence" || name == "Risk score" || riskScoreCanvasName.MatchString(name)
 }
 
 func intakeSourceName(source string) string {

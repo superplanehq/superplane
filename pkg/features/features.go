@@ -64,7 +64,7 @@ const FeatureWorkspaceSkills = "workspace_skills"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
-// FeatureFactoryRiskScore gates the Risk score automation on the Verify
+// FeatureFactoryRiskScore gates the merge confidence automation on the Verify
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
 
@@ -96,7 +96,7 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
-	{ID: FeatureFactoryRiskScore, Label: "Factory Risk Score", Description: "Add a risk score automation to the Verify column"},
+	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
 	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }

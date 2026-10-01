@@ -11,6 +11,8 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
+import { MergeConfidenceSettingsForm } from "./MergeConfidenceSettingsForm";
+import type { PlanningReviewDraft } from "./planningReviewMockup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -145,6 +147,31 @@ describe("ColumnAutomationViewPopup", () => {
       "href",
       "/org-1/workspaces/RF/apps/app-refund-implementer?run=run-implement-1",
     );
+  });
+
+  it("puts save and delete on one footer line", () => {
+    const draft: PlanningReviewDraft = {
+      title: "Assess Merge Confidence",
+      components: [
+        {
+          id: "assess-risk",
+          title: "Assess Merge Confidence",
+          description: "",
+          expanded: true,
+          configuration: { steps: [] },
+          concurrency: { max: "1", key: "" },
+        },
+      ],
+    };
+    renderPopup({
+      onDelete: vi.fn(),
+      general: <MergeConfidenceSettingsForm draft={draft} onSave={vi.fn()} />,
+    });
+
+    const footer = screen.getByTestId("column-automation-view-footer");
+    expect(within(footer).getByTestId("column-automation-view-delete")).toBeInTheDocument();
+    expect(within(footer).getByTestId("merge-confidence-settings-save")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view").querySelectorAll("footer")).toHaveLength(1);
   });
 
   it("asks for confirmation before deleting a custom automation", async () => {

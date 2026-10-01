@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import { type ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
@@ -18,6 +18,7 @@ import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
+import { consoleCheckList, mergeConfidencePanelTone } from "../../../lib/mergeConfidenceScore";
 import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
@@ -59,6 +60,11 @@ export function ConsoleSummaryPanel({
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
   const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
+  const mergeConfidence = consoleCheckList(panel.checks);
+  const reviewWithConfidence =
+    panel.hasDecision && panelReview && mergeConfidence && isPullRequestReviewFooter(fixture.footer)
+      ? mergeConfidence
+      : null;
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
@@ -69,16 +75,27 @@ export function ConsoleSummaryPanel({
           </FrameTitle>
           {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
         </FrameHeader>
-        <SummaryDecisionStrip
-          hasDecision={panel.hasDecision}
-          panelReview={panelReview}
-          decisionClassName={panel.decisionClassName}
-          isLive={panel.isLive}
-          liveStage={panel.liveStage}
-          footer={fixture.footer}
-          actionBusy={actionBusy}
-          onStop={onStopLiveRun}
-        />
+        {reviewWithConfidence ? (
+          <FramePanel
+            className={cn("py-3", mergeConfidencePanelTone(reviewWithConfidence.check))}
+            data-testid="redesign-console-review-confidence"
+          >
+            {isValidElement(panelReview)
+              ? cloneElement(panelReview, {}, <ConsoleCheckRows checks={panel.checks} heading={false} />)
+              : panelReview}
+          </FramePanel>
+        ) : (
+          <SummaryDecisionStrip
+            hasDecision={panel.hasDecision}
+            panelReview={panelReview}
+            decisionClassName={panel.decisionClassName}
+            isLive={panel.isLive}
+            liveStage={panel.liveStage}
+            footer={fixture.footer}
+            actionBusy={actionBusy}
+            onStop={onStopLiveRun}
+          />
+        )}
         {panel.panelPullRequests.length > 0 ? (
           <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
             <span className="text-[12px] font-medium text-muted-foreground">
@@ -89,9 +106,8 @@ export function ConsoleSummaryPanel({
             ))}
           </FramePanel>
         ) : null}
-        {panel.checks.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2 py-3">
-            <span className="text-[12px] font-medium text-muted-foreground">Checks</span>
+        {mergeConfidence && !reviewWithConfidence ? (
+          <FramePanel className={cn("flex flex-col py-3", mergeConfidencePanelTone(mergeConfidence.check))}>
             <ConsoleCheckRows checks={panel.checks} />
           </FramePanel>
         ) : null}
@@ -173,8 +189,8 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    // Every check on the task. A stage list would drop Risk score when
-    // no verify step ran, because only that step copies checks onto a card.
+    // Merge confidence metrics only. Planning confidence stays on the backlog
+    // card and is not useful after the task starts.
     checks: fixture.checks,
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };

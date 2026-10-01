@@ -12,6 +12,8 @@ export type WorkOrderCheckScoreFormat = "fraction" | "percent" | "boolean";
 
 export interface WorkOrderCheckPresentation {
   id: string;
+  /** Stable id across reports, e.g. "risk-review". */
+  key?: string;
   /** Short human name, e.g. "Risk score" or "Code quality". */
   name: string;
   score: number;
@@ -136,6 +138,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
   const automation = check.automation;
   return {
     id: check.id ?? check.key ?? "",
+    key: emptyToUndefined(check.key),
     name: check.name ?? "",
     score: check.score ?? 0,
     maxScore: check.maxScore ?? 0,
