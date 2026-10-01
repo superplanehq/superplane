@@ -95,6 +95,21 @@ func TestPublicFactoryBoardAcceptsCurrentWorkspaceKey(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 }
 
+func TestPublicFactoryBoardAcceptsStaleKeyPrefix(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, _, _ := setupTestServer(r, t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+
+	factory, line := openPublicLine(t, r, true)
+	stale := "xx-" + factory.URLID
+	response := execRequest(server, requestParams{
+		method: http.MethodGet,
+		path:   "/api/v1/public/organizations/" + r.Organization.Slug + "/workspaces/" + stale + "/lines/" + line.ID.String() + "/board",
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+}
+
 func TestAnonymousFactoryOrderRoutesStayUnauthorized(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

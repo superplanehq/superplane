@@ -9,7 +9,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
 } from "./__fixtures__/factoryPageResponses";
 import { FactoriesIndexPage } from "./FactoriesIndexPage";
-import { factoryHomePath, newFactoryPath } from "./lib/factoryPagePaths";
+import { factoryHomePath, factoryRouteSegment, newFactoryPath } from "./lib/factoryPagePaths";
 
 const listedFactories: Array<typeof ACME_ONBOARDING_FACTORY> = [];
 const permissionsState = vi.hoisted(() => ({ canCreate: true, isLoading: false }));
@@ -62,7 +62,7 @@ describe("FactoriesIndexPage", () => {
     renderIndex();
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
-      factoryHomePath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!, ACME_ONBOARDING_LINE_ID),
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY), ACME_ONBOARDING_LINE_ID),
     );
   });
 
@@ -71,7 +71,7 @@ describe("FactoriesIndexPage", () => {
     renderIndex();
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
-      factoryHomePath(FACTORIES_ORGANIZATION_ID, EMPTY_FACTORY.key!),
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(EMPTY_FACTORY)),
     );
   });
 
@@ -80,7 +80,7 @@ describe("FactoriesIndexPage", () => {
     renderIndex();
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
-      factoryHomePath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!, ACME_ONBOARDING_LINE_ID),
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY), ACME_ONBOARDING_LINE_ID),
     );
   });
 

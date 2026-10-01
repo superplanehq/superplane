@@ -10,12 +10,15 @@ export const ACME_ONBOARDING_FACTORY_ID = "factory-acme-onboarding";
 /** Workspace key for `PRIMARY_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const PRIMARY_FACTORY_KEY = "RF";
 export const PRIMARY_FACTORY_URL_ID = "k7m2xqab";
+export const PRIMARY_FACTORY_ROUTE_SEGMENT = `${PRIMARY_FACTORY_KEY.toLowerCase()}-${PRIMARY_FACTORY_URL_ID}`;
 /** Workspace key for `EMPTY_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const EMPTY_FACTORY_KEY = "PF";
 export const EMPTY_FACTORY_URL_ID = "p8n3wrcd";
+export const EMPTY_FACTORY_ROUTE_SEGMENT = `${EMPTY_FACTORY_KEY.toLowerCase()}-${EMPTY_FACTORY_URL_ID}`;
 /** Workspace key for `ACME_ONBOARDING_FACTORY_ID` — task identifiers use this, not the raw id. */
 export const ACME_ONBOARDING_FACTORY_KEY = "AO";
 export const ACME_ONBOARDING_FACTORY_URL_ID = "a1b2c3d4";
+export const ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT = `${ACME_ONBOARDING_FACTORY_KEY.toLowerCase()}-${ACME_ONBOARDING_FACTORY_URL_ID}`;
 
 export const STORYBOOK_ME_USER_ID = "storybook-user";
 export const STORYBOOK_ME_USER_NAME = "Leonardo DiCaprio";
