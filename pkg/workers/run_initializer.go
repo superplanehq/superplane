@@ -202,6 +202,7 @@ func (w *RunInitializer) initializeRun(workflowID, runID uuid.UUID, trigger stri
 		// and run any additional run finished callbacks we might have configured for the run.
 		//
 		if err != nil {
+			logger = logging.WithCanvasWorkspace(logger, unscopedCanvas(tx, locked.WorkflowID))
 			logger.WithError(err).Errorf("Error dispatching pending run callback")
 			admitted, failErr := w.failRun(tx, locked, eventCollector, executionCollector, err.Error())
 			if failErr != nil {
