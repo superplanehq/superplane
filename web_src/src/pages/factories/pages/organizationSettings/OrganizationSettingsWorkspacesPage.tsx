@@ -12,7 +12,12 @@ import { Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { factoryHomePath, factorySettingsWorkspaceGeneralPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factoryRouteSegment,
+  factorySettingsWorkspaceGeneralPath,
+  firstFactoryLineId,
+} from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 
@@ -141,7 +146,7 @@ function WorkspaceRow({
   onDelete: () => void;
 }) {
   const name = factory.name?.trim() || "Workspace";
-  const factoryKey = factory.key ?? "";
+  const factoryKey = factoryRouteSegment(factory);
   const homeHref = factoryKey ? factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory)) : undefined;
   const settingsHref = factoryKey ? factorySettingsWorkspaceGeneralPath(organizationId, factoryKey) : undefined;
 

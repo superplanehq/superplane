@@ -14,7 +14,13 @@ import {
 import { pathBelongsToOrganization } from "@/lib/safeRedirectPath";
 import { Navigate } from "react-router";
 
-import { factoryDetailPath, factoryListPath, factorySetupPath } from "../factories/lib/factoryPagePaths";
+import {
+  factoryDetailPath,
+  factoryListPath,
+  factoryRouteSegment,
+  factorySetupPath,
+} from "../factories/lib/factoryPagePaths";
+import { parseWorkspaceRouteSegment } from "../factories/lib/factoryKeyResolution";
 import { pickReadyFactory, readLastVisitedFactory } from "../factories/lib/lastVisitedFactory";
 
 type AccountOrganization = NonNullable<ReturnType<typeof useAccountOrganizations>["data"]>[number];
@@ -22,6 +28,7 @@ type Account = NonNullable<ReturnType<typeof useAccount>["account"]>;
 type WorkspaceHomeCandidate = {
   id?: string;
   key?: string;
+  urlId?: string;
   onboarding?: { completedAt?: string };
 };
 type SavedScreen = {
@@ -62,6 +69,11 @@ function workspaceKeyFromPath(path: string, routeId: string): string | null {
 }
 
 function workspaceIdForKey(workspaces: WorkspaceHomeCandidate[], key: string): string | null {
+  const parsed = parseWorkspaceRouteSegment(key);
+  if (parsed) {
+    const byUrlId = workspaces.find((workspace) => workspace.id && workspace.urlId === parsed.urlId);
+    return byUrlId?.id ?? null;
+  }
   const match = workspaces.find(
     (workspace) => workspace.id && workspace.key && workspace.key.toLowerCase() === key.toLowerCase(),
   );
@@ -95,13 +107,14 @@ function preferredWorkspaceId(screen: SavedScreen, workspaces: WorkspaceHomeCand
 }
 
 function pathForChosenWorkspace(routeId: string, workspace: WorkspaceHomeCandidate): string | null {
-  if (!workspace.key) {
+  const segment = factoryRouteSegment(workspace);
+  if (!segment) {
     return null;
   }
   if (workspace.onboarding?.completedAt) {
-    return factoryDetailPath(routeId, workspace.key);
+    return factoryDetailPath(routeId, segment);
   }
-  return factorySetupPath(routeId, workspace.key);
+  return factorySetupPath(routeId, segment);
 }
 
 function pickWorkspaceHomePath(args: SavedScreen & { workspaces?: WorkspaceHomeCandidate[] }): string {

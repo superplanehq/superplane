@@ -73,7 +73,7 @@ function useSplitRunWorkOrderExtras(
 }
 
 export function useFactoryAppSplitRunPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const params = useParams<{ appId?: string; automationId?: string }>();
   const appId = params.automationId ?? params.appId ?? "";
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export function useFactoryAppSplitRunPage() {
   );
   const back = useMemo(
     () =>
-      resolveFactoryAppBackNav(organizationId, factoryKey, {
+      resolveFactoryAppBackNav(organizationId, routeSegment, {
         from: query.from,
         appId,
         appName: visual.canvas.title,
@@ -124,7 +124,7 @@ export function useFactoryAppSplitRunPage() {
       }),
     [
       appId,
-      factoryKey,
+      routeSegment,
       lineName,
       order?.title,
       organizationId,
@@ -143,10 +143,10 @@ export function useFactoryAppSplitRunPage() {
     }),
     [query.from, query.lineId, query.orderNumber, query.runId],
   );
-  const editHref = factoryAppConfigurePath(organizationId, factoryKey, appId, configureNav);
+  const editHref = factoryAppConfigurePath(organizationId, routeSegment, appId, configureNav);
   const nodeEditHref = useCallback(
-    (nodeId: string) => factoryAppConfigurePath(organizationId, factoryKey, appId, { ...configureNav, nodeId }),
-    [appId, configureNav, factoryKey, organizationId],
+    (nodeId: string) => factoryAppConfigurePath(organizationId, routeSegment, appId, { ...configureNav, nodeId }),
+    [appId, configureNav, organizationId, routeSegment],
   );
 
   usePageTitle([splitRunPageTitle(!order, isLoading, visual.canvas.title), factory?.name ?? "Workspace"]);

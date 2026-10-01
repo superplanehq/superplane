@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { DatadogIntakeSetupDialog } from "./DatadogIntakeSetupDialog";
 import { DATADOG_INTAKE_SETUP_COPY } from "./datadogIntakeSetupCopy";
@@ -33,7 +33,7 @@ export function DatadogIntakeSetupPage() {
 }
 
 function resolveDatadogIntakeSetupModel(
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {
@@ -42,12 +42,12 @@ function resolveDatadogIntakeSetupModel(
   returnHref: string;
   dialog?: { organizationId: string; factoryId: string };
 } {
-  const { organizationId, factoryId, factoryKey, factory } = layout;
+  const { organizationId, factoryId, routeSegment, factory } = layout;
   const workspaceName = factory?.name ?? "Workspace";
   const lines = factory?.lines ?? [];
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
   const titleParts = [DATADOG_INTAKE_SETUP_COPY.pageTitle, workspaceName];
 
   if (!canUpdate || !lineId || (factory && !line)) {
