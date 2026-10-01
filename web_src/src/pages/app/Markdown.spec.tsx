@@ -502,3 +502,51 @@ describe("MarkdownContent images", () => {
     expect(container.querySelector("img")).not.toHaveClass("opacity-0");
   });
 });
+
+describe("MarkdownContent GitHub attachments", () => {
+  const attachment = "https://github.com/user-attachments/assets/31436ab5-d9ce-405a-89fc-fba12e03a40f";
+
+  it("plays a GitHub user-attachments autolink as video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(screen.queryByRole("link", { name: attachment })).not.toBeInTheDocument();
+  });
+
+  it("plays a GitHub attachment image as video when the type is unknown", () => {
+    render(<MarkdownContent content={`![clip](${attachment})`} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(video).toHaveAttribute("aria-label", "clip");
+  });
+
+  it("shows an image when the GitHub attachment is not a video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    fireEvent.error(document.querySelector("video")!);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("img", { name: attachment })).toHaveAttribute("src", attachment);
+  });
+
+  it("keeps a labeled GitHub attachment as a link", () => {
+    render(<MarkdownContent content={`See [Watch clip](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps regular GitHub issue links as links", () => {
+    render(<MarkdownContent content="See https://github.com/superplanehq/superplane/issues/8004" />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: /issues\/8004/ })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/issues/8004",
+    );
+  });
+});
