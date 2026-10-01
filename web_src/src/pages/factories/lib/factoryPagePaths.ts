@@ -368,11 +368,6 @@ export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: st
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/risk-score`;
 }
 
-/** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
-export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
-}
-
 /** Dedicated setup page for GitHub issue intake. */
 export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/github`;

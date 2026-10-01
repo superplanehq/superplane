@@ -37,7 +37,7 @@ import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoL
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -52,7 +52,6 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
-import { factoryPlanningSetupCompleted } from "./planningSettingsModel";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -138,7 +137,7 @@ import {
 import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
-import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
@@ -823,7 +822,6 @@ export function LinesPage() {
             onOpenWorkOrder={openWorkOrder}
             onClosePeek={closePeek}
             planningEnabled={factory?.planning?.enabled !== false}
-            planningSetupCompleted={factoryPlanningSetupCompleted(factory)}
           />
         </div>
       </div>
@@ -1011,7 +1009,6 @@ function LineDetail({
   onOpenWorkOrder,
   onClosePeek,
   planningEnabled,
-  planningSetupCompleted,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1042,7 +1039,6 @@ function LineDetail({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
   planningEnabled: boolean;
-  planningSetupCompleted: boolean;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -1055,6 +1051,10 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const creditFailureLabels = useMemo(
+    () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
+    [backlogAnalysis.runsByWorkOrder],
+  );
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
     disabledIds: string[];
@@ -1097,7 +1097,6 @@ function LineDetail({
         organizationId,
         factoryKey,
         lineId: line.id,
-        planningSetupCompleted,
       });
       if (href) {
         navigate(href);
@@ -1146,6 +1145,7 @@ function LineDetail({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
           colorView={colorView}
@@ -1188,6 +1188,7 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
+          factoryApps={apps}
           onClose={onClosePeek}
         />
       ) : null}
@@ -1209,6 +1210,7 @@ function LineBoardSplitRunPopup({
   onDispatch,
   analysisRuns,
   isAnalyzing,
+  factoryApps,
   onClose,
 }: {
   organizationId: string;
@@ -1224,6 +1226,7 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
+  factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
@@ -1252,6 +1255,7 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        columnApps: columnAppsFromFactoryApps(factoryApps),
         isAnalyzing,
         stoppedBy: closer.actor,
         closer,
@@ -1394,6 +1398,7 @@ function PhaseBoard({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  creditFailureLabels,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1422,6 +1427,7 @@ function PhaseBoard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
+  creditFailureLabels: ReadonlyMap<string, string>;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1558,6 +1564,7 @@ function PhaseBoard({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           automations={backlogAutomations}

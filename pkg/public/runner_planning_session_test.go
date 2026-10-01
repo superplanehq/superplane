@@ -3,14 +3,17 @@ package public
 import (
 	"bytes"
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -392,6 +395,117 @@ func TestWritePlanningWaitError(t *testing.T) {
 		event := requireCapturedException(t, transport.Events())
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
 	})
+
+	t.Run("dropped database connection returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("lookup: %w", errors.New("pgproto3.writeError: write failed: write tcp 10.96.2.5:43492->10.32.160.2:5432: write: connection reset by peer"))
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("wrapped postgres connection reset returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("pgproto3.writeError: write failed: %w", &net.OpError{
+			Op:  "write",
+			Net: "tcp",
+			Err: syscall.ECONNRESET,
+		})
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("bad database connection returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, fmt.Errorf("lookup: %w", driver.ErrBadConn))
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("blob connection reset stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+		blobReset := fmt.Errorf("download url: %w", &net.OpError{
+			Op:  "read",
+			Net: "tcp",
+			Err: syscall.ECONNRESET,
+		})
+
+		writePlanningWaitError(rec, req, session, blobReset)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("deadlock with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+		deadlock := fmt.Errorf("lookup: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
+
+		writePlanningWaitError(rec, req, session, deadlock)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, errors.New("lookup failed"))
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
 }
 
 func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
@@ -712,6 +826,37 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 		server.Router.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 	}
+}
+
+func TestRunnerPlanningWaitRestoresResultAfterConsumeCommitDrop(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	requireResolvedMessageWait(t, db, session)
+
+	result, consumed, err := consumeResolvedWait(session, db)
+	require.NoError(t, err)
+	require.True(t, consumed)
+	assert.Equal(t, models.PlanningWaitKindMessage, result.Kind)
+
+	idle, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitIdle, idle.WaitState)
+
+	restorePlanningWait(idle, result)
+	held, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitResolved, held.WaitState)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "Add refund retries.", delivered["text"])
 }
 
 func TestConsumeResolvedWaitTreatsDoubleConsumeAsMiss(t *testing.T) {
@@ -1106,6 +1251,113 @@ func TestBeginPlanningWaitAndNotify_SkipsFollowUpWaitWithoutQuestion(t *testing.
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 	assert.Empty(t, published)
 	assert.Equal(t, models.PlanningWaitPending, session.WaitState)
+}
+
+func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	line := mustAutoStartLine(t, r, factoryModel, true)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Nil(t, reloaded.AutoStartLineID)
+	active, err := reloaded.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, line.ID, active.LineID)
+	assert.Empty(t, active.Model)
+	assert.Empty(t, active.ThinkingLevel)
+	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+
+	err = beginPlanningWaitAndNotify(db, session)
+	require.Error(t, err)
+	activeAgain, err := reloaded.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, active.ID, activeAgain.ID)
+}
+
+func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, order.State)
+	_, err = order.FindActiveLineDispatch(db)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, updatedSession.State)
+}
+
+func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	line := mustAutoStartLine(t, r, factoryModel, false)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	require.NotNil(t, reloaded.AutoStartLineID)
+	assert.Equal(t, line.ID, *reloaded.AutoStartLineID)
+	_, err = reloaded.FindActiveLineDispatch(db)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	require.NoError(t, session.SendUserMessage(db, "Continue.", uuid.Nil))
+	_, err = session.ConsumeWait(db)
+	require.NoError(t, err)
+	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+
+	reloaded, err = models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	_, err = reloaded.FindActiveLineDispatch(db)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func mustAutoStartLine(t *testing.T, r *support.ResourceRegistry, factoryModel *models.Factory, withSteps bool) *models.FactoryLine {
+	t.Helper()
+	db := database.DB(t.Context())
+	var steps []models.FactoryLineStep
+	if withSteps {
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+		steps = []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint}}
+	}
+	line, err := factoryModel.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	return line
+}
+
+func mustEnableAutoStart(t *testing.T, db *gorm.DB, factoryModel *models.Factory, lineID uuid.UUID) {
+	t.Helper()
+	planning := factoryModel.Planning()
+	planning.AutoStartLineID = &lineID
+	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
 }
 
 func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {

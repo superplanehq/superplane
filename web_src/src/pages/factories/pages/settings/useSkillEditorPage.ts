@@ -62,7 +62,7 @@ export function useSkillEditorPage() {
   const [nameError, setNameError] = useState("");
   const [markdownError, setMarkdownError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(false);
-  const listPath = factorySettingsSectionPath(organizationId, factory.key ?? "", "workspace", "skills");
+  const listPath = factorySettingsSectionPath(organizationId, factory.key ?? "", "workspace", "agent");
   const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
 
   useEffect(() => {
@@ -133,6 +133,14 @@ export function useSkillEditorPage() {
         updateResource,
       }),
     confirmDelete: () => deleteSkill({ resourceId: resource?.id, listPath, navigate, deleteResource }),
+    toggleEnabled: (enabled: boolean) => {
+      if (!resource?.id) {
+        return;
+      }
+      void updateResource.mutateAsync({ resourceId: resource.id, enabled }).catch((error) => {
+        showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.skillUpdateFailed));
+      });
+    },
   };
 }
 

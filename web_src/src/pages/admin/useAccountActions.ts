@@ -37,6 +37,23 @@ export async function toggleBlock(acc: AdminAccount, onDone: () => void) {
   }
 }
 
+/** Returns the IDs of the organizations deleted with the account, or null when the delete fails. */
+export async function deleteAccount(accountId: string, accountName: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`/admin/api/accounts/${accountId}`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) {
+      showErrorToast((await res.text()) || "Failed to delete account");
+      return null;
+    }
+    const body: { deleted_organization_ids?: string[] } = await res.json();
+    showSuccessToast(`${accountName} deleted`);
+    return body.deleted_organization_ids ?? [];
+  } catch {
+    showErrorToast("Failed to delete account");
+    return null;
+  }
+}
+
 export async function startImpersonation(accountId: string) {
   try {
     const res = await fetch("/admin/api/impersonate/start", {

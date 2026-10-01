@@ -1,8 +1,8 @@
-import { formatCheckScore } from "../../../lib/workOrderChecks";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
+import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
 import type { AgentStep, AutomationStage } from "./automationsViewModel";
-import { formatClock } from "./redesignFormat";
+import { consoleCardArtifacts } from "./consolePages";
 
 /**
  * One line of outcome for the collapsed row. A running stage names the
@@ -54,10 +54,15 @@ function liveAgentLine(stage: AutomationStage): string {
   return last?.summary || last?.title || "";
 }
 
-/** Spend and duration of the latest run for the collapsed row. */
+/**
+ * Duration of the latest run for the collapsed row. Spend and model sit
+ * on the open-card footer, where they can update live.
+ */
 export function runMetaLine(stage: AutomationStage): string {
-  const duration = stage.status === "running" && stage.duration ? `${stage.duration} so far` : stage.duration;
-  return [stage.cost, stage.tokens, duration].filter(Boolean).join(" · ");
+  if (stage.status === "running" && stage.duration) {
+    return `${stage.duration} so far`;
+  }
+  return stage.duration ?? "";
 }
 
 /**
@@ -69,31 +74,18 @@ function runTitle(stage: AutomationStage): string | undefined {
   return stage.pullRequestActivity ? stage.name : undefined;
 }
 
-/** The open card shows the description. The header row shows output counts. */
-export function showDescriptionInBody(stage: AutomationStage): boolean {
-  return Boolean(stage.description?.trim());
-}
-
 export interface StepOutputSummary {
+  runCount: number;
   artifactCount: number;
-  artifactLabels: string[];
   checkCount: number;
-  checkLines: string[];
 }
 
-/** Artifact and check counts for one step, plus the hover-card lines. */
-export function stepOutputSummary(stage: AutomationStage): StepOutputSummary {
-  const artifactLabels = stage.outputs.artifacts.map(artifactLabel).filter(Boolean);
-  const checkLines = stage.checks.map((check) => {
-    const score = formatCheckScore(check);
-    const value = `${score.value}${score.scale}`;
-    return value ? `${check.name} ${value}` : check.name;
-  });
+/** Counts for the collapsed card badges. */
+export function stepOutputSummary(stage: AutomationStage, runCount = 0): StepOutputSummary {
   return {
-    artifactCount: stage.outputs.artifacts.length,
-    artifactLabels,
+    runCount,
+    artifactCount: consoleCardArtifacts(stage).length,
     checkCount: stage.checks.length,
-    checkLines,
   };
 }
 
@@ -102,15 +94,20 @@ export function outputCountLabel(count: number, singular: string, plural: string
 }
 
 /**
- * Footer of the open card. Only facts the header row does not show: when
- * the run started and which model ran it.
+ * Footer of the open card. Start stamp stays here. Model and spend are
+ * rendered beside this lead so spend can stay a live control.
  */
 export function runFooterLine(stage: AutomationStage): string {
-  const clock = formatClock(stage.startedAt);
+  const stamp = formatWorkOrderDateTime(new Date(stage.startedAt ?? ""));
   if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID) {
-    return clock ? `Closed ${clock}` : "";
+    return stamp ? `Closed ${stamp}` : "";
   }
-  return [clock ? `Started ${clock}` : "", stage.model].filter(Boolean).join(" · ");
+  return stamp;
+}
+
+/** Dollar amount and compact token count for the run footer. */
+export function runFooterSpendLabel(cost?: string, tokens?: string): string {
+  return [cost, tokens].filter(Boolean).join(" · ");
 }
 
 /** Markdown and inline HTML down to the words, for a one-line header. */

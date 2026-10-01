@@ -15,6 +15,7 @@ import {
   type BacklogIntakeItem,
   type BacklogIntakeSource,
 } from "./backlogIntakeItems";
+import { BacklogIntakeSearchRow } from "./BacklogIntakeSearchRow";
 
 function CreateTriggerButton({
   canAdd,
@@ -320,16 +321,7 @@ function IntakeSearchResults({
     body = (
       <>
         {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-accent"
-            data-testid={`lines-backlog-create-item-${item.id}`}
-            onClick={() => onImportItem(item)}
-          >
-            <span className="min-w-0 flex-1 truncate">{item.title}</span>
-            <span className="shrink-0 text-[12px] text-muted-foreground">{item.key}</span>
-          </button>
+          <BacklogIntakeSearchRow key={item.id} item={item} onImportItem={onImportItem} />
         ))}
         {isLoadingMore ? (
           <SearchLoadingStatus label={BACKLOG_CREATE_COPY.loadingMore} testId="lines-backlog-create-loading-more" />

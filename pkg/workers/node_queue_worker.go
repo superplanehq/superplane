@@ -108,7 +108,8 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessNode(logger, node, attemptStart); err != nil {
-						logger.Errorf("Error processing: %v", err)
+						logging.WithCanvasWorkspace(logger, canvasForLog(node.WorkflowID)).
+							Errorf("Error processing: %v", err)
 					}
 				}(node)
 			}
@@ -394,7 +395,8 @@ func (w *NodeQueueWorker) prepareQueueItems(
 
 		if !selfManaged {
 			if _, err := contexts.ResolveQueueName(tx, node, item); err != nil {
-				logger.Errorf("Error resolving queue name for item %s: %v", item.ID, err)
+				logging.WithCanvasWorkspace(logger, unscopedCanvas(tx, node.WorkflowID)).
+					Errorf("Error resolving queue name for item %s: %v", item.ID, err)
 				if err := w.handleQueueNameResolutionError(tx, node, item, err, collector); err != nil {
 					return nil, err
 				}
@@ -451,7 +453,8 @@ func (w *NodeQueueWorker) dispatchQueueItem(
 		// Since this error will always happen until the user fixes the node configuration,
 		// we create a failed execution and delete the queue item.
 		//
-		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
+		logging.WithCanvasWorkspace(logger, unscopedCanvas(tx, node.WorkflowID)).
+			Errorf("Error building configuration for node execution: %v", configErr.Error())
 		return w.handleNodeConfigurationError(tx, configErr, collector)
 	}
 

@@ -10,11 +10,70 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
+
+func Test__GitHubWebhookHandler__Setup(t *testing.T) {
+	t.Run("registers a repository hook", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":456,"name":"web"}`),
+			},
+		}
+
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://app.example/api/v1/webhooks/webhook-id",
+				Secret:        []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{EventType: "pull_request", Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: 456, WebhookName: "web"}, metadata)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
+	})
+
+	// Hosted GitHub App metadata must not skip hook registration. The App
+	// webhook endpoint no longer delivers repository events to nodes.
+	t.Run("does not skip hook registration for hosted app metadata", func(t *testing.T) {
+		t.Setenv(config.EnvGitHubAppID, "12345")
+		t.Setenv(config.EnvGitHubAppSlug, "superplane")
+		t.Setenv(config.EnvGitHubAppPrivateKey, "private-key")
+		t.Setenv(config.EnvGitHubAppWebhookSecret, "app-webhook-secret")
+
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"id":789,"name":"web"}`),
+			},
+		}
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		integrationCtx.Metadata = map[string]any{"hostedApp": true}
+
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://app.example/api/v1/webhooks/webhook-id",
+				Secret:        []byte("local-webhook-secret"),
+				Configuration: common.WebhookConfiguration{EventType: "pull_request", Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: 789, WebhookName: "web"}, metadata)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
+	})
+}
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &GitHubWebhookHandler{}
@@ -140,6 +199,31 @@ func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
 		err := handler.Cleanup(core.WebhookHandlerContext{
 			HTTP:        httpCtx,
 			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      Webhook{ID: 123},
+				Configuration: common.WebhookConfiguration{Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("does not skip hook removal for hosted app metadata", func(t *testing.T) {
+		handler := &GitHubWebhookHandler{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNoContent, ""),
+			},
+		}
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		integrationCtx.Metadata = map[string]any{"hostedApp": true}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
 			Webhook: &contexts.WebhookContext{
 				Metadata:      Webhook{ID: 123},
 				Configuration: common.WebhookConfiguration{Repository: "hello"},

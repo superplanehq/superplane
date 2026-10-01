@@ -114,15 +114,19 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
    * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit while the report revalidates", async () => {
-    organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
+    const firstVisit = mockPendingReports();
 
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },
     });
     const { unmount } = renderPage(queryClient);
 
-    await waitFor(() => expect(loadingState()).not.toBeInTheDocument());
-    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00");
+    await act(async () => {
+      firstVisit.resolveAll("100");
+    });
+
+    await waitFor(() => expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00"));
+    expect(loadingState()).not.toBeInTheDocument();
 
     unmount();
 
@@ -133,8 +137,6 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
 
     renderPage(queryClient);
 
-    // The previously loaded report is visible immediately: no full-page
-    // loading swap.
     expect(loadingState()).not.toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00");
     expect(
@@ -144,6 +146,8 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
         .some((query) => query.state.fetchStatus === "fetching"),
     ).toBe(true);
 
-    pending.resolveAll("250");
+    await act(async () => {
+      pending.resolveAll("250");
+    });
   });
 });

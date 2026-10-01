@@ -7,7 +7,12 @@ import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
@@ -37,11 +42,11 @@ import {
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScroll";
 
-/** Nav item id for workspace MCP servers, gated behind `FEATURE_WORKSPACE_MCP`. */
-const WORKSPACE_MCP_NAV_ITEM_ID = "workspace-mcp";
+/** Nav item id for Agent settings (MCP servers and skills). */
+const WORKSPACE_AGENT_NAV_ITEM_ID = "workspace-agent";
 
-/** Nav item id for workspace skills, gated behind `FEATURE_WORKSPACE_SKILLS`. */
-const WORKSPACE_SKILLS_NAV_ITEM_ID = "workspace-skills";
+/** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
+const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
 
 /** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
 const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
@@ -56,11 +61,11 @@ function visibleFactorySettingsNavGroups(
   hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP)) {
-    hiddenNavItemIds.add(WORKSPACE_MCP_NAV_ITEM_ID);
+  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP) && !hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
+    hiddenNavItemIds.add(WORKSPACE_AGENT_NAV_ITEM_ID);
   }
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
-    hiddenNavItemIds.add(WORKSPACE_SKILLS_NAV_ITEM_ID);
+  if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
+    hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
   }
   if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
     hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);

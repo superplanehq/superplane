@@ -5,227 +5,274 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/support"
-	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
-func Test__HandleGitHubAppSetup_missingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func Test__HandleGitHubAppSetup_ownerApprovedInstallWithoutState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
-		nil,
-	)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusFound, rec.Code)
-	assert.Equal(t, "/github/approved", rec.Header().Get("Location"))
-}
-
-func Test__HandleGitHubAppSetup_updateWithoutStateReturnsToApp(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/github/app/setup?installation_id=159131070&setup_action=update",
-		nil,
-	)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusFound, rec.Code)
-	assert.Equal(t, "/", rec.Header().Get("Location"))
-}
-
-func Test__HandleGitHubAppSetup_installWithoutInstallationIDStaysMissingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?setup_action=install", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func Test__HandleGitHubAppSetup_updateWithoutInstallationIDStaysMissingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?setup_action=update", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func Test__HandleGitHubAppOAuthCallback_missingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/oauth/callback", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppOAuthCallback(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func Test__HandleGitHubAppBind_missingState(t *testing.T) {
-	server := &Server{}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/bind", nil)
-	rec := httptest.NewRecorder()
-
-	server.HandleGitHubAppBind(rec, req)
-
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func Test__githubInstallationID(t *testing.T) {
-	id := int64(42)
-	got, ok := githubInstallationID(&gh.InstallationEvent{
-		Installation: &gh.Installation{ID: &id},
+func TestHandleGitHubAppSetup(t *testing.T) {
+	setGitHubAppEnvironment(t)
+	previousReconciliation := enqueueGitHubAppReconciliation
+	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
+	previousHasInstallationRequest := hasGitHubAppInstallationRequest
+	organizationID := uuid.New()
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
+	var installationIDs []int64
+	var organizationIDs []uuid.UUID
+	installationRequested := true
+	reconciliationCount := 0
+	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error {
+		reconciliationCount++
+		return nil
+	}
+	enqueueGitHubAppInstallationReconciliation = func(
+		_ context.Context,
+		installationID int64,
+		requestedOrganizationID uuid.UUID,
+		_ time.Time,
+	) error {
+		installationIDs = append(installationIDs, installationID)
+		organizationIDs = append(organizationIDs, requestedOrganizationID)
+		return nil
+	}
+	hasGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
+		return installationRequested, nil
+	}
+	t.Cleanup(func() {
+		enqueueGitHubAppReconciliation = previousReconciliation
+		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
+		hasGitHubAppInstallationRequest = previousHasInstallationRequest
 	})
-	require.True(t, ok)
-	assert.Equal(t, "42", got)
 
-	_, ok = githubInstallationID(&gh.PushEvent{})
+	t.Run("direct installation returns to the app", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install&state="+state,
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("direct listing installation returns to the app", func(t *testing.T) {
+		installationRequested = false
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("approved request opens the confirmation page", func(t *testing.T) {
+		installationRequested = true
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=install",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("repository update returns to the app", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=159131070&setup_action=update&state="+state,
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, []int64{159131070, 159131070, 159131070, 159131070}, installationIDs)
+		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil, organizationID}, organizationIDs)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("approval request returns to the app without an installation id", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?setup_action=request",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, 1, reconciliationCount)
+	})
+
+	t.Run("installation id is required", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?setup_action=install",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+}
+
+func TestGitHubAppSetupOrganizationID(t *testing.T) {
+	setGitHubAppEnvironment(t)
+	organizationID := uuid.New()
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
+	require.NoError(t, err)
+	assert.Equal(t, organizationID, githubAppSetupOrganizationID(state))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID(state+"tampered"))
+	assert.Equal(t, uuid.Nil, githubAppSetupOrganizationID("o_"+organizationID.String()))
+}
+
+func setGitHubAppEnvironment(t *testing.T) {
+	t.Helper()
+	t.Setenv(githubcommon.EnvGitHubAppID, "12345")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "superplane")
+	t.Setenv(
+		githubcommon.EnvGitHubAppPrivateKey,
+		"-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+	)
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+}
+
+func TestGitHubInstallationID(t *testing.T) {
+	id, ok := githubInstallationID([]byte(`{"installation":{"id":42}}`))
+	require.True(t, ok)
+	assert.Equal(t, int64(42), id)
+
+	_, ok = githubInstallationID([]byte(`{"repository":{"id":7}}`))
 	assert.False(t, ok)
 }
 
-func Test__authorizeHostedGitHubAppCallback(t *testing.T) {
+func TestApplyGitHubCatalogWebhook(t *testing.T) {
 	r := support.Setup(t)
-	defer r.Close()
+	db := database.DB(t.Context())
+	const installationID = int64(101)
+	const repositoryID = int64(201)
+	const accountID = int64(301)
+	const requesterID = int64(401)
 
-	state := "csrf-state-1"
-	integration, err := models.CreateIntegration(
-		uuid.New(),
-		r.Organization.ID,
-		"github",
-		"github-hosted",
-		nil,
-	)
-	require.NoError(t, err)
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:      501,
+		AccountID:      gh.Ptr(accountID),
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+		RequesterID:    requesterID,
+		RequesterLogin: "octocat",
+		RequestedAt:    time.Now(),
+	}}))
 
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"state":           state,
-		"hostedApp":       true,
-		"startedByUserID": r.User.String(),
-	})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	t.Run("missing session", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?state="+state, nil)
-		rec := httptest.NewRecorder()
-
-		(&Server{}).HandleGitHubAppSetup(rec, req)
-
-		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	})
-
-	t.Run("starter account", func(t *testing.T) {
-		status := authorizeHostedGitHubAppCallback(
-			accountContext(r.Account),
-			integration,
-		)
-		assert.Equal(t, 0, status)
-	})
-
-	t.Run("same org teammate is rejected", func(t *testing.T) {
-		teammateAccount, err := models.CreateAccount("teammate", "teammate@example.com")
-		require.NoError(t, err)
-		_, err = models.CreateUser(r.Organization.ID, teammateAccount.ID, teammateAccount.Email, teammateAccount.Name)
-		require.NoError(t, err)
-
-		status := authorizeHostedGitHubAppCallback(
-			accountContext(teammateAccount),
-			integration,
-		)
-		assert.Equal(t, http.StatusForbidden, status)
-	})
-
-	t.Run("other org account is rejected", func(t *testing.T) {
-		otherOrg, err := models.CreateOrganization("other-org", "other org")
-		require.NoError(t, err)
-		otherAccount, err := models.CreateAccount("other", "other@example.com")
-		require.NoError(t, err)
-		_, err = models.CreateUser(otherOrg.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
-		require.NoError(t, err)
-
-		status := authorizeHostedGitHubAppCallback(
-			accountContext(otherAccount),
-			integration,
-		)
-		assert.Equal(t, http.StatusForbidden, status)
-	})
-}
-
-func Test__dispatchGitHubAppByState_rejectsNonHosted(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	state := "legacy-state"
-	integration, err := models.CreateIntegration(
-		uuid.New(),
-		r.Organization.ID,
-		"github",
-		"github-legacy",
-		nil,
-	)
-	require.NoError(t, err)
-	integration.Metadata = datatypes.NewJSONType(map[string]any{
-		"state":     state,
-		"hostedApp": false,
-	})
-	require.NoError(t, database.Conn().Save(integration).Error)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?state="+state, nil)
-	req = req.WithContext(accountContext(r.Account))
-	rec := httptest.NewRecorder()
-
-	(&Server{}).HandleGitHubAppSetup(rec, req)
-
-	assert.Equal(t, http.StatusNotFound, rec.Code)
-}
-
-func Test__isHostedGitHubAppBrowserCallback(t *testing.T) {
-	hosted := &models.Integration{
-		AppName: "github",
-		Metadata: datatypes.NewJSONType(map[string]any{
-			"hostedApp": true,
-		}),
+	installation := &gh.Installation{
+		ID:                  gh.Ptr(installationID),
+		Account:             &gh.User{ID: gh.Ptr(accountID), Login: gh.Ptr("acme")},
+		HTMLURL:             gh.Ptr("https://github.com/organizations/acme/settings/installations/101"),
+		TargetType:          gh.Ptr("Organization"),
+		RepositorySelection: gh.Ptr("selected"),
 	}
-	legacy := &models.Integration{
-		AppName: "github",
-		Metadata: datatypes.NewJSONType(map[string]any{
-			"hostedApp": false,
-		}),
+	repository := &gh.Repository{
+		ID:            gh.Ptr(repositoryID),
+		FullName:      gh.Ptr("acme/api"),
+		Private:       gh.Ptr(true),
+		DefaultBranch: gh.Ptr("main"),
+	}
+	created := &gh.InstallationEvent{
+		Action:       gh.Ptr("created"),
+		Installation: installation,
+		Repositories: []*gh.Repository{repository},
 	}
 
-	setup := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/"+uuid.NewString()+"/setup", nil)
-	webhook := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/"+uuid.NewString()+"/webhook", nil)
+	// Duplicate deliveries are idempotent and preserve the approval row until
+	// the browser callback can identify why the installation was created.
+	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
+	require.NoError(t, applyGitHubCatalogWebhook(db, created, installationID))
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, requesterID)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	assert.Equal(t, int64(501), requests[0].RequestID)
+	stored, err := models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", stored.FullName)
 
-	assert.True(t, isHostedGitHubAppBrowserCallback(setup, hosted))
-	assert.False(t, isHostedGitHubAppBrowserCallback(setup, legacy))
-	assert.False(t, isHostedGitHubAppBrowserCallback(webhook, hosted))
-}
+	var jobCount int64
+	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
+	assert.Equal(t, int64(1), jobCount)
+	var queuedJob models.VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&queuedJob, "provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).Error)
+	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, queuedJob.Priority)
+	assert.WithinDuration(t, time.Now(), queuedJob.RunAt, time.Second)
 
-func accountContext(account *models.Account) context.Context {
-	return context.WithValue(context.Background(), middleware.AccountContextKey, account)
+	// A member event keeps its delayed refresh even when an immediate job is
+	// already queued. GitHub can take time to publish collaborator changes.
+	memberReceivedAt := time.Now()
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.MemberEvent{
+		Action:       gh.Ptr("edited"),
+		Repo:         repository,
+		Installation: installation,
+	}, installationID))
+	require.NoError(t, db.First(&queuedJob, "provider = ? AND repository_id = ?", models.ProviderGitHub, repositoryID).Error)
+	assert.WithinDuration(t, memberReceivedAt.Add(10*time.Second), queuedJob.RunAt, time.Second)
+
+	// Member changes enqueue the repository again after the previous job is
+	// complete so cached push access is refreshed.
+	claimAt := time.Now().Add(time.Minute)
+	job, err := models.ClaimVCSProviderRepositorySync(db, models.ProviderGitHub, claimAt, claimAt.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NoError(t, models.CompleteVCSProviderRepositorySync(db, models.ProviderGitHub, repositoryID, *job.LockedAt))
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.MemberEvent{
+		Action:       gh.Ptr("edited"),
+		Repo:         repository,
+		Installation: installation,
+	}, installationID))
+	require.NoError(t, db.Model(&models.VCSProviderRepositorySyncJob{}).Where("repository_id = ?", repositoryID).Count(&jobCount).Error)
+	assert.Equal(t, int64(1), jobCount)
+
+	// Repository removal revokes catalog access immediately.
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.InstallationRepositoriesEvent{
+		Action:              gh.Ptr("removed"),
+		Installation:        installation,
+		RepositoriesRemoved: []*gh.Repository{repository},
+		RepositorySelection: gh.Ptr("selected"),
+	}, installationID))
+	_, err = models.FindVCSProviderRepository(db, models.ProviderGitHub, repositoryID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+	// Uninstall removes the global installation and every local binding, but
+	// deleting a binding alone never deletes the global installation.
+	binding, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID, "acme")
+	require.NoError(t, err)
+	require.NoError(t, applyGitHubCatalogWebhook(db, &gh.InstallationEvent{
+		Action:       gh.Ptr("deleted"),
+		Installation: installation,
+	}, installationID))
+	_, err = models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = models.FindVCSProviderIntegrationBinding(db, binding.ID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }

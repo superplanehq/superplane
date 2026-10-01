@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -76,6 +77,128 @@ func TestProductiveWebhookWarning_JSONUsesWarningLevel(t *testing.T) {
 	assert.Equal(t, ComponentWebhookProductive, payloads[0]["component"])
 	assert.Equal(t, "task.updated", payloads[0]["webhookType"])
 	assert.Equal(t, "no activity", payloads[0]["error"])
+}
+
+func TestWithWebhookPayload_KeepsJSONAndCutsOversizedBodies(t *testing.T) {
+	fields := WithWebhookPayload(log.Fields{"component": ComponentWebhookSentry}, []byte(`{"action":"created"}`))
+	raw, ok := fields["payload"].(json.RawMessage)
+	require.True(t, ok)
+	payload := map[string]any{}
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	assert.Equal(t, "created", payload["action"])
+
+	oversized := bytes.Repeat([]byte("a"), webhookLogPayloadLimit+1)
+	logged := webhookPayloadString(t, WithWebhookPayload(log.Fields{}, oversized))
+	assertWebhookPayloadFits(t, logged)
+
+	slashes := bytes.Repeat([]byte{'\\'}, webhookLogPayloadLimit+1)
+	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, slashes)))
+
+	controls := bytes.Repeat([]byte{0}, webhookLogPayloadLimit/2)
+	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, controls)))
+
+	assert.Nil(t, WithWebhookPayload(nil, nil))
+}
+
+func webhookPayloadString(t *testing.T, fields log.Fields) string {
+	t.Helper()
+	logged, ok := fields["payload"].(string)
+	require.True(t, ok)
+	return logged
+}
+
+func assertWebhookPayloadFits(t *testing.T, logged string) {
+	t.Helper()
+	assert.True(t, strings.HasSuffix(logged, webhookPayloadTruncated))
+	encoded, err := json.Marshal(logged)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(encoded), webhookLogPayloadLimit)
+}
+
+func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
+	logger := SentryWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+
+	LogSentryWebhookInfo("Sentry app webhook received", log.Fields{
+		"hook_resource":     "issue",
+		"action":            "created",
+		"installation_uuid": "install-1",
+	})
+
+	payloads := decodeJSONLines(t, buffer.String())
+	require.Len(t, payloads, 1)
+	assert.Equal(t, "INFO", payloads[0]["severity"])
+	assert.Equal(t, "Sentry app webhook received", payloads[0]["message"])
+	assert.Equal(t, ComponentWebhookSentry, payloads[0]["component"])
+	assert.Equal(t, "issue", payloads[0]["hook_resource"])
+	assert.Equal(t, "created", payloads[0]["action"])
+	assert.Equal(t, "install-1", payloads[0]["installation_uuid"])
+	_, hasLevel := payloads[0]["level"]
+	assert.False(t, hasLevel)
+	_, hasMsg := payloads[0]["msg"]
+	assert.False(t, hasMsg)
+
+	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
+	assert.True(t, processIsText)
+}
+
+func TestLogDatadogWebhookInfo_JSONKeepsTypeAndIntegration(t *testing.T) {
+	previousOutput := log.StandardLogger().Out
+	previousFormatter := log.StandardLogger().Formatter
+	standardOutput := &bytes.Buffer{}
+	log.StandardLogger().SetOutput(standardOutput)
+	t.Cleanup(func() {
+		log.StandardLogger().SetOutput(previousOutput)
+		log.StandardLogger().SetFormatter(previousFormatter)
+	})
+
+	logger := DatadogWebhookLogger()
+	previousLoggerOutput := logger.Out
+	logger.SetOutput(standardLogWriter{})
+	t.Cleanup(func() {
+		logger.SetOutput(previousLoggerOutput)
+	})
+
+	LogDatadogWebhookInfo("Datadog webhook received", log.Fields{
+		"type":        "event",
+		"integration": "sentry",
+		"outcome":     "received",
+	}, nil)
+
+	payloads := decodeJSONLines(t, standardOutput.String())
+	require.Len(t, payloads, 1)
+	assert.Equal(t, "info", payloads[0]["level"])
+	assert.Equal(t, "Datadog webhook received", payloads[0]["msg"])
+	assert.Equal(t, WebhookLogType, payloads[0]["type"])
+	assert.Equal(t, DatadogIntegration, payloads[0]["integration"])
+	assert.Equal(t, "received", payloads[0]["outcome"])
+
+	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
+	assert.True(t, processIsText)
+	_, webhookIsJSON := logger.Formatter.(*log.JSONFormatter)
+	assert.True(t, webhookIsJSON)
+}
+
+func TestDatadogWebhookIdentity_ResolvesOnlyWhenAsked(t *testing.T) {
+	calls := 0
+	logger := WithDatadogWebhookIdentity(log.NewEntry(log.New()), func() log.Fields {
+		calls++
+		return log.Fields{"workspace_id": "ws-1"}
+	})
+
+	assert.Zero(t, calls)
+	assert.Equal(t, "ws-1", DatadogWebhookIdentity(logger)["workspace_id"])
+	assert.Equal(t, 1, calls)
+	assert.Nil(t, DatadogWebhookIdentity(nil))
+	assert.Nil(t, DatadogWebhookIdentity(log.NewEntry(log.New())))
+	assert.Nil(t, WithDatadogWebhookIdentity(nil, func() log.Fields {
+		return log.Fields{}
+	}))
 }
 
 func TestWithWebhookNode_AddsOrganizationCanvasAndWebhook(t *testing.T) {

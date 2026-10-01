@@ -11,7 +11,6 @@ import {
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
@@ -63,7 +62,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Sentry exceptions",
     description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
-    featureId: FEATURE_FACTORY_SENTRY_INTAKE,
   },
   {
     id: "productive-tasks",

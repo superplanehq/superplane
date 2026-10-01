@@ -113,6 +113,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     renderPopup(onClose);
 
     expect(screen.getByTestId("work-order-split-run-loading")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "RF-105 Draft: rework refund telemetry" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading task");
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
 

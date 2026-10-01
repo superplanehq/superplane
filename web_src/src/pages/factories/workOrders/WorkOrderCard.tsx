@@ -3,7 +3,11 @@ import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
-import { getWorkOrderAttentionReasons, type WorkOrderAttentionReason } from "../lib/workOrderAttention";
+import {
+  getWorkOrderAttentionReasons,
+  getWorkOrderFailedAttentionLabel,
+  type WorkOrderAttentionReason,
+} from "../lib/workOrderAttention";
 import {
   selectWorkOrderCardPullRequest,
   visibleWorkOrderCardAttentionReasons,
@@ -88,6 +92,17 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   selected?: boolean;
   /** True when the draft analysis session waits for a multiple-choice answer. */
   hasAgentQuestion?: boolean;
+  /**
+   * Short credit-failure label for a draft whose analysis never started.
+   * Line steps use the failed attention chip instead.
+   */
+  creditLabel?: string;
+  /**
+   * False on the public board. The card is static text: no link, no dialog.
+   */
+  interactive?: boolean;
+  /** Public board shows the member on a draft. Member boards hide that owner. */
+  showOwner?: boolean;
 }
 
 /**
@@ -124,15 +139,20 @@ export function WorkOrderCard({
   className,
   selected = false,
   hasAgentQuestion = false,
+  creditLabel,
+  interactive = true,
+  showOwner = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
+  const destination = interactive
+    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
+    : "";
   const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
   const source = workOrderCardSource(entry.order);
-  const pullRequestMerge = useExperimentalFeature(organizationId);
+  const pullRequestMerge = useExperimentalFeature(organizationId ? organizationId : null);
   const showPullRequestMerge = pullRequestMerge.has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const attentionReasons = visibleWorkOrderCardAttentionReasons(
     getWorkOrderAttentionReasons(entry.order, {
@@ -148,14 +168,15 @@ export function WorkOrderCard({
   return (
     <article
       className={cn(
-        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow",
-        WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
+        "group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm",
+        interactive && "transition hover:border-foreground/20 hover:shadow",
+        interactive && WORK_ORDER_CARD_HOVER_SURFACE_CLASS,
         className,
       )}
       data-testid={`work-order-card-${entry.id}`}
       data-selected={selected || undefined}
     >
-      <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
+      {interactive ? <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} /> : null}
 
       <div className="relative z-10 pointer-events-none">
         <WorkOrderCardTitleRow
@@ -171,6 +192,8 @@ export function WorkOrderCard({
           reasons={attentionReasons}
           feedbackLabel={addressingFeedbackLabels.get(entry.id)}
           checksPassedLabel={checksPassedLabels.get(entry.id)}
+          failedLabel={getWorkOrderFailedAttentionLabel(entry.order)}
+          creditLabel={isDraft ? creditLabel : undefined}
           cardPullRequest={cardPullRequest}
           hasAgentQuestion={showAgentQuestion}
           showPullRequestMerge={showPullRequestMerge}
@@ -185,6 +208,7 @@ export function WorkOrderCard({
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
           isAnalyzing={agentWorking}
+          showOwner={showOwner}
         />
       </div>
     </article>
@@ -235,6 +259,8 @@ function WorkOrderCardStatusRow({
   reasons,
   feedbackLabel,
   checksPassedLabel,
+  failedLabel,
+  creditLabel,
   cardPullRequest,
   hasAgentQuestion,
   showPullRequestMerge,
@@ -243,11 +269,14 @@ function WorkOrderCardStatusRow({
   reasons: WorkOrderAttentionReason[];
   feedbackLabel?: string;
   checksPassedLabel?: string;
+  failedLabel?: string;
+  creditLabel?: string;
   cardPullRequest: ReturnType<typeof selectWorkOrderCardPullRequest>;
   hasAgentQuestion: boolean;
   showPullRequestMerge?: boolean;
 }) {
-  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion) {
+  const showCredit = Boolean(creditLabel) && !reasons.includes("failed");
+  if (reasons.length === 0 && !cardPullRequest && !hasAgentQuestion && !showCredit) {
     return null;
   }
 
@@ -262,11 +291,12 @@ function WorkOrderCardStatusRow({
           ) : null}
         </>
       ) : null}
+      {showCredit ? <WorkOrderAttentionChip reason="failed" label={creditLabel} /> : null}
       {reasons.map((reason) => (
         <WorkOrderAttentionChip
           key={reason}
           reason={reason}
-          label={attentionChipLabel(reason, feedbackLabel, checksPassedLabel)}
+          label={attentionChipLabel(reason, { feedbackLabel, checksPassedLabel, failedLabel })}
         />
       ))}
     </div>
@@ -275,14 +305,16 @@ function WorkOrderCardStatusRow({
 
 function attentionChipLabel(
   reason: WorkOrderAttentionReason,
-  feedbackLabel?: string,
-  checksPassedLabel?: string,
+  labels: { feedbackLabel?: string; checksPassedLabel?: string; failedLabel?: string },
 ): string | undefined {
   if (reason === "feedback") {
-    return feedbackLabel;
+    return labels.feedbackLabel;
   }
   if (reason === "checksPassed") {
-    return checksPassedLabel;
+    return labels.checksPassedLabel;
+  }
+  if (reason === "failed") {
+    return labels.failedLabel;
   }
   return undefined;
 }
@@ -310,6 +342,7 @@ function WorkOrderCardMetaRow({
   showClarity = true,
   showConfidenceScore = true,
   isAnalyzing,
+  showOwner,
 }: {
   entry: WorkOrderListEntry;
   organizationId: string;
@@ -320,11 +353,12 @@ function WorkOrderCardMetaRow({
   showClarity?: boolean;
   showConfidenceScore?: boolean;
   isAnalyzing: boolean;
+  showOwner: boolean;
 }) {
   const createdLabel = createdAt ? formatRelative(createdAt) : "—";
   const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
   const showActions = hasScore || isAnalyzing;
-  const ownerMark = isDraft ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />;
+  const ownerMark = showOwner || !isDraft ? <CardOwnerMark entry={entry} organizationId={organizationId} /> : null;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">

@@ -34,6 +34,9 @@ var planningSessionMCPConfig string
 //go:embed follow_up_loop.js
 var followUpLoopScript string
 
+//go:embed attachment_limit.js
+var attachmentLimitScript string
+
 // PlanningSessionMCPScript is the stdio MCP server exposing task-refinement
 // tools. Runners that speak MCP (Claude, Codex, OpenCode) ship it under
 // SUPERPLANE_TASK_DIR as planning_session_mcp.js.
@@ -78,15 +81,44 @@ func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "analysis_protocol.md", Content: analysisProtocolMarkdown, Mode: "0644"}
 }
 
-// PlanningSessionMCPFiles returns the MCP server, static config, and analysis
-// protocol task files. Only attach these when HasPlanningSessionToken is true.
+// PlanningSessionMCPFiles returns the MCP server, attachment limit, static
+// config, and analysis protocol task files. Only attach these when
+// HasPlanningSessionToken is true.
 func PlanningSessionMCPFiles() []BrokerTaskFile {
 	return []BrokerTaskFile{
 		PlanningSessionMCPScriptFile(),
+		AttachmentLimitFile(),
 		PlanningSessionMCPConfigFile(),
 		PlanningSessionProtocolFile(),
 		PlanningSessionProtocolMarkdownFile(),
 	}
+}
+
+func AttachmentLimitFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "attachment_limit.js", Content: attachmentLimitScript, Mode: "0644"}
+}
+
+func AppendAttachmentLimitFile(files []BrokerTaskFile) []BrokerTaskFile {
+	return appendUniqueTaskFiles(files, AttachmentLimitFile())
+}
+
+func AppendPlanningSessionMCPFiles(files []BrokerTaskFile) []BrokerTaskFile {
+	return appendUniqueTaskFiles(files, PlanningSessionMCPFiles()...)
+}
+
+func appendUniqueTaskFiles(files []BrokerTaskFile, extra ...BrokerTaskFile) []BrokerTaskFile {
+	seen := make(map[string]struct{}, len(files))
+	for _, file := range files {
+		seen[file.Path] = struct{}{}
+	}
+	for _, file := range extra {
+		if _, ok := seen[file.Path]; ok {
+			continue
+		}
+		seen[file.Path] = struct{}{}
+		files = append(files, file)
+	}
+	return files
 }
 
 // FollowUpLoopFile returns the shared wait-loop task file. Only attach this

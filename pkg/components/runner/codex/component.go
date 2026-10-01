@@ -149,14 +149,16 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
+	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
 	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
-		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
+	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -8,19 +7,21 @@ import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
-import { PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
-import { LiveOwnerTimeCostRow } from "./LiveOwnerTimeCostRow";
+import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
-import { PlanningHeaderSpendCollector } from "./PlanningHeaderSpendCollector";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
-import type { CreatedTaskHref } from "./CreatedTaskCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
-import { DRAFT_START_THINKING_AUTO } from "@/lib/thinkingLevel";
-import { PopupHeaderActions } from "./PopupHeaderActions";
+import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
+import {
+  classicSplitRunFooter,
+  composerCreditVerdict,
+  creditBillingHref,
+  isTaskResultFooter,
+  SPLIT_RUN_ANALYZING_NOTE,
+} from "./splitRunFooter";
 import {
   defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
@@ -34,9 +35,11 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { createdTaskHref, draftStartAction, footerMutationHandlers, popupWorkOrderUrl } from "./workOrderPopupActions";
+import { createdTaskHref, draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
+import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHeader";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
+import { PopupShell } from "../work-order-popup-redesign/popupShared";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -45,7 +48,18 @@ export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
  * The automation canvas lives on the full run page, not here.
  */
 export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
-  const { organizationId, factoryId, orderId, fixture, fixed = false, onClose, canUpdate = true } = props;
+  const {
+    organizationId,
+    factoryId,
+    factoryKey,
+    orderNumber,
+    orderId,
+    fixture,
+    fixed = false,
+    onClose,
+    canUpdate = true,
+  } = props;
+  const titlePrefix = popupTitlePrefix(fixture, factoryKey, orderNumber);
   const factoryQuery = useFactory(organizationId ?? "", factoryId ?? "");
   const refinementEnabled = factoryPlanningEnabled(factoryQuery.data);
   const refinementFeature = { isLoading: factoryQuery.isPending };
@@ -85,21 +99,9 @@ export function WorkOrderSplitRunPopup(props: WorkOrderSplitRunPopupProps) {
   });
 
   if (mode === "loading") {
-    return <LoadingWorkOrderPopup title={fixture.title} fixed={fixed} onClose={onClose} />;
+    return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;
   }
-  return <AnalysisWorkOrderPopup {...props} analysis={analysis} popupData={popupData} />;
-}
-
-function LoadingWorkOrderPopup({ title, fixed, onClose }: { title: string; fixed: boolean; onClose?: () => void }) {
-  return (
-    <PopupShell testId="work-order-split-run-loading" fixed={fixed} onDismiss={onClose}>
-      <PopupHeader title={title} onClose={onClose} />
-      <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        Loading task…
-      </div>
-    </PopupShell>
-  );
+  return <AnalysisWorkOrderPopup {...props} titlePrefix={titlePrefix} analysis={analysis} popupData={popupData} />;
 }
 
 function AnalysisWorkOrderPopup({
@@ -118,9 +120,11 @@ function AnalysisWorkOrderPopup({
   canUpdate = true,
   analysis,
   popupData,
+  titlePrefix,
 }: WorkOrderSplitRunPopupProps & {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
+  titlePrefix?: string;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const dismissCurrentPopup = useCurrentPopupDismiss(orderId, onClose);
@@ -128,19 +132,19 @@ function AnalysisWorkOrderPopup({
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(DRAFT_START_THINKING_AUTO);
+  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
   const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
+  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const draftStart = draftStartAction(
     fixture.footer.kind,
     onDispatch,
     taskConsole ? () => {} : () => setTab("log"),
     draftModel,
-    draftThinking,
+    factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
   const unified = taskConsole && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
@@ -179,7 +183,7 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: true }) : undefined;
+  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
   const descriptionReview = taskConsole
     ? !unified && !showSidebarNote
@@ -219,27 +223,43 @@ function AnalysisWorkOrderPopup({
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
           panelReview={panelReview}
-          header={analysisPopupHeader({
-            edits,
-            fixture,
-            organizationId,
-            factoryKey,
-            orderNumber,
-            lineId,
-            onClose,
-            fullPage,
-            toggleFullPage,
-            mutations,
-            footerBusy: footerActions.busy,
-            reviewActions,
-            showOwnerRow: !unified,
-            planningSpend: draftPlanningHeaderSpend(fixture, analysis.view),
-          })}
+          header={(views) => (
+            <AnalysisPopupHeader
+              edits={edits}
+              fixture={fixture}
+              titlePrefix={titlePrefix}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
+              lineId={lineId}
+              onClose={onClose}
+              fullPage={fullPage}
+              toggleFullPage={toggleFullPage}
+              onArchive={mutations.onArchive}
+              footerBusy={footerActions.busy}
+              reviewActions={reviewActions}
+              showOwnerRow={!unified}
+              planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+              views={views}
+            />
+          )}
         />
         {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
+}
+
+function popupTitlePrefix(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  factoryKey?: string,
+  orderNumber?: string,
+): string | undefined {
+  const stored = fixture.identifier?.trim();
+  if (stored) {
+    return stored;
+  }
+  return formatWorkOrderIdentifier(factoryKey, orderNumber) || undefined;
 }
 
 function draftPlanningHeaderSpend(
@@ -274,65 +294,6 @@ function useAnalysisPopupEdits(args: {
     assigneeIds: fixture.assigneeIds ?? [],
     footerKind: fixture.footer.kind,
   });
-}
-
-function analysisPopupHeader(args: {
-  edits: ReturnType<typeof useAnalysisPopupEdits>;
-  fixture: WorkOrderSplitRunPopupProps["fixture"];
-  organizationId?: string;
-  factoryKey?: string;
-  orderNumber?: string;
-  lineId?: string;
-  onClose: WorkOrderSplitRunPopupProps["onClose"];
-  fullPage: boolean;
-  toggleFullPage: () => void;
-  mutations: ReturnType<typeof footerMutationHandlers>;
-  footerBusy: boolean;
-  reviewActions: ReactNode;
-  /** The unified view moves owner and spend into the summary panel. */
-  showOwnerRow: boolean;
-  planningSpend?: {
-    view: ReturnType<typeof useAnalysisPlanningSession>["view"];
-    savedTokens: number;
-    savedCostCents: number;
-  };
-}) {
-  return (views: ReactNode) => (
-    <PopupHeader
-      title={args.edits.title}
-      onClose={args.onClose}
-      canEditTitle={args.edits.canEdit}
-      titleBusy={args.edits.titleBusy}
-      onTitleSave={(next) => void args.edits.saveTitle(next)}
-      expanded={args.fullPage}
-      onToggleExpanded={args.toggleFullPage}
-      actions={
-        <PopupHeaderActions
-          copyUrl={popupWorkOrderUrl(args.organizationId, args.factoryKey, args.orderNumber, args.lineId)}
-          onArchive={args.fixture.footer.kind === "draft" ? args.mutations.onArchive : undefined}
-          archiveBusy={args.footerBusy}
-          taskActions={args.reviewActions}
-        />
-      }
-      accessory={views}
-    >
-      {args.planningSpend ? (
-        <PlanningHeaderSpendCollector
-          organizationId={args.organizationId}
-          view={args.planningSpend.view}
-          saved={{ tokens: args.planningSpend.savedTokens, cents: args.planningSpend.savedCostCents }}
-        />
-      ) : null}
-      {args.showOwnerRow ? (
-        <LiveOwnerTimeCostRow
-          fixture={{ ...args.fixture, owner: args.edits.owner }}
-          assigneeIds={args.edits.assigneeIds}
-          usageByModel={args.fixture.usageByModel}
-          usageByMachineType={args.fixture.usageByMachineType}
-        />
-      ) : null}
-    </PopupHeader>
-  );
 }
 
 function analysisReviewArgs(args: {
@@ -387,7 +348,7 @@ function analysisPopupReview(args: {
   isDispatching: boolean;
   footerBusy: boolean;
   canDispatch: boolean;
-  compact: boolean;
+  compact: boolean | "stacked";
   actionsOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
@@ -417,7 +378,7 @@ function analysisPopupReview(args: {
   );
 }
 
-function analysisDraftChrome(args: {
+type AnalysisDraftChromeArgs = {
   factory?: FactoriesFactory;
   organizationId?: string;
   factoryId?: string;
@@ -429,7 +390,9 @@ function analysisDraftChrome(args: {
   draftThinking: string;
   onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled: boolean;
-}) {
+};
+
+function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   if (!factoryPlanningEnabled(args.factory)) {
     return { footerModelSelect: undefined, stripAnalysis: undefined };
   }
@@ -444,16 +407,7 @@ function analysisDraftChrome(args: {
   });
   return {
     footerModelSelect: modelSelects.footer,
-    stripAnalysis: draftStripAnalysis(
-      args.fixture.footer.kind,
-      args.analysis,
-      modelSelects.strip,
-      createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
-      {
-        showClarity: factoryShowsClarity(args.factory),
-        showConfidence: factoryShowsConfidence(args.factory),
-      },
-    ),
+    stripAnalysis: draftStripAnalysis(args, modelSelects.strip),
   };
 }
 
@@ -485,7 +439,7 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSour
     return undefined;
   }
   if (unified) {
-    return "h-[min(52rem,calc(100vh-5rem))] w-[min(80rem,calc(100vw-5rem))]";
+    return "h-[min(52rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]";
   }
   return SPLIT_RUN_POPUP_DIALOG_CLASSNAME;
 }
@@ -502,17 +456,19 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
   };
 }
 
-function draftStripAnalysis(
-  footerKind: WorkOrderSplitRunPopupProps["fixture"]["footer"]["kind"],
-  analysis: ReturnType<typeof useAnalysisPlanningSession>,
-  modelSelect: ReactNode | undefined,
-  taskHref: CreatedTaskHref,
-  scores: { showClarity: boolean; showConfidence: boolean },
-) {
-  if (footerKind !== "draft") {
+function draftStripAnalysis(args: AnalysisDraftChromeArgs, modelSelect: ReactNode | undefined) {
+  if (args.fixture.footer.kind !== "draft") {
     return undefined;
   }
-  return { ...analysis, modelSelect, taskHref, ...scores };
+  const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
+  return {
+    ...args.analysis,
+    modelSelect,
+    taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
+    showClarity: factoryShowsClarity(args.factory),
+    showConfidence: factoryShowsConfidence(args.factory),
+    creditVerdict: composerCreditVerdict(args.fixture.footer.note, billingHref),
+  };
 }
 
 /**

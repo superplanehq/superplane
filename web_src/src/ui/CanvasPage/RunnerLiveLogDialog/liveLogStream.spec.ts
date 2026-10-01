@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import {
+  isBenignLiveLogWait,
+  LIVE_LOG_ERROR_CODE_HEADER,
+  LIVE_LOG_SESSION_NOT_READY_CODE,
+  LiveLogRequestError,
+} from "./liveLogErrors";
+import {
   consumeLiveLogNdjsonLine,
+  LiveLogStream,
   reducePromptUsageFromLiveLogLines,
   type LiveLogStreamHandlers,
 } from "./liveLogStream";
@@ -16,6 +23,16 @@ function handlers(overrides: Partial<LiveLogStreamHandlers> = {}): LiveLogStream
 }
 
 describe("consumeLiveLogNdjsonLine", () => {
+  it("ignores heartbeat records before activity dispatch", () => {
+    const next = handlers({ onRecord: vi.fn() });
+    consumeLiveLogNdjsonLine('{"type":"ping"}', next);
+    consumeLiveLogNdjsonLine('{"type":"ping","schema_version":2}', next);
+
+    expect(next.onLogLine).not.toHaveBeenCalled();
+    expect(next.onStreamError).not.toHaveBeenCalled();
+    expect(next.onRecord).not.toHaveBeenCalled();
+    expect(next.onTurn).not.toHaveBeenCalled();
+  });
   it("routes a structured turn record to onTurn", () => {
     const next = handlers();
     consumeLiveLogNdjsonLine('{"type":"turn","turn":3,"usage":{"input_tokens":10,"output_tokens":2}}', next);
@@ -144,5 +161,91 @@ describe("consumeLiveLogNdjsonLine", () => {
 
     expect(series[0].telemetry.turns[0].message).toBe("I will inspect the remotes.");
     expect(series[0].telemetry.turns[1].message).toBeUndefined();
+  });
+});
+
+describe("LiveLogStream session errors", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resolves after a heartbeat and clean EOF without a stream error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
+        .mockResolvedValueOnce(new Response('{"type":"ping"}\n{"type":"line","text":"done"}\n')),
+    );
+    const next = handlers();
+    await new LiveLogStream("organization-1", "canvas-1", "execution-1").pump(next);
+
+    expect(next.onLogLine).toHaveBeenCalledTimes(1);
+    expect(next.onLogLine).toHaveBeenCalledWith("done");
+    expect(next.onStreamError).not.toHaveBeenCalled();
+  });
+
+  it("preserves a real stream network failure", async () => {
+    const failure = new TypeError("network error");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ stream_url: "https://broker.example/live-logs", token: "test-token" }))
+        .mockResolvedValueOnce(new Response(new ReadableStream({ start: (controller) => controller.error(failure) }))),
+    );
+
+    await expect(new LiveLogStream("organization-1", "canvas-1", "execution-1").pump(handlers())).rejects.toBe(failure);
+  });
+
+  it("preserves the not-ready session code from the response header", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("Logs are not available for this execution yet. Check again shortly.", {
+          status: 404,
+          statusText: "Not Found",
+          headers: { [LIVE_LOG_ERROR_CODE_HEADER]: LIVE_LOG_SESSION_NOT_READY_CODE },
+        }),
+      ),
+    );
+
+    const stream = new LiveLogStream("organization-1", "canvas-1", "execution-1");
+    try {
+      await stream.pump(handlers());
+      throw new Error("expected session fetch to fail");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: "LiveLogRequestError",
+        code: LIVE_LOG_SESSION_NOT_READY_CODE,
+      });
+      expect(isBenignLiveLogWait(error)).toBe(true);
+    }
+  });
+
+  it("does not treat a 404 copy match as a wait without the error code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("Logs are not available for this execution yet. Check again shortly.", {
+          status: 404,
+          statusText: "Not Found",
+        }),
+      ),
+    );
+
+    const stream = new LiveLogStream("organization-1", "canvas-1", "execution-1");
+    try {
+      await stream.pump(handlers());
+      throw new Error("expected session fetch to fail");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: "LiveLogRequestError",
+        message: "Logs are not available for this execution yet. Check again shortly.",
+      });
+      expect(error).toBeInstanceOf(LiveLogRequestError);
+      expect((error as LiveLogRequestError).code).toBeUndefined();
+      expect(isBenignLiveLogWait(error)).toBe(false);
+    }
   });
 });

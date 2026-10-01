@@ -10,6 +10,11 @@ import { RequireExperimentalFeature } from "./RequireExperimentalFeature";
 function renderGate(
   initialEntry: string,
   queries: { organization?: OrganizationsOrganization; registry?: ExperimentalFeaturesRegistry },
+  gate = (
+    <RequireExperimentalFeature featureId="factories">
+      <div>Factories page</div>
+    </RequireExperimentalFeature>
+  ),
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -30,14 +35,7 @@ function renderGate(
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/:organizationId" element={<div>Home</div>} />
-          <Route
-            path="/:organizationId/factories"
-            element={
-              <RequireExperimentalFeature featureId="factories">
-                <div>Factories page</div>
-              </RequireExperimentalFeature>
-            }
-          />
+          <Route path="/:organizationId/factories" element={gate} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -76,6 +74,28 @@ describe("RequireExperimentalFeature", () => {
         features: [{ id: "factories", label: "Factories", description: "", released: false }],
       },
     });
+
+    expect(screen.getByText("Factories page")).toBeInTheDocument();
+  });
+
+  it("renders children when any listed feature is enabled", () => {
+    renderGate(
+      "/org-123/factories",
+      {
+        organization: {
+          spec: { enabledExperimentalFeatures: ["workspace_mcp"] },
+        } as OrganizationsOrganization,
+        registry: {
+          features: [
+            { id: "workspace_mcp", label: "Workspace MCP", description: "", released: false },
+            { id: "superplane_mcp_server", label: "MCP Server", description: "", released: false },
+          ],
+        },
+      },
+      <RequireExperimentalFeature anyOf={["workspace_mcp", "superplane_mcp_server"]}>
+        <div>Factories page</div>
+      </RequireExperimentalFeature>,
+    );
 
     expect(screen.getByText("Factories page")).toBeInTheDocument();
   });

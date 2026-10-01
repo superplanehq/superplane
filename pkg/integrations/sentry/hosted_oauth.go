@@ -205,9 +205,7 @@ func (s *Sentry) adoptHostedInstall(
 	bound.SetupReturnPath = metadata.SetupReturnPath
 	bound.TokenExpiresAt = tokens.ExpiresAt
 	ctx.Integration.SetMetadata(bound)
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-	return nil
+	return s.markHostedInstallReady(ctx)
 }
 
 func tokensForKnownHostedInstall(httpCtx core.HTTPContext, app HostedApp, install hostedSentryInstall) (*sentryAppAuthorizationResponse, error) {

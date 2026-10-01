@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -206,6 +209,52 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		assert.Equal(t, datadog.ErrorTrackingForbiddenMessage, message)
 	})
 
+	assertSearch := func(t *testing.T, sourceErr error) (codes.Code, string) {
+		t.Helper()
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, sourceErr), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		return code, message
+	}
+
+	for _, source := range liveIntakeClientErrors() {
+		t.Run(source.name+" 403 from search is a failed precondition", func(t *testing.T) {
+			code, message := assertSearch(t, source.statusError(http.StatusForbidden))
+			assert.Equal(t, codes.FailedPrecondition, code)
+			assert.Equal(t, intakeConnectFirstMessage, message)
+		})
+	}
+
+	t.Run("a non-auth 4xx from search is a failed precondition", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusUnprocessableEntity})
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, intakeCouldNotLoadItemsMessage, message)
+	})
+
+	t.Run("a 5xx from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, sentry.StatusError(http.StatusBadGateway))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("a 429 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusTooManyRequests})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("a 408 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusRequestTimeout})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
 	t.Run("integration error description is returned instead of unsupported search", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
@@ -385,6 +434,40 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, jiraItem.Title, response.GetOrder().GetTitle())
 		require.NotNil(t, response.GetOrder().GetOrigin())
 		assert.Equal(t, jiraItem.URL, response.GetOrder().GetOrigin().GetUrl())
+	})
+
+	t.Run("stores the Datadog issue title as the source label", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		issueID := "da226b38-baac-11f1-bad1-da7ad0900005"
+		datadogItem := IntakeItem{
+			ID:    issueID,
+			Title: "TimeoutError: checkout timed out",
+			Body:  "checkout timed out",
+			URL:   "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+		}
+		datadogDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSource{items: []IntakeItem{datadogItem}}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, datadogDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    datadogItem.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, datadogItem.URL, response.GetOrder().GetOrigin().GetUrl())
+		assert.Equal(t, datadogItem.Title, response.GetOrder().GetOrigin().GetLabel())
+
+		orderID, err := uuid.Parse(response.GetOrder().GetId())
+		require.NoError(t, err)
+		stored, err := factory.FindWorkOrder(database.DB(t.Context()), orderID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.OriginLabel)
+		assert.Equal(t, datadogItem.Title, *stored.OriginLabel)
 	})
 
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {

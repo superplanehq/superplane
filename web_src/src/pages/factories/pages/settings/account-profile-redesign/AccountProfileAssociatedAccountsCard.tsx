@@ -15,15 +15,15 @@ import { FactorySettingsCard } from "../FactorySettingsCard";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
 
 export function AccountProfileAssociatedAccountsCard({
-  githubUsername,
+  githubAccounts,
   onLinkGithub,
   onRemoveGithub,
 }: {
-  githubUsername: string | null;
+  githubAccounts: Array<{ providerId: string; username: string }>;
   onLinkGithub: () => void;
-  onRemoveGithub: () => void;
+  onRemoveGithub: (providerId: string) => void;
 }) {
-  const [removeOpen, setRemoveOpen] = useState(false);
+  const [accountToRemove, setAccountToRemove] = useState<{ providerId: string; username: string } | null>(null);
 
   return (
     <>
@@ -32,41 +32,64 @@ export function AccountProfileAssociatedAccountsCard({
           SuperPlane uses these accounts to credit your work. This does not change how you sign in.
         </p>
         <ul className="mt-4 space-y-4">
-          <li>
-            <SettingsActionRow
-              title={
-                <span className="inline-flex items-center gap-2">
-                  <Github className="size-4" aria-hidden />
-                  GitHub
-                </span>
-              }
-              description={
-                githubUsername
-                  ? `Linked as ${githubUsername}. Velocity uses this GitHub account to credit your pull requests.`
-                  : "Velocity uses this GitHub account to credit your pull requests."
-              }
-              testId="account-redesign-associated-github"
-              action={
-                githubUsername ? (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setRemoveOpen(true)}>
+          {githubAccounts.map((account, index) => (
+            <li key={account.providerId}>
+              <SettingsActionRow
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <Github className="size-4" aria-hidden />
+                    GitHub
+                  </span>
+                }
+                description={`Linked as ${account.username}. Velocity uses this GitHub account to credit your pull requests.`}
+                testId={
+                  index === 0
+                    ? "account-redesign-associated-github"
+                    : `account-redesign-associated-github-${account.providerId}`
+                }
+                action={
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setAccountToRemove(account)}>
                     Remove
                   </Button>
-                ) : (
+                }
+              />
+            </li>
+          ))}
+          {githubAccounts.length === 0 ? (
+            <li>
+              <SettingsActionRow
+                title={
+                  <span className="inline-flex items-center gap-2">
+                    <Github className="size-4" aria-hidden />
+                    GitHub
+                  </span>
+                }
+                description="Velocity uses this GitHub account to credit your pull requests."
+                testId="account-redesign-associated-github"
+                action={
                   <Button type="button" size="sm" variant="outline" onClick={onLinkGithub}>
                     Link GitHub
                   </Button>
-                )
-              }
-            />
-          </li>
+                }
+              />
+            </li>
+          ) : null}
         </ul>
+        {githubAccounts.length > 0 ? (
+          <Button type="button" size="sm" variant="outline" className="mt-4" onClick={onLinkGithub}>
+            Link another GitHub account
+          </Button>
+        ) : null}
       </FactorySettingsCard>
       <RemoveAssociatedGithubDialog
-        open={removeOpen}
-        onOpenChange={setRemoveOpen}
+        username={accountToRemove?.username ?? ""}
+        open={accountToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) setAccountToRemove(null);
+        }}
         onConfirm={() => {
-          onRemoveGithub();
-          setRemoveOpen(false);
+          if (accountToRemove) onRemoveGithub(accountToRemove.providerId);
+          setAccountToRemove(null);
         }}
       />
     </>
@@ -74,10 +97,12 @@ export function AccountProfileAssociatedAccountsCard({
 }
 
 function RemoveAssociatedGithubDialog({
+  username,
   open,
   onOpenChange,
   onConfirm,
 }: {
+  username: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -86,17 +111,18 @@ function RemoveAssociatedGithubDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Remove the GitHub link</DialogTitle>
+          <DialogTitle>Remove {username}?</DialogTitle>
           <DialogDescription>
-            Velocity reports stop crediting your pull requests to you. Your sign-in methods do not change.
+            Velocity reports will no longer credit pull requests from this GitHub account. Your sign-in methods do not
+            change.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Keep the link
+            Keep account
           </Button>
           <Button type="button" variant="destructive" onClick={onConfirm}>
-            Remove link
+            Remove account
           </Button>
         </DialogFooter>
       </DialogContent>

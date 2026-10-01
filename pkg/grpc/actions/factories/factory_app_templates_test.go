@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -66,6 +67,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
 	assert.Contains(t, result.canvasYAML, "implement and wire the change into the production page or component")
 	assert.Contains(t, result.canvasYAML, "does not replace the product implementation unless the task explicitly requests")
+	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, implementationPrompt, runner.FactoryCommitIdentityPrompt)
+	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
+	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -572,19 +580,24 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 
 func agentPrompt(t *testing.T, agent *yaml.Node) string {
 	t.Helper()
+	prompt, ok := implementationStep(t, agent, "Review Pull Request")["prompt"].(string)
+	require.True(t, ok)
+	return prompt
+}
+
+func implementationStep(t *testing.T, agent *yaml.Node, name string) map[string]any {
+	t.Helper()
 	steps, ok := agent.Configuration["steps"].([]any)
 	require.True(t, ok)
 	for _, step := range steps {
 		item, ok := step.(map[string]any)
-		if !ok || item["name"] != "Review Pull Request" {
+		if !ok || item["name"] != name {
 			continue
 		}
-		prompt, ok := item["prompt"].(string)
-		require.True(t, ok)
-		return prompt
+		return item
 	}
-	t.Fatal("review prompt not found")
-	return ""
+	t.Fatalf("step %q not found", name)
+	return nil
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

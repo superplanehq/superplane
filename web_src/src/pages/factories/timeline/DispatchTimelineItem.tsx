@@ -16,6 +16,7 @@ import { formatWorkOrderExecutionUsage } from "../lib/workOrderUsage";
 import { getWorkOrderExecutionRunHref } from "../lib/workOrderExecutions";
 import { overlayLivePullRequest } from "../lib/workOrderPullRequest";
 import { WorkOrderArtifactInline } from "../WorkOrderArtifactInline";
+import { WorkOrderCreditFailureNotice } from "../WorkOrderCreditFailureNotice";
 import { WorkOrderPullRequestInline } from "../WorkOrderPullRequestInline";
 import { TimelineMarker } from "./TimelineMarker";
 import { timelineActorClassName, timelineParagraphClassName, timelineTimeClassName } from "./timelineStyles";
@@ -150,6 +151,12 @@ function DispatchStepRow({
           </span>
         ))}
       </div>
+      <WorkOrderCreditFailureNotice
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        execution={step.execution}
+        className="mt-1"
+      />
       {step.comments?.map((comment, index) => (
         <StepDetail key={`comment-${index}`} body={comment.body} />
       ))}

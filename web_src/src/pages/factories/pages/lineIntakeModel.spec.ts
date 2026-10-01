@@ -6,7 +6,6 @@ import {
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 
 import {
@@ -371,26 +370,25 @@ describe("lineIntakeModel", () => {
     expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
-  it("marks Jira, Sentry, Productive.io, and Datadog as coming soon when their organization features are off", () => {
+  it("marks Jira, Productive.io, and Datadog as coming soon when their organization features are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
-    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "linear-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Jira, Sentry, Productive.io, and Datadog live when their organization features are on", () => {
+  it("keeps Jira, Productive.io, and Datadog live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
       [
         FEATURE_FACTORY_DATADOG_INTAKE,
         FEATURE_FACTORY_DEPENDABOT_INTAKE,
         FEATURE_FACTORY_JIRA_INTAKE,
-        FEATURE_FACTORY_SENTRY_INTAKE,
         FEATURE_FACTORY_PRODUCTIVE_INTAKE,
         FEATURE_FACTORY_LINEAR_INTAKE,
       ].includes(featureId),

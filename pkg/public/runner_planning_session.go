@@ -2,12 +2,16 @@ package public
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -18,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -200,6 +205,9 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		if session.WaitState == models.PlanningWaitResolved {
 			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
+				if result.Kind != "" {
+					restorePlanningWait(session, result)
+				}
 				writePlanningWaitError(w, r, session, err)
 				return
 			}
@@ -445,11 +453,53 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
+	maybeAutoStartPlannedWorkOrder(db, session)
 	if !hasOutstandingPlanningQuestion(session) {
 		return nil
 	}
 	messages.PublishPlanningAgentQuestion(session)
 	return nil
+}
+
+func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanningSession) {
+	if session == nil || session.DraftWorkOrderID == nil {
+		return
+	}
+	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start skipped for session %s", session.ID)
+		return
+	}
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start skipped for work order %s", session.DraftWorkOrderID)
+		return
+	}
+	ready, err := models.WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start readiness check failed for order %s", order.ID)
+		return
+	}
+	if !ready || factoryModel.PlanningAutoStartLineID == nil {
+		return
+	}
+	lineID := *factoryModel.PlanningAutoStartLineID
+	claimed, err := order.ClaimAutoStart(db, lineID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start could not claim the line for order %s", order.ID)
+		return
+	}
+	if !claimed {
+		return
+	}
+	line, err := factoryModel.FindLine(db, lineID)
+	if err != nil {
+		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+		return
+	}
+	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", ""); err != nil {
+		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+	}
 }
 
 func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSession, body string) error {
@@ -516,6 +566,7 @@ func mintPlanningWait(ctx context.Context, session *models.FactoryPlanningSessio
 	if err != nil {
 		return "", nil, err
 	}
+	rewritten, files = runneraction.RewriteLoopbackTaskFileURLs(rewritten, files)
 	payload := make([]map[string]any, 0, len(files))
 	for _, file := range files {
 		payload = append(payload, file.Map())
@@ -529,7 +580,7 @@ func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (m
 		return models.PlanningWaitResult{}, false, nil
 	}
 	if err != nil {
-		return models.PlanningWaitResult{}, false, err
+		return result, false, err
 	}
 	return result, true, nil
 }
@@ -561,8 +612,31 @@ func isPlanningRequestCanceled(r *http.Request, err error) bool {
 	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
+func isTransientPlanningWaitDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) {
+		return true
+	}
+	if !isDroppedConnectionError(err) {
+		return false
+	}
+	return strings.Contains(err.Error(), "pgproto3")
+}
+
+func isDroppedConnectionError(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) && (errors.Is(opErr.Err, syscall.ECONNRESET) || errors.Is(opErr.Err, syscall.EPIPE)) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "connection reset by peer") ||
+		strings.Contains(message, "broken pipe")
+}
+
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if isPlanningRequestCanceled(r, err) {
+	if isPlanningRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}

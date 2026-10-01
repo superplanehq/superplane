@@ -1,18 +1,34 @@
+import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Switch } from "@/components/ui/switch";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
+import { useDeleteFactory, useSetFactoryVisibility, useUpdateFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
+import {
+  factoryLineDetailPath,
+  factoryListPath,
+  factorySettingsGeneralPathAfterKeyChange,
+  firstFactoryLineId,
+} from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import {
   WORKSPACE_KEY_MAX_LENGTH,
@@ -21,6 +37,7 @@ import {
   normalizeWorkspaceKey,
 } from "../../lib/workspaceKey";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { PublicBadgeSettingsSection } from "./PublicBadgeSettingsSection";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { SettingsIdentityField } from "./settingsIdentityField";
 
@@ -51,6 +68,7 @@ export function FactorySettingsGeneralPage() {
 
   const canUpdate = canAct("factories", "update");
   const canDelete = canAct("factories", "delete");
+  const canPublish = canAct("factories", "publish");
   const savedName = factory.name ?? "";
   const savedKey = factory.key ?? "";
   const isDirty = name.trim() !== savedName || key !== savedKey;
@@ -118,6 +136,24 @@ export function FactorySettingsGeneralPage() {
             if (keyError) setKeyError("");
           }}
           onSave={handleSave}
+        />
+
+        <VisibilitySection
+          organizationId={organizationId}
+          factoryId={factoryId}
+          isPublic={Boolean(factory.public)}
+          publicBoardPath={publicBoardPath(organizationId, factory)}
+          canPublish={canPublish}
+          permissionsLoading={permissionsLoading}
+        />
+
+        <PublicBadgeSettingsSection
+          factory={factory}
+          publicBoardPath={publicBoardPath(organizationId, factory)}
+          canUpdate={canUpdate}
+          permissionsLoading={permissionsLoading}
+          isSaving={updateFactory.isPending}
+          onUpdate={(input) => updateFactory.mutateAsync(input)}
         />
 
         <DangerZoneSection
@@ -220,6 +256,131 @@ function WorkspaceDetailsSection({
           </LoadingButton>
         </PermissionTooltip>
       </div>
+    </FactorySettingsCard>
+  );
+}
+
+function publicBoardPath(
+  organizationId: string,
+  factory: { key?: string; lines?: Array<{ id?: string }> | null; public?: boolean },
+): string | undefined {
+  if (!factory.public || !factory.key) {
+    return undefined;
+  }
+  const lineId = firstFactoryLineId(factory);
+  if (!lineId) {
+    return undefined;
+  }
+  return factoryLineDetailPath(organizationId, factory.key, lineId);
+}
+
+interface VisibilitySectionProps {
+  organizationId: string;
+  factoryId: string;
+  isPublic: boolean;
+  publicBoardPath?: string;
+  canPublish: boolean;
+  permissionsLoading: boolean;
+}
+
+function VisibilitySection({
+  organizationId,
+  factoryId,
+  isPublic,
+  publicBoardPath,
+  canPublish,
+  permissionsLoading,
+}: VisibilitySectionProps) {
+  const setVisibility = useSetFactoryVisibility(organizationId, factoryId);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [nextPublic, setNextPublic] = useState(isPublic);
+  const actionLabel = isPublic ? "Change to private" : "Change to public";
+
+  const requestChange = (checked: boolean) => {
+    if (checked === isPublic || setVisibility.isPending) {
+      return;
+    }
+    setNextPublic(checked);
+    setConfirmOpen(true);
+  };
+
+  const confirmChange = async () => {
+    try {
+      await setVisibility.mutateAsync(nextPublic);
+      showSuccessToast(nextPublic ? "Workspace is public." : "Workspace is private.");
+      setConfirmOpen(false);
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to update workspace visibility"));
+    }
+  };
+
+  return (
+    <FactorySettingsCard title="Visibility" data-testid="factory-settings-visibility-card">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[13px] font-medium text-foreground">{isPublic ? "Public" : "Private"}</p>
+          <p className="text-[12px] leading-5 text-muted-foreground">
+            {isPublic
+              ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+              : "Only members of this organization can open the line board."}
+            {isPublic && publicBoardPath ? (
+              <>
+                {" "}
+                <Link href={publicBoardPath} className="underline" data-testid="factory-settings-visibility-board-link">
+                  View public board
+                </Link>
+              </>
+            ) : null}
+          </p>
+        </div>
+        <PermissionTooltip
+          allowed={canPublish || permissionsLoading}
+          message="You do not have permission to change workspace visibility."
+        >
+          <Switch
+            checked={isPublic}
+            disabled={!canPublish || setVisibility.isPending}
+            onCheckedChange={requestChange}
+            aria-label={actionLabel}
+            className="mt-0.5"
+            data-testid="factory-settings-visibility"
+          />
+        </PermissionTooltip>
+      </div>
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!setVisibility.isPending) {
+            setConfirmOpen(open);
+          }
+        }}
+      >
+        <AlertDialogContent data-testid="factory-settings-visibility-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {nextPublic ? "Make this workspace public?" : "Make this workspace private?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {nextPublic
+                ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+                : "Only members of this organization can open the line board."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={setVisibility.isPending} data-testid="factory-settings-visibility-cancel">
+              {nextPublic ? "Keep private" : "Keep public"}
+            </AlertDialogCancel>
+            <LoadingButton
+              loading={setVisibility.isPending}
+              loadingText="Saving..."
+              onClick={() => void confirmChange()}
+              data-testid="factory-settings-visibility-confirm"
+            >
+              {nextPublic ? "Make public" : "Make private"}
+            </LoadingButton>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FactorySettingsCard>
   );
 }

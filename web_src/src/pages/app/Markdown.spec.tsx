@@ -387,6 +387,17 @@ describe("MarkdownContent work order files", () => {
     expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
   });
 
+  it("keeps the video element mounted when the chat rerenders", () => {
+    const content = `See ![clip](sp-file://${fileId})`;
+    const files = [{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }];
+    const { rerender } = render(<MarkdownContent content={content} files={files} />);
+    const video = document.querySelector("video");
+
+    rerender(<MarkdownContent content={content} files={[{ ...files[0] }]} />);
+
+    expect(document.querySelector("video")).toBe(video);
+  });
+
   it("shows a download fallback for videos the browser cannot play", () => {
     render(
       <MarkdownContent
@@ -402,6 +413,30 @@ describe("MarkdownContent work order files", () => {
       "https://cdn.example/clip.mov",
     );
     expect(screen.getByText("This browser cannot play this video.")).toBeInTheDocument();
+  });
+
+  it("retries a video after a new download URL when playback failed", () => {
+    const { rerender } = render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    fireEvent.error(document.querySelector("video")!);
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Download video" })).toBeInTheDocument();
+
+    rerender(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip-2.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip-2.mp4");
   });
 });
 
@@ -465,5 +500,75 @@ describe("MarkdownContent images", () => {
     const { container } = render(<MarkdownContent content="![Architecture](https://files.example/architecture.png)" />);
 
     expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+  });
+});
+
+describe("MarkdownContent GitHub attachments", () => {
+  const attachment = "https://github.com/user-attachments/assets/31436ab5-d9ce-405a-89fc-fba12e03a40f";
+
+  it("plays a GitHub user-attachments autolink as video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(screen.queryByRole("link", { name: attachment })).not.toBeInTheDocument();
+  });
+
+  it("plays a GitHub attachment image as video when the type is unknown", () => {
+    render(<MarkdownContent content={`![clip](${attachment})`} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(video).toHaveAttribute("aria-label", "clip");
+  });
+
+  it("shows an image when the GitHub attachment is not a video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    fireEvent.error(document.querySelector("video")!);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("img", { name: attachment })).toHaveAttribute("src", attachment);
+  });
+
+  it("keeps a labeled GitHub attachment as a link", () => {
+    render(<MarkdownContent content={`See [Watch clip](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps a formatted GitHub attachment label as a link", () => {
+    render(<MarkdownContent content={`See [**Watch clip**](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps a repository file under assets as a link", () => {
+    const file = "https://github.com/superplanehq/superplane/blob/main/docs/assets/diagram.png";
+    render(<MarkdownContent content={`See ${file}`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: file })).toHaveAttribute("href", file);
+  });
+
+  it("plays a repository attachment autolink as video", () => {
+    const repoAttachment = "https://github.com/acme/app/assets/1/2";
+    render(<MarkdownContent content={repoAttachment} />);
+
+    expect(document.querySelector("video")).toHaveAttribute("src", repoAttachment);
+  });
+
+  it("keeps regular GitHub issue links as links", () => {
+    render(<MarkdownContent content="See https://github.com/superplanehq/superplane/issues/8004" />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: /issues\/8004/ })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/issues/8004",
+    );
   });
 });

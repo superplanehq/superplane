@@ -9,6 +9,7 @@ import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PLANNING_SETTINGS_COPY,
+  planningAutoStartLines,
   planningSettingsFromFactory,
   planningSettingsToApi,
   type PlanningSettingsTab,
@@ -69,6 +70,7 @@ export function PlanningSettingsHost({
       factoryKey={factoryKey}
       lineId={lineId}
       canvasId={canvasId}
+      lines={planningAutoStartLines(factoryQuery.data)}
       settings={planningSettingsFromFactory(factoryQuery.data)}
       title={findBacklogAutomationApp(appsQuery.data ?? [])?.name?.trim() || PLANNING_SETTINGS_COPY.title}
       initialTab={initialTab}
@@ -83,6 +85,7 @@ function PlanningSettingsLoaded({
   factoryKey,
   lineId,
   canvasId,
+  lines,
   settings,
   title,
   initialTab,
@@ -93,6 +96,7 @@ function PlanningSettingsLoaded({
   factoryKey: string;
   lineId?: string;
   canvasId?: string;
+  lines: ReturnType<typeof planningAutoStartLines>;
   settings: ReturnType<typeof planningSettingsFromFactory>;
   title: string;
   initialTab?: PlanningSettingsTab;
@@ -111,6 +115,7 @@ function PlanningSettingsLoaded({
   return (
     <PlanningSettingsPopup
       title={title}
+      lines={lines}
       settings={settings}
       automationGraph={automation.graph}
       automationLoading={automation.isLoading}

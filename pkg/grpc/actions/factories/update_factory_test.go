@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,5 +146,159 @@ func Test__UpdateFactory(t *testing.T) {
 			Confidence:     false,
 			SetupCompleted: true,
 		}, reloaded.Planning())
+	})
+
+	t.Run("public badge defaults cost off and keeps the token", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		assert.False(t, factory.PublicBadgeEnabled)
+		assert.False(t, factory.PublicBadgeShowCost)
+		assert.Nil(t, factory.PublicBadgeToken)
+
+		enabled := true
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                 factory.ID.String(),
+			PublicBadgeEnabled: &enabled,
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, response.Factory.PublicBadgeToken)
+		assert.True(t, response.Factory.PublicBadgeEnabled)
+		assert.False(t, response.Factory.PublicBadgeShowCost)
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		token := *reloaded.PublicBadgeToken
+		assert.GreaterOrEqual(t, len(token), 22)
+
+		disabled := false
+		response, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                 factory.ID.String(),
+			PublicBadgeEnabled: &disabled,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.Factory.PublicBadgeEnabled)
+		assert.Equal(t, token, response.Factory.PublicBadgeToken)
+		assert.False(t, response.Factory.PublicBadgeShowCost)
+
+		showCost := true
+		response, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id:                  factory.ID.String(),
+			PublicBadgeShowCost: &showCost,
+		})
+		require.NoError(t, err)
+		assert.False(t, response.Factory.PublicBadgeEnabled)
+		assert.True(t, response.Factory.PublicBadgeShowCost)
+		assert.Equal(t, token, response.Factory.PublicBadgeToken)
+
+		reloaded, err = models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.False(t, reloaded.PublicBadgeEnabled)
+		assert.True(t, reloaded.PublicBadgeShowCost)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		assert.Equal(t, token, *reloaded.PublicBadgeToken)
+	})
+
+	t.Run("concurrent first enables keep one token", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		const attempts = 8
+		enabled := true
+		tokens := make([]string, attempts)
+		errs := make([]error, attempts)
+		var wg sync.WaitGroup
+		wg.Add(attempts)
+		for i := range attempts {
+			go func() {
+				defer wg.Done()
+				response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+					Id:                 factory.ID.String(),
+					PublicBadgeEnabled: &enabled,
+				})
+				errs[i] = err
+				if err == nil && response.Factory != nil {
+					tokens[i] = response.Factory.PublicBadgeToken
+				}
+			}()
+		}
+		wg.Wait()
+
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+		require.NotEmpty(t, tokens[0])
+		for _, token := range tokens[1:] {
+			assert.Equal(t, tokens[0], token)
+		}
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.PublicBadgeToken)
+		assert.Equal(t, tokens[0], *reloaded.PublicBadgeToken)
+	})
+
+	t.Run("stores and clears the auto-start line", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		line, err := factory.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		response, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				SetupCompleted:  true,
+				AutoStartLineId: line.ID.String(),
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, line.ID.String(), response.Factory.Planning.GetAutoStartLineId())
+
+		cleared, err := UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:        true,
+				Confidence:     true,
+				SetupCompleted: true,
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, cleared.Factory.Planning.GetAutoStartLineId())
+
+		reloaded, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.PlanningAutoStartLineID)
+	})
+
+	t.Run("rejects an auto-start line outside the workspace", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		other, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("other"), "", "")
+		require.NoError(t, err)
+		foreignLine, err := other.CreateLine(database.DB(t.Context()), "implement", nil)
+		require.NoError(t, err)
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: "not-a-uuid",
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+		_, err = UpdateFactory(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryRequest{
+			Id: factory.ID.String(),
+			Planning: &pb.FactoryPlanning{
+				Enabled:         true,
+				Confidence:      true,
+				AutoStartLineId: foreignLine.ID.String(),
+			},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 }

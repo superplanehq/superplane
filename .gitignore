@@ -21,6 +21,14 @@ CLAUDE.local.md
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+.agents/skills/reui/
+.claude/skills/reui/
+.cursor/skills/reui/
+.cursor/rules/reui.mdc
+.cursor/mcp.json
+.mcp.json
+.opencode/
+opencode.json
 .worktrees/
 .superpowers/
 docs/superpowers/

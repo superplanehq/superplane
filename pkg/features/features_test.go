@@ -15,14 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory sentry intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactorySentryIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactorySentryIntake, f.ID)
-		assert.Equal(t, "Factory Sentry Intake", f.Label)
-		assert.Equal(t, "Add Sentry intake from the Backlog column", f.Description)
-	})
-
 	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryJiraIntake)
 		assert.True(t, ok)
@@ -123,6 +115,22 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns factory task console feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryTaskConsole)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryTaskConsole, f.ID)
+		assert.Equal(t, "Task Console", f.Label)
+	})
+
+	t.Run("known id returns SuperPlane MCP server feature", func(t *testing.T) {
+		f, ok := Get(FeatureSuperPlaneMCPServer)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
+		assert.Equal(t, "MCP Server", f.Label)
+		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -133,12 +141,17 @@ func Test__Get(t *testing.T) {
 		_, ok := Get("")
 		assert.False(t, ok)
 	})
+
+	t.Run("retired sentry intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_sentry_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
 }
 
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactorySentryIntake))
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDependabotIntake))
@@ -151,9 +164,17 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureFactoryRiskScore))
+	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
 	assert.False(t, Exists("factory_visual_evidence"))
+	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
+}
+
+func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
+	for _, feature := range All() {
+		assert.NotEqual(t, "factory_sentry_intake", feature.ID)
+	}
 }
 
 func Test__All_isCopy(t *testing.T) {

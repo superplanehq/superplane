@@ -30,7 +30,6 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
 	}
-	factoryID := resolvedFactory.ID
 
 	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
 	if err != nil {
@@ -51,14 +50,60 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 		}
 	}
 
-	var factory *models.Factory
+	line, err := resolvedFactory.FindLineByName(db, lineName)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+
+	factory, order, err := DispatchWorkOrderOnLine(
+		db,
+		resolvedFactory,
+		orderID,
+		line,
+		actor,
+		int(req.GetStartStepIndex()),
+		req.GetReplaceActive(),
+		req.GetModel(),
+		req.GetThinkingLevel(),
+	)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+	}
+
+	return &pb.DispatchWorkOrderResponse{
+		Order: serialized,
+	}, nil
+}
+
+func DispatchWorkOrderOnLine(
+	db *gorm.DB,
+	factory *models.Factory,
+	orderID uuid.UUID,
+	line *models.FactoryLine,
+	actor *uuid.UUID,
+	startIndex int,
+	replaceActive bool,
+	model string,
+	thinkingLevel string,
+) (*models.Factory, *models.FactoryWorkOrder, error) {
+	if factory == nil || line == nil || orderID == uuid.Nil {
+		return nil, nil, invalidArgument("work order dispatch is incomplete")
+	}
+
 	var order *models.FactoryWorkOrder
-	var pendingRuns []*models.CanvasRun
 	var startedSteps []*models.FactoryLineStepResult
 	var logger *log.Entry
 	var fromState string
+	orgID := factory.OrganizationID
+	factoryID := factory.ID
+	lineID := line.ID
 
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		f, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
 			return err
@@ -73,23 +118,24 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order).
+			WithField("organization_id", factory.OrganizationID)
 		if !order.IsDispatchable() {
 			return models.ErrFactoryWorkOrderNotDispatchable
 		}
 
-		line, err := factory.FindLineByName(tx, lineName)
+		currentLine, err := factory.FindLine(tx, lineID)
 		if err != nil {
 			return err
 		}
 
-		if len(line.Steps) == 0 {
+		if len(currentLine.Steps) == 0 {
 			return models.ErrFactoryLineHasNoSteps
 		}
 
-		model := strings.TrimSpace(req.GetModel())
+		model = strings.TrimSpace(model)
 		if model != "" {
-			allowed, err := listLineRunnerModels(tx, orgID, factoryID, lineName)
+			allowed, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
 			if err != nil {
 				return err
 			}
@@ -97,31 +143,35 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 				return invalidArgument("model is not available on this line")
 			}
 		}
-		thinkingLevel, err := runner.NormalizeDispatchThinkingLevel(req.GetThinkingLevel())
+		normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
 		if err != nil {
 			return invalidArgument(err.Error())
 		}
 
-		startIndex := int(req.GetStartStepIndex())
 		fromState = order.State
+		if err := fillMissingWorkOrderTitle(tx, order); err != nil {
+			return err
+		}
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
 			return err
 		}
+		if _, err := order.ClearAutoStart(tx); err != nil {
+			return err
+		}
 
-		if req.GetReplaceActive() && startIndex > 0 {
-			_, started, err := order.RetryLineStep(tx, line, startIndex)
+		if replaceActive && startIndex > 0 {
+			_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
 			if err != nil {
 				return err
 			}
 			startedSteps = started
-			pendingRuns = pendingRunsFromStepResults(started)
 			return nil
 		}
 
 		var abandoned []*models.FactoryLineStepResult
 		_, err = order.FindActiveLineDispatch(tx)
 		if err == nil {
-			if !req.GetReplaceActive() {
+			if !replaceActive {
 				return models.ErrFactoryWorkOrderLineDispatchActive
 			}
 			abandoned, err = order.AbandonActiveLineDispatch(tx)
@@ -132,24 +182,33 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model, thinkingLevel)
+		_, result, err := currentLine.DispatchFromWithModel(tx, order, startIndex, model, normalizedThinking)
 		if err != nil {
 			return err
 		}
 
 		startedSteps = append(abandoned, result)
-		pendingRuns = pendingRunsFromStepResults(startedSteps)
 		return nil
 	})
-
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
+		return nil, nil, err
 	}
 
-	for _, pendingRun := range pendingRuns {
-		if err := messages.NewCanvasRunMessage(pendingRun.WorkflowID.String(), pendingRun.ID.String()).PublishPending(); err != nil {
-			logger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
-		}
+	publishDispatchedWorkOrder(logger, orgID, factoryID, order, actor, fromState, startedSteps)
+	return factory, order, nil
+}
+
+func publishDispatchedWorkOrder(
+	logger *log.Entry,
+	orgID uuid.UUID,
+	factoryID uuid.UUID,
+	order *models.FactoryWorkOrder,
+	actor *uuid.UUID,
+	fromState string,
+	startedSteps []*models.FactoryLineStepResult,
+) {
+	for _, result := range startedSteps {
+		publishPendingStepRun(logger, result)
 	}
 
 	publishedOrders := map[uuid.UUID]struct{}{order.ID: {}}
@@ -194,23 +253,24 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
 		}
 	}
-
-	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to dispatch work order")
-	}
-
-	return &pb.DispatchWorkOrderResponse{
-		Order: serialized,
-	}, nil
 }
 
-func pendingRunsFromStepResults(results []*models.FactoryLineStepResult) []*models.CanvasRun {
-	var runs []*models.CanvasRun
-	for _, result := range results {
-		if result != nil && result.Run != nil {
-			runs = append(runs, result.Run)
-		}
+// publishPendingStepRun publishes one started step and logs that step's
+// work order. A replace or retry can also start a queued run for another
+// order, so the dispatch order on logger is not the owner of every run.
+func publishPendingStepRun(logger *log.Entry, result *models.FactoryLineStepResult) {
+	if result == nil || result.Run == nil {
+		return
 	}
-	return runs
+
+	runLogger := logger.WithField("run_id", result.Run.ID)
+	if result.Execution != nil && result.Execution.WorkOrderID != uuid.Nil {
+		runLogger = runLogger.WithField("order_id", result.Execution.WorkOrderID)
+	}
+
+	if err := messages.NewCanvasRunMessage(result.Run.WorkflowID.String(), result.Run.ID.String()).PublishPending(); err != nil {
+		runLogger.WithError(err).Errorf("Error publishing pending canvas run message: %v", err)
+		return
+	}
+	runLogger.Info("Published pending canvas run")
 }

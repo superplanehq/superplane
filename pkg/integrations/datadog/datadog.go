@@ -10,12 +10,25 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const ResourceTypeService = "service"
+
+const (
+	datadogWebhookOutcomeRejected  = "rejected"
+	datadogWebhookOutcomeFailed    = "failed"
+	datadogWebhookOutcomeIgnored   = "ignored"
+	datadogWebhookOutcomeReceived  = "received"
+	datadogWebhookOutcomeDelivered = "delivered"
+	datadogEventTypeUnknown        = "unknown"
+)
 
 const installationInstructions = `
 To configure Datadog to work with SuperPlane:
@@ -188,37 +201,148 @@ func (d *Datadog) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	if err := verifyWebhookRequest(ctx.Integration, ctx.Request); err != nil {
-		ctx.Logger.Warnf("rejected datadog webhook: %v", err)
+		logDatadogWebhookRejected(ctx, err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeRejected, 0)
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	body, err := io.ReadAll(ctx.Request.Body)
+	body, err := readWebhookBody(ctx.Request.Body)
 	if err != nil {
-		ctx.Logger.Errorf("failed to read datadog webhook body: %v", err)
+		if errors.Is(err, errWebhookBodyTooLarge) {
+			logDatadogWebhookFailed(ctx, datadogEventTypeUnknown, "", nil, err)
+			setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
+			ctx.Response.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+		logDatadogWebhookFailed(ctx, datadogEventTypeUnknown, "", nil, err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	payload := map[string]any{}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		ctx.Logger.Errorf("failed to decode datadog webhook body: %v", err)
+		logDatadogWebhookFailed(ctx, datadogEventTypeUnknown, "", body, err)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, 0)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	eventType, alertTransition := datadogEventKind(payload)
 	if !shouldDispatchErrorTrackingAlert(payload) {
+		logDatadogWebhookIgnored(ctx, eventType, alertTransition, body)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeIgnored, 0)
 		ctx.Response.WriteHeader(http.StatusOK)
 		return
 	}
 
-	if err := d.dispatchWebhookMessage(ctx, payload); err != nil {
-		ctx.Logger.Errorf("failed to dispatch datadog webhook: %v", err)
+	stampWebhookReceipt(payload, ctx.Request)
+	subscriptionCount, delivered, sendErr := d.dispatchWebhookMessage(ctx, payload)
+	if delivered == 0 && sendErr != nil {
+		logDatadogWebhookFailed(ctx, eventType, alertTransition, body, sendErr)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeFailed, subscriptionCount)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	if sendErr != nil {
+		logDatadogWebhookPartialFailure(ctx, eventType, alertTransition, body, sendErr)
+		setWebhookReceipt(ctx.Request, models.DatadogWebhookOutcomeAccepted, subscriptionCount)
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
+	}
+
+	logDatadogWebhookReceived(ctx, eventType, alertTransition, body, nil)
+	outcome := models.DatadogWebhookOutcomeAccepted
+	if subscriptionCount == 0 {
+		outcome = models.DatadogWebhookOutcomeNoSubscription
+	}
+	setWebhookReceipt(ctx.Request, outcome, subscriptionCount)
 	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func datadogEventKind(payload map[string]any) (string, string) {
+	eventType, _ := payload["event_type"].(string)
+	alertTransition, _ := payload["alert_transition"].(string)
+	return eventType, alertTransition
+}
+
+func logDatadogWebhookRejected(ctx core.HTTPRequestContext, err error) {
+	logging.LogDatadogWebhookWarn(
+		"Datadog webhook rejected",
+		datadogReceiptFields(ctx, datadogEventTypeUnknown, "", datadogWebhookOutcomeRejected, nil),
+		err,
+	)
+}
+
+func logDatadogWebhookFailed(ctx core.HTTPRequestContext, eventType, alertTransition string, body []byte, err error) {
+	logging.LogDatadogWebhookError(
+		"Datadog webhook failed",
+		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeFailed, body),
+		err,
+	)
+}
+
+func logDatadogWebhookIgnored(ctx core.HTTPRequestContext, eventType, alertTransition string, body []byte) {
+	logging.LogDatadogWebhookInfo(
+		"Datadog webhook ignored",
+		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeIgnored, body),
+		nil,
+	)
+}
+
+func logDatadogWebhookReceived(ctx core.HTTPRequestContext, eventType, alertTransition string, body []byte, err error) {
+	logging.LogDatadogWebhookInfo(
+		"Datadog webhook received",
+		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeReceived, body),
+		err,
+	)
+}
+
+func logDatadogWebhookPartialFailure(ctx core.HTTPRequestContext, eventType, alertTransition string, body []byte, err error) {
+	logging.LogDatadogWebhookError(
+		"Datadog webhook received",
+		datadogReceiptFields(ctx, eventType, alertTransition, datadogWebhookOutcomeReceived, body),
+		err,
+	)
+}
+
+func datadogReceiptFields(ctx core.HTTPRequestContext, eventType, alertTransition, outcome string, body []byte) log.Fields {
+	integrationID := ""
+	if ctx.Integration != nil {
+		integrationID = ctx.Integration.ID().String()
+	}
+
+	return logging.WithWebhookPayload(log.Fields{
+		"outcome":           outcome,
+		"event_type":        eventType,
+		"alert_transition":  alertTransition,
+		"organization_id":   ctx.OrganizationID,
+		"organization_name": "",
+		"integration_id":    integrationID,
+		"workspace_id":      "",
+		"workspace_name":    "",
+		"intake_id":         "",
+		"intake_name":       "",
+	}, body)
+}
+
+var errWebhookBodyTooLarge = errors.New("webhook body is too large")
+
+func readWebhookBody(body io.Reader) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+
+	payload, err := io.ReadAll(io.LimitReader(body, int64(config.MaxWebhookPayloadSize)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(payload) > config.MaxWebhookPayloadSize {
+		return nil, errWebhookBodyTooLarge
+	}
+	return payload, nil
 }
 
 func shouldDispatchErrorTrackingAlert(payload map[string]any) bool {
@@ -237,17 +361,15 @@ func isDispatchableAlertTransition(transition string) bool {
 		strings.EqualFold(transition, AlertTransitionRetriggered)
 }
 
-func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload map[string]any) error {
+func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload map[string]any) (subscriptionCount int, delivered int, sendErr error) {
 	subscriptions, err := ctx.Integration.ListSubscriptions()
 	if err != nil {
-		return fmt.Errorf("failed to list datadog subscriptions: %w", err)
+		return 0, 0, fmt.Errorf("failed to list datadog subscriptions: %w", err)
 	}
 
-	var sendErr error
-	delivered := 0
+	subscriptionCount = len(subscriptions)
 	for _, subscription := range subscriptions {
 		if err := subscription.SendMessage(payload); err != nil {
-			ctx.Logger.Errorf("failed to send datadog message to subscription: %v", err)
 			sendErr = errors.Join(sendErr, err)
 			continue
 		}
@@ -258,9 +380,9 @@ func (d *Datadog) dispatchWebhookMessage(ctx core.HTTPRequestContext, payload ma
 	// subscription accepted the alert, so a later retry cannot duplicate a
 	// delivery that already succeeded.
 	if delivered == 0 && sendErr != nil {
-		return sendErr
+		return subscriptionCount, delivered, sendErr
 	}
-	return nil
+	return subscriptionCount, delivered, sendErr
 }
 
 func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

@@ -187,6 +187,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 		}
 	}
 	require.True(t, found, "expected follow_up_loop.js task file")
+	require.Equal(t, runner.AttachmentLimitFile().Content, requireTaskFile(t, got.Files, "attachment_limit.js").Content)
 	require.NotEmpty(t, requireTaskFile(t, got.Files, "fetch_task_attachments.sh").Content)
 	require.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
 }
@@ -204,6 +205,7 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
 	require.Equal(t, runner.PlanningSessionProtocolFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.js").Content)
 	require.Equal(t, runner.PlanningSessionProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.md").Content)
+	require.Equal(t, runner.AttachmentLimitFile().Content, requireTaskFile(t, got.Files, "attachment_limit.js").Content)
 }
 
 func TestRunScriptSpawnsOpenCodeNotChatCompletions(t *testing.T) {

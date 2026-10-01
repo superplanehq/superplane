@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -28,11 +29,12 @@ type IntakeDependencies struct {
 }
 
 type IntakeItem struct {
-	ID    string
-	Key   string
-	Title string
-	Body  string
-	URL   string
+	ID        string
+	Key       string
+	Title     string
+	Body      string
+	URL       string
+	CreatedAt time.Time
 }
 
 type intakeItemSource interface {

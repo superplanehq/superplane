@@ -1,36 +1,32 @@
-import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
+import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { fetchFactoryAutomations, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
+import {
+  fetchFactoryAutomations,
+  useCreateFactoryLine,
+  useSelectFactoryVcsProviderRepository,
+  useUpdateFactory,
+} from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
-import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { advanceAfterGithubConnect } from "./advanceAfterGithubConnect";
+import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
-import {
-  githubIntegrationOwner,
-  githubOwnerFromConnections,
-  nameOrganizationFromGitHubOwner,
-  shouldNameOrganizationFromGitHub,
-} from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
-import { firstRunRepositoryPatch } from "./onboardingRepository";
 import {
   apiIssuesSource,
   initialOnboardingSelections,
@@ -43,23 +39,18 @@ import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
-import { useOnboardingGithubRepos } from "./useOnboardingGithubRepos";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import {
   useOnboardingSetupState,
   type InitialOnboardingSetupState,
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
-import { persistSelectedGithubConnection } from "./onboardingGithubCleanup";
-import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
-const ONBOARDING_INTEGRATIONS = ["github", "jira", ...AGENT_PROVIDER_IDS];
+const ONBOARDING_INTEGRATIONS = ["jira", ...AGENT_PROVIDER_IDS];
 
-// Onboarding never adopts an existing organization GitHub or agent
-// connection on its own. GitHub repositories must come from the account the
-// user picked. Agent keys stay unselected so a new workspace can use the
-// canonical SuperPlane template when hosted credit is available.
-const ONBOARDING_MANUAL_SELECTIONS = ["github", ...AGENT_PROVIDER_IDS] as const;
+// Agent keys stay unselected so a new workspace can use the canonical
+// SuperPlane template when hosted credit is available.
+const ONBOARDING_MANUAL_SELECTIONS = [...AGENT_PROVIDER_IDS] as const;
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key
@@ -138,11 +129,6 @@ function useSectionSaves(args: {
       }),
     );
   };
-  const saveRepository = (repository: string) => {
-    const integrationId = args.selections.github?.id;
-    if (!repository || !integrationId) return Promise.resolve(false);
-    return runSave(args.setSaving, () => args.updateOnboarding(firstRunRepositoryPatch(integrationId, repository)));
-  };
   // The caller passes the source, because a selection made in the same render
   // is not readable from the setup state yet.
   const saveIssues = (source: IssuesChoiceId) => {
@@ -155,7 +141,7 @@ function useSectionSaves(args: {
       }),
     );
   };
-  return { saveName, saveRepository, saveIssues };
+  return { saveName, saveIssues };
 }
 
 /** Names held by the other workspaces of the organization. */
@@ -175,166 +161,11 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
   );
 }
 
-/**
- * After an organization rename, the connection list reloads under the new
- * slug before the repository request can start. Keep one loader visible
- * through both requests.
- */
-function isRepositoryListLoading(args: {
-  savedIntegrationId?: string;
-  selectedIntegrationId: string;
-  connectionsLoading: boolean;
-  repositoriesLoading: boolean;
-}): boolean {
-  if (!args.savedIntegrationId && !args.selectedIntegrationId) return false;
-  return args.connectionsLoading || args.repositoriesLoading;
-}
-
-function useOnboardingGithubConnectionSelected(args: {
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
-  onboardingEntryPath?: string | null;
-  reresolveWorkspace: OnboardingWorkspaceResolution | null;
-  setup: OnboardingSetupApi;
-  setOpenSection: (section: WizardStepId) => void;
-  updateOnboarding: UpdateOnboarding;
-  updateOrganization: ReturnType<typeof useUpdateOrganization>;
-}) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-
-  return async (integration: OrganizationsIntegration) => {
-    args.setup.selectVcsHost("github");
-    args.setOpenSection("repo");
-
-    const integrationId = integration.metadata?.id;
-    if (!integrationId) return;
-
-    const previousId = args.factory?.onboarding?.vcsIntegrationId;
-    if (
-      !(await persistSelectedGithubConnection({
-        ...args,
-        queryClient,
-        integrationId,
-        previousId,
-      }))
-    ) {
-      return;
-    }
-
-    await advanceAfterGithubConnect({
-      onboardingEntryPath: args.onboardingEntryPath,
-      organizationId: args.organizationId,
-      nextSlug: args.organizationId,
-      factoryId: args.factoryId,
-      factoryKey: args.factoryKey,
-      navigate,
-      reresolveWorkspace: args.reresolveWorkspace,
-      queryClient,
-    });
-
-    const owner = githubIntegrationOwner(integration);
-    if (!owner || !shouldNameOrganizationFromGitHub(args.factory)) return;
-
-    try {
-      const nextSlug = await nameOrganizationFromGitHubOwner({
-        owner,
-        currentSlug: args.organizationId,
-        update: async (identity) => {
-          const response = await args.updateOrganization.mutateAsync(identity);
-          return response.data?.organization?.metadata?.slug;
-        },
-      });
-      if (!nextSlug || nextSlug === args.organizationId) return;
-
-      await advanceAfterGithubConnect({
-        onboardingEntryPath: args.onboardingEntryPath,
-        organizationId: args.organizationId,
-        nextSlug,
-        factoryId: args.factoryId,
-        factoryKey: args.factoryKey,
-        navigate,
-        reresolveWorkspace: args.reresolveWorkspace,
-        queryClient,
-      });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
-    }
-  };
-}
-
-function useOnboardingGithubConnectionsForPage(args: {
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
-  onboardingEntryPath?: string | null;
-  reresolveWorkspace: OnboardingWorkspaceResolution | null;
-  searchParams: URLSearchParams;
-  setup: OnboardingSetupApi;
-  openSection: WizardStepId;
-  setOpenSection: (section: WizardStepId) => void;
-  updateOnboarding: UpdateOnboarding;
-  updateOrganization: ReturnType<typeof useUpdateOrganization>;
-  integrationData: Parameters<typeof useOnboardingGithubConnections>[0]["integrationData"];
-  selections: IntegrationSelections;
-  selectInstance: (integrationName: string, integrationId: string) => void;
-}) {
-  const selectNewest = args.searchParams.get("pick") === "newest";
-  const onConnectionSelected = useOnboardingGithubConnectionSelected(args);
-
-  return useOnboardingGithubConnections({
-    integrationData: args.integrationData,
-    openSection: args.openSection,
-    // Only the `pick=newest` round trip auto-selects. Every other path,
-    // including an install request approved outside the round trip, shows
-    // the account picker and waits for the user to select the account.
-    selectNewest,
-    selections: args.selections,
-    selectInstance: args.selectInstance,
-    onConnectionSelected,
-  });
-}
-
-function useSelectOnboardingVcsConnection(args: {
-  organizationId: string;
-  factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
-  factoryId: string;
-  setup: OnboardingSetupApi;
-  updateOnboarding: UpdateOnboarding;
-  currentId: string;
-  selectInstance: (integrationName: string, integrationId: string) => void;
-}) {
-  const queryClient = useQueryClient();
-  return async (integrationId: string): Promise<boolean> => {
-    if (integrationId !== args.currentId) {
-      const saved = await persistSelectedGithubConnection({
-        setup: args.setup,
-        updateOnboarding: args.updateOnboarding,
-        organizationId: args.organizationId,
-        factory: args.factory,
-        factories: args.factories,
-        factoryId: args.factoryId,
-        queryClient,
-        integrationId,
-        previousId: args.currentId || args.factory?.onboarding?.vcsIntegrationId,
-      });
-      if (!saved) return false;
-    }
-    args.selectInstance("github", integrationId);
-    return true;
-  };
-}
-
 /** The mutation hooks the page model saves and provisions through. */
 function useOnboardingMutations(organizationId: string, factoryId: string) {
   return {
     updateFactory: useUpdateFactory(organizationId, factoryId),
+    selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
     updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
@@ -369,15 +200,6 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     args.mutations;
   const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
-  const githubConnections = useOnboardingGithubConnectionsForPage({
-    ...args,
-    updateOnboarding: updateOnboarding.mutateAsync,
-    updateOrganization,
-    integrationData: args.connect.integrationData,
-    selections: args.integrations.selections,
-    selectInstance: args.connect.selectInstance,
-  });
-  const github = useOnboardingGithubRepos(args.organizationId, githubIntegrationId);
   const takenNames = useMemo(
     () => otherWorkspaceNames(args.factories, args.factoryId),
     [args.factories, args.factoryId],
@@ -391,10 +213,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
-  const githubOwner = githubOwnerFromConnections(
-    [...githubConnections.readyInstances, ...githubConnections.allInstances],
-    githubIntegrationId,
-  );
+  const githubOwner = args.setup.selectedRepo?.split("/")[0];
   const finish = useFinishOnboarding({
     ...args,
     selections: args.integrations.selections,
@@ -423,33 +242,36 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     onProvisioned: args.setProvisionedDestination,
   });
   const finishSetup = useFinishSetupAction({ ...args, finish });
-  const selectVcsConnection = useSelectOnboardingVcsConnection({
-    ...args,
-    updateOnboarding: updateOnboarding.mutateAsync,
-    currentId: githubIntegrationId,
-    selectInstance: args.connect.selectInstance,
-  });
+  const selectCatalogRepository = async (repository: {
+    repositoryId?: string;
+    fullName?: string;
+  }): Promise<boolean> => {
+    if (!repository.repositoryId || !repository.fullName) return false;
+    const repositoryId = repository.repositoryId;
+    const fullName = repository.fullName;
+    return runSave(args.setSaving, async () => {
+      const factory = await args.mutations.selectGitHubRepository.mutateAsync(repositoryId);
+      const integrationId = factory.onboarding?.vcsIntegrationId;
+      if (!integrationId) throw new Error("GitHub repository selection returned no integration");
+      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.integrations.setSelections((current) => ({
+        ...current,
+        github: githubIntegrationSelection(integrationId, installationName),
+      }));
+      args.setup.selectVcsHost("github");
+      args.setup.selectRepo(fullName);
+    });
+  };
 
   return {
     githubIntegrationId,
-    githubConnections,
-    github,
     saves,
     githubOwner,
     finishSetup,
-    selectVcsConnection,
+    selectCatalogRepository,
     jira,
     installer,
     createIntake,
-    requestConfigure: () => {
-      window.open(githubInstallationUrl(github.githubIntegration.data), "_blank", "noopener,noreferrer");
-    },
-    repositoriesLoading: isRepositoryListLoading({
-      savedIntegrationId: args.factory?.onboarding?.vcsIntegrationId,
-      selectedIntegrationId: githubIntegrationId,
-      connectionsLoading: args.connect.connectionsLoading,
-      repositoriesLoading: github.repositoriesLoading,
-    }),
   };
 }
 
@@ -525,21 +347,8 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
-    // The connect screen refetches on open, so the picker never shows a
-    // stale connection list.
-    refreshGithubConnections: connect.refetchConnections,
-    githubConnectionsLoading: connect.connectionsLoading,
-    requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
-    offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
-    createVcsConnection: () => connect.createNew("github"),
-    selectVcsConnection: wired.selectVcsConnection,
-    githubConnections: wired.githubConnections,
-    selectedVcsConnectionId: wired.githubIntegrationId || undefined,
-    requestConfigure: wired.requestConfigure,
+    selectCatalogRepository: wired.selectCatalogRepository,
     integrationDialogs: connect.dialogs,
-    repositories: wired.github.repositories,
-    repositoriesLoading: wired.repositoriesLoading,
-    repositoriesError: wired.github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || wired.installer.isInstalling || wired.createIntake.isPending,
     ...wired.saves,

@@ -7,11 +7,13 @@ import type {
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrderRunUsageRow,
+  MeDescribeVcsProviderOnboardingResponse,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesFactoryAgentResource,
+  FactoriesFactoryMcpClient,
   FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
@@ -370,6 +372,8 @@ export interface FactoriesFixture {
   byokSelectedByProvider?: Record<string, string[]>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
+  /** Global GitHub App catalog state for Factory onboarding. */
+  githubOnboarding?: MeDescribeVcsProviderOnboardingResponse;
   /**
    * Per-order activity timelines. When an order id is absent, the handlers
    * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
@@ -387,8 +391,14 @@ export interface FactoriesFixture {
   intakeItemCatalog?: BacklogIntakeItemCatalog;
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  /** SuperPlane MCP clients connected to a workspace. */
+  mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
   agentResourceToolsById?: Record<string, Array<{ name: string; description?: string; readOnly?: boolean }>>;
+  /** Storybook: GET agent-resources list returns this HTTP status for these factory ids. */
+  failAgentResourcesListForFactoryIds?: string[];
+  /** Storybook: GET mcp-clients list returns this HTTP status for these factory ids. */
+  failMcpClientsListForFactoryIds?: string[];
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

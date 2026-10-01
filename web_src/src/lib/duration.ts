@@ -1,3 +1,8 @@
+const MS_PER_SECOND = 1_000;
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 3_600_000;
+const MS_PER_DAY = 86_400_000;
+
 type DurationParts = {
   days?: number;
   hours?: number;
@@ -20,17 +25,17 @@ type IntlWithDurationFormat = typeof Intl & {
 function toDurationParts(durationMs: number): DurationParts {
   let remainingMs = Math.max(0, Math.round(durationMs));
 
-  const days = Math.floor(remainingMs / 86_400_000);
-  remainingMs -= days * 86_400_000;
+  const days = Math.floor(remainingMs / MS_PER_DAY);
+  remainingMs -= days * MS_PER_DAY;
 
-  const hours = Math.floor(remainingMs / 3_600_000);
-  remainingMs -= hours * 3_600_000;
+  const hours = Math.floor(remainingMs / MS_PER_HOUR);
+  remainingMs -= hours * MS_PER_HOUR;
 
-  const minutes = Math.floor(remainingMs / 60_000);
-  remainingMs -= minutes * 60_000;
+  const minutes = Math.floor(remainingMs / MS_PER_MINUTE);
+  remainingMs -= minutes * MS_PER_MINUTE;
 
-  const seconds = Math.floor(remainingMs / 1_000);
-  remainingMs -= seconds * 1_000;
+  const seconds = Math.floor(remainingMs / MS_PER_SECOND);
+  remainingMs -= seconds * MS_PER_SECOND;
 
   const duration: DurationParts = {};
 
@@ -62,21 +67,36 @@ export type FormatDurationOptions = {
    *
    * `"second"` rounds to the nearest whole second and never renders
    * milliseconds. Durations under one second render as `"< 1s"` instead of
-   * `"0s"` or raw millisecond values. Useful for contexts like the work
-   * order timeline where sub-second precision is noise.
+   * `"0s"` or raw millisecond values. A raw duration of 24 hours or more
+   * rounds to the nearest hour and shows days and hours only. Useful for
+   * contexts like the work order timeline where sub-second precision is noise.
    */
   precision?: "millisecond" | "second";
 };
 
 export function formatDuration(durationMs: number, options?: FormatDurationOptions): string {
   if (options?.precision === "second") {
-    if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
-    if (durationMs < 1000) return "< 1s";
-
-    durationMs = Math.round(durationMs / 1000) * 1000;
+    return formatSecondPrecision(durationMs);
   }
 
-  const duration = toDurationParts(durationMs);
+  return formatResolvedDuration(toDurationParts(durationMs));
+}
+
+function formatSecondPrecision(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
+  if (durationMs < MS_PER_SECOND) return "< 1s";
+  if (durationMs >= MS_PER_DAY) {
+    return formatResolvedDuration(toDurationParts(roundToNearestHour(durationMs)));
+  }
+
+  return formatResolvedDuration(toDurationParts(Math.round(durationMs / MS_PER_SECOND) * MS_PER_SECOND));
+}
+
+function roundToNearestHour(durationMs: number): number {
+  return Math.floor((durationMs + MS_PER_HOUR / 2) / MS_PER_HOUR) * MS_PER_HOUR;
+}
+
+function formatResolvedDuration(duration: DurationParts): string {
   const DurationFormat = (Intl as IntlWithDurationFormat).DurationFormat;
 
   if (typeof DurationFormat === "function") {

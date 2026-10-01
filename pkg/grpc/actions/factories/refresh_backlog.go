@@ -38,7 +38,7 @@ func RefreshBacklog(
 ) (*pb.RefreshBacklogResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to refresh backlog")
+		return nil, intakeErrorToStatus(err, "failed to refresh backlog")
 	}
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -47,25 +47,25 @@ func RefreshBacklog(
 	}
 	archivedBy, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to refresh backlog")
+		return nil, intakeErrorToStatus(invalidArgument("invalid user id"), "failed to refresh backlog")
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to refresh backlog")
+		return nil, intakeErrorToStatus(err, "failed to refresh backlog")
 	}
 
 	sources, err := connectedIntakeAvailabilitySources(ctx, deps, db, factory)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to refresh backlog")
+		return nil, intakeErrorToStatus(err, "failed to refresh backlog")
 	}
 
 	orders, err := listFactoryWorkOrders(factory, db, models.ListFactoryWorkOrdersFilters{
 		States: []string{models.FactoryWorkOrderStateDraft},
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to refresh backlog")
+		return nil, intakeErrorToStatus(err, "failed to refresh backlog")
 	}
 
 	lookups := map[intakeItemAvailabilityKey]intakeItemAvailability{}

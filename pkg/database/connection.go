@@ -194,6 +194,10 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			vcs_provider_installation_reconcile_requesters,
+			vcs_provider_installation_reconcile_jobs,
+			vcs_provider_reconcile_jobs,
+			vcs_provider_installations,
 			secrets,
 			account_magic_codes,
 			account_password_auth,
@@ -226,7 +230,10 @@ func TruncateTables() error {
 			factory_planning_session_messages,
 			factory_planning_session_work_orders,
 			workspace_usage_events,
-			files
+			files,
+			mcp_oauth_clients,
+			mcp_oauth_codes,
+			mcp_oauth_refresh_tokens
 		restart identity cascade;
 	`).Error
 }
