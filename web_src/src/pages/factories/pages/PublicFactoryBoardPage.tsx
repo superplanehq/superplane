@@ -8,9 +8,10 @@ import { PublicFactoriesSidebar } from "../layout/FactoriesSidebar";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
 import type { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
+import { factoryRouteSegment, replaceFactoryKeySegment } from "../lib/factoryKeyResolution";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
-import { factoryRouteSegment, replaceFactoryKeySegment } from "../lib/factoryKeyResolution";
+import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
@@ -57,8 +58,6 @@ export function PublicFactoryBoardPage({
     factoryKey: string;
     lineId: string;
   }>();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [load, setLoad] = useState<BoardLoad>({ status: "loading" });
   const listState = useWorkOrderListState(`${organizationId}:${factoryKey}:${lineId}`);
   const signedInRef = useRef(signedIn);
@@ -105,18 +104,7 @@ export function PublicFactoryBoardPage({
     };
   }, [organizationId, factoryKey, lineId]);
 
-  useEffect(() => {
-    if (load.status !== "ready" || !load.board.urlId || !load.board.workspaceKey) {
-      return;
-    }
-    const canonical = factoryRouteSegment({ key: load.board.workspaceKey, urlId: load.board.urlId });
-    if (!canonical || canonical === factoryKey) {
-      return;
-    }
-    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, canonical);
-    navigate(`${target}${location.search}`, { replace: true });
-  }, [factoryKey, load, location.pathname, location.search, navigate, organizationId]);
-
+  usePublicBoardCanonicalRedirect(organizationId, factoryKey, load);
   usePublicBoardSocket(load.status === "ready", organizationId, factoryKey, lineId, reloadRef);
 
   const board = load.status === "ready" ? load.board : null;
@@ -165,6 +153,22 @@ export function PublicFactoryBoardPage({
       narrowed={listState.search.trim().length > 0 || listState.filterCount > 0}
     />
   );
+}
+
+function usePublicBoardCanonicalRedirect(organizationId: string, factoryKey: string, load: BoardLoad) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (load.status !== "ready" || !load.board.urlId || !load.board.workspaceKey) {
+      return;
+    }
+    const canonical = factoryRouteSegment({ key: load.board.workspaceKey, urlId: load.board.urlId });
+    if (!canonical || canonical === factoryKey) {
+      return;
+    }
+    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, canonical);
+    navigate(`${target}${location.search}`, { replace: true });
+  }, [factoryKey, load, location.pathname, location.search, navigate, organizationId]);
 }
 
 function usePublicBoardSocket(

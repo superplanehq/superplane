@@ -31,6 +31,13 @@ function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, facto
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
 }
 
+function workspaceLayoutKeys(factory: { key?: string; urlId?: string } | null | undefined, fallbackKey: string) {
+  return {
+    slug: factory?.key ?? fallbackKey,
+    routeSegment: factoryRouteSegment(factory) || fallbackKey,
+  };
+}
+
 /**
  * Hide workspace chrome while onboarding runs so the setup wizard matches the
  * onboarding design. Storybook uses its pending pointer; production checks the
@@ -136,8 +143,7 @@ function FactoriesLayoutContent({
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
-  const slug = factory?.key ?? factoryKey;
-  const routeSegment = factoryRouteSegment(factory) || factoryKey;
+  const { slug, routeSegment } = workspaceLayoutKeys(factory, factoryKey);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(
       organizationId,
