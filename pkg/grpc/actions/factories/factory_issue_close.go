@@ -36,6 +36,8 @@ type githubIssueWebhookIssue struct {
 	PullRequest json.RawMessage `json:"pull_request"`
 }
 
+var ErrArchiveDraftWorkOrders = errors.New("error archiving draft")
+
 func ArchiveDraftWorkOrdersFromGitHubIssueClosed(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
@@ -54,7 +56,14 @@ func ArchiveDraftWorkOrdersFromGitHubIssueClosed(
 		return code, err
 	}
 
-	archiveDraftWorkOrdersForClosedGitHubIssue(ctx, webhook, issue)
+	if err := archiveDraftWorkOrdersForClosedGitHubIssue(ctx, webhook, issue); err != nil {
+		log.WithError(err).Warnf(
+			"factory intake: failed to archive drafts for closed GitHub issue %s#%d",
+			issue.repository,
+			issue.number,
+		)
+		return http.StatusInternalServerError, fmt.Errorf("%w: %w", ErrArchiveDraftWorkOrders, err)
+	}
 	return http.StatusOK, nil
 }
 
@@ -99,22 +108,18 @@ func archiveDraftWorkOrdersForClosedGitHubIssue(
 	ctx context.Context,
 	webhook *models.Webhook,
 	issue closedGitHubIssue,
-) {
+) error {
 	if webhook == nil {
-		return
+		return nil
 	}
 
 	db := database.DB(ctx)
 	nodes, err := models.FindActiveWebhookNodesInTransaction(db, webhook.ID)
 	if err != nil {
-		log.WithError(err).Warnf(
-			"factory intake: failed to load nodes for closed GitHub issue %s#%d",
-			issue.repository,
-			issue.number,
-		)
-		return
+		return fmt.Errorf("load nodes for closed GitHub issue %s#%d: %w", issue.repository, issue.number, err)
 	}
 
+	var failed error
 	seenCanvas := map[uuid.UUID]struct{}{}
 	seenFactory := map[uuid.UUID]struct{}{}
 	for i := range nodes {
@@ -129,7 +134,7 @@ func archiveDraftWorkOrdersForClosedGitHubIssue(
 			continue
 		}
 		if err != nil {
-			log.WithError(err).Warnf("factory intake: failed to load intake for canvas %s", canvasID)
+			failed = errors.Join(failed, fmt.Errorf("load intake for canvas %s: %w", canvasID, err))
 			continue
 		}
 		if _, seen := seenFactory[intake.FactoryID]; seen {
@@ -138,18 +143,19 @@ func archiveDraftWorkOrdersForClosedGitHubIssue(
 		seenFactory[intake.FactoryID] = struct{}{}
 
 		factory, err := models.FindFactory(db, intake.OrganizationID, intake.FactoryID)
-		if err != nil {
+		if errors.Is(err, models.ErrFactoryNotFound) {
 			log.WithError(err).Warnf("factory intake: factory %s not found", intake.FactoryID)
 			continue
 		}
+		if err != nil {
+			failed = errors.Join(failed, fmt.Errorf("load factory %s: %w", intake.FactoryID, err))
+			continue
+		}
 		if err := archiveFactoryDraftsForClosedGitHubIssue(db, factory, issue); err != nil {
-			log.WithError(err).Warnf(
-				"factory intake: failed to archive drafts for closed GitHub issue %s#%d",
-				issue.repository,
-				issue.number,
-			)
+			failed = errors.Join(failed, err)
 		}
 	}
+	return failed
 }
 
 func archiveFactoryDraftsForClosedGitHubIssue(
@@ -159,9 +165,10 @@ func archiveFactoryDraftsForClosedGitHubIssue(
 ) error {
 	orders, err := factory.ListWorkOrdersByOriginURLFragment(db, fmt.Sprintf("/issues/%d", issue.number))
 	if err != nil {
-		return err
+		return fmt.Errorf("list drafts for closed GitHub issue %s#%d: %w", issue.repository, issue.number, err)
 	}
 
+	var failed error
 	for i := range orders {
 		order := &orders[i]
 		if !workOrderMatchesClosedGitHubIssue(order, issue) {
@@ -169,8 +176,12 @@ func archiveFactoryDraftsForClosedGitHubIssue(
 		}
 
 		closed, err := closeDraftWorkOrderIfCurrent(db, factory, order.ID, nil)
+		if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+			log.WithError(err).Warnf("factory intake: draft %s not found", order.ID)
+			continue
+		}
 		if err != nil {
-			log.WithError(err).Warnf("factory intake: failed to archive draft %s", order.ID)
+			failed = errors.Join(failed, fmt.Errorf("archive draft %s: %w", order.ID, err))
 			continue
 		}
 		if closed == nil {
@@ -187,7 +198,7 @@ func archiveFactoryDraftsForClosedGitHubIssue(
 			false,
 		)
 	}
-	return nil
+	return failed
 }
 
 func workOrderMatchesClosedGitHubIssue(order *models.FactoryWorkOrder, issue closedGitHubIssue) bool {

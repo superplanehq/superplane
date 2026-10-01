@@ -292,6 +292,27 @@ func TestArchiveDraftWorkOrdersFromGitHubIssueClosed(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, reload(t, hook.factory, order.ID).State)
 	})
 
+	t.Run("a database read failure returns an error and leaves the draft", func(t *testing.T) {
+		hook := newIntakeWebhook(t)
+		order := createDraft(t, hook.factory, "Still a draft", "https://github.com/acme/payments/issues/12")
+		body := closedBody("acme/payments", 12, "completed")
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		code, err := ArchiveDraftWorkOrdersFromGitHubIssueClosed(
+			ctx,
+			r.Encryptor,
+			hook.webhook,
+			"issues",
+			signed(hook.secret, body),
+			body,
+		)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrArchiveDraftWorkOrders)
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, reload(t, hook.factory, order.ID).State)
+	})
+
 	t.Run("an unverified body does not archive", func(t *testing.T) {
 		hook := newIntakeWebhook(t)
 		order := createDraft(t, hook.factory, "Unverified", "https://github.com/acme/payments/issues/12")

@@ -1822,7 +1822,11 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			r.Header,
 			body,
 		); err != nil {
-			http.Error(w, "invalid signature", code)
+			message := "invalid signature"
+			if errors.Is(err, factoryactions.ErrArchiveDraftWorkOrders) {
+				message = "error archiving draft"
+			}
+			http.Error(w, message, code)
 			return
 		}
 	}
