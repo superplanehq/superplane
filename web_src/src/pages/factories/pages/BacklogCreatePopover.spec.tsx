@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ComponentProps } from "react";
 
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
+
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import {
   BACKLOG_CREATE_COPY,
@@ -106,8 +108,8 @@ describe("BacklogCreatePopover", () => {
     const dependabot: BacklogIntakeSource = {
       intakeId: "intake-dependabot",
       name: "Dependabot alerts",
-      iconSrc: "/github.svg",
-      iconAlt: "GitHub",
+      iconSrc: dependabotIcon,
+      iconAlt: "Dependabot",
       tabLabel: "Dependabot",
     };
 
@@ -115,13 +117,13 @@ describe("BacklogCreatePopover", () => {
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     const githubIcon = screen.getByTestId("lines-backlog-create-icon-intake-github");
-    const dependabotIcon = screen.getByTestId("lines-backlog-create-icon-intake-dependabot");
+    const dependabotMark = screen.getByTestId("lines-backlog-create-icon-intake-dependabot");
     expect(screen.getByTestId("lines-backlog-create-tab-intake-github")).toHaveTextContent("GitHub");
-    expect(screen.getByTestId("lines-backlog-create-tab-intake-dependabot")).toHaveTextContent("Dependabot");
+    expect(screen.getByRole("tab", { name: "Dependabot" })).toBeInTheDocument();
     expect(githubIcon).toHaveAttribute("src", "/github.svg");
-    expect(dependabotIcon).toHaveAttribute("src", "/github.svg");
+    expect(dependabotMark).toHaveAttribute("src", dependabotIcon);
     expect(githubIcon).toHaveClass("dark:brightness-0", "dark:invert");
-    expect(dependabotIcon).toHaveClass("dark:brightness-0", "dark:invert");
+    expect(dependabotMark).toHaveClass("dark:brightness-0", "dark:invert");
     expect(screen.getByPlaceholderText("Import from Dependabot alert")).toBeInTheDocument();
   });
 

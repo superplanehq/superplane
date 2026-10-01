@@ -237,6 +237,34 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	assert.NotContains(t, string(body), appID.String())
 }
 
+func TestPublicBoardDependabotIntakeUsesDependabotIcon(t *testing.T) {
+	factory := &models.Factory{Name: "Instabot", Key: "NEWWO"}
+	line := &models.FactoryLine{Name: "implement"}
+	board := assemblePublicBoard(
+		factory,
+		line,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		[]models.FactoryIntake{{Source: models.FactoryIntakeSourceDependabotAlerts}},
+		nil,
+	)
+
+	assert.Equal(t, []publicAutomation{
+		{
+			ID:        "intake-0",
+			Kind:      "intake",
+			Name:      "Dependabot alerts",
+			CatalogID: "dependabot-alerts",
+			Icon:      "dependabot",
+			Health:    "healthy",
+		},
+	}, automationsNamed(board, "backlog"))
+}
+
 func automationsNamed(board *publicBoard, key string) []publicAutomation {
 	for _, column := range board.Columns {
 		if column.Key == key {
