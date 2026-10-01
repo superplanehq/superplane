@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { CanvasSpecYamlModal } from "./CanvasSpecYamlModal";
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   Editor: ({ value }: { value?: string }) => <pre data-testid="monaco-editor">{value}</pre>,
 }));
 

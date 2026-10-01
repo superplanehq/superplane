@@ -1,4 +1,4 @@
-import { Editor } from "@monaco-editor/react";
+import { Editor } from "@/ui/MonacoEditor";
 
 import { Textarea } from "@/components/ui/textarea";
 import { useTheme } from "@/contexts/useTheme";

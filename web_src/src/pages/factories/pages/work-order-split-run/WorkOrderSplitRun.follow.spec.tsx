@@ -54,7 +54,7 @@ const RUNNING_WITH_AGENT_NOTES: SplitRunFixture = {
   ),
 };
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 

@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 
-vi.mock("@monaco-editor/react", () => ({
+vi.mock("@/ui/MonacoEditor", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea
       aria-label="Panel YAML"
