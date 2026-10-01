@@ -36,6 +36,7 @@ var (
 	errIntakeNotConnected       = errors.New("intake is not connected")
 	errIntakeConnectionBroken   = errors.New("intake connection failed")
 	errIntakeItemNotFound       = errors.New("intake item not found")
+	errLinearIssueFiles         = errors.New("linear issue files")
 	errIntakeSearchUnsupported  = errors.New("this intake cannot search items yet")
 	errIntakeRefreshUnsupported = errors.New("no intake supports backlog refresh")
 	intakeItemSourceByTrigger   = map[string]intakeItemSourceBuilder{}

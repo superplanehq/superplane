@@ -3,6 +3,7 @@ package factories
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -166,25 +167,27 @@ func ImportFactoryIntakeItem(
 			IssueFiles(context.Context, string, string) ([]linear.IssueFile, []linear.IssueLink, error)
 		}); ok {
 			issueFiles, links, readErr := reader.IssueFiles(ctx, item.ID, body)
-			if readErr == nil {
-				body = linear.DescriptionWithLinks(body, links)
-				if len(issueFiles) > 0 {
-					ingested, ingestErr := storedfiles.AppendTaskFiles(
-						ctx,
-						tx,
-						blob.Current(),
-						orgID,
-						factory.ID,
-						order.ID,
-						&createdByID,
-						body,
-						incomingLinearFiles(issueFiles),
-					)
-					bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
-					if ingestErr == nil {
-						body = ingested.Markdown
-					}
+			if readErr != nil {
+				return errors.Join(errLinearIssueFiles, readErr)
+			}
+			body = linear.DescriptionWithLinks(body, links)
+			if len(issueFiles) > 0 {
+				ingested, ingestErr := storedfiles.AppendTaskFiles(
+					ctx,
+					tx,
+					blob.Current(),
+					orgID,
+					factory.ID,
+					order.ID,
+					&createdByID,
+					body,
+					incomingLinearFiles(issueFiles),
+				)
+				bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
+				if ingestErr != nil {
+					return errors.Join(errLinearIssueFiles, ingestErr)
 				}
+				body = ingested.Markdown
 			}
 		}
 		if body != order.Description {
