@@ -221,6 +221,7 @@ function countMCPActivity(counts: ActivityCounts, tool: AgentToolItem): void {
     increment(counts.questions, tool);
     return;
   }
+  // Leftover refine transcripts still record create_task MCP calls.
   if (identifier.includes("create_task")) {
     increment(counts.tasksCreated, tool);
     return;

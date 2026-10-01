@@ -253,20 +253,45 @@ describe("AgentActivityView", () => {
           completedTool("mcp-2", "propose_clarity", "mcp_tool_call"),
           completedTool("mcp-3", "propose_confidence", "mcp_tool_call"),
           completedTool("mcp-4", "mcp__superplane__survey", "mcp__superplane__survey"),
-          completedTool("mcp-5", "mcp__superplane__create_task", "mcp__superplane__create_task"),
-          completedTool("mcp-6", "create_task", "mcp_tool_call"),
         ])}
       />,
     );
 
     expect(
       screen.getByRole("button", {
-        name: "Explored 2 files, explored repository 2 times, inspected Git 2 times, prepared specification, scored task 2 times, prepared questions, created 2 tasks",
+        name: "Explored 2 files, explored repository 2 times, inspected Git 2 times, prepared specification, scored task 2 times, prepared questions",
       }),
     ).toBeInTheDocument();
   });
 
-  it("folds created tasks into the completed task summary", () => {
+  it("folds specification and scores into the completed task summary", () => {
+    render(
+      <AgentActivityView
+        activity={activityWithItems([
+          completedTool("mcp-1", "mcp__superplane__propose_spec", "mcp__superplane__propose_spec"),
+          completedTool("mcp-2", "propose_clarity", "mcp_tool_call"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Prepared task" })).toBeInTheDocument();
+  });
+
+  it("labels leftover create_task calls from older refine transcripts", () => {
+    render(
+      <AgentActivityView
+        live
+        activity={activityWithItems([
+          completedTool("mcp-1", "mcp__superplane__create_task", "mcp__superplane__create_task"),
+          completedTool("mcp-2", "create_task", "mcp_tool_call"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Created 2 tasks" })).toBeInTheDocument();
+  });
+
+  it("folds leftover created tasks into the completed summary", () => {
     render(
       <AgentActivityView
         activity={activityWithItems([

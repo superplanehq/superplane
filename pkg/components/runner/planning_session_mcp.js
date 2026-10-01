@@ -162,24 +162,6 @@ function currentActivityID() {
   return String(process.env.SUPERPLANE_ACTIVITY_ID || "").trim() || undefined;
 }
 
-// Splits one task off the draft under refinement. SuperPlane creates the
-// draft, links it to this session, and shows it in the chat.
-async function createTask(input) {
-  const title = String((input && input.title) || "").trim();
-  if (!title) {
-    throw new Error("title is required");
-  }
-  const description = String((input && input.description) || "").trim();
-  if (!description) {
-    throw new Error("description is required");
-  }
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/tasks", {
-    title,
-    description,
-    activity_id: currentActivityID(),
-  });
-}
-
 function requiredEnv(name, env = process.env) {
   const value = String(env[name] || "").trim();
   if (!value) {
@@ -391,26 +373,6 @@ const TOOLS = [
     },
   },
   {
-    name: "create_task",
-    description:
-      "Split one part of this task into a new draft task in the same backlog. Call this only after the user confirms the split in chat or in a survey answer. One call per task. Do not create a task that this session already created. After you create the tasks, narrow this task to the part that stays, then call propose_spec, propose_clarity, and propose_confidence again.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Short imperative title for the new task. Under 12 words.",
-        },
-        description: {
-          type: "string",
-          description:
-            "Markdown description of the new task. Self-contained: a reader who has not seen this chat must understand the goal, the scope, and what done looks like. Do not refer to this conversation.",
-        },
-      },
-      required: ["title", "description"],
-    },
-  },
-  {
     name: "inspect_attachment",
     description:
       "Inspect a user image from the task attachments directory. Returns the image so you can see it. Call this for every PNG, JPEG, GIF, or WebP user image. Do not use OCR or the file command.",
@@ -488,8 +450,6 @@ async function handleRequest(message) {
         result = await proposeConfidence(args);
       } else if (name === "survey") {
         result = await proposeSurvey(args);
-      } else if (name === "create_task") {
-        result = await createTask(args);
       } else if (name === "inspect_attachment") {
         result = inspectAttachment(args);
       } else {
@@ -664,7 +624,6 @@ module.exports = {
   proposeClarity,
   proposeConfidence,
   proposeSurvey,
-  createTask,
   inspectAttachment,
   recordAgentMessage,
   surveyQuestions,
