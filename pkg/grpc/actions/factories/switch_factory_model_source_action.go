@@ -28,6 +28,8 @@ func SwitchFactoryModelSource(
 		req.GetId(),
 		req.GetSource(),
 		req.GetApiKey(),
+		req.GetBaseUrl(),
+		req.GetApiType(),
 	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to switch model source")

@@ -7,12 +7,9 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
-import {
-  BYOK_PROVIDERS,
-  useBYOKLLMModels,
-  useSwitchFactoryModelSource,
-  useUpdateBYOKLLMModels,
-} from "@/hooks/useLLMModelAllowlists";
+import { useBYOKLLMModels, useSwitchFactoryModelSource, useUpdateBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -47,23 +44,31 @@ const BYOK_INTEGRATION_NAMES: Record<string, string> = {
   openrouter: "openrouter",
 };
 
-const SWITCH_PROVIDERS: LLMModelsSwitchProvider[] = ["anthropic", "openai", "openrouter"];
+const NAMED_BYOK_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
 
 export function FactorySettingsOrganizationLLMModelsPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("org", "update") && !permissionsLoading;
   const integrationsHref = useIntegrationsBasePath(organizationId);
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const customProviderEnabled =
+    hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK) &&
+    hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
+  const providers: LLMModelsSwitchProvider[] = customProviderEnabled
+    ? [...NAMED_BYOK_PROVIDERS, "custom"]
+    : [...NAMED_BYOK_PROVIDERS];
 
   const anthropic = useBYOKLLMModels(organizationId, "anthropic", true);
   const openai = useBYOKLLMModels(organizationId, "openai", true);
   const openrouter = useBYOKLLMModels(organizationId, "openrouter", true);
-  const byokQueries: Record<string, BYOKQuery> = { anthropic, openai, openrouter };
-  const connected = BYOK_PROVIDERS.filter((provider) => {
+  const custom = useBYOKLLMModels(organizationId, "custom", customProviderEnabled);
+  const byokQueries: Record<string, BYOKQuery> = { anthropic, openai, openrouter, custom };
+  const connected = providers.filter((provider) => {
     const query = byokQueries[provider];
     return query.data?.connected || (query.isError && !query.isLoading);
   });
-  const byokLoading = BYOK_PROVIDERS.some((provider) => byokQueries[provider].isLoading);
+  const byokLoading = providers.some((provider) => byokQueries[provider].isLoading);
 
   const hosted = useSelectableLLMModels(organizationId, { factoryId, sources: [SELECTABLE_LLM_SOURCE_HOSTED] });
   const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
@@ -78,14 +83,23 @@ export function FactorySettingsOrganizationLLMModelsPage() {
     setDialog({ target, step: "warn" });
   };
 
-  const saveSwitch = async (target: LLMModelsSwitchTarget, apiKey?: string) => {
+  const saveSwitch = async (
+    target: LLMModelsSwitchTarget,
+    connection?: { apiKey?: string; baseUrl?: string; apiType?: string },
+  ) => {
     try {
-      await switchSource.mutateAsync({ source: target, apiKey });
+      await switchSource.mutateAsync({
+        source: target,
+        apiKey: connection?.apiKey,
+        ...(target === "custom" ? { baseUrl: connection?.baseUrl, apiType: connection?.apiType } : {}),
+      });
       setDialog(null);
       setSwitchedNotice(
         target === "hosted"
           ? "Automations in this workspace now use the SuperPlane agent."
-          : `Automations in this workspace now use the ${byokProviderProductName(target)} agent.`,
+          : target === "custom"
+            ? "Automations in this workspace now use your custom provider."
+            : `Automations in this workspace now use the ${byokProviderProductName(target)} agent.`,
       );
       showSuccessToast("Model source saved.");
     } catch (switchError) {
@@ -117,7 +131,7 @@ export function FactorySettingsOrganizationLLMModelsPage() {
                 isLoading={hosted.isLoading}
                 isError={Boolean(hosted.isError)}
               />
-              <ProviderChoices providers={SWITCH_PROVIDERS} onChoose={choose} disabled={!canUpdate} />
+              <ProviderChoices providers={providers} onChoose={choose} disabled={!canUpdate} />
             </div>
           ) : (
             <div className="flex flex-col gap-5">
@@ -138,7 +152,12 @@ export function FactorySettingsOrganizationLLMModelsPage() {
               ) : (
                 <NoProviderNotice integrationsHref={integrationsHref} />
               )}
-              <ChangeModelSource current={currentProvider} onChoose={choose} disabled={!canUpdate} />
+              <ChangeModelSource
+                current={currentProvider}
+                providers={providers}
+                onChoose={choose}
+                disabled={!canUpdate}
+              />
             </div>
           )}
         </FactorySettingsCard>
@@ -164,8 +183,11 @@ export function FactorySettingsOrganizationLLMModelsPage() {
         }}
         onSaveKey={(apiKey) => {
           if (dialog && dialog.target !== "hosted") {
-            void saveSwitch(dialog.target, apiKey);
+            void saveSwitch(dialog.target, { apiKey });
           }
+        }}
+        onSaveCustom={(connection) => {
+          void saveSwitch("custom", connection);
         }}
         onSwitchToHosted={() => {
           void saveSwitch("hosted");
@@ -199,7 +221,7 @@ function resolveCurrentProvider(
 }
 
 function isSwitchProvider(value: string | undefined): value is LLMModelsSwitchProvider {
-  return value === "anthropic" || value === "openai" || value === "openrouter";
+  return value === "anthropic" || value === "openai" || value === "openrouter" || value === "custom";
 }
 
 function ProviderChoices({
@@ -225,11 +247,7 @@ function ProviderChoices({
             data-testid={`llm-models-connect-${provider}`}
           >
             <span className="flex min-w-0 items-center gap-2 text-[13px]">
-              <IntegrationIcon
-                integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
-                className="size-4"
-                size={16}
-              />
+              <ProviderMark provider={provider} />
               {byokProviderProductName(provider)}
             </span>
             <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChoose(provider)}>
@@ -244,14 +262,16 @@ function ProviderChoices({
 
 function ChangeModelSource({
   current,
+  providers,
   onChoose,
   disabled,
 }: {
   current: LLMModelsSwitchProvider | null;
+  providers: LLMModelsSwitchProvider[];
   onChoose: (target: LLMModelsSwitchTarget) => void;
   disabled: boolean;
 }) {
-  const others = SWITCH_PROVIDERS.filter((provider) => provider !== current);
+  const others = providers.filter((provider) => provider !== current);
   return (
     <div className="space-y-3 border-t border-border pt-4" data-testid="llm-models-change-source">
       <div>
@@ -278,11 +298,7 @@ function ChangeModelSource({
             data-testid={`llm-models-connect-${provider}`}
           >
             <span className="flex min-w-0 items-center gap-2 text-[13px]">
-              <IntegrationIcon
-                integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
-                className="size-4"
-                size={16}
-              />
+              <ProviderMark provider={provider} />
               {byokProviderProductName(provider)}
             </span>
             <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onChoose(provider)}>
@@ -292,6 +308,19 @@ function ChangeModelSource({
         ))}
       </ul>
     </div>
+  );
+}
+
+function ProviderMark({ provider, className }: { provider: string; className?: string }) {
+  if (provider === "custom") {
+    return <KeyRound className={cn("size-4 shrink-0", className)} aria-hidden />;
+  }
+  return (
+    <IntegrationIcon
+      integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
+      className={cn("size-4", className)}
+      size={16}
+    />
   );
 }
 
@@ -380,11 +409,7 @@ function ProviderKeyHeader({ provider, integrationHref }: { provider: string; in
       data-testid={`llm-models-key-${provider}`}
     >
       <div className="flex min-w-0 items-start gap-2">
-        <IntegrationIcon
-          integrationName={BYOK_INTEGRATION_NAMES[provider] ?? provider}
-          className="mt-0.5 size-4 shrink-0"
-          size={16}
-        />
+        <ProviderMark provider={provider} className="mt-0.5" />
         <div className="min-w-0">
           <p className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{providerKeyHeading(provider)}</p>
           <p className="text-[12px] text-muted-foreground">{COPY.ownKeyHelper}</p>

@@ -78,6 +78,28 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.NotEmpty(t, agent.Model)
 	})
 
+	t.Run("a custom provider runs through OpenCode", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		agentID := createReadyOnboardingIntegration(t, organization.ID, models.CustomLLMAppName)
+		_, err := models.UpsertOrganizationBYOKModelAllowlist(
+			db,
+			organization.ID,
+			models.UsageProviderCustom,
+			datatypes.JSONSlice[string]{"zeta-model", "alpha-model"},
+		)
+		require.NoError(t, err)
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, "runnerOpenRouter", agent.Component)
+		assert.Equal(t, models.UsageProviderCustom, agent.LLMProvider)
+		assert.Equal(t, "alpha-model", agent.Model)
+	})
+
 	t.Run("an agent without a runner falls back to the installations", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
