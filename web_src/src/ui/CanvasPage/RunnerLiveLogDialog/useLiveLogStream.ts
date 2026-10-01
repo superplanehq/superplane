@@ -23,7 +23,7 @@ import {
   startToolOnLatestSection,
   type CommandStart,
 } from "./liveLogSections";
-import { isBenignLiveLogWait } from "./liveLogErrors";
+import { isBenignLiveLogWait, isBrowserTransportFailure } from "./liveLogErrors";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
@@ -340,6 +340,16 @@ function errorFromUnknown(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function shouldReportLiveLogRequestFailure(error: Error, executionInFlight: boolean): boolean {
+  if (isBenignLiveLogWait(error)) {
+    return false;
+  }
+  if (executionInFlight && isBrowserTransportFailure(error)) {
+    return false;
+  }
+  return true;
+}
+
 async function waitForLiveLogReconnect(
   sessionAbort: AbortController,
   setState: Dispatch<SetStateAction<LogState>>,
@@ -379,7 +389,7 @@ async function pumpLiveLogConnection(
     if (streamError.name === "AbortError") {
       return "aborted";
     }
-    if (!sessionAbort.signal.aborted && !isBenignLiveLogWait(streamError)) {
+    if (!sessionAbort.signal.aborted && shouldReportLiveLogRequestFailure(streamError, params.executionInFlight)) {
       reportFailure("request", streamError);
       setState((prev) => applyStreamFailure(prev, streamError.message));
     }
