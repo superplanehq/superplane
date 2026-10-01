@@ -26,9 +26,6 @@ const (
 	PlanningSessionMessageRoleUser  = "user"
 	PlanningSessionMessageRoleAgent = "agent"
 	PlanningSessionMessageRolePlan  = "plan"
-	// PlanningSessionMessageRoleTask marks a task the agent split off this
-	// draft. Its text is a JSON PlanningTaskMessage.
-	PlanningSessionMessageRoleTask = "task"
 
 	PlanningWaitIdle     = ""
 	PlanningWaitPending  = "pending"
@@ -43,9 +40,6 @@ const (
 
 	maxPlanningSurveyQuestions = 5
 	maxPlanningSurveyOptions   = 6
-	// maxPlanningSplitTasks caps how many tasks one refine session can
-	// split off, so a looping agent cannot flood the backlog.
-	maxPlanningSplitTasks = 10
 )
 
 var (
