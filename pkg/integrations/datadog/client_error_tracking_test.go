@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,8 @@ func Test__Client__SearchErrorTrackingIssues(t *testing.T) {
 				"attributes": {
 					"error_type": "TimeoutError",
 					"error_message": "checkout timed out",
-					"service": "checkout"
+					"service": "checkout",
+					"first_seen": 1671612804001
 				}
 			}]
 		}`))
@@ -64,6 +66,7 @@ func Test__Client__SearchErrorTrackingIssues(t *testing.T) {
 	assert.Equal(t, "TimeoutError", issues[0].ErrorType)
 	assert.Equal(t, "checkout timed out", issues[0].ErrorMessage)
 	assert.Equal(t, "checkout", issues[0].Service)
+	assert.Equal(t, time.UnixMilli(1671612804001).UTC(), issues[0].FirstSeen)
 	assert.Equal(t, "TimeoutError: checkout timed out", issues[0].IssueTitle())
 	assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/issue-1", client.IssueURL(issues[0].ID))
 }
