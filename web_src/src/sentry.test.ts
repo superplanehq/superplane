@@ -38,6 +38,14 @@ describe("isIgnoredConsoleMessage", () => {
     ).toBe(true);
   });
 
+  it("ignores Monaco unknown-touch warnings, including the Sentry object suffix", () => {
+    expect(isIgnoredConsoleMessage("move of an UNKNOWN touch")).toBe(true);
+    expect(isIgnoredConsoleMessage("end of an UNKNOWN touch")).toBe(true);
+    expect(isIgnoredConsoleMessage("move of an UNKNOWN touch [object Touch]")).toBe(true);
+    expect(isIgnoredConsoleMessage("end of an UNKNOWN touch [object Touch]")).toBe(true);
+    expect(isIgnoredConsoleMessage("move of a known touch")).toBe(false);
+  });
+
   it("keeps genuine application console messages", () => {
     expect(isIgnoredConsoleMessage("Something actually broke")).toBe(false);
     expect(isIgnoredConsoleMessage("Unexpected token in JSON")).toBe(false);
