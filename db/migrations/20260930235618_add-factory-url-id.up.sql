@@ -1,3 +1,8 @@
+-- Keep the backfill and SET NOT NULL in one lock so a concurrent insert
+-- cannot land a NULL url_id after the backfill. golang-migrate wraps this
+-- file in one transaction; ACCESS EXCLUSIVE blocks writers until commit.
+LOCK TABLE factories IN ACCESS EXCLUSIVE MODE;
+
 ALTER TABLE factories ADD COLUMN url_id TEXT;
 
 DO $$
