@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 )
 
 // AssetHandler serves static files from the assets filesystem
@@ -24,6 +25,9 @@ type AssetHandler struct {
 	assetCDNOrigin  string
 	assetCDNClient  *http.Client
 	releaseMaxBytes int64
+	releaseCache    *releaseAssetCache
+	releaseLimiter  *releaseFetchLimiter
+	releaseGroup    singleflight.Group
 }
 
 // NewAssetHandler creates a new AssetHandler with the given file system.
@@ -39,6 +43,8 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 		assetCDNOrigin:  assetCDNOrigin(assets),
 		assetCDNClient:  newAssetCDNClient(),
 		releaseMaxBytes: releaseAssetMaxBytes,
+		releaseCache:    newReleaseAssetCache(),
+		releaseLimiter:  newReleaseFetchLimiter(),
 	}
 }
 

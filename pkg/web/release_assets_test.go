@@ -1,12 +1,15 @@
 package web
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 const releaseSHA = "0123456789abcdef0123456789abcdef01234567"
@@ -166,6 +169,129 @@ func TestReleaseAssetRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestReleaseAssetHeadDoesNotDownloadBody(t *testing.T) {
+	transport := &releaseCDNTransport{}
+	handler := releaseAssetHandler(transport)
+	path := releaseWorkerPath("editor.worker-old.js")
+
+	head := httptest.NewRecorder()
+	handler.ServeHTTP(head, httptest.NewRequest(http.MethodHead, path, nil))
+	if head.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, head.Code)
+	}
+	if head.Body.Len() != 0 {
+		t.Fatalf("expected empty HEAD body, got %q", head.Body.String())
+	}
+	if head.Header().Get("Content-Length") != "128" {
+		t.Fatalf("expected content length from CDN headers, got %q", head.Header().Get("Content-Length"))
+	}
+	if transport.calls != 1 || transport.methods[0] != http.MethodHead || transport.reads != 0 {
+		t.Fatalf("expected one unread HEAD fetch, got calls=%d methods=%v reads=%d", transport.calls, transport.methods, transport.reads)
+	}
+
+	again := httptest.NewRecorder()
+	handler.ServeHTTP(again, httptest.NewRequest(http.MethodHead, path, nil))
+	if again.Code != http.StatusOK || transport.calls != 1 {
+		t.Fatalf("expected cached HEAD, got status %d and %d CDN calls", again.Code, transport.calls)
+	}
+
+	get := httptest.NewRecorder()
+	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, path, nil))
+	if get.Code != http.StatusOK || get.Body.String() != "old-worker" {
+		t.Fatalf("expected GET body after HEAD, got %d %q", get.Code, get.Body.String())
+	}
+	if transport.calls != 2 || transport.methods[1] != http.MethodGet {
+		t.Fatalf("expected a later GET fetch, got calls=%d methods=%v", transport.calls, transport.methods)
+	}
+}
+
+func TestReleaseAssetLimitsRepeatedFetches(t *testing.T) {
+	transport := &releaseCDNTransport{}
+	handler := releaseAssetHandler(transport).(*AssetHandler)
+	now := time.Unix(1_700_000_000, 0)
+	for i := 0; i < releaseFetchBurst; i++ {
+		if !handler.releaseLimiter.beginFetch(now) {
+			t.Fatalf("expected fetch %d to be allowed", i+1)
+		}
+		handler.releaseLimiter.endFetch()
+	}
+	if handler.releaseLimiter.beginFetch(now) {
+		t.Fatal("expected fetch past the burst to be denied")
+	}
+
+	handler.releaseLimiter.mu.Lock()
+	handler.releaseLimiter.tokens = 0
+	handler.releaseLimiter.updated = time.Now().Add(time.Hour)
+	handler.releaseLimiter.mu.Unlock()
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodHead, releaseWorkerPath("editor.worker-limited.js"), nil))
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, recorder.Code)
+	}
+	if transport.calls != 0 || transport.reads != 0 {
+		t.Fatalf("expected no CDN download when limited, got calls=%d reads=%d", transport.calls, transport.reads)
+	}
+}
+
+func TestReleaseAssetLimitsConcurrentFetches(t *testing.T) {
+	block := make(chan struct{})
+	started := make(chan struct{}, releaseFetchInflight+1)
+	transport := &releaseCDNTransport{block: block, started: started}
+	handler := releaseAssetHandler(transport)
+	results := make(chan int, releaseFetchInflight+1)
+
+	for i := 0; i < releaseFetchInflight+1; i++ {
+		go func(i int) {
+			recorder := httptest.NewRecorder()
+			path := releaseWorkerPath(fmt.Sprintf("editor.worker-%d.js", i))
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodHead, path, nil))
+			results <- recorder.Code
+		}(i)
+	}
+
+	deadline := time.After(2 * time.Second)
+	seen := 0
+	for seen < releaseFetchInflight {
+		select {
+		case <-started:
+			seen++
+		case <-deadline:
+			t.Fatalf("timed out after %d CDN calls", seen)
+		}
+	}
+
+	denied := 0
+	waitDeadline := time.After(2 * time.Second)
+	for denied == 0 {
+		select {
+		case code := <-results:
+			if code == http.StatusTooManyRequests {
+				denied++
+			}
+		case <-waitDeadline:
+			t.Fatal("timed out waiting for the extra fetch to be denied")
+		}
+	}
+	close(block)
+
+	for completed := denied; completed < releaseFetchInflight+1; completed++ {
+		select {
+		case code := <-results:
+			if code == http.StatusTooManyRequests {
+				denied++
+			} else if code != http.StatusOK {
+				t.Fatalf("expected status %d, got %d", http.StatusOK, code)
+			}
+		case <-waitDeadline:
+			t.Fatal("timed out waiting for blocked fetches")
+		}
+	}
+	if denied != 1 || transport.calls != releaseFetchInflight || transport.reads != 0 {
+		t.Fatalf("expected one denial and %d unread HEAD calls, got denials=%d calls=%d reads=%d", releaseFetchInflight, denied, transport.calls, transport.reads)
+	}
+}
+
 func TestReleaseAssetIgnoresNonReleaseAssetBase(t *testing.T) {
 	cdnHits := 0
 	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -200,4 +326,59 @@ func releaseAssetFS(cdnOrigin string, workerBody string) fstest.MapFS {
 
 func releaseWorkerPath(name string) string {
 	return "/releases/" + releaseSHA + "/assets/" + name
+}
+
+func releaseAssetHandler(transport http.RoundTripper) http.Handler {
+	handler := NewAssetHandler(http.FS(releaseAssetFS("https://assets.example", "current-worker")), "").(*AssetHandler)
+	handler.assetCDNClient = &http.Client{Transport: transport}
+	return handler
+}
+
+type releaseCDNTransport struct {
+	mu      sync.Mutex
+	calls   int
+	reads   int
+	methods []string
+	block   <-chan struct{}
+	started chan struct{}
+}
+
+func (t *releaseCDNTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.mu.Lock()
+	t.calls++
+	t.methods = append(t.methods, req.Method)
+	t.mu.Unlock()
+	if t.started != nil {
+		t.started <- struct{}{}
+	}
+	if t.block != nil {
+		<-t.block
+	}
+
+	body := io.NopCloser(strings.NewReader("old-worker"))
+	length := int64(len("old-worker"))
+	if req.Method == http.MethodHead {
+		body = io.NopCloser(&failingReader{counter: t})
+		length = 128
+	}
+	header := make(http.Header)
+	header.Set("Content-Length", fmt.Sprintf("%d", length))
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        header,
+		Body:          body,
+		ContentLength: length,
+		Request:       req,
+	}, nil
+}
+
+type failingReader struct {
+	counter *releaseCDNTransport
+}
+
+func (r *failingReader) Read([]byte) (int, error) {
+	r.counter.mu.Lock()
+	r.counter.reads++
+	r.counter.mu.Unlock()
+	return 0, io.ErrUnexpectedEOF
 }
