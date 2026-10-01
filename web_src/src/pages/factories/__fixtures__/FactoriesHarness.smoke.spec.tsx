@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
-import { factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
+import { factoryRouteSegment, factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
@@ -15,6 +15,7 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY,
   REFUND_FACTORY_LINES,
   defaultFactoriesFixture,
 } from "./factoryPageResponses";
@@ -204,7 +205,7 @@ describe("FactoriesHarness tasks", () => {
     const settingsLink = await screen.findByTestId("factories-workspace-settings-link");
     expect(settingsLink).toHaveAttribute(
       "href",
-      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY),
+      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(REFUND_FACTORY)),
     );
     expect(settingsLink).not.toHaveClass("pointer-events-none");
   }, 10000);

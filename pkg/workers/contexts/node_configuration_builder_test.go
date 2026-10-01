@@ -503,7 +503,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	t.Run("permalink back to the work order", func(t *testing.T) {
 		expectedSuffix := fmt.Sprintf(
 			"/%s/workspaces/%s/work-order/%d",
-			r.Organization.ID.String(), factoryModel.Key, order.Number,
+			r.Organization.ID.String(), factoryModel.RouteSegment(), order.Number,
 		)
 
 		url, err := builder.ResolveExpression(`order().url`)

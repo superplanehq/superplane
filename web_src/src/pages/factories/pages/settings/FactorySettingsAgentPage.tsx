@@ -8,7 +8,7 @@ import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { AgentSettingsSectionEmpty } from "./AgentSettingsSectionEmpty";
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { factoryRouteSegment, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { MCPAddPicker } from "./MCPAddPicker";
@@ -36,7 +36,7 @@ export function FactorySettingsAgentPage() {
           <WorkspaceSkillsSection
             organizationId={page.organizationId}
             factoryId={page.factoryId}
-            factoryKey={page.factory.key ?? ""}
+            factoryKey={factoryRouteSegment(page.factory)}
             canUpdate={page.canUpdate}
           />
         ) : null}
@@ -84,7 +84,7 @@ function AddMCPConnectionButton({ canUpdate, onClick }: { canUpdate: boolean; on
 }
 
 function WorkspaceMCPServers({ page }: { page: ReturnType<typeof useMCPPage> }) {
-  const factoryKey = page.factory.key ?? "";
+  const factoryKey = factoryRouteSegment(page.factory);
   const configurePath = (resourceId: string) =>
     `${factorySettingsSectionPath(page.organizationId, factoryKey, "workspace", "mcp")}/${resourceId}`;
   const addConnectionAction = (

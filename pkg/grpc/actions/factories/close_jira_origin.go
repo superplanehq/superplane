@@ -217,7 +217,7 @@ func jiraCompletionCommentFor(baseURL string, factory *models.Factory, order *mo
 		return jiraCompletionComment
 	}
 
-	path := order.URLPath(factory.Key)
+	path := order.URLPath(factory.RouteSegment())
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if baseURL == "" || path == "" {
 		return jiraCompletionComment

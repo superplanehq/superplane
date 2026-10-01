@@ -20,11 +20,12 @@ import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryRouteSegment, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { BOARD_DONE_REJECTED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { withPlanLinePhases } from "../__fixtures__/lineMetricsPlanLine";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -143,12 +144,15 @@ function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
         <TooltipProvider>
-          <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
+          <MemoryRouter
+            initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`]}
+          >
             <FactoriesLayoutContext.Provider
               value={{
                 organizationId: "org-1",
                 factoryId: factory.id ?? PRIMARY_FACTORY_ID,
                 factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                routeSegment: factoryRouteSegment(factory) || PRIMARY_FACTORY_ROUTE_SEGMENT,
                 factory,
                 factories: [factory],
                 openCreateWorkOrder: vi.fn(),
@@ -337,7 +341,7 @@ describe("LinesPage Done column", () => {
 
   it("keeps the Done line and the board when a card opens for the first time", async () => {
     const user = userEvent.setup();
-    const taskHref = workOrderDetailPath("org-1", PRIMARY_FACTORY_KEY, "101", REFUND_LINE_PLAN_ID);
+    const taskHref = workOrderDetailPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "101", REFUND_LINE_PLAN_ID);
     useFactoryBoardWorkOrders.mockImplementation((...args: unknown[]) => {
       const options = args[2] as { done?: { lineId?: string } } | undefined;
       return boardPageResult(!options?.done?.lineId, useFactoryWorkOrders().data ?? []);
@@ -347,12 +351,15 @@ describe("LinesPage Done column", () => {
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`]}>
+            <MemoryRouter
+              initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`]}
+            >
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",
                   factoryId: PRIMARY_FACTORY_ID,
                   factoryKey: PRIMARY_FACTORY_KEY,
+                  routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
                   factory: REFUND_FACTORY,
                   factories: [REFUND_FACTORY],
                   openCreateWorkOrder: vi.fn(),
@@ -409,12 +416,15 @@ describe("LinesPage Done column", () => {
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/77?lineId=deleted-line`]}>
+            <MemoryRouter
+              initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/77?lineId=deleted-line`]}
+            >
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",
                   factoryId: PRIMARY_FACTORY_ID,
                   factoryKey: PRIMARY_FACTORY_KEY,
+                  routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
                   factory: REFUND_FACTORY,
                   factories: [REFUND_FACTORY],
                   openCreateWorkOrder: vi.fn(),
@@ -455,12 +465,13 @@ describe("LinesPage Done column", () => {
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/77`]}>
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/77`]}>
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",
                   factoryId: PRIMARY_FACTORY_ID,
                   factoryKey: PRIMARY_FACTORY_KEY,
+                  routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
                   factory: REFUND_FACTORY,
                   factories: [REFUND_FACTORY],
                   openCreateWorkOrder: vi.fn(),
