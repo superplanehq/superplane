@@ -503,6 +503,7 @@ func (w *NodeExecutor) executeActionNode(
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger = withFactoryOrder(logger, tx, execution.RunID)
+		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
@@ -521,6 +522,27 @@ func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entr
 	}
 
 	return logger.WithField("order_id", step.WorkOrderID)
+}
+
+// withRejectedHostedCredit adds the credit buckets that made the hosted
+// check fail. The next log line can then be compared with the billing page.
+func withRejectedHostedCredit(logger *log.Entry, orgID uuid.UUID, err error) *log.Entry {
+	if logger == nil || !errors.Is(err, models.ErrHostedCreditEmpty) || orgID == uuid.Nil {
+		return logger
+	}
+
+	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	if describeErr != nil {
+		return logger.WithField("hosted_credit_lookup_error", describeErr.Error())
+	}
+
+	return logger.WithFields(log.Fields{
+		"remaining_micros":          summary.RemainingMicros,
+		"welcome_remaining_micros":  summary.WelcomeRemainingMicros,
+		"included_remaining_micros": summary.IncludedRemainingMicros,
+		"topup_remaining_micros":    summary.PurchasedRemainingMicros,
+		"admin_remaining_micros":    summary.AdminRemainingMicros,
+	})
 }
 
 // failNodeExecution fails the node execution with the action error. A
