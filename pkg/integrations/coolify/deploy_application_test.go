@@ -64,7 +64,7 @@ func Test__Coolify_DeployApplication__Execute(t *testing.T) {
 		assert.Equal(t, "Deployments queued.", data["message"])
 
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 
 		request := httpCtx.Requests[0]
 		assert.Equal(t, "/api/v1/deploy", request.URL.Path)

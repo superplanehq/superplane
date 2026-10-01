@@ -35,7 +35,7 @@ func (c *ControlService) Documentation() string {
 
 ## How It Works
 
-1. Calls ` + "`GET /api/v1/services/{uuid}/{operation}`" + ` on the configured Coolify instance
+1. Calls ` + "`POST /api/v1/services/{uuid}/{operation}`" + ` on the configured Coolify instance
 2. Emits the API confirmation message on the default output channel
 
 ## Configuration

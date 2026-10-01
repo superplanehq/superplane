@@ -242,7 +242,7 @@ func (c *Client) ControlService(uuid string, op LifecycleOperation) (*LifecycleR
 }
 
 func (c *Client) lifecycle(path string, op LifecycleOperation) (*LifecycleResponse, error) {
-	resp, err := c.do(http.MethodGet, path, nil)
+	resp, err := c.do(http.MethodPost, path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (c *Client) Deploy(applicationUUID string, force bool) (*DeployResponse, er
 		query.Set("force", "true")
 	}
 
-	resp, err := c.do(http.MethodGet, "/deploy", query)
+	resp, err := c.do(http.MethodPost, "/deploy", query)
 	if err != nil {
 		return nil, err
 	}

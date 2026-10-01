@@ -35,7 +35,7 @@ func (c *DeployApplication) Documentation() string {
 
 ## How It Works
 
-1. Calls ` + "`GET /api/v1/deploy?uuid={uuid}&force={force}`" + ` on the configured Coolify instance
+1. Calls ` + "`POST /api/v1/deploy?uuid={uuid}&force={force}`" + ` on the configured Coolify instance
 2. Emits the queued deployment metadata (deployment UUID, message) on the default output channel and finishes immediately
 
 ## Configuration
