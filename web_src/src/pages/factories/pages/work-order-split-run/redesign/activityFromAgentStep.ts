@@ -1,3 +1,5 @@
+import { durationLabelMs } from "@/lib/duration";
+
 import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "../agentActivity";
 import { isThinkingPlaceholder } from "../streamNotesFromLiveLog";
 import type { AgentStep } from "./automationsViewModel";
@@ -7,16 +9,18 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
   const items: AgentActivityItem[] = [];
   const status = activityStatus(step.status);
 
-  if (step.output?.trim()) {
+  const command = bashCommandFromStep(step);
+  if (command) {
     items.push({
       type: "tool",
       id: `${step.id}-output`,
       kind: "bash",
       name: step.title,
-      input: step.output,
-      output: "",
+      input: command.script,
+      output: command.stdout,
       outputStreams: [],
       status,
+      durationMs: stepDurationMs(step.duration),
       truncated: false,
     });
   }
@@ -89,6 +93,28 @@ export function activityFromTranscript(activities: AgentActivity[]): AgentActivi
     sequence: last.sequence,
     status: withItems.some((activity) => activity.status === "running") ? "running" : last.status,
   };
+}
+
+function bashCommandFromStep(step: AgentStep): { script: string; stdout: string } | undefined {
+  const script = step.commandScript?.trim() ? step.commandScript : "";
+  if (script) {
+    return { script, stdout: step.commandStdout ?? "" };
+  }
+  if (!step.output?.trim()) {
+    return undefined;
+  }
+  return { script: step.output, stdout: "" };
+}
+
+function stepDurationMs(label?: string): number | undefined {
+  if (!label?.trim()) {
+    return undefined;
+  }
+  if (/^<\s*1s$/i.test(label.trim())) {
+    return 500;
+  }
+  const ms = durationLabelMs(label);
+  return ms > 0 ? ms : undefined;
 }
 
 function activityStatus(status: string): AgentActivityStatus {

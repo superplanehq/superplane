@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Canvas
 metadata:
-  name: Risk score
-  description: Score a pull request when it opens or updates, then report that score on the task.
+  name: Merge confidence
+  description: Score a pull request when it opens or updates, then report the checks you turned on.
 spec:
   edges:
     - channel: default
@@ -16,10 +16,37 @@ spec:
       targetId: assess-risk
     - channel: passed
       sourceId: assess-risk
-      targetId: format-risk-review
+      targetId: format-merge-confidence
     - channel: passed
-      sourceId: format-risk-review
+      sourceId: format-merge-confidence
+      targetId: should-report-risk
+    - channel: "true"
+      sourceId: should-report-risk
       targetId: report-risk-score
+    - channel: passed
+      sourceId: format-merge-confidence
+      targetId: should-report-performance
+    - channel: "true"
+      sourceId: should-report-performance
+      targetId: report-performance
+    - channel: passed
+      sourceId: format-merge-confidence
+      targetId: should-report-security
+    - channel: "true"
+      sourceId: should-report-security
+      targetId: report-security
+    - channel: passed
+      sourceId: format-merge-confidence
+      targetId: should-report-drift
+    - channel: "true"
+      sourceId: should-report-drift
+      targetId: report-drift
+    - channel: passed
+      sourceId: format-merge-confidence
+      targetId: should-report-reversibility
+    - channel: "true"
+      sourceId: should-report-reversibility
+      targetId: report-reversibility
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -60,7 +87,7 @@ spec:
         "y": 80
       isCollapsed: true
     - id: assess-risk
-      name: Assess Risk
+      name: Assess Merge Confidence
       type: TYPE_ACTION
       component: runnerClaudeCode
       configuration:
@@ -122,23 +149,32 @@ spec:
               Base branch: {{ root().data.pull_request.base.ref }}
               Head SHA: {{ root().data.pull_request.head.sha }}
 
-              Write ONLY valid JSON to /tmp/risk.json. No markdown fences.
+              The original task is the intent for this change.
+              Task title: {{ $["Find Pull Request"].data.workOrder.title }}
+              Task description: {{ $["Find Pull Request"].data.workOrder.description }}
+
+              Write ONLY valid JSON to /tmp/merge-confidence.json. No markdown fences.
 
               JSON schema:
               {
-                "repository": "owner/repo",
-                "pr_number": "123",
-                "title": "PR title",
-                "author": "github-username",
-                "risk_score": 1,
-                "risk_level": "very_low",
-                "summary": "one sentence"
+                "risk": { "enabled": true, "score": 1, "summary": "one sentence" },
+                "performance": { "enabled": true, "score": 1, "summary": "one sentence" },
+                "security": { "enabled": true, "score": 1, "summary": "one sentence" },
+                "drift": { "enabled": true, "score": 1, "summary": "one sentence" },
+                "reversibility": { "enabled": true, "score": 1, "summary": "one sentence" }
               }
 
-              risk_score is an integer from 1 to 5. A higher score means more risk.
-              risk_level must match the score:
-              1 very_low (Minimal Risk), 2 low (Low Risk), 3 medium (Moderate Risk), 4 high (High Risk), 5 critical (Severe Risk).
+              Enabled checks: {{ install_params.enabledChecks }}.
 
+              Always include risk, performance, security, drift, and reversibility.
+              Set enabled to true for every check named in Enabled checks.
+              Do not set enabled to false for a named check.
+              A named check stays on even when no practice in the repository applies to the diff.
+              For a check that is not named, set enabled to false, score to 0, and summary to an empty string.
+              When Enabled checks is none, set enabled to false for every check.
+
+              Risk. Use this section only when risk is enabled.
+              score is an integer from 1 to 5. A higher score means more risk.
               Apply these category rules. If a change matches a category, the score is at least that category score.
               If several categories match, use the highest score.
               If no category matches, judge the diff and choose a score from 1 to 5.
@@ -162,22 +198,70 @@ spec:
               Good lower: Lower risk because the pull request is introducing user interface changes only.
               Good higher: Higher risk because the pull request is introducing infrastructure changes by raising the ingress body limit from 64 MB to 80 MB.
               Good none: Moderate risk because the pull request matches no configured category and rewrites the retry loop.
+
+              Performance. Use this section only when performance is enabled.
+              score is an integer from 1 to 5. A higher score means the change follows the performance practices in this repository.
+              Read the repository for the performance practices it already states.
+              Use docs, comments, and the patterns in the existing code.
+              Do not use a generic checklist from outside this repository.
+              5 means the change follows every practice that applies.
+              4 means the change follows the practices that apply, with a small gap.
+              3 means the change follows some practices and breaks one that applies.
+              2 means the change breaks a practice that applies.
+              1 means the change breaks more than one practice that applies.
+              If no performance practice applies, keep enabled true and use 5.
+              summary is one sentence.
+              Name the practice and say whether the change follows it or breaks it.
+              If no practice applies, say that no performance practice in this repository applies.
+              Do not turn the check off. Do not repeat the score. Do not write a second sentence.
+
+              Security. Use this section only when security is enabled.
+              Use the same rules as Performance, for the security practices in this repository.
+              Read the repository for the security practices it already states.
+              Do not use a generic checklist from outside this repository.
+              If no security practice applies, keep enabled true and use 5.
+              Say that no security practice in this repository applies.
+              Do not turn the check off.
+
+              Drift. Use this section only when drift is enabled.
+              score is an integer from 1 to 5. A higher score means the change moved farther from the original task.
+              Compare the diff with the task title and the task description.
+              1 means the change does what the task asks.
+              2 means the change does the task and also makes a small extra change.
+              3 means the change does the task and also adds work that raises risk past the task.
+              4 means the change does most of the task and also does something the task did not ask for.
+              5 means the change does something different from the task, or raises risk far past the task.
+              If the task title and the task description are empty, use 1.
+              summary is one sentence.
+              Say what the task asked for and what the change did.
+              Do not repeat the score. Do not write a second sentence.
+
+              Reversibility. Use this section only when reversibility is enabled.
+              score is an integer from 1 to 5. A higher score means the change is easier to undo.
+              5 means a revert undoes the change and no data is lost.
+              4 means a revert undoes the change after one small manual step.
+              3 means a person must repair data or configuration to undo the change.
+              2 means part of the change stays after a revert.
+              1 means you cannot undo the change without data loss or a new change.
+              summary is one sentence.
+              Say what you must do to undo the change, or say that a revert is enough.
+              Do not repeat the score. Do not write a second sentence.
           - name: Emit Review
             type: bash
             command: |-
               set -euo pipefail
-              if [ ! -s /tmp/risk.json ]; then
-                echo "Missing /tmp/risk.json" >&2
+              if [ ! -s /tmp/merge-confidence.json ]; then
+                echo "Missing /tmp/merge-confidence.json" >&2
                 exit 1
               fi
-              jq -e 'has("risk_score") and has("summary") and has("risk_level")' /tmp/risk.json >/dev/null
-              cp /tmp/risk.json "$SUPERPLANE_RESULT_FILE"
+              jq -e 'has("risk") and has("performance") and has("security") and has("drift") and has("reversibility")' /tmp/merge-confidence.json >/dev/null
+              cp /tmp/merge-confidence.json "$SUPERPLANE_RESULT_FILE"
       position:
         x: 920
         "y": 80
       isCollapsed: true
-    - id: format-risk-review
-      name: Format Risk Review
+    - id: format-merge-confidence
+      name: Format Merge Confidence
       type: TYPE_ACTION
       component: runnerJS
       configuration:
@@ -186,12 +270,23 @@ spec:
         machine_type: e1-tiny-amd64
         script: |-
           function main() {
-            const review = ($["Assess Risk"] && $["Assess Risk"].data && $["Assess Risk"].data.result) || {};
-            const score = clampScore(review.risk_score);
-            const summary = String(review.summary || "").trim();
+            const review = ($["Assess Merge Confidence"] && $["Assess Merge Confidence"].data && $["Assess Merge Confidence"].data.result) || {};
             return {
-              risk_score: score,
-              summary: summary || `Risk ${score}/5`,
+              risk: normalizeCheck(review.risk),
+              performance: normalizeCheck(review.performance),
+              security: normalizeCheck(review.security),
+              drift: normalizeCheck(review.drift),
+              reversibility: normalizeCheck(review.reversibility),
+            };
+          }
+
+          function normalizeCheck(value) {
+            const item = value || {};
+            const summary = String(item.summary || "").trim();
+            return {
+              enabled: item.enabled === true,
+              score: clampScore(item.score),
+              summary: summary,
             };
           }
 
@@ -204,6 +299,16 @@ spec:
         x: 1200
         "y": 80
       isCollapsed: true
+    - id: should-report-risk
+      name: Report Risk?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.risk.enabled == true'
+      position:
+        x: 1480
+        "y": 80
+      isCollapsed: true
     - id: report-risk-score
       name: Report Risk Score
       type: TYPE_ACTION
@@ -211,15 +316,131 @@ spec:
       configuration:
         orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
         checkKey: risk-review
-        name: Risk score
+        name: Blast radius
         format: fraction
-        score: '{{ string($["Format Risk Review"].data.result.risk_score) }}'
+        score: '{{ string($["Format Merge Confidence"].data.result.risk.score) }}'
         maxScore: "5"
         direction: lowerIsBetter
         cautionAt: 3
         criticalAt: 4
-        summary: '{{ $["Format Risk Review"].data.result.summary }}'
+        summary: '{{ $["Format Merge Confidence"].data.result.risk.summary }}'
+      position:
+        x: 1760
+        "y": 80
+      isCollapsed: true
+    - id: should-report-performance
+      name: Report Performance?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.performance.enabled == true'
       position:
         x: 1480
-        "y": 460
+        "y": 260
+      isCollapsed: true
+    - id: report-performance
+      name: Report Performance
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: performance-review
+        name: Performance
+        format: fraction
+        score: '{{ string($["Format Merge Confidence"].data.result.performance.score) }}'
+        maxScore: "5"
+        direction: higherIsBetter
+        cautionAt: 3
+        criticalAt: 2
+        summary: '{{ $["Format Merge Confidence"].data.result.performance.summary }}'
+      position:
+        x: 1760
+        "y": 260
+      isCollapsed: true
+    - id: should-report-security
+      name: Report Security?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.security.enabled == true'
+      position:
+        x: 1480
+        "y": 440
+      isCollapsed: true
+    - id: report-security
+      name: Report Security
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: security-review
+        name: Security
+        format: fraction
+        score: '{{ string($["Format Merge Confidence"].data.result.security.score) }}'
+        maxScore: "5"
+        direction: higherIsBetter
+        cautionAt: 3
+        criticalAt: 2
+        summary: '{{ $["Format Merge Confidence"].data.result.security.summary }}'
+      position:
+        x: 1760
+        "y": 440
+      isCollapsed: true
+    - id: should-report-drift
+      name: Report Drift?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.drift.enabled == true'
+      position:
+        x: 1480
+        "y": 620
+      isCollapsed: true
+    - id: report-drift
+      name: Report Drift
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: drift-review
+        name: Drift from Specification
+        format: fraction
+        score: '{{ string($["Format Merge Confidence"].data.result.drift.score) }}'
+        maxScore: "5"
+        direction: lowerIsBetter
+        cautionAt: 3
+        criticalAt: 4
+        summary: '{{ $["Format Merge Confidence"].data.result.drift.summary }}'
+      position:
+        x: 1760
+        "y": 620
+      isCollapsed: true
+    - id: should-report-reversibility
+      name: Report Reversibility?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '$["Format Merge Confidence"].data.result.reversibility.enabled == true'
+      position:
+        x: 1480
+        "y": 800
+      isCollapsed: true
+    - id: report-reversibility
+      name: Report Reversibility
+      type: TYPE_ACTION
+      component: reportWorkOrderCheck
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        checkKey: reversibility-review
+        name: Reversibility
+        format: fraction
+        score: '{{ string($["Format Merge Confidence"].data.result.reversibility.score) }}'
+        maxScore: "5"
+        direction: higherIsBetter
+        cautionAt: 3
+        criticalAt: 2
+        summary: '{{ $["Format Merge Confidence"].data.result.reversibility.summary }}'
+      position:
+        x: 1760
+        "y": 800
       isCollapsed: true

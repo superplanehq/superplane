@@ -303,7 +303,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
-    expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
+    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
     expect(within(dialog).getByText("Verify")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -336,7 +336,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
-    expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
+    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
   }, 20000);
 

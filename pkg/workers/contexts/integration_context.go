@@ -539,6 +539,33 @@ func (c *IntegrationContext) Subscribe(configuration any) (*uuid.UUID, error) {
 	return &subscription.ID, nil
 }
 
+func (c *IntegrationContext) ListNodeConfigurations() ([]any, error) {
+	if c.tx == nil || c.integration == nil || c.integration.ID == uuid.Nil {
+		return nil, nil
+	}
+
+	var rows []struct {
+		Configuration datatypes.JSONType[map[string]any]
+	}
+	err := c.tx.
+		Table("workflow_nodes").
+		Select("workflow_nodes.configuration").
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Where("workflow_nodes.app_installation_id = ?", c.integration.ID).
+		Where("workflow_nodes.deleted_at IS NULL").
+		Scan(&rows).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	configurations := make([]any, 0, len(rows))
+	for _, row := range rows {
+		configurations = append(configurations, row.Configuration.Data())
+	}
+	return configurations, nil
+}
+
 func (c *IntegrationContext) ListSubscriptions() ([]core.IntegrationSubscriptionContext, error) {
 	subscriptions, err := models.ListIntegrationSubscriptions(c.tx, c.integration.ID)
 	if err != nil {

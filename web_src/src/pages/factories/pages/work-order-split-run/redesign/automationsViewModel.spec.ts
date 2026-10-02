@@ -400,7 +400,7 @@ describe("console automation grouping", () => {
     );
 
     expect(risk?.runs).toHaveLength(1);
-    expect(risk?.latest.checks.map((check) => check.name)).toEqual(["Risk score", "Diff size"]);
+    expect(risk?.latest.checks.map((check) => check.name)).toEqual(["Blast radius", "Diff size"]);
   });
 
   it("puts a Done-column app run in Done", () => {

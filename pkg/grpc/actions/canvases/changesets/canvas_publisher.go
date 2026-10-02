@@ -467,6 +467,11 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 		return nil
 	}
 
+	// Do not call Datadog here. This method runs inside the publish
+	// transaction. A later failure restores the intake, but Datadog
+	// would not restore a monitor deleted now. The cleanup worker
+	// deletes the monitor after the removal is committed.
+
 	delete(p.allNodes, existingNode.NodeID)
 	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
 	if err != nil {
@@ -570,6 +575,18 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		return err
 	}
 
+	triggerCtx, err := p.triggerContext(ctx, node)
+	if err != nil {
+		return err
+	}
+	if triggerCtx.Integration != nil && triggerCtx.Logger != nil {
+		triggerCtx.Logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
+	}
+
+	return trigger.Setup(triggerCtx)
+}
+
+func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.CanvasNode) (core.TriggerContext, error) {
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration: node.Configuration.Data(),
@@ -584,7 +601,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(p.tx, *node.AppInstallationID)
 		if err != nil {
-			return fmt.Errorf("failed to find app installation: %v", err)
+			return core.TriggerContext{}, fmt.Errorf("failed to find app installation: %v", err)
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -596,11 +613,10 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
-		logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
 	}
 
 	triggerCtx.Logger = logger
-	return trigger.Setup(triggerCtx)
+	return triggerCtx, nil
 }
 
 func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {

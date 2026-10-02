@@ -9,7 +9,7 @@ export type ToolActivityGroup = {
   tools: AgentToolItem[];
 };
 
-export type ActivityEntry = Exclude<AgentActivityItem, AgentToolItem> | ToolActivityGroup;
+export type ActivityEntry = AgentActivityItem | ToolActivityGroup;
 
 type ActivityCount = {
   count: number;
@@ -105,6 +105,37 @@ export function groupToolRuns(entries: AgentActivityItem[]): ActivityEntry[] {
   return grouped;
 }
 
+/** Console rows show SSH commands directly. Agent tools stay in a summary. */
+export function flattenCommandToolGroups(entries: ActivityEntry[]): ActivityEntry[] {
+  const next: ActivityEntry[] = [];
+  for (const entry of entries) {
+    if (entry.type !== "tool_activity_group") {
+      next.push(entry);
+      continue;
+    }
+
+    let buffer: AgentToolItem[] = [];
+    const flush = () => {
+      if (buffer.length === 0) {
+        return;
+      }
+      next.push({ type: "tool_activity_group", id: `tool-group-${buffer[0].id}`, tools: buffer });
+      buffer = [];
+    };
+
+    for (const tool of entry.tools) {
+      if (isCommandTool(tool)) {
+        flush();
+        next.push(tool);
+        continue;
+      }
+      buffer.push(tool);
+    }
+    flush();
+  }
+  return next;
+}
+
 function countActivities(tools: AgentToolItem[]): ActivityCounts {
   const counts = emptyActivityCounts();
   for (const tool of tools) {
@@ -190,8 +221,13 @@ function countMCPActivity(counts: ActivityCounts, tool: AgentToolItem): void {
     increment(counts.questions, tool);
     return;
   }
+  // Leftover refine transcripts still record create_task MCP calls.
   if (identifier.includes("create_task")) {
-    increment(counts.tasksCreated, tool);
+    if (tool.status === "passed" || tool.status === "running") {
+      increment(counts.tasksCreated, tool);
+    } else {
+      increment(counts.toolCalls, tool);
+    }
     return;
   }
   increment(counts.toolCalls, tool);

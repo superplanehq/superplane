@@ -111,4 +111,55 @@ describe("activitiesFromLiveLogSections", () => {
       }),
     ]);
   });
+
+  it("keeps a bash tool script apart from its command lines", () => {
+    const script = "set -euo pipefail\n\ngit clone repo";
+    const activities = activitiesFromLiveLogSections([
+      {
+        index: 2,
+        text: "Implementation",
+        kind: "prompt",
+        preview: "",
+        lines: [],
+        events: [
+          {
+            kind: "tools",
+            id: "tools-1",
+            tools: [
+              {
+                id: "tool-1",
+                kind: "bash",
+                text: script,
+                lines: ["Cloning into 'repo'...", "remote: Enumerating objects: 12, done."],
+                status: "passed",
+                duration_ms: 40,
+              },
+              {
+                id: "tool-2",
+                kind: "read",
+                text: "README.md",
+                lines: ["# Store"],
+                status: "passed",
+                duration_ms: 8,
+              },
+            ],
+          },
+        ],
+        status: "passed",
+        duration_ms: 40,
+        started_at: 2,
+        collapsed: true,
+      },
+    ]);
+
+    expect(activities[0]?.items).toEqual([
+      expect.objectContaining({
+        type: "tool",
+        kind: "bash",
+        input: script,
+        output: "Cloning into 'repo'...\nremote: Enumerating objects: 12, done.",
+      }),
+      expect.objectContaining({ type: "tool", kind: "read", input: "README.md", output: "" }),
+    ]);
+  });
 });
