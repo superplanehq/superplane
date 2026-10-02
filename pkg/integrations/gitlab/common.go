@@ -235,6 +235,53 @@ func removeReviewerIDs(existing, remove []int) []int {
 	return result
 }
 
+// assigneeIDsOf returns the user IDs of an issue's current assignees.
+func assigneeIDsOf(issue *Issue) []int {
+	ids := make([]int, 0, len(issue.Assignees))
+	for _, a := range issue.Assignees {
+		ids = append(ids, a.ID)
+	}
+	return ids
+}
+
+// mergeAssigneeIDs returns the union of existing and added IDs, preserving the
+// existing order and appending new IDs that are not already present.
+func mergeAssigneeIDs(existing, add []int) []int {
+	seen := make(map[int]struct{}, len(existing))
+	result := make([]int, 0, len(existing)+len(add))
+	for _, id := range existing {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	for _, id := range add {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
+}
+
+// removeAssigneeIDs returns the existing IDs with any of the given IDs removed.
+func removeAssigneeIDs(existing, remove []int) []int {
+	toRemove := make(map[int]struct{}, len(remove))
+	for _, id := range remove {
+		toRemove[id] = struct{}{}
+	}
+	result := make([]int, 0, len(existing))
+	for _, id := range existing {
+		if _, ok := toRemove[id]; ok {
+			continue
+		}
+		result = append(result, id)
+	}
+	return result
+}
+
 func normalizePipelineRef(ref string) string {
 	if strings.HasPrefix(ref, "refs/heads/") {
 		return strings.TrimPrefix(ref, "refs/heads/")
