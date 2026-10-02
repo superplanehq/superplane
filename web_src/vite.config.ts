@@ -91,6 +91,19 @@ export default defineConfig(() => {
       emptyOutDir: true,
       sourcemap: true,
       manifest: false, // do not generate manifest.json
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "monaco-editor",
+                test: /monaco-editor/,
+                includeDependenciesRecursively: false,
+              },
+            ],
+          },
+        },
+      },
       // rollupOptions: {
       //   input: {
       //     app: path.resolve('./src/main.tsx'),
