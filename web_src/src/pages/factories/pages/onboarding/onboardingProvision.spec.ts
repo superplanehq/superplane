@@ -6,6 +6,8 @@ import {
   DEFAULT_LINE_NAME,
   GITHUB_INTAKE_SOURCE,
   JIRA_INTAKE_SOURCE,
+  provisionDiscussionHandler,
+  provisionDiscussionHandlerWithoutBlocking,
   provisionEventApps,
   provisionGithubIntake,
   provisionJiraIntake,
@@ -423,5 +425,58 @@ describe("provisionOnboardingIntake", () => {
 
     expect(deleteIntake).toHaveBeenCalledWith("intake-jira");
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+  });
+});
+
+describe("provisionDiscussionHandler", () => {
+  it("creates a discussion handler and omits discussion settings", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([]);
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-1" });
+
+    await provisionDiscussionHandler({ listHandlers, createHandler });
+
+    expect(createHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
+    expect(createHandler.mock.calls[0][0]).not.toHaveProperty("settings");
+    expect(createHandler.mock.calls[0][0]).not.toHaveProperty("mention");
+    expect(createHandler.mock.calls[0][0]).not.toHaveProperty("allowedBots");
+  });
+
+  it("reuses an existing discussion handler", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([{ id: "handler-1", source: "SOURCE_PULL_REQUEST_DISCUSSION" }]);
+    const createHandler = vi.fn();
+
+    await provisionDiscussionHandler({ listHandlers, createHandler });
+
+    expect(createHandler).not.toHaveBeenCalled();
+  });
+
+  it("creates a discussion handler when only status checks exist", async () => {
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-2" });
+
+    await provisionDiscussionHandler({
+      listHandlers: vi.fn().mockResolvedValue([{ id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS" }]),
+      createHandler,
+    });
+
+    expect(createHandler).toHaveBeenCalledTimes(1);
+    expect(createHandler).toHaveBeenCalledWith({ source: "SOURCE_PULL_REQUEST_DISCUSSION" });
+  });
+
+  it("continues when listing or creating the handler fails", async () => {
+    await expect(
+      provisionDiscussionHandlerWithoutBlocking({
+        listHandlers: vi.fn().mockRejectedValue(new Error("list failed")),
+        createHandler: vi.fn(),
+      }),
+    ).resolves.toBeUndefined();
+
+    const createHandler = vi.fn().mockRejectedValue(new Error("create failed"));
+    await expect(
+      provisionDiscussionHandlerWithoutBlocking({
+        listHandlers: vi.fn().mockResolvedValue([]),
+        createHandler,
+      }),
+    ).resolves.toBeUndefined();
+    expect(createHandler).toHaveBeenCalledTimes(1);
   });
 });

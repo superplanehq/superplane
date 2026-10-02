@@ -116,7 +116,10 @@ vi.mock("@/hooks/useMe", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
-  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
+  useFactoryPRFeedbackHandlers: () => ({
+    data: [],
+    refetch: () => Promise.resolve({ data: [], error: null }),
+  }),
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 

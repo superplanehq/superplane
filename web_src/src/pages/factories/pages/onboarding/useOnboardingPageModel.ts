@@ -8,6 +8,7 @@ import {
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -171,6 +172,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
     createLine: useCreateFactoryLine(organizationId, factoryId),
     createIntake: useCreateFactoryIntake(organizationId, factoryId),
     deleteIntake: useDeleteFactoryIntake(organizationId, factoryId),
+    createPRFeedbackHandler: useCreateFactoryPRFeedbackHandler(organizationId, factoryId),
     installer: useInstallFactory({ organizationId }),
   };
 }
@@ -196,8 +198,16 @@ type OnboardingGithubSavesAndFinishArgs = {
 };
 
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
-  const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
-    args.mutations;
+  const {
+    updateFactory,
+    updateOnboarding,
+    updateOrganization,
+    createLine,
+    createIntake,
+    deleteIntake,
+    installer,
+    createPRFeedbackHandler,
+  } = args.mutations;
   const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const takenNames = useMemo(
@@ -226,6 +236,8 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
     deleteIntake: deleteIntake.mutateAsync,
+    listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
+    createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
