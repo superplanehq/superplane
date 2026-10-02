@@ -246,18 +246,7 @@ function AgentRunBody({
       </div>
     ) : null;
   const errors = failedNodes.length > 0 ? <FailedNodeAlerts nodes={failedNodes} runHref={runHref} /> : null;
-  if (steps || errors) {
-    return (
-      <div className="space-y-3">
-        {steps}
-        {errors}
-      </div>
-    );
-  }
-  if (!running) {
-    return note;
-  }
-  return (
+  const liveView = running ? (
     <div data-testid={`redesign-live-activity-${stageId}`}>
       {hasLiveContent && liveActivity ? (
         <AgentActivityView
@@ -271,7 +260,20 @@ function AgentRunBody({
       ) : null}
       <AgentLiveStatus active activity={liveActivity} startingLabel="Starting agent…" collapseReasoning={false} />
     </div>
-  );
+  ) : null;
+  if (steps || errors) {
+    return (
+      <div className="space-y-3">
+        {steps}
+        {errors}
+        {steps ? null : liveView}
+      </div>
+    );
+  }
+  if (!running) {
+    return note;
+  }
+  return liveView;
 }
 
 function RunnerNotes({

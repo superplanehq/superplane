@@ -62,7 +62,10 @@ function liveAgentLine(stage: AutomationStage): string {
  */
 export function runMetaLine(stage: AutomationStage, runs: AutomationStage[] = [stage]): string {
   const totalMs = runs.reduce((sum, run) => sum + durationLabelMs(run.duration ?? ""), 0);
-  const duration = formatMinutesSecondsDuration(totalMs) || (runs.length <= 1 ? (stage.duration ?? "") : "");
+  const duration =
+    formatMinutesSecondsDuration(totalMs) ||
+    (runs.some((run) => isSubSecondDuration(run.duration)) ? "<1s" : "") ||
+    (runs.length <= 1 ? (stage.duration ?? "") : "");
   if (!duration) {
     return "";
   }
@@ -128,6 +131,10 @@ function plainText(markdown: string): string {
     .replace(/^·\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isSubSecondDuration(label?: string): boolean {
+  return /^<\s*1s$/i.test((label ?? "").replace(/\s+so far$/i, "").trim());
 }
 
 function artifactLabel(artifact: AutomationStage["outputs"]["artifacts"][number]): string {

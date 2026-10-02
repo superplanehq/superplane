@@ -78,6 +78,13 @@ describe("runMetaLine", () => {
     expect(runMetaLine(latest, runs)).toBe("63m 7s");
   });
 
+  it("keeps less than a second when every run is under one second", () => {
+    const latest = { ...runningStage("implement"), status: "passed" as const, duration: "<1s" };
+    const earlier = { ...latest, id: "r1", duration: "<1s" };
+
+    expect(runMetaLine(latest, [earlier, latest])).toBe("<1s");
+  });
+
   it("marks the summed duration as still counting when a run is live", () => {
     const latest = { ...runningStage("implement"), status: "running" as const, duration: "2m" };
     const earlier = { ...latest, id: "r1", status: "passed" as const, duration: "10m" };
