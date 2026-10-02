@@ -3,16 +3,18 @@ import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CircleX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { AgentActivity } from "../agentActivity";
 import { activityFollowTick, activityFromAgentStep } from "./activityFromAgentStep";
 import { StepMarkerDetail } from "./AgentStepMarkerBody";
+import { bashStepCanOpen } from "./bashStepLog";
 import { useFollowLogScroll } from "../useFollowLogScroll";
 import type { AgentStep, AgentStepEvent, AgentToolRow, AutomationStage } from "./automationsViewModel";
 import { RawLogPre } from "./RawLogSheet";
-import { META_TEXT_CLASSNAME, MONO_LOG_CLASSNAME } from "./redesignFormat";
+import { formatClock, META_TEXT_CLASSNAME, MONO_LOG_CLASSNAME } from "./redesignFormat";
+import { logStatusTimeLabel } from "../logStatusTime";
 import { NodeIcon, StageStatusGlyph, ToolKindIcon } from "./redesignShared";
 
 export type AgentStepView = "summary" | "detailed" | "raw";
@@ -187,7 +189,8 @@ function AgentStepMarker({
   liveTestId?: string;
 }) {
   const running = step.status === "running";
-  const expandable = step.events.length > 0 || Boolean(step.output) || liveActive;
+  const bash = step.type === "bash";
+  const expandable = bash ? bashStepCanOpen(step) : step.events.length > 0 || Boolean(step.output) || liveActive;
   const [open, setOpen] = useState(running || defaultOpen);
   const userToggled = useRef(false);
   useEffect(() => {
@@ -209,18 +212,24 @@ function AgentStepMarker({
           <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
         ) : step.type === "node" ? (
           <NodeIcon iconSlug={step.iconSlug} />
-        ) : (
+        ) : bash ? null : (
           <ToolKindIcon type={step.type} />
         )}
       </MarkerIcon>
       <MarkerContent className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[13px] leading-5 text-foreground">
         <span className="max-w-[50%] shrink-0 truncate">{step.title}</span>
-        {step.type === "node" ? <NodeIcon iconSlug={step.iconSlug} /> : <ToolKindIcon type={step.type} />}
-        <StepStatusBadge status={step.status} />
+        {bash ? null : step.type === "node" ? (
+          <NodeIcon iconSlug={step.iconSlug} />
+        ) : (
+          <ToolKindIcon type={step.type} className="opacity-0 group-hover/marker:opacity-100" />
+        )}
+        {bash && step.status === "failed" ? null : <StepStatusBadge status={step.status} />}
         {reason ? (
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
         ) : null}
-        {step.duration ? (
+        {bash ? (
+          <BashRowTrail step={step} />
+        ) : step.duration ? (
           <span className="ml-auto w-12 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
             {step.duration}
           </span>
@@ -258,6 +267,30 @@ function AgentStepMarker({
       </CollapsibleContent>
     </Collapsible>
   );
+}
+
+function BashRowTrail({ step }: { step: AgentStep }) {
+  const label = bashHoverLabel(step);
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-2">
+      {label ? (
+        <span className="text-xs text-muted-foreground tabular-nums opacity-0 group-hover/marker:opacity-100">
+          {label}
+        </span>
+      ) : null}
+      <ToolKindIcon type="bash" className="opacity-0 group-hover/marker:opacity-100" />
+      {step.status === "failed" ? <CircleX className="size-3.5 shrink-0 text-destructive" aria-label="failed" /> : null}
+    </span>
+  );
+}
+
+function bashHoverLabel(step: AgentStep): string {
+  const clock =
+    step.startedAtMs !== undefined && Number.isFinite(step.startedAtMs)
+      ? formatClock(new Date(step.startedAtMs).toISOString())
+      : "";
+  const duration = logStatusTimeLabel(step.duration);
+  return [clock, duration].filter(Boolean).join(" · ");
 }
 
 function StepDetail({ step }: { step: AgentStep }) {

@@ -14,10 +14,14 @@ export function CommandLine({
   tool,
   expandable,
   showOutput = false,
+  showPromptMark = false,
+  defaultOpen = false,
 }: {
   tool: AgentToolItem;
   expandable: boolean;
   showOutput?: boolean;
+  showPromptMark?: boolean;
+  defaultOpen?: boolean;
 }) {
   const failed = tool.status === "failed" || tool.status === "timed_out";
   const script = agentToolScriptText(tool);
@@ -35,6 +39,7 @@ export function CommandLine({
           status={tool.status}
           meta={commandMetaLabel(tool)}
           duration={commandDurationLabel(tool)}
+          showPromptMark={showPromptMark}
         />
         {stdout ? <CommandStdout text={stdout} /> : null}
       </div>
@@ -52,6 +57,8 @@ export function CommandLine({
       status={tool.status}
       meta={commandMetaLabel(tool)}
       duration={commandDurationLabel(tool)}
+      showPromptMark={showPromptMark}
+      defaultOpen={defaultOpen}
     />
   );
 }
@@ -67,6 +74,8 @@ function ExpandableCommand({
   status,
   meta,
   duration,
+  showPromptMark = false,
+  defaultOpen = false,
 }: {
   script: string;
   headline: string;
@@ -78,11 +87,13 @@ function ExpandableCommand({
   status: string;
   meta?: string;
   duration?: string;
+  showPromptMark?: boolean;
+  defaultOpen?: boolean;
 }) {
   const multiLine = script.includes("\n");
   const hidesRest = script.trim() !== headline;
   const lineCount = shellScriptLineCount(script);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const lineRef = useRef<HTMLElement>(null);
   const [overflows, setOverflows] = useState(multiLine || hidesRest);
   useEffect(() => {
@@ -103,6 +114,7 @@ function ExpandableCommand({
         status={status}
         meta={meta}
         duration={duration}
+        showPromptMark={showPromptMark}
         lineRef={lineRef}
       />
     );
@@ -125,6 +137,7 @@ function ExpandableCommand({
         status={status}
         meta={meta}
         duration={duration}
+        showPromptMark={showPromptMark}
         expandable
         open={open}
         lineCount={lineCount}
@@ -209,17 +222,26 @@ type CommandRowProps = {
   open?: boolean;
   lineCount?: number;
   duration?: string;
+  showPromptMark?: boolean;
   lineRef?: Ref<HTMLElement>;
   onToggle?: () => void;
 };
 
-function CommandRow({ headline, meta, expandable = false, open = false, onToggle, ...row }: CommandRowProps) {
+function CommandRow({
+  headline,
+  meta,
+  expandable = false,
+  open = false,
+  onToggle,
+  showPromptMark = false,
+  ...row
+}: CommandRowProps) {
   const body = expandable ? (
     <button type="button" className="w-full" aria-expanded={open} aria-label={headline} onClick={onToggle}>
-      <CommandRowBody headline={headline} expandable open={open} {...row} />
+      <CommandRowBody headline={headline} expandable open={open} showPromptMark={showPromptMark} {...row} />
     </button>
   ) : (
-    <CommandRowBody headline={headline} {...row} />
+    <CommandRowBody headline={headline} showPromptMark={showPromptMark} {...row} />
   );
   if (!meta) {
     return body;
@@ -242,6 +264,7 @@ function CommandRowBody({
   open = false,
   lineCount,
   duration,
+  showPromptMark = false,
   lineRef,
 }: Omit<CommandRowProps, "meta" | "onToggle">) {
   return (
@@ -257,6 +280,11 @@ function CommandRowBody({
           <ChevronRight className={cn("size-3 text-muted-foreground transition-transform", open && "rotate-90")} />
         ) : null}
       </span>
+      {showPromptMark ? (
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
+          $
+        </span>
+      ) : null}
       <code
         ref={lineRef}
         title={headline}
@@ -271,7 +299,12 @@ function CommandRowBody({
       </code>
       {exitLabel ? <span className="shrink-0 font-sans text-[11px] text-destructive">{exitLabel}</span> : null}
       {lineCount && lineCount > 1 ? (
-        <span className="shrink-0 font-sans text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100">
+        <span
+          className={cn(
+            "shrink-0 font-sans text-[11px] text-muted-foreground",
+            showPromptMark ? undefined : "opacity-0 group-hover:opacity-100",
+          )}
+        >
           {lineCount} lines
         </span>
       ) : null}
