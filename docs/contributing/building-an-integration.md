@@ -8,7 +8,7 @@ High-level steps to add a new integration to SuperPlane.
 
 Choose the integration you want to build and **claim the existing issue by commenting on it** so we know you’re working on it.
 
-See: [Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/19).
+See: [Integrations Board](https://github.com/orgs/superplanehq/projects/2).
 
 ## 2. Research the connection method
 
