@@ -8,6 +8,7 @@ import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
 const HIDDEN_KINDS = new Set(["setup"]);
 const TOOL_LINE = /^-> \[([^\]]+)\]/;
+const ANALYSIS_WAIT_COMMAND = "Wait for the next message";
 
 export const RUNNER_COMPONENTS = new Set([
   "runnerSuperPlane",
@@ -34,7 +35,12 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
-export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
+export function notesFromLiveLogSections(
+  nodeId: string,
+  sections: CommandSection[],
+  analysisStatus?: SplitRunPhaseStatus,
+  nodeStatus?: SplitRunPhaseStatus,
+): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
     if (section.kind && HIDDEN_KINDS.has(section.kind)) {
@@ -47,7 +53,11 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section));
+    const note = noteFromCommandSection(nodeId, stepId, orderKey, section);
+    if (isCanceledAnalysisWait(section, analysisStatus, nodeStatus)) {
+      note.status = "cancelled";
+    }
+    notes.push(note);
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
@@ -385,9 +395,10 @@ export function notesForLiveStream(input: {
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
-    const notes = notesFromLiveLogSections(input.nodeId, input.sections);
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.analysisStatus, input.nodeStatus);
     if (notes.length > 0) {
       return notes;
     }
@@ -436,12 +447,23 @@ function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatu
   };
 }
 
-function streamStatus(status: string): SplitRunPhaseStatus {
-  if (status === "failed") {
-    return "failed";
+function isCanceledAnalysisWait(
+  section: CommandSection,
+  analysisStatus?: SplitRunPhaseStatus,
+  nodeStatus?: SplitRunPhaseStatus,
+): boolean {
+  if (section.status !== "failed" || section.text.trim() !== ANALYSIS_WAIT_COMMAND) {
+    return false;
   }
-  if (status === "running") {
-    return "running";
+  if (analysisStatus === "cancelled") {
+    return true;
+  }
+  return analysisStatus === "passed" && nodeStatus === "cancelled";
+}
+
+function streamStatus(status: string): SplitRunPhaseStatus {
+  if (status === "failed" || status === "running" || status === "cancelled") {
+    return status;
   }
   return "passed";
 }
