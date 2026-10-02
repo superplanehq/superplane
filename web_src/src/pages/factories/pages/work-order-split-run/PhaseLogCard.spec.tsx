@@ -186,15 +186,22 @@ describe("PhaseLogCard collapsed stream", () => {
         );
 
       expect(titleEl()).toHaveClass("line-clamp-2");
+      expect(titleEl()).not.toHaveClass("overflow-y-auto");
       const toggle = screen.getByTestId("split-run-title-toggle");
       expect(toggle).toHaveTextContent("Show more");
       expect(toggle).toHaveAttribute("aria-expanded", "false");
 
       await user.click(toggle);
 
+      expect(titleEl()).toHaveClass("max-h-48", "overflow-y-auto");
       expect(titleEl()).not.toHaveClass("line-clamp-2");
       expect(screen.getByTestId("split-run-title-toggle")).toHaveTextContent("Show less");
       expect(screen.getByTestId("split-run-title-toggle")).toHaveAttribute("aria-expanded", "true");
+
+      await user.click(screen.getByTestId("split-run-title-toggle"));
+
+      expect(titleEl()).toHaveClass("line-clamp-2");
+      expect(titleEl()).not.toHaveClass("overflow-y-auto");
     } finally {
       restoreHeights();
     }
