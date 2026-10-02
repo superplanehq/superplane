@@ -6,6 +6,7 @@ import {
   useWorkOrderArtifacts,
 } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useFactoryMergeConfidenceRuns } from "@/hooks/useMergeConfidenceRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -65,11 +66,29 @@ function useSplitRunWorkOrderExtras(
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const { runsByWorkOrder, analyzingOrderIds } = useFactoryBacklogAnalysis(organizationId, factoryId);
   const analysisRuns = orderId ? (runsByWorkOrder.get(orderId) ?? []) : [];
+  const mergeConfidence = useFactoryMergeConfidenceRuns(
+    organizationId,
+    factoryId,
+    order ? pullRequests : [],
+    order?.id ?? "",
+    orderChecks,
+  );
   // `analyzingOrderIds` also covers the optimistic window where a fresh draft
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
-  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing };
+  return {
+    orderChecks,
+    artifacts,
+    prFeedbackRuns,
+    analysisRuns,
+    mergeConfidenceRuns: mergeConfidence.runs,
+    mergeConfidenceCanvasIds: mergeConfidence.canvasIds,
+    mergeConfidenceTaskKey: mergeConfidence.taskKey,
+    mergeConfidencePullRequests: order ? pullRequests : [],
+    factoryApps,
+    isAnalyzing,
+  };
 }
 
 export function useFactoryAppSplitRunPage() {
@@ -80,24 +99,42 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
-  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing } = useSplitRunWorkOrderExtras(
-    organizationId,
-    factoryId,
-    order,
-    liveWorkOrder.data,
-  );
+  const {
+    orderChecks,
+    artifacts,
+    prFeedbackRuns,
+    analysisRuns,
+    mergeConfidenceRuns,
+    mergeConfidenceCanvasIds,
+    mergeConfidenceTaskKey,
+    mergeConfidencePullRequests,
+    factoryApps,
+    isAnalyzing,
+  } = useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
         prFeedbackRuns,
         analysisRuns,
+        mergeConfidenceRuns,
         columnApps: columnAppsFromFactoryApps(factoryApps),
         artifacts,
         isAnalyzing,
         resolveUser,
       }),
-    [order, orderChecks, artifacts, factoryApps, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [
+      order,
+      orderChecks,
+      artifacts,
+      factoryApps,
+      prFeedbackRuns,
+      analysisRuns,
+      mergeConfidenceRuns,
+      isAnalyzing,
+      query.lineId,
+      resolveUser,
+    ],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
@@ -155,9 +192,14 @@ export function useFactoryAppSplitRunPage() {
     back,
     canvas: visual.canvas,
     editHref,
+    factoryId,
     fixture,
     isLoading,
     liveError: live.isError,
+    mergeConfidenceCanvasIds,
+    mergeConfidenceOrderId: order?.id ?? "",
+    mergeConfidencePullRequests,
+    mergeConfidenceTaskKey,
     nodeId,
     nodeEditHref,
     organizationId,

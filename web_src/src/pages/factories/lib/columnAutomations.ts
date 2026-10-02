@@ -293,7 +293,8 @@ function customColumnAutomations(
   });
 }
 
-function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
+/** Verify canvas that scores merge confidence, including numbered copies. */
+export function isMergeConfidenceCanvas(app: { name?: string; columnKey?: string }): boolean {
   if (app.columnKey !== "verify") {
     return false;
   }
@@ -312,7 +313,7 @@ function riskScoreAutomation(
 ): ColumnAutomation[] {
   return apps.flatMap((app) => {
     const id = app.id?.trim();
-    if (!id || !isRiskScoreApp(app)) {
+    if (!id || !isMergeConfidenceCanvas(app)) {
       return [];
     }
     return [
