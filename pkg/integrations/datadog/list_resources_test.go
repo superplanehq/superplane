@@ -110,10 +110,22 @@ func Test__Datadog__ListResources(t *testing.T) {
 		assert.Equal(t, []string{"checkout"}, resourceIDs(resources))
 	})
 
-	t.Run("fails the list when the issue search fails and telemetry succeeds", func(t *testing.T) {
+	t.Run("keeps telemetry services when the issue search fails", func(t *testing.T) {
 		httpContext := serviceListHTTP(
 			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "checkout"))},
 			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service", "billing"))},
+			[]*http.Response{httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`)},
+		)
+
+		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"billing", "checkout"}, resourceIDs(resources))
+	})
+
+	t.Run("fails the list when the issue search fails and telemetry has no names", func(t *testing.T) {
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
 			[]*http.Response{httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`)},
 		)
 
@@ -339,7 +351,7 @@ func TestListServicesStartsIssueSearchWhileTelemetryIsOpen(t *testing.T) {
 	assert.Equal(t, []string{"from-issues", "from-logs"}, names)
 }
 
-func TestListServicesDoesNotDropOpenIssueServicesWhenTheSearchMissesTheDeadline(t *testing.T) {
+func TestListServicesKeepsTelemetryNamesWhenTheIssueSearchMissesTheDeadline(t *testing.T) {
 	gate := &deadlineHTTP{
 		started: make(chan struct{}),
 	}
@@ -353,9 +365,8 @@ func TestListServicesDoesNotDropOpenIssueServicesWhenTheSearchMissesTheDeadline(
 	client.SetRequestDeadline(time.Now().Add(50 * time.Millisecond))
 
 	names, err := client.ListServices()
-	require.Error(t, err)
-	assert.Empty(t, names)
-	assert.NotErrorIs(t, err, ErrErrorTrackingForbidden)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"from-logs", "from-spans"}, names)
 	select {
 	case <-gate.started:
 	default:

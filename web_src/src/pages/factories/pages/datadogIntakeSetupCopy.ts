@@ -17,6 +17,8 @@ export const DATADOG_INTAKE_SETUP_COPY = {
   wizardServicesLoading: "Loading Datadog services...",
   wizardServicesError: "SuperPlane could not load Datadog services.",
   wizardServicesEmpty: "No recent Error Tracking services. Enter a service name.",
+  serviceListIncomplete:
+    "Services found only on open issues can be missing if that search fails. Type a name if it is missing.",
   wizardNoMatchingServices: "No matching services.",
   wizardServiceNameLabel: "Service name",
   wizardServiceNamePlaceholder: "checkout",

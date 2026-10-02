@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { DATADOG_INTAKE_SETUP_COPY } from "./datadogIntakeSetupCopy";
 import { DATADOG_INTAKE_SETTINGS_COPY } from "./datadogIntakeSettingsCopy";
 import {
   DEFAULT_DATADOG_INTAKE_SETTINGS,
@@ -92,6 +93,7 @@ describe("DatadogIntakeFilterFields", () => {
     expect(screen.queryByTestId("datadog-environment-new")).not.toBeInTheDocument();
     expect(screen.getByTestId("datadog-environment-prod")).toBeInTheDocument();
     expect(screen.getByText(DATADOG_INTAKE_SETTINGS_COPY.environmentsHelper)).toBeInTheDocument();
+    expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.serviceListIncomplete)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 

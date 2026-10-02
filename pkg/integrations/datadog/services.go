@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -28,8 +29,10 @@ const (
 // days, plus services on open Error Tracking issues. The three reads run
 // together under one time limit. A refused or failed telemetry query is
 // skipped. A refused issue search is skipped when another source succeeds.
-// Any other issue search failure fails the list, so a cancelled search
-// cannot hide services that exist only on open issues.
+// Any other issue search failure keeps telemetry names when one exists, so
+// a temporary error does not hide those services. Services that exist only
+// on open issues are then missing. The list fails when that search fails
+// and no telemetry name is available.
 func (c *Client) ListServices() ([]string, error) {
 	restoreDeadline := c.applyServiceListDeadline()
 	defer restoreDeadline()
@@ -58,11 +61,15 @@ func (c *Client) ListServices() ([]string, error) {
 	}()
 	wg.Wait()
 
-	if issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden) {
+	if issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden) &&
+		!hasServiceName(spanErr, spanNames) && !hasServiceName(logErr, logNames) {
 		return nil, issueErr
 	}
 	if spanErr != nil && logErr != nil && issueErr != nil {
 		return nil, serviceListError(issueErr, spanErr, logErr)
+	}
+	if issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden) {
+		log.WithError(issueErr).Warn("datadog service list omitted open-issue services")
 	}
 
 	names := make([]string, 0)
@@ -174,6 +181,18 @@ func serviceListError(issueErr, spanErr, logErr error) error {
 		return spanErr
 	}
 	return logErr
+}
+
+func hasServiceName(err error, names []string) bool {
+	if err != nil {
+		return false
+	}
+	for _, name := range names {
+		if strings.TrimSpace(name) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func serviceNamesFromIssues(issues []ErrorTrackingIssue) []string {

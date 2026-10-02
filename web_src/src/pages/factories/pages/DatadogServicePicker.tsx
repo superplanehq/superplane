@@ -62,6 +62,9 @@ export function DatadogServicePicker({
           </Button>
         </div>
       ) : null}
+      {!loading && !error ? (
+        <p className="workspace-body-text text-muted-foreground">{DATADOG_INTAKE_SETUP_COPY.serviceListIncomplete}</p>
+      ) : null}
       {!loading && !error && options.length === 0 ? (
         <p className="workspace-body-text text-muted-foreground">{DATADOG_INTAKE_SETUP_COPY.wizardServicesEmpty}</p>
       ) : null}
