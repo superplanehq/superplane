@@ -201,6 +201,90 @@ func Test__OnIssue__HandleWebhook__Success(t *testing.T) {
 	assert.Equal(t, "create", data["action"])
 }
 
+func Test__OnIssue__HandleWebhook__ProjectScope(t *testing.T) {
+	trigger := &OnIssue{}
+	config := map[string]any{
+		"projects": []string{"project-1"},
+		"actions":  []string{"create", "update"},
+	}
+
+	t.Run("create in a selected project emits", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("create", nil)
+		body["data"].(map[string]any)["projectId"] = "project-1"
+		ctx := signedRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("create outside the selected projects is ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("create", nil)
+		body["data"].(map[string]any)["projectId"] = "other"
+		ctx := signedRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("update into a selected project emits", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("update", nil)
+		body["data"].(map[string]any)["projectId"] = "project-1"
+		body["updatedFrom"] = map[string]any{"projectId": nil}
+		ctx := signedRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("update that keeps the project is ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("update", nil)
+		body["data"].(map[string]any)["projectId"] = "project-1"
+		body["updatedFrom"] = map[string]any{"title": "old"}
+		ctx := signedRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("completed issue is ignored", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("create", nil)
+		data := body["data"].(map[string]any)
+		data["projectId"] = "project-1"
+		data["state"] = map[string]any{"type": "completed"}
+		ctx := signedRequest(t, body, config, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Zero(t, events.Count())
+	})
+
+	t.Run("completed issue without project scope still emits", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		body := issueEvent("create", nil)
+		body["data"].(map[string]any)["state"] = map[string]any{"type": "completed"}
+		ctx := signedRequest(t, body, map[string]any{"team": "t1", "actions": []string{"create"}}, events)
+
+		code, _, err := trigger.HandleWebhook(ctx)
+		assert.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+}
+
 func Test__OnIssue__HandleWebhook__FiltersActions(t *testing.T) {
 	trigger := &OnIssue{}
 
