@@ -478,7 +478,7 @@ func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
 		return nil, errors.New("trial end date is required")
 	}
 	if !parsed.After(time.Now()) {
-		return nil, errors.New("Choose a future date.")
+		return nil, errors.New("choose a future date")
 	}
 	end := parsed.UTC()
 	return &end, nil

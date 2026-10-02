@@ -388,7 +388,7 @@ func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
 			contentType: "application/json",
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
-		assert.Contains(t, response.Body.String(), "Choose a future date.")
+		assert.Contains(t, response.Body.String(), "choose a future date")
 	})
 
 	t.Run("PUT trial stores the end and reopens expired welcome credit", func(t *testing.T) {
