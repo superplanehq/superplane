@@ -737,7 +737,10 @@ function phasesForOrder(
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? [], columnApps),
   ];
-  return [...knownPhases, ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases)];
+  return [
+    ...knownPhases,
+    ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases, order.pullRequests),
+  ];
 }
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
@@ -929,6 +932,7 @@ function phasesForColumnAppChecks(
   checks: FactoriesWorkOrderCheck[] | undefined,
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
   knownPhases: SplitRunPhase[],
+  pullRequests?: FactoriesFactoryPullRequest[],
 ): SplitRunPhase[] {
   const checksByRun = columnAppChecksByRun(columnApps, checks);
   const extras: SplitRunPhase[] = [];
@@ -939,7 +943,7 @@ function phasesForColumnAppChecks(
       existing.checks = uniquePresentedChecks([...(existing.checks ?? []), ...presented]);
       continue;
     }
-    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts);
+    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts, pullRequests);
     if (phase) {
       extras.push(phase);
     }
@@ -984,6 +988,7 @@ function phaseForColumnAppCheck(
   columnApps: SplitRunColumnApp[],
   checks: FactoriesWorkOrderCheck[],
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
+  pullRequests?: FactoriesFactoryPullRequest[],
 ): SplitRunPhase | undefined {
   const first = checks[0];
   const ref = first ? columnAppCheckRef(first) : undefined;
@@ -998,24 +1003,29 @@ function phaseForColumnAppCheck(
   const name = phaseNameForColumn(columnKey);
   const componentName = columnAppCheckName(app, first, name);
   const latest = checks[checks.length - 1] ?? first;
-  const status: SplitRunPhaseStatus = "passed";
+  const run = canvasRunForCheck(ref.runId, pullRequests);
+  const status = run ? statusForCanvasRun(run) : "passed";
+  const span = run ? { createdAt: run.createdAt, updatedAt: run.finishedAt ?? run.updatedAt } : {};
+  const duration = span.createdAt ? durationForExecution(span, status) : "";
   const line: SplitRunStreamLine = {
     id: ref.runId,
-    at: clockLabel(latest.updatedAt),
+    at: clockLabel(span.createdAt ?? latest.updatedAt),
     componentName,
     status,
-    duration: "",
+    duration,
     kind: "action",
     componentType: componentName,
-    action: "passed",
+    action: prFeedbackStreamAction(status),
     iconSlug: "box",
   };
   return {
     id: `column-app-${ref.runId}`,
     name,
     status,
-    duration: "",
-    startedAt: first.updatedAt,
+    duration,
+    durationRunning: status === "running",
+    startedAt: span.createdAt ?? first.updatedAt,
+    endedAt: status === "running" ? undefined : span.updatedAt,
     componentName,
     artifacts: artifactsForCanvasRun(artifacts, ref.runId),
     checks: presentWorkOrderChecks(checks),
@@ -1025,6 +1035,20 @@ function phaseForColumnAppCheck(
     runId: ref.runId,
     columnKey,
   };
+}
+
+function canvasRunForCheck(runId: string, pullRequests: FactoriesFactoryPullRequest[] | undefined) {
+  for (const pullRequest of pullRequests ?? []) {
+    const linked = (pullRequest.runs ?? []).find((entry) => entry.run?.id === runId)?.run;
+    if (linked) {
+      return linked;
+    }
+    const activity = (pullRequest.activities ?? []).find((entry) => entry.run?.id === runId)?.run;
+    if (activity) {
+      return activity;
+    }
+  }
+  return undefined;
 }
 
 function columnAppCheckRef(check: FactoriesWorkOrderCheck): { appId: string; runId: string } | undefined {
