@@ -57,8 +57,12 @@ export function applyDefaultRefinementPrompt(
   };
 }
 
+export function refinementPromptMatchesDefault(draft: PlanningReviewDraft, defaultStep: PlanningReviewStep): boolean {
+  return applyDefaultRefinementPrompt(draft, defaultStep) === draft;
+}
+
 function stepsWithDefaultPrompt(steps: PlanningReviewStep[], defaultStep: PlanningReviewStep): PlanningReviewStep[] {
-  const namedIndex = steps.findIndex((step) => step.name === REFINE_TASK_STEP_NAME);
+  const namedIndex = steps.findIndex((step) => step.name === REFINE_TASK_STEP_NAME && step.type === "prompt");
   if (namedIndex >= 0) {
     return replacePrompt(steps, namedIndex, defaultStep.prompt);
   }

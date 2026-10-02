@@ -7,8 +7,13 @@ import { describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 import { PlanningReviewEditor } from "./PlanningReviewEditor";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
+
+vi.mock("@/lib/toast", () => ({
+  showErrorToast: vi.fn(),
+}));
 
 const DEFAULT_PROMPT = "Plan the task from the factory default.";
 
@@ -58,6 +63,22 @@ function renderEditor(
   );
 }
 
+function defaultStep(prompt: string): PlanningReviewStep {
+  return {
+    name: "Refine Task",
+    type: "prompt",
+    prompt,
+    workingDirectory: "repo",
+  };
+}
+
+function deferredStep() {
+  let resolve: (step: PlanningReviewStep | null) => void = () => undefined;
+  const promise = new Promise<PlanningReviewStep | null>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
 describe("PlanningReviewEditor restore default prompt", () => {
   it("hides Restore default prompt when no callback is given", () => {
     renderEditor();
@@ -65,23 +86,46 @@ describe("PlanningReviewEditor restore default prompt", () => {
     expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
   });
 
+  it("hides Restore default prompt when the prompt already matches", async () => {
+    const onRestoreDefaultPrompt = vi.fn(async () => defaultStep("Custom prompt"));
+    renderEditor({ onRestoreDefaultPrompt });
+
+    await waitFor(() => expect(onRestoreDefaultPrompt).toHaveBeenCalled());
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+  });
+
+  it("shows an error and Retry when the default prompt cannot load", async () => {
+    const user = userEvent.setup();
+    const pending = deferredStep();
+    const onRestoreDefaultPrompt = vi
+      .fn<() => Promise<PlanningReviewStep | null>>()
+      .mockImplementationOnce(async () => null)
+      .mockImplementationOnce(() => pending.promise);
+    renderEditor({ onRestoreDefaultPrompt });
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toHaveTextContent(
+      PLANNING_SETTINGS_COPY.restorePromptError,
+    );
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("planning-review-restore-default-prompt-retry"));
+    pending.resolve(defaultStep(DEFAULT_PROMPT));
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+  });
+
   it("replaces the prompt after confirm and saves only when Save Agent is clicked", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
-    const onRestoreDefaultPrompt = vi.fn(async () => ({
-      name: "Refine Task",
-      type: "prompt" as const,
-      prompt: DEFAULT_PROMPT,
-      workingDirectory: "repo",
-    }));
+    const onRestoreDefaultPrompt = vi.fn(async () => defaultStep(DEFAULT_PROMPT));
     renderEditor({ onSave, onRestoreDefaultPrompt });
 
-    await user.click(screen.getByTestId("planning-review-step-toggle-1"));
+    await user.click(await screen.findByTestId("planning-review-step-toggle-1"));
     expect(screen.getByTestId("planning-review-step-body-1")).toHaveValue("Custom prompt");
 
     await user.click(screen.getByTestId("planning-review-restore-default-prompt"));
     expect(screen.getByRole("heading", { name: "Restore the default prompt?" })).toBeInTheDocument();
-    expect(onRestoreDefaultPrompt).not.toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
 
     await user.click(screen.getByTestId("planning-review-restore-default-prompt-confirm"));
@@ -89,7 +133,6 @@ describe("PlanningReviewEditor restore default prompt", () => {
     await waitFor(() => {
       expect(screen.getByTestId("planning-review-step-body-1")).toHaveValue(DEFAULT_PROMPT);
     });
-    expect(onRestoreDefaultPrompt).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
 
     await user.click(screen.getByTestId("planning-review-save"));
@@ -110,5 +153,37 @@ describe("PlanningReviewEditor restore default prompt", () => {
         }),
       );
     });
+  });
+
+  it("disables Save until Restore finishes and retries without a second confirm", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const confirmLoad = deferredStep();
+    const retryLoad = deferredStep();
+    const onRestoreDefaultPrompt = vi
+      .fn<() => Promise<PlanningReviewStep | null>>()
+      .mockImplementationOnce(async () => defaultStep(DEFAULT_PROMPT))
+      .mockImplementationOnce(() => confirmLoad.promise)
+      .mockImplementationOnce(() => retryLoad.promise);
+    renderEditor({ onSave, onRestoreDefaultPrompt });
+
+    await user.click(await screen.findByTestId("planning-review-restore-default-prompt"));
+    await user.click(screen.getByTestId("planning-review-restore-default-prompt-confirm"));
+
+    await waitFor(() => expect(screen.getByTestId("planning-review-save")).toBeDisabled());
+    expect(onSave).not.toHaveBeenCalled();
+
+    confirmLoad.resolve(null);
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toBeEnabled();
+
+    await user.click(screen.getByTestId("planning-review-restore-default-prompt-retry"));
+    await waitFor(() => expect(screen.getByTestId("planning-review-save")).toBeDisabled());
+    expect(screen.queryByRole("heading", { name: "Restore the default prompt?" })).not.toBeInTheDocument();
+
+    retryLoad.resolve(defaultStep(DEFAULT_PROMPT));
+    await waitFor(() => expect(screen.getByTestId("planning-review-save")).toBeEnabled());
+    await user.click(screen.getByTestId("planning-review-step-toggle-1"));
+    expect(screen.getByTestId("planning-review-step-body-1")).toHaveValue(DEFAULT_PROMPT);
   });
 });

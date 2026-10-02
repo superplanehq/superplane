@@ -30,6 +30,9 @@ export function PlanningReviewForm({
   showVisualEvidenceSetting = false,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled = false,
+  restoreError,
+  onRetryRestore,
+  restoreRetryDisabled = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
@@ -39,6 +42,9 @@ export function PlanningReviewForm({
   showVisualEvidenceSetting?: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
+  restoreError?: string;
+  onRetryRestore?: () => void;
+  restoreRetryDisabled?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -59,6 +65,9 @@ export function PlanningReviewForm({
           showVisualEvidenceSetting={showVisualEvidenceSetting}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
+          restoreError={restoreError}
+          onRetryRestore={onRetryRestore}
+          restoreRetryDisabled={restoreRetryDisabled}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -74,6 +83,9 @@ function AgentPanel({
   showVisualEvidenceSetting,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
+  restoreError,
+  onRetryRestore,
+  restoreRetryDisabled,
   onChange,
 }: {
   component: PlanningReviewComponent;
@@ -83,6 +95,9 @@ function AgentPanel({
   showVisualEvidenceSetting: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
+  restoreError?: string;
+  onRetryRestore?: () => void;
+  restoreRetryDisabled: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const componentRef = useRef(component);
@@ -187,6 +202,9 @@ function AgentPanel({
         onChange={(steps) => setConfigurationField("steps", steps)}
         onRestoreDefaultPrompt={onRestoreDefaultPrompt}
         restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
+        restoreError={restoreError}
+        onRetryRestore={onRetryRestore}
+        restoreRetryDisabled={restoreRetryDisabled}
       />
       <PlanningReviewResourcesCard
         organizationId={organizationId}

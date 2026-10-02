@@ -107,6 +107,20 @@ describe("applyDefaultRefinementPrompt", () => {
     ]);
   });
 
+  it("replaces the prompt step when a bash step has the Refine Task name", () => {
+    const draft = draftWith([
+      { name: "Refine Task", type: "bash", command: "echo keep" },
+      { name: "Plan the work", type: "prompt", prompt: "Custom prompt", workingDirectory: "src" },
+    ]);
+
+    const next = applyDefaultRefinementPrompt(draft, defaultStep);
+
+    expect(stepsOf(next)).toEqual([
+      { name: "Refine Task", type: "bash", command: "echo keep" },
+      { name: "Plan the work", type: "prompt", prompt: DEFAULT_PROMPT, workingDirectory: "src" },
+    ]);
+  });
+
   it("leaves the draft unchanged when the prompt already matches", () => {
     const draft = draftWith([
       { name: "Refine Task", type: "prompt", prompt: DEFAULT_PROMPT, workingDirectory: "elsewhere" },

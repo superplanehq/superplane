@@ -13,7 +13,6 @@ import {
 import { Workflow } from "lucide-react";
 import { useState } from "react";
 
-import { applyDefaultRefinementPrompt } from "../lib/refinementPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import {
   PLANNING_REVIEW_DRAFT,
@@ -22,6 +21,7 @@ import {
   type PlanningReviewStep,
 } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
+import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
 
 function AutomationNote({ href }: { href?: string }) {
   return (
@@ -87,30 +87,13 @@ export function PlanningReviewEditor({
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const saveDisabled = isLoading || isSaving || draft.components.length === 0;
-
-  const handleRestoreConfirm = async () => {
-    if (!onRestoreDefaultPrompt || isRestoring) {
-      return;
-    }
-    setRestoreConfirmOpen(false);
-    setIsRestoring(true);
-    try {
-      const step = await onRestoreDefaultPrompt();
-      if (!step) {
-        return;
-      }
-      setDraft((current) => applyDefaultRefinementPrompt(current, step));
-    } catch {
-      // Caller reports the error and keeps the current prompt.
-    } finally {
-      setIsRestoring(false);
-    }
-  };
+  const restore = useRestoreDefaultPrompt({ draft, setDraft, onRestoreDefaultPrompt });
+  const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 
   const handleSave = async () => {
+    if (restore.isRestoring) {
+      return;
+    }
     if (!onSave) {
       onCancel?.();
       return;
@@ -143,8 +126,11 @@ export function PlanningReviewEditor({
             factoryId={factoryId}
             factoryKey={factoryKey}
             showVisualEvidenceSetting={showVisualEvidenceSetting}
-            onRestoreDefaultPrompt={onRestoreDefaultPrompt ? () => setRestoreConfirmOpen(true) : undefined}
-            restoreDefaultPromptDisabled={isRestoring}
+            onRestoreDefaultPrompt={restore.showRestore ? () => restore.setConfirmOpen(true) : undefined}
+            restoreDefaultPromptDisabled={restore.isRestoring}
+            restoreError={restore.restoreError}
+            onRetryRestore={restore.restoreError ? restore.retryRestore : undefined}
+            restoreRetryDisabled={restore.isRestoring}
           />
         </PopupBody>
       )}
@@ -166,9 +152,9 @@ export function PlanningReviewEditor({
         </Button>
       </footer>
       <RestoreDefaultPromptDialog
-        open={restoreConfirmOpen}
-        onOpenChange={setRestoreConfirmOpen}
-        onConfirm={() => void handleRestoreConfirm()}
+        open={restore.confirmOpen}
+        onOpenChange={restore.setConfirmOpen}
+        onConfirm={() => void restore.applyDefaultPrompt()}
       />
     </div>
   );
