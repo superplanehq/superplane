@@ -23,6 +23,8 @@ export function FactoryAppSplitRunPage() {
       <MergeConfidenceCanvasListeners
         organizationId={model.organizationId}
         canvasIds={model.mergeConfidenceCanvasIds}
+        pullRequests={model.mergeConfidencePullRequests}
+        taskKey={model.mergeConfidenceTaskKey}
       />
       {model.fixture && !model.liveError ? (
         <SplitRunLoadedPage model={model} />

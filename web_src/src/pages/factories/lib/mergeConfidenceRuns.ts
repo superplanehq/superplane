@@ -15,6 +15,12 @@ export type MergeConfidenceCanvas = {
   name: string;
 };
 
+/** A finished score run recorded on the task, not on the canvas run list. */
+export type MergeConfidenceRunRef = {
+  canvasId: string;
+  runId: string;
+};
+
 type PullRequestRef = {
   number?: string | number;
   repository?: string;
@@ -40,6 +46,63 @@ export function mergeConfidenceCanvases(
     }
     return [{ id, name: app.name?.trim() || "Merge confidence" }];
   });
+}
+
+/**
+ * Stable cache key for one task. Empty when the task has no pull request
+ * to score, so the log does not load canvas runs.
+ */
+export function mergeConfidenceTaskKey(orderId: string | undefined, pullRequests: PullRequestRef[]): string {
+  const identities = pullRequests
+    .map(pullRequestIdentity)
+    .flatMap((identity) => {
+      if (!identity.url && !(identity.number && identity.repository)) {
+        return [];
+      }
+      return [`${identity.repository ?? ""}:${identity.number ?? ""}:${identity.url ?? ""}`];
+    })
+    .sort();
+  if (identities.length === 0) {
+    return "";
+  }
+  return `${orderId?.trim() ?? ""}|${identities.join("|")}`;
+}
+
+/**
+ * Run ids already recorded for this task's Merge confidence scores.
+ * The log describes these runs instead of scanning every canvas run.
+ */
+export function mergeConfidenceRunRefsFromTask(
+  canvasIds: ReadonlySet<string>,
+  sources: {
+    checks?: Array<{ runId?: string; automation?: { appId?: string } }>;
+    events?: Array<{ type?: string; event?: unknown }>;
+  },
+): MergeConfidenceRunRef[] {
+  const seen = new Set<string>();
+  const refs: MergeConfidenceRunRef[] = [];
+  const add = (canvasId: string | undefined, runId: string | undefined) => {
+    const canvas = canvasId?.trim();
+    const run = runId?.trim();
+    if (!canvas || !run || !canvasIds.has(canvas)) {
+      return;
+    }
+    const key = `${canvas}:${run}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    refs.push({ canvasId: canvas, runId: run });
+  };
+
+  for (const check of sources.checks ?? []) {
+    add(check.automation?.appId, check.runId);
+  }
+  for (const event of sources.events ?? []) {
+    const ref = checkRunRefFromEvent(event);
+    add(ref.canvasId, ref.runId);
+  }
+  return refs;
 }
 
 /**
@@ -72,6 +135,23 @@ export function pullRequestIdentityFromRootEvent(run: CanvasesCanvasRun): PullRe
     number: eventPullRequestNumber(payload, pullRequest) ?? fromUrl.number,
     repository: eventRepository(payload, pullRequest) ?? fromUrl.repository,
     url,
+  };
+}
+
+function checkRunRefFromEvent(event: { type?: string; event?: unknown }): {
+  canvasId?: string;
+  runId?: string;
+} {
+  if (event.type !== "order.check.reported") {
+    return {};
+  }
+  const payload = asRecord(event.event);
+  const run = asRecord(payload?.run);
+  const automation = asRecord(payload?.automation);
+  const app = asRecord(payload?.app);
+  return {
+    canvasId: stringValue(automation?.appId)?.trim() || stringValue(app?.id)?.trim(),
+    runId: stringValue(run?.id)?.trim(),
   };
 }
 

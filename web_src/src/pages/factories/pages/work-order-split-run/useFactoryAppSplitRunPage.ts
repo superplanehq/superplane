@@ -66,7 +66,13 @@ function useSplitRunWorkOrderExtras(
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const { runsByWorkOrder, analyzingOrderIds } = useFactoryBacklogAnalysis(organizationId, factoryId);
   const analysisRuns = orderId ? (runsByWorkOrder.get(orderId) ?? []) : [];
-  const mergeConfidence = useFactoryMergeConfidenceRuns(organizationId, factoryId, order ? pullRequests : []);
+  const mergeConfidence = useFactoryMergeConfidenceRuns(
+    organizationId,
+    factoryId,
+    order ? pullRequests : [],
+    order?.id ?? "",
+    orderChecks,
+  );
   // `analyzingOrderIds` also covers the optimistic window where a fresh draft
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
@@ -78,6 +84,8 @@ function useSplitRunWorkOrderExtras(
     analysisRuns,
     mergeConfidenceRuns: mergeConfidence.runs,
     mergeConfidenceCanvasIds: mergeConfidence.canvasIds,
+    mergeConfidenceTaskKey: mergeConfidence.taskKey,
+    mergeConfidencePullRequests: order ? pullRequests : [],
     factoryApps,
     isAnalyzing,
   };
@@ -98,6 +106,8 @@ export function useFactoryAppSplitRunPage() {
     analysisRuns,
     mergeConfidenceRuns,
     mergeConfidenceCanvasIds,
+    mergeConfidenceTaskKey,
+    mergeConfidencePullRequests,
     factoryApps,
     isAnalyzing,
   } = useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
@@ -186,6 +196,8 @@ export function useFactoryAppSplitRunPage() {
     isLoading,
     liveError: live.isError,
     mergeConfidenceCanvasIds,
+    mergeConfidencePullRequests,
+    mergeConfidenceTaskKey,
     nodeId,
     nodeEditHref,
     organizationId,

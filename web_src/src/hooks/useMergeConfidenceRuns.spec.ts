@@ -4,14 +4,19 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { canvasesListRuns, factoriesListFactoryAutomations } = vi.hoisted(() => ({
-  canvasesListRuns: vi.fn(),
-  factoriesListFactoryAutomations: vi.fn(),
-}));
+const { canvasesDescribeRun, canvasesListRuns, factoriesListFactoryAutomations, factoriesListWorkOrderEvents } =
+  vi.hoisted(() => ({
+    canvasesDescribeRun: vi.fn(),
+    canvasesListRuns: vi.fn(),
+    factoriesListFactoryAutomations: vi.fn(),
+    factoriesListWorkOrderEvents: vi.fn(),
+  }));
 
 vi.mock("@/api-client", () => ({
+  canvasesDescribeRun,
   canvasesListRuns,
   factoriesListFactoryAutomations,
+  factoriesListWorkOrderEvents,
 }));
 
 import { mergeConfidenceRunsKey, useFactoryMergeConfidenceRuns } from "./useMergeConfidenceRuns";
@@ -21,10 +26,11 @@ function scoreRun(overrides: {
   number: number;
   repository: string;
   createdAt?: string;
+  state?: CanvasesCanvasRun["state"];
 }): CanvasesCanvasRun {
   return {
     id: overrides.id,
-    state: "STATE_FINISHED",
+    state: overrides.state ?? "STATE_FINISHED",
     result: "RESULT_PASSED",
     createdAt: overrides.createdAt ?? "2026-08-26T11:00:00Z",
     rootEvent: {
@@ -57,9 +63,25 @@ describe("useFactoryMergeConfidenceRuns", () => {
     factoriesListFactoryAutomations.mockResolvedValue({
       data: { automations: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }] },
     });
+    factoriesListWorkOrderEvents.mockResolvedValue({ data: { events: [], totalCount: 0, hasNextPage: false } });
+    canvasesDescribeRun.mockResolvedValue({ data: {} });
   });
 
-  it("follows the run-list cursor to load a score past the newest page", async () => {
+  it("does not list canvas runs when the task has no pull request", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useFactoryMergeConfidenceRuns("org-1", "factory-1", [], "order-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(factoriesListFactoryAutomations).toHaveBeenCalled());
+    expect(result.current.runs).toEqual([]);
+    expect(result.current.canvasIds).toEqual([]);
+    expect(canvasesListRuns).not.toHaveBeenCalled();
+    expect(factoriesListWorkOrderEvents).not.toHaveBeenCalled();
+    expect(canvasesDescribeRun).not.toHaveBeenCalled();
+  });
+
+  it("describes a recorded older score and does not page through unrelated runs", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const newest = Array.from({ length: 25 }, (_, index) =>
       scoreRun({
@@ -75,35 +97,81 @@ describe("useFactoryMergeConfidenceRuns", () => {
       repository: "acme/app",
       createdAt: "2026-08-01T00:00:00Z",
     });
-    canvasesListRuns
+    const inProgress = scoreRun({
+      id: "run-live",
+      number: 12,
+      repository: "acme/app",
+      createdAt: "2026-08-26T12:30:00Z",
+      state: "STATE_STARTED",
+    });
+    canvasesListRuns.mockResolvedValue({
+      data: {
+        runs: [inProgress, ...newest.slice(0, 24)],
+        totalCount: 200,
+        hasNextPage: true,
+        lastTimestamp: "2026-08-26T12:00:00Z",
+      },
+    });
+    factoriesListWorkOrderEvents
       .mockResolvedValueOnce({
         data: {
-          runs: newest,
-          totalCount: 26,
+          events: [{ type: "order.comment.added", event: {} }],
+          totalCount: 2,
           hasNextPage: true,
-          lastTimestamp: "2026-08-26T12:00:00Z",
+          lastTimestamp: "2026-08-20T00:00:00Z",
         },
       })
       .mockResolvedValueOnce({
         data: {
-          runs: [older],
-          totalCount: 26,
+          events: [
+            {
+              type: "order.check.reported",
+              event: { run: { id: "run-older" }, automation: { appId: "app-merge" } },
+            },
+          ],
+          totalCount: 2,
           hasNextPage: false,
           lastTimestamp: "2026-08-01T00:00:00Z",
         },
       });
+    canvasesDescribeRun.mockImplementation((request: { path?: { runId?: string } }) =>
+      Promise.resolve({
+        data: {
+          run:
+            request.path?.runId === "run-older"
+              ? older
+              : scoreRun({ id: "run-check", number: 12, repository: "acme/app" }),
+        },
+      }),
+    );
 
-    const { result } = renderHook(() => useFactoryMergeConfidenceRuns("org-1", "factory-1", pullRequests), {
-      wrapper: createWrapper(queryClient),
-    });
+    const { result } = renderHook(
+      () =>
+        useFactoryMergeConfidenceRuns("org-1", "factory-1", pullRequests, "order-1", [
+          { runId: "run-check", automation: { appId: "app-merge" } },
+        ]),
+      { wrapper: createWrapper(queryClient) },
+    );
 
-    await waitFor(() => expect(result.current.runs.map((entry) => entry.run.id)).toEqual(["run-older"]));
-    expect(canvasesListRuns).toHaveBeenNthCalledWith(
-      2,
+    await waitFor(() =>
+      expect(result.current.runs.map((entry) => entry.run.id)).toEqual(["run-older", "run-check", "run-live"]),
+    );
+    expect(canvasesListRuns).toHaveBeenCalledTimes(1);
+    expect(canvasesListRuns).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { canvasId: "app-merge" },
-        query: { limit: 25, before: "2026-08-26T12:00:00Z" },
+        query: { limit: 25 },
       }),
+    );
+    expect(factoriesListWorkOrderEvents).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        path: { factoryId: "factory-1", orderId: "order-1" },
+        query: { limit: 50, before: "2026-08-20T00:00:00Z" },
+      }),
+    );
+    expect(canvasesDescribeRun).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { canvasId: "app-merge", runId: "run-older" } }),
     );
   });
 
@@ -127,8 +195,9 @@ describe("useFactoryMergeConfidenceRuns", () => {
     });
     canvasesListRuns.mockReturnValueOnce(pendingFetch);
 
+    const taskKey = result.current.taskKey;
     act(() => {
-      void queryClient.invalidateQueries({ queryKey: mergeConfidenceRunsKey("org-1", "app-merge") });
+      void queryClient.invalidateQueries({ queryKey: mergeConfidenceRunsKey("org-1", "app-merge", taskKey) });
     });
     await waitFor(() => expect(canvasesListRuns).toHaveBeenCalledTimes(2));
 
@@ -139,10 +208,10 @@ describe("useFactoryMergeConfidenceRuns", () => {
       createdAt: "2026-08-26T12:00:00Z",
     });
     act(() => {
-      queryClient.setQueryData<CanvasesCanvasRun[]>(mergeConfidenceRunsKey("org-1", "app-merge"), (current) => [
-        ...(current ?? []),
-        live,
-      ]);
+      queryClient.setQueriesData<CanvasesCanvasRun[]>(
+        { queryKey: mergeConfidenceRunsKey("org-1", "app-merge", taskKey) },
+        (current) => [...(current ?? []), live],
+      );
     });
 
     await act(async () => {
@@ -151,7 +220,9 @@ describe("useFactoryMergeConfidenceRuns", () => {
     });
 
     await waitFor(() => expect(result.current.runs.map((entry) => entry.run.id)).toEqual(["run-kept", "run-live"]));
-    const cached = queryClient.getQueryData<CanvasesCanvasRun[]>(mergeConfidenceRunsKey("org-1", "app-merge"));
-    expect(cached?.map((run) => run.id)).toEqual(["run-kept", "run-live"]);
+    const cached = queryClient.getQueriesData<CanvasesCanvasRun[]>({
+      queryKey: mergeConfidenceRunsKey("org-1", "app-merge", taskKey),
+    });
+    expect(cached.some(([, runs]) => runs?.map((run) => run.id).join() === "run-kept,run-live")).toBe(true);
   });
 });

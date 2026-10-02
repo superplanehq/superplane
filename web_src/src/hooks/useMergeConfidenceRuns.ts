@@ -1,128 +1,224 @@
-import type { CanvasesCanvasRun, CanvasesListRunsResponse, FactoriesFactoryPullRequest } from "@/api-client";
-import { canvasesListRuns } from "@/api-client";
+import type {
+  CanvasesCanvasRun,
+  FactoriesFactoryPullRequest,
+  FactoriesListWorkOrderEventsResponse,
+  FactoriesWorkOrderCheck,
+} from "@/api-client";
+import { canvasesDescribeRun, canvasesListRuns, factoriesListWorkOrderEvents } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
+  getWorkOrderEventsNextPageParam,
+  WORK_ORDER_EVENTS_PAGE_LIMIT,
+} from "@/pages/factories/lib/workOrderEventsPagination";
+import {
   mergeConfidenceCanvases,
+  mergeConfidenceRunRefsFromTask,
   mergeConfidenceRunsForPullRequests,
+  mergeConfidenceTaskKey,
   mergeMergeConfidenceRunSnapshots,
+  upsertMergeConfidenceCanvasRun,
+  type MergeConfidenceCanvas,
   type MergeConfidenceLogRun,
+  type MergeConfidenceRunRef,
 } from "@/pages/factories/lib/mergeConfidenceRuns";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef } from "react";
 
 import { useFactoryAutomations } from "./useFactoryData";
 
 const MERGE_CONFIDENCE_RUNS_PAGE_LIMIT = 25;
-const MERGE_CONFIDENCE_RUNS_MAX_PAGES = 100;
+const MERGE_CONFIDENCE_EVENTS_MAX_PAGES = 20;
 
-export function mergeConfidenceRunsKey(organizationId: string, canvasId: string) {
-  return ["merge-confidence-runs", organizationId, canvasId] as const;
+export function mergeConfidenceRunsKey(organizationId: string, canvasId: string, taskKey: string) {
+  return ["merge-confidence-runs", organizationId, canvasId, taskKey] as const;
+}
+
+export function mergeConfidenceDescribedRunKey(organizationId: string, canvasId: string, runId: string) {
+  return ["merge-confidence-described-run", organizationId, canvasId, runId] as const;
+}
+
+function mergeConfidenceScoredRunRefsKey(
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  canvasIds: string,
+) {
+  return ["merge-confidence-scored-run-refs", organizationId, factoryId, orderId, canvasIds] as const;
 }
 
 /**
- * Recent Merge confidence runs for the task pull requests. A later score
- * is another canvas run, so the task log can list each one.
+ * Merge confidence runs for this task's pull requests. A later score is
+ * another canvas run, so the task log can list each one.
+ *
+ * The log does not scan the canvas history. It reads the newest page for a
+ * score still in progress, and describes runs already recorded on the task.
  */
 export function useFactoryMergeConfidenceRuns(
   organizationId: string,
   factoryId: string,
   pullRequests: FactoriesFactoryPullRequest[],
-): { runs: MergeConfidenceLogRun[]; canvasIds: string[] } {
+  orderId = "",
+  checks?: FactoriesWorkOrderCheck[],
+): { runs: MergeConfidenceLogRun[]; canvasIds: string[]; taskKey: string } {
   const queryClient = useQueryClient();
   const idsAtFetchStart = useRef(new Map<string, ReadonlySet<string>>());
   const { data: apps = [] } = useFactoryAutomations(organizationId, factoryId);
   const canvases = useMemo(() => mergeConfidenceCanvases(apps), [apps]);
-  const queries = useQueries({
-    queries: canvases.map((canvas) => ({
-      queryKey: mergeConfidenceRunsKey(organizationId, canvas.id),
-      queryFn: () => {
-        const current = queryClient.getQueryData<CanvasesCanvasRun[]>(
-          mergeConfidenceRunsKey(organizationId, canvas.id),
-        );
-        idsAtFetchStart.current.set(canvas.id, new Set((current ?? []).flatMap((run) => (run.id ? [run.id] : []))));
-        return listMergeConfidenceRuns(organizationId, canvas.id);
-      },
-      enabled: Boolean(organizationId && canvas.id),
-      refetchOnWindowFocus: false,
-      structuralSharing: (current: unknown, incoming: unknown) =>
-        mergeMergeConfidenceRunSnapshots(
-          current as CanvasesCanvasRun[] | undefined,
-          incoming as CanvasesCanvasRun[],
-          idsAtFetchStart.current.get(canvas.id),
-        ),
-    })),
+  const taskKey = useMemo(() => mergeConfidenceTaskKey(orderId, pullRequests), [orderId, pullRequests]);
+  const canvasIdSet = useMemo(() => new Set(canvases.map((canvas) => canvas.id)), [canvases]);
+  const canvasIdKey = useMemo(() => canvases.map((canvas) => canvas.id).join(","), [canvases]);
+  const { data: eventRefs = [] } = useQuery({
+    queryKey: mergeConfidenceScoredRunRefsKey(organizationId, factoryId, orderId, canvasIdKey),
+    queryFn: () => listMergeConfidenceScoredRunRefs(organizationId, factoryId, orderId, canvasIdSet),
+    enabled: Boolean(organizationId && factoryId && orderId && taskKey && canvasIdKey),
+    refetchOnWindowFocus: false,
   });
-  const runs = useMemo(
-    () =>
-      canvases.flatMap((canvas, index) =>
-        mergeConfidenceRunsForPullRequests(canvas, queries[index]?.data ?? [], pullRequests),
+  const checkRefs = useMemo(() => mergeConfidenceRunRefsFromTask(canvasIdSet, { checks }), [canvasIdSet, checks]);
+  const knownRefs = useMemo(() => dedupeRunRefs([...checkRefs, ...eventRefs]), [checkRefs, eventRefs]);
+  const listQueries = useQueries({
+    queries: taskKey
+      ? canvases.map((canvas) => {
+          const queryKey = [...mergeConfidenceRunsKey(organizationId, canvas.id, taskKey), "newest"] as const;
+          return {
+            queryKey,
+            queryFn: () => {
+              const current = queryClient.getQueryData<CanvasesCanvasRun[]>(queryKey);
+              idsAtFetchStart.current.set(
+                canvas.id,
+                new Set((current ?? []).flatMap((run) => (run.id ? [run.id] : []))),
+              );
+              return listNewestTaskRuns(organizationId, canvas, pullRequests);
+            },
+            enabled: Boolean(organizationId && canvas.id),
+            refetchOnWindowFocus: false,
+            structuralSharing: (current: unknown, incoming: unknown) =>
+              mergeMergeConfidenceRunSnapshots(
+                current as CanvasesCanvasRun[] | undefined,
+                incoming as CanvasesCanvasRun[],
+                idsAtFetchStart.current.get(canvas.id),
+              ),
+          };
+        })
+      : [],
+  });
+  const describeQueries = useQueries({
+    queries: taskKey
+      ? knownRefs.map((ref) => ({
+          queryKey: mergeConfidenceDescribedRunKey(organizationId, ref.canvasId, ref.runId),
+          queryFn: () => describeMergeConfidenceRun(organizationId, ref.canvasId, ref.runId),
+          enabled: Boolean(organizationId && ref.canvasId && ref.runId),
+          refetchOnWindowFocus: false,
+        }))
+      : [],
+  });
+  const runs = useMemo(() => {
+    const describedByCanvas = new Map<string, CanvasesCanvasRun[]>();
+    knownRefs.forEach((ref, index) => {
+      const run = describeQueries[index]?.data;
+      if (!run?.id) {
+        return;
+      }
+      const current = describedByCanvas.get(ref.canvasId) ?? [];
+      current.push(run);
+      describedByCanvas.set(ref.canvasId, current);
+    });
+    return canvases.flatMap((canvas, index) =>
+      mergeConfidenceRunsForPullRequests(
+        canvas,
+        mergeListedAndDescribed(listQueries[index]?.data, describedByCanvas.get(canvas.id)),
+        pullRequests,
       ),
-    [canvases, pullRequests, queries],
-  );
+    );
+  }, [canvases, describeQueries, knownRefs, listQueries, pullRequests]);
   return {
     runs,
-    canvasIds: canvases.map((canvas) => canvas.id),
+    canvasIds: taskKey ? canvases.map((canvas) => canvas.id) : [],
+    taskKey,
   };
 }
 
-async function listMergeConfidenceRuns(organizationId: string, canvasId: string): Promise<CanvasesCanvasRun[]> {
-  const runs: CanvasesCanvasRun[] = [];
-  const seen = new Set<string>();
-  let before: string | undefined;
-  let loadedCount = 0;
+async function describeMergeConfidenceRun(
+  organizationId: string,
+  canvasId: string,
+  runId: string,
+): Promise<CanvasesCanvasRun> {
+  const response = await canvasesDescribeRun(
+    withOrganizationHeader({
+      organizationId,
+      path: { canvasId, runId },
+    }),
+  );
+  const run = response.data?.run;
+  if (!run?.id) {
+    throw new Error("Merge confidence run not found");
+  }
+  return run;
+}
 
-  for (let page = 0; page < MERGE_CONFIDENCE_RUNS_MAX_PAGES; page += 1) {
-    const response = await canvasesListRuns(
+function mergeListedAndDescribed(
+  listed: CanvasesCanvasRun[] | undefined,
+  described: CanvasesCanvasRun[] | undefined,
+): CanvasesCanvasRun[] {
+  return (described ?? []).reduce((current, run) => upsertMergeConfidenceCanvasRun(current, run), listed ?? []);
+}
+
+async function listNewestTaskRuns(
+  organizationId: string,
+  canvas: MergeConfidenceCanvas,
+  pullRequests: FactoriesFactoryPullRequest[],
+): Promise<CanvasesCanvasRun[]> {
+  const response = await canvasesListRuns(
+    withOrganizationHeader({
+      organizationId,
+      path: { canvasId: canvas.id },
+      query: { limit: MERGE_CONFIDENCE_RUNS_PAGE_LIMIT },
+    }),
+  );
+  return mergeConfidenceRunsForPullRequests(canvas, response.data?.runs ?? [], pullRequests).map((entry) => entry.run);
+}
+
+async function listMergeConfidenceScoredRunRefs(
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  canvasIds: ReadonlySet<string>,
+): Promise<MergeConfidenceRunRef[]> {
+  const pages: Array<FactoriesListWorkOrderEventsResponse | undefined> = [];
+  const refs: MergeConfidenceRunRef[] = [];
+  let before: string | undefined;
+
+  for (let page = 0; page < MERGE_CONFIDENCE_EVENTS_MAX_PAGES; page += 1) {
+    const response = await factoriesListWorkOrderEvents(
       withOrganizationHeader({
         organizationId,
-        path: { canvasId },
+        path: { factoryId, orderId },
         query: {
-          limit: MERGE_CONFIDENCE_RUNS_PAGE_LIMIT,
+          limit: WORK_ORDER_EVENTS_PAGE_LIMIT,
           ...(before ? { before } : {}),
         },
       }),
     );
     const data = response.data;
-    const pageRuns = data?.runs ?? [];
-    for (const run of pageRuns) {
-      if (run.id && seen.has(run.id)) {
-        continue;
-      }
-      if (run.id) {
-        seen.add(run.id);
-      }
-      runs.push(run);
-    }
-    loadedCount += pageRuns.length;
-
-    const nextBefore = nextRunListCursor({ before, pageRuns, loadedCount, response: data });
-    if (!nextBefore) {
+    pages.push(data);
+    refs.push(...mergeConfidenceRunRefsFromTask(canvasIds, { events: data?.events }));
+    const nextBefore = getWorkOrderEventsNextPageParam(data, pages);
+    if (!nextBefore || nextBefore === before) {
       break;
     }
     before = nextBefore;
   }
 
-  return runs;
+  return dedupeRunRefs(refs);
 }
 
-function nextRunListCursor(options: {
-  before?: string;
-  pageRuns: CanvasesCanvasRun[];
-  loadedCount: number;
-  response: CanvasesListRunsResponse | undefined;
-}): string | undefined {
-  const { before, pageRuns, loadedCount, response } = options;
-  if (pageRuns.length === 0 || !response?.lastTimestamp || response.lastTimestamp === before) {
-    return undefined;
-  }
-
-  const totalCount = response.totalCount;
-  if (typeof totalCount === "number" && totalCount > 0 && loadedCount >= totalCount) {
-    return undefined;
-  }
-  if (response.hasNextPage === false) {
-    return undefined;
-  }
-
-  return response.lastTimestamp;
+function dedupeRunRefs(refs: MergeConfidenceRunRef[]): MergeConfidenceRunRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    const key = `${ref.canvasId}:${ref.runId}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }

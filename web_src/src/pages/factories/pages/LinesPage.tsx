@@ -1230,14 +1230,25 @@ function LineBoardSplitRunPopup({
   const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
-  const mergeConfidence = useFactoryMergeConfidenceRuns(organizationId, factoryId, peekPullRequests);
+  const mergeConfidence = useFactoryMergeConfidenceRuns(
+    organizationId,
+    factoryId,
+    peekPullRequests,
+    peekOrderId,
+    describedOrder?.checks,
+  );
   const popupOrder = describedOrder ?? peekOrder;
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
     <>
-      <MergeConfidenceCanvasListeners organizationId={organizationId} canvasIds={mergeConfidence.canvasIds} />
+      <MergeConfidenceCanvasListeners
+        organizationId={organizationId}
+        canvasIds={mergeConfidence.canvasIds}
+        taskKey={mergeConfidence.taskKey}
+        pullRequests={peekPullRequests}
+      />
       <WorkOrderSplitRunPopup
         key={peekOrderId}
         organizationId={organizationId}
