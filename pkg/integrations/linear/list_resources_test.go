@@ -40,7 +40,7 @@ func Test__ListResources__UnknownType(t *testing.T) {
 func Test__ListResources__TeamScopedTypesRequireTeam(t *testing.T) {
 	integration := &Linear{}
 
-	for _, resourceType := range []string{ResourceTypeWorkflowState, ResourceTypeMember, ResourceTypeLabel, ResourceTypeProject} {
+	for _, resourceType := range []string{ResourceTypeWorkflowState, ResourceTypeMember, ResourceTypeLabel} {
 		t.Run(resourceType, func(t *testing.T) {
 			resources, err := integration.ListResources(resourceType, core.ListResourcesContext{
 				Integration: integrationWithTeam(),

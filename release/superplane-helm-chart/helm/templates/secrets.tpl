@@ -63,6 +63,14 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.linear.name" }}
+{{- if eq .Values.linear.secretName "" }}
+{{- printf "%s-linear" .Release.Name }}
+{{- else }}
+{{- .Values.linear.secretName }}
+{{- end }}
+{{- end }}
+
 {{- define "superplane.serviceAccountName" -}}
 {{- if .Values.serviceAccount.name }}
 {{- .Values.serviceAccount.name }}
