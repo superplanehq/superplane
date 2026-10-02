@@ -2,6 +2,7 @@ const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
 
 type DurationParts = {
   days?: number;
@@ -104,6 +105,52 @@ function formatResolvedDuration(duration: DurationParts): string {
   }
 
   return formatDurationFallback(duration);
+}
+
+/**
+ * At most two units: `2m 5s`, `1h 30m`, `1d 2h`, or `1w 3d`.
+ * Rounds the smaller unit. A lone remainder is omitted (`2h`, not `2h 0m`).
+ */
+export function formatCompactDuration(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return "";
+  }
+  if (durationMs < MS_PER_SECOND) {
+    return "< 1s";
+  }
+  if (durationMs >= MS_PER_WEEK) {
+    return formatTwoUnits(durationMs, MS_PER_WEEK, "w", MS_PER_DAY, "d", 7);
+  }
+  if (durationMs >= MS_PER_DAY) {
+    return formatTwoUnits(durationMs, MS_PER_DAY, "d", MS_PER_HOUR, "h", 24);
+  }
+  if (durationMs >= MS_PER_HOUR) {
+    return formatTwoUnits(durationMs, MS_PER_HOUR, "h", MS_PER_MINUTE, "m", 60);
+  }
+  if (durationMs >= MS_PER_MINUTE) {
+    return formatTwoUnits(durationMs, MS_PER_MINUTE, "m", MS_PER_SECOND, "s", 60);
+  }
+  return `${Math.round(durationMs / MS_PER_SECOND)}s`;
+}
+
+function formatTwoUnits(
+  durationMs: number,
+  majorMs: number,
+  majorUnit: string,
+  minorMs: number,
+  minorUnit: string,
+  minorPerMajor: number,
+): string {
+  let major = Math.floor(durationMs / majorMs);
+  let minor = Math.round((durationMs % majorMs) / minorMs);
+  if (minor >= minorPerMajor) {
+    major += 1;
+    minor = 0;
+  }
+  if (minor > 0) {
+    return `${major}${majorUnit} ${minor}${minorUnit}`;
+  }
+  return `${major}${majorUnit}`;
 }
 
 /** Clock time for a scan column: `02:59`, or `1:10:22` after one hour. */
