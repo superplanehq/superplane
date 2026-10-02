@@ -89,6 +89,7 @@ export function ConnectOptionRow({
           className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", unavailable && "cursor-not-allowed")}
           onClick={select}
           disabled={unavailable}
+          aria-pressed={selected}
         >
           <span className="mt-0.5 shrink-0">{icon}</span>
           <span className="min-w-0 flex-1">

@@ -14,6 +14,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -71,6 +72,8 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 		factory.ID.String(),
 		modelSourceAnthropic,
 		"sk-test",
+		"",
+		"",
 	)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []uuid.UUID{hosted.ID, provider.ID}, changed)
@@ -93,6 +96,8 @@ func Test__SwitchFactoryModelSource__RewritesAgentCanvases(t *testing.T) {
 		r.Organization.ID.String(),
 		factory.ID.String(),
 		modelSourceHosted,
+		"",
+		"",
 		"",
 	)
 	require.NoError(t, err)
@@ -229,6 +234,8 @@ func Test__SwitchFactoryModelSource__StopsWhenTheKeyCannotListModels(t *testing.
 		factory.ID.String(),
 		modelSourceAnthropic,
 		"sk-bad",
+		"",
+		"",
 	)
 	require.Error(t, err)
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
@@ -281,6 +288,8 @@ func Test__SwitchFactoryModelSource__UsesDefaultsWhenTheModelListIsUnavailable(t
 		factory.ID.String(),
 		modelSourceAnthropic,
 		"sk-test",
+		"",
+		"",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []uuid.UUID{canvas.ID}, changed)
@@ -310,6 +319,8 @@ func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 		factory.ID.String(),
 		modelSourceAnthropic,
 		"sk-new",
+		"",
+		"",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, installation.ID.String(), integrationID)
@@ -317,4 +328,127 @@ func Test__SwitchFactoryModelSource__ReusesReadyIntegration(t *testing.T) {
 	var saved models.Integration
 	require.NoError(t, db.First(&saved, "id = ?", installation.ID).Error)
 	assert.Equal(t, "kept", saved.Configuration.Data()["apiKey"])
+}
+
+func Test__SwitchFactoryModelSource__CustomProviderRequiresBothFlags(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	live := *canvas.LiveVersionID
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"token",
+		"https://models.example/v1",
+		"openai-compatible",
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	assertCanvasLiveVersion(t, db, canvas.ID, live)
+}
+
+func Test__SwitchFactoryModelSource__CustomProviderRewritesAgents(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	stubProviderModels(r.Registry, models.CustomLLMAppName, []string{"zeta-model", "alpha-model"})
+
+	changed, _, err := SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"token",
+		"https://models.example/v1/",
+		"OpenAI-Compatible",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []uuid.UUID{canvas.ID}, changed)
+	assertAgentNode(t, db, canvas.ID, "runnerOpenRouter", "alpha-model", models.CustomLLMAppName)
+
+	live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	for i := range live.Nodes {
+		if live.Nodes[i].ID != "agent" {
+			continue
+		}
+		assert.Equal(t, models.UsageProviderCustom, live.Nodes[i].Configuration["llmProvider"])
+	}
+
+	var saved models.Integration
+	require.NoError(t, db.Where("organization_id = ? AND app_name = ?", r.Organization.ID, models.CustomLLMAppName).First(&saved).Error)
+	assert.Equal(t, "https://models.example/v1", saved.Configuration.Data()["baseURL"])
+	assert.Equal(t, "openai-compatible", saved.Configuration.Data()["apiType"])
+}
+
+func Test__SwitchFactoryModelSource__CustomProviderRequiresTokenWhenURLChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	createLineAppWithRunner(t, r, factory.ID, models.SuperPlaneRunnerComponent, "hosted", "")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	stubProviderModels(r.Registry, models.CustomLLMAppName, []string{"alpha-model"})
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"token",
+		"https://models.example/v1",
+		"openai-compatible",
+	)
+	require.NoError(t, err)
+
+	var saved models.Integration
+	require.NoError(t, db.Where("organization_id = ? AND app_name = ?", r.Organization.ID, models.CustomLLMAppName).First(&saved).Error)
+	keptKey := saved.Configuration.Data()["apiKey"]
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"",
+		"https://other.example/v1",
+		"openai-compatible",
+	)
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+	require.NoError(t, db.First(&saved, "id = ?", saved.ID).Error)
+	assert.Equal(t, "https://models.example/v1", saved.Configuration.Data()["baseURL"])
+	assert.Equal(t, keptKey, saved.Configuration.Data()["apiKey"])
+
+	_, _, err = SwitchFactoryModelSourceInTransaction(
+		t.Context(),
+		r.Registry,
+		r.Organization.ID.String(),
+		factory.ID.String(),
+		modelSourceCustom,
+		"replacement-token",
+		"https://other.example/v1",
+		"openai",
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.First(&saved, "id = ?", saved.ID).Error)
+	assert.Equal(t, "https://other.example/v1", saved.Configuration.Data()["baseURL"])
+	assert.Equal(t, "openai", saved.Configuration.Data()["apiType"])
+	assert.NotEqual(t, keptKey, saved.Configuration.Data()["apiKey"])
 }
