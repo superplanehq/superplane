@@ -161,8 +161,8 @@ interface ConsoleColumn {
 /**
  * Task stages sit in the column named after them. A column app uses the
  * column it is installed on. The create-task stage is omitted; the Intake
- * event shows it. Pull request activity sits in Verify, except a closer
- * run or an app installed on another column.
+ * event shows it. Pull request activity sits in Verify, except factory
+ * PR Closure and an app installed on another column.
  */
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
   const byColumn = stagesByConsoleColumn(groups, closerAppId);
