@@ -1,9 +1,9 @@
-import JsonView from "@uiw/react-json-view";
 import React from "react";
 import { useTheme } from "@/contexts/useTheme";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
+import { getJsonViewStyle } from "@/lib/jsonViewTheme";
 import { cn, resolveIcon } from "@/lib/utils";
+import { JsonPayload } from "./RunInspectorTimelineCard";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import type { RunNodeDetailTabData, RunNodeDetailTabKey } from "./types";
@@ -75,24 +75,10 @@ export function RunNodeDetailTabSection({
           />
         ) : null}
         {activeTab === "payload" && hasPayload ? (
-          <JsonView
-            value={tabData?.payload as object}
-            collapsed={2}
-            style={jsonViewStyle}
-            className={jsonViewClassName}
-            displayObjectSize={false}
-            enableClipboard={false}
-          />
+          <JsonPayload value={tabData?.payload} jsonViewStyle={jsonViewStyle} collapsed={2} />
         ) : null}
         {activeTab === "configuration" && hasConfig ? (
-          <JsonView
-            value={tabData?.configuration as object}
-            collapsed={2}
-            style={jsonViewStyle}
-            className={jsonViewClassName}
-            displayObjectSize={false}
-            enableClipboard={false}
-          />
+          <JsonPayload value={tabData?.configuration} jsonViewStyle={jsonViewStyle} collapsed={2} />
         ) : null}
       </div>
     </div>

@@ -132,6 +132,7 @@ export function JsonPayload({
       className={jsonViewClassName}
       displayObjectSize={false}
       enableClipboard={false}
+      shortenTextAfterLength={0}
     >
       <JsonView.String
         render={({ children, ...props }, { type, value: stringValue }) => {
