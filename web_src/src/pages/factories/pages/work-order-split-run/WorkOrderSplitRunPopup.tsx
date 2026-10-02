@@ -211,8 +211,8 @@ function AnalysisWorkOrderPopup({
     setDuplicateBusy(true);
     try {
       const newOrder = await createWorkOrder.mutateAsync({
-        title: fixture.title,
-        description: popupData.sourceDescription,
+        title: edits.title,
+        description: edits.description,
       });
 
       showSuccessToast("Task duplicated");

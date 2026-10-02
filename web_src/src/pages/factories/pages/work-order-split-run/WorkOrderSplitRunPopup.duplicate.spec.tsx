@@ -13,6 +13,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useDescribeRun: () => ({ data: undefined, isError: false, isLoading: false }),
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
+}));
+
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
