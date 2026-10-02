@@ -29,7 +29,7 @@ func Test__ApplyPolarSubscriptionReplacesAdminTrialWithPaid(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
 
@@ -56,7 +56,7 @@ func Test__ApplyPolarSubscriptionReplacesAdminBusinessOnCancel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
 	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
@@ -89,7 +89,7 @@ func Test__SetAdminOrganizationPlanAllowsPolarCustomerWithoutSubscription(t *tes
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_polar"))
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
 	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
@@ -109,7 +109,7 @@ func Test__SetAdminOrganizationPlanRejectsActivePolarSubscription(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
 	require.ErrorIs(t, err, models.ErrPolarManagedBillingPlan)
 
 	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
@@ -147,7 +147,7 @@ func Test__SetAdminOrganizationPlanAllowsEndedPolarSubscription(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
 	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
@@ -190,7 +190,7 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
 	assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
@@ -203,7 +203,7 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedUsage(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(models.DefaultIncludedGrantCents), summary.IncludedRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
 
-	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	summary, err = models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -223,7 +223,7 @@ func Test__SetAdminOrganizationPlanBusinessGrantsIncludedWhenPeriodWasMissing(t 
 			"current_period_end":   nil,
 		}).Error)
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	require.NotNil(t, plan.CurrentPeriodStart)
 	require.NotNil(t, plan.CurrentPeriodEnd)
@@ -237,14 +237,14 @@ func Test__SetAdminOrganizationPlanNoneAfterBusinessResubscribe(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
-	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
 	require.NoError(t, err)
-	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanNone, plan.Plan)
 	assert.False(t, plan.IsActiveBusiness())
@@ -259,10 +259,10 @@ func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 
-	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
 	require.NoError(t, err)
 	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
 	assert.True(t, plan.IsOpenTrial(time.Now()))
@@ -272,6 +272,210 @@ func Test__SetAdminOrganizationPlanTrialExpiresIncludedUsage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.IncludedRemainingMicros)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.WelcomeRemainingMicros)
+}
+
+func Test__SetAdminOrganizationPlanExplicitTrialEndKeepsOpenStart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, before.TrialStartedAt)
+	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
+	adminGrant, err := models.AddAdminLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(1100), "ops", nil)
+	require.NoError(t, err)
+	includedEnd := time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second)
+	_, err = models.AddIncludedLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(500),
+		"order-included-"+r.Organization.ID.String(),
+		includedEnd,
+	)
+	require.NoError(t, err)
+	purchased, err := models.AddTopupLLMCreditGrant(
+		db,
+		r.Organization.ID,
+		models.CentsToMicros(2500),
+		"order-topup-"+r.Organization.ID.String(),
+	)
+	require.NoError(t, err)
+	adminBefore := reloadGrant(t, db, adminGrant.ID)
+	purchasedBefore := reloadGrant(t, db, purchased.ID)
+
+	trialEnd := time.Now().Add(40 * 24 * time.Hour).UTC().Truncate(time.Second)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, &trialEnd)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.True(t, plan.TrialEndsAt.Equal(trialEnd))
+	require.NotNil(t, plan.TrialStartedAt)
+	assert.True(t, plan.TrialStartedAt.Equal(*before.TrialStartedAt))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	assert.Equal(t, int64(1), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindWelcome))
+	assert.Equal(t, welcomeBefore.AmountMicros, welcome.AmountMicros)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+
+	shorterEnd := time.Now().Add(48 * time.Hour).UTC().Truncate(time.Second)
+	plan, err = models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, &shorterEnd)
+	require.NoError(t, err)
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.True(t, plan.TrialEndsAt.Equal(shorterEnd))
+	require.NotNil(t, plan.TrialStartedAt)
+	assert.True(t, plan.TrialStartedAt.Equal(*before.TrialStartedAt))
+	welcome = requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(shorterEnd))
+	assert.Equal(t, welcomeBefore.AmountMicros, welcome.AmountMicros)
+
+	assertGrantUnchanged(t, db, adminBefore)
+	assertGrantUnchanged(t, db, purchasedBefore)
+	assert.Equal(t, models.CentsToMicros(500), reloadIncludedAmount(t, db, r.Organization.ID))
+}
+
+func Test__SetAdminOrganizationPlanReopensExpiredTrialCredit(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, before.TrialStartedAt)
+	ended := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Update("trial_ends_at", ended).Error)
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Update("expires_at", ended).Error)
+
+	trialEnd := time.Now().Add(21 * 24 * time.Hour).UTC().Truncate(time.Second)
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, &trialEnd)
+	require.NoError(t, err)
+	require.NotNil(t, plan.TrialStartedAt)
+	assert.True(t, plan.TrialStartedAt.After(*before.TrialStartedAt))
+	assert.WithinDuration(t, time.Now(), *plan.TrialStartedAt, 5*time.Second)
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.True(t, plan.TrialEndsAt.Equal(trialEnd))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	assert.Equal(t, int64(1), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindWelcome))
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+}
+
+func Test__SetAdminOrganizationPlanTrialDoesNotCreateWelcomeGrant(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Delete(&models.OrganizationLLMCreditGrant{}).Error)
+
+	trialEnd := time.Now().Add(10 * 24 * time.Hour).UTC().Truncate(time.Second)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, &trialEnd)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindWelcome))
+}
+
+func Test__SetAdminOrganizationPlanNilTrialEndKeepsFourteenDayDefault(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
+	before, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	plan, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
+	require.NoError(t, err)
+	require.NotNil(t, plan.TrialEndsAt)
+	assert.WithinDuration(t, time.Now().Add(models.DefaultWelcomeGrantTTL), *plan.TrialEndsAt, 5*time.Second)
+	require.NotNil(t, plan.TrialStartedAt)
+	require.NotNil(t, before.TrialStartedAt)
+	assert.True(t, plan.TrialStartedAt.Equal(*before.TrialStartedAt))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	require.NotNil(t, welcomeBefore.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
+}
+
+func Test__SetAdminOrganizationPlanBusinessAndNoneKeepWelcomeExpiry(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
+	planBefore, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	ignoredEnd := time.Now().Add(60 * 24 * time.Hour).UTC().Truncate(time.Second)
+
+	business, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, &ignoredEnd)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanBusiness, business.Plan)
+	require.NotNil(t, business.TrialEndsAt)
+	require.NotNil(t, planBefore.TrialEndsAt)
+	assert.True(t, business.TrialEndsAt.Equal(*planBefore.TrialEndsAt))
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
+
+	none, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanNone, &ignoredEnd)
+	require.NoError(t, err)
+	assert.Equal(t, models.BillingPlanNone, none.Plan)
+	require.NotNil(t, none.TrialEndsAt)
+	assert.True(t, none.TrialEndsAt.Equal(*planBefore.TrialEndsAt))
+	welcome = requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(*welcomeBefore.ExpiresAt))
+}
+
+func requireWelcomeGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) models.OrganizationLLMCreditGrant {
+	t.Helper()
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindWelcome).First(&grant).Error)
+	return grant
+}
+
+func countGrants(t *testing.T, db *gorm.DB, orgID uuid.UUID, kind string) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", orgID, kind).
+		Count(&count).Error)
+	return count
+}
+
+func reloadGrant(t *testing.T, db *gorm.DB, id uuid.UUID) models.OrganizationLLMCreditGrant {
+	t.Helper()
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("id = ?", id).First(&grant).Error)
+	return grant
+}
+
+func reloadIncludedAmount(t *testing.T, db *gorm.DB, orgID uuid.UUID) int64 {
+	t.Helper()
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindIncluded).First(&grant).Error)
+	return grant.AmountMicros
+}
+
+func assertGrantUnchanged(t *testing.T, db *gorm.DB, before models.OrganizationLLMCreditGrant) {
+	t.Helper()
+	var after models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("id = ?", before.ID).First(&after).Error)
+	assert.Equal(t, before.Kind, after.Kind)
+	assert.Equal(t, before.AmountMicros, after.AmountMicros)
+	if before.ExpiresAt == nil {
+		assert.Nil(t, after.ExpiresAt)
+		return
+	}
+	require.NotNil(t, after.ExpiresAt)
+	assert.True(t, after.ExpiresAt.Equal(*before.ExpiresAt))
 }
 
 func Test__ApplyPolarSubscriptionCancelRestoresOpenTrial(t *testing.T) {
@@ -442,7 +646,7 @@ func Test__ResolveOrganizationBillingPlanLeavesActiveBusiness(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 
 	plan, err := models.ResolveOrganizationBillingPlan(db, r.Organization.ID)
@@ -456,7 +660,7 @@ func Test__ResolveOrganizationBillingPlanExpiresIncludedUsage(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	expireOrganizationTrial(t, db, r.Organization.ID)
 

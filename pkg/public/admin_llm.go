@@ -100,7 +100,8 @@ type organizationBillingPlanResponse struct {
 }
 
 type organizationBillingPlanRequest struct {
-	Plan string `json:"plan"`
+	Plan        string  `json:"plan"`
+	TrialEndsAt *string `json:"trial_ends_at"`
 }
 
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
@@ -428,7 +429,14 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
 	}
 
-	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
+	planName := strings.TrimSpace(req.Plan)
+	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = models.SetAdminOrganizationPlan(database.Conn(), orgID, planName, trialEndsAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -456,6 +464,24 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
 		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
 	}, nil
+}
+
+func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
+	if planName != models.BillingPlanTrial {
+		return nil, nil
+	}
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil, errors.New("trial end date is required")
+	}
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*raw))
+	if err != nil {
+		return nil, errors.New("trial end date is required")
+	}
+	if !parsed.After(time.Now()) {
+		return nil, errors.New("Choose a future date.")
+	}
+	end := parsed.UTC()
+	return &end, nil
 }
 
 func formatOptionalTime(value *time.Time) *string {
