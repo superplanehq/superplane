@@ -58,7 +58,7 @@ export function elapsedForDisplay(
   if (!label) {
     return status === "running" ? "Running" : "";
   }
-  return status === "running" ? `${label} so far` : label;
+  return label;
 }
 
 export function durationForStatus(status: SplitRunPhaseStatus): string {
