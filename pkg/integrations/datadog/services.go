@@ -27,8 +27,9 @@ const (
 // ListServices returns service names seen in spans or logs in the last 30
 // days, plus services on open Error Tracking issues. The three reads run
 // together under one time limit. A refused or failed telemetry query is
-// skipped. The list fails only when every source fails. A refused issue
-// search then returns ErrErrorTrackingForbidden.
+// skipped. A refused issue search is skipped when another source succeeds.
+// Any other issue search failure fails the list, so a cancelled search
+// cannot hide services that exist only on open issues.
 func (c *Client) ListServices() ([]string, error) {
 	restoreDeadline := c.applyServiceListDeadline()
 	defer restoreDeadline()
@@ -57,6 +58,9 @@ func (c *Client) ListServices() ([]string, error) {
 	}()
 	wg.Wait()
 
+	if issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden) {
+		return nil, issueErr
+	}
 	if spanErr != nil && logErr != nil && issueErr != nil {
 		return nil, serviceListError(issueErr, spanErr, logErr)
 	}

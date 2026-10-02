@@ -98,6 +98,30 @@ func Test__Datadog__ListResources(t *testing.T) {
 		assert.Equal(t, []string{"alpha", "beta", "middle", "zeta"}, resourceIDs(resources))
 	})
 
+	t.Run("keeps telemetry services when the issue search is refused", func(t *testing.T) {
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "checkout"))},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+		)
+
+		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"checkout"}, resourceIDs(resources))
+	})
+
+	t.Run("fails the list when the issue search fails and telemetry succeeds", func(t *testing.T) {
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "checkout"))},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service", "billing"))},
+			[]*http.Response{httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`)},
+		)
+
+		_, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrErrorTrackingForbidden)
+	})
+
 	t.Run("keeps the list when a telemetry query fails or is refused", func(t *testing.T) {
 		httpContext := serviceListHTTP(
 			[]*http.Response{httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`)},
@@ -313,6 +337,50 @@ func TestListServicesStartsIssueSearchWhileTelemetryIsOpen(t *testing.T) {
 	require.NoError(t, err)
 	assert.Less(t, time.Since(started), 2*time.Second)
 	assert.Equal(t, []string{"from-issues", "from-logs"}, names)
+}
+
+func TestListServicesDoesNotDropOpenIssueServicesWhenTheSearchMissesTheDeadline(t *testing.T) {
+	gate := &deadlineHTTP{
+		started: make(chan struct{}),
+	}
+	client := &Client{
+		APIKey:  "test-api-key",
+		AppKey:  "test-app-key",
+		Site:    "datadoghq.com",
+		BaseURL: "https://api.datadoghq.com",
+		http:    gate,
+	}
+	client.SetRequestDeadline(time.Now().Add(50 * time.Millisecond))
+
+	names, err := client.ListServices()
+	require.Error(t, err)
+	assert.Empty(t, names)
+	assert.NotErrorIs(t, err, ErrErrorTrackingForbidden)
+	select {
+	case <-gate.started:
+	default:
+		t.Fatal("issue search did not start")
+	}
+}
+
+type deadlineHTTP struct {
+	started chan struct{}
+	once    sync.Once
+}
+
+func (h *deadlineHTTP) Do(request *http.Request) (*http.Response, error) {
+	switch request.URL.Path {
+	case spansAggregatePath:
+		return httpJSON(http.StatusOK, spanAggregateBody("service", "from-spans")), nil
+	case logsAggregatePath:
+		return httpJSON(http.StatusOK, logAggregateBody("service", "from-logs")), nil
+	case errorTrackingSearchPath:
+		h.once.Do(func() { close(h.started) })
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	default:
+		return nil, fmt.Errorf("unexpected path %s", request.URL.Path)
+	}
 }
 
 const errorTrackingSearchPath = "/api/v2/error-tracking/issues/search"
