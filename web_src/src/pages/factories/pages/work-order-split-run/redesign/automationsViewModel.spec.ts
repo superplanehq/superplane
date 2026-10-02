@@ -105,6 +105,17 @@ describe("settleStoppedSteps", () => {
   it("leaves a running step alone while the stage is still running", () => {
     expect(settleStoppedSteps([running], "running")).toEqual([running]);
   });
+
+  it("marks a running prompt failed when the stage failed", () => {
+    expect(settleStoppedSteps([running], "failed").map((step) => step.status)).toEqual(["failed"]);
+  });
+
+  it("stops a running command when the stage failed without marking it failed", () => {
+    const command = { ...running, id: "command", title: "bash script.sh", type: "bash" } satisfies AgentStep;
+
+    expect(settleStoppedSteps([command], "failed").map((step) => step.status)).toEqual(["stopped"]);
+    expect(settleStoppedSteps([command], "cancelled").map((step) => step.status)).toEqual(["cancelled"]);
+  });
 });
 
 describe("Backlog column stages", () => {
