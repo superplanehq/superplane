@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
 )
 
@@ -57,7 +58,15 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 			factoriesByID[factory.ID.String()] = factory
 		}
 
-		outcome, err := applyGitHubPullRequestClosed(db, factory, pullRequest, merged, mergedAt, closedAt)
+		outcome, err := applyGitHubPullRequestClosed(
+			db,
+			factory,
+			pullRequest,
+			merged,
+			mergedAt,
+			closedAt,
+			githubCloseAutomation(payload, merged),
+		)
 		if err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to close work order for pull request %s", pullRequest.ID)
 			continue
@@ -83,13 +92,14 @@ func applyGitHubPullRequestClosed(
 	pullRequest *models.FactoryPullRequest,
 	merged bool,
 	mergedAt, closedAt *time.Time,
+	automation *factoryevents.AutomationRef,
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := stampFactoryPullRequestClosed(tx, pullRequest, merged, mergedAt, closedAt); err != nil {
 			return err
 		}
-		closed, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, merged)
+		closed, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, merged, automation)
 		if err != nil {
 			return err
 		}
@@ -130,6 +140,7 @@ func closeFactoryWorkOrderForPullRequest(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 	merged bool,
+	automation *factoryevents.AutomationRef,
 ) (*factoryPullRequestCloseResult, error) {
 	order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
 	if err != nil {
@@ -151,13 +162,50 @@ func closeFactoryWorkOrderForPullRequest(
 		return outcome, nil
 	}
 
-	order, err = order.Close(tx, outcome.result, nil)
-	if err != nil {
+	if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+		ToState:    models.FactoryWorkOrderStateClosed,
+		Result:     outcome.result,
+		Automation: automation,
+		SkipSame:   true,
+	}); err != nil {
 		return nil, err
 	}
 	outcome.order = order
 	outcome.closed = true
 	return outcome, nil
+}
+
+func githubCloseAutomation(payload githubMergeabilityWebhookPayload, merged bool) *factoryevents.AutomationRef {
+	if payload.PullRequest == nil {
+		return githubUserAutomation(payload.Sender)
+	}
+	if merged && payload.PullRequest.MergedBy != nil {
+		return githubUserAutomation(payload.PullRequest.MergedBy)
+	}
+	return githubUserAutomation(payload.Sender)
+}
+
+func githubUserAutomation(user *githubWebhookUser) *factoryevents.AutomationRef {
+	if user == nil {
+		return nil
+	}
+	login := strings.TrimSpace(user.Login)
+	if login == "" {
+		return nil
+	}
+	name := strings.TrimSpace(user.Name)
+	if name == "" {
+		name = login
+	}
+	htmlURL := strings.TrimSpace(user.HTMLURL)
+	if htmlURL == "" {
+		htmlURL = "https://github.com/" + login
+	}
+	return &factoryevents.AutomationRef{
+		AppName:  login,
+		NodeName: name,
+		NodeID:   htmlURL,
+	}
 }
 
 func parseGitHubTimestamp(value string) *time.Time {

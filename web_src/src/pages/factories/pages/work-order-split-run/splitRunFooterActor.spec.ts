@@ -77,6 +77,33 @@ describe("footerCloserFromEvents", () => {
     ).toEqual({ automationName: "PR Closure" });
   });
 
+  it("keeps a GitHub profile URL stored on the closer automation", () => {
+    expect(
+      footerCloserFromEvents(
+        [
+          {
+            type: "order.status.updated",
+            timestamp: "2026-08-04T12:00:00.000Z",
+            event: {
+              automation: {
+                appName: "alex",
+                nodeName: "Alex Rivera",
+                nodeId: "https://github.com/alex",
+              },
+              toState: "closed",
+              toResult: "completed",
+            },
+          },
+        ],
+        "completed",
+        resolveUser,
+      ),
+    ).toEqual({
+      automationName: "Alex Rivera",
+      automationHref: "https://github.com/alex",
+    });
+  });
+
   it("uses the latest matching close, not an older one", () => {
     expect(
       footerCloserFromEvents(

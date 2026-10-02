@@ -80,6 +80,16 @@ function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: numb
 }
 
 describe("AgentRunsPage run comments", () => {
+  it("does not show duration on the run rows", () => {
+    renderRuns([
+      { ...commentRun("First review."), id: "address-1", duration: "16m 46s" },
+      { ...commentRun("Second review."), id: "address-2", duration: "11m 22s" },
+    ]);
+
+    expect(screen.queryByText("16m 46s")).not.toBeInTheDocument();
+    expect(screen.queryByText("11m 22s")).not.toBeInTheDocument();
+  });
+
   it("clips a long comment to five lines and expands it on Show more", async () => {
     const restoreHeights = stubElementHeights({ scrollHeight: 240, clientHeight: 100 });
     try {

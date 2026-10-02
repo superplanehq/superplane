@@ -65,6 +65,25 @@ describe("runMetaLine", () => {
 
     expect(runMetaLine(stage)).toBe("10m 56s so far");
   });
+
+  it("sums every run on the card, not only the latest", () => {
+    const latest = { ...runningStage("implement"), status: "passed" as const, duration: "9m 22s" };
+    const runs = [
+      { ...latest, id: "r1", duration: "22m 38s" },
+      { ...latest, id: "r2", duration: "16m 35s" },
+      { ...latest, id: "r3", duration: "14m 32s" },
+      latest,
+    ];
+
+    expect(runMetaLine(latest, runs)).toBe("63m 7s");
+  });
+
+  it("marks the summed duration as still counting when a run is live", () => {
+    const latest = { ...runningStage("implement"), status: "running" as const, duration: "2m" };
+    const earlier = { ...latest, id: "r1", status: "passed" as const, duration: "10m" };
+
+    expect(runMetaLine(latest, [earlier, latest])).toBe("12m so far");
+  });
 });
 
 describe("runFooterLine", () => {
