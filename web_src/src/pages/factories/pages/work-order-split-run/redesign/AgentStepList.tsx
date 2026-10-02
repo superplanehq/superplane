@@ -95,7 +95,7 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
   // An open step already shows its output, so do not repeat its first line.
   const reason = open && !step.summary ? "" : stepReason(step);
   const row = (
-    <div className="flex min-w-0 items-start gap-2.5 px-3 py-2">
+    <div className="group/step flex min-w-0 items-start gap-2.5 px-3 py-2">
       {expandable ? (
         <ChevronRight
           className={cn("mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
@@ -108,9 +108,7 @@ function AgentStepRow({ step, detailed, defaultOpen }: { step: AgentStep; detail
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-[13px] font-medium text-foreground">{step.title}</span>
           <StepStatusBadge status={step.status} />
-          {step.duration ? (
-            <span className={cn(META_TEXT_CLASSNAME, "ml-auto shrink-0 tabular-nums")}>{step.duration}</span>
-          ) : null}
+          <StepDuration duration={step.duration} />
         </div>
         {reason ? <p className="truncate text-[12.5px] text-muted-foreground">{reason}</p> : null}
       </div>
@@ -203,7 +201,7 @@ function AgentStepMarker({
     { resumeOnBottom: true },
   );
   const row = (
-    <Marker className={cn("min-w-0 py-1", running && "bg-muted")}>
+    <Marker className={cn("group/step min-w-0 py-1", running && "bg-muted")}>
       <MarkerIcon className="text-muted-foreground">
         {expandable ? (
           <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
@@ -220,11 +218,7 @@ function AgentStepMarker({
         {reason ? (
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
         ) : null}
-        {step.duration ? (
-          <span className="ml-auto w-12 shrink-0 text-end text-xs text-muted-foreground tabular-nums">
-            {step.duration}
-          </span>
-        ) : null}
+        <StepDuration duration={step.duration} />
       </MarkerContent>
     </Marker>
   );
@@ -307,6 +301,23 @@ function StepCommand({ text }: { text: string }) {
         <pre className={cn(MONO_LOG_CLASSNAME, "mt-1 whitespace-pre-wrap")}>{text}</pre>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function StepDuration({ duration }: { duration?: string }) {
+  if (!duration) {
+    return null;
+  }
+  return (
+    <span
+      className={cn(
+        META_TEXT_CLASSNAME,
+        "ml-auto shrink-0 whitespace-nowrap text-end opacity-0 transition-opacity duration-150 group-hover/step:opacity-100",
+      )}
+    >
+      <span className="sr-only">Duration </span>
+      {duration}
+    </span>
   );
 }
 

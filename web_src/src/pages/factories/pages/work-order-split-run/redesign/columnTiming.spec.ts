@@ -125,6 +125,38 @@ describe("timingsForConsoleColumns", () => {
     expect(timings.verify).toBeUndefined();
   });
 
+  it("counts pull-request Verify work in the Verify dwell", () => {
+    const fixStarted = "2026-09-30T12:06:00.000Z";
+    const mergeStarted = VERIFY_AT;
+    const closedAt = "2026-09-30T12:42:00.000Z";
+    const timings = timingsFor(
+      phase("backlog", "Backlog", INTAKE_AT),
+      phase("implement", "Implement", IMPLEMENT_AT),
+      {
+        ...phase("pr-feedback-fix", "Checks failed on abc", fixStarted),
+        componentName: "Fix pull request checks",
+        pullRequestActivity: { startedAt: fixStarted },
+      },
+      {
+        ...phase("column-app-merge", "Verify", mergeStarted),
+        componentName: "Merge confidence",
+        columnKey: "verify",
+      },
+      {
+        ...phase("pr-feedback-close", "Pull request merged", closedAt),
+        componentName: "PR Closure",
+        appId: "app-pr-closure",
+        pullRequestActivity: { startedAt: closedAt },
+      },
+    );
+
+    expect(timings.verify).toEqual({
+      enteredAt: fixStarted,
+      durationMs: Date.parse(closedAt) - Date.parse(fixStarted),
+    });
+    expect(timings.done).toEqual({ enteredAt: closedAt });
+  });
+
   it("maps a named implement step to Implement even when stepIndex is 1", () => {
     const timings = timingsFor(phase("backlog", "Backlog", INTAKE_AT), {
       ...phase("open-pr", "Open pull request", IMPLEMENT_AT, "running"),
