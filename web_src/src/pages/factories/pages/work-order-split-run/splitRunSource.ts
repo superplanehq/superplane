@@ -6,6 +6,7 @@ import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -35,6 +36,12 @@ export type SplitRunSource =
       iconSrc: string;
       iconAlt: string;
       ticket?: { label: string; href: string };
+    }
+  | {
+      kind: "mcp";
+      name: string;
+      iconSrc: string;
+      iconAlt: string;
     }
   | {
       kind: "manual";
@@ -121,6 +128,16 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
   const automation = order.createdBy?.automation;
   if (automation) {
     return intakeSourceFromKind(intakeKindForAutomation(automation));
+  }
+
+  const mcpName = order.mcpClient?.name?.trim();
+  if (mcpName) {
+    return {
+      kind: "mcp",
+      name: mcpName,
+      iconSrc: superplaneIcon,
+      iconAlt: "SuperPlane",
+    };
   }
 
   return {
