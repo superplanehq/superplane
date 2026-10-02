@@ -265,7 +265,7 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
 }
 
 function isGitHubDependabotAlertHref(parsed: URL | undefined): boolean {
-  return parsed?.hostname === "github.com" && parsed.pathname.toLowerCase().includes("/security/dependabot");
+  return parsed?.hostname === "github.com" && /^\/[^/]+\/[^/]+\/security\/dependabot(?:\/|$)/i.test(parsed.pathname);
 }
 
 function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {

@@ -214,6 +214,23 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  it("keeps a GitHub issue when the repository path contains security and dependabot", () => {
+    const href = "https://github.com/security/dependabot/issues/12";
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: href },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "GitHub issues",
+        iconAlt: "GitHub",
+        ticket: { label: "security/dependabot#12", href },
+      }),
+    );
+  });
+
   it("keeps a GitHub issue when the title or label mentions Dependabot", () => {
     expect(
       splitRunSourceForOrder({
