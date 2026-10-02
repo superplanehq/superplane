@@ -312,7 +312,7 @@ describe("AgentRunsPage pull request checks", () => {
     expect(screen.queryByText("build: CI")).not.toBeInTheDocument();
   });
 
-  it("shows the same rows after checks fail and hides the markdown list", () => {
+  it("shows a failed check summary on the row and hides the markdown list", () => {
     mockExecutions([
       {
         nodeId: WAIT_NODE_ID,
@@ -328,6 +328,7 @@ describe("AgentRunsPage pull request checks", () => {
                     status: "completed",
                     conclusion: "failure",
                     detailsUrl: "https://example.com/build",
+                    summary: "The build failed on Semaphore 2.0.",
                   },
                 ],
                 checks: [{ name: "unwatched", status: "completed", conclusion: "failure" }],
@@ -346,10 +347,44 @@ describe("AgentRunsPage pull request checks", () => {
     );
 
     expect(screen.getByText(/Fixing failed checks on/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["buildFailed"]);
+    expect(screen.getByText("The build failed on Semaphore 2.0.")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual([
+      "buildThe build failed on Semaphore 2.0.Failed",
+    ]);
     expect(screen.queryByText("Failed checks")).not.toBeInTheDocument();
-    expect(screen.queryByText(/The build failed on Semaphore/)).not.toBeInTheDocument();
+    expect(screen.queryByText("build: CI")).not.toBeInTheDocument();
     expect(screen.queryByText("unwatched")).not.toBeInTheDocument();
+  });
+
+  it("keeps the failure explanation when the snapshot has no summary", () => {
+    mockExecutions([
+      {
+        nodeId: WAIT_NODE_ID,
+        state: "STATE_FINISHED",
+        metadata: {
+          selectedChecks: [
+            {
+              name: "build",
+              status: "completed",
+              conclusion: "failure",
+              detailsUrl: "https://example.com/build",
+            },
+          ],
+        },
+      },
+    ]);
+
+    renderChecksCard(
+      checksRun(
+        `Fixing failed checks on [3fc0c4c](${COMMIT_URL})`,
+        "Failed checks\n· [build: CI](https://example.com/build): The build failed on Semaphore 2.0.",
+      ),
+    );
+
+    expect(screen.getByText("build")).toBeInTheDocument();
+    const description = screen.getByTestId("redesign-run-description");
+    expect(description).toHaveTextContent("Failed checks");
+    expect(description).toHaveTextContent("The build failed on Semaphore 2.0.");
   });
 
   it("keeps the description when the execution read fails", () => {

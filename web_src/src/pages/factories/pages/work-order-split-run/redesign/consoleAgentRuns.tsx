@@ -163,9 +163,7 @@ function RunDetails({
   return (
     <>
       <WatchedPullRequestCheckList checks={checks} />
-      {checks.length > 0 && isChecksMarkdownDescription(run.description) ? null : (
-        <RunDescription description={run.description} />
-      )}
+      {checksDescriptionIsRedundant(run.description, checks) ? null : <RunDescription description={run.description} />}
       <LiveAgentSteps
         stage={run}
         phase={phase}
@@ -209,10 +207,26 @@ function WatchedPullRequestCheckList({ checks }: { checks: WatchedPullRequestChe
   return (
     <ul aria-label="Pull request checks" className="flex flex-col" data-testid="pull-request-checks">
       {checks.map((check, index) => (
-        <li key={`${check.name}-${index}`} className="flex min-w-0 items-center gap-2 py-1">
-          <StaticStatusGlyph status={CHECK_GLYPH[check.status]} />
-          <CheckName check={check} />
-          <span className={cn("shrink-0 text-[12px] font-medium", CHECK_STATUS_CLASS[check.status])}>
+        <li
+          key={`${check.name}-${index}`}
+          className={cn("flex min-w-0 gap-2 py-1", check.summary ? "items-start" : "items-center")}
+        >
+          <span className={cn("flex shrink-0", check.summary && "mt-0.5")}>
+            <StaticStatusGlyph status={CHECK_GLYPH[check.status]} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <CheckName check={check} />
+            {check.summary ? (
+              <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">{check.summary}</p>
+            ) : null}
+          </div>
+          <span
+            className={cn(
+              "shrink-0 text-[12px] font-medium",
+              check.summary && "mt-0.5",
+              CHECK_STATUS_CLASS[check.status],
+            )}
+          >
             {check.status}
           </span>
         </li>
@@ -221,21 +235,56 @@ function WatchedPullRequestCheckList({ checks }: { checks: WatchedPullRequestChe
   );
 }
 
+function checksDescriptionIsRedundant(description: string | undefined, checks: WatchedPullRequestCheck[]): boolean {
+  if (!isChecksMarkdownDescription(description) || checks.length === 0) {
+    return false;
+  }
+  const explanations = checkExplanations(description);
+  if (explanations.length === 0) {
+    return true;
+  }
+  const shown = new Set(checks.flatMap((check) => (check.summary ? [check.summary] : [])));
+  return explanations.every((explanation) => shown.has(explanation));
+}
+
 function isChecksMarkdownDescription(description: string | undefined): boolean {
+  const body = checksMarkdownLines(description);
+  return body.length > 0 && body.every((line) => line.startsWith("· "));
+}
+
+function checksMarkdownLines(description: string | undefined): string[] {
   const lines = description
     ?.split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
   if (!lines || lines.length === 0) {
-    return false;
+    return [];
   }
-  const body = lines[0] === "Failed checks" ? lines.slice(1) : lines;
-  return body.length > 0 && body.every((line) => line.startsWith("· "));
+  return lines[0] === "Failed checks" ? lines.slice(1) : lines;
+}
+
+function checkExplanations(description: string | undefined): string[] {
+  return checksMarkdownLines(description).flatMap(lineExplanation);
+}
+
+function lineExplanation(line: string): string[] {
+  const item = line.startsWith("· ") ? line.slice(2) : line;
+  const linked = item.match(/^\[[^\]]*\]\([^)]*\)(?::\s*(\S.*))?$/);
+  if (linked) {
+    const summary = linked[1]?.trim();
+    return summary ? [summary] : [];
+  }
+  const parts = item.split(": ");
+  if (parts.length < 2) {
+    return [];
+  }
+  const summary = parts[parts.length - 1]?.trim();
+  return summary ? [summary] : [];
 }
 
 function CheckName({ check }: { check: WatchedPullRequestCheck }) {
   const href = safeExternalUrl(check.detailsUrl);
-  const className = "min-w-0 flex-1 truncate text-[12.5px] font-medium text-foreground";
+  const className = "block min-w-0 truncate text-[12.5px] font-medium text-foreground";
   if (!href) {
     return <span className={className}>{check.name}</span>;
   }

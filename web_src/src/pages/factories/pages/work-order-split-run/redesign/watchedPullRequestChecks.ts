@@ -10,6 +10,7 @@ export type WatchedPullRequestCheck = {
   name: string;
   status: WatchedCheckStatus;
   detailsUrl?: string;
+  summary?: string;
 };
 
 type CanvasNodeRef = {
@@ -103,11 +104,13 @@ function watchedCheckFromValue(value: unknown): WatchedPullRequestCheck[] {
     return [];
   }
   const detailsUrl = typeof value.detailsUrl === "string" ? value.detailsUrl.trim() : "";
+  const summary = typeof value.summary === "string" ? value.summary.trim() : "";
   return [
     {
       name,
       status: watchedCheckStatus(stringField(value.status), stringField(value.conclusion)),
       ...(detailsUrl ? { detailsUrl } : {}),
+      ...(summary ? { summary } : {}),
     },
   ];
 }
