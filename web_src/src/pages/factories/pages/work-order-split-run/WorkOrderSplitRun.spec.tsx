@@ -1181,8 +1181,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
   });
 
-  it("disables merge and shows the reason on hover when automation is running", async () => {
-    const user = userEvent.setup();
+  it("disables merge and shows the reason when automation is running", () => {
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
@@ -1194,10 +1193,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(within(note).getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(within(note).getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
+    expect(within(note).getByTestId("split-run-merge-reason")).toHaveTextContent("Automation is still running.");
   });
 
   it("lists the reviewed pull request once, on the review strip only", () => {
