@@ -130,6 +130,36 @@ func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
 	return integrations, nil
 }
 
+// ListIntegrationsPage returns one page of connections for an organization.
+// Search matches the app name or the connection name. Results are ordered by
+// app name, then connection name.
+func ListIntegrationsPage(tx *gorm.DB, orgID uuid.UUID, search string, limit, offset int) ([]Integration, int64, error) {
+	query := tx.Model(&Integration{}).Where("organization_id = ?", orgID)
+	if search != "" {
+		like := "%" + search + "%"
+		query = query.Where("app_name ILIKE ? OR installation_name ILIKE ?", like, like)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var integrations []Integration
+	err := query.Order("app_name ASC, installation_name ASC").Find(&integrations).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return integrations, total, nil
+}
+
 func CountIntegrationsByOrganization(orgID string) (int64, error) {
 	return CountIntegrationsByOrganizationInTransaction(database.Conn(), orgID)
 }

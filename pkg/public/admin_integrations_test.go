@@ -38,7 +38,10 @@ func TestAdminListOrgIntegrations(t *testing.T) {
 		require.Equal(t, http.StatusOK, response.Code)
 
 		var body struct {
-			Items []adminIntegration `json:"items"`
+			Items  []adminIntegration `json:"items"`
+			Total  int64              `json:"total"`
+			Limit  int                `json:"limit"`
+			Offset int                `json:"offset"`
 		}
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 
@@ -56,7 +59,50 @@ func TestAdminListOrgIntegrations(t *testing.T) {
 		assert.Equal(t, "9eb2cdda-c7f4-42c4-9fd2-2f20a5d08215", found.Details["installation_uuid"])
 		assert.Equal(t, "referrizer", found.Details["external_organization"])
 		assert.Equal(t, "true", found.Details["hosted_app"])
+		assert.Equal(t, 50, body.Limit)
+		assert.Equal(t, 0, body.Offset)
+		assert.GreaterOrEqual(t, body.Total, int64(1))
 		assert.NotContains(t, response.Body.String(), "csrf-state-value")
+	})
+
+	t.Run("returns one page and keeps the rest for the next offset", func(t *testing.T) {
+		name := "page-cap-" + uuid.NewString()[:8]
+		_, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "sentry", name+"-b", nil)
+		require.NoError(t, err)
+		_, err = models.CreateIntegration(uuid.New(), r.Organization.ID, "github", name+"-a", nil)
+		require.NoError(t, err)
+
+		first := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/integrations?search=" + name + "&limit=1&offset=0",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, first.Code)
+
+		var page struct {
+			Items  []adminIntegration `json:"items"`
+			Total  int64              `json:"total"`
+			Limit  int                `json:"limit"`
+			Offset int                `json:"offset"`
+		}
+		require.NoError(t, json.Unmarshal(first.Body.Bytes(), &page))
+		require.Len(t, page.Items, 1)
+		assert.Equal(t, int64(2), page.Total)
+		assert.Equal(t, 1, page.Limit)
+		assert.Equal(t, 0, page.Offset)
+		assert.Equal(t, "github", page.Items[0].AppName)
+		assert.Equal(t, name+"-a", page.Items[0].InstallationName)
+
+		second := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/integrations?search=" + name + "&limit=1&offset=1",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, second.Code)
+		require.NoError(t, json.Unmarshal(second.Body.Bytes(), &page))
+		require.Len(t, page.Items, 1)
+		assert.Equal(t, name+"-b", page.Items[0].InstallationName)
+		assert.Equal(t, 1, page.Offset)
 	})
 
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {

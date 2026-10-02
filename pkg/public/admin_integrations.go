@@ -1,10 +1,8 @@
 package public
 
 import (
-	"cmp"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -25,10 +23,6 @@ type adminIntegration struct {
 	UpdatedAt        string            `json:"updated_at"`
 }
 
-type adminIntegrationsResponse struct {
-	Items []adminIntegration `json:"items"`
-}
-
 // adminListOrgIntegrations returns the connections of an organization with
 // their state. Metadata can hold CSRF state and other private values, so only
 // allowlisted identifiers leave the server.
@@ -41,16 +35,13 @@ func (s *Server) adminListOrgIntegrations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	integrations, err := models.ListIntegrations(database.DB(r.Context()), org.ID)
+	search, limit, offset := parsePagination(r)
+	integrations, total, err := models.ListIntegrationsPage(database.DB(r.Context()), org.ID, search, limit, offset)
 	if err != nil {
 		log.Errorf("admin: failed to list integrations for org %s: %v", orgID, err)
 		http.Error(w, "Failed to list connections", http.StatusInternalServerError)
 		return
 	}
-
-	slices.SortFunc(integrations, func(a, b models.Integration) int {
-		return cmp.Or(cmp.Compare(a.AppName, b.AppName), cmp.Compare(a.InstallationName, b.InstallationName))
-	})
 
 	items := make([]adminIntegration, 0, len(integrations))
 	for _, integration := range integrations {
@@ -66,7 +57,12 @@ func (s *Server) adminListOrgIntegrations(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	respondJSON(w, adminIntegrationsResponse{Items: items})
+	respondJSON(w, paginatedResponse{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	})
 }
 
 func adminIntegrationDetails(metadata map[string]any) map[string]string {

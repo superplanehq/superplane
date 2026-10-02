@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
@@ -84,7 +84,7 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
-        if (url === `/admin/api/organizations/${ORG_ID}/integrations`) {
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
           return jsonResponse({
             items: [
               {
@@ -98,6 +98,9 @@ describe("OrganizationDetail", () => {
                 updated_at: "2024-02-20T12:00:00Z",
               },
             ],
+            total: 1,
+            limit: 50,
+            offset: 0,
           });
         }
         if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
@@ -233,6 +236,66 @@ describe("OrganizationDetail", () => {
     expect(within(panel).getByText("Sentry is not sending issue events.")).toBeInTheDocument();
     expect(within(panel).getByText("install-uuid-1")).toBeInTheDocument();
     expect(within(panel).getByText("acme-sentry-org")).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Search connections..."), "acme");
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/admin/api/organizations/${ORG_ID}/integrations?`),
+        expect.objectContaining({ credentials: "include" }),
+      );
+      const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+      expect(urls.some((url) => url.includes("search=acme") && url.includes("limit=50"))).toBe(true);
+    });
+  });
+
+  it("loads the next page of connections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({
+          id: ORG_ID,
+          name: "Acme",
+          slug: "acme",
+          description: "Builds widgets",
+          canvas_count: 2,
+          task_count: 4,
+          done_task_count: 6,
+          member_count: 3,
+          created_at: "2024-01-15T12:00:00Z",
+          updated_at: "2024-02-20T12:00:00Z",
+        });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+        const offset = new URL(url, "http://localhost").searchParams.get("offset");
+        return jsonResponse({
+          items: [
+            {
+              id: offset === "50" ? "integration-2" : "integration-1",
+              app_name: "sentry",
+              installation_name: offset === "50" ? "second-sentry" : "acme-sentry",
+              state: "ready",
+              state_description: "",
+              details: {},
+              created_at: "2024-01-15T12:00:00Z",
+              updated_at: "2024-02-20T12:00:00Z",
+            },
+          ],
+          total: 51,
+          limit: 50,
+          offset: Number(offset ?? 0),
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("second-sentry")).toBeInTheDocument();
+    expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {

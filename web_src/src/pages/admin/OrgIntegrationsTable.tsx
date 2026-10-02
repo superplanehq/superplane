@@ -1,8 +1,9 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
-import { useQuery } from "@tanstack/react-query";
-import { Plug } from "lucide-react";
+import { Plug, Search } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminPagination from "./AdminPagination";
 
 export type AdminIntegration = {
   id: string;
@@ -17,8 +18,10 @@ export type AdminIntegration = {
 
 type AdminIntegrationsResponse = {
   items: AdminIntegration[];
+  total: number;
 };
 
+const PAGE_SIZE = 50;
 const LOAD_ERROR = "Could not load connections.";
 
 const DETAIL_LABELS: Record<string, string> = {
@@ -34,30 +37,90 @@ const STATE_CLASSES: Record<string, string> = {
   error: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
 };
 
-async function fetchOrgIntegrations(orgId: string): Promise<AdminIntegrationsResponse> {
-  const response = await fetch(`/admin/api/organizations/${orgId}/integrations`, { credentials: "include" });
-  if (!response.ok) {
-    throw new Error(LOAD_ERROR);
-  }
-  return (await response.json()) as AdminIntegrationsResponse;
-}
-
 export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["admin", "organizations", orgId, "integrations"],
-    queryFn: () => fetchOrgIntegrations(orgId),
-  });
-  const items = data?.items ?? [];
+  const [items, setItems] = useState<AdminIntegration[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const requestId = useRef(0);
+
+  const fetchIntegrations = useCallback(
+    async (nextSearch: string, nextOffset: number) => {
+      const id = ++requestId.current;
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(nextOffset) });
+      if (nextSearch) {
+        params.set("search", nextSearch);
+      }
+      try {
+        const response = await fetch(`/admin/api/organizations/${orgId}/integrations?${params}`, {
+          credentials: "include",
+        });
+        if (id !== requestId.current) {
+          return;
+        }
+        if (!response.ok) {
+          setError(true);
+          setLoading(false);
+          return;
+        }
+        const body = (await response.json()) as AdminIntegrationsResponse;
+        setItems(body.items ?? []);
+        setTotal(body.total);
+        setError(false);
+        setLoading(false);
+      } catch {
+        if (id !== requestId.current) {
+          return;
+        }
+        setError(true);
+        setLoading(false);
+      }
+    },
+    [orgId],
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setOffset(0);
+      void fetchIntegrations(search, 0);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [search, fetchIntegrations]);
 
   return (
     <div className="mb-8">
-      <div className="flex items-center gap-2 mb-3">
-        <Plug size={16} className="text-gray-600 dark:text-gray-400" />
-        <Heading level={2} className="text-gray-800 text-base dark:text-gray-100">
-          Connections ({items.length})
-        </Heading>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Plug size={16} className="text-gray-600 dark:text-gray-400" />
+          <Heading level={2} className="text-base text-gray-800 dark:text-gray-100">
+            Connections ({total})
+          </Heading>
+        </div>
+        <div className="relative w-56">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <input
+            type="text"
+            placeholder="Search connections..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pr-3 pl-9 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+          />
+        </div>
       </div>
-      <OrgIntegrationsBody isLoading={isLoading} isError={isError} items={items} />
+      <OrgIntegrationsBody isLoading={loading} isError={error} items={items} hasSearch={search !== ""} />
+      {items.length > 0 ? (
+        <AdminPagination
+          offset={offset}
+          total={total}
+          pageSize={PAGE_SIZE}
+          onPageChange={(nextOffset) => {
+            setOffset(nextOffset);
+            void fetchIntegrations(search, nextOffset);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -66,39 +129,45 @@ function OrgIntegrationsBody({
   isLoading,
   isError,
   items,
+  hasSearch,
 }: {
   isLoading: boolean;
   isError: boolean;
   items: AdminIntegration[];
+  hasSearch: boolean;
 }) {
   if (isLoading) {
-    return <Text className="text-gray-500 text-sm dark:text-gray-400">Loading...</Text>;
+    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading...</Text>;
   }
   if (isError) {
-    return <Text className="text-red-600 text-sm dark:text-red-400">{LOAD_ERROR}</Text>;
+    return <Text className="text-sm text-red-600 dark:text-red-400">{LOAD_ERROR}</Text>;
   }
   if (items.length === 0) {
-    return <Text className="text-gray-500 text-sm dark:text-gray-400">This organization has no connections.</Text>;
+    return (
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        {hasSearch ? "No connections match your search." : "This organization has no connections."}
+      </Text>
+    );
   }
 
   return (
-    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
+    <div className="overflow-x-auto rounded-md bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-100 dark:border-gray-700/70">
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Connection</th>
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Status</th>
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Details</th>
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Updated</th>
+            <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Connection</th>
+            <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
+            <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Details</th>
+            <th className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">Updated</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-b border-slate-50 last:border-0 align-top dark:border-gray-800/70">
+            <tr key={item.id} className="border-b border-slate-50 align-top last:border-0 dark:border-gray-800/70">
               <td className="px-4 py-2.5">
-                <div className="text-gray-800 font-medium dark:text-gray-100">{item.installation_name}</div>
-                <div className="text-gray-500 text-xs dark:text-gray-400">{item.app_name}</div>
-                <div className="font-mono text-xs text-gray-400 break-all dark:text-gray-500">{item.id}</div>
+                <div className="font-medium break-all text-gray-800 dark:text-gray-100">{item.installation_name}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{item.app_name}</div>
+                <div className="font-mono text-xs break-all text-gray-400 dark:text-gray-500">{item.id}</div>
               </td>
               <td className="px-4 py-2.5">
                 <span
