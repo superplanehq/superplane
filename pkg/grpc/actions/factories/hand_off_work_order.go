@@ -432,7 +432,7 @@ func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
 			matches = append(matches, stage)
 		}
 	}
-	if len(runnable) == 1 {
+	if len(runnable) == 1 && (len(stages) == 1 || runnable[0].IsImplementation) {
 		return runnable[0].Index, nil
 	}
 	if len(matches) == 1 {

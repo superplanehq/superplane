@@ -339,6 +339,30 @@ func Test__HandOffWorkOrder__RejectsInvalidInput(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 		assert.Contains(t, grpcerrors.StatusMessage(err), "Cannot choose an implementation stage")
 	})
+
+	t.Run("planning and closure without implementation", func(t *testing.T) {
+		otherFactory := seedHandOffFactory(t, r, db)
+		planApp, planEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, otherFactory.ID, "plan", "start-plan")
+		closureApp, closureEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, otherFactory.ID, "close", "start-close")
+		require.NoError(t, closureApp.StampFactoryAppTemplate(db, closureEntry, "pr-closure", 1))
+		renameCanvas(t, db, closureApp, "Close work")
+		_, err := otherFactory.CreateLine(db, "ship", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: planApp.ID, Entrypoint: planEntry},
+			{Type: models.FactoryLineStepTypeRunApp, AppID: closureApp.ID, Entrypoint: closureEntry},
+		})
+		require.NoError(t, err)
+		_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID: otherFactory.ID.String(),
+			Title:     "Ship it",
+			Plan:      "# Plan",
+			Column:    HandOffColumnImplement,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "Cannot choose an implementation stage")
+		assert.Contains(t, grpcerrors.StatusMessage(err), planApp.Name)
+		assert.Contains(t, grpcerrors.StatusMessage(err), "Close work")
+	})
 }
 
 func seedHandOffFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
