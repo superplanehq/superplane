@@ -1,16 +1,19 @@
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
+import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 
 export type SplitRunFooterCloser = {
   actor?: OrgUserDisplay;
+  actorHref?: string;
   automationName?: string;
+  automationHref?: string;
 };
 
 interface FooterActorPayload {
   user?: { id?: string };
-  automation?: { nodeName?: string; appName?: string };
+  automation?: { nodeId?: string; nodeName?: string; appName?: string };
   toState?: string;
   toResult?: string;
   run?: { result?: string };
@@ -41,9 +44,11 @@ export function footerCloserFromEvents(
 
   const actor = resolveUser(payload.user?.id) ?? undefined;
   const automationName = payload.automation?.nodeName?.trim() || payload.automation?.appName?.trim() || undefined;
+  const automationHref = safeExternalUrl(payload.automation?.nodeId) ?? undefined;
   return {
     ...(actor ? { actor } : {}),
     ...(automationName ? { automationName } : {}),
+    ...(automationHref ? { automationHref } : {}),
   };
 }
 

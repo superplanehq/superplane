@@ -1,3 +1,5 @@
+import { durationLabelMs, formatMinutesSecondsDuration } from "@/lib/duration";
+
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
@@ -55,14 +57,22 @@ function liveAgentLine(stage: AutomationStage): string {
 }
 
 /**
- * Duration of the latest run for the collapsed row. Spend and model sit
- * on the open-card footer, where they can update live.
+ * Duration on the collapsed row: every run on the card, added together.
+ * Spend and model sit on the open-card footer, where they can update live.
  */
-export function runMetaLine(stage: AutomationStage): string {
-  if (stage.status === "running" && stage.duration) {
-    return `${stage.duration} so far`;
+export function runMetaLine(stage: AutomationStage, runs: AutomationStage[] = [stage]): string {
+  const totalMs = runs.reduce((sum, run) => sum + durationLabelMs(run.duration ?? ""), 0);
+  const duration =
+    formatMinutesSecondsDuration(totalMs) ||
+    (runs.some((run) => isSubSecondDuration(run.duration)) ? "<1s" : "") ||
+    (runs.length <= 1 ? (stage.duration ?? "") : "");
+  if (!duration) {
+    return "";
   }
-  return stage.duration ?? "";
+  if (stage.status === "running" || runs.some((run) => run.status === "running")) {
+    return `${duration} so far`;
+  }
+  return duration;
 }
 
 /**
@@ -121,6 +131,10 @@ function plainText(markdown: string): string {
     .replace(/^·\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isSubSecondDuration(label?: string): boolean {
+  return /^<\s*1s$/i.test((label ?? "").replace(/\s+so far$/i, "").trim());
 }
 
 function artifactLabel(artifact: AutomationStage["outputs"]["artifacts"][number]): string {

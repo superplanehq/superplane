@@ -2248,6 +2248,27 @@ describe("line board work-order examples", () => {
     expect(closure?.description).toBe("Alex marked this task as successful.");
   });
 
+  it("says the Completed card is resolved because the person merged the pull request", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...LINE_BOARD_DONE_RECEIPTS_ORDER,
+        pullRequests: [
+          {
+            number: "510",
+            title: LINE_BOARD_DONE_RECEIPTS_ORDER.title,
+            url: "https://github.com/example/ledger/pull/510",
+            state: "STATE_MERGED",
+          },
+        ],
+      },
+      { closer: { automationName: "Alex", automationHref: "https://github.com/alex" } },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "done-closure")?.description).toBe(
+      "Resolved because [Alex](https://github.com/alex) merged [#510 Send refund receipts after provider confirm](https://github.com/example/ledger/pull/510).",
+    );
+  });
+
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([
