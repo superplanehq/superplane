@@ -24,7 +24,6 @@ export function ConsoleAutomationCard({
   factoryKey,
   orderNumber,
   expandIdle,
-  anyLive,
   canStopRun,
   actionBusy,
   onStopRun,
@@ -38,8 +37,6 @@ export function ConsoleAutomationCard({
   orderNumber?: string;
   /** True for the current-column card on a draft that has not started a run. */
   expandIdle: boolean;
-  /** True when any automation on this task is running or waiting. */
-  anyLive: boolean;
   canStopRun: boolean;
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
@@ -52,14 +49,12 @@ export function ConsoleAutomationCard({
   const live = isLiveAutomationStatus(shownStatus);
   const [open, setOpen] = useState(live || expandIdle);
   useEffect(() => {
-    if (live) {
+    if (live || expandIdle) {
       setOpen(true);
       return;
     }
-    if (!anyLive && !expandIdle) {
-      setOpen(false);
-    }
-  }, [anyLive, expandIdle, live]);
+    setOpen(false);
+  }, [expandIdle, live]);
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
       ? () => {

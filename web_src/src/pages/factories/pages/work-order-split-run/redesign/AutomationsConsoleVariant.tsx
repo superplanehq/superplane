@@ -112,7 +112,6 @@ export function AutomationsConsoleVariant({
         columns={columns}
         markers={markers}
         currentColumn={currentColumn}
-        anyLive={anyLive}
         expandIdleCards={expandIdleCards}
         showIntake={showIntake}
         source={source}
@@ -179,7 +178,6 @@ function ConsoleTimeline({
   columns,
   markers,
   currentColumn,
-  anyLive,
   expandIdleCards,
   showIntake,
   source,
@@ -202,7 +200,6 @@ function ConsoleTimeline({
   columns: ConsoleColumn[];
   markers: ColumnMarker[];
   currentColumn: number;
-  anyLive: boolean;
   expandIdleCards: boolean;
   showIntake: boolean;
   source?: SplitRunSource;
@@ -254,7 +251,6 @@ function ConsoleTimeline({
             factoryKey={factoryKey}
             orderNumber={orderNumber}
             expandIdle={expandIdleCards && index + 1 === currentColumn}
-            anyLive={anyLive}
             canStopRun={canStopRun}
             actionBusy={actionBusy}
             onStopRun={onStopRun}
@@ -278,7 +274,6 @@ function ColumnTimelineItem({
   factoryKey,
   orderNumber,
   expandIdle,
-  anyLive,
   canStopRun,
   actionBusy,
   onStopRun,
@@ -295,7 +290,6 @@ function ColumnTimelineItem({
   factoryKey?: string;
   orderNumber?: string;
   expandIdle: boolean;
-  anyLive: boolean;
   canStopRun: boolean;
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
@@ -331,7 +325,6 @@ function ColumnTimelineItem({
               factoryKey={factoryKey}
               orderNumber={orderNumber}
               expandIdle={expandIdle}
-              anyLive={anyLive}
               canStopRun={canStopRun}
               actionBusy={actionBusy}
               onStopRun={onStopRun}
