@@ -9,6 +9,7 @@ const RUNNER_COMPONENTS = new Set([
   "runnerSuperPlane",
   "runnerClaudeCode",
   "runnerCodex",
+  "runnerMuse",
   "runnerOpenRouter",
 ]);
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";

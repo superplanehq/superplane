@@ -161,6 +161,26 @@ func TestRecordRunnerLLMUsageFromCustomProvider(t *testing.T) {
 	assert.Equal(t, "byok", recorder.records[0].FundingSource)
 }
 
+func TestRecordRunnerLLMUsageFromMuseFinishedEvent(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	RecordRunnerLLMUsage(
+		recorder,
+		nil,
+		"runnerMuse.finished",
+		map[string]any{
+			"model":       "muse-spark-1.3",
+			"credentials": map[string]any{"source": "secret"},
+		},
+		json.RawMessage(`{"usage":{"input_tokens":8,"output_tokens":3},"model":"muse-spark-1.3"}`),
+	)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, models.UsageProviderCustom, recorder.records[0].Provider)
+	assert.Equal(t, "muse-spark-1.3", recorder.records[0].Model)
+	assert.Equal(t, "byok", recorder.records[0].FundingSource)
+}
+
 func TestRecordRunnerLLMUsageFromSuperPlaneFinishedEvent(t *testing.T) {
 	t.Parallel()
 

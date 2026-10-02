@@ -25,6 +25,7 @@ export const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
   runnerSuperPlane: "code",
   runnerClaudeCode: "code",
   runnerCodex: "code",
+  runnerMuse: "code",
   runnerOpenRouter: "code",
   timeGate: "clock",
   filter: "filter",

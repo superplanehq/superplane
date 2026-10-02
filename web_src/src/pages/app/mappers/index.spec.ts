@@ -201,6 +201,42 @@ describe("getExecutionDetails", () => {
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
+  it("resolves runnerMuse mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerMuse");
+    const props = mapper.props({
+      node: {
+        id: "node-muse-1",
+        name: "Run Muse Code",
+        componentName: "runnerMuse",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Implement", type: "prompt" },
+          ],
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerMuse",
+        label: "Run Muse Code",
+        description: "Runs the Meta Muse Code CLI on a fleet runner",
+        icon: "code",
+        color: "#0866FF",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.headerAction).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
+    expect(getStateMap("runnerMuse")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
   it("resolves runnerSuperPlane mapper and state registry", () => {
     const mapper = getComponentBaseMapper("runnerSuperPlane");
     const props = mapper.props({

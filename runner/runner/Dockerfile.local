@@ -2,7 +2,7 @@
 # Context: repository root — docker build -f runner/Dockerfile.local .
 #
 # Local-dev image with factory host-mode tools (bash, python3, node, git, gh,
-# jq, Claude Code, Codex, OpenCode) plus Docker CLI. Runs as the image user node
+# jq, Claude Code, Codex, Muse Code, OpenCode) plus Docker CLI. Runs as the image user node
 # (uid 1000) because Claude Code rejects bypassPermissions as root. Mount
 # the daemon socket for execution_mode=docker:
 #   -v /var/run/docker.sock:/var/run/docker.sock
@@ -57,14 +57,18 @@ RUN apt-get update \
     "opencode-ai@${OPENCODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}" \
     "playwright@${PLAYWRIGHT_VERSION}" \
+  && MUSE_INSTALL_DIR=/usr/local/bin MUSE_NO_MODIFY_PATH=1 \
+    bash -c 'curl -fsSL https://dev.meta.ai/install.sh | bash' \
   && playwright install --with-deps chromium \
   && chmod -R a+rX /ms-playwright \
   && command -v claude \
   && command -v codex \
   && command -v opencode \
+  && command -v muse \
   && claude --version \
   && codex --version \
   && opencode --version \
+  && muse --version \
   && playwright --version \
   && playwright cli --help >/dev/null \
   && playwright screenshot about:blank /tmp/playwright-smoke.png \
@@ -88,6 +92,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ENV WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin
+ENV MUSE_NO_AUTO_UPDATE=1
 
 COPY --from=build /out/runner /usr/local/bin/runner
 COPY --from=build /out/mint-runner-registration /usr/local/bin/mint-runner-registration

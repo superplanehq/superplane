@@ -52,6 +52,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
   <LinkCard title="Run Codex" href="#run-codex" description="Runs the Codex CLI on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run Muse Code" href="#run-muse-code" description="Runs the Meta Muse Code CLI on a fleet runner" />
   <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="Run SuperPlane Agent" href="#run-super-plane-agent" description="Runs a SuperPlane-hosted coding agent on a fleet runner." />
@@ -1766,6 +1767,57 @@ function main() {
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerJS.finished"
+}
+```
+
+<a id="run-muse-code"></a>
+
+## Run Muse Code
+
+**Component key:** `runnerMuse`
+
+Runs the Meta Muse Code CLI in non-interactive mode on a fleet runner.
+
+### Prerequisites
+- The `muse` CLI is installed on the runner machine and available on `PATH`.
+- A Meta API key stored as a SuperPlane secret, or a Custom provider integration configured for the Meta Model API.
+
+Browser sign-in is not copied to remote runners. Meta recommends an API key for non-interactive use.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install dependencies, run tests, push).
+- **prompt** — a Muse Code turn. Later prompts continue the same Muse session.
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Credentials**: SuperPlane secret used as `META_API_KEY`, or a Custom provider integration. Set the integration base URL to `https://api.meta.ai/v1`.
+- **Model**: Select a model from Organization LLM Models. Muse uses its default when omitted.
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerMuse.finished"
 }
 ```
 

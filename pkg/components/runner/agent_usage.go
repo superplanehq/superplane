@@ -65,6 +65,8 @@ func providerForFinishedEvent(finishedEventType string, configuration any) (stri
 		return models.UsageProviderAnthropic, true
 	case "runnerCodex.finished":
 		return models.UsageProviderOpenAI, true
+	case "runnerMuse.finished":
+		return models.UsageProviderCustom, true
 	case "runnerOpenRouter.finished":
 		if configurationString(configuration, "llmProvider") == models.UsageProviderCustom {
 			return models.UsageProviderCustom, true

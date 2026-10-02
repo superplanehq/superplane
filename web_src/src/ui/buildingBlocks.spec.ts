@@ -20,6 +20,7 @@ const components = [
   { name: "runnerSuperPlane", label: "Run SuperPlane Agent" },
   { name: "runnerClaudeCode", label: "Run Claude Code" },
   { name: "runnerCodex", label: "Run Codex" },
+  { name: "runnerMuse", label: "Run Muse Code" },
   { name: "runnerOpenRouter", label: "Run OpenRouter Agent" },
   { name: "runner", label: "Run Shell Commands" },
   { name: "display", label: "Display" },
@@ -52,6 +53,7 @@ describe("buildBuildingBlockCategories", () => {
       "runnerSuperPlane",
       "runnerClaudeCode",
       "runnerCodex",
+      "runnerMuse",
       "runnerOpenRouter",
     ]);
     expect(categories.find((category) => category.name === "Core")?.blocks.map((block) => block.name)).toEqual([

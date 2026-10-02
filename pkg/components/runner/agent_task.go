@@ -199,7 +199,7 @@ cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
 
 // WrapPromptCommandInWorkingDirectory cds into dir, then copies workspace
 // skills into that directory before it runs the prompt command. Claude, Codex,
-// and OpenCode load SKILL.md from the working directory, not from the task dir.
+// Muse Code, and OpenCode load SKILL.md from the working directory, not from the task dir.
 func WrapPromptCommandInWorkingDirectory(dir, command string) string {
 	return WrapCommandInWorkingDirectory(dir, InstallWorkspaceSkillFilesCommand()+command)
 }

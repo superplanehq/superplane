@@ -21,6 +21,7 @@ export const AGENT_HARNESS_COMPONENTS = new Set<string>([
   "runnerSuperPlane",
   "runnerClaudeCode",
   "runnerCodex",
+  "runnerMuse",
   "runnerOpenRouter",
 ]);
 

@@ -97,12 +97,16 @@ npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 npm install -g "opencode-ai@${OPENCODE_VERSION}"
 npm install -g "@openai/codex@${CODEX_VERSION}"
 npm install -g "playwright@${PLAYWRIGHT_VERSION}"
+MUSE_INSTALL_DIR=/usr/local/bin MUSE_NO_MODIFY_PATH=1 \
+  bash -c 'curl -fsSL https://dev.meta.ai/install.sh | bash'
+echo 'MUSE_NO_AUTO_UPDATE=1' >> /etc/environment
 export PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 playwright install --with-deps chromium
 chmod -R a+rX /opt/ms-playwright
 claude --version
 opencode --version
 codex --version
+muse --version
 playwright --version
 playwright cli --help >/dev/null
 PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright playwright screenshot about:blank /tmp/playwright-smoke.png
@@ -156,6 +160,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+Environment=MUSE_NO_AUTO_UPDATE=1
 EnvironmentFile=/etc/default/superplane-runner
 PrivateUsers=no
 RestrictNamespaces=no
