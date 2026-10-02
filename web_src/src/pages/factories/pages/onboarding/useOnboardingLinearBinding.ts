@@ -20,6 +20,20 @@ export function useOnboardingLinearBinding(
     setLinearProjectIds(readOnboardingLinearProjects(factoryId, linearIntegrationId));
   }, [factoryId, linearIntegrationId]);
 
+  const projectsReady = Boolean(linearIntegrationId) && !linearProjectsQuery.isPending && !linearProjectsQuery.isError;
+  useEffect(() => {
+    if (!projectsReady) return;
+    const available = new Set(
+      (linearProjectsQuery.data ?? []).map((project) => project.id).filter((id): id is string => Boolean(id)),
+    );
+    setLinearProjectIds((current) => {
+      const next = current.filter((id) => available.has(id));
+      if (next.length === current.length && next.every((id, index) => id === current[index])) return current;
+      writeOnboardingLinearProjects(factoryId, linearIntegrationId, next);
+      return next;
+    });
+  }, [projectsReady, linearProjectsQuery.data, factoryId, linearIntegrationId]);
+
   const toggleLinearProject = useCallback(
     (projectId: string) => {
       setLinearProjectIds((current) => {
