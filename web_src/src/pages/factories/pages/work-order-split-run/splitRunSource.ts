@@ -32,7 +32,8 @@ export type SplitRunIntakeKind =
 export type SplitRunAddedBy =
   | { kind: "intake"; name: string }
   | { kind: "manual" }
-  | { kind: "imported"; personName: string };
+  | { kind: "imported"; personName: string }
+  | { kind: "mcp"; name: string };
 
 export type SplitRunSource =
   | {
@@ -57,6 +58,9 @@ export type SplitRunSource =
     };
 
 export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
+  if (source.kind === "mcp") {
+    return { kind: "mcp", name: source.name };
+  }
   if (source.addedBy) {
     return source.addedBy;
   }

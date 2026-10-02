@@ -13,7 +13,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { collectSplitRunArtifacts, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
-import { sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
+import { addedByForSource, sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
 
 describe("sourceTicketLabel", () => {
   it("uses owner/repo#number for GitHub issues", () => {
@@ -185,18 +185,18 @@ describe("splitRunSourceForOrder", () => {
   });
 
   it("names the MCP client when the task has an MCP source", () => {
-    expect(
-      splitRunSourceForOrder({
-        ...DRAFT_WORK_ORDER,
-        mcpClient: { id: "superplane-local", name: "Cursor" },
-      }),
-    ).toEqual(
+    const source = splitRunSourceForOrder({
+      ...DRAFT_WORK_ORDER,
+      mcpClient: { id: "superplane-local", name: "Cursor" },
+    });
+    expect(source).toEqual(
       expect.objectContaining({
         kind: "mcp",
         name: "Cursor",
         iconAlt: "SuperPlane",
       }),
     );
+    expect(addedByForSource(source)).toEqual({ kind: "mcp", name: "Cursor" });
   });
 
   it("resolves the source person's avatar from the org members list when one is available", () => {
