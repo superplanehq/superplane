@@ -22,13 +22,14 @@ func testGRPCServices(
 	t.Helper()
 
 	services, err := grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:         "http://localhost",
-		WebhooksBaseURL: "http://localhost",
-		Encryptor:       encryptor,
-		AuthService:     authService,
-		Registry:        registry,
-		OIDCProvider:    oidcProvider,
-		JWTSigner:       jwt.NewSigner("test-runner-registration-secret"),
+		BaseURL:          "http://localhost",
+		WebhooksBaseURL:  "http://localhost",
+		RunnerAPIBaseURL: "http://localhost",
+		Encryptor:        encryptor,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		JWTSigner:        jwt.NewSigner("test-runner-registration-secret"),
 	})
 	require.NoError(t, err)
 	return services

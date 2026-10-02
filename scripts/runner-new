@@ -8,6 +8,7 @@ cd "${repo_root}"
 runner_image="${LOCAL_RUNNER_IMAGE:-superplane-runner-local:dev}"
 runner_network="${LOCAL_RUNNER_NETWORK:-superplane_default}"
 runner_api_url="${LOCAL_RUNNER_API_URL:-http://app:8000}"
+admin_token="${INSTALLATION_ADMIN_TOKEN:-${LOCAL_FLEET_MANAGER_ADMIN_TOKEN:-superplane-local-fleet-manager-token}}"
 compose=(docker compose -f docker-compose.dev.yml)
 runner_compose=(
   "${compose[@]}"
@@ -15,16 +16,11 @@ runner_compose=(
   --profile local-runner-image
 )
 admin=(
-  "${compose[@]}" exec -T -e INSTALLATION_ADMIN_TOKEN app
+  "${compose[@]}" exec -T -e "INSTALLATION_ADMIN_TOKEN=${admin_token}" app
   go run ./cmd/admin/main.go
   --url http://localhost:8000
   --output text
 )
-
-if [[ -z "${INSTALLATION_ADMIN_TOKEN:-}" ]]; then
-  echo "INSTALLATION_ADMIN_TOKEN is required." >&2
-  exit 1
-fi
 
 if [[ -z "$("${compose[@]}" ps --status running -q app 2>/dev/null)" ]]; then
   echo "Run \`make dev.up\` and \`make dev.server\` first." >&2
@@ -52,7 +48,7 @@ restore_fleet_manager() {
   trap - EXIT
   if [[ "${fleet_manager_was_running}" == true ]]; then
     echo "Restarting the local Fleet Manager."
-    if ! "${runner_compose[@]}" up -d --no-build fleet-manager; then
+    if ! "${runner_compose[@]}" up -d --no-build --no-deps fleet-manager; then
       if [[ "${status}" -eq 0 ]]; then
         status=1
       fi

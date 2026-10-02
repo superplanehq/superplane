@@ -186,6 +186,34 @@ func TestRunnerTaskLogCompactorArchivesTaskWithoutChunks(t *testing.T) {
 	assert.Empty(t, content)
 }
 
+func TestRunnerTaskLogCompactorRejectsMissingActiveLogs(t *testing.T) {
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+
+	compactor := NewRunnerTaskLogCompactor(
+		provider,
+		activeStore,
+		uuid.NewString(),
+		time.Second,
+		time.Minute,
+	)
+	err = compactor.processTask(t.Context(), LogArchivingCandidate{
+		TaskID:          uuid.New(),
+		OrganizationID:  uuid.New(),
+		ActiveStore:     runnerlogs.StoreFS,
+		State:           models.RunnerTaskLogStateArchiving,
+		ProcessingUntil: time.Now().Add(time.Minute),
+	})
+
+	require.ErrorIs(t, err, runnerlogs.ErrNotFound)
+}
+
 func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	resource := support.Setup(t)
 	db := database.DB(t.Context())

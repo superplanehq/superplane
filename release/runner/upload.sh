@@ -38,7 +38,7 @@ require_command aws "Install and authenticate the AWS CLI."
 for artifact in "${ARCHIVES[@]}" checksums.txt; do
   if [ ! -f "${OUTPUT_DIR}/${artifact}" ]; then
     echo "Error: ${OUTPUT_DIR}/${artifact} does not exist." >&2
-    echo "Run release/runner/release.sh ${VERSION} first." >&2
+    echo "Run release/runner/build.sh ${VERSION} first." >&2
     exit 1
   fi
 done

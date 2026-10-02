@@ -59,7 +59,7 @@ TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e T
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
+GOTESTSUM=$(COMPOSE) run --rm -e CI -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -149,6 +149,7 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	@$(COMPOSE) exec app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
@@ -186,14 +187,8 @@ endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
 
 dev.runners:
-ifeq ($(strip $(INSTALLATION_ADMIN_TOKEN)),)
-	@echo "Fleet Manager is not running because INSTALLATION_ADMIN_TOKEN is not set."
-	@echo "Complete owner setup, create a personal API token, add it to .env,"
-	@echo "then run: make dev.runners"
-else
-	$(COMPOSE_RUNNER) up -d --no-build fleet-manager
+	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
-endif
 
 runner.new:
 	@bash ./scripts/runner-new

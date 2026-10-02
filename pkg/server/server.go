@@ -410,7 +410,7 @@ func startFactoryJiraCloseConsumer(
 }
 
 func buildGRPCServices(
-	baseURL, webhooksBaseURL string,
+	baseURL, webhooksBaseURL, runnerAPIBaseURL string,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
 	registry *registry.Registry,
@@ -419,14 +419,15 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 ) (*grpc.Services, error) {
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:         baseURL,
-		WebhooksBaseURL: webhooksBaseURL,
-		Encryptor:       encryptor,
-		AuthService:     authService,
-		Registry:        registry,
-		OIDCProvider:    oidcProvider,
-		AgentService:    agentService,
-		JWTSigner:       jwtSigner,
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
 	})
 }
 
@@ -717,6 +718,7 @@ func Start() {
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
+	runnerAPIBaseURL := getRunnerAPIBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
@@ -789,6 +791,7 @@ func Start() {
 		services, err := buildGRPCServices(
 			baseURL,
 			webhooksBaseURL,
+			runnerAPIBaseURL,
 			encryptorInstance,
 			authService,
 			registry,
@@ -840,6 +843,14 @@ func getWebhookBaseURL(baseURL string) string {
 		webhookBaseURL = baseURL
 	}
 	return webhookBaseURL
+}
+
+func getRunnerAPIBaseURL(baseURL string) string {
+	runnerAPIBaseURL := os.Getenv("RUNNER_API_BASE_URL")
+	if runnerAPIBaseURL == "" {
+		runnerAPIBaseURL = baseURL
+	}
+	return runnerAPIBaseURL
 }
 
 func newBlobProvider() (blob.Provider, error) {

@@ -48,14 +48,15 @@ type Services struct {
 }
 
 type ServicesConfig struct {
-	BaseURL         string
-	WebhooksBaseURL string
-	Encryptor       crypto.Encryptor
-	AuthService     authorization.Authorization
-	Registry        *registry.Registry
-	OIDCProvider    oidc.Provider
-	AgentService    agentsActions.AgentsService
-	JWTSigner       *jwt.Signer
+	BaseURL          string
+	WebhooksBaseURL  string
+	RunnerAPIBaseURL string
+	Encryptor        crypto.Encryptor
+	AuthService      authorization.Authorization
+	Registry         *registry.Registry
+	OIDCProvider     oidc.Provider
+	AgentService     agentsActions.AgentsService
+	JWTSigner        *jwt.Signer
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
@@ -98,7 +99,7 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		AdminRunners: NewAdminRunnersService(
 			adminRunnerActions.NewService(
 				cfg.JWTSigner,
-				cfg.BaseURL,
+				cfg.RunnerAPIBaseURL,
 			),
 		),
 	}, nil

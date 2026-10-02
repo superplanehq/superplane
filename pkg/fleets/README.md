@@ -10,6 +10,9 @@ Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
 their short-lived registration token.
 
+The local Compose service waits for owner setup and manages a development
+token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
+
 AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
 from this layout:
 

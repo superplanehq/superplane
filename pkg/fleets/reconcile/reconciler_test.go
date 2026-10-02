@@ -3,7 +3,9 @@ package reconcile
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -25,6 +27,18 @@ type fakeAdmin struct {
 
 func (f *fakeAdmin) DescribeFleet(context.Context, string) (adminclient.Fleet, error) {
 	return f.fleet, nil
+}
+
+func (f *fakeAdmin) DescribeRunner(
+	_ context.Context,
+	_, runnerID string,
+) (adminclient.Runner, error) {
+	for _, runner := range append(f.activeRunners, f.terminatedRunners...) {
+		if runner.ID == runnerID {
+			return runner, nil
+		}
+	}
+	return adminclient.Runner{}, &adminclient.HTTPError{StatusCode: http.StatusNotFound}
 }
 
 func (f *fakeAdmin) GetFleetCapacity(
@@ -52,12 +66,19 @@ func (f *fakeAdmin) ListRunners(
 	_ context.Context,
 	_ string,
 	states []string,
-	_ int,
+	limit int,
 ) ([]adminclient.Runner, error) {
 	if len(states) == 1 && states[0] == adminclient.RunnerStateTerminated {
-		return f.terminatedRunners, nil
+		return limitedRunners(f.terminatedRunners, limit), nil
 	}
-	return f.activeRunners, nil
+	return limitedRunners(f.activeRunners, limit), nil
+}
+
+func limitedRunners(runners []adminclient.Runner, limit int) []adminclient.Runner {
+	if limit <= 0 || len(runners) <= limit {
+		return runners
+	}
+	return runners[:limit]
 }
 
 func (f *fakeAdmin) DeleteRunner(
@@ -245,6 +266,44 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 		resources: []provider.Resource{{
 			ID:       "resource-terminated",
 			RunnerID: "runner-terminated",
+			FleetID:  "fleet-a",
+		}},
+	}
+	reconciler := newTestReconciler(
+		t,
+		admin,
+		&fakeArtifactResolver{},
+		resourceProvider,
+		0,
+		0,
+	)
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(resourceProvider.deleted) != 1 ||
+		resourceProvider.deleted[0].ID != "resource-terminated" {
+		t.Fatalf("deleted resources = %#v", resourceProvider.deleted)
+	}
+}
+
+func TestTerminatedRunnerCleanupDoesNotDependOnListLimit(t *testing.T) {
+	admin := newFakeAdmin()
+	for i := range listLimit {
+		admin.terminatedRunners = append(admin.terminatedRunners, adminclient.Runner{
+			ID:    fmt.Sprintf("old-runner-%d", i),
+			State: adminclient.RunnerStateTerminated,
+		})
+	}
+	admin.terminatedRunners = append(admin.terminatedRunners, adminclient.Runner{
+		ID:      "runner-with-resource",
+		FleetID: "fleet-a",
+		State:   adminclient.RunnerStateTerminated,
+	})
+	resourceProvider := &fakeProvider{
+		resources: []provider.Resource{{
+			ID:       "resource-terminated",
+			RunnerID: "runner-with-resource",
 			FleetID:  "fleet-a",
 		}},
 	}

@@ -125,9 +125,7 @@ const (
  * treat the cursor as opaque and return it unchanged; they must not convert an
  * upload chunk sequence into a cursor.
  *
- * Delete removes one task directory. DeleteExpired scans the primary and
- * fallback paths and removes abandoned task directories after the safety
- * period.
+ * Delete removes one task directory.
  */
 type Store struct {
 	primaryPath string
@@ -429,90 +427,6 @@ func (s *Store) Delete(ctx context.Context, taskID uuid.UUID) (err error) {
 		return fmt.Errorf("delete active runner log directory: %w", err)
 	}
 	return nil
-}
-
-func (s *Store) DeleteExpired(
-	ctx context.Context,
-	before time.Time,
-) (deleted int64, err error) {
-	startedAt := time.Now()
-	defer func() {
-		s.metrics.recordOperation(ctx, startedAt, "delete_expired", err)
-	}()
-
-	for _, root := range s.paths {
-		entries, err := os.ReadDir(root)
-		if err != nil {
-			return deleted, fmt.Errorf("list active runner logs in %q: %w", root, err)
-		}
-		for _, entry := range entries {
-			if err := ctx.Err(); err != nil {
-				return deleted, err
-			}
-			if !entry.IsDir() {
-				continue
-			}
-			taskID, err := uuid.Parse(entry.Name())
-			if err != nil {
-				continue
-			}
-
-			removed, err := s.deleteIfExpired(ctx, root, taskID, before)
-			if err != nil {
-				return deleted, err
-			}
-			if removed {
-				deleted++
-			}
-		}
-	}
-	return deleted, nil
-}
-
-func (s *Store) deleteIfExpired(
-	ctx context.Context,
-	root string,
-	taskID uuid.UUID,
-	before time.Time,
-) (bool, error) {
-	processLock := s.lockFor(taskID)
-	processLock.Lock()
-	defer processLock.Unlock()
-
-	if _, _, err := s.locateTask(taskID); err != nil {
-		return false, err
-	}
-
-	lockFile, err := s.acquireFileLock(ctx, root, taskID)
-	if err != nil {
-		return false, err
-	}
-	defer releaseFileLock(lockFile)
-
-	taskDir := s.taskDir(root, taskID)
-	current, found, err := readManifest(taskDir)
-	if err != nil {
-		return false, err
-	}
-
-	updatedAt := current.UpdatedAt
-	if !found {
-		info, err := os.Stat(taskDir)
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		if err != nil {
-			return false, fmt.Errorf("stat orphaned active runner log directory: %w", err)
-		}
-		updatedAt = info.ModTime()
-	}
-	if !updatedAt.Before(before) {
-		return false, nil
-	}
-	if err := os.RemoveAll(taskDir); err != nil {
-		return false, fmt.Errorf("delete expired active runner log directory: %w", err)
-	}
-	return true, nil
 }
 
 func (s *Store) taskDir(root string, taskID uuid.UUID) string {

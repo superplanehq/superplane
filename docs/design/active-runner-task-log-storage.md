@@ -17,7 +17,6 @@ It also describes the filesystem store implementation.
   the retained-size limit.
 - SuperPlane will send a log upload policy with each task.
 - SuperPlane can update the policy in log upload responses.
-- Active log data will have a seven-day safety expiration.
 - Clients will use a cursor and will not request old active data again.
 
 ## Context
@@ -139,7 +138,6 @@ Its logical operations are:
 - `Append`: Persist one ordered runner chunk.
 - `ReadAfter`: Read data after an opaque cursor.
 - `Delete`: Remove all active data for one task.
-- `DeleteExpired`: Remove abandoned active data after the safety period.
 
 The implementation must provide these guarantees:
 
@@ -152,7 +150,6 @@ The implementation must provide these guarantees:
 - A read returns complete NDJSON records in order.
 - A cursor identifies the last returned position.
 - `Delete` is idempotent.
-- `DeleteExpired` is safe to call repeatedly.
 - One task cannot exceed the configured retained-size limit.
 - Multiple API replicas can use the store safely.
 
@@ -345,8 +342,6 @@ Cleanup failure does not make the completed log unavailable.
 The cleanup worker retries the explicit deletion.
 After successful deletion, the lifecycle remains `archived`, and the worker
 clears the scheduled cleanup time.
-The active store also uses a seven-day expiration policy as a final safeguard.
-This policy removes data if the cleanup worker cannot complete the deletion.
 
 ## Filesystem Store
 
@@ -526,8 +521,7 @@ The store never modifies committed bytes in place.
 It can release the task lock after it opens the bounded section.
 
 `Delete` removes the task directory.
-`DeleteExpired` scans all configured roots and removes expired task directories.
-Both operations use the same locks as append and read operations.
+It uses the same locks as append and read operations.
 
 ### Filesystem migration
 
@@ -622,7 +616,6 @@ It then retries the lifecycle update.
 
 The final object remains available.
 The cleanup worker retries deletion.
-The store expiration policy removes abandoned data later.
 
 ## Security and Tenant Isolation
 
@@ -729,7 +722,6 @@ Test the filesystem store with:
 - API failure after a durable append
 - Store unavailability and recovery
 - Cleanup retries after explicit deletion failure
-- Seven-day safety expiration
 - Policy changes while tasks are running
 - Temporary overload responses and runner retries
 - Active readers that reach the final cursor

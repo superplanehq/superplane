@@ -124,6 +124,15 @@ func (c *Client) ListRunners(
 	return response.Runners, nil
 }
 
+func (c *Client) DescribeRunner(ctx context.Context, fleetID, runnerID string) (Runner, error) {
+	var response struct {
+		Runner Runner `json:"runner"`
+	}
+	path := fleetPath(fleetID) + "/runners/" + url.PathEscape(strings.TrimSpace(runnerID))
+	err := c.do(ctx, http.MethodGet, path, nil, nil, &response)
+	return response.Runner, err
+}
+
 func (c *Client) DeleteRunner(ctx context.Context, fleetID, runnerID string) (Runner, error) {
 	var response struct {
 		Runner Runner `json:"runner"`

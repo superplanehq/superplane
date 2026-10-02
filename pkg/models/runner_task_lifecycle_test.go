@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -117,4 +118,58 @@ func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 	lifecycle, err := reloadedTask.FindLifecycle(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
+}
+
+func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+
+	fleet := newTestRunnerFleet()
+	require.NoError(t, fleet.Create(db))
+
+	now := time.Now()
+	runner := &models.Runner{
+		ID:            uuid.New(),
+		FleetID:       fleet.ID,
+		State:         models.RunnerStateIdle,
+		RunnerVersion: "0.1.0",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	require.NoError(t, db.Create(runner).Error)
+
+	newTask := func() *models.RunnerTask {
+		return &models.RunnerTask{
+			ID:                uuid.New(),
+			OrganizationID:    resource.Organization.ID,
+			FleetID:           fleet.ID,
+			Backend:           models.RunnerTaskBackendIntegrated,
+			State:             models.RunnerTaskStateQueued,
+			PayloadCiphertext: []byte("ciphertext"),
+			QueuedAt:          now,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+	}
+	firstTask := newTask()
+	secondTask := newTask()
+	require.NoError(t, db.Create(firstTask).Error)
+	require.NoError(t, db.Create(secondTask).Error)
+
+	require.NoError(t, firstTask.Reserve(db, runner.ID))
+	require.NoError(t, firstTask.Start(db, runner, "test-store", now))
+	require.NoError(t, firstTask.Complete(
+		db,
+		runner,
+		"first-completion",
+		datatypes.JSON([]byte(`{}`)),
+		0,
+		"",
+		false,
+		now,
+	))
+
+	require.NoError(t, secondTask.Reserve(db, runner.ID))
+	assert.Equal(t, models.RunnerTaskStateReserved, secondTask.State)
 }

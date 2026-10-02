@@ -4,10 +4,10 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ]; then
-  echo "Usage: release/runner/release.sh <version>"
+  echo "Usage: release/runner/build.sh <version>"
   echo ""
   echo "Example:"
-  echo "  release/runner/release.sh v0.0.1"
+  echo "  release/runner/build.sh v0.0.1"
   exit 1
 fi
 

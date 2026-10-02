@@ -21,8 +21,8 @@ for another task.
 
 ## Local development
 
-Start the development environment and set `INSTALLATION_ADMIN_TOKEN` in
-`.env`. Use this command to test runner or runner API changes:
+Start the development environment and complete owner setup. Use this command
+to test runner or runner API changes:
 
 ```sh
 make runner.new
@@ -30,11 +30,11 @@ make runner.new
 
 The target rebuilds the local runner image and starts one attached ephemeral
 runner. It pauses the local Fleet Manager and restores it after the runner
-exits. It uses the `e1-large-amd64` fleet by default. Set a different existing
-fleet when necessary:
+exits. `make dev.setup` creates the default `e1-large-amd64` fleet. To use a
+different fleet, create it through the admin CLI and set `RUNNER_FLEET`:
 
 ```sh
-make runner.new RUNNER_FLEET=e1-tiny-arm64
+make runner.new RUNNER_FLEET=my-local-fleet
 ```
 
 Use a different terminal to start tasks and inspect runner behavior. Press

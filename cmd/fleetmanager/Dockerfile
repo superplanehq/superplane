@@ -12,5 +12,7 @@ COPY --from=build /fleet-manager /usr/local/bin/fleet-manager
 ENTRYPOINT ["/usr/local/bin/fleet-manager"]
 
 FROM docker:27-cli AS local
+RUN apk add --no-cache postgresql-client
 COPY --from=build /fleet-manager /usr/local/bin/fleet-manager
-ENTRYPOINT ["/usr/local/bin/fleet-manager"]
+COPY --chmod=755 scripts/entrypoint.local.sh /usr/local/bin/fleet-manager-entrypoint
+ENTRYPOINT ["/usr/local/bin/fleet-manager-entrypoint"]

@@ -104,7 +104,8 @@ CREATE TABLE runner_tasks (
 
 CREATE UNIQUE INDEX runner_tasks_runner_id_key
   ON runner_tasks (runner_id)
-  WHERE runner_id IS NOT NULL;
+  WHERE runner_id IS NOT NULL
+    AND state IN ('reserved', 'running');
 CREATE INDEX runner_tasks_fleet_state_idx ON runner_tasks (fleet_id, state, queued_at);
 CREATE INDEX runner_tasks_organization_idx ON runner_tasks (organization_id, created_at);
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -331,59 +330,6 @@ func TestAppendTruncatesAtRetainedLimit(t *testing.T) {
 	result, err = store.Append(t.Context(), taskID, 0, content)
 	require.NoError(t, err)
 	assert.True(t, result.Truncated)
-}
-
-func TestDeleteExpired(t *testing.T) {
-	store := newTestStore(t)
-	expiredID := uuid.New()
-	activeID := uuid.New()
-	require.NoError(t, store.Initialize(t.Context(), expiredID))
-	require.NoError(t, store.Initialize(t.Context(), activeID))
-
-	_, err := store.Append(t.Context(), expiredID, 0, []byte("old\n"))
-	require.NoError(t, err)
-	_, err = store.Append(t.Context(), activeID, 0, []byte("new\n"))
-	require.NoError(t, err)
-
-	expiredDir := store.taskDir(store.primaryPath, expiredID)
-	expired, found, err := readManifest(expiredDir)
-	require.NoError(t, err)
-	require.True(t, found)
-	expired.UpdatedAt = time.Now().Add(-8 * 24 * time.Hour)
-	require.NoError(t, writeManifest(expiredDir, expired))
-
-	deleted, err := store.DeleteExpired(t.Context(), time.Now().Add(-7*24*time.Hour))
-	require.NoError(t, err)
-	assert.Equal(t, int64(1), deleted)
-
-	_, err = store.ReadAfter(t.Context(), expiredID, "")
-	require.ErrorIs(t, err, runnerlogs.ErrNotFound)
-	assert.Equal(t, "new\n", readResult(t, store, activeID, "").content)
-}
-
-func TestDeleteExpiredScansFallbackPaths(t *testing.T) {
-	base := t.TempDir()
-	primaryPath := filepath.Join(base, "primary")
-	fallbackPath := filepath.Join(base, "fallback")
-	fallbackStore := newTestStoreAt(t, fallbackPath)
-	taskID := uuid.New()
-	require.NoError(t, fallbackStore.Initialize(t.Context(), taskID))
-
-	taskDir := fallbackStore.taskDir(fallbackPath, taskID)
-	current, found, err := readManifest(taskDir)
-	require.NoError(t, err)
-	require.True(t, found)
-	current.UpdatedAt = time.Now().Add(-8 * 24 * time.Hour)
-	require.NoError(t, writeManifest(taskDir, current))
-
-	store, err := New(primaryPath, fallbackPath)
-	require.NoError(t, err)
-	require.NoError(t, store.Setup(testSetupContext(t)))
-	deleted, err := store.DeleteExpired(t.Context(), time.Now().Add(-7*24*time.Hour))
-	require.NoError(t, err)
-
-	assert.Equal(t, int64(1), deleted)
-	assert.NoDirExists(t, taskDir)
 }
 
 type readValue struct {

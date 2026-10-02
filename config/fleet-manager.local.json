@@ -13,46 +13,6 @@
         "architecture": "amd64",
         "runnerApiUrl": "http://app:8000",
         "network": "superplane_default",
-        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
-        "extraHosts": ["host.docker.internal:host-gateway"]
-      }
-    },
-    {
-      "id": "e1-large-arm64",
-      "provider": "docker",
-      "maxCapacity": 1,
-      "docker": {
-        "image": "superplane-runner-local:dev",
-        "architecture": "arm64",
-        "runnerApiUrl": "http://app:8000",
-        "network": "superplane_default",
-        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
-        "extraHosts": ["host.docker.internal:host-gateway"]
-      }
-    },
-    {
-      "id": "e1-tiny-amd64",
-      "provider": "docker",
-      "maxCapacity": 1,
-      "docker": {
-        "image": "superplane-runner-local:dev",
-        "architecture": "amd64",
-        "runnerApiUrl": "http://app:8000",
-        "network": "superplane_default",
-        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
-        "extraHosts": ["host.docker.internal:host-gateway"]
-      }
-    },
-    {
-      "id": "e1-tiny-arm64",
-      "provider": "docker",
-      "maxCapacity": 1,
-      "docker": {
-        "image": "superplane-runner-local:dev",
-        "architecture": "arm64",
-        "runnerApiUrl": "http://app:8000",
-        "network": "superplane_default",
-        "volumes": ["/var/run/docker.sock:/var/run/docker.sock"],
         "extraHosts": ["host.docker.internal:host-gateway"]
       }
     }

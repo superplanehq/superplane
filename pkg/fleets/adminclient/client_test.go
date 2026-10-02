@@ -119,6 +119,33 @@ func TestHTTPErrorIncludesStatus(t *testing.T) {
 	}
 }
 
+func TestDescribeRunnerUsesFleetAndRunnerPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %q", r.Method)
+		}
+		if r.URL.Path != "/admin/api/installation/fleets/fleet-a/runners/runner-1" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{
+			"runner":{"id":"runner-1","fleetId":"fleet-a","state":"terminated","runnerVersion":"1.2.3"}
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "personal-token", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, err := client.DescribeRunner(context.Background(), "fleet-a", "runner-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runner.ID != "runner-1" || runner.State != RunnerStateTerminated {
+		t.Fatalf("runner = %#v", runner)
+	}
+}
+
 func TestCreateRunnerRetriesServerFailureWithSameIdempotencyKey(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

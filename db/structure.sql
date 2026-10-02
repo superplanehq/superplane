@@ -4065,7 +4065,7 @@ CREATE INDEX runner_tasks_organization_idx ON public.runner_tasks USING btree (o
 -- Name: runner_tasks_runner_id_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX runner_tasks_runner_id_key ON public.runner_tasks USING btree (runner_id) WHERE (runner_id IS NOT NULL);
+CREATE UNIQUE INDEX runner_tasks_runner_id_key ON public.runner_tasks USING btree (runner_id) WHERE ((runner_id IS NOT NULL) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
 
 
 --

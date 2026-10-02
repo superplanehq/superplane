@@ -27,6 +27,7 @@ type AdminClient interface {
 		string,
 		adminclient.CreateRunnerRequest,
 	) (adminclient.CreateRunnerResponse, error)
+	DescribeRunner(context.Context, string, string) (adminclient.Runner, error)
 	ListRunners(context.Context, string, []string, int) ([]adminclient.Runner, error)
 	DeleteRunner(context.Context, string, string) (adminclient.Runner, error)
 }
@@ -368,28 +369,36 @@ func (r *Reconciler) deleteTerminatedResources(
 	ctx context.Context,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
-	terminated, err := r.admin.ListRunners(
-		ctx,
-		r.config.FleetID,
-		[]string{adminclient.RunnerStateTerminated},
-		listLimit,
-	)
-	if err != nil {
-		return fmt.Errorf("list terminated runners for fleet %s: %w", r.config.FleetID, err)
-	}
 	var deleteErrors []error
-	for _, runner := range terminated {
-		for _, resource := range resourcesByRunner[runner.ID] {
+	for runnerID, resources := range resourcesByRunner {
+		runner, err := r.admin.DescribeRunner(ctx, r.config.FleetID, runnerID)
+		if err != nil && !adminclient.IsStatus(err, http.StatusNotFound) {
+			deleteErrors = append(deleteErrors, fmt.Errorf(
+				"describe runner %s for resource cleanup: %w",
+				runnerID,
+				err,
+			))
+			continue
+		}
+		if err == nil && runner.State != adminclient.RunnerStateTerminated {
+			continue
+		}
+
+		deleted := true
+		for _, resource := range resources {
 			if err := r.provider.Delete(ctx, resource); err != nil {
+				deleted = false
 				deleteErrors = append(deleteErrors, fmt.Errorf(
-					"delete provider resource %s for terminated runner %s: %w",
+					"delete provider resource %s for runner %s: %w",
 					resource.ID,
-					runner.ID,
+					runnerID,
 					err,
 				))
 			}
 		}
-		delete(resourcesByRunner, runner.ID)
+		if deleted {
+			delete(resourcesByRunner, runnerID)
+		}
 	}
 	return errors.Join(deleteErrors...)
 }

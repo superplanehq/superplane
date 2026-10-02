@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/metric"
@@ -15,7 +14,6 @@ import (
 const (
 	StoreFS                = "fs"
 	MaxRetainedBytes int64 = 10 * 1024 * 1024
-	SafetyExpiration       = 7 * 24 * time.Hour
 
 	TruncationRecord = `{"type":"line","text":"SuperPlane stopped retaining logs because this task reached the 10 MiB log limit."}` + "\n"
 
@@ -101,12 +99,6 @@ type Store interface {
 	 * The archiver calls it after the final blob is available and the live-reader grace period expires.
 	 */
 	Delete(context.Context, uuid.UUID) error
-
-	/*
-	 * DeleteExpired removes abandoned active logs whose last activity is older than the supplied time.
-	 * It is the safety cleanup path for tasks that did not complete normal archival and returns the number of task logs removed.
-	 */
-	DeleteExpired(context.Context, time.Time) (int64, error)
 }
 
 var (

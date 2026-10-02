@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -67,13 +66,6 @@ func (w *RunnerTaskLogCompactor) Start(ctx context.Context) {
 }
 
 func (w *RunnerTaskLogCompactor) Process(ctx context.Context) error {
-	_, err := w.activeStore.DeleteExpired(
-		ctx,
-		time.Now().Add(-runnerlogs.SafetyExpiration),
-	)
-	if err != nil {
-		return err
-	}
 	for range runnerTaskLogArchivingBatchSize {
 		now := time.Now()
 		candidate, err := claimLogArchiving(
@@ -120,13 +112,8 @@ func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate LogA
 	}
 
 	active, err := w.activeStore.ReadAfter(ctx, candidate.TaskID, "")
-	if errors.Is(err, runnerlogs.ErrNotFound) {
-		active = &runnerlogs.ReadResult{
-			Content: io.NopCloser(bytes.NewReader(nil)),
-			Cursor:  "0",
-		}
-	} else if err != nil {
-		return err
+	if err != nil {
+		return fmt.Errorf("read active task logs: %w", err)
 	}
 	defer active.Content.Close()
 	if err := candidate.recordFinalCursor(database.DB(ctx), active.Cursor, time.Now()); err != nil {
