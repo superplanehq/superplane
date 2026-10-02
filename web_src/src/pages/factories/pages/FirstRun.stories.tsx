@@ -111,6 +111,22 @@ export const ChooseWaitingForApproval: Story = {
   ),
 };
 
+export const ChooseLoadingAfterInstall: Story = {
+  name: "3e Choose organization (loading after install)",
+  render: () => (
+    <FirstRunChooseScreen
+      repositories={["octocat/dotfiles"]}
+      selectedRepository={null}
+      githubLogin="octocat"
+      synchronizing
+      chrome={firstRunStoryChrome(2)}
+      onSelectRepository={() => undefined}
+      onGrantAccess={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
+};
+
 export const ChooseRepository: Story = {
   name: "3d Choose repository (filtered)",
   render: () => (

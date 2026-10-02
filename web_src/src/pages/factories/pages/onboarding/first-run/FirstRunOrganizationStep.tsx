@@ -3,6 +3,8 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Clock } from "lucide-react";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
+import { FirstRunSkeletonRows } from "./FirstRunSkeletonRows";
 
 const copy = FIRST_RUN_COPY.choose;
 
@@ -31,87 +33,62 @@ export function FirstRunOrganizationStep({
   onGrantAccess: () => void;
 }) {
   const hasPendingApprovals = pendingOrganizations.length > 0;
+  const missingAccess = (
+    <FirstRunMissingAccessLine
+      hint={copy.organizationWriteAccessHint}
+      question={copy.missingOrganization}
+      action={copy.installAction}
+      disabled={grantAccessDisabled}
+      loading={grantingAccess}
+      onClick={onGrantAccess}
+    />
+  );
+  const empty = organizations.length === 0;
+
   return (
     <>
       {hasPendingApprovals ? <PendingApprovalRows organizations={pendingOrganizations} /> : null}
-      {organizations.length === 0 ? (
+      {empty && !synchronizing ? (
         <OrganizationEmptyState
-          synchronizing={synchronizing}
           hasPendingApprovals={hasPendingApprovals}
           disabled={grantAccessDisabled}
           grantingAccess={grantingAccess}
           onGrantAccess={onGrantAccess}
         />
       ) : (
-        <OrganizationList
-          organizations={organizations}
-          disabled={disabled}
-          grantAccessDisabled={grantAccessDisabled}
-          grantingAccess={grantingAccess}
-          onSelectOrganization={onSelectOrganization}
-          onGrantAccess={onGrantAccess}
-        />
+        <div className="space-y-3 text-left" data-testid="first-run-github-organization-picker">
+          {organizations.map((organization) => (
+            <Button
+              key={organization}
+              type="button"
+              className="w-full justify-start"
+              disabled={disabled}
+              onClick={() => onSelectOrganization(organization)}
+              data-testid={`first-run-github-use-${organization}`}
+            >
+              {copy.useOrganization(organization)}
+            </Button>
+          ))}
+          {synchronizing ? (
+            <FirstRunSkeletonRows
+              count={empty ? 2 : 1}
+              label={copy.loadingOrganizations}
+              testId="first-run-organizations-loading"
+            />
+          ) : null}
+          {missingAccess}
+        </div>
       )}
     </>
   );
 }
 
-function OrganizationList({
-  organizations,
-  disabled,
-  grantAccessDisabled,
-  grantingAccess,
-  onSelectOrganization,
-  onGrantAccess,
-}: {
-  organizations: string[];
-  disabled: boolean;
-  grantAccessDisabled: boolean;
-  grantingAccess: boolean;
-  onSelectOrganization: (organization: string) => void;
-  onGrantAccess: () => void;
-}) {
-  return (
-    <div className="space-y-3 text-left" data-testid="first-run-github-organization-picker">
-      {organizations.map((organization) => (
-        <Button
-          key={organization}
-          type="button"
-          className="w-full justify-start"
-          disabled={disabled}
-          onClick={() => onSelectOrganization(organization)}
-          data-testid={`first-run-github-use-${organization}`}
-        >
-          {copy.useOrganization(organization)}
-        </Button>
-      ))}
-      <div className="flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
-        <span>{copy.missingOrganization}</span>
-        <LoadingButton
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onGrantAccess}
-          disabled={grantAccessDisabled}
-          loading={grantingAccess}
-          loadingText={copy.openingGitHub}
-          data-testid="first-run-grant-access"
-        >
-          {copy.installAction}
-        </LoadingButton>
-      </div>
-    </div>
-  );
-}
-
 function OrganizationEmptyState({
-  synchronizing,
   hasPendingApprovals,
   disabled,
   grantingAccess,
   onGrantAccess,
 }: {
-  synchronizing: boolean;
   hasPendingApprovals: boolean;
   disabled: boolean;
   grantingAccess: boolean;
@@ -123,7 +100,7 @@ function OrganizationEmptyState({
       data-testid="first-run-repositories-empty"
     >
       <div className="space-y-1 text-[13px]">
-        <p className="font-medium text-foreground">{synchronizing ? copy.emptySynchronizingTitle : copy.emptyTitle}</p>
+        <p className="font-medium text-foreground">{copy.emptyTitle}</p>
         <p className="text-muted-foreground">{copy.emptyBody}</p>
       </div>
       <LoadingButton

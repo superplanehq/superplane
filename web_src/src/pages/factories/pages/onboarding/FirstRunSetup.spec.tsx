@@ -226,7 +226,7 @@ describe("FirstRunSetup GitHub catalog", () => {
 
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
     expect(screen.getByTestId("first-run-repositories-synchronizing")).toHaveTextContent(
-      FIRST_RUN_COPY.choose.synchronizing,
+      FIRST_RUN_COPY.choose.synchronizingOrganizations,
     );
   });
 

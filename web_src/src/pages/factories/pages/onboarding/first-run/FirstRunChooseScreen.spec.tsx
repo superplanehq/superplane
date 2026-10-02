@@ -192,19 +192,39 @@ describe("FirstRunChooseScreen", () => {
       };
       const view = render(<FirstRunChooseScreen {...props} repositories={[]} />);
 
-      expect(screen.getByText(copy.emptySynchronizingTitle)).toBeInTheDocument();
+      const loading = screen.getByRole("status", { name: copy.loadingOrganizations });
+      expect(loading.children).toHaveLength(2);
+      expect(screen.queryByTestId("first-run-repositories-empty")).not.toBeInTheDocument();
       expect(
         within(screen.getByTestId("first-run-step-organization-header")).getByTestId(
           "first-run-repositories-synchronizing",
         ),
-      ).toBeInTheDocument();
+      ).toHaveTextContent(copy.synchronizingOrganizations);
 
       view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api"]} />);
       expect(screen.getByRole("button", { name: copy.useOrganization("acme") })).toBeInTheDocument();
+      expect(screen.getByRole("status", { name: copy.loadingOrganizations }).children).toHaveLength(1);
 
       view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api", "octo/web"]} />);
       expect(screen.getByRole("button", { name: copy.useOrganization("acme") })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: copy.useOrganization("octo") })).toBeInTheDocument();
+
+      view.rerender(<FirstRunChooseScreen {...props} synchronizing={false} repositories={["acme/api", "octo/web"]} />);
+      expect(screen.queryByRole("status", { name: copy.loadingOrganizations })).not.toBeInTheDocument();
+    });
+
+    it("explains that only organizations with a writable repository appear", () => {
+      render(
+        <FirstRunChooseScreen
+          repositories={["octo/repo"]}
+          selectedRepository={null}
+          onSelectRepository={vi.fn()}
+          onGrantAccess={vi.fn()}
+          onContinue={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(copy.organizationWriteAccessHint)).toBeInTheDocument();
     });
   });
 
@@ -403,6 +423,22 @@ describe("FirstRunChooseScreen", () => {
       const status = within(repositoryHeader).getByTestId("first-run-repositories-synchronizing");
       expect(status).toHaveTextContent(copy.synchronizing);
       expect(status).toHaveClass("sp-ai-thinking");
+      expect(screen.getByRole("status", { name: copy.loadingRepositories })).toBeInTheDocument();
+    });
+
+    it("explains that only writable repositories appear", () => {
+      render(
+        <FirstRunChooseScreen
+          repositories={["octo/repo"]}
+          selectedRepository="octo/repo"
+          onSelectRepository={vi.fn()}
+          onGrantAccess={vi.fn()}
+          onContinue={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(copy.writeAccessHint)).toBeInTheDocument();
+      expect(screen.queryByRole("status", { name: copy.loadingRepositories })).not.toBeInTheDocument();
     });
   });
 

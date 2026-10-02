@@ -16,7 +16,9 @@ import { useMemo, useState } from "react";
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
+import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
 import { FirstRunOrganizationStep } from "./FirstRunOrganizationStep";
+import { FirstRunSkeletonRows } from "./FirstRunSkeletonRows";
 import {
   findOrganization,
   ownerOfRepository,
@@ -79,7 +81,8 @@ export function FirstRunChooseScreen({
   const organization = loading ? null : organizationChoice.organization;
   // In the repository step, Back returns to the organization step of this screen.
   const screenChrome = organization && chrome ? { ...chrome, onBack: organizationChoice.clear } : chrome;
-  const syncStatus = synchronizing ? <RepositorySyncStatus /> : undefined;
+  const syncText = organization ? copy.synchronizing : copy.synchronizingOrganizations;
+  const syncStatus = synchronizing ? <RepositorySyncStatus text={syncText} /> : undefined;
   const grantAccessDisabled = busy || !appConfigured;
 
   return (
@@ -107,6 +110,7 @@ export function FirstRunChooseScreen({
               repositories={repositoriesInOrganization(repositories, organization)}
               selectedRepository={selectedRepository}
               busy={busy}
+              synchronizing={synchronizing}
               grantAccessDisabled={grantAccessDisabled}
               grantingAccess={grantingAccess}
               onSelectRepository={onSelectRepository}
@@ -259,6 +263,7 @@ function RepositoryStepBody({
   repositories,
   selectedRepository,
   busy,
+  synchronizing,
   grantAccessDisabled,
   grantingAccess,
   onSelectRepository,
@@ -267,6 +272,7 @@ function RepositoryStepBody({
   repositories: string[];
   selectedRepository: string | null;
   busy: boolean;
+  synchronizing: boolean;
   grantAccessDisabled: boolean;
   grantingAccess: boolean;
   onSelectRepository: (repository: string) => void;
@@ -282,35 +288,31 @@ function RepositoryStepBody({
         listClassName="max-h-48"
         onSelect={onSelectRepository}
       />
-      <div className="flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
-        <span>{copy.missingRepository}</span>
-        <LoadingButton
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onGrantAccess}
-          disabled={grantAccessDisabled}
-          loading={grantingAccess}
-          loadingText={copy.openingGitHub}
-          data-testid="first-run-grant-access"
-        >
-          {copy.grantAccess}
-        </LoadingButton>
-      </div>
+      {synchronizing ? (
+        <FirstRunSkeletonRows count={1} label={copy.loadingRepositories} testId="first-run-repositories-loading-more" />
+      ) : null}
+      <FirstRunMissingAccessLine
+        hint={copy.writeAccessHint}
+        question={copy.missingRepository}
+        action={copy.grantAccess}
+        disabled={grantAccessDisabled}
+        loading={grantingAccess}
+        onClick={onGrantAccess}
+      />
     </>
   );
 }
 
-function RepositorySyncStatus() {
+function RepositorySyncStatus({ text }: { text: string }) {
   return (
     <span className="flex items-center gap-2 text-[12px] font-normal text-muted-foreground">
       <span
         className="sp-ai-thinking inline-block leading-5"
-        data-text={copy.synchronizing}
+        data-text={text}
         data-testid="first-run-repositories-synchronizing"
         role="status"
       >
-        {copy.synchronizing}
+        {text}
       </span>
     </span>
   );
