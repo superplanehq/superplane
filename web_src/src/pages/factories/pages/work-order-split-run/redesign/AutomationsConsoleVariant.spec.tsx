@@ -256,6 +256,24 @@ describe("AutomationsConsoleVariant card collapse", () => {
     expect(cardState("Implementation")).toHaveAttribute("data-state", "closed");
     expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
   });
+
+  it("sums every Implement run on the card header", () => {
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "passed",
+      footerTone: "done",
+      phases: SPLIT_RUN_RUNNING.phases.flatMap((phase) =>
+        phase.id === "implement"
+          ? [
+              { ...phase, id: "implement-old", status: "passed" as const, duration: "22m 38s", artifacts: [] },
+              { ...phase, status: "passed" as const, duration: "9m 22s" },
+            ]
+          : [phase],
+      ),
+    });
+
+    expect(screen.getByTestId("redesign-console-card-header-implementation-implementation")).toHaveTextContent("32m");
+  });
 });
 
 describe("AutomationsConsoleVariant summary strip", () => {

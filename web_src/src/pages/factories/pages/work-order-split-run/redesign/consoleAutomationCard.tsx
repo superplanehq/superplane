@@ -87,7 +87,9 @@ export function ConsoleAutomationCard({
           <StageStatusGlyph status={shownStatus} />
           <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
           <StepOutputCounts stage={latest} phase={shownPhase} runs={automation.runs} />
-          <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{runMetaLine(latest)}</span>
+          <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>
+            {runMetaLine(latest, automation.runs)}
+          </span>
           <ChevronRight
             className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
             aria-hidden

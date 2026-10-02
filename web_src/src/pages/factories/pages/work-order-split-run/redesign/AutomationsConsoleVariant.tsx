@@ -36,7 +36,7 @@ import { META_TEXT_CLASSNAME } from "./redesignFormat";
 /**
  * Variant B: automation console. Backlog, Implement, Verify, and Done sit
  * on a timeline. Each card is the latest run of one automation, seen
- * through its agent. The header carries status and this run's duration. The
+ * through its agent. The header carries status and the summed duration. The
  * body is the same marker list on a finished run and on a running one. A
  * running step is the live row. The footer carries start time, live
  * spend, model, and Retry or Stop. Canvas nodes are not shown on this tab.
