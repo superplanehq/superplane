@@ -107,6 +107,23 @@ func ResolveClient(ctx context.Context, tx *gorm.DB, httpClient mcp.HTTPDoer, cl
 	return client, nil
 }
 
+func ClientDisplayName(tx *gorm.DB, clientID string) string {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return models.DefaultMCPClientName
+	}
+	if clientID == LocalClientID {
+		return LocalClientName
+	}
+	if stored, err := models.FindMCPOAuthClient(tx, clientID); err == nil {
+		name := strings.TrimSpace(stored.ClientName)
+		if name != "" {
+			return name
+		}
+	}
+	return models.DefaultMCPClientName
+}
+
 func lookupClient(ctx context.Context, tx *gorm.DB, httpClient mcp.HTTPDoer, clientID string) (*Client, *OAuthError) {
 	if clientID == LocalClientID {
 		return &Client{ID: LocalClientID, Name: LocalClientName, RedirectURIs: append([]string{}, CursorRedirectURIs...)}, nil
