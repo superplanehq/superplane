@@ -8,7 +8,7 @@ import {
   type LineBoardColumnColorView,
 } from "../lib/lineBoardColumnColorViewPreference";
 
-export type LineBoardColumnColorId = "lime" | "yellow" | "teal" | "sky" | "purple" | "slate";
+export type LineBoardColumnColorId = "lime" | "yellow" | "teal" | "sky" | "purple" | "slate" | "rose" | "orange";
 
 export interface LineBoardColumnColor {
   id: LineBoardColumnColorId;
@@ -64,6 +64,20 @@ export const LINE_BOARD_COLUMN_COLORS: LineBoardColumnColor[] = [
     className: "bg-slate-300 dark:bg-slate-600",
     laneClassName: "bg-slate-100 dark:bg-slate-800/50",
     borderClassName: "border-slate-400 dark:border-slate-600/45",
+  },
+  {
+    id: "rose",
+    label: "Rose",
+    className: "bg-rose-300 dark:bg-rose-800",
+    laneClassName: "bg-rose-100 dark:bg-rose-950/40",
+    borderClassName: "border-rose-400 dark:border-rose-800/45",
+  },
+  {
+    id: "orange",
+    label: "Orange",
+    className: "bg-orange-300 dark:bg-orange-800",
+    laneClassName: "bg-orange-100 dark:bg-orange-950/40",
+    borderClassName: "border-orange-400 dark:border-orange-800/45",
   },
 ];
 
