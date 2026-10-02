@@ -264,7 +264,10 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
 
-		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
 		require.NoError(t, err)
 		response := execRequest(server, requestParams{
 			method:      "PUT",
@@ -336,7 +339,10 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		require.NoError(t, err)
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 
-		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
 		require.NoError(t, err)
 		response := execRequest(server, requestParams{
 			method:      "PUT",
@@ -347,5 +353,118 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "Cancel or change the subscription in Polar")
+	})
+}
+
+func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("PUT trial rejects a missing end", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "trial end date is required")
+	})
+
+	t.Run("PUT trial rejects an end that is not in the future", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Choose a future date.")
+	})
+
+	t.Run("PUT trial stores the end and reopens expired welcome credit", func(t *testing.T) {
+		ended := time.Now().Add(-time.Hour)
+		require.NoError(t, database.Conn().Model(&models.OrganizationLLMCreditGrant{}).
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			Update("expires_at", ended).Error)
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+
+		trialEnd := time.Now().Add(18 * 24 * time.Hour).UTC().Truncate(time.Second)
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": trialEnd.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		require.NotNil(t, plan.TrialEndsAt)
+		parsed, err := time.Parse(time.RFC3339, *plan.TrialEndsAt)
+		require.NoError(t, err)
+		assert.True(t, parsed.Equal(trialEnd))
+
+		var welcome models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&welcome).Error)
+		require.NotNil(t, welcome.ExpiresAt)
+		assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+		assert.Equal(t, before.AmountMicros, welcome.AmountMicros)
+
+		summary, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+	})
+
+	t.Run("PUT business and none ignore trial end", func(t *testing.T) {
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+		ignored := time.Now().Add(90 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+		for _, planName := range []string{"business", "none"} {
+			body, err := json.Marshal(map[string]any{
+				"plan":          planName,
+				"trial_ends_at": ignored,
+			})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method:      "PUT",
+				path:        path,
+				authCookie:  token,
+				body:        body,
+				contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusOK, response.Code, planName)
+
+			var welcome models.OrganizationLLMCreditGrant
+			require.NoError(t, database.Conn().
+				Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+				First(&welcome).Error)
+			require.NotNil(t, welcome.ExpiresAt)
+			require.NotNil(t, before.ExpiresAt)
+			assert.True(t, welcome.ExpiresAt.Equal(*before.ExpiresAt), planName)
+		}
 	})
 }
