@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { getWorkOrderRunHref } from "../../../lib/workOrderExecutions";
 import type { SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import type { AutomationStage } from "./automationsViewModel";
@@ -33,12 +34,16 @@ export function AgentRunsPage({
   phases,
   automationName,
   organizationId,
+  factoryKey,
+  orderNumber,
   usagePhaseId,
 }: {
   runs: AutomationStage[];
   phases: SplitRunPhase[];
   automationName: string;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   /** Only this run reports into the card usage chart. */
   usagePhaseId?: string;
 }) {
@@ -50,6 +55,8 @@ export function AgentRunsPage({
         phase={phases.find((phase) => phase.id === single.id)}
         automationName={automationName}
         organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
         reportUsage={!usagePhaseId || single.id === usagePhaseId}
       />
     );
@@ -62,6 +69,8 @@ export function AgentRunsPage({
           run={run}
           phase={phases.find((phase) => phase.id === run.id)}
           organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
           defaultOpen={index === runs.length - 1}
           reportUsage={!usagePhaseId || run.id === usagePhaseId}
         />
@@ -76,12 +85,16 @@ function SingleRun({
   phase,
   automationName,
   organizationId,
+  factoryKey,
+  orderNumber,
   reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   automationName: string;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
@@ -96,7 +109,14 @@ function SingleRun({
           className={RUN_TITLE_MARKDOWN}
         />
       ) : null}
-      <RunDetails run={run} phase={phase} organizationId={organizationId} reportUsage={reportUsage} />
+      <RunDetails
+        run={run}
+        phase={phase}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        reportUsage={reportUsage}
+      />
     </div>
   );
 }
@@ -105,12 +125,16 @@ function AgentRunRow({
   run,
   phase,
   organizationId,
+  factoryKey,
+  orderNumber,
   defaultOpen,
   reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   defaultOpen: boolean;
   reportUsage: boolean;
 }) {
@@ -142,7 +166,14 @@ function AgentRunRow({
         ) : null}
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
-        <RunDetails run={run} phase={phase} organizationId={organizationId} reportUsage={reportUsage} />
+        <RunDetails
+          run={run}
+          phase={phase}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
+          reportUsage={reportUsage}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -152,11 +183,15 @@ function RunDetails({
   run,
   phase,
   organizationId,
+  factoryKey,
+  orderNumber,
   reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   reportUsage: boolean;
 }) {
   const checks = useWatchedPullRequestChecks(phase, organizationId);
@@ -170,6 +205,7 @@ function RunDetails({
         organizationId={organizationId}
         emptyNote="No steps for this run."
         reportUsage={reportUsage}
+        runHref={runHrefFor(organizationId, factoryKey, phase, orderNumber)}
       />
     </>
   );
@@ -339,4 +375,16 @@ function RunDescription({ description }: { description?: string }) {
 /** Markdown links reduced to their text, for aria labels. */
 function plainRunTitle(name: string): string {
   return name.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim() || "run";
+}
+
+function runHrefFor(
+  organizationId: string | undefined,
+  factoryKey: string | undefined,
+  phase: SplitRunPhase | undefined,
+  orderNumber: string | undefined,
+): string | null {
+  if (!organizationId || !factoryKey) {
+    return null;
+  }
+  return getWorkOrderRunHref(organizationId, factoryKey, phase?.appId, phase?.runId, { orderNumber });
 }

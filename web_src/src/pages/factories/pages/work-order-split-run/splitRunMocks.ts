@@ -142,6 +142,8 @@ export interface SplitRunPhase {
   durationRunning?: boolean;
   /** When this automation started. */
   startedAt?: string;
+  /** When this automation finished. Used for board-column dwell. */
+  endedAt?: string;
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -1547,7 +1549,8 @@ function executionToPhase(
     name,
     status,
     duration,
-    startedAt: execution.createdAt,
+    startedAt: execution.createdAt || execution.updatedAt,
+    endedAt: endedAtForExecution(execution, status),
     componentName,
     artifacts,
     checks: checksForLineExecution(execution, apiChecks, demoArtifacts),
@@ -1710,6 +1713,14 @@ function dispatchForExecution(order: FactoriesWorkOrder, execution: FactoriesWor
   return (order.lineDispatches ?? []).find((dispatch) =>
     (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
   );
+}
+
+function endedAtForExecution(execution: FactoriesWorkOrderExecution, status: SplitRunPhaseStatus): string | undefined {
+  if (status === "running" || status === "pending") {
+    return undefined;
+  }
+  const value = execution.finishedAt || execution.updatedAt;
+  return Date.parse(value ?? "") ? value : undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

@@ -4,10 +4,8 @@ import { agentToolCommandHeadline, agentToolDisplayText, agentToolScriptText } f
 import { formatDuration } from "@/lib/duration";
 import { normalizeTerminalOutput, shellScriptLineCount } from "@/lib/shellScript";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronRight, CircleX, SquareTerminal } from "lucide-react";
 
-import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import type { AgentToolItem } from "./agentActivity";
 
 export function CommandLine({
@@ -33,7 +31,6 @@ export function CommandLine({
           failed={failed}
           testId={`agent-tool-${tool.id}`}
           status={tool.status}
-          meta={commandMetaLabel(tool)}
           duration={commandDurationLabel(tool)}
         />
         {stdout ? <CommandStdout text={stdout} /> : null}
@@ -50,7 +47,6 @@ export function CommandLine({
       exitLabel={exitLabel}
       testId={`agent-tool-${tool.id}`}
       status={tool.status}
-      meta={commandMetaLabel(tool)}
       duration={commandDurationLabel(tool)}
     />
   );
@@ -65,7 +61,6 @@ function ExpandableCommand({
   exitLabel,
   testId,
   status,
-  meta,
   duration,
 }: {
   script: string;
@@ -76,7 +71,6 @@ function ExpandableCommand({
   exitLabel?: string;
   testId: string;
   status: string;
-  meta?: string;
   duration?: string;
 }) {
   const multiLine = script.includes("\n");
@@ -101,7 +95,6 @@ function ExpandableCommand({
         exitLabel={exitLabel}
         testId={testId}
         status={status}
-        meta={meta}
         duration={duration}
         lineRef={lineRef}
       />
@@ -123,7 +116,6 @@ function ExpandableCommand({
         failed={failed}
         exitLabel={exitLabel}
         status={status}
-        meta={meta}
         duration={duration}
         expandable
         open={open}
@@ -204,7 +196,6 @@ type CommandRowProps = {
   exitLabel?: string;
   testId?: string;
   status: string;
-  meta?: string;
   expandable?: boolean;
   open?: boolean;
   lineCount?: number;
@@ -213,23 +204,15 @@ type CommandRowProps = {
   onToggle?: () => void;
 };
 
-function CommandRow({ headline, meta, expandable = false, open = false, onToggle, ...row }: CommandRowProps) {
-  const body = expandable ? (
-    <button type="button" className="w-full" aria-expanded={open} aria-label={headline} onClick={onToggle}>
-      <CommandRowBody headline={headline} expandable open={open} {...row} />
-    </button>
-  ) : (
-    <CommandRowBody headline={headline} {...row} />
-  );
-  if (!meta) {
-    return body;
+function CommandRow({ headline, expandable = false, open = false, onToggle, ...row }: CommandRowProps) {
+  if (expandable) {
+    return (
+      <button type="button" className="w-full" aria-expanded={open} aria-label={headline} onClick={onToggle}>
+        <CommandRowBody headline={headline} expandable open={open} {...row} />
+      </button>
+    );
   }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{expandable ? body : <div>{body}</div>}</TooltipTrigger>
-      <TooltipContent side="top">{meta}</TooltipContent>
-    </Tooltip>
-  );
+  return <CommandRowBody headline={headline} {...row} />;
 }
 
 function CommandRowBody({
@@ -243,7 +226,7 @@ function CommandRowBody({
   lineCount,
   duration,
   lineRef,
-}: Omit<CommandRowProps, "meta" | "onToggle">) {
+}: Omit<CommandRowProps, "onToggle">) {
   return (
     <div
       className={cn(
@@ -291,21 +274,6 @@ function commandDurationLabel(tool: AgentToolItem): string | undefined {
     return undefined;
   }
   return formatDuration(tool.durationMs, { precision: "second" }) || undefined;
-}
-
-function commandMetaLabel(tool: AgentToolItem): string | undefined {
-  const parts: string[] = [];
-  if (tool.startedAtMs !== undefined) {
-    const stamp = formatWorkOrderDateTime(new Date(tool.startedAtMs));
-    if (stamp) {
-      parts.push(stamp);
-    }
-  }
-  const duration = commandDurationLabel(tool);
-  if (duration) {
-    parts.push(duration);
-  }
-  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 function failedCommandOutput(tool: AgentToolItem, failed: boolean): string | undefined {

@@ -18,6 +18,8 @@ import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
+import { FailedNodeAlerts } from "./failedNodeAlerts";
+import { failedNonRunnerErrors, type FailedNodeError } from "./failedNodeErrors";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
 const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
@@ -38,6 +40,7 @@ export function LiveAgentSteps({
   expandSteps = false,
   emptyNote,
   reportUsage = true,
+  runHref,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
@@ -48,10 +51,12 @@ export function LiveAgentSteps({
   emptyNote?: string;
   /** When false, skip the usage chart. The card footer only charts the latest run. */
   reportUsage?: boolean;
+  /** Canvas run page for a failed node that is not a runner. */
+  runHref?: string | null;
 }) {
   const run = useLiveAgentRun(stage, phase, organizationId);
   const note = emptyNote && stage.status !== "running" ? <p className={META_TEXT_CLASSNAME}>{emptyNote}</p> : null;
-  if (!organizationId || !phase || run.runners.length === 0) {
+  if (!organizationId || !phase) {
     return (
       <SettledRunBody
         stage={stage}
@@ -85,6 +90,8 @@ export function LiveAgentSteps({
         liveActivity={run.liveActivity}
         hasLiveContent={run.hasLiveContent}
         note={note}
+        runHref={runHref}
+        failedNodes={run.failedNodes}
       />
     </>
   );
@@ -112,7 +119,10 @@ function SettledRunBody({
 
 function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefined, organizationId?: string) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
-  const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
+  const stream = useMemo(
+    () => (live.stream.length > 0 ? live.stream : (phase?.stream ?? [])),
+    [live.stream, phase?.stream],
+  );
   const runners = stream.filter((line) => isRunnerComponent(line.component) && Boolean(line.executionId));
   const [liveByLine, setLiveByLine] = useState<Record<string, RunnerLive>>({});
   const reportLive = useCallback((lineId: string, next: RunnerLive) => {
@@ -125,6 +135,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes), stoppedStatus),
     [transcriptNotes, stoppedStatus],
   );
+  const failedNodes = useMemo(() => failedNonRunnerErrors(stream), [stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
   const running = Boolean(runningRunner);
   const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
@@ -152,6 +163,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
       ...stage,
       agentSteps: agentStepsForLiveRun(stage.agentSteps, liveSteps, pending.streamWaiting, stoppedStatus),
     },
+    failedNodes,
     stoppedStatus,
   };
 }
@@ -204,6 +216,8 @@ function AgentRunBody({
   liveActivity,
   hasLiveContent,
   note,
+  runHref,
+  failedNodes,
 }: {
   stageId: string;
   shown: AutomationStage;
@@ -214,12 +228,14 @@ function AgentRunBody({
   liveActivity?: AgentActivity;
   hasLiveContent: boolean;
   note: ReactNode;
+  runHref?: string | null;
+  failedNodes: FailedNodeError[];
 }) {
   if (showLogSkeleton) {
     return <AgentLogSkeleton />;
   }
-  if (shown.agentSteps.length > 0) {
-    return (
+  const steps =
+    shown.agentSteps.length > 0 ? (
       <div className={cn(revealSteps && LOADING_REVEAL_CLASSNAME)}>
         <AgentStepMarkers
           stage={shown}
@@ -227,6 +243,14 @@ function AgentRunBody({
           liveActivity={running ? liveActivity : undefined}
           liveActive={running}
         />
+      </div>
+    ) : null;
+  const errors = failedNodes.length > 0 ? <FailedNodeAlerts nodes={failedNodes} runHref={runHref} /> : null;
+  if (steps || errors) {
+    return (
+      <div className="space-y-3">
+        {steps}
+        {errors}
       </div>
     );
   }
