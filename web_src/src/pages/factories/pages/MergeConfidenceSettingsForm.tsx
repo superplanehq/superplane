@@ -11,9 +11,7 @@ import {
   type MergeConfidenceCheck,
 } from "./mergeConfidenceChecks";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
-import { RiskScoreCategoryEditor } from "./RiskScoreCategoryEditor";
-import { defaultRiskScoreCategories, parseRiskScoreRules, type RiskScoreCategory } from "./riskScoreCategories";
-import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
+import { defaultRiskScoreCategories, parseRiskScoreRules } from "./riskScoreCategories";
 
 /** General tab for an installed merge confidence automation. Checks live in the agent prompt. */
 export function MergeConfidenceSettingsForm({
@@ -27,19 +25,14 @@ export function MergeConfidenceSettingsForm({
   const [checks, setChecks] = useState<MergeConfidenceCheck[]>(
     () => parseEnabledChecks(prompt) ?? defaultMergeConfidenceChecks(),
   );
-  const [categories, setCategories] = useState<RiskScoreCategory[]>(
-    () => parseRiskScoreRules(prompt) ?? defaultRiskScoreCategories(),
-  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const nextChecks = parseEnabledChecks(prompt);
-    const nextCategories = parseRiskScoreRules(prompt);
-    if (!nextChecks || !nextCategories) {
+    if (!nextChecks || !parseRiskScoreRules(prompt)) {
       return;
     }
     setChecks(nextChecks);
-    setCategories(nextCategories);
   }, [prompt]);
 
   const toggle = (check: MergeConfidenceCheck, enabled: boolean) => {
@@ -50,6 +43,7 @@ export function MergeConfidenceSettingsForm({
   };
 
   const save = async () => {
+    const categories = parseRiskScoreRules(prompt) ?? defaultRiskScoreCategories();
     const next = draftWithMergeConfidence(draft, { checks, categories });
     if (!next) {
       return;
@@ -63,8 +57,6 @@ export function MergeConfidenceSettingsForm({
       setSaving(false);
     }
   };
-
-  const riskOn = checks.includes("risk");
 
   return (
     <>
@@ -81,23 +73,12 @@ export function MergeConfidenceSettingsForm({
             </header>
             <MergeConfidenceCheckList checks={checks} onToggle={toggle} idPrefix="merge-confidence-check" />
           </section>
-          {riskOn ? (
-            <section className="space-y-3">
-              <header>
-                <h2 className="text-[15px] font-semibold text-foreground">{RISK_SCORE_SETUP_COPY.categoriesTitle}</h2>
-                <p className="workspace-body-text mt-1 text-muted-foreground">
-                  {RISK_SCORE_SETUP_COPY.categoriesHelper} {RISK_SCORE_SETUP_COPY.scaleHelper}
-                </p>
-              </header>
-              <RiskScoreCategoryEditor categories={categories} onChange={setCategories} />
-            </section>
-          ) : null}
         </div>
       </div>
       <ColumnAutomationFooterAction>
         <Button
           type="button"
-          disabled={saving || (riskOn && categories.length === 0)}
+          disabled={saving}
           onClick={() => void save()}
           data-testid="merge-confidence-settings-save"
         >
