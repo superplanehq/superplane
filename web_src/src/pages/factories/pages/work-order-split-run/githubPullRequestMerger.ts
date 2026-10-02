@@ -40,6 +40,6 @@ export function closerFromGitHubMergedBy(
     return {};
   }
   const name = user?.name?.trim() || login;
-  const href = safeExternalUrl(user.html_url) ?? `https://github.com/${login}`;
+  const href = safeExternalUrl(user?.html_url) ?? `https://github.com/${login}`;
   return { automationName: name, automationHref: href };
 }

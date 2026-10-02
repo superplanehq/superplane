@@ -216,6 +216,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         {
           id: "on-run",
@@ -266,6 +267,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         {
           id: "fail-if",
