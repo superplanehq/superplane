@@ -28,6 +28,8 @@ export function PlanningReviewForm({
   factoryId,
   factoryKey,
   showVisualEvidenceSetting = false,
+  onRestoreDefaultPrompt,
+  restoreDefaultPromptDisabled = false,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
@@ -35,6 +37,8 @@ export function PlanningReviewForm({
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting?: boolean;
+  onRestoreDefaultPrompt?: () => void;
+  restoreDefaultPromptDisabled?: boolean;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -53,6 +57,8 @@ export function PlanningReviewForm({
           factoryId={factoryId}
           factoryKey={factoryKey}
           showVisualEvidenceSetting={showVisualEvidenceSetting}
+          onRestoreDefaultPrompt={onRestoreDefaultPrompt}
+          restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -66,6 +72,8 @@ function AgentPanel({
   factoryId,
   factoryKey,
   showVisualEvidenceSetting,
+  onRestoreDefaultPrompt,
+  restoreDefaultPromptDisabled,
   onChange,
 }: {
   component: PlanningReviewComponent;
@@ -73,6 +81,8 @@ function AgentPanel({
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting: boolean;
+  onRestoreDefaultPrompt?: () => void;
+  restoreDefaultPromptDisabled: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const componentRef = useRef(component);
@@ -175,6 +185,8 @@ function AgentPanel({
       <PlanningReviewStepList
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
+        onRestoreDefaultPrompt={onRestoreDefaultPrompt}
+        restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
       />
       <PlanningReviewResourcesCard
         organizationId={organizationId}

@@ -136,6 +136,7 @@ export function PlanningSettingsPopup({
           showAutomationNote={false}
           showCancel={false}
           showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
+          onRestoreDefaultPrompt={agent.onRestoreDefaultPrompt}
         />
       ) : (
         <PlanningGeneralTab

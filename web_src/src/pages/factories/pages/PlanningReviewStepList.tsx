@@ -19,9 +19,13 @@ const KIND_LABEL: Record<PlanningReviewStepKind, string> = { bash: "Bash", promp
 export function PlanningReviewStepList({
   steps,
   onChange,
+  onRestoreDefaultPrompt,
+  restoreDefaultPromptDisabled = false,
 }: {
   steps: PlanningReviewStep[];
   onChange: (steps: PlanningReviewStep[]) => void;
+  onRestoreDefaultPrompt?: () => void;
+  restoreDefaultPromptDisabled?: boolean;
 }) {
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [openStep, setOpenStep] = useState("");
@@ -55,6 +59,19 @@ export function PlanningReviewStepList({
           {steps.length}
         </span>
         <span className="flex-1" />
+        {onRestoreDefaultPrompt ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={onRestoreDefaultPrompt}
+            disabled={restoreDefaultPromptDisabled}
+            data-testid="planning-review-restore-default-prompt"
+          >
+            Restore default prompt
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" size="sm" onClick={addStep} data-testid="planning-review-add-step">
           <Plus aria-hidden />
           Add step

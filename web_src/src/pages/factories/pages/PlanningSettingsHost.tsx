@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
+import { loadDefaultRefinementPrompt } from "../lib/loadDefaultRefinementPrompt";
+import { REFINE_TASK_NODE_ID } from "../lib/refinementPrompt";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
@@ -16,8 +18,6 @@ import {
 } from "./planningSettingsModel";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
-
-const REFINE_TASK_NODE_ID = "refine-task";
 
 interface PlanningSettingsHostProps {
   organizationId: string;
@@ -150,6 +150,9 @@ function PlanningSettingsLoaded({
               factoryKey,
               onSave: agent.save,
               showVisualEvidenceSetting: false,
+              onRestoreDefaultPrompt: canvasId
+                ? () => loadDefaultRefinementPrompt({ organizationId, factoryId, automationId: canvasId })
+                : undefined,
             }
           : undefined
       }
