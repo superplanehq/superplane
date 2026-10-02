@@ -133,6 +133,8 @@ describe("activityFromAgentStep", () => {
     const command = activityFromAgentStep(step!)?.items[0];
 
     expect(step?.output).toBe(`${script}\n\n${stdout}`);
+    expect(step?.startedAtMs).toBe(1);
+    expect(step?.commandScript).toBe(script);
     expect(command).toEqual(
       expect.objectContaining({
         type: "tool",

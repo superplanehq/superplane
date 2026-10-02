@@ -92,11 +92,21 @@ describe("notesFromLiveLogSections", () => {
     expect(notes.map((note) => note.componentType)).toEqual(["bash", "prompt", "note", "read"]);
     expect(notes[0]?.componentName).toBe("Set Up Git User");
     expect(notes[0]?.duration).toBe("<1s");
+    expect(notes[0]?.startedAtMs).toBe(1);
+    expect(notes[0]?.commandScript).toBe('echo "Using superplaneagent@superplane.com"');
+    expect(notes[0]?.commandStdout).toBe("Using superplaneagent@superplane.com");
     expect(notes[0]?.detail).toContain('echo "Using superplaneagent@superplane.com"');
     expect(notes[0]?.detail).toContain("Using superplaneagent");
     expect(notes[1]?.componentName).toBe("Implementation");
     expect(notes[3]?.componentName).toBe("pkg/foo.go");
     expect(notes[3]?.noteParentId).toBe("agent-step-5");
+  });
+
+  it("leaves the bash start time unset when the section has none", () => {
+    const notes = notesFromLiveLogSections("agent", [{ ...bashSection(), started_at: null }]);
+
+    expect(notes[0]?.startedAtMs).toBeUndefined();
+    expect(notes[0]?.commandScript).toBe('echo "Using superplaneagent@superplane.com"');
   });
 
   it("uses the step name and keeps the command preview in the body", () => {

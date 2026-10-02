@@ -58,6 +58,7 @@ export interface AgentStep {
   type: "prompt" | "bash" | "node";
   status: SplitRunPhaseStatus;
   duration?: string;
+  startedAtMs?: number;
   summary: string;
   toolCount: number;
   output?: string;
@@ -356,6 +357,7 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     type: group.line.componentType === "bash" ? "bash" : "prompt",
     status: group.line.status,
     duration: group.line.duration,
+    startedAtMs: group.line.startedAtMs,
     summary: "",
     toolCount: tools.length,
     output: group.line.detail?.trim() || undefined,

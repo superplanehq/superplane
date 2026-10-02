@@ -77,9 +77,17 @@ function noteFromCommandSection(
     detail: detail || undefined,
     commandScript: bashScript || undefined,
     commandStdout: bashScript ? output || undefined : undefined,
+    startedAtMs: bashStartedAtMs(section),
     duration: commandSectionDuration(section.duration_ms),
     ...orderKeyProps(orderKey),
   };
+}
+
+function bashStartedAtMs(section: CommandSection): number | undefined {
+  if (section.kind !== "bash" || section.started_at === null) {
+    return undefined;
+  }
+  return section.started_at;
 }
 
 function commandSectionDuration(durationMs: number | null): string | undefined {

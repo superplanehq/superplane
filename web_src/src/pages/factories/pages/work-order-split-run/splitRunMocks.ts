@@ -103,6 +103,7 @@ export interface SplitRunStreamLine {
   detail?: string;
   commandScript?: string;
   commandStdout?: string;
+  startedAtMs?: number;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
   /** Agent transcript line. No checkmark. */
