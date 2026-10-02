@@ -2191,6 +2191,50 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.attentionCard).toBe(true);
   });
 
+  it("uses the canvas run span for a column-app check card", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-26T11:00:00Z",
+                  finishedAt: "2026-08-26T11:04:00Z",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-merge",
+            key: "merge-confidence",
+            name: "Merge confidence",
+            score: 4,
+            maxScore: 5,
+            level: "LEVEL_POSITIVE",
+            automation: { appId: "app-merge", appName: "Merge confidence" },
+            runId: "run-merge",
+            updatedAt: "2026-08-26T11:04:00Z",
+          },
+        ],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("4m");
+  });
+
   it("uses the canvas run span for PR feedback phase duration", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
