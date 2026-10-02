@@ -50,6 +50,18 @@ const BADGE_SIZES = [
 
 type BadgeSize = (typeof BADGE_SIZES)[number]["value"];
 
+const BADGE_IMAGE_ALT = "PRs via SuperPlane";
+
+function badgeSnippet(size: BadgeSize, imageURL: string, linkURL: string): string {
+  if (!imageURL) {
+    return "";
+  }
+  if (size === "wide") {
+    return `<a href="${linkURL}"><img src="${imageURL}" alt="${BADGE_IMAGE_ALT}" width="100%"></a>`;
+  }
+  return `[![${BADGE_IMAGE_ALT}](${imageURL})](${linkURL})`;
+}
+
 type PublicBadgeUpdate = {
   publicBadgeEnabled?: boolean;
   publicBadgeShowCost?: boolean;
@@ -162,7 +174,7 @@ function usePublicBadgeState(
     customized: changed.length > 0,
     linkToBoard,
     canLinkToBoard: Boolean(publicBoardPath),
-    markdown: imageURL ? `[![PRs via SuperPlane](${imageURL})](${linkURL})` : "",
+    markdown: badgeSnippet(size, imageURL, linkURL),
     previewURL: imageURL ? `${imageURL}&v=${previewNonce}` : "",
     setPeriod,
     setSize,
