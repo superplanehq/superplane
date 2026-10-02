@@ -80,6 +80,32 @@ describe("streamFromLiveRun", () => {
     expect(claude?.executionId).toBeUndefined();
   });
 
+  it("puts the node error on the stream line", () => {
+    const stream = streamFromLiveRun(
+      {
+        spec: {
+          nodes: [{ id: "broken-node", name: "Broken node", type: "TYPE_ACTION", component: "http.request" }],
+        },
+      },
+      {
+        executions: [
+          {
+            id: "exec-broken",
+            nodeId: "broken-node",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            resultMessage: "unknown name asdad (1:1)\n | asdad\n | ^",
+          },
+        ],
+      },
+    );
+
+    expect(stream.find((line) => line.nodeId === "broken-node")).toMatchObject({
+      status: "failed",
+      detail: "unknown name asdad (1:1)\n | asdad\n | ^",
+    });
+  });
+
   it("orders log lines by canvas topology, not execution time", () => {
     const stream = streamFromLiveRun(
       {
