@@ -37,6 +37,13 @@ var providerAgentModelSpecs = map[string]providerAgentModelSpec{
 }
 
 func agentModelsForSource(source string, modelIDs []string) (string, string) {
+	if source == modelSourceCustom {
+		ids := uniqueSortedModelIDs(modelIDs)
+		if len(ids) == 0 {
+			return "", ""
+		}
+		return ids[0], ids[0]
+	}
 	spec, ok := providerAgentModelSpecs[source]
 	if !ok {
 		return "", ""

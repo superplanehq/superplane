@@ -79,7 +79,7 @@ function selectableModel(
   key: string;
   label: string;
 } {
-  const label = provider === "openrouter" ? id : `${provider}/${id}`;
+  const label = provider === "openrouter" || provider === "custom" ? id : `${provider}/${id}`;
   return {
     source: { id: source, name: source === "hosted" ? "SuperPlane" : "Your keys" },
     provider: { id: provider, name: provider },
@@ -411,5 +411,36 @@ describe("HostedModelFieldRenderer", () => {
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "Default");
     expect(onValuesChange).toHaveBeenCalledWith({ model: "claude-sonnet-4-6", thinkingLevel: undefined });
+  });
+
+  it("lists the custom provider allowlist on an OpenRouter agent", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    mockSelectableModels([
+      selectableModel("byok", "openrouter", "openrouter-only"),
+      selectableModel("byok", "custom", "muse-spark-1.3-contributor"),
+    ]);
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField("openrouter")}
+        value="deepseek-flash"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ llmProvider: "custom", model: "deepseek-flash" }}
+        organizationId="org-1"
+      />,
+    );
+
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.hover(screen.getByTestId("field-model-hosted-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "muse-spark-1.3-contributor" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "openrouter-only" })).not.toBeInTheDocument();
+
+    await selectFlyoutOption(user, "field-model-hosted-model-list", "muse-spark-1.3-contributor");
+    expect(onValuesChange).toHaveBeenCalledWith({
+      model: "muse-spark-1.3-contributor",
+      thinkingLevel: undefined,
+    });
   });
 });

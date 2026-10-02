@@ -66,6 +66,9 @@ func providerForFinishedEvent(finishedEventType string, configuration any) (stri
 	case "runnerCodex.finished":
 		return models.UsageProviderOpenAI, true
 	case "runnerOpenRouter.finished":
+		if configurationString(configuration, "llmProvider") == models.UsageProviderCustom {
+			return models.UsageProviderCustom, true
+		}
 		return models.UsageProviderOpenRouter, true
 	case "runnerSuperPlane.finished":
 		provider := configurationString(configuration, "hostedProvider")

@@ -28,6 +28,9 @@ export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 /** Organization experimental feature: organization LLM Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
+/** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
+export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
+
 /** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
