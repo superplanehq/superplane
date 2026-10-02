@@ -373,10 +373,10 @@ describe("splitRunFixtureForWorkOrder", () => {
       { checks: OPEN_WORK_ORDER_CHECKS },
     );
     const verify = fixture.phases.find((phase) => phase.id === "verify-1");
-    expect(verify?.checks?.map((check) => check.name)).toEqual(["Risk score", "Code quality"]);
+    expect(verify?.checks?.map((check) => check.name)).toEqual(["Blast radius", "Code quality"]);
     expect(fixture.phases.find((phase) => phase.id === "implement-0")?.checks).toBeUndefined();
     expect(fixture.checks.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
       "Test coverage",
       "Confidence score",
@@ -1228,7 +1228,7 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-102", "#502"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
   });
@@ -1239,10 +1239,10 @@ describe("line board work-order examples", () => {
     const failed = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, { checks: VERIFY_STEP_CHECKS });
     const running = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { checks: RUNNING_WORK_ORDER_CHECKS });
 
-    expect(verify.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(done.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(failed.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(running.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "CI"]);
+    expect(verify.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(done.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(failed.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(running.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "CI"]);
     expect(verify.checks[0]?.summary).toContain("fit for an agent");
     expect(running.checks.filter((check) => check.name === "Confidence score")).toHaveLength(1);
   });
@@ -1264,7 +1264,7 @@ describe("line board work-order examples", () => {
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
@@ -2228,7 +2228,7 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-88", "#510"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#510"]);
@@ -2246,6 +2246,27 @@ describe("line board work-order examples", () => {
     const closure = fixture.phases.find((phase) => phase.id === "done-closure");
     expect(closure).toMatchObject({ name: "Done", componentName: "Completed", status: "passed" });
     expect(closure?.description).toBe("Alex marked this task as successful.");
+  });
+
+  it("says the Completed card is resolved because the person merged the pull request", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...LINE_BOARD_DONE_RECEIPTS_ORDER,
+        pullRequests: [
+          {
+            number: "510",
+            title: LINE_BOARD_DONE_RECEIPTS_ORDER.title,
+            url: "https://github.com/example/ledger/pull/510",
+            state: "STATE_MERGED",
+          },
+        ],
+      },
+      { closer: { automationName: "Alex", automationHref: "https://github.com/alex" } },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "done-closure")?.description).toBe(
+      "Resolved because [Alex](https://github.com/alex) merged [#510 Send refund receipts after provider confirm](https://github.com/example/ledger/pull/510).",
+    );
   });
 
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {

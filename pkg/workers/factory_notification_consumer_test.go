@@ -406,7 +406,7 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		require.NotNil(t, creatorAlert)
 		assert.Contains(t, creatorAlert.Title, "The agent has a question")
 		assert.Contains(t, creatorAlert.Body, factoryModel.WorkOrderKey(order.Number))
-		assert.Equal(t, order.URLPath(factoryModel.Key), creatorAlert.URLPath)
+		assert.Equal(t, order.URLPath(factoryModel.RouteSegment()), creatorAlert.URLPath)
 		assert.Equal(t, factoryModel.WorkOrderKey(order.Number), creatorAlert.OrderKey)
 		assert.Equal(t, factoryModel.Key, creatorAlert.FactoryKey)
 		assert.Equal(t, models.NotificationTypeWorkOrderAgentQuestion, creatorAlert.EventType)

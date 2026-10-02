@@ -216,7 +216,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
 	case errors.Is(err, errRiskScoreDisabled):
-		return grpcerrors.FailedPrecondition(err, "Risk score is not enabled for this organization.")
+		return grpcerrors.FailedPrecondition(err, "Merge confidence is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):

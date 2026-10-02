@@ -43,26 +43,7 @@ export type CreateWithAgentPlanMessage = {
   createdAtMs?: number;
 };
 
-/**
- * A task the agent split off this draft. The transcript shows it as a card
- * at the moment it was created, so the user can open it right away.
- */
-export type CreateWithAgentTaskMessage = {
-  id: string;
-  kind: "task";
-  role: "task";
-  workOrderId: string;
-  key: string;
-  title: string;
-  number?: number;
-  activityId?: string;
-  createdAtMs?: number;
-};
-
-export type CreateWithAgentMessage =
-  | CreateWithAgentTextMessage
-  | CreateWithAgentPlanMessage
-  | CreateWithAgentTaskMessage;
+export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentPlanMessage;
 
 export type CreateWithAgentSurveyQuestion = {
   prompt: string;

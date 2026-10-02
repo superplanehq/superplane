@@ -24,6 +24,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     organizationId: "org-1",
     factoryId: "factory-1",
     factoryKey: "PAY",
+    routeSegment: "pay",
     factory,
     factories,
   }),
@@ -76,7 +77,9 @@ vi.mock("react-router", () => {
 });
 
 vi.mock("./AgentStep", () => ({
-  AgentStep: () => <div data-testid="agent-step" />,
+  AgentStep: ({ showCustomProvider }: { showCustomProvider?: boolean }) => (
+    <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
+  ),
 }));
 
 function setupState(): OnboardingSetupApi {
@@ -92,6 +95,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
@@ -260,20 +264,21 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
-  it("lists SuperPlane-hosted models before Your key in the model source choice", () => {
+  it("keeps SuperPlane-hosted models as the choice and own key as a link", () => {
     renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
 
     const source = screen.getByTestId("first-run-model-source");
     const buttons = within(source).getAllByRole("button");
     expect(buttons[0]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.hostedModels));
-    expect(buttons[1]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.ownKey));
+    expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+    expect(buttons[1]).toHaveAccessibleName(FIRST_RUN_COPY.agent.ownKey);
+    expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("opens the backlog when the organization chooses SuperPlane-hosted models", async () => {
+  it("opens the backlog when SuperPlane-hosted models stay selected", async () => {
     const user = userEvent.setup();
     renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
 
-    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
@@ -287,8 +292,24 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
 
     expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
-    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "no");
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("offers a custom provider on the agent card when that flag is on", async () => {
+    const user = userEvent.setup();
+    renderStatefulSetup({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      customProvider: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
+
+    expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBodyWithCustom)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.ownKey })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "yes");
   });
 
   it("sends a bring-your-own-key organization back to the model source when none is chosen", () => {

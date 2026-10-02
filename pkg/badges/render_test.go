@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"strings"
 	"testing"
@@ -197,6 +198,21 @@ func TestRender_WideKeepsMetricsWhenCostIsShown(t *testing.T) {
 	assertWideKeepsCostAndMetrics(t, svg, "$4.20 per merged PR")
 }
 
+func TestRender_ChartSVGFillsPreviewColumn(t *testing.T) {
+	in := exampleInput()
+	in.Size = SizeWide
+	svg := mustRender(t, in)
+	parseSVG(t, svg)
+	root := svgRootTag(t, svg)
+	assert.Contains(t, root, `width="1012"`)
+	assert.NotContains(t, root, `preserveAspectRatio="none"`)
+
+	viewWidth, viewHeight := viewBoxSize(t, root)
+	displayHeight := attrInt(t, root, "height")
+	assert.Equal(t, 800, viewWidth)
+	assert.Equal(t, int(math.Round(float64(viewHeight)*1012/800)), displayHeight)
+}
+
 func TestRender_WideKeepsFittingCostOnTheHeaderLine(t *testing.T) {
 	cost := int64(100)
 	in := Input{
@@ -289,12 +305,39 @@ func textTag(t *testing.T, svg, label string) string {
 
 func viewBoxHeight(t *testing.T, svg string) int {
 	t.Helper()
-	match := regexp.MustCompile(`viewBox="0 0 \d+ (\d+)"`).FindStringSubmatch(svg)
-	require.Len(t, match, 2)
-	var height int
-	_, err := fmt.Sscanf(match[1], "%d", &height)
-	require.NoError(t, err)
+	_, height := viewBoxSize(t, svg)
 	return height
+}
+
+func viewBoxSize(t *testing.T, svg string) (int, int) {
+	t.Helper()
+	match := regexp.MustCompile(`viewBox="0 0 (\d+) (\d+)"`).FindStringSubmatch(svg)
+	require.Len(t, match, 3)
+	return atoi(t, match[1]), atoi(t, match[2])
+}
+
+func svgRootTag(t *testing.T, svg string) string {
+	t.Helper()
+	start := strings.Index(svg, "<svg ")
+	require.NotEqual(t, -1, start)
+	end := strings.Index(svg[start:], ">")
+	require.NotEqual(t, -1, end)
+	return svg[start : start+end]
+}
+
+func attrInt(t *testing.T, tag, name string) int {
+	t.Helper()
+	match := regexp.MustCompile(name + `="(\d+)"`).FindStringSubmatch(tag)
+	require.Len(t, match, 2)
+	return atoi(t, match[1])
+}
+
+func atoi(t *testing.T, raw string) int {
+	t.Helper()
+	var n int
+	_, err := fmt.Sscanf(raw, "%d", &n)
+	require.NoError(t, err)
+	return n
 }
 
 func TestRender_ThousandsSeparator(t *testing.T) {

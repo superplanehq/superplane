@@ -13,6 +13,8 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 )
 
 func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
@@ -22,6 +24,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			requestID := requestIDFromHeader(r)
 			w.Header().Set(requestIDHeader, requestID)
 			r = withRequestLogFields(r, requestID)
+			r = grpc.WithServerErrorReport(r)
 			// Use a response writer wrapper to capture status code
 			lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
@@ -42,7 +45,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 				}
 
 				fields := handledRequestFields(r, status, duration)
-				logHandledRequest(logger, fields, status)
+				logHandledRequest(logger, r, fields, status)
 
 				if recovered != nil {
 					captureHTTPPanic(r, status, recovered)
@@ -103,14 +106,18 @@ func setLogField(fields log.Fields, key string, value string) {
 	fields[key] = value
 }
 
-func logHandledRequest(logger *log.Logger, fields log.Fields, status int) {
+func logHandledRequest(logger *log.Logger, r *http.Request, fields log.Fields, status int) {
 	entry := logger.WithFields(fields)
 	message := handledRequestMessage(fields)
-	if status >= http.StatusInternalServerError {
-		entry.Error(message)
+	if status < http.StatusInternalServerError {
+		entry.Info(message)
 		return
 	}
-	entry.Info(message)
+
+	if noted, ok := grpc.NotedServerErrorFrom(r.Context()); ok {
+		entry = entry.WithError(noted.Cause)
+	}
+	entry.Error(message)
 }
 
 func handledRequestMessage(fields log.Fields) string {
@@ -173,30 +180,9 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 	})
 }
 
-// shouldCaptureHTTPError reports whether a response status code represents a
-// server-side error worth forwarding to Sentry.
-//
-// We only capture true server errors (5xx) and deliberately skip status codes
-// that indicate the client sent an unsupported request rather than a real
-// server bug. In particular:
-//
-//   - 501 Not Implemented is returned by grpc-gateway when a path exists but
-//     the HTTP method has no mapping (e.g. POST /api/v1/triggers/start when
-//     only GET /api/v1/triggers/{name} is defined). Those requests are caused
-//     by clients hitting the wrong endpoint and should not create Sentry
-//     issues.
-//   - 505 HTTP Version Not Supported is likewise a client-caused mismatch.
+// shouldCaptureHTTPError reports whether a response status should be sent to Sentry.
 func shouldCaptureHTTPError(status int) bool {
-	if status < http.StatusInternalServerError {
-		return false
-	}
-
-	switch status {
-	case http.StatusNotImplemented, http.StatusHTTPVersionNotSupported:
-		return false
-	}
-
-	return true
+	return grpc.ReportableHTTPStatus(status)
 }
 
 func captureHTTPError(r *http.Request, status int) {
@@ -205,11 +191,53 @@ func captureHTTPError(r *http.Request, status int) {
 		return
 	}
 
+	if grpc.ServerErrorAlreadyReported(r.Context()) {
+		return
+	}
+
+	noted, hasCause := grpc.NotedServerErrorFrom(r.Context())
 	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetRequest(r)
+		request := r
+		if noted.OmitRequestBody {
+			request = requestWithoutBody(r)
+		}
+		scope.SetRequest(request)
 		scope.SetTag("status", strconv.Itoa(status))
-		hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+		for key, value := range noted.Tags {
+			scope.SetTag(key, value)
+		}
+		if !hasCause {
+			hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
+			return
+		}
+
+		setHandlerMessage(scope, noted.Source)
+		hub.CaptureException(noted.Cause)
 	})
+}
+
+func requestWithoutBody(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+
+	clone := r.Clone(r.Context())
+	clone.Body = http.NoBody
+	clone.GetBody = nil
+	clone.ContentLength = 0
+	clone.Form = nil
+	clone.PostForm = nil
+	clone.MultipartForm = nil
+	return clone
+}
+
+func setHandlerMessage(scope *sentry.Scope, source error) {
+	_, message, ok := grpcerrors.HandlerStatus(source)
+	if !ok || message == "" {
+		return
+	}
+
+	scope.SetExtra("handler_message", message)
 }
 
 func shouldLogRequest(path string) bool {

@@ -14,6 +14,7 @@ export type ColumnAutomationRowAction = "settings" | "disable" | "enable" | "rem
 
 const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
   analysis: Sparkles,
+  "risk-score": Sparkles,
   "agent-step": Bot,
   custom: Workflow,
 };

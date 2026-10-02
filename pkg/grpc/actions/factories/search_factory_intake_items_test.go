@@ -436,6 +436,40 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, jiraItem.URL, response.GetOrder().GetOrigin().GetUrl())
 	})
 
+	t.Run("stores the Datadog issue title as the source label", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		issueID := "da226b38-baac-11f1-bad1-da7ad0900005"
+		datadogItem := IntakeItem{
+			ID:    issueID,
+			Title: "TimeoutError: checkout timed out",
+			Body:  "checkout timed out",
+			URL:   "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+		}
+		datadogDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSource{items: []IntakeItem{datadogItem}}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, datadogDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    datadogItem.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, datadogItem.URL, response.GetOrder().GetOrigin().GetUrl())
+		assert.Equal(t, datadogItem.Title, response.GetOrder().GetOrigin().GetLabel())
+
+		orderID, err := uuid.Parse(response.GetOrder().GetId())
+		require.NoError(t, err)
+		stored, err := factory.FindWorkOrder(database.DB(t.Context()), orderID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.OriginLabel)
+		assert.Equal(t, datadogItem.Title, *stored.OriginLabel)
+	})
+
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := createIntake(t, factory)

@@ -121,6 +121,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 			summary.Action,
 			installationUUID,
 			nil,
+			body,
 		), err)
 		captureSentryWebhookErrorToSentry(
 			r,
@@ -137,7 +138,9 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 		summary.Action,
 		installationUUID,
 		integrationIDs(integrations),
+		body,
 	))
+	r = r.WithContext(sentryintegration.WithHostedSentryWebhookLogged(r.Context()))
 
 	if len(integrations) == 0 {
 		s.claimPendingHostedSentryInstall(r, app, body)
@@ -163,6 +166,7 @@ func (s *Server) HandleSentryAppWebhook(w http.ResponseWriter, r *http.Request) 
 				summary.Action,
 				installationUUID,
 				integrationIDs(integrations),
+				body,
 			), err)
 			s.finishSentryWebhook(r, receiptID, summary, http.StatusInternalServerError, models.SentryWebhookOutcomeFailed, len(integrations))
 			http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -349,14 +353,14 @@ func isHostedSentryApp(integration *models.Integration) bool {
 	return metadata.HostedApp
 }
 
-func sentryAppWebhookFields(resource, action, installationUUID string, integrationIDs []string) log.Fields {
-	return log.Fields{
+func sentryAppWebhookFields(resource, action, installationUUID string, integrationIDs []string, body []byte) log.Fields {
+	return logging.WithWebhookPayload(log.Fields{
 		"hook_resource":     strings.TrimSpace(resource),
 		"action":            action,
 		"installation_uuid": installationUUID,
 		"integration_count": len(integrationIDs),
 		"integration_ids":   strings.Join(integrationIDs, ","),
-	}
+	}, body)
 }
 
 func integrationIDs(integrations []models.Integration) []string {

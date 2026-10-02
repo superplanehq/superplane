@@ -1,13 +1,17 @@
 package workers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	logrus "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -470,7 +474,14 @@ func Test__NodeExecutor_RecordsHostedCreditFailureReasonOnFactoryStep(t *testing
 			})
 
 			executor := newTestNodeExecutor(t, r)
+			logs := captureExecutorLogs(executor)
 			require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+			failure := actionFailureLog(t, logs)
+			assert.Equal(t, step.OrganizationID.String(), failure["organization_id"])
+			assert.Equal(t, step.FactoryID.String(), failure["factory_id"])
+			assert.Equal(t, step.WorkOrderID.String(), failure["order_id"])
+			assertRejectedHostedCredit(t, failure, step.OrganizationID, tc.err)
 
 			updatedExecution, err := models.FindNodeExecution(execution.WorkflowID, execution.ID)
 			require.NoError(t, err)
@@ -514,7 +525,15 @@ func Test__NodeExecutor_HostedCreditFailureOutsideFactoryStep(t *testing.T) {
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	executor := newTestNodeExecutor(t, r)
+	logs := captureExecutorLogs(executor)
 	require.NoError(t, executor.LockAndProcessNodeExecution(execution.ID))
+
+	failure := actionFailureLog(t, logs)
+	assert.Equal(t, r.Organization.ID.String(), failure["organization_id"])
+	_, hasFactory := failure["factory_id"]
+	_, hasOrder := failure["order_id"]
+	assert.False(t, hasFactory)
+	assert.False(t, hasOrder)
 
 	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
 	require.NoError(t, err)
@@ -553,6 +572,8 @@ func createFactoryStepNodeExecution(
 		[]models.Edge{},
 	)
 
+	require.NoError(t, database.Conn().Model(canvas).Update("factory_id", step.FactoryID).Error)
+
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().
@@ -564,4 +585,50 @@ func createFactoryStepNodeExecution(
 
 func stringPointer(value string) *string {
 	return &value
+}
+
+func assertRejectedHostedCredit(t *testing.T, failure map[string]any, orgID uuid.UUID, err error) {
+	t.Helper()
+
+	if !errors.Is(err, models.ErrHostedCreditEmpty) {
+		_, present := failure["remaining_micros"]
+		assert.False(t, present)
+		return
+	}
+
+	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	require.NoError(t, describeErr)
+	assert.Equal(t, float64(summary.RemainingMicros), failure["remaining_micros"])
+	assert.Equal(t, float64(summary.WelcomeRemainingMicros), failure["welcome_remaining_micros"])
+	assert.Equal(t, float64(summary.IncludedRemainingMicros), failure["included_remaining_micros"])
+	assert.Equal(t, float64(summary.PurchasedRemainingMicros), failure["topup_remaining_micros"])
+	assert.Equal(t, float64(summary.AdminRemainingMicros), failure["admin_remaining_micros"])
+}
+
+func captureExecutorLogs(executor *NodeExecutor) *bytes.Buffer {
+	buffer := &bytes.Buffer{}
+	logger := logrus.New()
+	logger.SetOutput(buffer)
+	logger.SetFormatter(&logrus.JSONFormatter{})
+	executor.logger = logger.WithField("worker", "NodeExecutor")
+	return buffer
+}
+
+func actionFailureLog(t *testing.T, buffer *bytes.Buffer) map[string]any {
+	t.Helper()
+
+	var failure map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(buffer.Bytes()), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var entry map[string]any
+		require.NoError(t, json.Unmarshal(line, &entry))
+		message, _ := entry["msg"].(string)
+		if strings.HasPrefix(message, "failed to execute action") {
+			failure = entry
+		}
+	}
+	require.NotNil(t, failure, "expected a failed to execute action log")
+	return failure
 }

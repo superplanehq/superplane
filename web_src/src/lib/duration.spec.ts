@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import {
   formatClockDuration,
   formatClockDurationLabel,
+  formatCompactDuration,
   formatDuration,
   formatGoDuration,
   formatGoDurationLabel,
@@ -74,6 +75,26 @@ describe("duration", () => {
     expect(formatMinutesSecondsDuration(51_988)).toBe("51s");
     expect(formatMinutesSecondsDuration(61_500)).toBe("1m 1s");
     expect(formatMinutesSecondsDuration(5_400_000)).toBe("90m");
+  });
+});
+
+describe("formatCompactDuration", () => {
+  const second = 1_000;
+  const minute = 60 * second;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+
+  it("keeps at most two units and steps min+sec, hour+min, day+hour, week+day", () => {
+    expect(formatCompactDuration(0)).toBe("");
+    expect(formatCompactDuration(482)).toBe("< 1s");
+    expect(formatCompactDuration(16 * second)).toBe("16s");
+    expect(formatCompactDuration(2 * minute + 5 * second)).toBe("2m 5s");
+    expect(formatCompactDuration(hour + 30 * minute + 40 * second)).toBe("1h 31m");
+    expect(formatCompactDuration(23 * hour + 13 * minute + 40 * second)).toBe("23h 14m");
+    expect(formatCompactDuration(day + 2 * hour + 12 * minute)).toBe("1d 2h");
+    expect(formatCompactDuration(week + 3 * day + 5 * hour)).toBe("1w 3d");
+    expect(formatCompactDuration(week)).toBe("1w");
   });
 });
 

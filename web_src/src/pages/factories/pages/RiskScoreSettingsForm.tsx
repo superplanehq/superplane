@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 import {
   draftWithRiskScoreCategories,
@@ -55,7 +56,7 @@ export function RiskScoreSettingsForm({
           <RiskScoreCategoryEditor categories={categories} onChange={setCategories} />
         </div>
       </div>
-      <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+      <ColumnAutomationFooterAction>
         <Button
           type="button"
           disabled={saving || categories.length === 0}
@@ -64,7 +65,7 @@ export function RiskScoreSettingsForm({
         >
           {saving ? RISK_SCORE_SETUP_COPY.saving : RISK_SCORE_SETUP_COPY.save}
         </Button>
-      </footer>
+      </ColumnAutomationFooterAction>
     </>
   );
 }

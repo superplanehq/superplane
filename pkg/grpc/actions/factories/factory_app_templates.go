@@ -27,6 +27,9 @@ var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\
 // defaultRiskScoreRules matches the setup page defaults. One line, so it stays inside the prompt block.
 const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2 (low). User interface changes = 2 (low). Additive database changes = 3 (medium). Dependency updates = 3 (medium). API behavior changes = 3 (medium). Authorization changes = 4 (high). Authentication changes = 4 (high). Data deletion or migration = 4 (high). Infrastructure changes = 4 (high). Billing and payment changes = 5 (critical). Secrets and credentials = 5 (critical)."
 
+// defaultMergeConfidenceChecks is every check, in prompt order. "none" turns them all off.
+const defaultMergeConfidenceChecks = "risk, performance, security, drift, reversibility"
+
 //go:embed templates/*.yaml
 var factoryTemplateFiles embed.FS
 
@@ -105,6 +108,32 @@ type factoryTemplateAgent struct {
 	planningModel             string
 	credentialSource          string
 	credentialIntegrationName string
+	llmProvider               string
+}
+
+func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
+	if agent == nil {
+		return nil
+	}
+	if agent.Component == models.SuperPlaneRunnerComponent {
+		return &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		}
+	}
+
+	integration, _ := agent.Credentials["integration"].(map[string]any)
+	name, _ := integration["name"].(string)
+	if name == "" {
+		return nil
+	}
+	return &factoryTemplateAgent{
+		component:                 agent.component(),
+		model:                     agent.model(),
+		credentialSource:          "integration",
+		credentialIntegrationName: name,
+		llmProvider:               agent.LLMProvider,
+	}
 }
 
 type materializedFactoryTemplate struct {
@@ -174,6 +203,9 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	}
 	if strings.TrimSpace(normalized["riskRules"]) == "" {
 		normalized["riskRules"] = defaultRiskScoreRules
+	}
+	if strings.TrimSpace(normalized["enabledChecks"]) == "" {
+		normalized["enabledChecks"] = defaultMergeConfidenceChecks
 	}
 	repository := strings.TrimSpace(normalized["repository"])
 	if repository == "" {
@@ -270,6 +302,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		delete(node.Configuration, "credentials")
 		delete(node.Configuration, "model")
 		delete(node.Configuration, "maxTurns")
+		delete(node.Configuration, "llmProvider")
 		return
 	}
 	node.Component = agent.component
@@ -282,6 +315,11 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		model = agent.planningModel
 	}
 	node.Configuration["model"] = models.ConcreteClaudeModelID(model, nil)
+	if agent.llmProvider == models.UsageProviderCustom {
+		node.Configuration["llmProvider"] = models.UsageProviderCustom
+	} else {
+		delete(node.Configuration, "llmProvider")
+	}
 }
 
 func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
@@ -333,6 +371,10 @@ func factoryTemplateInputFromRequest(req *pb.MaterializeFactoryAppTemplateReques
 			planningModel:             req.Agent.GetPlanningModel(),
 			credentialSource:          req.Agent.GetCredentialSource(),
 			credentialIntegrationName: req.Agent.GetCredentialIntegrationName(),
+		}
+		custom := integrations[models.CustomLLMAppName]
+		if agent.component == "runnerOpenRouter" && custom.name != "" && custom.name == agent.credentialIntegrationName {
+			agent.llmProvider = models.UsageProviderCustom
 		}
 	}
 	return factoryTemplateInput{
@@ -509,6 +551,9 @@ func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
 			return nil
 		}
 		agent := &factoryTemplateAgent{component: name, model: model}
+		if provider, _ := node.Configuration["llmProvider"].(string); provider == models.UsageProviderCustom {
+			agent.llmProvider = provider
+		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
 		agent.credentialSource, _ = credentials["source"].(string)
 		if integration, ok := credentials["integration"].(map[string]any); ok {
@@ -655,11 +700,15 @@ func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 			continue
 		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
-		return &intakeAgent{
+		agent := &intakeAgent{
 			Component:   node.ComponentName(),
 			Credentials: maps.Clone(credentials),
 			Model:       configString(node.Configuration, "model"),
 		}
+		if provider, _ := node.Configuration["llmProvider"].(string); provider == models.UsageProviderCustom {
+			agent.LLMProvider = provider
+		}
+		return agent
 	}
 	return nil
 }

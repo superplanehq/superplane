@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -16,11 +17,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-const factoryMergeabilityWebhookKey = "factoryMergeability"
+const (
+	factoryMergeabilityWebhookKey      = "factoryMergeability"
+	factoryMergeabilityRefreshAttempts = 3
+	factoryMergeabilityRefreshDelay    = 200 * time.Millisecond
+)
 
 var factoryMergeabilityGitHubEvents = []string{"check_run", "check_suite", "status", "pull_request"}
 
@@ -86,7 +92,7 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		if err := refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
+		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		}
 	}
@@ -112,7 +118,7 @@ func retryFactoryPullRequestMergeabilityRefresh(
 	organizationID, factoryID, pullRequestID uuid.UUID,
 ) {
 	var err error
-	for attempt := 1; attempt <= 3; attempt++ {
+	for attempt := 1; attempt <= factoryMergeabilityRefreshAttempts; attempt++ {
 		err = refreshFactoryPullRequestMergeabilityByID(ctx, deps, organizationID, factoryID, pullRequestID)
 		if err == nil {
 			return
@@ -122,9 +128,49 @@ func retryFactoryPullRequestMergeabilityRefresh(
 			attempt,
 			pullRequestID,
 		)
-		if attempt < 3 {
-			time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+		if errors.Is(err, errFactoryPullRequestMergeabilityUnavailable) &&
+			!errors.Is(err, errFactoryPullRequestMergeabilityTemporary) {
+			return
 		}
+		if attempt < factoryMergeabilityRefreshAttempts && !waitForFactoryMergeabilityRefresh(ctx, attempt) {
+			return
+		}
+	}
+}
+
+func refreshFactoryPullRequestMergeabilityWithRetry(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) error {
+	var err error
+	for attempt := 1; attempt <= factoryMergeabilityRefreshAttempts; attempt++ {
+		err = refreshFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		if err == nil || !errors.Is(err, errFactoryPullRequestMergeabilityTemporary) {
+			return err
+		}
+		log.WithError(err).Warnf(
+			"factory mergeability: refresh attempt %d failed for pull request %s",
+			attempt,
+			pullRequest.ID,
+		)
+		if attempt < factoryMergeabilityRefreshAttempts && !waitForFactoryMergeabilityRefresh(ctx, attempt) {
+			return ctx.Err()
+		}
+	}
+	return err
+}
+
+func waitForFactoryMergeabilityRefresh(ctx context.Context, attempt int) bool {
+	timer := time.NewTimer(time.Duration(attempt) * factoryMergeabilityRefreshDelay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 
@@ -162,8 +208,12 @@ func refreshFactoryPullRequestMergeability(
 	pullRequest *models.FactoryPullRequest,
 ) error {
 	before := storedFactoryPullRequestMergeability(pullRequest)
-	if _, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); err != nil {
+	result, err := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	if err != nil {
 		return fmt.Errorf("failed to refresh pull request %s: %w", pullRequest.ID, err)
+	}
+	if result != nil && result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
+		return unavailableFactoryPullRequestMergeabilityError(pullRequest.ID, result.canRetry)
 	}
 	if storedFactoryPullRequestMergeability(pullRequest) == before {
 		return nil
@@ -191,16 +241,24 @@ func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest
 	}
 }
 
+type githubWebhookUser struct {
+	Login   string `json:"login"`
+	HTMLURL string `json:"html_url"`
+	Name    string `json:"name"`
+}
+
 type githubMergeabilityWebhookPayload struct {
 	Action     string `json:"action"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
+	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
-		Number   int64  `json:"number"`
-		Merged   bool   `json:"merged"`
-		MergedAt string `json:"merged_at"`
-		ClosedAt string `json:"closed_at"`
+		Number   int64              `json:"number"`
+		Merged   bool               `json:"merged"`
+		MergedAt string             `json:"merged_at"`
+		ClosedAt string             `json:"closed_at"`
+		MergedBy *githubWebhookUser `json:"merged_by"`
 		Head     struct {
 			SHA string `json:"sha"`
 		} `json:"head"`

@@ -2,12 +2,11 @@ import { Badge } from "@/components/reui/badge";
 
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage } from "./automationsViewModel";
-import { outputCountLabel, stepOutputSummary } from "./consoleCardText";
+import { outputCountLabel } from "./consoleCardText";
 import { consolePages } from "./consolePages";
 
 /**
- * Collapsed-card counts. Same three facts as the open-card tabs:
- * agent runs, artifacts, and checks. Badges only — no hover card.
+ * Collapsed-card count of agent runs. Badges only — no hover card.
  */
 export function StepOutputCounts({
   stage,
@@ -19,19 +18,12 @@ export function StepOutputCounts({
   runs?: AutomationStage[];
 }) {
   const runCount = consolePages(stage, phase, runs).includes("agent") ? runs.length : 0;
-  const summary = stepOutputSummary(stage, runCount);
-  if (summary.runCount === 0 && summary.artifactCount === 0 && summary.checkCount === 0) {
+  if (runCount === 0) {
     return null;
   }
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      {summary.runCount > 0 ? (
-        <CountBadge label={outputCountLabel(summary.runCount, "agent run", "agent runs")} />
-      ) : null}
-      {summary.artifactCount > 0 ? (
-        <CountBadge label={outputCountLabel(summary.artifactCount, "artifact", "artifacts")} />
-      ) : null}
-      {summary.checkCount > 0 ? <CountBadge label={outputCountLabel(summary.checkCount, "check", "checks")} /> : null}
+      <CountBadge label={outputCountLabel(runCount, "agent run", "agent runs")} />
     </div>
   );
 }

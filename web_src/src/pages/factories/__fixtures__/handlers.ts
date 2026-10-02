@@ -125,6 +125,21 @@ function takenFactoryKeys(factories: FactoriesFactory[]): Set<string> {
   return new Set(factories.map((factory) => factory.key).filter((key): key is string => Boolean(key)));
 }
 
+function unusedFactoryUrlId(factories: FactoriesFactory[]): string {
+  const taken = new Set(factories.map((factory) => factory.urlId).filter((id): id is string => Boolean(id)));
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    let candidate = "";
+    for (let i = 0; i < 8; i += 1) {
+      candidate += alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+    }
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+  return "zzzzzzzz";
+}
+
 /** Same letter-only keys the live API derives when the client omits `key`. */
 function unusedFactoryKey(factories: FactoriesFactory[], name: string, requestedKey: string): string {
   const taken = takenFactoryKeys(factories);
@@ -156,6 +171,7 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
         id: `storybook-factory-${fixture.factories.length + 1}`,
         name,
         key: unusedFactoryKey(fixture.factories, name, stringOrEmpty(request.key)),
+        urlId: unusedFactoryUrlId(fixture.factories),
         description: stringOrEmpty(request.description),
         lines: [],
         onboarding: {},

@@ -8,18 +8,19 @@ import {
   useUpdateFactory,
 } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } from "@/hooks/useFactoryIntakeData";
-import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
+import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_ORGANIZATION_BYOK } from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
+import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
+import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
 import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
@@ -286,11 +287,26 @@ export function useOnboardingPageModel(args: {
 }) {
   const { canAct } = usePermissions();
   const bringYourOwnKey = useExperimentalFeature(args.organizationId);
+  const customProvider =
+    bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
   const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey);
+  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
+  const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
+    enabled: Boolean(args.organizationId),
+  });
+  const existingIntegrationNames = useMemo(
+    () =>
+      new Set(
+        connectedIntegrations
+          .map((item) => item.metadata?.name?.trim())
+          .filter((name): name is string => Boolean(name)),
+      ),
+    [connectedIntegrations],
+  );
+  const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
     remainingCreditCents: agent.remainingCreditCents,
@@ -334,6 +350,17 @@ export function useOnboardingPageModel(args: {
     agent,
   });
 
+  const requestConnect = (id: IntegrationId) => {
+    if (id !== "customLlm" || !customProvider) return connect.requestConnect(id);
+    const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
+    if (existing) {
+      integrations.setSelections(existing);
+      return true;
+    }
+    setCustomProviderDialogOpen(true);
+    return false;
+  };
+
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
@@ -341,14 +368,23 @@ export function useOnboardingPageModel(args: {
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
     bringYourOwnKeyLoading: bringYourOwnKey.isLoading,
+    customProvider,
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,
-    requestConnect: connect.requestConnect,
+    requestConnect,
     selectCatalogRepository: wired.selectCatalogRepository,
-    integrationDialogs: connect.dialogs,
+    integrationDialogs: createElement(OnboardingConnectDialogs, {
+      connectDialogs: connect.dialogs,
+      customProviderOpen: customProviderDialogOpen,
+      organizationId: args.organizationId,
+      existingNames: existingIntegrationNames,
+      selections: integrations.selections,
+      onSelectionsChange: integrations.setSelections,
+      onCloseCustomProvider: () => setCustomProviderDialogOpen(false),
+    }),
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || wired.installer.isInstalling || wired.createIntake.isPending,
     ...wired.saves,

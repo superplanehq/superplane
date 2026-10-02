@@ -37,7 +37,6 @@ function analysisProtocol(env = process.env) {
         "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
         "Call propose_clarity every turn with a 1 through 5 score and a short summary. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Each summary is one chip, not the plan.",
       )
-      .replace("propose_spec, propose_clarity, and propose_confidence again", "propose_spec and propose_clarity again")
       .replace("the spec and the scores", "the spec and the Clarity score");
   } else if (!clarity && confidence) {
     text = text
@@ -49,7 +48,6 @@ function analysisProtocol(env = process.env) {
         "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
         "Call propose_confidence every turn with a 1 through 5 score and a short summary. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
       )
-      .replace("propose_spec, propose_clarity, and propose_confidence again", "propose_spec and propose_confidence again")
       .replace("the spec and the scores", "the spec and the Confidence score");
   } else {
     text = text
@@ -61,7 +59,6 @@ function analysisProtocol(env = process.env) {
         "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.\n\n",
         "",
       )
-      .replace("propose_spec, propose_clarity, and propose_confidence again", "propose_spec again")
       .replace("the spec and the scores", "the spec");
   }
   if (!clarity) {

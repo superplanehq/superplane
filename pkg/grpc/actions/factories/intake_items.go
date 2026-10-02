@@ -299,21 +299,29 @@ func jiraIssueProjectKey(issueKey string) string {
 func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
 	title := jiraIssueSummary(hit.Fields)
 	return IntakeItem{
-		ID:    hit.Key,
-		Key:   hit.Key,
-		Title: title,
-		URL:   jira.IssueURL(siteURL, hit.Key),
+		ID:        hit.Key,
+		Key:       hit.Key,
+		Title:     title,
+		URL:       jira.IssueURL(siteURL, hit.Key),
+		CreatedAt: jiraIssueCreatedTime(hit.Fields),
 	}
 }
 
 func jiraIssueFromFullIssue(issue *jira.Issue, siteURL string) IntakeItem {
 	return IntakeItem{
-		ID:    issue.Key,
-		Key:   issue.Key,
-		Title: jiraIssueSummary(issue.Fields),
-		Body:  jira.IssueDescriptionText(issue),
-		URL:   jira.IssueURL(siteURL, issue.Key),
+		ID:        issue.Key,
+		Key:       issue.Key,
+		Title:     jiraIssueSummary(issue.Fields),
+		Body:      jira.IssueDescriptionText(issue),
+		URL:       jira.IssueURL(siteURL, issue.Key),
+		CreatedAt: jiraIssueCreatedTime(issue.Fields),
 	}
+}
+
+func jiraIssueCreatedTime(fields map[string]any) time.Time {
+	raw, _ := fields["created"].(string)
+	createdAt, _ := jira.ParseJiraDateTime(raw)
+	return createdAt
 }
 
 func jiraIssueSummary(fields map[string]any) string {
@@ -800,15 +808,17 @@ func (s *sentryIntakeItemSource) ownsIssue(issue *sentry.Issue) bool {
 }
 
 func sentryIssueItem(issue sentry.Issue) IntakeItem {
+	createdAt, _ := time.Parse(time.RFC3339, issue.FirstSeen)
 	issueURL := strings.TrimSpace(issue.Permalink)
 	if issueURL == "" {
 		issueURL = strings.TrimSpace(issue.WebURL)
 	}
 	return IntakeItem{
-		ID:    issue.ID,
-		Key:   issue.ShortID,
-		Title: issue.Title,
-		URL:   issueURL,
+		ID:        issue.ID,
+		Key:       issue.ShortID,
+		Title:     issue.Title,
+		URL:       issueURL,
+		CreatedAt: createdAt,
 	}
 }
 
@@ -867,11 +877,12 @@ func datadogServiceSearchQuery(service, query string) string {
 
 func datadogIssueItem(client *datadog.Client, issue datadog.ErrorTrackingIssue) IntakeItem {
 	return IntakeItem{
-		ID:    issue.ID,
-		Key:   issue.Service,
-		Title: issue.IssueTitle(),
-		Body:  strings.TrimSpace(issue.ErrorMessage),
-		URL:   client.IssueURL(issue.ID),
+		ID:        issue.ID,
+		Key:       issue.Service,
+		Title:     issue.IssueTitle(),
+		Body:      strings.TrimSpace(issue.ErrorMessage),
+		URL:       client.IssueURL(issue.ID),
+		CreatedAt: issue.FirstSeen,
 	}
 }
 
@@ -932,11 +943,12 @@ func gitHubIssueItems(issues []*github.Issue, limit int) []IntakeItem {
 
 func gitHubIssueItem(issue *github.Issue) IntakeItem {
 	return IntakeItem{
-		ID:    strconv.Itoa(issue.GetNumber()),
-		Key:   fmt.Sprintf("#%d", issue.GetNumber()),
-		Title: issue.GetTitle(),
-		Body:  issue.GetBody(),
-		URL:   issue.GetHTMLURL(),
+		ID:        strconv.Itoa(issue.GetNumber()),
+		Key:       fmt.Sprintf("#%d", issue.GetNumber()),
+		Title:     issue.GetTitle(),
+		Body:      issue.GetBody(),
+		URL:       issue.GetHTMLURL(),
+		CreatedAt: issue.GetCreatedAt().Time,
 	}
 }
 

@@ -60,6 +60,7 @@ import {
   type BacklogAnalysisRun,
 } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
+import { closureCardDescription } from "./closureCardText";
 import {
   buildSplitRunFooter,
   doneFooterForStatus,
@@ -69,6 +70,7 @@ import {
   type SplitRunFooterKind,
   type SplitRunFooterTone,
 } from "./splitRunFooter";
+import type { SplitRunFooterCloser } from "./splitRunFooterActor";
 import { intakeTicketAnalysisFixture, type LineIntakeAnalyzingTicket } from "../lineIntakeModel";
 import { implementationPlanMarkdown, reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
@@ -101,6 +103,8 @@ export interface SplitRunStreamLine {
   /** Whether the displayed duration should keep ticking. Defaults to a running status. */
   durationRunning?: boolean;
   detail?: string;
+  commandScript?: string;
+  commandStdout?: string;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
   /** Agent transcript line. No checkmark. */
@@ -140,6 +144,8 @@ export interface SplitRunPhase {
   durationRunning?: boolean;
   /** When this automation started. */
   startedAt?: string;
+  /** When this automation finished. Used for board-column dwell. */
+  endedAt?: string;
   /** Component that ran or is running in this phase. */
   componentName: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -405,7 +411,7 @@ export type SplitRunFixtureOptions = {
   /** Person who stopped the current automation, when known. */
   stoppedBy?: OrgUserDisplay;
   /** Person or automation that closed the task, when known. */
-  closer?: { actor?: OrgUserDisplay; automationName?: string };
+  closer?: SplitRunFooterCloser;
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
   /**
@@ -499,7 +505,7 @@ function reviewSurfaces(
     hideWaitingDecision?: boolean;
     fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
-    closer?: { actor?: OrgUserDisplay; automationName?: string };
+    closer?: SplitRunFooterCloser;
     analysisRuns?: BacklogAnalysisRun[];
     isAnalyzing?: boolean;
   },
@@ -746,13 +752,12 @@ const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "r
 function closurePhaseForOrder(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
-  closer?: { actor?: OrgUserDisplay; automationName?: string },
+  closer?: SplitRunFooterCloser,
 ): SplitRunPhase[] {
   if (!CLOSED_DISPLAY_STATUSES.has(displayStatus)) {
     return [];
   }
-  const note = doneFooterForStatus(displayStatus, closer).note;
-  const sentence = note ? `${note.actor?.name ? `${note.actor.name} ` : ""}${note.headline}.` : undefined;
+  const sentence = closureCardDescription(displayStatus, closer, order.pullRequests);
   return [
     {
       id: SPLIT_RUN_CLOSURE_PHASE_ID,
@@ -1545,7 +1550,8 @@ function executionToPhase(
     name,
     status,
     duration,
-    startedAt: execution.createdAt,
+    startedAt: execution.createdAt || execution.updatedAt,
+    endedAt: endedAtForExecution(execution, status),
     componentName,
     artifacts,
     checks: checksForLineExecution(execution, apiChecks, demoArtifacts),
@@ -1708,6 +1714,14 @@ function dispatchForExecution(order: FactoriesWorkOrder, execution: FactoriesWor
   return (order.lineDispatches ?? []).find((dispatch) =>
     (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
   );
+}
+
+function endedAtForExecution(execution: FactoriesWorkOrderExecution, status: SplitRunPhaseStatus): string | undefined {
+  if (status === "running" || status === "pending") {
+    return undefined;
+  }
+  const value = execution.finishedAt || execution.updatedAt;
+  return Date.parse(value ?? "") ? value : undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

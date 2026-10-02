@@ -14,13 +14,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ModelAllowlistEditor } from "@/pages/organization/settings/ModelAllowlistEditor";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
-import { byokProviderProductName, ORGANIZATION_LLM_MODELS_COPY as COPY } from "./organizationLLMModelsCopy";
+import {
+  byokProviderProductName,
+  CUSTOM_LLM_API_TYPES,
+  ORGANIZATION_LLM_MODELS_COPY as COPY,
+} from "./organizationLLMModelsCopy";
 
-export type LLMModelsSwitchProvider = "anthropic" | "openai" | "openrouter";
+export type LLMModelsSwitchProvider = "anthropic" | "openai" | "openrouter" | "custom";
+
+export type CustomProviderConnection = {
+  apiKey: string;
+  baseUrl: string;
+  apiType: string;
+};
 
 export type LLMModelsSwitchTarget = "hosted" | LLMModelsSwitchProvider;
 
@@ -41,6 +52,7 @@ const PROVIDER_MODELS: Record<LLMModelsSwitchProvider, string[]> = {
   anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
   openai: ["gpt-5", "gpt-4.1"],
   openrouter: ["anthropic/claude-sonnet-4-6", "openai/gpt-5"],
+  custom: [],
 };
 
 export interface FactorySettingsLLMModelsSwitchPreviewProps {
@@ -239,6 +251,8 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
     setSaved(false);
   }, [provider, modelIds]);
 
+  const allSelected = modelIds.length > 0 && modelIds.every((model) => selected.includes(model));
+
   return (
     <div className="space-y-3">
       <ModelAllowlistEditor
@@ -251,9 +265,15 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
           setSaved(false);
           setSelected((current) => (checked ? [...current, model] : current.filter((id) => id !== model)));
         }}
+        onBulkToggle={() => {
+          setDirty(true);
+          setSaved(false);
+          setSelected(allSelected ? [] : [...modelIds]);
+        }}
         disabled={false}
         searchLabel={`Search ${byokProviderProductName(provider)} models`}
         showCount
+        showBulkToggle
       />
       <div className="flex items-center gap-3">
         <Button
@@ -283,6 +303,7 @@ export function SwitchDialog({
   onContinueToKey,
   onBackToWarning,
   onSaveKey,
+  onSaveCustom,
   onSwitchToHosted,
 }: {
   source: "hosted" | LLMModelsSwitchProvider;
@@ -291,92 +312,212 @@ export function SwitchDialog({
   onContinueToKey: () => void;
   onBackToWarning: () => void;
   onSaveKey: (apiKey: string) => void;
+  onSaveCustom?: (connection: CustomProviderConnection) => void;
   onSwitchToHosted: () => void;
 }) {
-  const [apiKey, setApiKey] = useState("");
   const current = sourceLabel(source);
   const next = dialog ? sourceLabel(dialog.target) : "";
-  const open = dialog !== null;
-
-  useEffect(() => {
-    if (dialog?.step !== "key") {
-      setApiKey("");
-    }
-  }, [dialog?.target, dialog?.step]);
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
+      open={dialog !== null}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
           onCancel();
         }
       }}
     >
       <DialogContent data-testid="llm-models-switch-dialog">
         {dialog?.step === "warn" ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Switch automations to {next}?</DialogTitle>
-              <DialogDescription>
-                This replaces the {current} agent in every automation in this workspace with the {next} agent.{" "}
-                {dialog.target === "hosted" ? "SuperPlane bills these runs." : `${next} bills these runs.`}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Keep {current}
-              </Button>
-              {dialog.target === "hosted" ? (
-                <Button type="button" onClick={onSwitchToHosted}>
-                  Switch to SuperPlane
-                </Button>
-              ) : (
-                <Button type="button" onClick={onContinueToKey}>
-                  Switch to {next}
-                </Button>
-              )}
-            </DialogFooter>
-          </>
+          <SwitchWarning
+            current={current}
+            next={next}
+            target={dialog.target}
+            onCancel={onCancel}
+            onContinueToKey={onContinueToKey}
+            onSwitchToHosted={onSwitchToHosted}
+          />
         ) : null}
-        {dialog?.step === "key" ? (
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (apiKey.trim() === "") {
-                return;
-              }
-              onSaveKey(apiKey.trim());
-              setApiKey("");
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Your {next} key</DialogTitle>
-              <DialogDescription>SuperPlane stores this key for agents in this workspace.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="llm-models-switch-api-key">{next} API key</Label>
-              <Input
-                id="llm-models-switch-api-key"
-                data-testid="llm-models-switch-api-key"
-                type="password"
-                autoComplete="off"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onBackToWarning}>
-                Back
-              </Button>
-              <Button type="submit" disabled={apiKey.trim() === ""}>
-                Save and switch
-              </Button>
-            </DialogFooter>
-          </form>
+        {dialog?.step === "key" && dialog.target === "custom" ? (
+          <CustomProviderKeyStep onBack={onBackToWarning} onSaveKey={onSaveKey} onSaveCustom={onSaveCustom} />
+        ) : null}
+        {dialog?.step === "key" && dialog.target !== "custom" ? (
+          <ProviderKeyStep providerName={next} onBack={onBackToWarning} onSaveKey={onSaveKey} />
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SwitchWarning({
+  current,
+  next,
+  target,
+  onCancel,
+  onContinueToKey,
+  onSwitchToHosted,
+}: {
+  current: string;
+  next: string;
+  target: LLMModelsSwitchTarget;
+  onCancel: () => void;
+  onContinueToKey: () => void;
+  onSwitchToHosted: () => void;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Switch automations to {next}?</DialogTitle>
+        <DialogDescription>
+          This replaces the {current} agent in every automation in this workspace with the {next} agent.{" "}
+          {target === "hosted" ? "SuperPlane bills these runs." : `${next} bills these runs.`}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Keep {current}
+        </Button>
+        {target === "hosted" ? (
+          <Button type="button" onClick={onSwitchToHosted}>
+            Switch to SuperPlane
+          </Button>
+        ) : (
+          <Button type="button" onClick={onContinueToKey}>
+            Switch to {next}
+          </Button>
+        )}
+      </DialogFooter>
+    </>
+  );
+}
+
+function CustomProviderKeyStep({
+  onBack,
+  onSaveKey,
+  onSaveCustom,
+}: {
+  onBack: () => void;
+  onSaveKey: (apiKey: string) => void;
+  onSaveCustom?: (connection: CustomProviderConnection) => void;
+}) {
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiType, setApiType] = useState("");
+  const ready = apiKey.trim() !== "" && baseUrl.trim() !== "" && apiType !== "";
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!ready) return;
+        const connection = { apiKey: apiKey.trim(), baseUrl: baseUrl.trim(), apiType };
+        if (onSaveCustom) {
+          onSaveCustom(connection);
+        } else {
+          onSaveKey(connection.apiKey);
+        }
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Custom provider</DialogTitle>
+        <DialogDescription>
+          Set the provider URL, token, and API type. SuperPlane stores the token for agents in this workspace.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-2">
+        <Label htmlFor="llm-models-custom-url">API URL</Label>
+        <Input
+          id="llm-models-custom-url"
+          data-testid="llm-models-custom-url"
+          type="url"
+          autoComplete="off"
+          placeholder="https://example.com/v1"
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="llm-models-custom-token">API token</Label>
+        <Input
+          id="llm-models-custom-token"
+          data-testid="llm-models-custom-token"
+          type="password"
+          autoComplete="off"
+          value={apiKey}
+          onChange={(event) => setApiKey(event.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="llm-models-custom-api-type">API type</Label>
+        <Select value={apiType} onValueChange={setApiType}>
+          <SelectTrigger id="llm-models-custom-api-type" data-testid="llm-models-custom-api-type">
+            <SelectValue placeholder="Select an API type" />
+          </SelectTrigger>
+          <SelectContent>
+            {CUSTOM_LLM_API_TYPES.map((type) => (
+              <SelectItem key={type.id} value={type.id}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <Button type="submit" disabled={!ready}>
+          Save and switch
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function ProviderKeyStep({
+  providerName,
+  onBack,
+  onSaveKey,
+}: {
+  providerName: string;
+  onBack: () => void;
+  onSaveKey: (apiKey: string) => void;
+}) {
+  const [apiKey, setApiKey] = useState("");
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (apiKey.trim() === "") return;
+        onSaveKey(apiKey.trim());
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Your {providerName} key</DialogTitle>
+        <DialogDescription>SuperPlane stores this key for agents in this workspace.</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-2">
+        <Label htmlFor="llm-models-switch-api-key">{providerName} API key</Label>
+        <Input
+          id="llm-models-switch-api-key"
+          data-testid="llm-models-switch-api-key"
+          type="password"
+          autoComplete="off"
+          value={apiKey}
+          onChange={(event) => setApiKey(event.target.value)}
+        />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <Button type="submit" disabled={apiKey.trim() === ""}>
+          Save and switch
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

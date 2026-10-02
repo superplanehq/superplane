@@ -137,7 +137,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   }),
   "risk-score": buildEventApp({
     id: "risk-score",
-    title: "Risk score",
+    title: "Merge confidence",
     description: "Score a pull request when it opens or updates.",
     triggerNodeId: "on-pr-risk",
   }),

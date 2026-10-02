@@ -1374,7 +1374,7 @@ func (c *Client) searchIssuesPage(jql, nextPageToken string, maxResults int) (is
 	body := jiraSearchPOSTBody{
 		JQL:           jql,
 		MaxResults:    maxResults,
-		Fields:        []string{"summary"},
+		Fields:        []string{"summary", "created"},
 		NextPageToken: nextPageToken,
 	}
 	bodyBytes, err := json.Marshal(body)

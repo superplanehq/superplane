@@ -2,17 +2,30 @@ const BYOK_PROVIDER_PRODUCT_NAMES: Record<string, string> = {
   anthropic: "Claude",
   openai: "OpenAI",
   openrouter: "OpenRouter",
+  custom: "Custom provider",
 };
+
+export const CUSTOM_LLM_API_TYPES = [
+  { id: "anthropic", label: "Anthropic" },
+  { id: "openai", label: "OpenAI" },
+  { id: "openai-compatible", label: "OpenAI-compatible" },
+] as const;
 
 export function byokProviderProductName(provider: string): string {
   return BYOK_PROVIDER_PRODUCT_NAMES[provider] ?? provider;
 }
 
 export function providerKeyHeading(provider: string): string {
+  if (provider === "custom") {
+    return "Your custom provider";
+  }
   return `Your ${byokProviderProductName(provider)} key`;
 }
 
 export function providerKeyIntegrationLink(provider: string): string {
+  if (provider === "custom") {
+    return "Open integration";
+  }
   return `Open ${byokProviderProductName(provider)} integration`;
 }
 

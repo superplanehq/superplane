@@ -1,8 +1,15 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
-const { useCanvasRuntimeWebsocketMock } = vi.hoisted(() => ({
+type DescribeRunQuery = {
+  data: { run?: { rootEvent?: { id?: string } } } | undefined;
+  isError: boolean;
+  isLoading: boolean;
+};
+
+const { useCanvasRuntimeWebsocketMock, useDescribeRunMock } = vi.hoisted(() => ({
   useCanvasRuntimeWebsocketMock: vi.fn(),
+  useDescribeRunMock: vi.fn((): DescribeRunQuery => ({ data: undefined, isError: false, isLoading: false })),
 }));
 
 vi.mock("@/hooks/useCanvasWebsocket", () => ({
@@ -11,7 +18,7 @@ vi.mock("@/hooks/useCanvasWebsocket", () => ({
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: undefined, isError: false, isLoading: false }),
-  useDescribeRun: () => ({ data: undefined, isError: false, isLoading: false }),
+  useDescribeRun: useDescribeRunMock,
 }));
 
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
@@ -19,6 +26,7 @@ import type { SplitRunPhase } from "./splitRunMocks";
 
 afterEach(() => {
   vi.clearAllMocks();
+  useDescribeRunMock.mockReturnValue({ data: undefined, isError: false, isLoading: false });
 });
 
 const PHASE: SplitRunPhase = {
@@ -52,6 +60,18 @@ describe("useSplitRunLiveCanvas", () => {
     );
 
     expect(useCanvasRuntimeWebsocketMock).toHaveBeenCalledWith("canvas-fb", "org-1", true);
+  });
+
+  it("returns the root event id from the describe-run payload", () => {
+    useDescribeRunMock.mockReturnValue({
+      data: { run: { rootEvent: { id: "event-root" } } },
+      isError: false,
+      isLoading: false,
+    });
+
+    const { result } = renderHook(() => useSplitRunLiveCanvas("org-1", PHASE));
+
+    expect(result.current.rootEventId).toBe("event-root");
   });
 
   it("keeps the canvas websocket closed when the live app is missing", () => {

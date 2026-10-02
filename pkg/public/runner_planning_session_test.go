@@ -3,14 +3,17 @@ package public
 import (
 	"bytes"
 	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -392,6 +395,117 @@ func TestWritePlanningWaitError(t *testing.T) {
 		event := requireCapturedException(t, transport.Events())
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
 	})
+
+	t.Run("dropped database connection returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("lookup: %w", errors.New("pgproto3.writeError: write failed: write tcp 10.96.2.5:43492->10.32.160.2:5432: write: connection reset by peer"))
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("wrapped postgres connection reset returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+		lookupReset := fmt.Errorf("pgproto3.writeError: write failed: %w", &net.OpError{
+			Op:  "write",
+			Net: "tcp",
+			Err: syscall.ECONNRESET,
+		})
+
+		writePlanningWaitError(rec, req, session, lookupReset)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("bad database connection returns pending", func(t *testing.T) {
+		hook := logtest.NewGlobal()
+		t.Cleanup(func() { hook.Reset() })
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, fmt.Errorf("lookup: %w", driver.ErrBadConn))
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, "pending", body["status"])
+		assert.Empty(t, transport.Events())
+		for _, entry := range hook.AllEntries() {
+			assert.NotEqual(t, log.ErrorLevel, entry.Level)
+		}
+	})
+
+	t.Run("blob connection reset stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+		blobReset := fmt.Errorf("download url: %w", &net.OpError{
+			Op:  "read",
+			Net: "tcp",
+			Err: syscall.ECONNRESET,
+		})
+
+		writePlanningWaitError(rec, req, session, blobReset)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("deadlock with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+		deadlock := fmt.Errorf("lookup: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
+
+		writePlanningWaitError(rec, req, session, deadlock)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
+
+	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
+		transport := bindTestSentryHub(t)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)
+		req.Pattern = "/api/v1/runner/planning-sessions/wait"
+		rec := httptest.NewRecorder()
+
+		writePlanningWaitError(rec, req, session, errors.New("lookup failed"))
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.Equal(t, "Lookup failed\n", rec.Body.String())
+		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+	})
 }
 
 func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
@@ -492,55 +606,6 @@ func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
 	assert.Equal(t, models.PlanningSessionMessageRoleAgent, messages[0].Role)
 	assert.Equal(t, "I found the retry seam in billing/retry.go.", messages[0].Text)
 	assert.True(t, messages[0].Delivered)
-}
-
-func TestRunnerPlanningSessionCreatesSplitTask(t *testing.T) {
-	r := support.Setup(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-
-	body := `{"title":"Add the retry table","description":"Schema and migration only."}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code, "no user reply yet, so nothing confirms a split")
-	assert.Contains(t, rec.Body.String(), "user has not replied")
-
-	require.NoError(t, session.SendUserMessage(db, "Split: table first. Yes.", r.User))
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec = httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-
-	var response struct {
-		Status      string `json:"status"`
-		WorkOrderID string `json:"work_order_id"`
-		Key         string `json:"key"`
-		Title       string `json:"title"`
-	}
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, "created", response.Status)
-	assert.Equal(t, "Add the retry table", response.Title)
-
-	split, err := session.SplitTaskOrders(db)
-	require.NoError(t, err)
-	require.Len(t, split, 1)
-	assert.Equal(t, split[0].ID.String(), response.WorkOrderID)
-	assert.Equal(t, factoryModel.WorkOrderKey(split[0].Number), response.Key)
-	assert.Equal(t, "Schema and migration only.", split[0].Description)
-
-	messages, err := models.ListPlanningSessionMessages(db, session.ID)
-	require.NoError(t, err)
-	require.Len(t, messages, 2)
-	assert.Equal(t, models.PlanningSessionMessageRoleTask, messages[1].Role)
-
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(`{"title":"","description":"x"}`)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec = httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
 func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
@@ -712,6 +777,37 @@ func TestRunnerPlanningSessionRejectsRunMismatch(t *testing.T) {
 		server.Router.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 	}
+}
+
+func TestRunnerPlanningWaitRestoresResultAfterConsumeCommitDrop(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	requireResolvedMessageWait(t, db, session)
+
+	result, consumed, err := consumeResolvedWait(session, db)
+	require.NoError(t, err)
+	require.True(t, consumed)
+	assert.Equal(t, models.PlanningWaitKindMessage, result.Kind)
+
+	idle, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitIdle, idle.WaitState)
+
+	restorePlanningWait(idle, result)
+	held, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitResolved, held.WaitState)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "Add refund retries.", delivered["text"])
 }
 
 func TestConsumeResolvedWaitTreatsDoubleConsumeAsMiss(t *testing.T) {

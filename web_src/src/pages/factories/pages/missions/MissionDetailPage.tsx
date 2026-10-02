@@ -28,7 +28,7 @@ import { MissionWorkOrderList } from "./MissionWorkOrderList";
 /** Storybook-only mission detail. Open one mission and see its tasks. */
 export function MissionDetailPage() {
   const { missionId } = useParams<{ missionId: string }>();
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const assignment = useOptionalMissionAssignment();
   const missions = assignment?.missions ?? SEEDED_MISSIONS;
   const {
@@ -37,7 +37,7 @@ export function MissionDetailPage() {
     error: workOrdersError,
     refetch,
   } = useFactoryWorkOrders(organizationId, factoryId);
-  const listHref = workOrdersPath(organizationId, factoryKey);
+  const listHref = workOrdersPath(organizationId, routeSegment);
 
   if (!missionId) {
     return <Navigate to={listHref} replace />;
@@ -75,7 +75,7 @@ export function MissionDetailPage() {
   return (
     <MissionDetailLoadedView
       organizationId={organizationId}
-      factoryKey={factoryKey}
+      factoryKey={routeSegment}
       factory={factory}
       mission={mission}
       workOrders={workOrders}

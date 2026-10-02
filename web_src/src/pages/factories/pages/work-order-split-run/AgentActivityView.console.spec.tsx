@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "bun:test";
 
+import { formatDuration } from "@/lib/duration";
+
 import type { AgentActivity, AgentToolItem } from "./agentActivity";
 import { AgentActivityView } from "./AgentActivityView";
 
@@ -37,12 +39,14 @@ describe("AgentActivityView console", () => {
         activity={activityWith({
           ...completedTool("command-1", "bash", "Bash"),
           input: "cd /tmp/opencode && curl -fL bun.zip\nunzip bun.zip",
+          durationMs: 2_400,
         })}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Researched 1 source" }));
+    expect(screen.queryByRole("button", { name: "Researched 1 source" })).not.toBeInTheDocument();
     expect(screen.getByText("2 lines")).toBeInTheDocument();
+    expect(screen.getByText(formatDuration(2_400, { precision: "second" }))).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "curl -fL bun.zip" }));
 
     const command = screen.getByTestId("agent-tool-command-1");
@@ -67,7 +71,7 @@ describe("AgentActivityView console", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Researched 1 source" }));
+    expect(screen.queryByRole("button", { name: "Researched 1 source" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "curl -fL bun.zip" }));
     expect(screen.getByTestId("agent-tool-command-1").textContent).toBe(script);
   });
@@ -116,7 +120,7 @@ describe("AgentActivityView console", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
+    expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
     );
@@ -125,8 +129,47 @@ describe("AgentActivityView console", () => {
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
-  it("collapses carriage-return progress into finished output lines", async () => {
+  it("shows a multi-line bash script and its output in one block", async () => {
     const user = userEvent.setup();
+    const script = [
+      "set -euo pipefail",
+      "",
+      "# Identify commits as SuperPlane Agent.",
+      'git config --global user.email "superplaneagent@superplane.com"',
+      'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo',
+    ].join("\n");
+    const stdout = "Cloning into 'repo'...\nremote: Enumerating objects: 9384, done.";
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: script,
+          output: stdout,
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
+    expect(screen.getByText("4 lines")).toBeInTheDocument();
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
+    );
+
+    const command = screen.getByTestId("agent-tool-command-1");
+    const output = screen.getByText(/Cloning into 'repo'/);
+    expect(command.textContent).toBe(script);
+    expect(command.textContent).not.toContain("Cloning into");
+    expect(command).toHaveClass("text-foreground/90");
+    expect(output).toHaveClass("text-muted-foreground");
+    expect(output.parentElement).toBe(command.parentElement);
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
+  });
+
+  it("collapses carriage-return progress into finished output lines", () => {
     render(
       <AgentActivityView
         collapseCompleted={false}
@@ -140,8 +183,8 @@ describe("AgentActivityView console", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Inspected Git" }));
-    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Output")).not.toBeInTheDocument();
     expect(screen.getByText("remote: Enumerating objects: 9364, done.")).toBeInTheDocument();
     expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
   });
@@ -158,12 +201,17 @@ describe("AgentActivityView console", () => {
           input: "false",
           status: "failed",
           exitCode: 1,
+          output: "permission denied\nremote rejected",
         })}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Used terminal" }));
+    expect(screen.queryByRole("button", { name: "Used terminal" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("failed")).toBeInTheDocument();
     expect(screen.getByText("Exit code 1")).toBeInTheDocument();
+    expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "false" }));
+    expect(screen.getByText(/permission denied/).textContent).toBe("permission denied\nremote rejected");
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
@@ -185,6 +233,46 @@ describe("AgentActivityView console", () => {
     await user.click(screen.getByRole("button", { name: "Explored 1 file" }));
     expect(screen.getByText("README.md")).toBeInTheDocument();
     expect(screen.getByText("bun is not installed on the host")).toBeInTheDocument();
+  });
+
+  it("keeps an agent file summary in the console", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("read-1", "read", "read"),
+          input: "README.md",
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "curl -fL bun.zip" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Explored 1 file" }));
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+  });
+
+  it("shows command duration on the line and does not open a tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "echo hi",
+          durationMs: 2_400,
+        })}
+      />,
+    );
+
+    const command = screen.getByTestId("agent-tool-command-1");
+    await user.hover(command);
+    expect(command.parentElement).toHaveTextContent(formatDuration(2_400, { precision: "second" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("keeps completed reasoning visible when collapse is off", () => {

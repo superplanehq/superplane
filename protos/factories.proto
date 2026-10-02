@@ -959,10 +959,14 @@ message UpdateFactoryOnboardingResponse {
 
 message SwitchFactoryModelSourceRequest {
   string id = 1;
-  // hosted, anthropic, openai, or openrouter.
+  // hosted, anthropic, openai, openrouter, or custom.
   string source = 2;
   // Provider API key. Required when this organization has no ready integration for the source.
   string api_key = 3;
+  // Provider base URL. Required when the source is a new custom provider.
+  string base_url = 4;
+  // API type for a custom provider: anthropic, openai, or openai-compatible.
+  string api_type = 5;
 }
 
 message SwitchFactoryModelSourceResponse {
@@ -1061,6 +1065,8 @@ message Factory {
   bool public_badge_show_cost = 11;
   // Unguessable token for the public badge URL. Empty until the badge is turned on once.
   string public_badge_token = 12;
+  // Stable id in workspace URLs. Does not change when the workspace key changes.
+  string url_id = 13;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
@@ -1625,6 +1631,7 @@ message FactoryPullRequestMergeability {
     BLOCKED_REASON_DRAFT = 4;
     BLOCKED_REASON_CONFLICTING = 5;
     BLOCKED_REASON_MISSING_INTEGRATION = 6;
+    BLOCKED_REASON_UNAVAILABLE = 7;
   }
 
   enum MergeMethod {
@@ -1667,6 +1674,7 @@ message FactoryIntakeItem {
   string title = 3;
   string body = 4;
   string url = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message SearchFactoryIntakeItemsRequest {

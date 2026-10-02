@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Check, Plus, Settings, Triangle } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { factoryRouteSegment } from "../lib/factoryKeyResolution";
 import { factorySettingsWorkspaceGeneralPath, pathAfterWorkspaceSwitch } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
@@ -39,7 +40,7 @@ export function WorkspaceSwitcher({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const workspaceName = factory.name?.trim() || "Workspace";
-  const currentFactoryKey = factory.key;
+  const currentRouteSegment = factoryRouteSegment(factory);
 
   return (
     <div className="flex flex-col items-center gap-1 px-1.5 pt-3 pb-1" data-testid="factories-workspace-switcher">
@@ -71,14 +72,14 @@ export function WorkspaceSwitcher({
               permissionsLoading={permissionsLoading}
               onCreateFactory={onCreateFactory}
               onSwitch={(next) => {
-                if (!currentFactoryKey || !next.key) {
+                if (!currentRouteSegment || !factoryRouteSegment(next)) {
                   return;
                 }
                 navigate(
                   pathAfterWorkspaceSwitch({
                     pathname,
                     organizationId,
-                    currentFactoryKey,
+                    currentFactoryKey: currentRouteSegment,
                     nextFactory: next,
                   }),
                 );
@@ -109,6 +110,7 @@ function WorkspaceSwitcherMenu({
   onCreateFactory,
   onSwitch,
 }: Omit<WorkspaceSwitcherProps, "infoOnly"> & { onSwitch: (next: FactoriesFactory) => void }) {
+  const currentRouteSegment = factoryRouteSegment(factory);
   return (
     <>
       <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
@@ -118,7 +120,7 @@ function WorkspaceSwitcherMenu({
           organizationId={organizationId}
           entry={entry}
           isCurrent={entry.id === factory.id}
-          currentFactoryKey={factory.key}
+          currentFactoryKey={currentRouteSegment}
           canOpenSettings={canOpenSettings}
           onSwitch={onSwitch}
         />
@@ -160,14 +162,15 @@ function WorkspaceSwitcherRow({
   canOpenSettings: boolean;
   onSwitch: (next: FactoriesFactory) => void;
 }) {
-  const settingsHref = entry.key ? factorySettingsWorkspaceGeneralPath(organizationId, entry.key) : undefined;
+  const routeSegment = factoryRouteSegment(entry);
+  const settingsHref = routeSegment ? factorySettingsWorkspaceGeneralPath(organizationId, routeSegment) : undefined;
 
   return (
     <div className="flex items-center gap-0.5">
       <DropdownMenuItem
         className="min-w-0 flex-1"
         onClick={() => {
-          if (isCurrent || !entry.key || !currentFactoryKey) {
+          if (isCurrent || !routeSegment || !currentFactoryKey) {
             return;
           }
           onSwitch(entry);

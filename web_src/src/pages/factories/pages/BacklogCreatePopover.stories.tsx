@@ -31,6 +31,7 @@ const GITHUB_ITEMS: BacklogIntakeItem[] = [
     key: "#12",
     title: "Handle duplicate refunds",
     body: "Retrying a refund posts twice.",
+    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
   },
   {
     id: "gh-2",
@@ -38,6 +39,7 @@ const GITHUB_ITEMS: BacklogIntakeItem[] = [
     key: "#18",
     title: "Fix checkout timeout",
     body: "",
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: "gh-3",

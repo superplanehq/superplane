@@ -8,6 +8,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
+import { factoryLineDetailPath, factoryRouteSegment, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsGeneralPage } from "./FactorySettingsGeneralPage";
 
@@ -122,7 +123,8 @@ describe("FactorySettingsGeneralPage", () => {
     const cost = screen.getByRole("switch", { name: "Show cost per merged PR" });
     expect(cost).not.toBeChecked();
 
-    const snippet = screen.getByTestId("factory-settings-public-badge-markdown");
+    const snippet = screen.getByLabelText("Markdown");
+    expect(screen.getByRole("button", { name: "Copy Markdown" })).toBeInTheDocument();
     expect(snippet).toHaveValue(
       `[![PRs via SuperPlane](${window.location.origin}/api/v1/public/badges/badge-token.svg?period=30&size=small)](${window.location.origin})`,
     );
@@ -135,8 +137,14 @@ describe("FactorySettingsGeneralPage", () => {
 
     await user.click(screen.getByTestId("factory-settings-public-badge-size"));
     await user.click(screen.getByRole("option", { name: "Full width" }));
+    expect(screen.getByLabelText("HTML")).toBe(snippet);
+    expect(screen.getByRole("button", { name: "Copy HTML" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy Markdown" })).not.toBeInTheDocument();
     const afterSize = (snippet as HTMLInputElement).value;
-    expect(afterSize).toContain("period=14&size=wide");
+    const wideURL = `${window.location.origin}/api/v1/public/badges/badge-token.svg?period=14&size=wide`;
+    expect(afterSize).toBe(
+      `<a href="${window.location.origin}"><img src="${wideURL}" alt="PRs via SuperPlane" width="100%"></a>`,
+    );
 
     await user.click(cost);
     expect(mutateAsync).toHaveBeenCalledWith({ publicBadgeShowCost: true });
@@ -175,7 +183,10 @@ describe("FactorySettingsGeneralPage", () => {
     renderPage({ ...REFUND_FACTORY, public: true });
 
     const link = screen.getByTestId("factory-settings-visibility-board-link");
-    expect(link).toHaveAttribute("href", "/org-1/workspaces/rf/lines/line-plan-and-implement");
+    expect(link).toHaveAttribute(
+      "href",
+      factoryLineDetailPath("org-1", factoryRouteSegment(REFUND_FACTORY), firstFactoryLineId(REFUND_FACTORY)!),
+    );
     expect(link).toHaveTextContent("View public board");
   });
 
@@ -276,6 +287,8 @@ describe("FactorySettingsGeneralPage", () => {
 
     await user.click(boardSwitch);
     const snippet = screen.getAllByTestId("factory-settings-public-badge-markdown").at(-1) as HTMLInputElement;
-    expect(snippet.value).toContain(`](${window.location.origin}/org-1/workspaces/rf/lines/line-plan-and-implement)`);
+    expect(snippet.value).toContain(
+      `](${window.location.origin}${factoryLineDetailPath("org-1", factoryRouteSegment(REFUND_FACTORY), firstFactoryLineId(REFUND_FACTORY)!)})`,
+    );
   });
 });

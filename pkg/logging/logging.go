@@ -2,8 +2,10 @@ package logging
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -28,6 +30,12 @@ const (
 	webhookTypeUnknown              = "unknown"
 	productiveTaskCreated           = "task.created"
 	productiveTaskUpdated           = "task.updated"
+
+	// webhookLogPayloadLimit is the maximum JSON-encoded size of the
+	// payload field. That leaves room for the other fields under Cloud
+	// Logging's 256 KB entry limit.
+	webhookLogPayloadLimit  = 128 * 1024
+	webhookPayloadTruncated = "...(truncated)"
 )
 
 // WebhookNodeFields are the canvas and webhook ids added to a node logger
@@ -54,6 +62,12 @@ func newJSONLineLogger() *log.Logger {
 	return logger
 }
 
+func newCloudLoggingLineLogger() *log.Logger {
+	logger := newJSONLineLogger()
+	logger.SetFormatter(NewCloudLoggingFormatter())
+	return logger
+}
+
 func newProductiveWebhookLogger() *log.Logger {
 	return newJSONLineLogger()
 }
@@ -62,7 +76,9 @@ func newProductiveWebhookLogger() *log.Logger {
 var productiveWebhookLogger = newProductiveWebhookLogger()
 
 // sentryWebhookLogger writes one JSON object per hosted Sentry webhook log.
-var sentryWebhookLogger = newJSONLineLogger()
+// message and severity are the Cloud Logging summary fields. The other fields
+// stay in the JSON payload.
+var sentryWebhookLogger = newCloudLoggingLineLogger()
 
 // datadogWebhookLogger writes one JSON object per Datadog webhook log.
 var datadogWebhookLogger = newJSONLineLogger()
@@ -175,6 +191,27 @@ func WithCanvas(logger *log.Entry, canvas models.Canvas) *log.Entry {
 	})
 }
 
+// WithCanvasWorkspace adds organization_id for every canvas, and factory_id
+// when the canvas belongs to a workspace. factory_id is the workspace UUID.
+func WithCanvasWorkspace(logger *log.Entry, canvas *models.Canvas) *log.Entry {
+	if logger == nil || canvas == nil {
+		return logger
+	}
+
+	fields := log.Fields{}
+	if canvas.OrganizationID != uuid.Nil {
+		fields["organization_id"] = canvas.OrganizationID
+	}
+	if canvas.FactoryID != nil && *canvas.FactoryID != uuid.Nil {
+		fields["factory_id"] = *canvas.FactoryID
+	}
+	if len(fields) == 0 {
+		return logger
+	}
+
+	return logger.WithFields(fields)
+}
+
 // WithWebhookNode adds the SuperPlane organization, canvas, and webhook ids
 // to the logger passed into a webhook handler.
 func WithWebhookNode(logger *log.Entry, fields WebhookNodeFields) *log.Entry {
@@ -222,6 +259,66 @@ func LogProductiveWebhookFailure(event string, fields log.Fields, err error) {
 // task webhook that succeeded with less data than expected.
 func LogProductiveWebhookWarning(event string, message string, fields log.Fields, err error) {
 	productiveWebhookEntry(event, fields, err).Warn(message)
+}
+
+// WithWebhookPayload adds the incoming webhook body to a log line.
+// Valid JSON stays an object. A body over the limit is cut.
+func WithWebhookPayload(fields log.Fields, body []byte) log.Fields {
+	payload := webhookLogPayload(body)
+	if payload == nil {
+		return fields
+	}
+	if fields == nil {
+		fields = log.Fields{}
+	}
+	fields["payload"] = payload
+	return fields
+}
+
+func webhookLogPayload(body []byte) any {
+	if len(body) == 0 {
+		return nil
+	}
+	if len(body) <= webhookLogPayloadLimit && json.Valid(body) {
+		return json.RawMessage(body)
+	}
+	if webhookStringEncodedSize(string(body)) <= webhookLogPayloadLimit {
+		return string(body)
+	}
+	return truncateWebhookPayload(body)
+}
+
+// truncateWebhookPayload cuts the body until its JSON string encoding fits
+// the payload limit. A raw byte count is not enough: one backslash or
+// control byte can encode as several characters.
+func truncateWebhookPayload(body []byte) string {
+	low := 0
+	high := len(body)
+	if high > webhookLogPayloadLimit {
+		high = webhookLogPayloadLimit
+	}
+
+	best := 0
+	for low <= high {
+		mid := low + (high-low)/2
+		candidate := string(body[:mid]) + webhookPayloadTruncated
+		if webhookStringEncodedSize(candidate) <= webhookLogPayloadLimit {
+			best = mid
+			low = mid + 1
+			continue
+		}
+		high = mid - 1
+	}
+
+	return string(body[:best]) + webhookPayloadTruncated
+}
+
+func webhookStringEncodedSize(value string) int {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return webhookLogPayloadLimit + 1
+	}
+	return len(encoded)
 }
 
 // LogSentryWebhookInfo writes one JSON info line for a hosted Sentry webhook.

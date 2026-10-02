@@ -21,7 +21,7 @@ function readFactoryAppOrderRef(searchParams: URLSearchParams): string | null {
 }
 
 export function useFactoryAppCanvasRoute() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const params = useParams<{ appId?: string; automationId?: string }>();
   const appId = params.automationId ?? params.appId ?? "";
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,7 +49,7 @@ export function useFactoryAppCanvasRoute() {
   );
   const back = useMemo(
     () =>
-      resolveFactoryAppBackNav(organizationId, factoryKey, {
+      resolveFactoryAppBackNav(organizationId, routeSegment, {
         from,
         appId,
         appName: canvas?.metadata?.name,
@@ -58,7 +58,7 @@ export function useFactoryAppCanvasRoute() {
         lineName,
         orderTitle: order?.title,
       }),
-    [appId, canvas?.metadata?.name, factoryKey, from, lineId, lineName, order?.title, organizationId, orderNumber],
+    [appId, canvas?.metadata?.name, routeSegment, from, lineId, lineName, order?.title, organizationId, orderNumber],
   );
   const shouldRedirect = shouldRedirectFactoryAppCanvas({
     appId,
@@ -75,7 +75,7 @@ export function useFactoryAppCanvasRoute() {
   return {
     organizationId,
     factoryId,
-    factoryKey,
+    factoryKey: routeSegment,
     appId,
     canvas,
     canvasLoading,

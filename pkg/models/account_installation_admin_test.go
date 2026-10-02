@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -227,6 +228,46 @@ func TestListAllOrganizations(t *testing.T) {
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
 		assert.Equal(t, "Alpha Corp", orgs[0].Name)
+	})
+
+	t.Run("filters by organization id", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		target, err := CreateOrganization("Target Org", "")
+		require.NoError(t, err)
+		other, err := CreateOrganization("Other Org", "")
+		require.NoError(t, err)
+		deleted, err := CreateOrganization("Deleted Org", "")
+		require.NoError(t, err)
+		require.NoError(t, SoftDeleteOrganization(deleted.ID.String()))
+
+		id := target.ID.String()
+		cases := []struct {
+			name   string
+			search string
+			want   []uuid.UUID
+		}{
+			{name: "full id in lower case", search: id, want: []uuid.UUID{target.ID}},
+			{name: "full id in upper case", search: strings.ToUpper(id), want: []uuid.UUID{target.ID}},
+			{name: "first 8 characters", search: id[:8], want: []uuid.UUID{target.ID}},
+			{name: "surrounding spaces", search: "  " + id + "  ", want: []uuid.UUID{target.ID}},
+			{name: "name", search: "target", want: []uuid.UUID{target.ID}},
+			{name: "different organization id", search: other.ID.String(), want: []uuid.UUID{other.ID}},
+			{name: "deleted organization id", search: deleted.ID.String()},
+			{name: "id without hyphens", search: strings.ReplaceAll(id, "-", "")},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				orgs, total, err := ListAllOrganizations(database.Conn(), tc.search, 50, 0, "", "")
+				require.NoError(t, err)
+				assert.Equal(t, int64(len(tc.want)), total)
+				require.Len(t, orgs, len(tc.want))
+				for i, org := range orgs {
+					assert.Equal(t, tc.want[i], org.ID)
+				}
+			})
+		}
 	})
 
 	t.Run("paginates results", func(t *testing.T) {

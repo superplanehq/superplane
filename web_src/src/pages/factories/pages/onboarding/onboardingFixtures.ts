@@ -1,6 +1,6 @@
 export type VcsHostId = "github" | "gitlab";
 /** Matches SuperPlane integration registry names (Claude = `claude`, not anthropic). */
-export type IntegrationId = "github" | "gitlab" | "claude" | "openai" | "openrouter" | "linear" | "jira";
+export type IntegrationId = "github" | "gitlab" | "claude" | "openai" | "openrouter" | "customLlm" | "linear" | "jira";
 export type AgentHarnessId = "claude-code" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
 export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
@@ -35,6 +35,12 @@ export const AGENT_OPTIONS: IntegrationOption[] = [
     detail: "Connect an OpenRouter API key for many model providers.",
   },
 ];
+
+export const CUSTOM_PROVIDER_OPTION: IntegrationOption = {
+  id: "customLlm",
+  label: "Custom provider",
+  detail: "Set a provider URL, token, and API type.",
+};
 
 /** Large enough that Storybook can demonstrate search filtering. */
 export const FIXTURE_REPOS: Record<VcsHostId, string[]> = {
@@ -145,6 +151,8 @@ export function integrationLabel(id: IntegrationId) {
       return "OpenAI";
     case "openrouter":
       return "OpenRouter";
+    case "customLlm":
+      return "Custom provider";
     case "linear":
       return "Linear";
     case "jira":

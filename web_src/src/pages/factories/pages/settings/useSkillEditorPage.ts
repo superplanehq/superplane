@@ -11,7 +11,7 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { factoryRouteSegment, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle } from "./skillFrontmatter";
@@ -62,7 +62,7 @@ export function useSkillEditorPage() {
   const [nameError, setNameError] = useState("");
   const [markdownError, setMarkdownError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(false);
-  const listPath = factorySettingsSectionPath(organizationId, factory.key ?? "", "workspace", "agent");
+  const listPath = factorySettingsSectionPath(organizationId, factoryRouteSegment(factory), "workspace", "agent");
   const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
 
   useEffect(() => {

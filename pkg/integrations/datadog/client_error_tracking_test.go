@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,8 @@ func Test__Client__SearchErrorTrackingIssues(t *testing.T) {
 				"attributes": {
 					"error_type": "TimeoutError",
 					"error_message": "checkout timed out",
-					"service": "checkout"
+					"service": "checkout",
+					"first_seen": 1671612804001
 				}
 			}]
 		}`))
@@ -64,6 +66,7 @@ func Test__Client__SearchErrorTrackingIssues(t *testing.T) {
 	assert.Equal(t, "TimeoutError", issues[0].ErrorType)
 	assert.Equal(t, "checkout timed out", issues[0].ErrorMessage)
 	assert.Equal(t, "checkout", issues[0].Service)
+	assert.Equal(t, time.UnixMilli(1671612804001).UTC(), issues[0].FirstSeen)
 	assert.Equal(t, "TimeoutError: checkout timed out", issues[0].IssueTitle())
 	assert.Equal(t, "https://app.datadoghq.eu/error-tracking/issue/issue-1", client.IssueURL(issues[0].ID))
 }
@@ -147,6 +150,32 @@ func Test__Client__SearchErrorTrackingIssues__Forbidden(t *testing.T) {
 	require.ErrorIs(t, err, ErrErrorTrackingForbidden)
 }
 
+func Test__Client__SearchErrorTrackingIssues__NewestCreatedFirst(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{"id": "older", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "older", "type": "issue"}}}},
+				{"id": "newest", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "newest", "type": "issue"}}}},
+				{"id": "middle", "type": "error_tracking_search_result", "relationships": {"issue": {"data": {"id": "middle", "type": "issue"}}}}
+			],
+			"included": [
+				{"id": "older", "type": "issue", "attributes": {"first_seen": 1000, "service": "intake-test"}},
+				{"id": "newest", "type": "issue", "attributes": {"first_seen": 3000, "service": "intake-test"}},
+				{"id": "middle", "type": "issue", "attributes": {"first_seen": 2000, "service": "intake-test"}}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL, http: server.Client()}
+	issues, err := client.SearchErrorTrackingIssues("service:intake-test", 2)
+	require.NoError(t, err)
+	require.Len(t, issues, 2)
+	assert.Equal(t, "newest", issues[0].ID)
+	assert.Equal(t, "middle", issues[1].ID)
+}
+
 func Test__Client__SearchErrorTrackingIssues__EmptyQueryUsesStar(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -177,6 +206,9 @@ func Test__Datadog__Instructions__NamesApplicationKeyScopes(t *testing.T) {
 	assert.Contains(t, instructions, "create_webhooks")
 	assert.Contains(t, instructions, "manage_integrations")
 	assert.Contains(t, instructions, "error_tracking_read")
+	assert.Contains(t, instructions, "monitors_read")
+	assert.Contains(t, instructions, "monitors_write")
+	assert.NotContains(t, instructions, "Add the webhook to a monitor")
 	assert.Contains(t, instructions, "apm_read")
 	assert.Contains(t, instructions, "logs_read_data")
 	assert.Contains(t, instructions, "rum_apps_read")
@@ -189,5 +221,5 @@ func Test__Datadog__Instructions__NamesApplicationKeyScopes(t *testing.T) {
 			appKeyDescription = field.Description
 		}
 	}
-	assert.Equal(t, "A restricted key needs create_webhooks, manage_integrations, and error_tracking_read. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.", appKeyDescription)
+	assert.Equal(t, "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.", appKeyDescription)
 }

@@ -61,6 +61,8 @@ export interface AgentStep {
   summary: string;
   toolCount: number;
   output?: string;
+  commandScript?: string;
+  commandStdout?: string;
   events: AgentStepEvent[];
   iconSlug?: string;
 }
@@ -169,6 +171,11 @@ export function stagesFromFixture(fixture: SplitRunFixture): AutomationStageGrou
  */
 export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">): boolean {
   return Boolean(stage.appId) || stage.id === "backlog" || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID;
+}
+
+/** The synthetic create-task stage. The console Intake event shows it. */
+export function isConsoleCreationStage(stage: Pick<AutomationStage, "id">): boolean {
+  return stage.id === "backlog";
 }
 
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
@@ -329,6 +336,7 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
     duration: line.duration,
     summary: "",
     toolCount: 0,
+    output: line.detail?.trim() || undefined,
     events: [],
     iconSlug: line.iconSlug,
   };
@@ -357,6 +365,8 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     summary: "",
     toolCount: tools.length,
     output: group.line.detail?.trim() || undefined,
+    commandScript: group.line.commandScript,
+    commandStdout: group.line.commandStdout,
     events: group.events.map((event) =>
       event.kind === "note"
         ? { kind: "note", id: event.line.id, text: event.line.componentName }

@@ -91,10 +91,11 @@ func (FactoryWorkOrder) TableName() string {
 }
 
 // URLPath is the canonical UI permalink of the work order, relative to the
-// server base URL. The factory key is part of the path, so callers that only
-// hold the order must load the factory that owns it.
-func (o *FactoryWorkOrder) URLPath(factoryKey string) string {
-	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryKey, o.Number)
+// server base URL. `factoryRouteSegment` is the workspace URL segment
+// (`key-urlId`). Callers that only hold the order must load the factory
+// that owns it and pass Factory.RouteSegment().
+func (o *FactoryWorkOrder) URLPath(factoryRouteSegment string) string {
+	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryRouteSegment, o.Number)
 }
 
 func (o *FactoryWorkOrder) IsOpen() bool {
@@ -124,6 +125,9 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 	label := ""
 	if o.OriginLabel != nil {
 		label = strings.TrimSpace(*o.OriginLabel)
+	}
+	if title := datadogWorkOrderOriginLabel(url, label, o.Title); title != "" {
+		label = title
 	}
 	if label == "" {
 		label = OriginLabelFromURL(url)

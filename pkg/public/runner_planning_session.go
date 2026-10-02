@@ -2,12 +2,16 @@ package public
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -23,7 +27,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
-	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -56,14 +59,6 @@ type planningScoreRequest struct {
 type planningAgentMessageRequest struct {
 	Text       string `json:"text"`
 	ActivityID string `json:"activity_id"`
-}
-
-// planningCreateTaskRequest is one task the agent splits off the draft it
-// refines, after the user confirmed the split.
-type planningCreateTaskRequest struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	ActivityID  string `json:"activity_id"`
 }
 
 func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +196,9 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		if session.WaitState == models.PlanningWaitResolved {
 			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
+				if result.Kind != "" {
+					restorePlanningWait(session, result)
+				}
 				writePlanningWaitError(w, r, session, err)
 				return
 			}
@@ -371,58 +369,6 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
-// handleRunnerPlanningCreateTask creates a new draft for part of the work
-// the session refines. The new draft fans out to the Backlog automation
-// like a task created by hand, so it gets its own refine session.
-func (s *Server) handleRunnerPlanningCreateTask(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
-	if !ok {
-		return
-	}
-	var req planningCreateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-	activityID, ok := parseOptionalActivityID(w, req.ActivityID)
-	if !ok {
-		return
-	}
-	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
-	if err != nil {
-		writeRunnerPlanningError(w, r, session, err)
-		return
-	}
-	db := database.DB(r.Context())
-	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
-	if err != nil {
-		writeRunnerPlanningError(w, r, session, err)
-		return
-	}
-	order, err := session.CreateSplitTask(db, factoryModel, models.PlanningSplitTask{
-		Title:       req.Title,
-		Description: req.Description,
-	}, activityID)
-	if err != nil {
-		writeRunnerPlanningError(w, r, session, err)
-		return
-	}
-	workersctx.EmitWorkOrderCreated(db, factoryModel, order)
-	if err := messages.PublishFactoryWorkOrderUpdated(
-		factoryModel.ID.String(),
-		order.ID.String(),
-		factoryevents.EventTypeOrderStatusUpdated,
-	); err != nil {
-		log.WithError(err).Warnf("Failed to publish factory work order updated for split task %s", order.ID)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":        "created",
-		"work_order_id": order.ID.String(),
-		"key":           factoryModel.WorkOrderKey(order.Number),
-		"title":         order.Title,
-	})
-}
-
 // parseOptionalActivityID reads an optional activity id from a request body.
 // It writes the 400 response itself and reports false when the id is malformed.
 func parseOptionalActivityID(w http.ResponseWriter, raw string) (uuid.UUID, bool) {
@@ -573,7 +519,7 @@ func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (m
 		return models.PlanningWaitResult{}, false, nil
 	}
 	if err != nil {
-		return models.PlanningWaitResult{}, false, err
+		return result, false, err
 	}
 	return result, true, nil
 }
@@ -605,8 +551,31 @@ func isPlanningRequestCanceled(r *http.Request, err error) bool {
 	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
+func isTransientPlanningWaitDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) {
+		return true
+	}
+	if !isDroppedConnectionError(err) {
+		return false
+	}
+	return strings.Contains(err.Error(), "pgproto3")
+}
+
+func isDroppedConnectionError(err error) bool {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) && (errors.Is(opErr.Err, syscall.ECONNRESET) || errors.Is(opErr.Err, syscall.EPIPE)) {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "connection reset by peer") ||
+		strings.Contains(message, "broken pipe")
+}
+
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if isPlanningRequestCanceled(r, err) {
+	if isPlanningRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}

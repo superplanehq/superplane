@@ -213,7 +213,7 @@ const OrganizationsList: React.FC = () => {
         subtitle={`${total} organization${total !== 1 ? "s" : ""} across this installation`}
         search={search}
         onSearchChange={setSearch}
-        placeholder="Search organizations..."
+        placeholder="Search by name or ID..."
       />
       {organizations.length === 0 ? (
         <div className="text-center py-12">
