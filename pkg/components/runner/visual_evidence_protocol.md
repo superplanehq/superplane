@@ -18,8 +18,9 @@
 - Use `eval` to verify computed styles or state when the change has a testable visual property.
 - Check the browser console for errors before capture.
 - Capture the changed element or a focused viewport. Do not capture a mostly empty full page.
-- Call `inspect_screenshot` for every screenshot, including a video poster. Review the returned image and verify that the intended state is visible.
-- Upload an unchanged inspected screenshot with `upload_artifact`. For video evidence, call `upload_artifact` once with the video `path` and inspected screenshot `posterPath`.
+- Call `inspect_screenshot` for every screenshot, including a video poster. If the returned image is available to you, review it and verify that the intended state is visible.
+- If the client reports that your model does not support image input, do not claim that you reviewed it. Upload the unchanged screenshot for human review and continue the task. Lack of model image support does not make visual evidence unavailable.
+- Upload the unchanged screenshot with `upload_artifact`. For video evidence, call `upload_artifact` once with the video `path` and screenshot `posterPath`.
 - Do not use file size, custom PNG decoding, or pixel-color counting as a substitute for visual inspection.
 - Upload the smallest useful set. Usually, use one focused image for each affected theme or state.
 - Capture evidence after the requested UI changes and verification are complete. If later edits change the shown UI, recapture and upload the evidence.
