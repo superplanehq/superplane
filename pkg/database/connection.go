@@ -101,11 +101,8 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 	return u.String()
 }
 
-func postgresDialector(dsn string) gorm.Dialector {
-	return postgres.New(postgres.Config{
-		DSN:                  dsn,
-		PreferSimpleProtocol: true,
-	})
+func openAppDB(dsn string, cfg *gorm.Config) (*gorm.DB, error) {
+	return gorm.Open(postgres.Open(dsn), cfg)
 }
 
 func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, error) {
@@ -116,7 +113,7 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
-	db, err := gorm.Open(postgresDialector(dsn), &gorm.Config{})
+	db, err := openAppDB(dsn, &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +147,7 @@ func connect() *gorm.DB {
 	})
 	logger := newGormTimeoutLogger(baseLogger)
 
-	db, err := gorm.Open(postgresDialector(dsn), &gorm.Config{Logger: logger})
+	db, err := openAppDB(dsn, &gorm.Config{Logger: logger})
 	if err != nil {
 		panic(err)
 	}

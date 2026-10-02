@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
@@ -18,21 +19,30 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestPostgresDialectorPrefersSimpleProtocol(t *testing.T) {
-	dialector := postgresDialector("postgres://user:pass@db.example:5432/appdb?sslmode=disable")
-	pgDialector, ok := dialector.(*postgresdrv.Dialector)
-	require.True(t, ok)
-	require.NotNil(t, pgDialector.Config)
-	require.True(t, pgDialector.PreferSimpleProtocol)
-}
-
 func TestReadSucceedsAfterIntegerColumnBecomesBigint(t *testing.T) {
 	if os.Getenv("DB_HOST") == "" {
 		t.Skip("DB_HOST not set (run with make test in Docker)")
 	}
 
-	preparedStatementDSN := withQueryExecMode(t, postgresDSNFromEnv(), "cache_statement")
-	db, err := gorm.Open(postgresDialector(preparedStatementDSN), &gorm.Config{})
+	t.Run("cache statement", func(t *testing.T) {
+		dsn := withQueryExecMode(t, postgresDSNFromEnv(), "cache_statement")
+		err := readAfterIntegerColumnBecomesBigint(t, dsn)
+		var pgErr *pgconn.PgError
+		require.ErrorAs(t, err, &pgErr)
+		require.Equal(t, "0A000", pgErr.Code)
+	})
+
+	t.Run("production dsn", func(t *testing.T) {
+		require.NoError(t, readAfterIntegerColumnBecomesBigint(t, postgresDSNFromEnv()))
+	})
+}
+
+func TestJSONBMapUpdateAndContainment(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	db, err := openAppDB(postgresDSNFromEnv(), &gorm.Config{})
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
@@ -42,28 +52,55 @@ func TestReadSucceedsAfterIntegerColumnBecomesBigint(t *testing.T) {
 		require.NoError(t, sqlDB.Close())
 	})
 
+	table, err := scratchTableName()
+	require.NoError(t, err)
+	require.NoError(t, db.Exec("CREATE TABLE "+table+" (id integer PRIMARY KEY, payload jsonb NOT NULL)").Error)
+	t.Cleanup(func() {
+		dropScratchTable(t, table)
+	})
+	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, payload) VALUES (1, '{}')").Error)
+
+	metadata := map[string]any{
+		"groupKey":    "abc",
+		"sourceNodes": []any{map[string]any{"nodeId": "process-1"}},
+	}
+	require.NoError(t, db.Table(table).Where("id = ?", 1).Update("payload", metadata).Error)
+
+	matches, err := json.Marshal(map[string]string{"groupKey": "abc"})
+	require.NoError(t, err)
+	var count int64
+	require.NoError(t, db.Table(table).Where("payload @> ?::jsonb", matches).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func readAfterIntegerColumnBecomesBigint(t *testing.T, dsn string) error {
+	t.Helper()
+	conn := openPinnedSQLConn(t, dsn)
 	ctx := context.Background()
-	conn, err := sqlDB.Conn(ctx)
+	table, err := scratchTableName()
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, "CREATE TABLE "+table+" (id integer PRIMARY KEY, amount integer)")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, conn.Close())
+		dropScratchTable(t, table)
 	})
-
-	_, err = conn.ExecContext(ctx, `CREATE TEMPORARY TABLE column_type_change (id integer PRIMARY KEY, amount integer)`)
-	require.NoError(t, err)
-	_, err = conn.ExecContext(ctx, `INSERT INTO column_type_change (id, amount) VALUES (1, 7)`)
+	_, err = conn.ExecContext(ctx, "INSERT INTO "+table+" (id, amount) VALUES (1, 7)")
 	require.NoError(t, err)
 
-	const query = `SELECT amount FROM column_type_change WHERE id = $1`
+	query := "SELECT amount FROM " + table + " WHERE id = $1"
 	var amount int64
 	require.NoError(t, conn.QueryRowContext(ctx, query, 1).Scan(&amount))
 	require.Equal(t, int64(7), amount)
 
-	_, err = conn.ExecContext(ctx, `ALTER TABLE column_type_change ALTER COLUMN amount TYPE bigint`)
+	_, err = conn.ExecContext(ctx, "ALTER TABLE "+table+" ALTER COLUMN amount TYPE bigint")
 	require.NoError(t, err)
 
-	require.NoError(t, conn.QueryRowContext(ctx, query, 1).Scan(&amount))
+	err = conn.QueryRowContext(ctx, query, 1).Scan(&amount)
+	if err != nil {
+		return err
+	}
 	require.Equal(t, int64(7), amount)
+	return nil
 }
 
 func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
