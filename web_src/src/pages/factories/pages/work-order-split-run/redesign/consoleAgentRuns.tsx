@@ -159,11 +159,6 @@ function AgentRunRow({
             className={cn(RUN_TITLE_MARKDOWN, "flex-1 [&_a]:pointer-events-auto")}
           />
         </div>
-        {run.duration ? (
-          <span className={cn(META_TEXT_CLASSNAME, "pointer-events-none relative z-10 shrink-0 tabular-nums")}>
-            {run.duration}
-          </span>
-        ) : null}
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
         <RunDetails

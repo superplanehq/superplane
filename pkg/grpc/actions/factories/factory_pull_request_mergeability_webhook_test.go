@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -603,11 +604,21 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		return []byte(fmt.Sprintf(`{
 			"action": "closed",
 			"repository": {"full_name": %q},
+			"sender": {
+				"login": "alex",
+				"html_url": "https://github.com/alex",
+				"name": "Alex Rivera"
+			},
 			"pull_request": {
 				"number": %d,
 				"merged": %s,
 				"merged_at": %s,
 				"closed_at": %q,
+				"merged_by": {
+					"login": "alex",
+					"html_url": "https://github.com/alex",
+					"name": "Alex Rivera"
+				},
 				"head": {"sha": "abc123"}
 			}
 		}`, repository, number, mergedJSON, mergedAt, closedAt))
@@ -662,6 +673,29 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryPullRequestStateMerged, stored.State)
 		require.NotNil(t, stored.MergedAt)
+
+		events, err := reloaded.ListEvents(db, 10, nil)
+		require.NoError(t, err)
+		var payload factoryevents.WorkOrderStatusUpdated
+		found := false
+		for _, event := range events {
+			if event.Type != factoryevents.EventTypeOrderStatusUpdated {
+				continue
+			}
+			var next factoryevents.WorkOrderStatusUpdated
+			require.NoError(t, json.Unmarshal(event.Data, &next))
+			if next.ToState != models.FactoryWorkOrderStateClosed {
+				continue
+			}
+			payload = next
+			found = true
+			break
+		}
+		require.True(t, found)
+		require.NotNil(t, payload.Automation)
+		assert.Equal(t, "alex", payload.Automation.AppName)
+		assert.Equal(t, "Alex Rivera", payload.Automation.NodeName)
+		assert.Equal(t, "https://github.com/alex", payload.Automation.NodeID)
 	})
 
 	t.Run("closes a pull request without a merge as rejected", func(t *testing.T) {
