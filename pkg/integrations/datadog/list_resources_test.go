@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,34 +45,27 @@ func TestFacetValues(t *testing.T) {
 
 func Test__Datadog__ListResources(t *testing.T) {
 	t.Run("lists a service present only in spans", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusOK, spanAggregateBody("service", "myt-home-api")),
-				httpJSON(http.StatusOK, logAggregateBody("service")),
-				httpJSON(http.StatusOK, issueSearchBody()),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "myt-home-api"))},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody())},
+		)
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
 		assert.Equal(t, []core.IntegrationResource{
 			{Type: ResourceTypeService, ID: "myt-home-api", Name: "myt-home-api"},
 		}, resources)
-		require.Len(t, httpContext.Requests, 3)
-		assert.Equal(t, spansAggregatePath, httpContext.Requests[0].URL.Path)
-		assert.Equal(t, logsAggregatePath, httpContext.Requests[1].URL.Path)
-		assert.Equal(t, "/api/v2/error-tracking/issues/search", httpContext.Requests[2].URL.Path)
-		assertAggregateQuery(t, httpContext.Requests[0], serviceFacet, serviceAggregateMax, `"query":"*"`)
+		assertServiceListPaths(t, httpContext.Requests)
+		assertAggregateQuery(t, requestByPath(t, httpContext.Requests, spansAggregatePath), serviceFacet, serviceAggregatePageSize, `"query":"*"`)
 	})
 
 	t.Run("lists a service present only in logs when spans return other names", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusOK, spanAggregateBody("service", "checkout")),
-				httpJSON(http.StatusOK, logAggregateBody("service", "myt-home-api")),
-				httpJSON(http.StatusOK, issueSearchBody()),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "checkout"))},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service", "myt-home-api"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody())},
+		)
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
@@ -78,29 +73,25 @@ func Test__Datadog__ListResources(t *testing.T) {
 	})
 
 	t.Run("lists a service present only on an open issue when telemetry is refused", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-				httpJSON(http.StatusOK, issueSearchBody("billing")),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody("billing"))},
+		)
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"billing"}, resourceIDs(resources))
-		require.Len(t, httpContext.Requests, 3)
-		assert.Equal(t, "issue", httpContext.Requests[2].URL.Query().Get("include"))
+		assertServiceListPaths(t, httpContext.Requests)
+		assert.Equal(t, "issue", requestByPath(t, httpContext.Requests, errorTrackingSearchPath).URL.Query().Get("include"))
 	})
 
 	t.Run("lists each service once and sorts the names", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusOK, spanAggregateBody("service", "zeta", "alpha", "  ", "alpha")),
-				httpJSON(http.StatusOK, logAggregateBody("service", "alpha", "middle")),
-				httpJSON(http.StatusOK, issueSearchBody("middle", "  ", "beta")),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusOK, spanAggregateBody("service", "zeta", "alpha", "  ", "alpha"))},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service", "alpha", "middle"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody("middle", "  ", "beta"))},
+		)
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
@@ -108,32 +99,88 @@ func Test__Datadog__ListResources(t *testing.T) {
 	})
 
 	t.Run("keeps the list when a telemetry query fails or is refused", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`),
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-				httpJSON(http.StatusOK, issueSearchBody("checkout")),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusInternalServerError, `{"errors":["unavailable"]}`)},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody("checkout"))},
+		)
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"checkout"}, resourceIDs(resources))
-		require.Len(t, httpContext.Requests, 3)
+		assertServiceListPaths(t, httpContext.Requests)
 	})
 
 	t.Run("returns the Error Tracking permission error when every source is refused", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-				httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`),
-			},
-		}
+		httpContext := serviceListHTTP(
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+			[]*http.Response{httpJSON(http.StatusForbidden, `{"errors":["forbidden"]}`)},
+		)
 
 		_, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.ErrorIs(t, err, ErrErrorTrackingForbidden)
-		require.Len(t, httpContext.Requests, 3)
+		assertServiceListPaths(t, httpContext.Requests)
+	})
+
+	t.Run("asks for more names when one telemetry page is full", func(t *testing.T) {
+		firstPage := serviceNames(serviceAggregatePageSize)
+		httpContext := serviceListHTTP(
+			[]*http.Response{
+				httpJSON(http.StatusOK, spanAggregateBody("service", firstPage...)),
+				httpJSON(http.StatusOK, spanAggregateBody("service", "svc-extra")),
+			},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody())},
+		)
+
+		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.NoError(t, err)
+		assert.Contains(t, resourceIDs(resources), "svc-extra")
+		assert.Contains(t, resourceIDs(resources), "svc-0000")
+		spanRequests := requestsByPath(httpContext.Requests, spansAggregatePath)
+		require.Len(t, spanRequests, 2)
+		assertAggregateQuery(t, spanRequests[0], serviceFacet, serviceAggregatePageSize, `"query":"*"`)
+		assertAggregateQuery(t, spanRequests[1], serviceFacet, serviceAggregateMax, `"query":"*"`)
+	})
+
+	t.Run("reads the next names when a larger page is refused", func(t *testing.T) {
+		firstPage := serviceNames(serviceAggregatePageSize)
+		httpContext := serviceListHTTP(
+			[]*http.Response{
+				httpJSON(http.StatusOK, spanAggregateBody("service", firstPage...)),
+				httpJSON(http.StatusBadRequest, `{"errors":["limit"]}`),
+				httpJSON(http.StatusOK, spanAggregateBody("service", "svc-extra")),
+			},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody())},
+		)
+
+		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.NoError(t, err)
+		assert.Contains(t, resourceIDs(resources), "svc-0999")
+		assert.Contains(t, resourceIDs(resources), "svc-extra")
+		spanRequests := requestsByPath(httpContext.Requests, spansAggregatePath)
+		require.Len(t, spanRequests, 3)
+		assert.Equal(t, `service:>"svc-0999"`, aggregateQuery(t, spanRequests[2]))
+	})
+
+	t.Run("stops when the next page does not add names", func(t *testing.T) {
+		firstPage := serviceNames(serviceAggregatePageSize)
+		httpContext := serviceListHTTP(
+			[]*http.Response{
+				httpJSON(http.StatusOK, spanAggregateBody("service", firstPage...)),
+				httpJSON(http.StatusBadRequest, `{"errors":["limit"]}`),
+				httpJSON(http.StatusOK, spanAggregateBody("service", firstPage...)),
+			},
+			[]*http.Response{httpJSON(http.StatusOK, logAggregateBody("service"))},
+			[]*http.Response{httpJSON(http.StatusOK, issueSearchBody())},
+		)
+
+		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
+		require.NoError(t, err)
+		assert.Len(t, resources, serviceAggregatePageSize)
+		assert.Len(t, requestsByPath(httpContext.Requests, spansAggregatePath), 3)
 	})
 
 	t.Run("lists environments from span aggregates", func(t *testing.T) {
@@ -224,6 +271,123 @@ func Test__Datadog__ListResources(t *testing.T) {
 	})
 }
 
+func TestListServicesStartsIssueSearchWhileTelemetryIsOpen(t *testing.T) {
+	gate := &gatedHTTP{
+		allEntered: make(chan struct{}),
+		release:    make(chan struct{}),
+		byPath: map[string]*http.Response{
+			logsAggregatePath:       httpJSON(http.StatusOK, logAggregateBody("service", "from-logs")),
+			errorTrackingSearchPath: httpJSON(http.StatusOK, issueSearchBody("from-issues")),
+		},
+	}
+	client := &Client{
+		APIKey:  "test-api-key",
+		AppKey:  "test-app-key",
+		Site:    "datadoghq.com",
+		BaseURL: "https://api.datadoghq.com",
+		http:    gate,
+	}
+	client.SetRequestDeadline(time.Now().Add(time.Second))
+
+	done := make(chan struct{})
+	var names []string
+	var err error
+	started := time.Now()
+	go func() {
+		defer close(done)
+		names, err = client.ListServices()
+	}()
+
+	select {
+	case <-gate.allEntered:
+	case <-time.After(time.Second):
+		t.Fatal("issue search did not start while the span read was still open")
+	}
+	close(gate.release)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stalled span read held the service list")
+	}
+	require.NoError(t, err)
+	assert.Less(t, time.Since(started), 2*time.Second)
+	assert.Equal(t, []string{"from-issues", "from-logs"}, names)
+}
+
+const errorTrackingSearchPath = "/api/v2/error-tracking/issues/search"
+
+func serviceListHTTP(spans, logs, issues []*http.Response) *contexts.HTTPContext {
+	return &contexts.HTTPContext{
+		ResponsesByPath: map[string][]*http.Response{
+			spansAggregatePath:      spans,
+			logsAggregatePath:       logs,
+			errorTrackingSearchPath: issues,
+		},
+	}
+}
+
+func serviceNames(count int) []string {
+	names := make([]string, count)
+	for i := range names {
+		names[i] = fmt.Sprintf("svc-%04d", i)
+	}
+	return names
+}
+
+func assertServiceListPaths(t *testing.T, requests []*http.Request) {
+	t.Helper()
+	require.Len(t, requests, 3)
+	assert.NotNil(t, requestByPath(t, requests, spansAggregatePath))
+	assert.NotNil(t, requestByPath(t, requests, logsAggregatePath))
+	assert.NotNil(t, requestByPath(t, requests, errorTrackingSearchPath))
+}
+
+func requestByPath(t *testing.T, requests []*http.Request, path string) *http.Request {
+	t.Helper()
+	matches := requestsByPath(requests, path)
+	require.NotEmpty(t, matches)
+	return matches[0]
+}
+
+func requestsByPath(requests []*http.Request, path string) []*http.Request {
+	matches := make([]*http.Request, 0)
+	for _, request := range requests {
+		if request.URL.Path == path {
+			matches = append(matches, request)
+		}
+	}
+	return matches
+}
+
+type gatedHTTP struct {
+	mu         sync.Mutex
+	entered    int
+	allEntered chan struct{}
+	release    chan struct{}
+	byPath     map[string]*http.Response
+}
+
+func (h *gatedHTTP) Do(request *http.Request) (*http.Response, error) {
+	h.mu.Lock()
+	h.entered++
+	if h.entered == 3 {
+		close(h.allEntered)
+	}
+	h.mu.Unlock()
+
+	if request.URL.Path == spansAggregatePath {
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	}
+	<-h.release
+	response := h.byPath[request.URL.Path]
+	if response == nil {
+		return nil, fmt.Errorf("no response for %s", request.URL.Path)
+	}
+	return response, nil
+}
+
 func datadogListContext(httpContext *contexts.HTTPContext) core.ListResourcesContext {
 	return core.ListResourcesContext{
 		HTTP: httpContext,
@@ -285,6 +449,23 @@ func resourceIDs(resources []core.IntegrationResource) []string {
 		ids = append(ids, resource.ID)
 	}
 	return ids
+}
+
+func aggregateQuery(t *testing.T, request *http.Request) string {
+	t.Helper()
+	body, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	var payload struct {
+		Data struct {
+			Attributes struct {
+				Filter struct {
+					Query string `json:"query"`
+				} `json:"filter"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(body, &payload))
+	return payload.Data.Attributes.Filter.Query
 }
 
 func assertAggregateQuery(t *testing.T, request *http.Request, facet string, limit int, queryPart string) {

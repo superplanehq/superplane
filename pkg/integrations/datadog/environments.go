@@ -166,8 +166,15 @@ func facetString(value any) string {
 }
 
 func isForbidden(err error) bool {
+	return apiStatus(err) == http.StatusForbidden
+}
+
+func apiStatus(err error) int {
 	apiError, ok := err.(*APIError)
-	return ok && apiError.StatusCode == http.StatusForbidden
+	if !ok {
+		return 0
+	}
+	return apiError.StatusCode
 }
 
 func environmentResources(names []string) []core.IntegrationResource {
