@@ -105,4 +105,33 @@ describe("timingsForConsoleColumns", () => {
     expect(timings.implement?.enteredAt).toBe(IMPLEMENT_AT);
     expect(timings.implement?.durationMs).toBe(NOW - Date.parse(IMPLEMENT_AT));
   });
+
+  it("stops dwell at the last ended time when the line is closed", () => {
+    const implement = { ...phase("implement", "Implement", IMPLEMENT_AT, "failed"), endedAt: VERIFY_AT };
+    const timings = timingsForConsoleColumns(
+      {
+        ...SPLIT_RUN_RUNNING,
+        lineStatus: "failed",
+        currentStepIndex: 0,
+        phases: [phase("backlog", "Backlog", INTAKE_AT), implement],
+      },
+      NOW,
+    );
+
+    expect(timings.implement).toEqual({
+      enteredAt: IMPLEMENT_AT,
+      durationMs: Date.parse(VERIFY_AT) - Date.parse(IMPLEMENT_AT),
+    });
+    expect(timings.verify).toBeUndefined();
+  });
+
+  it("maps a named implement step to Implement even when stepIndex is 1", () => {
+    const timings = timingsFor(phase("backlog", "Backlog", INTAKE_AT), {
+      ...phase("open-pr", "Open pull request", IMPLEMENT_AT, "running"),
+      stepIndex: 1,
+    });
+
+    expect(timings.implement).toEqual({ enteredAt: IMPLEMENT_AT, durationMs: NOW - Date.parse(IMPLEMENT_AT) });
+    expect(timings.verify).toBeUndefined();
+  });
 });

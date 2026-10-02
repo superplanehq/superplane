@@ -48,6 +48,9 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Running");
     expect(screen.getByTestId("redesign-console-column-marker-verify")).toHaveAttribute("data-status", "pending");
     expect(screen.getByTestId("redesign-console-column-marker-done")).toHaveAttribute("data-status", "pending");
+    expect(
+      within(screen.getByTestId("redesign-console-column-backlog")).queryByText("Skipped"),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
     expect(screen.getByTestId("redesign-console-column-verify").getAttribute("data-completed")).toBeNull();
   });
