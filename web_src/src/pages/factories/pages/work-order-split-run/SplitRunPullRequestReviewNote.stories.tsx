@@ -112,6 +112,76 @@ export const MergeUnavailable: Story = {
   ),
 };
 
+export const WebhookFailed: Story = {
+  name: "Webhook setup failed",
+  parameters: {
+    msw: {
+      handlers: [
+        http.get("*/account/experimental-features", () =>
+          HttpResponse.json({ features: [{ id: "factory_pull_request_merge", released: true }] }),
+        ),
+        http.get("*/api/v1/organizations/org-1", () =>
+          HttpResponse.json({ organization: { metadata: { id: "org-1" } } }),
+        ),
+        http.get("*/api/v1/factories/factory-1/prs/pr-6812/mergeability", () =>
+          HttpResponse.json({
+            mergeability: {
+              canMerge: false,
+              blockedReason: "BLOCKED_REASON_WEBHOOK_FAILED",
+              message:
+                "SuperPlane could not register a webhook on this repository. GitHub allows 20 pull request webhooks, and this repository already has 20. Remove an unused webhook, then try again.",
+            },
+          }),
+        ),
+        http.post("*/api/v1/factories/factory-1/prs/pr-6812/webhook-retry", () => HttpResponse.json({})),
+      ],
+    },
+  },
+  render: () => (
+    <div className="flex max-w-[750px] flex-col gap-6">
+      <SplitRunAttentionNote
+        note={{
+          headline: "Waiting for user review",
+          text: "The pull request is open.",
+          cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+        }}
+        organizationId="org-1"
+        factoryId="factory-1"
+        orderId="wo-1"
+        pullRequests={[
+          {
+            id: "pr-6812",
+            provider: "PROVIDER_GITHUB",
+            state: "STATE_OPEN",
+            url: "https://github.com/acme/payments/pull/6812",
+            number: "6812",
+          },
+        ]}
+      />
+      <SplitRunAttentionNote
+        compact
+        note={{
+          headline: "Waiting for user review",
+          text: "The pull request is open.",
+          cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+        }}
+        organizationId="org-1"
+        factoryId="factory-1"
+        orderId="wo-1"
+        pullRequests={[
+          {
+            id: "pr-6812",
+            provider: "PROVIDER_GITHUB",
+            state: "STATE_OPEN",
+            url: "https://github.com/acme/payments/pull/6812",
+            number: "6812",
+          },
+        ]}
+      />
+    </div>
+  ),
+};
+
 export const MergeReady: Story = {
   name: "Merge is ready",
   render: () => (

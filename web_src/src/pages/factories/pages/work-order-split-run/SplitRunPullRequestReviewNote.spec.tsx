@@ -8,11 +8,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
 const mergeMutate = vi.fn();
+const retryMutate = vi.fn();
 const experimentalFeatureHas = { current: (_id: string) => true };
 
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
   useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+  useRetryFactoryPullRequestWebhook: () => ({ mutate: retryMutate, isPending: false }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -54,6 +56,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   mergeMutate.mockReset();
+  retryMutate.mockReset();
   experimentalFeatureHas.current = () => true;
   mergeability.current = {
     canMerge: true,
@@ -339,5 +342,70 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
     expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+  });
+
+  it("shows a failed webhook setup on the full strip without a hover", async () => {
+    const user = userEvent.setup();
+    const message =
+      "SuperPlane could not register a webhook on this repository. GitHub allows 20 pull request webhooks, and this repository already has 20. Remove an unused webhook, then try again.";
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_WEBHOOK_FAILED",
+      message,
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: message })).toBeInTheDocument();
+    expect(note).not.toHaveTextContent("Merge status is unavailable right now.");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-webhook-retry")).toHaveAccessibleName("Try again");
+
+    await user.click(screen.getByTestId("split-run-webhook-retry"));
+    expect(retryMutate).toHaveBeenCalledWith("pr-6812", expect.any(Object));
+  });
+
+  it("shows a failed webhook setup on the compact strip without a hover", () => {
+    const message = "SuperPlane could not register a webhook on this repository. Try again.";
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_WEBHOOK_FAILED",
+      message,
+    };
+    renderNote({ pullRequests: [GITHUB_PR], compact: true });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: message })).toBeInTheDocument();
+    expect(note).not.toHaveTextContent("POST /repos/acme/app/hooks returned 500");
+    expect(screen.getByTestId("split-run-webhook-retry")).toBeInTheDocument();
+  });
+
+  it("hides webhook setup errors when pull request merge is off", () => {
+    experimentalFeatureHas.current = () => false;
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_WEBHOOK_FAILED",
+      message: "SuperPlane could not register a webhook on this repository. Try again.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-webhook-retry")).not.toBeInTheDocument();
+  });
+
+  it("hides Try again when the user cannot act", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_WEBHOOK_FAILED",
+      message: "SuperPlane could not register a webhook on this repository. Try again.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR], canAct: false });
+
+    expect(
+      screen.getByRole("heading", { name: "SuperPlane could not register a webhook on this repository. Try again." }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-webhook-retry")).not.toBeInTheDocument();
   });
 });

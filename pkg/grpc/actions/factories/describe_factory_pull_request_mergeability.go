@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
 )
@@ -39,6 +40,28 @@ func DescribeFactoryPullRequestMergeability(
 	}
 	repository = pullRequest.Repository
 
+	hook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
+	}
+	if hook == nil && factoryMergeabilityWebhookExpected(db, factory, pullRequest.Repository) {
+		if ensureErr := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); ensureErr != nil {
+			log.WithError(ensureErr).Warnf(
+				"factory mergeability: failed to ensure webhook for %s",
+				pullRequest.Repository,
+			)
+		}
+		hook, err = findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
+		}
+	}
+	if hook != nil && hook.State == models.WebhookStateFailed {
+		return &pb.DescribeFactoryPullRequestMergeabilityResponse{
+			Mergeability: failedFactoryMergeabilityResult(pullRequest, hook).proto(),
+		}, nil
+	}
+
 	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
@@ -48,6 +71,12 @@ func DescribeFactoryPullRequestMergeability(
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 		}
+	}
+	if result != nil {
+		result.WebhookSetupPending = webhookSetupInProgress(
+			hook,
+			factoryMergeabilityWebhookExpected(db, factory, pullRequest.Repository),
+		)
 	}
 
 	return &pb.DescribeFactoryPullRequestMergeabilityResponse{Mergeability: result.proto()}, nil

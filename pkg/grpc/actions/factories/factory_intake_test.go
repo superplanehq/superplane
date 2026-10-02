@@ -363,7 +363,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.True(t, listed.GetIntakes()[0].GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, listed.GetIntakes()[0].GetHealth())
 
-		require.NoError(t, webhook.MarkFailed(database.DB(t.Context())))
+		require.NoError(t, webhook.MarkFailed(database.DB(t.Context()), ""))
 		listed, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
 		require.NoError(t, err)
 		require.Len(t, listed.GetIntakes(), 1)

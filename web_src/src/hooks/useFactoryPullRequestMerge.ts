@@ -1,10 +1,25 @@
-import { factoriesDescribeFactoryPullRequestMergeability, factoriesMergeFactoryPullRequest } from "@/api-client";
+import {
+  factoriesDescribeFactoryPullRequestMergeability,
+  factoriesMergeFactoryPullRequest,
+  factoriesRetryFactoryPullRequestWebhook,
+} from "@/api-client";
 import type { FactoriesFactoryPullRequestMergeability, FactoryPullRequestMergeabilityMergeMethod } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryQueryKeys } from "./useFactoryData";
 import { invalidateFactoryWorkOrderQueries } from "./useFactoryWebsocket";
+
+export const factoryPullRequestWebhookSetupPollMs = 2_000;
+
+export function factoryPullRequestMergeabilityPollInterval(
+  mergeability: { webhookSetupPending?: boolean } | undefined,
+): number | false {
+  if (mergeability?.webhookSetupPending) {
+    return factoryPullRequestWebhookSetupPollMs;
+  }
+  return false;
+}
 
 export function factoryPullRequestMergeabilityKey(organizationId: string, factoryId: string, pullRequestId: string) {
   return factoryQueryKeys.pullRequestMergeability(organizationId, factoryId, pullRequestId);
@@ -28,6 +43,7 @@ export function useFactoryPullRequestMergeability(
       return response.data?.mergeability ?? {};
     },
     enabled: Boolean(organizationId && factoryId && pullRequestId) && (options?.enabled ?? true),
+    refetchInterval: (current) => factoryPullRequestMergeabilityPollInterval(current.state.data),
   });
 }
 
@@ -60,6 +76,26 @@ export function useMergeFactoryPullRequest(organizationId: string, factoryId: st
         queryKey: factoryPullRequestMergeabilityKey(organizationId, factoryId, input.pullRequestId),
       });
       invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
+    },
+  });
+}
+
+export function useRetryFactoryPullRequestWebhook(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pullRequestId: string) => {
+      await factoriesRetryFactoryPullRequestWebhook(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, prId: pullRequestId },
+        }),
+      );
+    },
+    onSuccess: (_data, pullRequestId) => {
+      void queryClient.invalidateQueries({
+        queryKey: factoryPullRequestMergeabilityKey(organizationId, factoryId, pullRequestId),
+      });
     },
   });
 }

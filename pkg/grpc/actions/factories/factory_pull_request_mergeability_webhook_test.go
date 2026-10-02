@@ -103,13 +103,19 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	require.Len(t, webhooks, 1)
 	assert.Equal(t, firstID, webhooks[0].ID)
 
-	require.NoError(t, db.Model(&webhooks[0]).Update("state", models.WebhookStateFailed).Error)
+	require.NoError(t, db.Model(&webhooks[0]).Updates(map[string]any{
+		"state":       models.WebhookStateFailed,
+		"retry_count": 3,
+		"last_error":  `error creating webhook: The "pull_request" event cannot have more than 20 hooks.`,
+	}).Error)
 	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
 	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
 	require.NoError(t, err)
 	require.Len(t, webhooks, 1)
 	assert.Equal(t, firstID, webhooks[0].ID)
-	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	assert.Equal(t, models.WebhookStateFailed, webhooks[0].State)
+	assert.Equal(t, 3, webhooks[0].RetryCount)
+	assert.Contains(t, webhooks[0].LastError, "cannot have more than 20 hooks")
 	assert.Equal(t, "acme/app", factoryMergeabilityWebhookRepository(webhooks[0].Configuration.Data()))
 
 	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/other"))
