@@ -4,7 +4,6 @@ import { describe, expect, it } from "bun:test";
 
 import { formatDuration } from "@/lib/duration";
 
-import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 import type { AgentActivity, AgentToolItem } from "./agentActivity";
 import { AgentActivityView } from "./AgentActivityView";
 
@@ -255,9 +254,8 @@ describe("AgentActivityView console", () => {
     expect(screen.getByText("README.md")).toBeInTheDocument();
   });
 
-  it("shows command time and duration on hover", async () => {
+  it("shows command duration on the line and does not open a tooltip", async () => {
     const user = userEvent.setup();
-    const startedAtMs = Date.parse("2026-09-30T00:59:00.000Z");
     render(
       <AgentActivityView
         collapseCompleted={false}
@@ -266,16 +264,15 @@ describe("AgentActivityView console", () => {
         activity={activityWith({
           ...completedTool("command-1", "bash", "Bash"),
           input: "echo hi",
-          startedAtMs,
           durationMs: 2_400,
         })}
       />,
     );
 
-    await user.hover(screen.getByTestId("agent-tool-command-1"));
-    const tooltip = await screen.findByRole("tooltip");
-    expect(tooltip).toHaveTextContent(formatWorkOrderDateTime(new Date(startedAtMs)));
-    expect(tooltip).toHaveTextContent(formatDuration(2_400, { precision: "second" }));
+    const command = screen.getByTestId("agent-tool-command-1");
+    await user.hover(command);
+    expect(command.parentElement).toHaveTextContent(formatDuration(2_400, { precision: "second" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
   it("keeps completed reasoning visible when collapse is off", () => {
