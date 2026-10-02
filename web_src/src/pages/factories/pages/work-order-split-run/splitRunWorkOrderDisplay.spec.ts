@@ -28,7 +28,7 @@ describe("elapsedForDisplay", () => {
   it("formats running elapsed time from createdAt", () => {
     const now = Date.parse(START) + FOUR_MINUTES;
     expect(elapsedForDisplay("running", { createdAt: START, updatedAt: START }, now)).toBe(
-      `${formatDuration(FOUR_MINUTES, { precision: "second" })} so far`,
+      formatDuration(FOUR_MINUTES, { precision: "second" }),
     );
   });
 
@@ -39,12 +39,12 @@ describe("elapsedForDisplay", () => {
     );
   });
 
-  it("rounds a running multi-day duration and keeps so far", () => {
+  it("rounds a running multi-day duration the same way as a finished one", () => {
     const now = Date.parse(START) + LONG_RUN;
-    expect(elapsedForDisplay("running", { createdAt: START, updatedAt: START }, now)).toBe("5d 8h so far");
+    expect(elapsedForDisplay("running", { createdAt: START, updatedAt: START }, now)).toBe("5d 8h");
   });
 
-  it("rounds a finished multi-day duration without so far", () => {
+  it("rounds a finished multi-day duration", () => {
     const updatedAt = new Date(Date.parse(START) + LONG_RUN).toISOString();
     expect(elapsedForDisplay("completed", { createdAt: START, updatedAt })).toBe("5d 8h");
   });

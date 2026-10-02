@@ -191,7 +191,7 @@ const nodes: Node<StepNodeData>[] = [
       showLogs: true,
       details: {
         startedAt: "14:03:47",
-        duration: "9m so far",
+        duration: "9m",
         agent: "implementor",
         attempt: "1 / 3",
         output: "Editing auth mock routes and tests…",

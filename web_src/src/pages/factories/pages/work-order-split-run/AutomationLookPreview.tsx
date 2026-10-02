@@ -29,7 +29,7 @@ const START: PreviewPhase[] = [
     id: "implement",
     name: "Implement",
     status: "running",
-    duration: "1m 12s so far",
+    duration: "1m 12s",
     nodes: [
       { name: "Claude Code", status: "running" },
       { name: "Run tests", status: "pending" },
@@ -87,9 +87,7 @@ export function AutomationLookPreview({ look }: { look: AutomationLook }) {
   };
   const onRerun = (id: string) => {
     setPhases((current) =>
-      current.map((phase) =>
-        phase.id === id ? { ...phase, status: "running" as const, duration: "0s so far" } : phase,
-      ),
+      current.map((phase) => (phase.id === id ? { ...phase, status: "running" as const, duration: "0s" } : phase)),
     );
     setOpenId(id);
   };
