@@ -85,6 +85,43 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 	}
 }
 
+func TestEmptyRepositoryUsesBranchFromLostInitRace(t *testing.T) {
+	remote := bareRepository(t)
+	result := runCloneScriptWithPushShim(
+		t,
+		implementationCloneCommand(t),
+		fileURL(remote),
+		"develop",
+		seedRemoteBranchScript(t, "develop"),
+	)
+
+	require.NoError(t, result.err, result.stderr)
+	repo := filepath.Join(result.dir, "repo")
+	assert.Equal(t, "winner", strings.TrimSpace(gitOutput(t, repo, "log", "-1", "--format=%s")))
+	assert.Equal(t, "0", revListCount(t, repo, "origin/develop..HEAD"))
+	content, err := os.ReadFile(filepath.Join(repo, "README"))
+	require.NoError(t, err)
+	assert.Equal(t, "winner\n", string(content))
+	assert.Equal(t, "develop", strings.TrimSpace(gitOutput(t, repo, "rev-parse", "--abbrev-ref", "HEAD")))
+}
+
+func TestEmptyRepositoryFailsWhenInitPushFails(t *testing.T) {
+	remote := bareRepository(t)
+	result := runCloneScriptWithPushShim(
+		t,
+		implementationCloneCommand(t),
+		fileURL(remote),
+		"develop",
+		"#!/bin/sh\nexit 1\n",
+	)
+
+	require.Error(t, result.err)
+	assert.Contains(t, result.stderr, "Failed to create develop.")
+	heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
+	assert.Empty(t, strings.TrimSpace(heads))
+	assert.NoFileExists(t, filepath.Join(result.dir, "repo", "README"))
+}
+
 func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 	remote := bareRepository(t)
 	result := runCloneScript(t, implementationCloneCommand(t), fileURL(remote), "develop")
@@ -153,6 +190,11 @@ type cloneScriptResult struct {
 
 func runCloneScript(t *testing.T, script, repoURL, base string) cloneScriptResult {
 	t.Helper()
+	return runCloneScriptWithPushShim(t, script, repoURL, base, "")
+}
+
+func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim string) cloneScriptResult {
+	t.Helper()
 
 	gitPath := gitBinary(t)
 	dir := t.TempDir()
@@ -160,7 +202,17 @@ func runCloneScript(t *testing.T, script, repoURL, base string) cloneScriptResul
 	binDir := filepath.Join(dir, "bin")
 	require.NoError(t, os.Mkdir(binDir, 0o755))
 	logPath := filepath.Join(dir, "git-args")
-	wrapper := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + shellQuote(logPath) + "\nexec " + shellQuote(gitPath) + " \"$@\"\n"
+	shimPath := ""
+	if pushShim != "" {
+		shimPath = filepath.Join(dir, "push-shim")
+		require.NoError(t, os.WriteFile(shimPath, []byte(pushShim), 0o755))
+	}
+	wrapper := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + shellQuote(logPath) + "\n" +
+		"if [ \"$1\" = push ] && [ -n \"$PUSH_SHIM\" ] && [ ! -f \"$PUSH_SHIM_ONCE\" ]; then\n" +
+		"  touch \"$PUSH_SHIM_ONCE\"\n" +
+		"  \"$PUSH_SHIM\" || exit $?\n" +
+		"fi\n" +
+		"exec " + shellQuote(gitPath) + " \"$@\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "git"), []byte(wrapper), 0o755))
 
 	configPath := filepath.Join(home, ".gitconfig")
@@ -174,11 +226,14 @@ func runCloneScript(t *testing.T, script, repoURL, base string) cloneScriptResul
 		"GIT_CONFIG_GLOBAL=" + configPath,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_TERMINAL_PROMPT=0",
+		"GIT_REAL=" + gitPath,
 		"LANG=C",
 		"LC_ALL=C",
 		"REPO_URL=" + repoURL,
 		"BASE=" + base,
 		"GITHUB_TOKEN=test-token",
+		"PUSH_SHIM=" + shimPath,
+		"PUSH_SHIM_ONCE=" + filepath.Join(dir, "push-shim-once"),
 	}
 	output, err := cmd.CombinedOutput()
 	args, readErr := os.ReadFile(logPath)
@@ -191,6 +246,20 @@ func runCloneScript(t *testing.T, script, repoURL, base string) cloneScriptResul
 		gitArgs: string(args),
 		err:     err,
 	}
+}
+
+func seedRemoteBranchScript(t *testing.T, branch string) string {
+	t.Helper()
+	return "#!/bin/sh\n" +
+		"set -eu\n" +
+		"work=$(mktemp -d)\n" +
+		"\"$GIT_REAL\" clone \"$REPO_URL\" \"$work\"\n" +
+		"cd \"$work\"\n" +
+		"\"$GIT_REAL\" checkout -B " + shellQuote(branch) + "\n" +
+		"printf '%s\\n' 'winner' > README\n" +
+		"\"$GIT_REAL\" add README\n" +
+		"\"$GIT_REAL\" -c user.email=winner@example.com -c user.name=Winner commit -m winner\n" +
+		"\"$GIT_REAL\" push origin " + shellQuote("HEAD:refs/heads/"+branch) + "\n"
 }
 
 func bareRepository(t *testing.T) string {

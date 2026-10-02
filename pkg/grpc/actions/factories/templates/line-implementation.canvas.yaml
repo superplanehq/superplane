@@ -262,11 +262,29 @@ spec:
               HOOK
               chmod +x .git/hooks/prepare-commit-msg
 
+              use_existing_branch() {
+                echo "Another run created ${branch}. Using that branch." >&2
+                git fetch origin "${branch}"
+                git checkout -B "${branch}" "origin/${branch}"
+              }
+
               if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
-                echo "Remote has no branches. Creating ${branch}." >&2
-                git checkout -B "${branch}"
-                git commit --allow-empty -s -m "chore: Initialize repository"
-                git push -u origin "HEAD:refs/heads/${branch}"
+                remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                if [ -n "$remote_head" ]; then
+                  use_existing_branch
+                else
+                  echo "Remote has no branches. Creating ${branch}." >&2
+                  git checkout -B "${branch}"
+                  git commit --allow-empty -s -m "chore: Initialize repository"
+                  if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+                    remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                    if [ -z "$remote_head" ]; then
+                      echo "Failed to create ${branch}." >&2
+                      exit 1
+                    fi
+                    use_existing_branch
+                  fi
+                fi
               fi
           - name: Implementation
             type: prompt
