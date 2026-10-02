@@ -1,29 +1,18 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import type { FilesFile } from "@/api-client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 
-import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
-import { runningSplitRunPhaseId } from "./followLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
-import { splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
-import {
-  classicSplitRunFixture,
-  hasActivePullRequestActivity,
-  refinePopupShowsAutomations,
-  type SplitRunPopupTab,
-} from "./splitRunPopupModel";
-import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
-import { useFollowLogScroll } from "./useFollowLogScroll";
+import type { SplitRunFixture } from "./splitRunMocks";
+import { refinePopupShowsAutomations } from "./splitRunPopupModel";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import type { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
-import { WorkOrderSplitRunBody } from "./WorkOrderSplitRunBody";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type SplitRunPopupTabsProps = {
@@ -36,10 +25,6 @@ type SplitRunPopupTabsProps = {
   orderId?: string;
   orderNumber?: string;
   lineId?: string;
-  /** Show the pre-console Task and Automations tabs instead of the console. */
-  classic: boolean;
-  tab: SplitRunPopupTab;
-  onTabChange: (tab: SplitRunPopupTab) => void;
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
@@ -128,9 +113,6 @@ export function SplitRunPopupTabs({
   orderId,
   orderNumber,
   lineId,
-  classic,
-  tab,
-  onTabChange,
   canUpdate,
   footerActions,
   resultFooter,
@@ -176,33 +158,6 @@ export function SplitRunPopupTabs({
     );
   }
 
-  if (classic) {
-    return (
-      <SplitRunPopupClassicTabs
-        fixture={fixture}
-        edits={edits}
-        popupData={popupData}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        orderId={orderId}
-        orderNumber={orderNumber}
-        lineId={lineId}
-        tab={tab}
-        onTabChange={onTabChange}
-        canUpdate={canUpdate}
-        footerActions={footerActions}
-        resultFooter={resultFooter}
-        sidebarNote={sidebarNote}
-        analysis={analysis}
-        sourceOnly={sourceOnly}
-        lookupErrorNote={lookupErrorNote}
-        files={files}
-        header={header}
-      />
-    );
-  }
-
   return (
     <>
       {header(null)}
@@ -238,125 +193,6 @@ export function SplitRunPopupTabs({
         />
       </div>
     </>
-  );
-}
-
-/** The pre-console popup: Task and Automations tabs. Kept for orgs without the Task Console feature. */
-function SplitRunPopupClassicTabs({
-  fixture,
-  edits,
-  popupData,
-  organizationId,
-  factoryId,
-  factoryKey,
-  orderId,
-  orderNumber,
-  lineId,
-  tab,
-  onTabChange,
-  canUpdate,
-  footerActions,
-  resultFooter,
-  sidebarNote,
-  analysis,
-  sourceOnly,
-  lookupErrorNote,
-  files,
-  header,
-}: Omit<SplitRunPopupTabsProps, "classic" | "panelReview" | "sessionLookupError"> & {
-  lookupErrorNote: ReactNode;
-  files?: FilesFile[];
-}) {
-  const classicFixture = useMemo(() => classicSplitRunFixture(fixture), [fixture]);
-  const [streamTick, setStreamTick] = useState("");
-  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(classicFixture.phases), streamTick, {
-    resumeOnBottom: true,
-  });
-  return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => {
-        if (value === "description" || value === "log") {
-          onTabChange(value);
-        }
-      }}
-      className="flex min-h-0 min-w-0 flex-1 flex-col"
-    >
-      {header(
-        <SplitRunPopupViewTabs
-          lineStatus={classicFixture.lineStatus}
-          hasActivePullRequestActivity={hasActivePullRequestActivity(classicFixture)}
-        />,
-      )}
-      <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
-        {lookupErrorNote}
-        <SplitRunPopupOverview
-          fixture={classicFixture}
-          edits={edits}
-          popupData={popupData}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          orderId={orderId}
-          orderNumber={orderNumber}
-          files={files}
-          resultFooter={resultFooter}
-          sidebarNote={sidebarNote}
-          analysis={analysis}
-          sourceOnly={sourceOnly}
-        />
-      </TabsContent>
-      <TabsContent
-        value="log"
-        forceMount
-        className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-      >
-        <WorkOrderSplitRunBody
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          orderId={orderId}
-          orderNumber={orderNumber}
-          lineId={lineId}
-          fixture={classicFixture}
-          canUpdate={canUpdate}
-          footerActions={footerActions}
-          follow={follow}
-          onStreamTick={setStreamTick}
-          files={files}
-        />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-const VIEW_TAB_CLASSNAME = "sp-popup-view-tab";
-
-function SplitRunPopupViewTabs({
-  lineStatus,
-  hasActivePullRequestActivity: hasActivePRActivity,
-}: {
-  lineStatus: SplitRunFixture["lineStatus"];
-  hasActivePullRequestActivity: boolean;
-}) {
-  const automationStatus = hasActivePRActivity ? "running" : displayStatusForLineStatus(lineStatus);
-  const automationStatusLabel = hasActivePRActivity ? "Running" : splitRunStatusLabel(lineStatus);
-  return (
-    <TabsList aria-label="Task views">
-      <TabsTrigger value="description" className={VIEW_TAB_CLASSNAME}>
-        Task
-      </TabsTrigger>
-      <TabsTrigger value="log" className={VIEW_TAB_CLASSNAME}>
-        <WorkOrderStatusIcon
-          status={automationStatus}
-          title={automationStatusLabel}
-          className="size-3"
-          data-testid="split-run-log-tab-dot"
-          aria-hidden
-        />
-        Automations
-      </TabsTrigger>
-    </TabsList>
   );
 }
 

@@ -13,7 +13,6 @@ import { TooltipProvider } from "@/ui/tooltip";
 import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
-const taskConsoleEnabled = { current: true };
 const { closeMutateAsync } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
 }));
@@ -59,7 +58,7 @@ const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSe
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: () => taskConsoleEnabled.current,
+    has: () => true,
     enabledExperimentalFeatures: [],
     isLoading: false,
   }),
@@ -257,7 +256,6 @@ describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
-    taskConsoleEnabled.current = true;
     useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     findPlanningSessionMock.mockReset();
@@ -1579,20 +1577,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
-  it("shows Archive in the header of a started open popup with Task and Automations", () => {
-    taskConsoleEnabled.current = false;
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
-
-    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
-    const archive = screen.getByTestId("popup-work-order-archive-button");
-    const share = screen.getByTestId("popup-work-order-copy-link-button");
-    expect(archive).toHaveAttribute("aria-label", "Archive");
-    expect(archive.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-  });
-
   it("archives a started open task as rejected and closes the popup", async () => {
-    taskConsoleEnabled.current = false;
     const user = userEvent.setup();
     const onClose = vi.fn();
     renderPopup({
@@ -1711,6 +1696,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
+    expect(screen.getByTestId("work-order-split-run").className).not.toContain("w-[min(72rem");
   });
 
   it("tells a draft is under analysis and keeps Archive in the header", () => {
