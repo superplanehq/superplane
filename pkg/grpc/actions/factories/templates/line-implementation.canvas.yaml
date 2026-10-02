@@ -261,11 +261,20 @@ spec:
               exit 0
               HOOK
               chmod +x .git/hooks/prepare-commit-msg
+
+              if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+                echo "Remote has no branches. Creating ${branch}." >&2
+                git checkout -B "${branch}"
+                git commit --allow-empty -s -m "chore: Initialize repository"
+                git push -u origin "HEAD:refs/heads/${branch}"
+              fi
           - name: Implementation
             type: prompt
             workingDirectory: repo
             prompt: |-
               You are implementing a SuperPlane task. The repository is cloned in the current working directory on {{ task().default_branch }}.
+
+              If the repository had no commits, the clone step already pushed an initial commit on {{ task().default_branch }}. Do not change that commit.
 
               Repository: {{ task().repository }}
               Task title: {{ task().title }}

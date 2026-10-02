@@ -46,6 +46,13 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 				assert.NotContains(t, cloneLine, "--branch")
 				assert.NotContains(t, cloneLine, "--depth")
 				assert.NotContains(t, cloneLine, "github.com")
+				heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
+				if script.name == "implementation" {
+					assert.Contains(t, heads, "refs/heads/main")
+					assert.Equal(t, "0", revListCount(t, filepath.Join(result.dir, "repo"), "origin/main..HEAD"))
+				} else {
+					assert.Empty(t, strings.TrimSpace(heads))
+				}
 			})
 
 			t.Run("named branch uses a depth-1 clone", func(t *testing.T) {
@@ -61,6 +68,7 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 				assert.FileExists(t, filepath.Join(result.dir, "repo", ".git", "shallow"))
 				head := gitOutput(t, filepath.Join(result.dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD")
 				assert.Equal(t, "develop", strings.TrimSpace(head))
+				assert.Equal(t, "1", revListCount(t, remote, "develop"))
 			})
 
 			t.Run("missing named branch fails", func(t *testing.T) {
@@ -75,6 +83,25 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
+	remote := bareRepository(t)
+	result := runCloneScript(t, implementationCloneCommand(t), fileURL(remote), "develop")
+
+	require.NoError(t, result.err, result.stderr)
+	heads := gitOutput(t, remote, "ls-remote", "--heads", fileURL(remote))
+	assert.Contains(t, heads, "refs/heads/develop")
+	assert.NotContains(t, heads, "refs/heads/main")
+	assert.NotContains(t, heads, "refs/heads/master")
+
+	repo := filepath.Join(result.dir, "repo")
+	assert.Equal(t, "0", revListCount(t, repo, "origin/develop..HEAD"))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("work\n"), 0o644))
+	gitOutput(t, repo, "checkout", "-b", "feature")
+	gitOutput(t, repo, "add", "README")
+	gitOutput(t, repo, "commit", "-m", "feat: Add work")
+	assert.Equal(t, "1", revListCount(t, repo, "origin/develop..HEAD"))
 }
 
 func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
@@ -211,6 +238,11 @@ func gitOutput(t *testing.T, dir string, args ...string) string {
 	return runGit(t, dir, args...)
 }
 
+func revListCount(t *testing.T, dir, rangeSpec string) string {
+	t.Helper()
+	return strings.TrimSpace(gitOutput(t, dir, "rev-list", "--count", rangeSpec))
+}
+
 func denyNetworkGit(t *testing.T, configPath string) {
 	t.Helper()
 
@@ -230,37 +262,22 @@ var (
 func gitBinary(t *testing.T) string {
 	t.Helper()
 	gitOnce.Do(func() {
-		gitPath, gitErr = ensureGit()
+		gitPath, gitErr = findGit()
 	})
-	require.NoError(t, gitErr)
+	if gitErr != nil {
+		t.Skip(gitErr.Error())
+	}
 	return gitPath
 }
 
-func ensureGit() (string, error) {
+func findGit() (string, error) {
 	if path, err := exec.LookPath("git"); err == nil {
 		return path, nil
 	}
 	if _, err := os.Stat("/usr/bin/git"); err == nil {
 		return "/usr/bin/git", nil
 	}
-	if _, err := os.Stat("/usr/bin/apt-get"); err != nil {
-		return "", fmt.Errorf("git is not installed")
-	}
-
-	update := exec.Command("apt-get", "update")
-	update.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	if output, err := update.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("apt-get update: %w: %s", err, output)
-	}
-	install := exec.Command("apt-get", "install", "-y", "--no-install-recommends", "git")
-	install.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	if output, err := install.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("apt-get install git: %w: %s", err, output)
-	}
-	if _, err := os.Stat("/usr/bin/git"); err == nil {
-		return "/usr/bin/git", nil
-	}
-	return exec.LookPath("git")
+	return "", fmt.Errorf("git is not installed")
 }
 
 func fileURL(path string) string {
