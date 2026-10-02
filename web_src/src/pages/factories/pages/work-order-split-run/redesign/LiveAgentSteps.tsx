@@ -2,7 +2,11 @@ import type { AgentPromptUsageSeries } from "@/lib/agentRunTelemetry";
 import { cn } from "@/lib/utils";
 import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import { Link } from "@/components/Link/link";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/ui/skeleton";
+import { Bug } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { LOADING_REVEAL_CLASSNAME } from "../../../lib/loadingReveal";
@@ -19,6 +23,7 @@ import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
+import { NodeIcon } from "./redesignShared";
 
 const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
 const AGENT_LOG_SKELETON_LABEL = "Waiting for logs";
@@ -31,6 +36,13 @@ type RunnerLive = {
   isLoading: boolean;
 };
 
+type FailedNodeError = {
+  id: string;
+  name: string;
+  message: string;
+  iconSlug?: string;
+};
+
 export function LiveAgentSteps({
   stage,
   phase,
@@ -38,6 +50,7 @@ export function LiveAgentSteps({
   expandSteps = false,
   emptyNote,
   reportUsage = true,
+  runHref,
 }: {
   stage: AutomationStage;
   phase?: SplitRunPhase;
@@ -48,10 +61,12 @@ export function LiveAgentSteps({
   emptyNote?: string;
   /** When false, skip the usage chart. The card footer only charts the latest run. */
   reportUsage?: boolean;
+  /** Canvas run page for a failed node that is not a runner. */
+  runHref?: string | null;
 }) {
   const run = useLiveAgentRun(stage, phase, organizationId);
   const note = emptyNote && stage.status !== "running" ? <p className={META_TEXT_CLASSNAME}>{emptyNote}</p> : null;
-  if (!organizationId || !phase || run.runners.length === 0) {
+  if (!organizationId || !phase) {
     return (
       <SettledRunBody
         stage={stage}
@@ -85,6 +100,8 @@ export function LiveAgentSteps({
         liveActivity={run.liveActivity}
         hasLiveContent={run.hasLiveContent}
         note={note}
+        runHref={runHref}
+        failedNodes={run.failedNodes}
       />
     </>
   );
@@ -112,7 +129,10 @@ function SettledRunBody({
 
 function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefined, organizationId?: string) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
-  const stream = live.stream.length > 0 ? live.stream : (phase?.stream ?? []);
+  const stream = useMemo(
+    () => (live.stream.length > 0 ? live.stream : (phase?.stream ?? [])),
+    [live.stream, phase?.stream],
+  );
   const runners = stream.filter((line) => isRunnerComponent(line.component) && Boolean(line.executionId));
   const [liveByLine, setLiveByLine] = useState<Record<string, RunnerLive>>({});
   const reportLive = useCallback((lineId: string, next: RunnerLive) => {
@@ -125,6 +145,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes), stoppedStatus),
     [transcriptNotes, stoppedStatus],
   );
+  const failedNodes = useMemo(() => failedNonRunnerErrors(stream), [stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
   const running = Boolean(runningRunner);
   const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
@@ -152,6 +173,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
       ...stage,
       agentSteps: agentStepsForLiveRun(stage.agentSteps, liveSteps, pending.streamWaiting, stoppedStatus),
     },
+    failedNodes,
     stoppedStatus,
   };
 }
@@ -204,6 +226,8 @@ function AgentRunBody({
   liveActivity,
   hasLiveContent,
   note,
+  runHref,
+  failedNodes,
 }: {
   stageId: string;
   shown: AutomationStage;
@@ -214,12 +238,14 @@ function AgentRunBody({
   liveActivity?: AgentActivity;
   hasLiveContent: boolean;
   note: ReactNode;
+  runHref?: string | null;
+  failedNodes: FailedNodeError[];
 }) {
   if (showLogSkeleton) {
     return <AgentLogSkeleton />;
   }
-  if (shown.agentSteps.length > 0) {
-    return (
+  const steps =
+    shown.agentSteps.length > 0 ? (
       <div className={cn(revealSteps && LOADING_REVEAL_CLASSNAME)}>
         <AgentStepMarkers
           stage={shown}
@@ -227,6 +253,14 @@ function AgentRunBody({
           liveActivity={running ? liveActivity : undefined}
           liveActive={running}
         />
+      </div>
+    ) : null;
+  const errors = failedNodes.length > 0 ? <FailedNodeAlerts nodes={failedNodes} runHref={runHref} /> : null;
+  if (steps || errors) {
+    return (
+      <div className="space-y-3">
+        {steps}
+        {errors}
       </div>
     );
   }
@@ -346,6 +380,51 @@ function useRunnerLiveNotes(
     isStreaming,
     isLoading,
   };
+}
+
+function failedNonRunnerErrors(lines: SplitRunStreamLine[]): FailedNodeError[] {
+  return lines
+    .filter((line) => !line.note && line.status === "failed" && !isRunnerComponent(line.component))
+    .map((line) => ({
+      id: line.id,
+      name: line.componentName,
+      message: line.detail?.trim() || "This node failed.",
+      iconSlug: line.iconSlug,
+    }));
+}
+
+function FailedNodeAlerts({ nodes, runHref }: { nodes: FailedNodeError[]; runHref?: string | null }) {
+  return (
+    <div className="space-y-2">
+      {nodes.map((node) => (
+        <FailedNodeAlert key={node.id} node={node} runHref={runHref} />
+      ))}
+    </div>
+  );
+}
+
+function FailedNodeAlert({ node, runHref }: { node: FailedNodeError; runHref?: string | null }) {
+  return (
+    <Alert variant="destructive" data-testid="redesign-run-node-error">
+      <NodeIcon iconSlug={node.iconSlug} />
+      <AlertTitle>{node.name}</AlertTitle>
+      <AlertDescription>
+        <pre className="max-h-40 w-full overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap text-destructive">
+          {node.message}
+        </pre>
+      </AlertDescription>
+      {runHref ? (
+        <AlertAction>
+          <Button asChild size="sm" variant="outline">
+            <Link href={runHref}>
+              <Bug className="size-3.5" aria-hidden />
+              Debug
+            </Link>
+          </Button>
+        </AlertAction>
+      ) : null}
+    </Alert>
+  );
 }
 
 function AgentLogSkeleton() {
