@@ -2,6 +2,7 @@ import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArti
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -26,6 +27,7 @@ export type SplitRunIntakeKind =
   | "pagerduty-incidents"
   | "productive-tasks"
   | "datadog"
+  | "linear-issues"
   | "slack";
 
 export type SplitRunAddedBy =
@@ -77,6 +79,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
   "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
   datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
+  "linear-issues": { name: "Linear", iconSrc: linearIcon, iconAlt: "Linear" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
@@ -88,6 +91,7 @@ const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = 
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
   { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
+  { pattern: /linear/i, kind: "linear-issues" },
 ];
 
 export function sourceTicketLabel(url: string): string {
@@ -102,6 +106,10 @@ export function sourceTicketLabel(url: string): string {
   const jira = jiraTicketLabel(parsed);
   if (jira) {
     return jira;
+  }
+  const linear = linearTicketLabel(parsed);
+  if (linear) {
+    return linear;
   }
   const id = hostTicketId(parsed);
   // Productive.io links carry the organization id where other hosts carry a
@@ -219,6 +227,9 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host.includes("atlassian.net") || host.includes("jira.com")) {
     return "jira-issues";
   }
+  if (host === "linear.app" || host.endsWith(".linear.app")) {
+    return "linear-issues";
+  }
   return intakeKindFromLabel(host);
 }
 
@@ -259,6 +270,18 @@ function githubTicketLabel(parsed: URL): string | undefined {
     return undefined;
   }
   return `${owner}/${repo}#${number}`;
+}
+
+function linearTicketLabel(parsed: URL): string | undefined {
+  if (parsed.hostname !== "linear.app" && !parsed.hostname.endsWith(".linear.app")) {
+    return undefined;
+  }
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  const issueAt = parts.indexOf("issue");
+  if (issueAt >= 0 && parts[issueAt + 1]) {
+    return parts[issueAt + 1];
+  }
+  return undefined;
 }
 
 function jiraTicketLabel(parsed: URL): string | undefined {

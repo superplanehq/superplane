@@ -34,6 +34,7 @@ describe("sourceTicketLabel", () => {
 
   it("uses the issue key for Jira browse links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/browse/DEV-3")).toBe("DEV-3");
+    expect(sourceTicketLabel("https://linear.app/acme/issue/ENG-142/fix-login-redirect")).toBe("ENG-142");
   });
 
   it("uses the issue key for Jira project issue links", () => {
