@@ -77,11 +77,12 @@ function PublicBoardTaskCard({ card, board, index }: { card: PublicBoardCard; bo
       onDispatch={async () => undefined}
       onAssigneesSave={async () => undefined}
       pullRequests={order.pullRequests ?? []}
-      clarityScore={card.clarity}
-      confidenceScore={card.confidence}
+      clarityScore={card.analyzing ? undefined : card.clarity}
+      confidenceScore={card.analyzing ? undefined : card.confidence}
       showClarity={board.showClarity}
       showConfidenceScore={board.showConfidence}
-      hasAgentQuestion={Boolean(card.agentQuestion)}
+      isAnalyzing={Boolean(card.analyzing)}
+      hasAgentQuestion={!card.analyzing && Boolean(card.agentQuestion)}
       interactive={false}
       showOwner
     />

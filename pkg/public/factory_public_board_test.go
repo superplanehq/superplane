@@ -19,7 +19,59 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
+
+func TestPublicCardHoldsAnalysisFlagsUntilWait(t *testing.T) {
+	order := &models.FactoryWorkOrder{
+		Title:     "Retry refunds",
+		State:     models.FactoryWorkOrderStateDraft,
+		CreatedAt: time.Now(),
+	}
+	planning := models.FactoryPlanning{Clarity: true, Confidence: true}
+	checks := []models.FactoryWorkOrderCheck{
+		{Name: models.PlanningClarityCheckName, Score: 4},
+		{Name: models.PlanningConfidenceCheckName, Score: 2},
+	}
+	surveyID := uuid.New()
+	session := &models.FactoryPlanningSession{
+		State:    models.PlanningSessionStateRunning,
+		SurveyID: &surveyID,
+		Survey: datatypes.NewJSONType(models.PlanningSessionSurvey{
+			Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which API?", Options: []string{"REST"}}},
+		}),
+	}
+	dispatches := []models.FactoryWorkOrderLineDispatchRecord{{
+		FactoryWorkOrderLineDispatch: models.FactoryWorkOrderLineDispatch{
+			State: models.FactoryWorkOrderLineDispatchStateActive,
+		},
+	}}
+
+	working := publicCardFromOrder(order, planning, checks, nil, session, dispatches, nil)
+	assert.True(t, working.Analyzing)
+	assert.True(t, working.Running)
+	assert.Nil(t, working.Clarity)
+	assert.Nil(t, working.Confidence)
+	assert.False(t, working.AgentQuestion)
+
+	session.WaitState = models.PlanningWaitPending
+	waiting := publicCardFromOrder(order, planning, checks, nil, session, nil, nil)
+	assert.False(t, waiting.Analyzing)
+	assert.False(t, waiting.Running)
+	require.NotNil(t, waiting.Clarity)
+	require.NotNil(t, waiting.Confidence)
+	assert.Equal(t, 4, *waiting.Clarity)
+	assert.Equal(t, 2, *waiting.Confidence)
+	assert.True(t, waiting.AgentQuestion)
+
+	session.State = models.PlanningSessionStateEnded
+	session.WaitState = ""
+	ended := publicCardFromOrder(order, planning, checks, nil, session, nil, nil)
+	assert.False(t, ended.Analyzing)
+	assert.False(t, ended.AgentQuestion)
+	require.NotNil(t, ended.Clarity)
+	assert.Equal(t, 4, *ended.Clarity)
+}
 
 func TestPublicFactoryBoardHidesPrivateWorkspace(t *testing.T) {
 	r := support.Setup(t)

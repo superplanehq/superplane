@@ -76,6 +76,7 @@ type publicCard struct {
 	Clarity       *int               `json:"clarity,omitempty"`
 	PullRequest   *publicPullRequest `json:"pullRequest,omitempty"`
 	AgentQuestion bool               `json:"agentQuestion,omitempty"`
+	Analyzing     bool               `json:"analyzing,omitempty"`
 }
 
 type publicOrigin struct {
@@ -551,15 +552,31 @@ func publicCardFromOrder(
 		card.Approval = err == nil && len(notes) > 0
 	}
 	if order.State == models.FactoryWorkOrderStateDraft {
-		if planning.Confidence {
-			card.Confidence = scoreForCheck(checks, "Confidence score")
-		}
-		if planning.Clarity {
-			card.Clarity = scoreForCheck(checks, "Clarity score")
-		}
-		card.AgentQuestion = sessionHasAgentQuestion(session)
+		applyDraftAnalysisFlags(&card, planning, checks, session)
 	}
 	return card
+}
+
+// applyDraftAnalysisFlags keeps a working analysis session on the thinking
+// indicator. Scores and an agent question appear only after the agent waits,
+// or after the run ends without a wait.
+func applyDraftAnalysisFlags(
+	card *publicCard,
+	planning models.FactoryPlanning,
+	checks []models.FactoryWorkOrderCheck,
+	session *models.FactoryPlanningSession,
+) {
+	if session.IsWorking() {
+		card.Analyzing = true
+		return
+	}
+	if planning.Confidence {
+		card.Confidence = scoreForCheck(checks, models.PlanningConfidenceCheckName)
+	}
+	if planning.Clarity {
+		card.Clarity = scoreForCheck(checks, models.PlanningClarityCheckName)
+	}
+	card.AgentQuestion = session.IsWaiting() && sessionHasAgentQuestion(session)
 }
 
 func uiWorkOrderState(state string) string {

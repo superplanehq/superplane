@@ -13,7 +13,7 @@ import {
 import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { draftCardAgentIsWorking, planningSessionHasPendingSurvey } from "./planningSessionView";
+import { backlogCardAnalysisFlags } from "./planningSessionView";
 import { factoryShowsClarity, factoryShowsConfidence } from "./planningSettingsModel";
 
 const FILTER_CARD_SKELETON_COUNT = 3;
@@ -114,30 +114,23 @@ export function LineBoardWorkOrderCard({
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
   const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const session = order.planningSession;
-  const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing, {
+  const analysis = cardAnalysis(showConfidence, order.checkScores, order.planningSession, isAnalyzing, {
     showClarity: factoryShowsClarity(factory),
     showConfidence: factoryShowsConfidence(factory),
   });
 
   return (
-    <WorkOrderCard
-      {...workOrderCardContext}
-      entry={entry}
-      {...scores}
-      hasAgentQuestion={showConfidence && planningSessionHasPendingSurvey(session)}
-      creditLabel={creditLabel}
-      onOpen={onOpen}
-    />
+    <WorkOrderCard {...workOrderCardContext} entry={entry} {...analysis} creditLabel={creditLabel} onOpen={onOpen} />
   );
 }
 
 /**
- * Scores come from the list. The thinking state follows the planning session
- * summary on that list. A local backlog run still counts until the first score.
- * The opened card loads the full session.
+ * Scores come from the list. The card stays in the working state until the
+ * agent waits, even when scores and a survey are already saved. A local
+ * backlog run still counts until the first score. The opened card loads the
+ * full session.
  */
-function cardScores(
+function cardAnalysis(
   showConfidence: boolean,
   checks: FactoriesWorkOrderCheckScore[] | undefined,
   session: FactoriesWorkOrderSummary["planningSession"],
@@ -145,18 +138,19 @@ function cardScores(
   visibility: { showClarity: boolean; showConfidence: boolean },
 ): Pick<
   ComponentProps<typeof WorkOrderCard>,
-  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore"
+  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore" | "hasAgentQuestion"
 > {
   if (!showConfidence) {
-    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false, hasAgentQuestion: false };
   }
   const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
   const confidenceScore = visibility.showConfidence ? confidenceScoreFromChecks(checks) : undefined;
+  const flags = backlogCardAnalysisFlags(session, backlogAnalyzing, clarityScore ?? confidenceScore);
   return {
-    clarityScore,
-    confidenceScore,
+    ...(flags.showScores ? { clarityScore, confidenceScore } : {}),
     showClarity: visibility.showClarity,
     showConfidenceScore: visibility.showConfidence,
-    isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
+    isAnalyzing: flags.isAnalyzing,
+    hasAgentQuestion: flags.hasAgentQuestion,
   };
 }

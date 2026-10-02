@@ -262,6 +262,32 @@ export function draftCardAgentIsWorking(
   });
 }
 
+export type BacklogCardAnalysisFlags = {
+  isAnalyzing: boolean;
+  showScores: boolean;
+  hasAgentQuestion: boolean;
+};
+
+/**
+ * A backlog card stays in the working state until the agent waits.
+ * Saved scores and a survey stay off the card until then.
+ * A local backlog run still counts until the first score.
+ */
+export function backlogCardAnalysisFlags(
+  session: (PlanningSessionMachineInput & Pick<PlanningSessionPayload, "survey">) | null | undefined,
+  backlogAnalyzing: boolean,
+  score?: number,
+): BacklogCardAnalysisFlags {
+  if (planningSessionIsWorking(session)) {
+    return { isAnalyzing: true, showScores: false, hasAgentQuestion: false };
+  }
+  return {
+    isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, score),
+    showScores: true,
+    hasAgentQuestion: planningSessionIsWaiting(session) && planningSessionHasPendingSurvey(session),
+  };
+}
+
 export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
   return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
 }

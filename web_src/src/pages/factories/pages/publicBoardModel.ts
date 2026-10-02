@@ -43,6 +43,7 @@ export interface PublicBoardCard {
   clarity?: number;
   pullRequest?: { number: number; state: string; mergeable: boolean; extraCount: number };
   agentQuestion?: boolean;
+  analyzing?: boolean;
 }
 
 export interface PublicBoardColumn {
