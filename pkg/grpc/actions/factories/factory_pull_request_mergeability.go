@@ -230,7 +230,8 @@ func persistFactoryPullRequestMergeability(
 	}
 	if result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN ||
 		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION ||
-		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE {
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE ||
+		result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED {
 		return nil
 	}
 	return pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{

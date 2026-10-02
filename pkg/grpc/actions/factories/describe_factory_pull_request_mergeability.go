@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
 )
@@ -38,6 +39,16 @@ func DescribeFactoryPullRequestMergeability(
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 	}
 	repository = pullRequest.Repository
+
+	failedWebhook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
+	}
+	if failedWebhook != nil && failedWebhook.State == models.WebhookStateFailed {
+		return &pb.DescribeFactoryPullRequestMergeabilityResponse{
+			Mergeability: failedFactoryMergeabilityResult(pullRequest, failedWebhook).proto(),
+		}, nil
+	}
 
 	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {

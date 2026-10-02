@@ -25,8 +25,9 @@ type Webhook struct {
 	Configuration     datatypes.JSONType[any]
 	Metadata          datatypes.JSONType[any]
 	AppInstallationID *uuid.UUID
-	RetryCount        int `gorm:"default:0"`
-	MaxRetries        int `gorm:"default:3"`
+	RetryCount        int    `gorm:"default:0"`
+	MaxRetries        int    `gorm:"default:3"`
+	LastError         string `gorm:"not null;default:''"`
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
@@ -39,18 +40,25 @@ type WebhookResource struct {
 }
 
 func (w *Webhook) Ready(tx *gorm.DB) error {
-	return tx.Model(w).
-		Update("state", WebhookStateReady).
-		Update("updated_at", time.Now()).
-		Error
+	w.State = WebhookStateReady
+	w.LastError = ""
+	return tx.Model(w).Updates(map[string]any{
+		"state":      WebhookStateReady,
+		"last_error": "",
+		"updated_at": time.Now(),
+	}).Error
 }
 
 func (w *Webhook) ReadyWithMetadata(tx *gorm.DB, metadata any) error {
-	return tx.Model(w).
-		Update("state", WebhookStateReady).
-		Update("metadata", datatypes.NewJSONType(metadata)).
-		Update("updated_at", time.Now()).
-		Error
+	w.State = WebhookStateReady
+	w.LastError = ""
+	w.Metadata = datatypes.NewJSONType(metadata)
+	return tx.Model(w).Updates(map[string]any{
+		"state":      WebhookStateReady,
+		"metadata":   w.Metadata,
+		"last_error": "",
+		"updated_at": time.Now(),
+	}).Error
 }
 
 func (w *Webhook) MarkProvisioning(tx *gorm.DB) error {
@@ -68,11 +76,34 @@ func (w *Webhook) IncrementRetry(tx *gorm.DB) error {
 		Error
 }
 
-func (w *Webhook) MarkFailed(tx *gorm.DB) error {
-	return tx.Model(w).
-		Update("state", WebhookStateFailed).
-		Update("updated_at", time.Now()).
-		Error
+func (w *Webhook) MarkFailed(tx *gorm.DB, setupError string) error {
+	w.State = WebhookStateFailed
+	w.LastError = setupError
+	return tx.Model(w).Updates(map[string]any{
+		"state":      WebhookStateFailed,
+		"last_error": setupError,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+func (w *Webhook) RecordSetupError(tx *gorm.DB, setupError string) error {
+	w.LastError = setupError
+	return tx.Model(w).Updates(map[string]any{
+		"last_error": setupError,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+func (w *Webhook) ResetPending(tx *gorm.DB) error {
+	w.State = WebhookStatePending
+	w.RetryCount = 0
+	w.LastError = ""
+	return tx.Model(w).Updates(map[string]any{
+		"state":       WebhookStatePending,
+		"retry_count": 0,
+		"last_error":  "",
+		"updated_at":  time.Now(),
+	}).Error
 }
 
 func (w *Webhook) HasExceededRetries() bool {

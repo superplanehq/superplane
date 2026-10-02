@@ -569,6 +569,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
 		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/prs/{pr_id}/webhook-retry"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestMerge},
+		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{id}/onboarding"}: {
 			Resource:                     "factories",
 			Action:                       "update",

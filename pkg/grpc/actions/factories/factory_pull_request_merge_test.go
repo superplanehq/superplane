@@ -7,10 +7,12 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -22,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -1195,6 +1198,215 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, second.GetBlockedReason())
 		assert.Equal(t, "newheadsha", second.GetHeadSha())
 	})
+}
+
+const webhookSetupHookLimitProductMessage = "SuperPlane could not register a webhook on this repository. GitHub allows 20 pull request webhooks, and this repository already has 20. Remove an unused webhook, then try again."
+const webhookSetupFallbackProductMessage = "SuperPlane could not register a webhook on this repository. Try again."
+
+func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	created, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
+		FactoryId:   factory.ID.String(),
+		WorkOrderId: order.ID.String(),
+		Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
+		Repository:  "acme/app",
+		Number:      42,
+		Url:         "https://github.com/acme/app/pull/42",
+		Title:       "Ready",
+		State:       pb.FactoryPullRequest_STATE_OPEN,
+	})
+	require.NoError(t, err)
+	pr := created.GetPullRequest()
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	vcsID := integration.ID.String()
+	appRepo := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &vcsID,
+		AppRepository:    &appRepo,
+	}))
+
+	const headSHA = "abc123def456"
+	useMergeableGitHub := func(t *testing.T) {
+		t.Helper()
+		combined, checks := successChecks()
+		original := newFactoryGitHubAPI
+		newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+			return &fakeFactoryGitHub{
+				pullRequest: mergeableGitHubPullRequest(headSHA),
+				combined:    combined,
+				checkRuns:   checks,
+				repository:  allMethodsRepository(),
+			}, nil
+		}
+		t.Cleanup(func() { newFactoryGitHubAPI = original })
+	}
+	describe := func(t *testing.T) *pb.FactoryPullRequestMergeability {
+		t.Helper()
+		resp, err := DescribeFactoryPullRequestMergeability(ctx, IntakeDependencies{}, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.GetMergeability())
+		return resp.GetMergeability()
+	}
+	createWebhook := func(t *testing.T, state, lastError string, retryCount int) models.Webhook {
+		t.Helper()
+		now := time.Now()
+		webhook := models.Webhook{
+			ID:                uuid.New(),
+			State:             state,
+			Secret:            []byte("secret"),
+			Configuration:     datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration("acme/app"))),
+			AppInstallationID: &integration.ID,
+			RetryCount:        retryCount,
+			MaxRetries:        3,
+			LastError:         lastError,
+			CreatedAt:         &now,
+		}
+		require.NoError(t, db.Create(&webhook).Error)
+		return webhook
+	}
+
+	t.Run("returns the hook limit message and does not use a cached merge result", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      true,
+			HeadSHA:        headSHA,
+			AllowedMethods: "SQUASH",
+		}))
+		providerError := `error creating webhook: POST /repos/acme/app/hooks returned 422: The "pull_request" event cannot have more than 20 hooks.`
+		webhook := createWebhook(t, models.WebhookStateFailed, providerError, 3)
+
+		got := describe(t)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, webhookSetupHookLimitProductMessage, got.GetMessage())
+		assert.NotContains(t, got.GetMessage(), "cannot have more than 20 hooks")
+
+		reloaded, err := models.FindWebhookInTransaction(db, webhook.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.WebhookStateFailed, reloaded.State)
+		assert.Equal(t, 3, reloaded.RetryCount)
+		assert.Equal(t, providerError, reloaded.LastError)
+		cached, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: stored.ID})
+		require.NoError(t, err)
+		assert.True(t, cached.Mergeable)
+		assert.Empty(t, cached.MergeBlockedReason)
+	})
+
+	t.Run("returns the fallback message for an unknown setup error", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		providerError := "error creating webhook: POST /repos/acme/app/hooks returned 500: boom"
+		createWebhook(t, models.WebhookStateFailed, providerError, 3)
+
+		got := describe(t)
+		assert.False(t, got.GetCanMerge())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
+		assert.Equal(t, webhookSetupFallbackProductMessage, got.GetMessage())
+		assert.NotContains(t, got.GetMessage(), "boom")
+	})
+
+	t.Run("does not add a setup error for a ready webhook", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		createWebhook(t, models.WebhookStateReady, "", 0)
+
+		got := describe(t)
+		assert.True(t, got.GetCanMerge())
+		assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
+		assert.NotContains(t, got.GetMessage(), "could not register a webhook")
+	})
+}
+
+func TestRetryFactoryPullRequestWebhook(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	created, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
+		FactoryId:   factory.ID.String(),
+		WorkOrderId: order.ID.String(),
+		Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
+		Repository:  "acme/app",
+		Number:      7,
+		Url:         "https://github.com/acme/app/pull/7",
+		Title:       "Ready",
+		State:       pb.FactoryPullRequest_STATE_OPEN,
+	})
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+	require.NoError(t, err)
+	vcsID := integration.ID.String()
+	appRepo := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &vcsID,
+		AppRepository:    &appRepo,
+	}))
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:                uuid.New(),
+		State:             models.WebhookStateFailed,
+		Secret:            []byte("secret"),
+		Configuration:     datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration("acme/app"))),
+		AppInstallationID: &integration.ID,
+		RetryCount:        3,
+		MaxRetries:        3,
+		LastError:         `The "pull_request" event cannot have more than 20 hooks.`,
+		CreatedAt:         &now,
+	}
+	require.NoError(t, db.Create(&webhook).Error)
+
+	retry := func() error {
+		_, err := RetryFactoryPullRequestWebhook(ctx, orgID, &pb.RetryFactoryPullRequestWebhookRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      created.GetPullRequest().GetId(),
+		})
+		return err
+	}
+
+	require.NoError(t, retry())
+	reloaded, err := models.FindWebhookInTransaction(db, webhook.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStatePending, reloaded.State)
+	assert.Equal(t, 0, reloaded.RetryCount)
+	assert.Empty(t, reloaded.LastError)
+	webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	assert.Len(t, webhooks, 1)
+
+	require.NoError(t, reloaded.Ready(db))
+	require.NoError(t, retry())
+	stillReady, err := models.FindWebhookInTransaction(db, webhook.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStateReady, stillReady.State)
+	assert.Empty(t, stillReady.LastError)
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	assert.Len(t, webhooks, 1)
 }
 
 func grantExclusivePullRequestAccess(
