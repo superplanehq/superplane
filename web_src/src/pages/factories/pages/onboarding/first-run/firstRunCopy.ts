@@ -75,9 +75,7 @@ export const FIRST_RUN_COPY = {
     ownKeyBodyWithCustom:
       "Connect Anthropic, OpenAI, OpenRouter, or a custom provider. SuperPlane uses this connection for agent runs.",
     modelSourceHeading: "Choose the model source",
-    ownKey: "Your key",
-    ownKeyHelper: "Connect Anthropic, OpenAI, or OpenRouter.",
-    ownKeyHelperWithCustom: "Connect Anthropic, OpenAI, OpenRouter, or a custom provider.",
+    ownKey: "Use your own key instead",
     hostedModels: "SuperPlane-hosted models",
     hostedModelsHelper: "SuperPlane runs the agents. You do not connect a provider.",
     loading: "Checking agent availability…",

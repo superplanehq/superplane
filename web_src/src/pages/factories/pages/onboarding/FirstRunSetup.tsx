@@ -117,9 +117,10 @@ function AgentScreen({
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
+  const credentialChoice = modelSource.offered && !modelSource.choice ? "hosted" : modelSource.choice;
   const canFinish = agentFinishReady({
     modelSourceChoice: modelSource.offered,
-    credentialChoice: modelSource.choice,
+    credentialChoice,
     providerConnected: isAgentProviderConnected(setup.connected),
     agentReady: setup.agentReady,
     hostedAgentReady,
@@ -142,7 +143,6 @@ function AgentScreen({
             <FirstRunModelSourceChoice
               disabled={saving || loading}
               modelSource={modelSource.choice}
-              ownKeyHelper={showCustomProvider ? FIRST_RUN_COPY.agent.ownKeyHelperWithCustom : undefined}
               onSelectModelSource={modelSource.onSelect}
             />
           </FirstRunPanel>
@@ -357,7 +357,10 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onSelect: flow.selectCredentialChoice,
       }}
       onRequestConnect={model.requestConnect}
-      onContinue={() => void flow.continueFromAgent()}
+      onContinue={() => {
+        if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
+        void flow.continueFromAgent();
+      }}
     />
   );
 }
