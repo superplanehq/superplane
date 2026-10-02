@@ -27,6 +27,7 @@ export const PLANNING_SETTINGS_COPY = {
   save: "Save",
   saving: "Saving",
   saveError: "Could not save Planning settings.",
+  restorePromptError: "Could not restore the default prompt.",
   loading: "Loading Planning settings.",
   loadError: "Could not load Planning settings.",
   retry: "Retry",

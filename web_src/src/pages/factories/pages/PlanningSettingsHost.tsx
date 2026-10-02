@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
+import { loadDefaultRefinementPrompt } from "../lib/loadDefaultRefinementPrompt";
+import { REFINE_TASK_NODE_ID } from "../lib/refinementPrompt";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
@@ -16,8 +18,6 @@ import {
 } from "./planningSettingsModel";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
-
-const REFINE_TASK_NODE_ID = "refine-task";
 
 interface PlanningSettingsHostProps {
   organizationId: string;
@@ -111,6 +111,13 @@ function PlanningSettingsLoaded({
   const editAutomationHref = canvasId
     ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
     : undefined;
+  const loadRestorePrompt = useCallback(() => {
+    if (!canvasId) {
+      return Promise.reject(new Error(PLANNING_SETTINGS_COPY.restorePromptError));
+    }
+    return loadDefaultRefinementPrompt({ organizationId, factoryId, automationId: canvasId });
+  }, [canvasId, factoryId, organizationId]);
+  const selectedAgentIsRefineTask = agent.agentNode?.id === REFINE_TASK_NODE_ID;
 
   return (
     <PlanningSettingsPopup
@@ -150,6 +157,7 @@ function PlanningSettingsLoaded({
               factoryKey,
               onSave: agent.save,
               showVisualEvidenceSetting: false,
+              onRestoreDefaultPrompt: canvasId && selectedAgentIsRefineTask ? loadRestorePrompt : undefined,
             }
           : undefined
       }

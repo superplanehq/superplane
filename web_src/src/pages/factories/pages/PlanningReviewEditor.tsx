@@ -1,11 +1,27 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 import { Workflow } from "lucide-react";
 import { useState } from "react";
 
 import { PlanningReviewForm } from "./PlanningReviewForm";
-import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
+import {
+  PLANNING_REVIEW_DRAFT,
+  singleAgentDraft,
+  type PlanningReviewDraft,
+  type PlanningReviewStep,
+} from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
+import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
 
 function AutomationNote({ href }: { href?: string }) {
   return (
@@ -38,6 +54,7 @@ export type PlanningReviewAgentSlot = {
   factoryKey?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   showVisualEvidenceSetting?: boolean;
+  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep | null>;
 };
 
 /** Agent editor body. The column menu popup and the automation view Agent tab share this. */
@@ -53,6 +70,7 @@ export function PlanningReviewEditor({
   showAutomationNote = true,
   showCancel = true,
   showVisualEvidenceSetting = false,
+  onRestoreDefaultPrompt,
 }: {
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -65,12 +83,17 @@ export function PlanningReviewEditor({
   showAutomationNote?: boolean;
   showCancel?: boolean;
   showVisualEvidenceSetting?: boolean;
+  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep | null>;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const saveDisabled = isLoading || isSaving || draft.components.length === 0;
+  const restore = useRestoreDefaultPrompt({ draft, setDraft, onRestoreDefaultPrompt });
+  const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 
   const handleSave = async () => {
+    if (restore.isRestoring) {
+      return;
+    }
     if (!onSave) {
       onCancel?.();
       return;
@@ -103,6 +126,11 @@ export function PlanningReviewEditor({
             factoryId={factoryId}
             factoryKey={factoryKey}
             showVisualEvidenceSetting={showVisualEvidenceSetting}
+            onRestoreDefaultPrompt={restore.showRestore ? () => restore.setConfirmOpen(true) : undefined}
+            restoreDefaultPromptDisabled={restore.isRestoring}
+            restoreError={restore.restoreError}
+            onRetryRestore={restore.restoreError ? restore.retryRestore : undefined}
+            restoreRetryDisabled={restore.isRestoring}
           />
         </PopupBody>
       )}
@@ -123,6 +151,41 @@ export function PlanningReviewEditor({
           {isSaving ? "Saving…" : "Save Agent"}
         </Button>
       </footer>
+      <RestoreDefaultPromptDialog
+        open={restore.confirmOpen}
+        onOpenChange={restore.setConfirmOpen}
+        onConfirm={() => void restore.applyDefaultPrompt()}
+      />
     </div>
+  );
+}
+
+function RestoreDefaultPromptDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent data-testid="planning-review-restore-default-prompt-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Restore the default prompt?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This replaces the current Refine Task prompt with the factory default. The change applies only after you
+            click Save Agent.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="planning-review-restore-default-prompt-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} data-testid="planning-review-restore-default-prompt-confirm">
+            Restore default prompt
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
