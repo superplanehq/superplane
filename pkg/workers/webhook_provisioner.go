@@ -218,6 +218,13 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 	return nil
 }
 
+func setupErrorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 // lockAndMarkProvisioning acquires a row lock and transitions the webhook
 // from "pending" to "provisioning". Returns nil if the row was already picked
 // up by another worker.
@@ -306,11 +313,16 @@ func (w *WebhookProvisioner) handleProvisioningError(logger *log.Entry, webhook 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if webhook.HasExceededRetries() {
 			logger.Infof("Webhook has exceeded max retries (%d), marking as failed", webhook.MaxRetries)
-			if err := webhook.MarkFailed(tx); err != nil {
+			if err := webhook.MarkFailed(tx, setupErrorText(originalErr)); err != nil {
 				logger.Errorf("Error marking webhook as failed: %v", err)
 				return err
 			}
 			return nil
+		}
+
+		if err := webhook.RecordSetupError(tx, setupErrorText(originalErr)); err != nil {
+			logger.Errorf("Error saving webhook setup error: %v", err)
+			return err
 		}
 
 		// Reset state back to pending so it can be retried.

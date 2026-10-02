@@ -10,7 +10,11 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useFactoryPullRequestMergeability, useMergeFactoryPullRequest } from "@/hooks/useFactoryPullRequestMerge";
+import {
+  useFactoryPullRequestMergeability,
+  useMergeFactoryPullRequest,
+  useRetryFactoryPullRequestWebhook,
+} from "@/hooks/useFactoryPullRequestMerge";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -92,13 +96,22 @@ function ConnectedPullRequestMergeAction({
   const enabled = Boolean(organizationId && factoryId && pullRequestId);
   const mergeabilityQuery = useFactoryPullRequestMergeability(organizationId, factoryId, pullRequestId, { enabled });
   const mergeMutation = useMergeFactoryPullRequest(organizationId, factoryId, orderId);
+  const retryMutation = useRetryFactoryPullRequestWebhook(organizationId, factoryId);
 
   return (
     <SplitRunPullRequestMergeControls
       mergeability={mergeabilityQuery.data}
       merging={mergeMutation.isPending}
+      retrying={retryMutation.isPending}
       canAct={canAct}
       compact={compact}
+      onRetry={() => {
+        retryMutation.mutate(pullRequestId, {
+          onError: (error) => {
+            showErrorToast(getApiErrorMessage(error, "SuperPlane could not retry webhook setup."));
+          },
+        });
+      }}
       onMerge={(mergeMethod, expectedHeadSha) => {
         mergeMutation.mutate(
           { pullRequestId, mergeMethod, expectedHeadSha },
@@ -134,15 +147,19 @@ function selectedMergeMethod(
 export function SplitRunPullRequestMergeControls({
   mergeability,
   merging,
+  retrying = false,
   canAct,
   compact,
   onMerge,
+  onRetry,
 }: {
   mergeability?: FactoriesFactoryPullRequestMergeability;
   merging: boolean;
+  retrying?: boolean;
   canAct: boolean;
   compact: boolean;
   onMerge: (mergeMethod: FactoryPullRequestMergeMethodChoice, expectedHeadSha: string) => void;
+  onRetry?: () => void;
 }) {
   const allowedMethods = allowedMergeMethods(mergeability?.allowedMethods);
   const [selectedMethod, setSelectedMethod] = useState<FactoryPullRequestMergeMethodChoice | undefined>();
@@ -192,6 +209,19 @@ export function SplitRunPullRequestMergeControls({
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {canAct && mergeability?.blockedReason === "BLOCKED_REASON_WEBHOOK_FAILED" ? (
+        <Button
+          type="button"
+          variant="outline"
+          size={compact ? "sm" : "lg"}
+          className={compact ? undefined : "h-11 px-5 text-[15px] font-semibold"}
+          disabled={retrying}
+          onClick={onRetry}
+          data-testid="split-run-webhook-retry"
+        >
+          {PULL_REQUEST_REVIEW_COPY.retryWebhook}
+        </Button>
+      ) : null}
       <PermissionTooltip allowed={canAct} message={PULL_REQUEST_REVIEW_COPY.permission}>
         {canAct && reason ? (
           <Tooltip>

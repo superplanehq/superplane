@@ -180,11 +180,13 @@ func (c *IntegrationContext) mergeWebhookConfiguration(
 	webhook.Configuration = datatypes.NewJSONType(mergedConfiguration)
 	webhook.State = models.WebhookStatePending
 	webhook.RetryCount = 0
+	webhook.LastError = ""
 
 	return c.tx.Model(webhook).Updates(map[string]any{
 		"configuration": webhook.Configuration,
 		"state":         webhook.State,
 		"retry_count":   webhook.RetryCount,
+		"last_error":    "",
 		"updated_at":    time.Now(),
 	}).Error
 }
