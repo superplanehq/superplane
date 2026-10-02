@@ -55,7 +55,9 @@ func ListFactoryAgentResourceTools(
 	if err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
-	saveDefaultMCPWriteTools(db, resource, tools)
+	if err := saveDefaultMCPWriteTools(db, resource, tools); err != nil {
+		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
+	}
 
 	out := make([]*pb.FactoryAgentResourceTool, 0, len(tools))
 	for _, tool := range tools {
@@ -89,18 +91,18 @@ func applyDefaultMCPWriteTools(
 	if err != nil {
 		return
 	}
-	saveDefaultMCPWriteTools(db, resource, tools)
+	_ = saveDefaultMCPWriteTools(db, resource, tools)
 }
 
-func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource, tools []mcp.Tool) {
+func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource, tools []mcp.Tool) error {
 	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
-		return
+		return nil
 	}
 	if resource.Config.Data().ToolsDefaultApplied {
-		return
+		return nil
 	}
 
-	_ = db.Transaction(func(tx *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
 		var current models.FactoryAgentResource
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).

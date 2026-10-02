@@ -1,10 +1,12 @@
 package factories
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -305,6 +307,61 @@ func Test__ListFactoryAgentResourceToolsSavesDefaultsFromTheReturnedList(t *test
 	require.NoError(t, err)
 	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
 	assert.Equal(t, []string{"create_issue"}, saved.Config.Data().DisabledTools)
+}
+
+func Test__ListFactoryAgentResourceToolsReturnsErrorWhenDefaultSaveFails(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Exec(`
+		ALTER TABLE factory_agent_resources
+		ADD CONSTRAINT reject_tools_default_applied
+		CHECK (COALESCE(config->>'toolsDefaultApplied', 'false') <> 'true') NOT VALID
+	`).Error)
+	t.Cleanup(func() {
+		_ = database.Conn().Exec(`ALTER TABLE factory_agent_resources DROP CONSTRAINT IF EXISTS reject_tools_default_applied`).Error
+	})
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	lists := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		body, readErr := io.ReadAll(req.Body)
+		require.NoError(t, readErr)
+		if strings.Contains(string(body), `"tools/list"`) {
+			lists++
+		}
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		mcpToolsHandler(t, []map[string]any{
+			{"name": "search", "annotations": map[string]any{"readOnlyHint": true}},
+			{"name": "create_issue"},
+		}).ServeHTTP(w, req)
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       server.URL,
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	_, err = ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.Error(t, err)
+	assert.Equal(t, 1, lists)
+	code, message, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Equal(t, "SuperPlane could not load the tools. Try again.", message)
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.False(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Empty(t, saved.Config.Data().DisabledTools)
 }
 
 func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
