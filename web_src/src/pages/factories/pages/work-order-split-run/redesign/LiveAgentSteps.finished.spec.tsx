@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -338,6 +338,53 @@ describe("LiveAgentSteps finished runs", () => {
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Debug" })).toHaveAttribute("href", FAILED_RUN_HREF);
     expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+  });
+
+  it("stops a stored running command on a failed task without marking it failed", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "failed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false, isLoading: false, sections: [] }));
+    const stage = {
+      ...implementStage(),
+      status: "failed" as const,
+      agentSteps: [
+        {
+          id: "command",
+          title: "Run script",
+          type: "bash" as const,
+          status: "running" as const,
+          summary: "",
+          toolCount: 0,
+          output: "bash script.sh",
+          events: [],
+        },
+      ],
+    };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={{ ...implementPhase(), status: "failed" as const }}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    const command = await screen.findByRole("button", { name: /Run script/ });
+    expect(command).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Canceled")).not.toBeInTheDocument();
+
+    fireEvent.click(command);
+
+    expect(screen.queryByLabelText("failed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
   });
 
   it("does not mark a successful command failed when a later step fails", async () => {

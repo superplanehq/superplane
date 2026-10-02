@@ -57,7 +57,11 @@ export interface AgentStep {
   id: string;
   title: string;
   type: "prompt" | "bash" | "node";
-  status: SplitRunPhaseStatus;
+  /**
+   * `stopped` is an unfinished command on a finished failed run. It is not
+   * still running, and it is not Failed: the failure can belong to a later step.
+   */
+  status: SplitRunPhaseStatus | "stopped";
   duration?: string;
   summary: string;
   toolCount: number;
@@ -356,21 +360,20 @@ export function agentStepsFromNotes(notes: SplitRunStreamLine[]): AgentStep[] {
   return groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
 }
 
-/** A canceled stage stops an open step. A failed stage does not mark a running command failed. */
+/** A canceled stage stops an open step. A failed stage stops an open command without marking it Failed. */
 export function settleStoppedSteps(steps: AgentStep[], status?: SplitRunPhaseStatus): AgentStep[] {
   if (status !== "cancelled" && status !== "failed") {
     return steps;
   }
   return steps.map((step) => {
-    if (step.status !== "running" || keepsCommandStatus(step, status)) {
+    if (step.status !== "running") {
       return step;
+    }
+    if (status === "failed" && step.type === "bash") {
+      return { ...step, status: "stopped" };
     }
     return { ...step, status };
   });
-}
-
-function keepsCommandStatus(step: AgentStep, status: SplitRunPhaseStatus): boolean {
-  return status === "failed" && step.type === "bash";
 }
 
 function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {

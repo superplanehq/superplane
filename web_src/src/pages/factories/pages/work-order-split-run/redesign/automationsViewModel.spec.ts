@@ -106,10 +106,14 @@ describe("settleStoppedSteps", () => {
     expect(settleStoppedSteps([running], "running")).toEqual([running]);
   });
 
-  it("does not mark a running command failed when the stage failed, and still cancels it", () => {
+  it("marks a running prompt failed when the stage failed", () => {
+    expect(settleStoppedSteps([running], "failed").map((step) => step.status)).toEqual(["failed"]);
+  });
+
+  it("stops a running command when the stage failed without marking it failed", () => {
     const command = { ...running, id: "command", title: "bash script.sh", type: "bash" } satisfies AgentStep;
 
-    expect(settleStoppedSteps([command], "failed")).toEqual([command]);
+    expect(settleStoppedSteps([command], "failed").map((step) => step.status)).toEqual(["stopped"]);
     expect(settleStoppedSteps([command], "cancelled").map((step) => step.status)).toEqual(["cancelled"]);
   });
 });
