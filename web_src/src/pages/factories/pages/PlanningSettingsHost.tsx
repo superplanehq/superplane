@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { findBacklogAutomationApp } from "../lib/linePhaseRuns";
+import { REFINE_TASK_NODE_ID } from "../lib/refinementPromptFromAutomationDefaults";
 import { PlanningSettingsPopup } from "./PlanningSettingsPopup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
@@ -15,9 +16,8 @@ import {
   type PlanningSettingsTab,
 } from "./planningSettingsModel";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
+import { useDefaultRefinementPrompt } from "./useDefaultRefinementPrompt";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
-
-const REFINE_TASK_NODE_ID = "refine-task";
 
 interface PlanningSettingsHostProps {
   organizationId: string;
@@ -107,6 +107,12 @@ function PlanningSettingsLoaded({
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId, {
     preferredAgentNodeId: REFINE_TASK_NODE_ID,
   });
+  const refinementPrompt = useDefaultRefinementPrompt({
+    organizationId,
+    factoryId,
+    automationId: canvasId,
+  });
+  const canRestoreRefinementPrompt = agent.agentNode?.id === REFINE_TASK_NODE_ID;
   const updateFactory = useUpdateFactory(organizationId, factoryId);
   const editAutomationHref = canvasId
     ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
@@ -150,6 +156,9 @@ function PlanningSettingsLoaded({
               factoryKey,
               onSave: agent.save,
               showVisualEvidenceSetting: false,
+              defaultRefinementPrompt: canRestoreRefinementPrompt ? refinementPrompt.prompt : undefined,
+              defaultRefinementPromptFailed: canRestoreRefinementPrompt ? refinementPrompt.failed : false,
+              onRetryDefaultRefinementPrompt: canRestoreRefinementPrompt ? refinementPrompt.retry : undefined,
             }
           : undefined
       }
