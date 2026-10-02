@@ -222,6 +222,28 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     });
   });
 
+  it("selects all models from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    setConnected("openrouter", ["model-a", "model-b"], ["model-a"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    const bulkToggle = screen.getByTestId("model-allowlist-bulk-toggle");
+    expect(bulkToggle).toHaveTextContent("Select all");
+    await user.click(bulkToggle);
+    await user.click(screen.getByRole("button", { name: "Save models" }));
+    expect(saveModels).toHaveBeenCalledWith({ provider: "openrouter", allowedModels: ["model-a", "model-b"] });
+  });
+
+  it("deselects all models from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    setConnected("openrouter", ["model-a", "model-b"], ["model-a", "model-b"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    await user.click(screen.getByTestId("model-allowlist-bulk-toggle"));
+    await user.click(screen.getByRole("button", { name: "Save models" }));
+    expect(saveModels).toHaveBeenCalledWith({ provider: "openrouter", allowedModels: [] });
+  });
+
   it("disables changes when the user cannot update", () => {
     canUpdate = false;
     setConnected("openrouter", ["anthropic/claude-sonnet-4-6"]);

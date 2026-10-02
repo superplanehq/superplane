@@ -251,6 +251,8 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
     setSaved(false);
   }, [provider, modelIds]);
 
+  const allSelected = modelIds.length > 0 && modelIds.every((model) => selected.includes(model));
+
   return (
     <div className="space-y-3">
       <ModelAllowlistEditor
@@ -263,9 +265,15 @@ function ProviderModelChecklist({ provider }: { provider: LLMModelsSwitchProvide
           setSaved(false);
           setSelected((current) => (checked ? [...current, model] : current.filter((id) => id !== model)));
         }}
+        onBulkToggle={() => {
+          setDirty(true);
+          setSaved(false);
+          setSelected(allSelected ? [] : [...modelIds]);
+        }}
         disabled={false}
         searchLabel={`Search ${byokProviderProductName(provider)} models`}
         showCount
+        showBulkToggle
       />
       <div className="flex items-center gap-3">
         <Button

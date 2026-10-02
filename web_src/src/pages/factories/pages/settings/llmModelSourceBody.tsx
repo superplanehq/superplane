@@ -367,6 +367,7 @@ function ProviderModelEditor({
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<string[] | null>(null);
   const selected = draft ?? savedIds;
+  const allSelected = modelIds.length > 0 && modelIds.every((id) => selected.includes(id));
 
   const save = async () => {
     try {
@@ -386,9 +387,11 @@ function ProviderModelEditor({
         query={search}
         onQueryChange={setSearch}
         onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
+        onBulkToggle={() => setDraft(allSelected ? [] : [...modelIds])}
         disabled={!canUpdate || update.isPending}
         searchLabel={`Search ${byokProviderProductName(provider)} models`}
         showCount
+        showBulkToggle
       />
       <PermissionTooltip allowed={canUpdate} message={COPY.noPermission}>
         <Button type="button" onClick={() => void save()} disabled={!canUpdate || update.isPending || draft === null}>
