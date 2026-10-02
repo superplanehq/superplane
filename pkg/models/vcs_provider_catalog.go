@@ -123,13 +123,10 @@ func (VCSProviderInstallationReconcileJob) TableName() string {
 	return "vcs_provider_installation_reconcile_jobs"
 }
 
-// VCSProviderInstallationRequesterWindow caps how long an organization waits
-// on the sync of an installation that it requested.
-const VCSProviderInstallationRequesterWindow = 30 * time.Minute
-
 // VCSProviderInstallationReconcileRequester links an installation to the
 // organization that installed or updated it. The row outlives the reconcile
-// job, so the organization sees the collaborator sync of that installation.
+// job until the collaborator sync of that installation finishes, so the
+// organization sees that sync.
 type VCSProviderInstallationReconcileRequester struct {
 	Provider       string    `gorm:"primaryKey"`
 	InstallationID int64     `gorm:"primaryKey"`
@@ -400,7 +397,6 @@ func VCSProviderCatalogSynchronizing(
 			FROM vcs_provider_installation_reconcile_requesters AS requester
 			WHERE requester.provider = ?
 				AND requester.organization_id = ?
-				AND requester.created_at > ?
 		)
 		SELECT EXISTS (
 			SELECT 1
@@ -423,7 +419,7 @@ func VCSProviderCatalogSynchronizing(
 	`,
 		provider, providerUserID,
 		provider, providerUserID,
-		provider, organizationID, time.Now().Add(-VCSProviderInstallationRequesterWindow),
+		provider, organizationID,
 		provider,
 		provider,
 	).Scan(&synchronizing).Error
@@ -493,9 +489,27 @@ func EnqueueVCSProviderInstallationReconciliation(
 	})
 }
 
-func DeleteStaleVCSProviderInstallationRequesters(tx *gorm.DB, provider string, before time.Time) error {
+// DeleteFinishedVCSProviderInstallationRequesters deletes requester rows whose
+// installation has no reconcile job and no repository sync job left.
+// createdBefore keeps new rows while the reconcile job enqueues their syncs.
+func DeleteFinishedVCSProviderInstallationRequesters(tx *gorm.DB, provider string, createdBefore time.Time) error {
 	return tx.
-		Where("provider = ? AND created_at < ?", provider, before).
+		Where("provider = ? AND created_at < ?", provider, createdBefore).
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM vcs_provider_installation_reconcile_jobs AS job
+			WHERE job.provider = vcs_provider_installation_reconcile_requesters.provider
+				AND job.installation_id = vcs_provider_installation_reconcile_requesters.installation_id
+		)`).
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM vcs_provider_repository_sync_jobs AS job
+			JOIN vcs_provider_repositories AS repository
+				ON repository.provider = job.provider
+				AND repository.repository_id = job.repository_id
+			WHERE repository.provider = vcs_provider_installation_reconcile_requesters.provider
+				AND repository.installation_id = vcs_provider_installation_reconcile_requesters.installation_id
+		)`).
 		Delete(&VCSProviderInstallationReconcileRequester{}).
 		Error
 }

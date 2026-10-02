@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	vcsProviderReconcileInterval              = 5 * time.Minute
-	vcsProviderInstallRequestPollInterval     = 5 * time.Second
-	vcsProviderInstallRequestRefreshInterval  = 15 * time.Second
-	vcsProviderInstallationRequesterRetention = time.Hour
-	vcsProviderJobPollInterval                = time.Second
-	vcsProviderClaimTimeout                   = 5 * time.Minute
-	vcsProviderJobBatchSize                   = 8
-	vcsProviderInstallationJobConcurrency     = 4
-	vcsProviderInstallationMaxAttempts        = 10
-	vcsProviderInstallationRetryMaximumDelay  = 30 * time.Second
+	vcsProviderReconcileInterval             = 5 * time.Minute
+	vcsProviderInstallRequestPollInterval    = 5 * time.Second
+	vcsProviderInstallRequestRefreshInterval = 15 * time.Second
+	vcsProviderInstallationRequesterGrace    = 5 * time.Minute
+	vcsProviderJobPollInterval               = time.Second
+	vcsProviderClaimTimeout                  = 5 * time.Minute
+	vcsProviderJobBatchSize                  = 8
+	vcsProviderInstallationJobConcurrency    = 4
+	vcsProviderInstallationMaxAttempts       = 10
+	vcsProviderInstallationRetryMaximumDelay = 30 * time.Second
 )
 
 type vcsProviderCatalog interface {
@@ -214,13 +214,13 @@ func (w *VCSProviderCatalogWorker) reconcile(ctx context.Context) {
 	if err := w.catalog.Reconcile(ctx, models.VCSProviderRepositorySyncPriorityBackground); err != nil {
 		w.logger.WithError(err).Error("failed to reconcile the VCS provider catalog")
 	}
-	w.deleteStaleInstallationRequesters()
+	w.deleteFinishedInstallationRequesters()
 }
 
-func (w *VCSProviderCatalogWorker) deleteStaleInstallationRequesters() {
-	before := time.Now().Add(-vcsProviderInstallationRequesterRetention)
-	if err := models.DeleteStaleVCSProviderInstallationRequesters(database.Conn(), w.provider, before); err != nil {
-		w.logger.WithError(err).Error("failed to delete stale VCS installation requesters")
+func (w *VCSProviderCatalogWorker) deleteFinishedInstallationRequesters() {
+	createdBefore := time.Now().Add(-vcsProviderInstallationRequesterGrace)
+	if err := models.DeleteFinishedVCSProviderInstallationRequesters(database.Conn(), w.provider, createdBefore); err != nil {
+		w.logger.WithError(err).Error("failed to delete finished VCS installation requesters")
 	}
 }
 
