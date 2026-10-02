@@ -297,7 +297,7 @@ describe("OrganizationDetail connections", () => {
     expect(screen.queryByText("No connections match this search.")).not.toBeInTheDocument();
   });
 
-  it("explains how to add connections when the organization has none", async () => {
+  it("reloads the admin list when the organization has no connections", async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input) === `/admin/api/organizations/${ORG_ID}`) {
@@ -313,10 +313,19 @@ describe("OrganizationDetail connections", () => {
     await user.click(await screen.findByRole("tab", { name: "Connections" }));
 
     expect(await screen.findByText("This organization has no connections.")).toBeInTheDocument();
-    expect(screen.getByText("Members add connections on the organization integrations page.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open integrations" })).toHaveAttribute(
-      "href",
-      "/org-1/organization/integrations",
-    );
+    expect(
+      screen.getByText("Members add connections in the organization. Reload this list after they add one."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open integrations" })).not.toBeInTheDocument();
+
+    const callsBeforeReload = vi.mocked(fetch).mock.calls.length;
+    await user.click(screen.getByRole("button", { name: "Reload connections" }));
+    await waitFor(() => {
+      const urls = vi
+        .mocked(fetch)
+        .mock.calls.slice(callsBeforeReload)
+        .map(([input]) => String(input));
+      expect(urls.some((url) => url.includes(`/admin/api/organizations/${ORG_ID}/integrations`))).toBe(true);
+    });
   });
 });

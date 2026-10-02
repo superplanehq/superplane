@@ -4,10 +4,8 @@ import { Timestamp } from "@/components/Timestamp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { Plug, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
 import AdminPagination from "./AdminPagination";
 
 export type AdminIntegration = {
@@ -157,10 +155,12 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
         isError={error}
         items={items}
         hasSearch={search !== ""}
-        orgId={orgId}
         onClearSearch={() => {
           setSearch("");
           setLoading(true);
+        }}
+        onReload={() => {
+          void fetchIntegrations(search, offset);
         }}
       />
       {!loading && items.length > 0 ? (
@@ -183,15 +183,15 @@ function OrgIntegrationsBody({
   isError,
   items,
   hasSearch,
-  orgId,
   onClearSearch,
+  onReload,
 }: {
   isLoading: boolean;
   isError: boolean;
   items: AdminIntegration[];
   hasSearch: boolean;
-  orgId: string;
   onClearSearch: () => void;
+  onReload: () => void;
 }) {
   if (isLoading) {
     return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading...</Text>;
@@ -200,7 +200,7 @@ function OrgIntegrationsBody({
     return <Text className="text-sm text-red-600 dark:text-red-400">{LOAD_ERROR}</Text>;
   }
   if (items.length === 0) {
-    return <OrgIntegrationsEmpty hasSearch={hasSearch} orgId={orgId} onClearSearch={onClearSearch} />;
+    return <OrgIntegrationsEmpty hasSearch={hasSearch} onClearSearch={onClearSearch} onReload={onReload} />;
   }
 
   return (
@@ -258,12 +258,12 @@ function OrgIntegrationsBody({
 
 function OrgIntegrationsEmpty({
   hasSearch,
-  orgId,
   onClearSearch,
+  onReload,
 }: {
   hasSearch: boolean;
-  orgId: string;
   onClearSearch: () => void;
+  onReload: () => void;
 }) {
   if (hasSearch) {
     return (
@@ -281,10 +281,10 @@ function OrgIntegrationsEmpty({
     <div className="space-y-2">
       <Text className="text-sm text-gray-500 dark:text-gray-400">This organization has no connections.</Text>
       <Text className="text-sm text-gray-500 dark:text-gray-400">
-        Members add connections on the organization integrations page.
+        Members add connections in the organization. Reload this list after they add one.
       </Text>
-      <Button variant="outline" size="sm" asChild>
-        <Link to={organizationIntegrationsPath(orgId)}>Open integrations</Link>
+      <Button type="button" variant="outline" size="sm" onClick={onReload}>
+        Reload connections
       </Button>
     </div>
   );
