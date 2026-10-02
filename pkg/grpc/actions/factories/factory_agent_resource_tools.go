@@ -51,11 +51,12 @@ func ListFactoryAgentResourceTools(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list MCP tools")
 	}
-	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), resource.Config.Data().URL, headers)
+	listed := resource.Config.Data()
+	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), listed.URL, headers)
 	if err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
-	if err := saveDefaultMCPWriteTools(db, resource, tools); err != nil {
+	if err := saveDefaultMCPWriteTools(db, resource, listed, tools); err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
 
@@ -87,14 +88,20 @@ func applyDefaultMCPWriteTools(
 	if err != nil {
 		return
 	}
-	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), resource.Config.Data().URL, headers)
+	listed := resource.Config.Data()
+	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), listed.URL, headers)
 	if err != nil {
 		return
 	}
-	_ = saveDefaultMCPWriteTools(db, resource, tools)
+	_ = saveDefaultMCPWriteTools(db, resource, listed, tools)
 }
 
-func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource, tools []mcp.Tool) error {
+func saveDefaultMCPWriteTools(
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+	listed models.FactoryAgentResourceConfig,
+	tools []mcp.Tool,
+) error {
 	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
 		return nil
 	}
@@ -107,10 +114,17 @@ func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).
 			First(&current).Error
-		if err != nil || current.Config.Data().ToolsDefaultApplied {
+		if err != nil {
 			return err
 		}
-		config := current.Config.Data()
+		currentConfig := current.Config.Data()
+		if currentConfig.ToolsDefaultApplied {
+			return nil
+		}
+		if !mcpToolListStillMatches(listed, currentConfig) {
+			return errMCPConnectionChanged
+		}
+		config := currentConfig
 		config.DisabledTools = writeToolNames(tools)
 		config.ToolsDefaultApplied = true
 		normalized := config.NormalizedMCP()
@@ -129,6 +143,11 @@ func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource
 		resource.UpdatedAt = now
 		return nil
 	})
+}
+
+func mcpToolListStillMatches(listed, current models.FactoryAgentResourceConfig) bool {
+	return strings.TrimSpace(listed.URL) == strings.TrimSpace(current.URL) &&
+		listed.MCPAuth() == current.MCPAuth()
 }
 
 func writeToolNames(tools []mcp.Tool) []string {

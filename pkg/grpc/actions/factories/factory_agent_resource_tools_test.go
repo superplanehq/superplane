@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -364,6 +365,82 @@ func Test__ListFactoryAgentResourceToolsReturnsErrorWhenDefaultSaveFails(t *test
 	assert.Empty(t, saved.Config.Data().DisabledTools)
 }
 
+func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(*models.FactoryAgentResourceConfig)
+	}{
+		{
+			name: "url",
+			change: func(config *models.FactoryAgentResourceConfig) {
+				config.URL = "https://other.example.com/mcp"
+			},
+		},
+		{
+			name: "auth",
+			change: func(config *models.FactoryAgentResourceConfig) {
+				config.Auth = models.FactoryAgentResourceAuthOAuth
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+
+			var resourceID uuid.UUID
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				body, readErr := io.ReadAll(req.Body)
+				require.NoError(t, readErr)
+				if strings.Contains(string(body), `"tools/list"`) {
+					saved, findErr := factory.FindAgentResource(db, resourceID)
+					require.NoError(t, findErr)
+					config := saved.Config.Data()
+					tc.change(&config)
+					require.NoError(t, saved.Update(db, nil, nil, &config))
+				}
+				req.Body = io.NopCloser(bytes.NewReader(body))
+				mcpToolsHandler(t, []map[string]any{
+					{"name": "search", "annotations": map[string]any{"readOnlyHint": true}},
+					{"name": "create_issue"},
+				}).ServeHTTP(w, req)
+			}))
+			t.Cleanup(server.Close)
+
+			resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+				Transport: "http",
+				URL:       server.URL,
+				Auth:      models.FactoryAgentResourceAuthHeaders,
+			})
+			require.NoError(t, err)
+			resourceID = resource.ID
+
+			_, err = ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+				FactoryId:  factory.ID.String(),
+				ResourceId: resource.ID.String(),
+			})
+			require.Error(t, err)
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.FailedPrecondition, code)
+			assert.Equal(t, "SuperPlane could not load the tools. Try again.", message)
+
+			saved, err := factory.FindAgentResource(db, resource.ID)
+			require.NoError(t, err)
+			assert.False(t, saved.Config.Data().ToolsDefaultApplied)
+			assert.Empty(t, saved.Config.Data().DisabledTools)
+			if tc.name == "url" {
+				assert.Equal(t, "https://other.example.com/mcp", saved.Config.Data().URL)
+			} else {
+				assert.Equal(t, models.FactoryAgentResourceAuthOAuth, saved.Config.Data().MCPAuth())
+			}
+		})
+	}
+}
+
 func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
 	r := support.Setup(t)
 	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
@@ -383,7 +460,7 @@ func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
 	config.ToolsDefaultApplied = true
 	require.NoError(t, resource.Update(db, nil, nil, &config))
 
-	saveDefaultMCPWriteTools(db, &stale, []mcp.Tool{
+	saveDefaultMCPWriteTools(db, &stale, stale.Config.Data(), []mcp.Tool{
 		{Name: "search", ReadOnly: true},
 		{Name: "create_issue"},
 	})
