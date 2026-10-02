@@ -53,6 +53,8 @@ export function AnalysisPopupHeader({
   fullPage,
   toggleFullPage,
   onArchive,
+  onDuplicate,
+  canDuplicate,
   footerBusy,
   reviewActions,
   showOwnerRow,
@@ -70,6 +72,8 @@ export function AnalysisPopupHeader({
   fullPage: boolean;
   toggleFullPage: () => void;
   onArchive?: () => void;
+  onDuplicate?: () => void;
+  canDuplicate?: boolean;
   footerBusy: boolean;
   reviewActions: ReactNode;
   /** The unified view moves owner and spend into the summary panel. */
@@ -96,6 +100,8 @@ export function AnalysisPopupHeader({
           copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
           onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
           archiveBusy={footerBusy}
+          onDuplicate={onDuplicate}
+          canDuplicate={canDuplicate}
           taskActions={reviewActions}
         />
       }

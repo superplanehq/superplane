@@ -1,10 +1,15 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useFactory } from "@/hooks/useFactoryData";
+import { useFactory, useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { usePermissions } from "@/contexts/usePermissions";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
+import { showErrorToast } from "@/lib/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
@@ -35,7 +40,7 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
+import { draftStartAction, footerMutationHandlers, stripFileReferences } from "./workOrderPopupActions";
 import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHeader";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
@@ -131,6 +136,35 @@ function AnalysisWorkOrderPopup({
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
+  const { canAct } = usePermissions();
+  const navigate = useNavigate();
+  const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const canCreateTasks = canAct("work_orders", "create");
+
+  const handleDuplicate = async () => {
+    if (!organizationId || !factoryId || !factoryKey) {
+      return;
+    }
+
+    const strippedDescription = stripFileReferences(edits.description);
+
+    try {
+      const newOrder = await createWorkOrder.mutateAsync({
+        title: edits.title,
+        description: strippedDescription,
+      });
+
+      if (!newOrder.number) {
+        throw new Error("Failed to create task");
+      }
+
+      // Close current popup and navigate to new task
+      onClose?.();
+      navigate(workOrderDetailPath(organizationId, factoryKey, newOrder.number, lineId));
+    } catch (error) {
+      showErrorToast(`Failed to duplicate task: ${getApiErrorMessage(error)}`);
+    }
+  };
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
   const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
@@ -223,26 +257,28 @@ function AnalysisWorkOrderPopup({
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
           panelReview={panelReview}
-          header={(views) => (
-            <AnalysisPopupHeader
-              edits={edits}
-              fixture={fixture}
-              titlePrefix={titlePrefix}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              lineId={lineId}
-              onClose={onClose}
-              fullPage={fullPage}
-              toggleFullPage={toggleFullPage}
-              onArchive={mutations.onArchive}
-              footerBusy={footerActions.busy}
-              reviewActions={reviewActions}
-              showOwnerRow={!unified}
-              planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
-              views={views}
-            />
-          )}
+           header={(views) => (
+             <AnalysisPopupHeader
+               edits={edits}
+               fixture={fixture}
+               titlePrefix={titlePrefix}
+               organizationId={organizationId}
+               factoryKey={factoryKey}
+               orderNumber={orderNumber}
+               lineId={lineId}
+               onClose={onClose}
+               fullPage={fullPage}
+               toggleFullPage={toggleFullPage}
+               onArchive={mutations.onArchive}
+               onDuplicate={handleDuplicate}
+               canDuplicate={canCreateTasks}
+               footerBusy={footerActions.busy}
+               reviewActions={reviewActions}
+               showOwnerRow={!unified}
+               planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+               views={views}
+             />
+           )}
         />
         {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>

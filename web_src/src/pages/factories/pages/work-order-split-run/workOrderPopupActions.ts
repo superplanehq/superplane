@@ -59,3 +59,26 @@ function startThinkingPayload(selectedThinking?: string) {
   }
   return draftStartThinkingPayload(selectedThinking);
 }
+
+/**
+ * Strips sp-file:// references from markdown and HTML.
+ * Removes pasted-image markdown references and attachment links while preserving
+ * surrounding text and ordinary HTTP/HTTPS links.
+ */
+export function stripFileReferences(description: string): string {
+  let result = description;
+
+  // Remove markdown image/link syntax with sp-file:// URLs: ![alt](sp-file://...) or [text](sp-file://...)
+  result = result.replace(/(!?\[[^\]]*]\()sp-file:\/\/[a-f0-9-]+(\))/g, "");
+
+  // Remove HTML img src with sp-file:// URLs: src="sp-file://..."
+  result = result.replace(/(\bsrc\s*=\s*["'])sp-file:\/\/[a-f0-9-]+(["'])/gi, "$1$2");
+
+  // Remove HTML href with sp-file:// URLs: href="sp-file://..."
+  result = result.replace(/(\bhref\s*=\s*["'])sp-file:\/\/[a-f0-9-]+(["'])/gi, "$1$2");
+
+  // Clean up empty markdown links/images left behind by the above replacements: ]() or ![]()
+  result = result.replace(/(!?\[\s*\]\s*\(\s*\))/g, "");
+
+  return result;
+}
