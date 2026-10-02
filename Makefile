@@ -59,7 +59,7 @@ TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e T
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e CI -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment

@@ -22,7 +22,8 @@ for another task.
 ## Local development
 
 Start the development environment and complete owner setup. Use this command
-to test runner or runner API changes:
+to test runner or runner API changes. Set `INSTALLATION_ADMIN_TOKEN` to a
+personal API token for an installation administrator:
 
 ```sh
 make runner.new

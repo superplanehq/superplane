@@ -12,7 +12,7 @@ database_name="${DB_NAME:-superplane_dev}"
 database_user="${DB_USERNAME:-postgres}"
 database_password="${DB_PASSWORD:-the-cake-is-a-lie}"
 token_name="Local Fleet Manager"
-token="${LOCAL_FLEET_MANAGER_ADMIN_TOKEN:-superplane-local-fleet-manager-token}"
+token="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
 token_hash="$(printf '%s' "$token" | sha256sum | cut -d ' ' -f 1)"
 
 query_database() {

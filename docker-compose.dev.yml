@@ -254,7 +254,6 @@ services:
     environment:
       FLEET_MANAGER_CONFIG_FILE: /etc/superplane/fleet-manager.json
       INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
-      LOCAL_FLEET_MANAGER_ADMIN_TOKEN: ${LOCAL_FLEET_MANAGER_ADMIN_TOKEN:-superplane-local-fleet-manager-token}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: superplane_dev

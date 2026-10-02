@@ -8,7 +8,11 @@ cd "${repo_root}"
 runner_image="${LOCAL_RUNNER_IMAGE:-superplane-runner-local:dev}"
 runner_network="${LOCAL_RUNNER_NETWORK:-superplane_default}"
 runner_api_url="${LOCAL_RUNNER_API_URL:-http://app:8000}"
-admin_token="${INSTALLATION_ADMIN_TOKEN:-${LOCAL_FLEET_MANAGER_ADMIN_TOKEN:-superplane-local-fleet-manager-token}}"
+admin_token="${INSTALLATION_ADMIN_TOKEN:-}"
+if [[ -z "${admin_token}" ]]; then
+  echo "Set INSTALLATION_ADMIN_TOKEN to an installation administrator personal API token." >&2
+  exit 1
+fi
 compose=(docker compose -f docker-compose.dev.yml)
 runner_compose=(
   "${compose[@]}"
