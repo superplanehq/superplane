@@ -202,6 +202,12 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		}
 	}
 
+	// Sync the comment to any existing work orders
+	if err := i.syncIssueComment(ctx, data, config.Repository); err != nil {
+		ctx.Logger.Warnf("Failed to sync issue comment to work order: %v", err)
+		// Don't fail the webhook; continue with normal event emission
+	}
+
 	err = ctx.Events.Emit("github.issueComment", data)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)
@@ -213,4 +219,33 @@ func (i *OnIssueComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 
 func (i *OnIssueComment) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func (i *OnIssueComment) syncIssueComment(ctx core.WebhookRequestContext, data map[string]any, repository string) error {
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	comment, ok := data["comment"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	number, ok := issue["number"].(float64)
+	if !ok || number <= 0 {
+		return nil
+	}
+
+	body, _ := comment["body"].(string)
+	if body == "" {
+		return nil
+	}
+
+	sender, _ := data["sender"].(map[string]any)
+	senderLogin, _ := sender["login"].(string)
+
+	// Sync the comment to any existing work orders
+	_, err := common.SyncGitHubIssueComment(ctx, repository, int(number), body, senderLogin)
+	return err
 }

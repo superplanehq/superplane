@@ -178,15 +178,23 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	if !common.WhitelistedAction(data, config.Actions) {
-		action, ok := common.ExtractAction(data)
-		if !ok {
-			ctx.Logger.Info("Ignoring event - without a valid action")
-			return http.StatusOK, nil, nil
-		}
+	action, ok := common.ExtractAction(data)
+	if !ok {
+		ctx.Logger.Info("Ignoring event - without a valid action")
+		return http.StatusOK, nil, nil
+	}
 
+	if !common.WhitelistedAction(data, config.Actions) {
 		ctx.Logger.Infof("Ignoring event - action %q is not configured", action)
 		return http.StatusOK, nil, nil
+	}
+
+	// Special handling for "edited" action: sync to existing work orders
+	if action == "edited" {
+		if err := i.syncEditedIssue(ctx, data, config.Repository); err != nil {
+			ctx.Logger.Warnf("Failed to sync edited issue to work order: %v", err)
+			// Don't fail the webhook; continue with normal event emission
+		}
 	}
 
 	err = ctx.Events.Emit("github.issue", data)
@@ -200,4 +208,27 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func (i *OnIssue) syncEditedIssue(ctx core.WebhookRequestContext, data map[string]any, repository string) error {
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	number, ok := issue["number"].(float64)
+	if !ok || number <= 0 {
+		return nil
+	}
+
+	title, _ := issue["title"].(string)
+	body, _ := issue["body"].(string)
+
+	if title == "" {
+		return nil
+	}
+
+	// Sync the edited issue to any existing work orders
+	_, err := common.SyncGitHubIssueEdit(ctx, repository, int(number), title, body)
+	return err
 }
