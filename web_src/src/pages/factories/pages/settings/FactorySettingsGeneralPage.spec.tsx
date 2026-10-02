@@ -137,7 +137,10 @@ describe("FactorySettingsGeneralPage", () => {
     await user.click(screen.getByTestId("factory-settings-public-badge-size"));
     await user.click(screen.getByRole("option", { name: "Full width" }));
     const afterSize = (snippet as HTMLInputElement).value;
-    expect(afterSize).toContain("period=14&size=wide");
+    const wideURL = `${window.location.origin}/api/v1/public/badges/badge-token.svg?period=14&size=wide`;
+    expect(afterSize).toBe(
+      `<a href="${window.location.origin}"><img src="${wideURL}" alt="PRs via SuperPlane" width="100%"></a>`,
+    );
 
     await user.click(cost);
     expect(mutateAsync).toHaveBeenCalledWith({ publicBadgeShowCost: true });
