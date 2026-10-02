@@ -172,6 +172,12 @@ func decodeJSON(r io.Reader, result any) error {
 		return err
 	}
 
+	return decodeValue(raw, result)
+}
+
+// decodeValue decodes an already-parsed JSON value into the target struct,
+// with the same weak typing decodeJSON applies to whole response bodies.
+func decodeValue(value any, result any) error {
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           result,
 		TagName:          "json",
@@ -181,7 +187,60 @@ func decodeJSON(r io.Reader, result any) error {
 		return err
 	}
 
-	return decoder.Decode(raw)
+	return decoder.Decode(value)
+}
+
+// listPerPage is the largest page Hetzner serves. The API defaults to 25 items
+// and caps per_page at 50, so every listing has to follow next_page to the end.
+const listPerPage = 50
+
+type paginationMeta struct {
+	Pagination struct {
+		NextPage *int `json:"next_page"`
+	} `json:"pagination"`
+}
+
+// listAll returns every page of a Hetzner collection endpoint. collection is the
+// key the items arrive under (for example "servers" for /servers), and the
+// walk follows meta.pagination.next_page until the API reports no further page.
+func listAll[T any](c *Client, path, collection string) ([]T, error) {
+	all := []T{}
+	page := 1
+
+	for {
+		resp, err := c.do("GET", fmt.Sprintf("%s?per_page=%d&page=%d", path, listPerPage, page), nil)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, c.parseError(resp)
+		}
+
+		var body map[string]any
+		if err := decodeJSON(resp.Body, &body); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode list %s response: %w", collection, err)
+		}
+		resp.Body.Close()
+
+		var items []T
+		if err := decodeValue(body[collection], &items); err != nil {
+			return nil, fmt.Errorf("decode list %s response: %w", collection, err)
+		}
+		all = append(all, items...)
+
+		var meta paginationMeta
+		if err := decodeValue(body["meta"], &meta); err != nil {
+			return nil, fmt.Errorf("decode list %s pagination: %w", collection, err)
+		}
+
+		// next_page is null on the last page. The <= guard keeps a malformed
+		// response from looping forever.
+		if meta.Pagination.NextPage == nil || *meta.Pagination.NextPage <= page {
+			return all, nil
+		}
+		page = *meta.Pagination.NextPage
+	}
 }
 
 func (c *Client) parseError(resp *http.Response) error {
@@ -327,45 +386,13 @@ func (c *Client) CreateServerSnapshot(serverID, description string) (*ImageRespo
 }
 
 func (c *Client) ListServers() ([]ServerResponse, error) {
-	resp, err := c.do("GET", "/servers?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		Servers []ServerResponse `json:"servers"`
-	}
-	if err := decodeJSON(resp.Body, &out); err != nil {
-		return nil, fmt.Errorf("decode list servers response: %w", err)
-	}
-	return out.Servers, nil
+	return listAll[ServerResponse](c, "/servers", "servers")
 }
 
 // load balancer actions
 
 func (c *Client) ListLoadBalancers() ([]ServerResponse, error) {
-	resp, err := c.do("GET", "/load_balancers?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		LoadBalancers []ServerResponse `json:"load_balancers"`
-	}
-	if err := decodeJSON(resp.Body, &out); err != nil {
-		return nil, fmt.Errorf("decode list load balancers response: %w", err)
-	}
-	return out.LoadBalancers, nil
+	return listAll[ServerResponse](c, "/load_balancers", "load_balancers")
 }
 
 func (c *Client) CreateLoadBalancer(name, loadBalancerType, location, algorithm string) (*ServerResponse, *ActionResponse, error) {
@@ -429,23 +456,7 @@ type ServerTypeResponse struct {
 }
 
 func (c *Client) ListServerTypes() ([]ServerTypeResponse, error) {
-	resp, err := c.do("GET", "/server_types?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		ServerTypes []ServerTypeResponse `json:"server_types"`
-	}
-	if err := decodeJSON(resp.Body, &out); err != nil {
-		return nil, fmt.Errorf("decode list server types response: %w", err)
-	}
-	return out.ServerTypes, nil
+	return listAll[ServerTypeResponse](c, "/server_types", "server_types")
 }
 
 // ServerTypeLocationNames returns the location names (e.g. fsn1, nbg1) where the given server type is available.
@@ -498,48 +509,24 @@ type ImageResponse struct {
 }
 
 func (c *Client) ListImages() ([]ImageResponse, error) {
-	all := []ImageResponse{}
-	seen := map[int]struct{}{}
-	page := 1
-
-	for {
-		resp, err := c.do("GET", fmt.Sprintf("/images?per_page=50&page=%d", page), nil)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, c.parseError(resp)
-		}
-
-		var out struct {
-			Images []ImageResponse `json:"images"`
-			Meta   struct {
-				Pagination struct {
-					NextPage *int `json:"next_page"`
-				} `json:"pagination"`
-			} `json:"meta"`
-		}
-		if err := decodeJSON(resp.Body, &out); err != nil {
-			resp.Body.Close()
-			return nil, fmt.Errorf("decode list images response: %w", err)
-		}
-		resp.Body.Close()
-
-		for _, img := range out.Images {
-			if _, ok := seen[img.ID]; ok {
-				continue
-			}
-			seen[img.ID] = struct{}{}
-			all = append(all, img)
-		}
-
-		if out.Meta.Pagination.NextPage == nil || *out.Meta.Pagination.NextPage <= page {
-			break
-		}
-		page = *out.Meta.Pagination.NextPage
+	images, err := listAll[ImageResponse](c, "/images", "images")
+	if err != nil {
+		return nil, err
 	}
 
-	return all, nil
+	// A page walk can see the same image twice when the underlying list changes
+	// between requests, so only the first occurrence of an ID is kept.
+	unique := make([]ImageResponse, 0, len(images))
+	seen := map[int]struct{}{}
+	for _, image := range images {
+		if _, ok := seen[image.ID]; ok {
+			continue
+		}
+		seen[image.ID] = struct{}{}
+		unique = append(unique, image)
+	}
+
+	return unique, nil
 }
 
 func (c *Client) GetImage(imageID string) (*ImageResponse, error) {
@@ -607,43 +594,11 @@ func (l *LocationResponse) LocationDisplayName() string {
 }
 
 func (c *Client) ListLocations() ([]LocationResponse, error) {
-	resp, err := c.do("GET", "/locations?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		Locations []LocationResponse `json:"locations"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("decode list locations response: %w", err)
-	}
-	return out.Locations, nil
+	return listAll[LocationResponse](c, "/locations", "locations")
 }
 
 func (c *Client) ListFirewalls() ([]FirewallResponse, error) {
-	resp, err := c.do("GET", "/firewalls?per_page=50", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		Firewalls []FirewallResponse `json:"firewalls"`
-	}
-	if err := decodeJSON(resp.Body, &out); err != nil {
-		return nil, fmt.Errorf("decode list firewalls response: %w", err)
-	}
-	return out.Firewalls, nil
+	return listAll[FirewallResponse](c, "/firewalls", "firewalls")
 }
 
 func (c *Client) Verify() error {
@@ -667,23 +622,7 @@ type LoadBalancerTypeResponse struct {
 }
 
 func (c *Client) ListLoadBalancerTypes() ([]LoadBalancerTypeResponse, error) {
-	resp, err := c.do("GET", "/load_balancer_types", nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseError(resp)
-	}
-
-	var out struct {
-		LoadBalancerTypes []LoadBalancerTypeResponse `json:"load_balancer_types"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, fmt.Errorf("decode list load balancer types response: %w", err)
-	}
-	return out.LoadBalancerTypes, nil
+	return listAll[LoadBalancerTypeResponse](c, "/load_balancer_types", "load_balancer_types")
 }
 
 // resolveServerID extracts the server ID from the configuration map,
