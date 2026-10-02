@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/google/uuid"
@@ -103,6 +104,31 @@ func TestAdminListOrgIntegrations(t *testing.T) {
 		require.Len(t, page.Items, 1)
 		assert.Equal(t, name+"-b", page.Items[0].InstallationName)
 		assert.Equal(t, 1, page.Offset)
+	})
+
+	t.Run("treats percent and underscore as literal characters", func(t *testing.T) {
+		name := "wild-" + uuid.NewString()[:8]
+		_, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", name+"-a%_b", nil)
+		require.NoError(t, err)
+		_, err = models.CreateIntegration(uuid.New(), r.Organization.ID, "sentry", name+"-axb", nil)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method: "GET",
+			path: "/admin/api/organizations/" + r.Organization.ID.String() +
+				"/integrations?search=" + url.QueryEscape(name+"-a%_b") + "&limit=50",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items []adminIntegration `json:"items"`
+			Total int64              `json:"total"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &page))
+		require.Len(t, page.Items, 1)
+		assert.Equal(t, int64(1), page.Total)
+		assert.Equal(t, name+"-a%_b", page.Items[0].InstallationName)
 	})
 
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {

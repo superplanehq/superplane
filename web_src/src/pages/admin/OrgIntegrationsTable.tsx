@@ -1,6 +1,8 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Plug, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminPagination from "./AdminPagination";
@@ -31,6 +33,25 @@ const DETAIL_LABELS: Record<string, string> = {
   hosted_app: "Hosted app",
 };
 
+function integrationListUrl(orgId: string, search: string, offset: number) {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+  if (search) {
+    params.set("search", search);
+  }
+  return `/admin/api/organizations/${orgId}/integrations?${params}`;
+}
+
+function earlierPageOffset(total: number, offset: number, rowCount: number) {
+  if (rowCount > 0 || offset <= 0 || total <= 0) {
+    return null;
+  }
+  const lastOffset = Math.floor((total - 1) / PAGE_SIZE) * PAGE_SIZE;
+  if (lastOffset >= offset) {
+    return null;
+  }
+  return lastOffset;
+}
+
 const STATE_CLASSES: Record<string, string> = {
   ready: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300",
   pending: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
@@ -49,24 +70,30 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
   const fetchIntegrations = useCallback(
     async (nextSearch: string, nextOffset: number) => {
       const id = ++requestId.current;
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(nextOffset) });
-      if (nextSearch) {
-        params.set("search", nextSearch);
-      }
+      const showFailure = () => {
+        setError(true);
+        setLoading(false);
+      };
+      setLoading(true);
+      setError(false);
       try {
-        const response = await fetch(`/admin/api/organizations/${orgId}/integrations?${params}`, {
-          credentials: "include",
-        });
+        const response = await fetch(integrationListUrl(orgId, nextSearch, nextOffset), { credentials: "include" });
         if (id !== requestId.current) {
           return;
         }
         if (!response.ok) {
-          setError(true);
-          setLoading(false);
+          showFailure();
           return;
         }
         const body = (await response.json()) as AdminIntegrationsResponse;
-        setItems(body.items ?? []);
+        const rows = body.items ?? [];
+        const retryOffset = earlierPageOffset(body.total, nextOffset, rows.length);
+        if (retryOffset !== null) {
+          setOffset(retryOffset);
+          void fetchIntegrations(nextSearch, retryOffset);
+          return;
+        }
+        setItems(rows);
         setTotal(body.total);
         setError(false);
         setLoading(false);
@@ -74,8 +101,7 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
         if (id !== requestId.current) {
           return;
         }
-        setError(true);
-        setLoading(false);
+        showFailure();
       }
     },
     [orgId],
@@ -99,18 +125,22 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
           </Heading>
         </div>
         <div className="relative w-56">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-          <input
+          <Label htmlFor="admin-connection-search" className="sr-only">
+            Search connections
+          </Label>
+          <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <Input
+            id="admin-connection-search"
             type="text"
             placeholder="Search connections..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pr-3 pl-9 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="pl-9"
           />
         </div>
       </div>
       <OrgIntegrationsBody isLoading={loading} isError={error} items={items} hasSearch={search !== ""} />
-      {items.length > 0 ? (
+      {!loading && items.length > 0 ? (
         <AdminPagination
           offset={offset}
           total={total}

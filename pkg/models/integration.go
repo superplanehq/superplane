@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -136,8 +137,12 @@ func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
 func ListIntegrationsPage(tx *gorm.DB, orgID uuid.UUID, search string, limit, offset int) ([]Integration, int64, error) {
 	query := tx.Model(&Integration{}).Where("organization_id = ?", orgID)
 	if search != "" {
-		like := "%" + search + "%"
-		query = query.Where("app_name ILIKE ? OR installation_name ILIKE ?", like, like)
+		like := containsLikePattern(search)
+		query = query.Where(
+			"app_name ILIKE ? ESCAPE '\\' OR installation_name ILIKE ? ESCAPE '\\'",
+			like,
+			like,
+		)
 	}
 
 	var total int64
@@ -158,6 +163,13 @@ func ListIntegrationsPage(tx *gorm.DB, orgID uuid.UUID, search string, limit, of
 		return nil, 0, err
 	}
 	return integrations, total, nil
+}
+
+// containsLikePattern matches the search text inside a name. Percent and
+// underscore stay literal characters.
+func containsLikePattern(search string) string {
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search)
+	return "%" + escaped + "%"
 }
 
 func CountIntegrationsByOrganization(orgID string) (int64, error) {

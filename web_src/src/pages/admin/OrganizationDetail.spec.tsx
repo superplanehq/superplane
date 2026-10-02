@@ -237,7 +237,8 @@ describe("OrganizationDetail", () => {
     expect(within(panel).getByText("install-uuid-1")).toBeInTheDocument();
     expect(within(panel).getByText("acme-sentry-org")).toBeInTheDocument();
 
-    await user.type(screen.getByPlaceholderText("Search connections..."), "acme");
+    expect(screen.getByRole("textbox", { name: "Search connections" })).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "Search connections" }), "acme");
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining(`/admin/api/organizations/${ORG_ID}/integrations?`),
@@ -296,6 +297,141 @@ describe("OrganizationDetail", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByText("second-sentry")).toBeInTheDocument();
     expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
+  });
+
+  it("hides the current page while the next page loads", async () => {
+    const user = userEvent.setup();
+    let releaseNextPage: (response: Response) => void = () => {};
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({
+          id: ORG_ID,
+          name: "Acme",
+          slug: "acme",
+          description: "Builds widgets",
+          canvas_count: 0,
+          task_count: 0,
+          done_task_count: 0,
+          member_count: 0,
+          created_at: "2024-01-15T12:00:00Z",
+          updated_at: "2024-02-20T12:00:00Z",
+        });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+        const offset = new URL(url, "http://localhost").searchParams.get("offset");
+        if (offset === "50") {
+          return new Promise((resolve) => {
+            releaseNextPage = resolve;
+          });
+        }
+        return jsonResponse({
+          items: [
+            {
+              id: "integration-1",
+              app_name: "sentry",
+              installation_name: "acme-sentry",
+              state: "ready",
+              state_description: "",
+              details: {},
+              created_at: "2024-01-15T12:00:00Z",
+              updated_at: "2024-02-20T12:00:00Z",
+            },
+          ],
+          total: 51,
+          limit: 50,
+          offset: 0,
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Loading...")).toBeInTheDocument();
+    expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
+
+    releaseNextPage(
+      jsonResponse({
+        items: [
+          {
+            id: "integration-2",
+            app_name: "sentry",
+            installation_name: "second-sentry",
+            state: "ready",
+            state_description: "",
+            details: {},
+            created_at: "2024-01-15T12:00:00Z",
+            updated_at: "2024-02-20T12:00:00Z",
+          },
+        ],
+        total: 51,
+        limit: 50,
+        offset: 50,
+      }),
+    );
+    expect(await screen.findByText("second-sentry")).toBeInTheDocument();
+  });
+
+  it("returns to an earlier page when a later page is empty", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({
+          id: ORG_ID,
+          name: "Acme",
+          slug: "acme",
+          description: "Builds widgets",
+          canvas_count: 0,
+          task_count: 0,
+          done_task_count: 0,
+          member_count: 0,
+          created_at: "2024-01-15T12:00:00Z",
+          updated_at: "2024-02-20T12:00:00Z",
+        });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+        const offset = new URL(url, "http://localhost").searchParams.get("offset");
+        if (offset === "50") {
+          return jsonResponse({ items: [], total: 50, limit: 50, offset: 50 });
+        }
+        return jsonResponse({
+          items: [
+            {
+              id: "integration-1",
+              app_name: "sentry",
+              installation_name: "acme-sentry",
+              state: "ready",
+              state_description: "",
+              details: {},
+              created_at: "2024-01-15T12:00:00Z",
+              updated_at: "2024-02-20T12:00:00Z",
+            },
+          ],
+          total: 51,
+          limit: 50,
+          offset: 0,
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+      expect(urls.filter((url) => url.includes("offset=50")).length).toBeGreaterThan(0);
+      expect(urls.filter((url) => url.includes("offset=0")).length).toBeGreaterThan(1);
+    });
+    expect(screen.getByText("acme-sentry")).toBeInTheDocument();
+    expect(screen.queryByText("This organization has no connections.")).not.toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {
