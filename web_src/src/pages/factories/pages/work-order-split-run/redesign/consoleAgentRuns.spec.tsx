@@ -166,7 +166,7 @@ function mockChecksCanvas(nodes: Array<{ id: string; component: string }> = []) 
 }
 
 function mockExecutions(executions: unknown, failed = false) {
-  useEventExecutions.mockImplementation((canvasId, eventId) => {
+  useEventExecutions.mockImplementation((canvasId: string | undefined, eventId: string | null | undefined) => {
     if (failed || canvasId !== "canvas-checks" || eventId !== "event-root") {
       return { data: undefined, isError: failed, isLoading: false };
     }

@@ -16,6 +16,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [RUNNING_RUNNER],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream());
@@ -27,6 +28,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
         { ...RUNNING_RUNNER, status: "passed" as const },
@@ -77,6 +79,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(
@@ -134,6 +137,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true, isLoading: false }));
@@ -158,6 +162,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true, isLoading: true }));
@@ -183,6 +188,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: true,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [],
     });
     const stage = { ...implementStage(), status: "passed" as const, agentSteps: [] };
@@ -206,6 +212,7 @@ describe("LiveAgentSteps finished runs", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false }));

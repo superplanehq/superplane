@@ -1,9 +1,15 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
+type DescribeRunQuery = {
+  data: { run?: { rootEvent?: { id?: string } } } | undefined;
+  isError: boolean;
+  isLoading: boolean;
+};
+
 const { useCanvasRuntimeWebsocketMock, useDescribeRunMock } = vi.hoisted(() => ({
   useCanvasRuntimeWebsocketMock: vi.fn(),
-  useDescribeRunMock: vi.fn(() => ({ data: undefined, isError: false, isLoading: false })),
+  useDescribeRunMock: vi.fn((): DescribeRunQuery => ({ data: undefined, isError: false, isLoading: false })),
 }));
 
 vi.mock("@/hooks/useCanvasWebsocket", () => ({
