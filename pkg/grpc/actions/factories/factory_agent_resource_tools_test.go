@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -245,6 +246,95 @@ func Test__ListFactoryAgentResourceToolsMarksEmptyListApplied(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
 	assert.Empty(t, saved.Config.Data().DisabledTools)
+}
+
+func Test__ListFactoryAgentResourceToolsSavesDefaultsFromTheReturnedList(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	lists := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var payload struct {
+			Method string `json:"method"`
+		}
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&payload))
+		switch payload.Method {
+		case "initialize":
+			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": 1, "result": map[string]any{}})
+		case "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			lists++
+			if lists > 1 {
+				http.Error(w, "second list failed", http.StatusBadGateway)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      2,
+				"result": map[string]any{"tools": []map[string]any{
+					{"name": "search", "annotations": map[string]any{"readOnlyHint": true}},
+					{"name": "create_issue"},
+				}},
+			})
+		default:
+			t.Fatalf("unexpected method %s", payload.Method)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       server.URL,
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	response, err := ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, response.GetTools(), 2)
+	assert.Equal(t, 1, lists)
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Equal(t, []string{"create_issue"}, saved.Config.Data().DisabledTools)
+}
+
+func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.com/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	stale := *resource
+	config := resource.Config.Data()
+	config.DisabledTools = []string{"search"}
+	config.ToolsDefaultApplied = true
+	require.NoError(t, resource.Update(db, nil, nil, &config))
+
+	saveDefaultMCPWriteTools(db, &stale, []mcp.Tool{
+		{Name: "search", ReadOnly: true},
+		{Name: "create_issue"},
+	})
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Equal(t, []string{"search"}, saved.Config.Data().DisabledTools)
 }
 
 func mcpToolsHandler(t *testing.T, tools []map[string]any) http.Handler {

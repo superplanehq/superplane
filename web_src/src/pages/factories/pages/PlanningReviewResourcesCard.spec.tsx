@@ -165,6 +165,42 @@ describe("PlanningReviewResourcesCard", () => {
       [HEADER_MCP_RESOURCE.id ?? ""]: ["create_issue"],
     });
   });
+
+  it("removes the automation disable when a workspace-disabled tool is turned on", async () => {
+    const user = userEvent.setup();
+    const onEnabledToolsChange = vi.fn();
+    const onDisabledToolsChange = vi.fn();
+    useFactoryAgentResources.mockImplementation((_org: string, _factory: string, kind: string) => {
+      if (kind === "KIND_SKILL") {
+        return { data: [], isLoading: false, isError: false };
+      }
+      return {
+        data: [{ ...HEADER_MCP_RESOURCE, disabledTools: ["create_issue"] }],
+        isLoading: false,
+        isError: false,
+      };
+    });
+    useFactoryAgentResourceTools.mockReturnValue({
+      data: [
+        { name: "search", readOnly: true },
+        { name: "create_issue", readOnly: false },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    renderCard({
+      onEnabledToolsChange,
+      onDisabledToolsChange,
+      disabledTools: { [HEADER_MCP_RESOURCE.id ?? ""]: ["create_issue"] },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Tools" }));
+    await user.click(screen.getByTestId("mcp-tool-enabled-create_issue"));
+    expect(onEnabledToolsChange).toHaveBeenCalledWith({
+      [HEADER_MCP_RESOURCE.id ?? ""]: ["create_issue"],
+    });
+    expect(onDisabledToolsChange).toHaveBeenCalledWith({});
+  });
 });
 
 describe("disabledAgentResourceIds", () => {

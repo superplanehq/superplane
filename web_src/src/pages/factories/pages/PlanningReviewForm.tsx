@@ -75,11 +75,15 @@ function AgentPanel({
   showVisualEvidenceSetting: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
+  const componentRef = useRef(component);
   const setConfigurationField = (name: string, value: unknown) => {
-    onChange({
-      ...component,
-      configuration: { ...component.configuration, [name]: value },
-    });
+    const current = componentRef.current;
+    const next = {
+      ...current,
+      configuration: { ...current.configuration, [name]: value },
+    };
+    componentRef.current = next;
+    onChange(next);
   };
   const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
@@ -94,7 +98,6 @@ function AgentPanel({
     current: currentModel,
   });
 
-  const componentRef = useRef(component);
   componentRef.current = component;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;

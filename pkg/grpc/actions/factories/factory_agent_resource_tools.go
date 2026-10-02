@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -11,7 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func ListFactoryAgentResourceTools(
@@ -52,7 +55,7 @@ func ListFactoryAgentResourceTools(
 	if err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
-	applyDefaultMCPWriteTools(ctx, deps, db, resource)
+	saveDefaultMCPWriteTools(db, resource, tools)
 
 	out := make([]*pb.FactoryAgentResourceTool, 0, len(tools))
 	for _, tool := range tools {
@@ -86,20 +89,44 @@ func applyDefaultMCPWriteTools(
 	if err != nil {
 		return
 	}
+	saveDefaultMCPWriteTools(db, resource, tools)
+}
 
-	var current models.FactoryAgentResource
-	err = db.Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).First(&current).Error
-	if err != nil || current.Config.Data().ToolsDefaultApplied {
+func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource, tools []mcp.Tool) {
+	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
 		return
 	}
-	config := current.Config.Data()
-	config.DisabledTools = writeToolNames(tools)
-	config.ToolsDefaultApplied = true
-	if err := current.Update(db, nil, nil, &config); err != nil {
+	if resource.Config.Data().ToolsDefaultApplied {
 		return
 	}
-	resource.Config = current.Config
-	resource.UpdatedAt = current.UpdatedAt
+
+	_ = db.Transaction(func(tx *gorm.DB) error {
+		var current models.FactoryAgentResource
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).
+			First(&current).Error
+		if err != nil || current.Config.Data().ToolsDefaultApplied {
+			return err
+		}
+		config := current.Config.Data()
+		config.DisabledTools = writeToolNames(tools)
+		config.ToolsDefaultApplied = true
+		normalized := config.NormalizedMCP()
+		now := time.Now()
+		result := tx.Model(&models.FactoryAgentResource{}).
+			Where("organization_id = ? AND id = ?", current.OrganizationID, current.ID).
+			Where("COALESCE(config->>'toolsDefaultApplied', 'false') <> 'true'").
+			Updates(map[string]any{
+				"config":     datatypes.NewJSONType(normalized),
+				"updated_at": now,
+			})
+		if result.Error != nil || result.RowsAffected == 0 {
+			return result.Error
+		}
+		resource.Config = datatypes.NewJSONType(normalized)
+		resource.UpdatedAt = now
+		return nil
+	})
 }
 
 func writeToolNames(tools []mcp.Tool) []string {

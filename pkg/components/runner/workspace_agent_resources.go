@@ -208,6 +208,10 @@ func assembleWorkspaceMCPServer(
 	if strings.TrimSpace(config.URL) == "" || resource.Name == models.ReservedFactoryAgentResourceName {
 		return workspaceMCPServer{}, false
 	}
+	if !config.ToolsDefaultApplied {
+		logger.WithField("mcp", resource.Name).Warn("skip workspace MCP: tool defaults are not saved")
+		return workspaceMCPServer{}, false
+	}
 
 	headers := map[string]string{}
 	switch config.MCPAuth() {

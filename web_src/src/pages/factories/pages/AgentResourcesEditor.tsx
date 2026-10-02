@@ -226,6 +226,11 @@ function MCPAutomationRow({
                 onEnabledToolsChange(
                   nextResourceTools(enabledTools, id, nextDisabledTools(enabledOverride, toolName, !enabled)),
                 );
+                if (enabled) {
+                  onDisabledToolsChange(
+                    nextResourceTools(disabledTools, id, nextDisabledTools(automationDisabled, toolName, true)),
+                  );
+                }
                 return;
               }
               onDisabledToolsChange(

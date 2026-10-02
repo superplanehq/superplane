@@ -35,9 +35,10 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.example.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 		Headers: []models.FactoryAgentResourceHeader{{
 			Name:       "Authorization",
 			SecretName: "vendor-mcp",
@@ -46,9 +47,10 @@ func TestAttachWorkspaceAgentResourcesWritesHeaderServers(t *testing.T) {
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "off", false, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.example.com/other",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/other",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 		Headers: []models.FactoryAgentResourceHeader{{
 			Name:       "Authorization",
 			SecretName: "vendor-mcp",
@@ -94,9 +96,10 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.deepwiki.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.deepwiki.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 
@@ -120,7 +123,7 @@ func TestAttachWorkspaceAgentResourcesWritesPublicServersWithoutHeaders(t *testi
 	assert.Empty(t, payload.Servers[0].Headers)
 }
 
-func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *testing.T) {
+func TestAttachWorkspaceAgentResourcesSkipsServerUntilDefaultsAreSaved(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
 	db := database.DB(t.Context())
@@ -131,6 +134,29 @@ func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *test
 		Transport: "http",
 		URL:       "https://mcp.example.com/mcp",
 		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	assert.Empty(t, environment)
+	assert.Empty(t, files)
+}
+
+func TestAttachWorkspaceAgentResourcesSkipsServerWhenHeaderSecretMissing(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 		Headers: []models.FactoryAgentResourceHeader{{
 			Name:       "Authorization",
 			SecretName: "missing-secret",
@@ -155,9 +181,10 @@ func TestAttachWorkspaceAgentResourcesSkipsWhenFeatureDisabled(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.example.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 		Headers: []models.FactoryAgentResourceHeader{{
 			Name:       "Authorization",
 			SecretName: "vendor-mcp",
@@ -218,9 +245,10 @@ func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.deepwiki.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.deepwiki.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
@@ -249,15 +277,17 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	kept, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.deepwiki.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.deepwiki.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 	disabled, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "linear", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.linear.app/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.linear.app/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
@@ -301,10 +331,11 @@ func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport:     "http",
-		URL:           "https://mcp.example.com/mcp",
-		Auth:          models.FactoryAgentResourceAuthHeaders,
-		DisabledTools: []string{"search"},
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
+		DisabledTools:       []string{"search"},
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
@@ -345,10 +376,11 @@ func TestAttachWorkspaceAgentResourcesOmitsEnabledOverride(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport:     "http",
-		URL:           "https://mcp.example.com/mcp",
-		Auth:          models.FactoryAgentResourceAuthHeaders,
-		DisabledTools: []string{"create_issue", "search"},
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
+		DisabledTools:       []string{"create_issue", "search"},
 	})
 	require.NoError(t, err)
 
@@ -383,10 +415,11 @@ func TestAttachWorkspaceAgentResourcesKeepsToolOffWhenBothListsNameIt(t *testing
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport:     "http",
-		URL:           "https://mcp.example.com/mcp",
-		Auth:          models.FactoryAgentResourceAuthHeaders,
-		DisabledTools: []string{"create_issue"},
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
+		DisabledTools:       []string{"create_issue"},
 	})
 	require.NoError(t, err)
 
@@ -421,9 +454,10 @@ func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *test
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.example.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.example.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "review-copy", true, models.FactoryAgentResourceConfig{
@@ -449,9 +483,10 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 	disabled, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "deepwiki", true, models.FactoryAgentResourceConfig{
-		Transport: "http",
-		URL:       "https://mcp.deepwiki.com/mcp",
-		Auth:      models.FactoryAgentResourceAuthHeaders,
+		Transport:           "http",
+		URL:                 "https://mcp.deepwiki.com/mcp",
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		ToolsDefaultApplied: true,
 	})
 	require.NoError(t, err)
 
