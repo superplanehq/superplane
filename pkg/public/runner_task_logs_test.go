@@ -17,7 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-	logpostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
@@ -32,10 +32,10 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	previousProvider := blob.Current()
 	blob.SetCurrent(provider)
 	t.Cleanup(func() { blob.SetCurrent(previousProvider) })
-	activeStore := logpostgres.New()
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      database.DB(t.Context()),
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 	previousActiveStore := runnerlogs.Current()
@@ -65,7 +65,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	require.NoError(t, database.Conn().Create(&task).Error)
 	require.NoError(t, database.Conn().Create(&models.RunnerTaskLogLifecycle{
 		TaskID:      task.ID,
-		ActiveStore: runnerlogs.StorePostgres,
+		ActiveStore: runnerlogs.StoreFS,
 		State:       models.RunnerTaskLogStateActive,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -90,10 +90,10 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusOK, live.Code)
 	assert.Equal(t, models.RunnerTaskLogStateActive, live.Header().Get(runnerlogs.HeaderState))
-	assert.Equal(t, "2", live.Header().Get(runnerlogs.HeaderCursor))
+	assert.Equal(t, "13", live.Header().Get(runnerlogs.HeaderCursor))
 	assert.Equal(t, "first\nsecond\n", live.Body.String())
 
-	incremental := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "1")
+	incremental := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "6")
 	require.Equal(t, http.StatusOK, incremental.Code)
 	assert.Equal(t, "second\n", incremental.Body.String())
 
@@ -114,7 +114,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 			ContentEncoding: "gzip",
 		},
 	))
-	finalCursor := "2"
+	finalCursor := "13"
 	require.NoError(t, database.Conn().Model(&models.RunnerTaskLogLifecycle{}).
 		Where("task_id = ?", task.ID).
 		Updates(map[string]any{
@@ -130,7 +130,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 
 	require.NoError(t, activeStore.Delete(t.Context(), task.ID))
 
-	stale := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "1")
+	stale := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "6")
 	require.Equal(t, http.StatusConflict, stale.Code)
 	assert.Equal(t, "true", stale.Header().Get(runnerlogs.HeaderReset))
 

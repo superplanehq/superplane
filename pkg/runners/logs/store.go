@@ -10,12 +10,10 @@ import (
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/metric"
-	"gorm.io/gorm"
 )
 
 const (
 	StoreFS                = "fs"
-	StorePostgres          = "postgres"
 	MaxRetainedBytes int64 = 10 * 1024 * 1024
 	SafetyExpiration       = 7 * 24 * time.Hour
 
@@ -44,7 +42,6 @@ type ReadResult struct {
 
 type SetupContext struct {
 	Context       context.Context
-	Database      *gorm.DB
 	MeterProvider metric.MeterProvider
 }
 
@@ -52,11 +49,10 @@ type SetupContext struct {
  * Store owns chunks and all append-frequency metadata needed to order,
  * deduplicate, limit, and read them.
  *
- * An implementation backed by an external system must keep that metadata in
- * the external system. Accepting a chunk must not write sequence, byte-count,
- * or truncation metadata to the application PostgreSQL database. This rule
- * keeps PostgreSQL out of the active log write path when another store is
- * selected.
+ * An implementation must keep that metadata in its active log storage.
+ * Accepting a chunk must not write sequence, byte-count, or truncation metadata
+ * to the application PostgreSQL database. This rule keeps the application
+ * database out of the active log write path.
  */
 type Store interface {
 
@@ -95,9 +91,8 @@ type Store interface {
 	 * to receive only newer records. ErrNotFound means that the task has no active-store record.
 	 *
 	 * The cursor is independent from the runner chunk sequence passed to Append.
-	 * Callers must not create a cursor from a chunk sequence or interpret its value.
-	 * PostgreSQL currently uses the next chunk sequence, while FS uses a committed
-	 * byte offset. A client only stores and returns the latest cursor from ReadAfter.
+	 * Callers must not create a cursor from a chunk sequence or interpret its
+	 * value. A client only stores and returns the latest cursor from ReadAfter.
 	 */
 	ReadAfter(context.Context, uuid.UUID, string) (*ReadResult, error)
 

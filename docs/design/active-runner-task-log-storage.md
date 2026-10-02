@@ -1,14 +1,13 @@
 # Active Runner Task Log Storage
 
 This document defines the design for active runner task logs.
-It also describes the PostgreSQL and filesystem store implementations.
+It also describes the filesystem store implementation.
 
 ## Decision Summary
 
-- SuperPlane will use a configurable active log store.
-- SuperPlane will set up only the selected active log store during startup.
-- PostgreSQL is intended for small and medium installations.
-- A shared filesystem is available for larger installations.
+- SuperPlane will use a filesystem for active runner task logs.
+- Local and single-replica installations can use a local filesystem.
+- Multi-replica installations must use a shared filesystem.
 - Blob storage will continue to hold completed task logs.
 - A task log will have a maximum retained size of 10 MiB.
 - Active stores will initially keep log chunks uncompressed.
@@ -46,10 +45,9 @@ Repeated reads also increase storage operations and backend work.
 - Limit the retained log size for each task.
 - Read active logs without one storage request for each runner chunk.
 - Support multiple API replicas.
-- Keep requirements small for installations that use PostgreSQL.
-- Support large workloads without adding log traffic to the application database.
+- Keep active log traffic out of the application database.
+- Support small and large installations with the same storage implementation.
 - Move completed logs to the existing blob storage system.
-- Let operators select an active log store for their installation.
 - Control runner log traffic without a runner configuration change.
 
 ## Non-goals
@@ -74,10 +72,10 @@ The expected write rate is approximately one chunk per active logging task per i
 
 The expected installation sizes are:
 
-| Organization size | Concurrent tasks | Store guidance |
+| Organization size | Concurrent tasks | Filesystem guidance |
 | --- | ---: | --- |
-| Small | 10 to 100 | PostgreSQL |
-| Medium | 100 to 1,000 | PostgreSQL |
+| Small | 10 to 100 | Local or shared filesystem |
+| Medium | 100 to 1,000 | Local or shared filesystem |
 | Large | 1,000 to 10,000 | Shared filesystem |
 | Huge | More than 10,000 | Shared filesystem with measured capacity |
 
@@ -128,15 +126,15 @@ An archived lifecycle with a cleanup time still has active data available for
 existing readers. After the grace period, SuperPlane deletes the active data,
 keeps the lifecycle archived, and clears the cleanup time.
 
-External active stores own their chunk sequence and byte-count metadata.
-SuperPlane must not update PostgreSQL for every external-store append.
+The filesystem store owns its chunk sequence and byte-count metadata.
+SuperPlane must not update PostgreSQL for every append.
 
 ## Active Log Store Contract
 
 The active log store is an internal interface.
 Its logical operations are:
 
-- `Setup`: Prepare and validate the selected store during application startup.
+- `Setup`: Prepare and validate the filesystem store during application startup.
 - `Initialize`: Create store metadata before SuperPlane sends the task to a runner.
 - `Append`: Persist one ordered runner chunk.
 - `ReadAfter`: Read data after an opaque cursor.
@@ -159,22 +157,17 @@ The implementation must provide these guarantees:
 - Multiple API replicas can use the store safely.
 
 The cursor is opaque outside the store implementation.
-This rule permits different physical layouts in PostgreSQL and the filesystem.
 The append sequence and read cursor are independent:
 
 - The append sequence identifies runner upload chunks for ordering and deduplication.
 - The read cursor identifies a store-specific position in the combined active log.
 
-PostgreSQL uses the next chunk sequence as its current read cursor.
 The filesystem uses a committed byte offset.
 Clients must not construct or interpret cursors.
 
 SuperPlane calls `Setup` before it starts runner API handlers and log workers.
-Startup fails if the selected store cannot complete setup.
-SuperPlane does not set up stores that the installation did not select.
-The setup context supplies store dependencies, including the application
-database and the metrics provider. Each implementation uses only the
-dependencies that it needs.
+Startup fails if the filesystem store cannot complete setup.
+The setup context supplies the operation context and metrics provider.
 
 SuperPlane calls `Initialize` before it sends a task to a runner.
 This call creates the store metadata and selects the filesystem path.
@@ -355,60 +348,12 @@ clears the scheduled cleanup time.
 The active store also uses a seven-day expiration policy as a final safeguard.
 This policy removes data if the cleanup worker cannot complete the deletion.
 
-## PostgreSQL Store
-
-PostgreSQL is the default active store for self-hosted installations.
-It requires no additional infrastructure.
-
-The PostgreSQL implementation uses immutable chunk rows.
-A conceptual table has these columns:
-
-| Column | Purpose |
-| --- | --- |
-| `task_id` | Identifies the runner task |
-| `sequence` | Orders the chunks |
-| `content` | Stores NDJSON bytes |
-| `created_at` | Supports operations and cleanup |
-
-The primary key is `(task_id, sequence)`.
-The table does not need a UUID for each chunk.
-It should not have unrelated secondary indexes.
-
-The chunk table belongs to the PostgreSQL active store.
-Application database migrations do not create this table.
-The PostgreSQL store creates and upgrades its table through `Setup`.
-This rule prevents installations that select the filesystem from creating an unused
-chunk table.
-
-PostgreSQL setup must use versioned and concurrency-safe schema changes.
-It must not depend only on `CREATE TABLE IF NOT EXISTS` for future schema
-updates.
-
-One transaction inserts the chunk and advances the task upload metadata.
-The transaction also enforces the 10 MiB limit.
-
-The implementation must not append all data to one growing `bytea` value.
-PostgreSQL would create a new row and TOAST value for each update.
-This behavior causes repeated data writes, WAL growth, and vacuum work.
-
-An active read uses one ordered query for the task.
-It does not perform one query for each chunk.
-
-Cleanup uses one indexed delete for normal task sizes.
-Large deletions can use rate-limited batches.
-Batching smooths load but does not reduce total vacuum work.
-
-PostgreSQL marks deleted tuples as dead.
-Autovacuum later makes their space reusable.
-Operators must monitor dead tuples, WAL volume, and vacuum delay.
-
-This store targets small and medium self-hosted organizations.
-Large installations can select another active store.
-
 ## Filesystem Store
 
-The filesystem store is the default local development store.
-Larger installations can use the same implementation with a shared filesystem.
+The filesystem store is the active runner log store for all installations.
+Local development and single-replica installations can use a local filesystem.
+Larger and multi-replica installations use the same implementation with a
+shared filesystem.
 All runner API and archiver replicas must mount the same paths.
 
 The shared filesystem must provide these features:
@@ -609,17 +554,9 @@ It routes each task to the path selected during initialization.
 
 ## Configuration
 
-Each installation selects one active log store.
-The available choices are:
-
-- `postgres`: Intended for small and medium installations.
-- `fs`: Intended for local development and shared filesystem deployments.
-
-PostgreSQL configuration uses the existing application database.
-The filesystem configuration uses these variables:
+The filesystem store uses these variables:
 
 ```text
-RUNNER_ACTIVE_LOG_STORE=fs
 RUNNER_ACTIVE_LOG_FS_PATH=/primary/path
 RUNNER_ACTIVE_LOG_FS_FALLBACK_PATHS=/old/path,/another/old/path
 ```
@@ -629,14 +566,13 @@ RUNNER_ACTIVE_LOG_FS_FALLBACK_PATHS=/old/path,/another/old/path
 Local Docker uses `/var/lib/superplane/active-runner-logs` on a named volume.
 It does not configure fallback paths.
 
-The task lifecycle record stores the selected backend.
-An installation must drain active tasks before it changes the backend.
-Filesystem fallback paths support volume changes without a backend change.
+The task lifecycle record stores the active store name.
+Filesystem fallback paths support volume changes without interrupting active
+tasks.
 
 The task lifecycle table belongs to the application schema.
 Application database migrations create it for every installation.
-It coordinates archiving and records pending active-data cleanup for all
-active store implementations.
+It coordinates archiving and records pending active-data cleanup.
 
 Final log storage continues to use the existing blob provider configuration.
 
@@ -694,8 +630,8 @@ The public API authorizes every read through the task's organization.
 The runner API authorizes every append through the assigned runner.
 
 The active store is not directly accessible to runners or browsers.
-Only SuperPlane services can access the PostgreSQL or filesystem store.
-The application enforces organization isolation for all active stores.
+Only SuperPlane services can access the filesystem store.
+The application enforces organization isolation.
 
 Logs can contain secrets.
 The store must use encryption in transit and at rest.
@@ -720,13 +656,6 @@ Useful logical metrics include:
 - Cleanup attempts, latency, and errors
 - Age of the oldest active and archiving task
 
-PostgreSQL deployments should also monitor:
-
-- Live and dead chunk tuples
-- Chunk-table size
-- WAL bytes from log storage
-- Autovacuum runs and delay
-
 Filesystem deployments should also monitor:
 
 - Operation latency and errors
@@ -747,6 +676,13 @@ Client replay can multiply those reads.
 
 This approach uses fewer rows.
 It rewrites the growing value and creates excessive WAL and dead data.
+
+### Immutable PostgreSQL chunk rows
+
+This approach can serve small installations without additional infrastructure.
+Each chunk adds application database writes, WAL traffic, and cleanup work.
+The filesystem store keeps active log traffic out of the application database
+and supports the same storage model at larger scales.
 
 ### Redis
 
@@ -770,17 +706,16 @@ Their APIs, availability models, and costs differ.
 
 1. Add the active log lifecycle record.
 2. Add the active log store interface.
-3. Implement the PostgreSQL store.
+3. Implement the filesystem store and volume migration routing.
 4. Add cursor-based active reads.
 5. Update the client to preserve and send its cursor.
 6. Enforce the 10 MiB retained-size limit.
 7. Update archiving to read through the active store.
 8. Add common metrics and failure tests.
-9. Implement the filesystem store and volume migration routing.
 
 ## Validation Plan
 
-Test PostgreSQL and the filesystem store with:
+Test the filesystem store with:
 
 - 100 concurrent logging tasks
 - 500 concurrent logging tasks
@@ -801,10 +736,10 @@ Test PostgreSQL and the filesystem store with:
 - Stale cursors after active data cleanup
 - New readers of completed logs
 
-Record database or store utilization during each test.
+Record filesystem utilization during each test.
 Confirm that normal SuperPlane API latency stays stable.
 
-Also test the filesystem store with:
+Also test:
 
 - Concurrent appends from multiple application replicas.
 - Shared-volume advisory locks.

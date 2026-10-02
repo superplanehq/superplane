@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-	logpostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
@@ -27,10 +27,10 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 	require.NoError(t, err)
 	installationID, err := models.GetInstallationID(db)
 	require.NoError(t, err)
-	activeStore := logpostgres.New()
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      db,
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 
@@ -58,7 +58,7 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 	require.NoError(t, db.Create(&task).Error)
 	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
 		TaskID:      task.ID,
-		ActiveStore: runnerlogs.StorePostgres,
+		ActiveStore: runnerlogs.StoreFS,
 		State:       models.RunnerTaskLogStateArchivable,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -119,10 +119,10 @@ func TestRunnerTaskLogCompactorArchivesTaskWithoutChunks(t *testing.T) {
 	require.NoError(t, err)
 	installationID, err := models.GetInstallationID(db)
 	require.NoError(t, err)
-	activeStore := logpostgres.New()
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      db,
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 
@@ -150,7 +150,7 @@ func TestRunnerTaskLogCompactorArchivesTaskWithoutChunks(t *testing.T) {
 	require.NoError(t, db.Create(&task).Error)
 	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
 		TaskID:      task.ID,
-		ActiveStore: runnerlogs.StorePostgres,
+		ActiveStore: runnerlogs.StoreFS,
 		State:       models.RunnerTaskLogStateArchivable,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -193,10 +193,10 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	require.NoError(t, err)
 	installationID, err := models.GetInstallationID(db)
 	require.NoError(t, err)
-	activeStore := logpostgres.New()
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      db,
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 
@@ -224,7 +224,7 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	require.NoError(t, db.Create(&task).Error)
 	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
 		TaskID:      task.ID,
-		ActiveStore: runnerlogs.StorePostgres,
+		ActiveStore: runnerlogs.StoreFS,
 		State:       models.RunnerTaskLogStateArchivable,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),

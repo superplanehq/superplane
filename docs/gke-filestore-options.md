@@ -268,7 +268,6 @@ volumeMounts:
 Configure SuperPlane:
 
 ```yaml
-RUNNER_ACTIVE_LOG_STORE: fs
 RUNNER_ACTIVE_LOG_FS_PATH: /var/lib/superplane/active-runner-logs
 ```
 
@@ -298,7 +297,6 @@ Use this migration:
 Example cutover configuration:
 
 ```yaml
-RUNNER_ACTIVE_LOG_STORE: fs
 RUNNER_ACTIVE_LOG_FS_PATH: /var/lib/superplane/active-runner-logs-new
 RUNNER_ACTIVE_LOG_FS_FALLBACK_PATHS: /var/lib/superplane/active-runner-logs-old
 ```
@@ -337,7 +335,6 @@ That flow is unnecessary for ephemeral active logs.
 - [ ] Mount the PVC in all runner API replicas.
 - [ ] Mount the PVC in all log archiver and cleanup replicas.
 - [ ] Use the same paths and environment variables in every replica.
-- [ ] Set `RUNNER_ACTIVE_LOG_STORE=fs`.
 - [ ] Set `RUNNER_ACTIVE_LOG_FS_PATH`.
 - [ ] Support a list of fallback PVC mounts and paths.
 - [ ] Verify container UID, GID, and directory permissions.

@@ -133,7 +133,7 @@ CREATE INDEX runner_registrations_expiry_idx
 
 CREATE TABLE runner_task_log_lifecycles (
   task_id          UUID PRIMARY KEY REFERENCES runner_tasks(id) ON DELETE CASCADE,
-  active_store     TEXT NOT NULL DEFAULT 'postgres',
+  active_store     TEXT NOT NULL,
   state            VARCHAR(32) NOT NULL DEFAULT 'active',
   final_object_key TEXT,
   final_cursor     TEXT,

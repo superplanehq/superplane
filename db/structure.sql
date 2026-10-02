@@ -1136,7 +1136,7 @@ CREATE TABLE public.runner_registrations (
 
 CREATE TABLE public.runner_task_log_lifecycles (
     task_id uuid NOT NULL,
-    active_store text DEFAULT 'postgres'::text NOT NULL,
+    active_store text NOT NULL,
     state character varying(32) DEFAULT 'active'::character varying NOT NULL,
     final_object_key text,
     final_cursor text,

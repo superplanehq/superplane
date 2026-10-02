@@ -21,7 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerclientapi "github.com/superplanehq/superplane/pkg/runners/api"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 )
@@ -48,7 +48,7 @@ func TestUploadTaskLogChunk(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, &task.ID)
 	require.NoError(t, err)
-	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StorePostgres)
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS)
 	require.NoError(t, err)
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
 	require.Equal(t, http.StatusOK, response.Code)
@@ -58,10 +58,10 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	runner, err = models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
 
-	store := runnerlogspostgres.New()
+	store, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, store.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      db,
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 	previousStore := runnerlogs.Current()
@@ -71,7 +71,7 @@ func TestUploadTaskLogChunk(t *testing.T) {
 		runnerlogs.SetCurrent(previousStore)
 	})
 	require.NoError(t, store.Initialize(t.Context(), task.ID))
-	require.NoError(t, task.Start(db, runner, runnerlogs.StorePostgres, time.Now()))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, time.Now()))
 
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
@@ -90,7 +90,7 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	content, err := io.ReadAll(read.Content)
 	require.NoError(t, err)
 	assert.Equal(t, "first\n", string(content))
-	assert.Equal(t, "1", read.Cursor)
+	assert.Equal(t, "6", read.Cursor)
 
 	for sequence := int64(1); sequence < 3; sequence++ {
 		assertUploadStatus(

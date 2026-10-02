@@ -192,18 +192,6 @@ func TruncateTables() error {
 		return err
 	}
 
-	if err := Conn().Exec(`
-		DO $$
-		BEGIN
-			IF to_regclass('runner_active_log_chunks') IS NOT NULL THEN
-				TRUNCATE TABLE runner_active_log_chunks, runner_active_logs;
-			END IF;
-		END
-		$$;
-	`).Error; err != nil {
-		return err
-	}
-
 	return Conn().Exec(`
 		truncate table
 			runner_task_log_lifecycles,

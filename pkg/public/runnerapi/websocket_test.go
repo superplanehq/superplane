@@ -18,7 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
-	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 )
@@ -51,10 +51,10 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 	require.NoError(t, db.Create(task).Error)
 	require.NoError(t, task.Reserve(db, runner.ID))
 
-	activeStore := runnerlogspostgres.New()
+	activeStore, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
 	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
 		Context:       t.Context(),
-		Database:      db,
 		MeterProvider: otel.GetMeterProvider(),
 	}))
 	previousStore := runnerlogs.Current()
@@ -72,7 +72,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 		&task.ID,
 	)
 	require.NoError(t, err)
-	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StorePostgres)
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS)
 	require.NoError(t, err)
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
@@ -127,7 +127,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 	assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
 	lifecycle, err := reloadedTask.FindLifecycle(db)
 	require.NoError(t, err)
-	assert.Equal(t, runnerlogs.StorePostgres, lifecycle.ActiveStore)
+	assert.Equal(t, runnerlogs.StoreFS, lifecycle.ActiveStore)
 	assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
 
 	reloadedRunner, err := models.FindRunner(db, runner.ID)

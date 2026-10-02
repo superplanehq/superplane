@@ -42,7 +42,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
-	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
@@ -737,7 +736,6 @@ func Start() {
 		setupContext := context.Background()
 		if err := activeLogStore.Setup(runnerlogs.SetupContext{
 			Context:       setupContext,
-			Database:      database.DB(setupContext),
 			MeterProvider: otel.GetMeterProvider(),
 		}); err != nil {
 			panic(fmt.Sprintf("failed to set up runner active log store: %v", err))
@@ -865,25 +863,14 @@ func newBlobProvider() (blob.Provider, error) {
 }
 
 func newRunnerActiveLogStore() (runnerlogs.Store, error) {
-	name := strings.TrimSpace(os.Getenv("RUNNER_ACTIVE_LOG_STORE"))
-	if name == "" {
-		if os.Getenv("START_RUNNER_API") == "yes" ||
-			os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
-			return nil, fmt.Errorf("RUNNER_ACTIVE_LOG_STORE is not set")
-		}
+	if os.Getenv("START_RUNNER_API") != "yes" &&
+		os.Getenv("START_RUNNER_LOG_COMPACTOR") != "yes" &&
+		os.Getenv("START_RUNNER_CLEANUP_WORKER") != "yes" {
 		return nil, nil
 	}
 
-	switch name {
-	case runnerlogs.StoreFS:
-		log.Println("Creating FS runner active log store")
-		return runnerlogsfs.NewProvider()
-	case runnerlogs.StorePostgres:
-		log.Println("Creating PostgreSQL runner active log store")
-		return runnerlogspostgres.New(), nil
-	default:
-		return nil, fmt.Errorf("unsupported runner active log store %q", name)
-	}
+	log.Println("Creating FS runner active log store")
+	return runnerlogsfs.NewProvider()
 }
 
 /*

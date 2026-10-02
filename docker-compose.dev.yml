@@ -36,7 +36,6 @@ services:
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
       START_RUNNER_API: "yes"
-      RUNNER_ACTIVE_LOG_STORE: "fs"
       RUNNER_ACTIVE_LOG_FS_PATH: "/var/lib/superplane/active-runner-logs"
       START_RUNNER_LOG_COMPACTOR: "yes"
       START_RUNNER_CLEANUP_WORKER: "yes"

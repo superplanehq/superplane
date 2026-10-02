@@ -43,7 +43,7 @@ func TestRegisterRunnerConsumesGrantAndReturnsCredential(t *testing.T) {
 
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StorePostgres)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
@@ -82,7 +82,7 @@ func TestRegisterRunnerRejectsVersionMismatchAndTerminatesRunner(t *testing.T) {
 	runner, registration, fleet := createRegistrationFixture(t)
 	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, nil)
 	require.NoError(t, err)
-	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StorePostgres)
+	server, err := NewServer(signer, &crypto.NoOpEncryptor{}, runnerlogs.StoreFS)
 	require.NoError(t, err)
 
 	response := executeRegistrationRequest(t, server, token, "different-version")
