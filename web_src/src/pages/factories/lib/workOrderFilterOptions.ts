@@ -15,6 +15,7 @@ import {
   type WorkOrderFilters,
   type WorkOrderListEntry,
 } from "./workOrderListModel";
+import { MCP_SOURCE_FILTER_PREFIX } from "./workOrderCardSource";
 import { WORK_ORDER_DISPLAY_STATUSES, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 /** One selectable value in a Filter submenu. */
@@ -109,6 +110,9 @@ export function buildSourceFilterOptions(
 export function sourceFilterLabel(sourceId: string): string {
   if (sourceId === MANUAL_FILTER_VALUE) {
     return CREATED_MANUALLY;
+  }
+  if (sourceId.startsWith(MCP_SOURCE_FILTER_PREFIX)) {
+    return sourceId.slice(MCP_SOURCE_FILTER_PREFIX.length) || sourceId;
   }
   if (isSplitRunIntakeKind(sourceId)) {
     return INTAKE_PRESENTATION[sourceId].name;

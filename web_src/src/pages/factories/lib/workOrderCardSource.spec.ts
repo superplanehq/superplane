@@ -64,6 +64,19 @@ describe("workOrderCardSource", () => {
       ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
     });
   });
+
+  it("returns the MCP client name for a handed-off task", () => {
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Cursor" },
+      }),
+    ).toEqual({
+      name: "Cursor",
+      iconSrc: superplaneIcon,
+      iconAlt: "SuperPlane",
+    });
+  });
 });
 
 describe("workOrderListSource", () => {
@@ -83,6 +96,18 @@ describe("workOrderListSource", () => {
     ).toEqual({
       id: "github-issues",
       label: "GitHub issues",
+    });
+  });
+
+  it("uses the MCP client name for a handed-off task", () => {
+    expect(
+      workOrderListSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Cursor" },
+      }),
+    ).toEqual({
+      id: "mcp:Cursor",
+      label: "Cursor",
     });
   });
 });
