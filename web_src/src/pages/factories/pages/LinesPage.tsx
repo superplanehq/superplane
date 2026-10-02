@@ -585,7 +585,7 @@ export function LinesPage() {
     }
     if (template.id === "linear-issues") {
       if (selectedLine.id) {
-        navigate(factoryLinearIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }

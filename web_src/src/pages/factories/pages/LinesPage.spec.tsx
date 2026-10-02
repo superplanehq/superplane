@@ -1259,7 +1259,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("linear-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryLinearIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryLinearIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
