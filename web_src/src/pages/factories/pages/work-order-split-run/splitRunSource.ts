@@ -1,5 +1,6 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
@@ -23,6 +24,7 @@ export const CREATED_MANUALLY = "Created manually";
 
 export type SplitRunIntakeKind =
   | "github-issues"
+  | "dependabot-alerts"
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
@@ -85,6 +87,7 @@ const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
 
 export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
+  "dependabot-alerts": { name: "Dependabot alerts", iconSrc: dependabotIcon, iconAlt: "Dependabot" },
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
@@ -95,9 +98,12 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
 };
 
 // Sources an intake app or a ticket link can be recognized by, before the
-// GitHub default applies. GitHub itself needs no hint: its intake app is named
-// after its issues, and its links carry no other marker.
+// GitHub default applies. GitHub issues need no hint: the intake app is named
+// after its issues, and an issue link has no other marker. Dependabot alerts
+// share github.com, so the alert path is classified first. This hint only
+// names an automation when the task has no origin link.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
+  { pattern: /dependabot/i, kind: "dependabot-alerts" },
   { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
@@ -238,7 +244,8 @@ function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSou
 }
 
 function intakeKindFromHref(href: string): SplitRunIntakeKind {
-  const host = parseUrl(href)?.hostname ?? "";
+  const parsed = parseUrl(href);
+  const host = parsed?.hostname ?? "";
   if (host.includes("sentry.io")) {
     return "sentry-exceptions";
   }
@@ -251,7 +258,14 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host === "linear.app" || host.endsWith(".linear.app")) {
     return "linear-issues";
   }
+  if (isGitHubDependabotAlertHref(parsed)) {
+    return "dependabot-alerts";
+  }
   return intakeKindFromLabel(host);
+}
+
+function isGitHubDependabotAlertHref(parsed: URL | undefined): boolean {
+  return parsed?.hostname === "github.com" && /^\/[^/]+\/[^/]+\/security\/dependabot(?:\/|$)/i.test(parsed.pathname);
 }
 
 function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
