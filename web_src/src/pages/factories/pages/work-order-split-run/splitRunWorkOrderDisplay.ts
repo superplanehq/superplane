@@ -34,7 +34,7 @@ export function displayStatusForLineStatus(status: SplitRunPhaseStatus): WorkOrd
   if (status === "passed") return "completed";
   if (status === "waiting") return "waiting";
   if (status === "failed") return "failed";
-  if (status === "cancelled") return "cancelled";
+  if (status === "cancelled") return "rejected";
   return "draft";
 }
 
@@ -51,14 +51,21 @@ export function elapsedForDisplay(
   }
   const start = Date.parse(order?.createdAt ?? "");
   if (!Number.isFinite(start)) {
-    return status === "running" ? "Running" : "";
+    return elapsedWithoutClock(status);
   }
   const end = status === "running" ? now : Date.parse(order?.updatedAt ?? "") || now;
   const label = formatDuration(Math.max(0, end - start), { precision: "second" });
   if (!label) {
-    return status === "running" ? "Running" : "";
+    return elapsedWithoutClock(status);
   }
-  return status === "running" ? `${label} so far` : label;
+  return label;
+}
+
+function elapsedWithoutClock(status: WorkOrderDisplayStatus): string {
+  if (status === "running") {
+    return "Running";
+  }
+  return "";
 }
 
 export function durationForStatus(status: SplitRunPhaseStatus): string {

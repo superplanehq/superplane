@@ -1,9 +1,10 @@
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { cn } from "@/lib/utils";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
+import { KeyRound } from "lucide-react";
 
 import { hostedCreditGrantCopy, shouldShowHostedCreditGrant } from "./onboardingAgentReadiness";
-import { AGENT_OPTIONS, type IntegrationId } from "./onboardingFixtures";
+import { AGENT_OPTIONS, CUSTOM_PROVIDER_OPTION, type IntegrationId } from "./onboardingFixtures";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "./onboardingSteps";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
@@ -11,11 +12,13 @@ export function AgentStep({
   organizationId,
   setup,
   showHostedCredit = true,
+  showCustomProvider = false,
   onRequestConnect,
 }: {
   organizationId: string;
   setup: OnboardingSetupApi;
   showHostedCredit?: boolean;
+  showCustomProvider?: boolean;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -39,10 +42,16 @@ export function AgentStep({
         </div>
       ) : null}
       <div className="grid gap-2">
-        {AGENT_OPTIONS.map((option) => (
+        {(showCustomProvider ? [...AGENT_OPTIONS, CUSTOM_PROVIDER_OPTION] : AGENT_OPTIONS).map((option) => (
           <ConnectOptionRow
             key={option.id}
-            icon={<IntegrationChoiceIcon name={option.id} />}
+            icon={
+              option.id === "customLlm" ? (
+                <KeyRound className="size-5" aria-hidden />
+              ) : (
+                <IntegrationChoiceIcon name={option.id} />
+              )
+            }
             title={option.label}
             detail={option.detail}
             connectLabel={option.label}

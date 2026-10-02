@@ -49,37 +49,16 @@ func DescribeFactoryVelocity(
 	factoryID := factory.ID
 
 	now := time.Now().In(time.Local)
-	buckets := buildDayBuckets(now, period)
-	current := velocityWindow{start: buckets[0].start, end: buckets[len(buckets)-1].end}
-	previous := velocityWindow{start: current.start.AddDate(0, 0, -period), end: current.start}
-	previousBuckets := buildWindowBuckets(previous, period)
-
-	repoOwner, repoName, hasRepo := parseOwnerRepo(req.GetRepository())
-
-	// One query covers both windows, so the comparison costs no extra round trip.
-	rows, err := models.ListFactoryVelocityPullRequests(db, factoryID, previous.start, current.end)
+	loaded, err := loadVelocityWindowData(db, factory, period, req.GetRepository(), now)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
-	rows = filterVelocityRowsByRepository(rows, repoOwner, repoName, hasRepo)
-
-	currentOrders := collectVelocityOrders(rows, current)
-	previousOrders := collectVelocityOrders(rows, previous)
-
-	usage, err := models.SumUsageForWorkOrdersByKind(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
-	}
-	applyVelocityOrderUsage(currentOrders, usage)
-	applyVelocityOrderUsage(previousOrders, usage)
-
-	cohort, err := loadMergeCohort(db, factoryID, hasRepo, previous.start, current.end)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
-	}
-
-	fillBuckets(buckets, rows, currentOrders, cohort.merges, current)
-	fillBuckets(previousBuckets, rows, previousOrders, cohort.merges, previous)
+	buckets := loaded.buckets
+	previousBuckets := loaded.previousBuckets
+	current := loaded.current
+	currentOrders := loaded.currentOrders
+	cohort := loaded.cohort
+	repoOwner, repoName := loaded.repoOwner, loaded.repoName
 
 	yesterdayIdx := len(buckets) - 2
 	if yesterdayIdx < 0 {
@@ -182,6 +161,8 @@ func velocityPeopleSortKeyFromProto(sort pb.DescribeFactoryVelocityRequest_Peopl
 		return velocitySortMedianCycleHours
 	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_COST_USD:
 		return velocitySortCostUsd
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_FACTORY_WASTE:
+		return velocitySortFactoryWaste
 	default:
 		return velocitySortTotal
 	}

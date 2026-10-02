@@ -57,7 +57,7 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 			}))
 		})
 		usePolarTestServer(t, server)
-		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness, nil)
 		require.NoError(t, err)
 
 		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
@@ -88,7 +88,7 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 			}))
 		})
 		usePolarTestServer(t, server)
-		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+		_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness, nil)
 		require.NoError(t, err)
 
 		resp, err := ListHostedCreditProducts(context.Background(), r.Organization.ID.String(), &pb.ListHostedCreditProductsRequest{})
@@ -102,7 +102,7 @@ func Test__ListHostedCreditProducts(t *testing.T) {
 
 func Test__CreateHostedCreditCheckout(t *testing.T) {
 	r := support.Setup(t)
-	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(database.Conn(), r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 
 	t.Run("invalid organization id", func(t *testing.T) {
@@ -347,7 +347,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 	t.Run("creates a polar team customer per organization with the same owner", func(t *testing.T) {
 		other, err := models.CreateOrganization(support.RandomName("billing-org"), "")
 		require.NoError(t, err)
-		_, err = models.SetAdminOrganizationPlan(database.Conn(), other.ID, models.BillingPlanBusiness)
+		_, err = models.SetAdminOrganizationPlan(database.Conn(), other.ID, models.BillingPlanBusiness, nil)
 		require.NoError(t, err)
 		created := map[string]string{}
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -622,7 +622,10 @@ func Test__BillingState(t *testing.T) {
 
 func polarAPIServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Polar-Version", r.Header.Get("Polar-Version"))
+		handler(w, r)
+	}))
 	t.Cleanup(server.Close)
 	return server
 }

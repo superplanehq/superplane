@@ -56,7 +56,21 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerName: "On Task",
     createTitle: "{{ root().data.data.attributes.title }}",
     createDescription: "{{ root().data.data.attributes.description }}",
-    title: "Productive.io task intake",
+    title: "Productive task intake",
+  },
+  datadog: {
+    triggerComponent: "datadog.onErrorTrackingAlert",
+    triggerName: "On Error Tracking Alert",
+    createTitle: "{{ root().data.title }}",
+    createDescription: "{{ root().data.body }}\n\n{{ root().data.link }}",
+    title: "Datadog error intake",
+  },
+  "linear-issues": {
+    triggerComponent: "linear.onIssue",
+    triggerName: "On Issue",
+    createTitle: "{{ root().data.data.identifier }}: {{ root().data.data.title }}",
+    createDescription: "{{ root().data.data.description }}",
+    title: "Linear issue intake",
   },
 };
 

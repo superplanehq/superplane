@@ -74,6 +74,18 @@ service Factories {
     };
   }
 
+  rpc SetFactoryVisibility(SetFactoryVisibilityRequest) returns (SetFactoryVisibilityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{id}/visibility"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set factory visibility";
+      description: "Makes a workspace board public or private. Requires factories publish permission.";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryOnboarding(UpdateFactoryOnboardingRequest) returns (UpdateFactoryOnboardingResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/onboarding"
@@ -86,6 +98,18 @@ service Factories {
     };
   }
 
+  rpc SwitchFactoryModelSource(SwitchFactoryModelSourceRequest) returns (SwitchFactoryModelSourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/model-source"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Switch factory model source";
+      description: "Saves a provider key, updates the workspace agent harness, and rewrites agent nodes on workspace canvases";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{id}/repository"
@@ -94,6 +118,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory repository";
       description: "Updates the repository used by a factory workspace";
+      tags: "Factory";
+    };
+  }
+
+  rpc SelectFactoryVCSProviderRepository(SelectFactoryVCSProviderRepositoryRequest) returns (SelectFactoryVCSProviderRepositoryResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{id}/onboarding/vcs-repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a Factory VCS repository";
+      description: "Selects an accessible VCS repository and creates the organization integration reference";
       tags: "Factory";
     };
   }
@@ -389,6 +425,17 @@ service Factories {
     };
   }
 
+  rpc SearchDependabotIntakeSetupItems(SearchDependabotIntakeSetupItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/dependabot-intake-setup-items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Preview Dependabot packages for intake setup";
+      description: "Lists open alert packages before the Dependabot intake exists";
+      tags: "Factory";
+    };
+  }
+
   rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
@@ -516,6 +563,18 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update work order status";
       description: "Transitions a work order between lifecycle states";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendWorkOrderToBacklog(SendWorkOrderToBacklogRequest) returns (SendWorkOrderToBacklogResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/backlog"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send work order to backlog";
+      description: "Moves a closed work order to draft and optionally closes pull requests and clears artifacts";
       tags: "Factory";
     };
   }
@@ -726,6 +785,28 @@ service Factories {
     };
   }
 
+  rpc ListFactoryMCPClients(ListFactoryMCPClientsRequest) returns (ListFactoryMCPClientsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/mcp-clients"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List SuperPlane MCP clients";
+      description: "Returns MCP clients that signed in to this workspace.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RevokeFactoryMCPClient(RevokeFactoryMCPClientRequest) returns (RevokeFactoryMCPClientResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/mcp-clients/{client_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a SuperPlane MCP client";
+      description: "Disconnects an MCP client from this workspace. The client must sign in again.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -829,9 +910,24 @@ message UpdateFactoryRequest {
   bool clear_hosted_spend_budget = 6;
   // Full replacement of Planning settings. Absent means do not change.
   optional FactoryPlanning planning = 7;
+  // When true, the public badge URL returns an SVG. Absent means do not change.
+  optional bool public_badge_enabled = 8;
+  // When true, Large and Full width badges show cost per merged pull request.
+  // Absent means do not change. A public URL cannot turn this on.
+  optional bool public_badge_show_cost = 9;
 }
 
 message UpdateFactoryResponse {
+  Factory factory = 1;
+}
+
+message SetFactoryVisibilityRequest {
+  string id = 1;
+  // True when anyone with the line URL can view the board.
+  bool public = 2;
+}
+
+message SetFactoryVisibilityResponse {
   Factory factory = 1;
 }
 
@@ -861,6 +957,23 @@ message UpdateFactoryOnboardingResponse {
   Factory factory = 1;
 }
 
+message SwitchFactoryModelSourceRequest {
+  string id = 1;
+  // hosted, anthropic, openai, openrouter, or custom.
+  string source = 2;
+  // Provider API key. Required when this organization has no ready integration for the source.
+  string api_key = 3;
+  // Provider base URL. Required when the source is a new custom provider.
+  string base_url = 4;
+  // API type for a custom provider: anthropic, openai, or openai-compatible.
+  string api_type = 5;
+}
+
+message SwitchFactoryModelSourceResponse {
+  Factory factory = 1;
+  string integration_id = 2;
+}
+
 message UpdateFactoryRepositoryRequest {
   string id = 1;
   // Repository slug in owner/name form.
@@ -870,6 +983,16 @@ message UpdateFactoryRepositoryRequest {
 }
 
 message UpdateFactoryRepositoryResponse {
+  Factory factory = 1;
+}
+
+message SelectFactoryVCSProviderRepositoryRequest {
+  string id = 1;
+  string provider = 2;
+  int64 repository_id = 3;
+}
+
+message SelectFactoryVCSProviderRepositoryResponse {
   Factory factory = 1;
 }
 
@@ -909,6 +1032,8 @@ message FactoryOnboarding {
   string default_branch = 10;
   // True when account onboarding created this workspace.
   bool initial = 11;
+  int64 app_repository_id = 12;
+  int64 backlog_repository_id = 13;
 }
 
 message Factory {
@@ -934,6 +1059,14 @@ message Factory {
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
   FactoryPlanning planning = 8;
+  // True when anyone with the line URL can view the board.
+  bool public = 9;
+  bool public_badge_enabled = 10;
+  bool public_badge_show_cost = 11;
+  // Unguessable token for the public badge URL. Empty until the badge is turned on once.
+  string public_badge_token = 12;
+  // Stable id in workspace URLs. Does not change when the workspace key changes.
+  string url_id = 13;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
@@ -943,6 +1076,8 @@ message FactoryPlanning {
   bool confidence = 3;
   // True after the post-onboarding Planning wizard or a Planning settings save.
   bool setup_completed = 4;
+  // Line that starts each task when the plan scores 5. Empty leaves auto-start off.
+  string auto_start_line_id = 5;
 }
 
 message FactoryLine {
@@ -1075,6 +1210,8 @@ message FactoryIntake {
     SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
+    SOURCE_DATADOG = 7;
+    SOURCE_LINEAR_ISSUES = 8;
   }
 
   enum InitialImportStatus {
@@ -1157,6 +1294,21 @@ message FactoryIntake {
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
     repeated string dependabot_severities = 17;
+    // Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
+    // On by default. An empty selection still listens for Triggered.
+    optional bool datadog_triggered_alerts = 18;
+    // Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes
+    // only. Off by default.
+    optional bool datadog_retriggered_alerts = 19;
+    // Environments that still create a task. Empty means every environment.
+    // Datadog intakes only.
+    repeated string datadog_environments = 20;
+    // Projects that still create a task. Required for a Linear intake.
+    // Linear issue intakes only.
+    repeated string linear_project_ids = 21;
+    // Label names that still create a task. Empty means every label.
+    // Linear issue intakes only.
+    repeated string linear_labels = 22;
   }
 
   string id = 1;
@@ -1486,6 +1638,7 @@ message FactoryPullRequestMergeability {
     BLOCKED_REASON_DRAFT = 4;
     BLOCKED_REASON_CONFLICTING = 5;
     BLOCKED_REASON_MISSING_INTEGRATION = 6;
+    BLOCKED_REASON_UNAVAILABLE = 7;
   }
 
   enum MergeMethod {
@@ -1528,6 +1681,7 @@ message FactoryIntakeItem {
   string title = 3;
   string body = 4;
   string url = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message SearchFactoryIntakeItemsRequest {
@@ -1535,6 +1689,12 @@ message SearchFactoryIntakeItemsRequest {
   string intake_id = 2;
   string query = 3;
   int32 limit = 4;
+}
+
+message SearchDependabotIntakeSetupItemsRequest {
+  string factory_id = 1;
+  repeated string dependabot_severities = 2;
+  int32 limit = 3;
 }
 
 message SearchFactoryIntakeItemsResponse {
@@ -1574,6 +1734,8 @@ message ListWorkOrdersRequest {
   uint32 limit = 6;
   // Return orders older than this id in updated_at DESC, id DESC order.
   string before_id = 7;
+  // When set, return orders that ran on this line, plus orders with no line.
+  string line_id = 8;
 }
 
 message ListWorkOrdersResponse {
@@ -1667,6 +1829,12 @@ message WorkOrder {
   PlanningSessionSummary planning_session = 23;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 24;
+  // Set after an auto-start attempt that did not start the task.
+  // Empty before the attempt, and empty again after a successful start.
+  string auto_start_line_id = 25;
+  // MCP client that created this task through a hand-off. Empty for
+  // tasks that did not come from an MCP client.
+  WorkOrderMcpClient mcp_client = 26;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1696,6 +1864,9 @@ message WorkOrderSummary {
   PlanningSessionSummary planning_session = 19;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 20;
+  // MCP client that created this task through a hand-off. Empty for
+  // tasks that did not come from an MCP client.
+  WorkOrderMcpClient mcp_client = 21;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -1710,6 +1881,12 @@ message WorkOrderCheckScore {
 message WorkOrderOrigin {
   string url = 1;
   string label = 2;
+}
+
+// MCP OAuth client that handed a task to Implement or Verify.
+message WorkOrderMcpClient {
+  string id = 1;
+  string name = 2;
 }
 
 // WorkOrderStatusNote announces what a waiting work order is blocked on
@@ -1855,6 +2032,10 @@ message WorkOrderExecution {
   // Models that recorded spend on this step. Distinct ledger model ids,
   // oldest first. UI prefers these over the Start override.
   repeated string models = 13;
+  // Why the step failed before it could run. Set only for SuperPlane
+  // hosted credit failures: no_hosted_credit,
+  // hosted_subscription_required, or workspace_budget_empty.
+  string failure_reason = 14;
 }
 
 message WorkOrderExecutionStep {
@@ -1941,6 +2122,17 @@ message UpdateWorkOrderStatusRequest {
 }
 
 message UpdateWorkOrderStatusResponse {
+  WorkOrder order = 1;
+}
+
+message SendWorkOrderToBacklogRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  bool close_pull_requests = 3;
+  bool clear_artifacts = 4;
+}
+
+message SendWorkOrderToBacklogResponse {
   WorkOrder order = 1;
 }
 
@@ -2107,6 +2299,8 @@ message DescribeFactoryVelocityRequest {
     PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
     // Sorts on cost_cents.
     PEOPLE_SORT_COST_USD = 5;
+    // SuperPlane tasks this person opened that closed without a merge.
+    PEOPLE_SORT_FACTORY_WASTE = 6;
   }
 
   enum SortDirection {
@@ -2721,3 +2915,28 @@ message FindPlanningSessionByWorkOrderRequest {
 message FindPlanningSessionByWorkOrderResponse {
   PlanningSession session = 1;
 }
+
+message FactoryMCPClient {
+  string id = 1;
+  string client_name = 2;
+  string user_id = 3;
+  string user_name = 4;
+  string user_email = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string user_avatar_url = 7;
+}
+
+message ListFactoryMCPClientsRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryMCPClientsResponse {
+  repeated FactoryMCPClient clients = 1;
+}
+
+message RevokeFactoryMCPClientRequest {
+  string factory_id = 1;
+  string client_id = 2;
+}
+
+message RevokeFactoryMCPClientResponse {}

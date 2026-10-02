@@ -135,6 +135,12 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Close the task when the attached pull request merges or is closed without a merge.",
     triggerNodeId: "on-pr-closed",
   }),
+  "risk-score": buildEventApp({
+    id: "risk-score",
+    title: "Merge confidence",
+    description: "Score a pull request when it opens or updates.",
+    triggerNodeId: "on-pr-risk",
+  }),
 };
 
 export const DEFAULT_FACTORY_ID = "software-factory";

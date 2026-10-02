@@ -27,7 +27,6 @@ import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
 import {
   useFirstRunSetupFlow,
-  useFreshConnectionsOnConnectScreen,
   type FirstRunScreen,
   type FirstRunSetupFlow,
   type IntegrationId,
@@ -50,10 +49,7 @@ const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
   tickets: 4,
 };
 
-// The reverse path walks the exact screens in reverse order, back to the
-// welcome screen. The connect screen has two pages (the Connect GitHub page
-// and the account picker), so `backActionFor` in FirstRunSetup handles the
-// connect and choose screens itself.
+// The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
   tickets: "choose",
@@ -88,8 +84,10 @@ type AgentModelSource = {
   onSelect: (choice: OnboardingAgentCredentialChoice) => void;
 };
 
-function agentScreenBody(modelSource: AgentModelSource): string {
-  if (modelSource.choice === "own-key") return FIRST_RUN_COPY.agent.ownKeyBody;
+function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
+  if (modelSource.choice === "own-key") {
+    return customProvider ? FIRST_RUN_COPY.agent.ownKeyBodyWithCustom : FIRST_RUN_COPY.agent.ownKeyBody;
+  }
   if (modelSource.offered) return FIRST_RUN_COPY.agent.modelSourceBody;
   return AGENT_STEP.purpose;
 }
@@ -102,6 +100,7 @@ function AgentScreen({
   saving,
   loading,
   hostedAgentReady,
+  showCustomProvider,
   modelSource,
   onRequestConnect,
   onContinue,
@@ -113,13 +112,15 @@ function AgentScreen({
   saving: boolean;
   loading: boolean;
   hostedAgentReady: boolean;
+  showCustomProvider: boolean;
   modelSource: AgentModelSource;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
+  const credentialChoice = modelSource.offered && !modelSource.choice ? "hosted" : modelSource.choice;
   const canFinish = agentFinishReady({
     modelSourceChoice: modelSource.offered,
-    credentialChoice: modelSource.choice,
+    credentialChoice,
     providerConnected: isAgentProviderConnected(setup.connected),
     agentReady: setup.agentReady,
     hostedAgentReady,
@@ -128,7 +129,7 @@ function AgentScreen({
   return (
     <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource)}</p>
+        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
@@ -153,6 +154,7 @@ function AgentScreen({
                 organizationId={organizationId}
                 setup={setup}
                 showHostedCredit={modelSource.choice !== "own-key"}
+                showCustomProvider={showCustomProvider}
                 onRequestConnect={onRequestConnect}
               />
             </FirstRunPanel>
@@ -176,33 +178,12 @@ function AgentScreen({
   );
 }
 
-/**
- * Back walks the exact screens in reverse order: repository, account picker,
- * Connect GitHub, welcome. The picker is a page of the connect screen, so
- * Back on the picker closes it instead of changing screens.
- */
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  if (target === "connect" && flow.pickerShowing) {
-    return flow.closePicker;
-  }
   if (target === "choose") {
-    return () => flow.goToScreen("connect", "picker");
+    return () => flow.goToScreen(flow.identityConnected ? "welcome" : "connect");
   }
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
-}
-
-/** Picker data for the connect screen. The Connect GitHub page passes none. */
-function pickerPropsFor(flow: FirstRunSetupFlow) {
-  if (!flow.pickerShowing) {
-    return {};
-  }
-  return {
-    pendingInstallations: flow.accountPicker?.installations,
-    githubState: flow.accountPicker?.state,
-    githubAppSlug: flow.accountPicker?.appSlug,
-    githubLogin: flow.accountPicker?.githubLogin,
-  };
 }
 
 /** Hosted credentials provision from this screen, so it shows finish progress. */
@@ -211,14 +192,12 @@ function ticketsContinueLabel(ticketsFinishSetup: boolean): string {
 }
 
 function TicketsScreenHost({
-  organizationId,
   flow,
   model,
   saving,
   chrome,
   sphere,
 }: {
-  organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   saving: boolean;
@@ -232,7 +211,11 @@ function TicketsScreenHost({
       chrome={chrome}
       sphere={sphere}
       jiraAvailable={flow.jiraAvailable}
+      jiraFeatureLoading={flow.jiraFeatureLoading}
       jiraChoiceBlock={flow.jiraChoiceBlock}
+      linearAvailable={flow.linearAvailable}
+      linearFeatureLoading={flow.linearFeatureLoading}
+      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -242,14 +225,18 @@ function TicketsScreenHost({
       jiraProjectsLoading={model.jiraProjectsLoading}
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
-      jiraCompletion={model.jiraCompletion}
-      organizationId={organizationId}
-      jiraIntegrationId={model.jiraIntegrationId}
+      linearConnected={model.setup.connected.has("linear")}
+      linearProjects={model.linearProjects}
+      linearProjectsLoading={model.linearProjectsLoading}
+      linearProjectsError={model.linearProjectsError}
+      linearProjectIds={model.linearProjectIds}
       onSelectTicketSource={flow.selectTicketSource}
       onConnectJira={() => void flow.connectJira()}
       onSelectJiraProject={model.setJiraProjectId}
-      onJiraCompletionChange={model.setJiraCompletion}
       onRetryJiraProjects={model.retryJiraProjects}
+      onConnectLinear={() => void flow.connectLinear()}
+      onToggleLinearProject={model.toggleLinearProject}
+      onRetryLinearProjects={model.retryLinearProjects}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );
@@ -265,7 +252,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
-  useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -318,17 +304,12 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        loading={flow.pickerLoading}
-        installRequested={flow.installRequested}
-        githubOrganizations={flow.githubOrganizations}
-        {...pickerPropsFor(flow)}
-        bindingInstallationId={flow.bindingInstallationId}
+        loading={flow.repositoriesLoading}
         connecting={flow.blockingAction === "opening-github"}
+        connectError={flow.connectError}
         chrome={chromeFor("connect")}
-        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", setup.selectedRepo)}
+        sphere={sphereFor("connect", setup.selectedRepo)}
         onConnectGitHub={() => void flow.connectGitHub()}
-        onUseInstallation={flow.useInstallation}
-        onInstallOther={() => void flow.installOnAnotherAccount()}
       />
     );
   }
@@ -336,15 +317,24 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "choose") {
     return (
       <FirstRunChooseScreen
-        repositories={model.repositories}
+        repositories={flow.repositories}
         selectedRepository={setup.selectedRepo}
-        loading={model.repositoriesLoading}
+        githubLogin={flow.githubLogin}
+        githubUserId={flow.githubUserId}
+        githubIdentities={flow.githubIdentities}
+        loading={flow.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
+        grantingAccess={flow.blockingAction === "opening-github"}
+        switchingGitHubAccount={flow.blockingAction === "switching-github-account"}
+        synchronizing={flow.synchronizing}
+        pendingOrganizations={flow.pendingOrganizations}
+        appConfigured={flow.appConfigured}
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-        organizationName={model.githubOwner}
         onSelectRepository={setup.selectRepo}
-        onEditConnection={() => model.requestConfigure()}
+        onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
+        onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
+        onGrantAccess={() => void flow.grantGitHubAccess()}
         onContinue={() => void flow.continueFromRepository()}
       />
     );
@@ -353,7 +343,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <TicketsScreenHost
-        organizationId={organizationId}
         flow={flow}
         model={model}
         saving={model.saving}
@@ -372,13 +361,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
+      showCustomProvider={model.customProvider}
       modelSource={{
         offered: flow.agentBeforeTickets,
         choice: flow.credentialChoice,
         onSelect: flow.selectCredentialChoice,
       }}
       onRequestConnect={model.requestConnect}
-      onContinue={() => void flow.continueFromAgent()}
+      onContinue={() => {
+        if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
+        void flow.continueFromAgent();
+      }}
     />
   );
 }

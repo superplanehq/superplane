@@ -1,0 +1,43 @@
+/** STE copy for the MCP Server settings section. */
+export const SUPERPLANE_MCP_SERVER_COPY = {
+  title: "External services → SuperPlane",
+  sectionDescription: "External MCP clients use it to access this workspace.",
+  emptyTitle: "No clients connected yet",
+  emptyDescription: "Connected editors and agents appear here after they sign in.",
+  serverUrlLabel: "Server URL",
+  copyUrl: "Copy server URL",
+  copiedUrl: "Copied server URL",
+  copyConfig: "Copy MCP configuration",
+  copiedConfig: "Copied MCP configuration",
+  copyCommand: "Copy command",
+  copiedCommand: "Copied command",
+  loading: "Loading MCP clients...",
+  loadError: "SuperPlane could not load MCP clients. Try again.",
+  unnamedClient: "MCP client",
+  unnamedUser: "Unknown user",
+  clientsSearchPlaceholder: "Search by user or editor",
+  clientsSearchEmpty: "No clients match this search.",
+  revoke: "Revoke",
+  revokeTitle: (name: string) => `Revoke "${name}"?`,
+  revokeDescription: "This disconnects the client from this workspace. The client must sign in again.",
+  revoking: "Revoking...",
+  revoked: "MCP client revoked.",
+  revokeFailed: "SuperPlane could not revoke the MCP client.",
+  noUpdatePermission: "You do not have permission to update this workspace.",
+  connectClient: "Connect",
+  connectTitle: "Connect a client",
+  tools: {
+    cursor: {
+      label: "Cursor",
+      steps: ["Open MCP settings in Cursor.", "Paste this object into mcp.json.", "Sign in when Cursor asks."],
+    },
+    claudeCode: {
+      label: "Claude Code",
+      steps: ["Run this command in a terminal.", "Start Claude Code.", "Sign in when Claude Code asks."],
+    },
+    vscode: {
+      label: "VS Code",
+      steps: ["Open MCP settings in VS Code.", "Paste this object into mcp.json.", "Sign in when VS Code asks."],
+    },
+  },
+} as const;

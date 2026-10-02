@@ -11,7 +11,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
-import { disabledAgentResourceTools } from "./PlanningReviewDisabledTools";
+import { disabledAgentResourceTools, enabledAgentResourceTools } from "./PlanningReviewDisabledTools";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
 
@@ -75,11 +75,15 @@ function AgentPanel({
   showVisualEvidenceSetting: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
+  const componentRef = useRef(component);
   const setConfigurationField = (name: string, value: unknown) => {
-    onChange({
-      ...component,
-      configuration: { ...component.configuration, [name]: value },
-    });
+    const current = componentRef.current;
+    const next = {
+      ...current,
+      configuration: { ...current.configuration, [name]: value },
+    };
+    componentRef.current = next;
+    onChange(next);
   };
   const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
@@ -94,7 +98,6 @@ function AgentPanel({
     current: currentModel,
   });
 
-  const componentRef = useRef(component);
   componentRef.current = component;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -179,8 +182,10 @@ function AgentPanel({
         factoryKey={factoryKey}
         disabledIds={disabledAgentResourceIds(component.configuration)}
         disabledTools={disabledAgentResourceTools(component.configuration)}
+        enabledTools={enabledAgentResourceTools(component.configuration)}
         onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
         onDisabledToolsChange={(tools) => setConfigurationField("disabledAgentResourceTools", tools)}
+        onEnabledToolsChange={(tools) => setConfigurationField("enabledAgentResourceTools", tools)}
       />
     </div>
   );

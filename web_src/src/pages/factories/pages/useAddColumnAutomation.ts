@@ -1,7 +1,9 @@
+import { organizationsDescribeIntegration } from "@/api-client";
 import { useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -17,6 +19,7 @@ import {
 import {
   factoryAppConfigurePath,
   factoryPRFeedbackSetupPath,
+  factoryRiskScoreSetupPath,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 
@@ -36,8 +39,10 @@ export function useAddColumnAutomation(args: {
   const navigate = useNavigate();
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
-  const allowCustom = useExperimentalFeature(args.organizationId).has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const catalogOptions = { allowCustom };
+  const experimentalFeatures = useExperimentalFeature(args.organizationId);
+  const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+  const allowRiskScore = experimentalFeatures.has(FEATURE_FACTORY_RISK_SCORE);
+  const catalogOptions = { allowCustom, allowRiskScore };
 
   const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
@@ -63,7 +68,17 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "pr-closure") {
-      await installPRClosure(args, installFactory, navigate, closePicker);
+      await installBundledCanvas(args, installFactory, navigate, closePicker, {
+        factoryId: "pr-closure",
+        missingGitHubMessage: "Connect GitHub in workspace setup before you add pull request closure.",
+      });
+      return;
+    }
+    if (entry.kind === "risk-score") {
+      closePicker();
+      if (args.lineId) {
+        navigate(factoryRiskScoreSetupPath(args.organizationId, args.factoryKey, args.lineId));
+      }
       return;
     }
     if (entry.kind !== "custom") {
@@ -122,7 +137,21 @@ function openPRFeedbackSetup(
   }
 }
 
-async function installPRClosure(
+async function installationName(organizationId: string, integrationId: string): Promise<string> {
+  try {
+    const response = await organizationsDescribeIntegration(
+      withOrganizationHeader({
+        organizationId,
+        path: { id: organizationId, integrationId },
+      }),
+    );
+    return response.data?.integration?.metadata?.name?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+async function installBundledCanvas(
   args: {
     organizationId: string;
     factoryId: string;
@@ -136,16 +165,22 @@ async function installPRClosure(
   installFactory: ReturnType<typeof useInstallFactory>["installFactory"],
   navigate: (path: string) => void,
   close: () => void,
+  options: { factoryId: string; missingGitHubMessage: string },
 ) {
   if (!args.githubIntegrationId) {
-    showErrorToast("Connect GitHub in workspace setup before you add pull request closure.");
+    showErrorToast(options.missingGitHubMessage);
+    return;
+  }
+  const githubInstallationName = await installationName(args.organizationId, args.githubIntegrationId);
+  if (!githubInstallationName) {
+    showErrorToast(options.missingGitHubMessage);
     return;
   }
   try {
     const installed = await installFactory({
-      factoryId: "pr-closure",
+      factoryId: options.factoryId,
       workspaceFactoryId: args.factoryId,
-      integrations: { github: { id: args.githubIntegrationId, name: "GitHub", ready: true } },
+      integrations: { github: { id: args.githubIntegrationId, name: githubInstallationName, ready: true } },
       installParams: {
         appRepository: args.appRepository,
         backlogRepository: args.backlogRepository,

@@ -15,7 +15,6 @@ import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCand
 import {
   collectSplitRunArtifacts,
   collectSplitRunPullRequests,
-  defaultSplitRunPopupTab,
   refinePopupShowsAutomations,
   resolveSplitRunPopupArtifacts,
   resolveSplitRunPopupPullRequests,
@@ -23,11 +22,12 @@ import {
   splitRunDescriptionMarkdown,
   splitRunIntentDocument,
   splitRunLinkedArtifacts,
+  splitRunPanelArtifacts,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
-import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
+import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 describe("splitRunPopupModel", () => {
   it("hides Automations on a draft refine popup", () => {
@@ -111,95 +111,6 @@ describe("splitRunPopupModel", () => {
       }),
     );
     expect(splitRunPhaseRunHref({ phase: prCreation! })).toBeUndefined();
-  });
-
-  it("opens Automations only while a line run or pull request activity is active", () => {
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER))).toBe("description");
-    expect(
-      defaultSplitRunPopupTab(
-        splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
-          analysisRuns: [
-            {
-              canvasId: "canvas-backlog",
-              workOrderId: DRAFT_WORK_ORDER.id ?? "",
-              run: {
-                id: "run-analysis",
-                canvasId: "canvas-backlog",
-                state: "STATE_STARTED",
-                createdAt: "2026-08-28T12:00:00Z",
-                updatedAt: "2026-08-28T12:00:00Z",
-              },
-            },
-          ],
-        }),
-      ),
-    ).toBe("description");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER))).toBe("description");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER))).toBe("description");
-    expect(defaultSplitRunPopupTab(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER))).toBe("description");
-    const noActiveRuns = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER);
-    expect(
-      defaultSplitRunPopupTab({
-        ...noActiveRuns,
-        footer: { ...noActiveRuns.footer, kind: "running" },
-      }),
-    ).toBe("description");
-    expect(
-      defaultSplitRunPopupTab(
-        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
-          prFeedbackRuns: [
-            {
-              canvasId: "canvas-pr-feedback",
-              pullRequestNumber: "12",
-              run: {
-                id: "run-pr-feedback",
-                canvasId: "canvas-pr-feedback",
-                state: "STATE_STARTED",
-                result: "RESULT_UNKNOWN",
-              },
-            },
-          ],
-        }),
-      ),
-    ).toBe("log");
-    expect(
-      defaultSplitRunPopupTab(
-        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
-          prFeedbackRuns: [
-            {
-              canvasId: "canvas-pr-feedback",
-              pullRequestNumber: "12",
-              waitingForAccess: true,
-              run: {
-                id: "run-pr-feedback-queued",
-                canvasId: "canvas-pr-feedback",
-                state: "STATE_STARTED",
-                result: "RESULT_UNKNOWN",
-              },
-            },
-          ],
-        }),
-      ),
-    ).toBe("log");
-    expect(
-      defaultSplitRunPopupTab(
-        splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
-          prFeedbackRuns: [
-            {
-              canvasId: "canvas-pr-feedback",
-              pullRequestNumber: "12",
-              run: {
-                id: "run-pr-feedback",
-                canvasId: "canvas-pr-feedback",
-                state: "STATE_FINISHED",
-                result: "RESULT_PASSED",
-              },
-            },
-          ],
-        }),
-      ),
-    ).toBe("description");
-    expect(defaultSplitRunPopupTab(SPLIT_RUN_RUNNING)).toBe("log");
   });
 
   it("prefers the saved work-order description on a live order", () => {
@@ -356,5 +267,40 @@ describe("splitRunPopupModel", () => {
     ]);
 
     expect(artifacts.map((artifact) => artifact.id)).toEqual(["older", "newer", "undated"]);
+  });
+
+  it("keeps document markdowns in the panel artifact list, oldest first", () => {
+    const artifacts = splitRunPanelArtifacts([
+      {
+        id: "spec",
+        type: "TYPE_MARKDOWN",
+        createdAt: "2026-08-25T11:00:00.000Z",
+        data: { name: "spec.md", body: "# Spec" },
+      },
+      {
+        id: "description",
+        type: "TYPE_MARKDOWN",
+        createdAt: "2026-08-25T09:00:00.000Z",
+        data: { name: "description.md", body: "The task." },
+      },
+      {
+        id: "preview",
+        type: "TYPE_LINK",
+        createdAt: "2026-08-25T10:00:00.000Z",
+        data: { title: "Preview", url: "https://preview.example.com/2" },
+      },
+    ]);
+
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "preview", "spec"]);
+  });
+
+  it("keeps the input order for panel artifacts without a createdAt", () => {
+    const artifacts = splitRunPanelArtifacts([
+      { id: "description", type: "TYPE_MARKDOWN", data: { name: "description.md" } },
+      { id: "spec", type: "TYPE_MARKDOWN", data: { name: "spec.md" } },
+      { id: "branch", type: "TYPE_BRANCH", data: { name: "feat/duplicate-task" } },
+    ]);
+
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "spec", "branch"]);
   });
 });

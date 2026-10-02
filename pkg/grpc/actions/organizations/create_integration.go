@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
@@ -49,6 +50,21 @@ func CreateIntegration(
 	}
 	orgID = org.String()
 
+	if integrationName == models.CustomLLMAppName {
+		enabled, err := models.OrganizationHasExperimentalFeatures(
+			database.Conn(),
+			org,
+			features.FeatureOrganizationBYOK,
+			features.FeatureOrganizationBYOKCustomProvider,
+		)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to read organization features")
+		}
+		if !enabled {
+			return nil, grpcerrors.PermissionDenied(nil, "Custom provider is not enabled for this organization.")
+		}
+	}
+
 	//
 	// Check if an integration with this name already exists in the organization
 	//
@@ -67,6 +83,9 @@ func CreateIntegration(
 	})
 
 	configMap := configurationMap(appConfig)
+	if github.PreferHostedInstall(orgID, integrationName, configMap) {
+		return nil, grpcerrors.FailedPrecondition(nil, "select a repository to connect the public GitHub App")
+	}
 
 	//
 	// If the integration and organization support the new flow, use it.
@@ -109,9 +128,6 @@ func CreateIntegration(
 }
 
 func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
-	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
-		return false
-	}
 	if sentry.PreferHostedInstall(integrationName, config) {
 		return false
 	}

@@ -24,6 +24,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     organizationId: "org-1",
     factoryId: "factory-1",
     factoryKey: "PAY",
+    routeSegment: "pay",
     factory,
     factories,
   }),
@@ -43,12 +44,20 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
-vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
-  useRecheckGitHubInstallRequest: vi.fn(),
-}));
-
-vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutateAsync: vi.fn() }),
+vi.mock("./useGitHubOnboarding", () => ({
+  useGitHubOnboarding: () => ({
+    data: {
+      appConfigured: true,
+      identity: { userId: "42", login: "octocat" },
+      repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
+      pendingRequests: [],
+      synchronizing: false,
+    },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+    configureInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 const navigateSpy = vi.fn();
@@ -68,7 +77,9 @@ vi.mock("react-router", () => {
 });
 
 vi.mock("./AgentStep", () => ({
-  AgentStep: () => <div data-testid="agent-step" />,
+  AgentStep: ({ showCustomProvider }: { showCustomProvider?: boolean }) => (
+    <div data-testid="agent-step" data-custom-provider={showCustomProvider ? "yes" : "no"} />
+  ),
 }));
 
 function setupState(): OnboardingSetupApi {
@@ -84,29 +95,18 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
-    refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
-    githubConnectionsLoading: false,
-    requestPrivateGitHubConnect: vi.fn(),
-    offersPrivateGitHubAppSetup: false,
-    createVcsConnection: vi.fn(),
-    selectVcsConnection: vi.fn().mockResolvedValue(true),
-    githubConnections: { name: "github", allInstances: [], readyInstances: [] },
-    selectedVcsConnectionId: "github-1",
-    requestConfigure: vi.fn(),
+    selectCatalogRepository: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
-    repositories: ["acme/payments-service"],
-    repositoriesLoading: false,
-    repositoriesError: null,
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
-    saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,
@@ -115,17 +115,23 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectId: "",
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    setJiraCompletion: vi.fn(),
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
+    linearIntegrationId: "",
+    linearProjectIds: [],
+    toggleLinearProject: vi.fn(),
+    linearProjects: [],
+    linearProjectsLoading: false,
+    linearProjectsError: false,
+    retryLinearProjects: vi.fn(),
     ...overrides,
   };
 }
 
 function withRepository(): OnboardingSetupApi {
-  return { ...setupState(), selectedRepo: "acme/payments-service" };
+  return { ...setupState(), selectedRepo: "acme/api" };
 }
 
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
@@ -265,20 +271,21 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
   });
 
-  it("lists SuperPlane-hosted models before Your key in the model source choice", () => {
+  it("keeps SuperPlane-hosted models as the choice and own key as a link", () => {
     renderSetup(pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }));
 
     const source = screen.getByTestId("first-run-model-source");
     const buttons = within(source).getAllByRole("button");
     expect(buttons[0]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.hostedModels));
-    expect(buttons[1]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.ownKey));
+    expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+    expect(buttons[1]).toHaveAccessibleName(FIRST_RUN_COPY.agent.ownKey);
+    expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("opens the backlog when the organization chooses SuperPlane-hosted models", async () => {
+  it("opens the backlog when SuperPlane-hosted models stay selected", async () => {
     const user = userEvent.setup();
     renderStatefulSetup({ hostedAgentReady: true, hostedModelsAvailable: true, bringYourOwnKey: true });
 
-    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.hostedModels) }));
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
@@ -292,8 +299,24 @@ describe("FirstRunSetup chrome", () => {
     await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
 
     expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBody)).toBeInTheDocument();
-    expect(screen.getByTestId("agent-step")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "no");
     expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
+  });
+
+  it("offers a custom provider on the agent card when that flag is on", async () => {
+    const user = userEvent.setup();
+    renderStatefulSetup({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      customProvider: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: new RegExp(FIRST_RUN_COPY.agent.ownKey) }));
+
+    expect(screen.getByText(FIRST_RUN_COPY.agent.ownKeyBodyWithCustom)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.agent.ownKey })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("agent-step")).toHaveAttribute("data-custom-provider", "yes");
   });
 
   it("sends a bring-your-own-key organization back to the model source when none is chosen", () => {

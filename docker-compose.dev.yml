@@ -85,8 +85,8 @@ services:
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       NO_ENCRYPTION: "yes"
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-1234567890abcdefghijklmnopqrstuv}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-1234567890abcdefghijklmnopqrstuv}
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.
@@ -109,13 +109,13 @@ services:
       SUPERPLANE_GITHUB_APP_SLUG: ${SUPERPLANE_GITHUB_APP_SLUG:-}
       SUPERPLANE_GITHUB_APP_PRIVATE_KEY: ${SUPERPLANE_GITHUB_APP_PRIVATE_KEY:-}
       SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET: ${SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET:-}
-      SUPERPLANE_GITHUB_APP_CLIENT_ID: ${SUPERPLANE_GITHUB_APP_CLIENT_ID:-}
-      SUPERPLANE_GITHUB_APP_CLIENT_SECRET: ${SUPERPLANE_GITHUB_APP_CLIENT_SECRET:-}
       SUPERPLANE_SENTRY_APP_SLUG: ${SUPERPLANE_SENTRY_APP_SLUG:-}
       SUPERPLANE_SENTRY_APP_CLIENT_ID: ${SUPERPLANE_SENTRY_APP_CLIENT_ID:-}
       SUPERPLANE_SENTRY_APP_CLIENT_SECRET: ${SUPERPLANE_SENTRY_APP_CLIENT_SECRET:-}
       SUPERPLANE_JIRA_OAUTH_CLIENT_ID: ${SUPERPLANE_JIRA_OAUTH_CLIENT_ID:-}
       SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET: ${SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET:-}
+      SUPERPLANE_LINEAR_OAUTH_CLIENT_ID: ${SUPERPLANE_LINEAR_OAUTH_CLIENT_ID:-}
+      SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET: ${SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET:-}
       SUPERPLANE_DEV_HOSTED_OPENROUTER: ${SUPERPLANE_DEV_HOSTED_OPENROUTER:-}
       SUPERPLANE_DEV_OPENROUTER_API_KEY: ${SUPERPLANE_DEV_OPENROUTER_API_KEY:-}
       SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY: ${SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY:-}
@@ -140,6 +140,7 @@ services:
       POLAR_BUSINESS_PRODUCT_ID: ${POLAR_BUSINESS_PRODUCT_ID:-}
       POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
+      POLAR_API_VERSION: ${POLAR_API_VERSION:-}
 
       #
       # Platform blob storage. Development uses a local directory. Hosted
@@ -181,7 +182,7 @@ services:
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
     profiles: [dev]
-    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
     ports:
@@ -196,7 +197,7 @@ services:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
     restart: "on-failure"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
       timeout: 3s
       retries: 5

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
 } from "@/lib/experimentalFeatures";
 
 import {
@@ -21,7 +21,7 @@ import {
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Jira, Sentry, PagerDuty, and Productive.io as automations that feed Backlog", () => {
+  it("defines GitHub, Jira, Sentry, PagerDuty, Productive.io, and Datadog as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
       "dependabot-alerts",
@@ -29,6 +29,8 @@ describe("lineIntakeModel", () => {
       "sentry-exceptions",
       "pagerduty-incidents",
       "productive-tasks",
+      "datadog",
+      "linear-issues",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -104,6 +106,22 @@ describe("lineIntakeModel", () => {
     expect(intake?.resourceId).toBe("ENG");
     expect(intake?.settings.jiraMoveOnComplete).toBe(true);
     expect(intake?.settings.jiraCompletionColumn).toBe("Done");
+  });
+
+  it("maps the Datadog service onto the settings draft", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-datadog",
+        canvasId: "canvas-datadog",
+        source: "SOURCE_DATADOG",
+        integrationId: "datadog-1",
+        resourceId: "checkout",
+      },
+    ]);
+
+    expect(intake?.integrationId).toBe("datadog-1");
+    expect(intake?.resourceId).toBe("checkout");
+    expect(intake?.settings.datadogService).toBe("checkout");
   });
 
   it("carries the paused state from the intake API", () => {
@@ -260,7 +278,7 @@ describe("lineIntakeModel", () => {
 
     expect(fixture.phases.map((phase) => [phase.id, phase.status, phase.duration])).toEqual([
       ["ingest", "passed", "2s"],
-      ["analyze", "running", "3m 12s so far"],
+      ["analyze", "running", "3m 12s"],
       ["plan", "pending", "—"],
       ["score", "pending", "—"],
     ]);
@@ -337,7 +355,7 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists GitHub, Dependabot, Jira, Sentry, Productive.io, and coming-soon DataDog and Notion add-intake sources", () => {
+  it("lists GitHub, Dependabot, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion add-intake sources", () => {
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
       "github-issues",
       "dependabot-alerts",
@@ -345,32 +363,31 @@ describe("lineIntakeModel", () => {
       "sentry-exceptions",
       "productive-tasks",
       "datadog",
+      "linear-issues",
       "notion",
     ]);
-    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual([
-      "datadog",
-      "notion",
-    ]);
+    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
-  it("marks Jira, Sentry, and Productive.io as coming soon when their organization features are off", () => {
+  it("marks Jira, Productive.io, and Datadog as coming soon when their organization features are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
-    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Jira, Sentry, and Productive.io live when their organization features are on", () => {
+  it("keeps Jira, Productive.io, and Datadog live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
       [
-        FEATURE_FACTORY_DEPENDABOT_INTAKE,
+        FEATURE_FACTORY_DATADOG_INTAKE,
         FEATURE_FACTORY_JIRA_INTAKE,
-        FEATURE_FACTORY_SENTRY_INTAKE,
+        FEATURE_FACTORY_LINEAR_INTAKE,
         FEATURE_FACTORY_PRODUCTIVE_INTAKE,
       ].includes(featureId),
     );
@@ -379,7 +396,8 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
   });
 
   it("maps every intake template id to an API source the picker can create", () => {
@@ -392,5 +410,6 @@ describe("lineIntakeModel", () => {
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
     expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
+    expect(apiIntakeSource("linear-issues")).toBe("SOURCE_LINEAR_ISSUES");
   });
 });

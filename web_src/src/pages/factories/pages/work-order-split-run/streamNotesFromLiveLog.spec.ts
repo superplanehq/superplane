@@ -90,14 +90,16 @@ describe("notesFromLiveLogSections", () => {
     ]);
 
     expect(notes.map((note) => note.componentType)).toEqual(["bash", "prompt", "note", "read"]);
-    expect(notes[0]?.componentName).toBe('echo "Using superplaneagent@superplane.com"');
+    expect(notes[0]?.componentName).toBe("Set Up Git User");
+    expect(notes[0]?.duration).toBe("<1s");
+    expect(notes[0]?.detail).toContain('echo "Using superplaneagent@superplane.com"');
     expect(notes[0]?.detail).toContain("Using superplaneagent");
-    expect(notes[1]?.componentName).toBe("You are implementing a fix");
+    expect(notes[1]?.componentName).toBe("Implementation");
     expect(notes[3]?.componentName).toBe("pkg/foo.go");
     expect(notes[3]?.noteParentId).toBe("agent-step-5");
   });
 
-  it("keeps the full multi-line preview for bash and prompt step titles", () => {
+  it("uses the step name and keeps the command preview in the body", () => {
     const notes = notesFromLiveLogSections("agent", [
       {
         ...bashSection(),
@@ -109,8 +111,10 @@ describe("notesFromLiveLogSections", () => {
       },
     ]);
 
-    expect(notes[0]?.componentName).toBe('set -e\necho "line one"\necho "line two"');
-    expect(notes[1]?.componentName).toBe("You are implementing a fix.\n\nRead the ticket first.");
+    expect(notes[0]?.componentName).toBe("Set Up Git User");
+    expect(notes[0]?.detail).toContain('set -e\necho "line one"\necho "line two"');
+    expect(notes[1]?.componentName).toBe("Implementation");
+    expect(notes[1]?.detail).toContain("You are implementing a fix.\n\nRead the ticket first.");
   });
 
   it("tags the section, its notes, and its tools with the section start time", () => {
@@ -237,7 +241,7 @@ describe("notesFromLiveLogSections", () => {
     ]);
 
     expect(notes.map((note) => note.componentName)).toEqual([
-      "You are implementing a fix",
+      "Implementation",
       "I will verify the seams.",
       "git status",
     ]);
@@ -276,7 +280,7 @@ describe("notesFromLiveLogSections", () => {
       },
     ]);
 
-    expect(notes.map((note) => note.componentName)).toEqual(["You are implementing a fix", "ls pkg"]);
+    expect(notes.map((note) => note.componentName)).toEqual(["Implementation", "ls pkg"]);
     expect(notes[1]?.componentType).toBe("bash");
     expect(notes[1]?.detail).toBe("pkg/");
   });
@@ -358,7 +362,7 @@ describe("notesFromLiveLogSections", () => {
     ]);
 
     expect(notes.map((note) => ({ type: note.componentType, name: note.componentName }))).toEqual([
-      { type: "prompt", name: "You are implementing a fix" },
+      { type: "prompt", name: "Implementation" },
       { type: "read", name: "pkg/foo.go" },
       { type: "grep", name: "rootTriggerRenderer" },
     ]);

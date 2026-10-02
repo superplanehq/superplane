@@ -2,20 +2,31 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
+
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
 func Test__ProductiveTaskItem(t *testing.T) {
@@ -64,6 +75,17 @@ type stubIntakeItemSource struct {
 
 func (s stubIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
 	return s.items, s.err
+}
+
+type linearFileIntakeSource struct {
+	stubIntakeItemSource
+	files    []linear.IssueFile
+	links    []linear.IssueLink
+	filesErr error
+}
+
+func (s linearFileIntakeSource) IssueFiles(context.Context, string, string) ([]linear.IssueFile, []linear.IssueLink, error) {
+	return s.files, s.links, s.filesErr
 }
 
 func (s stubIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
@@ -185,6 +207,106 @@ func Test__SearchFactoryIntakeItems(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Contains(t, message, "This intake cannot search items yet.")
+	})
+
+	t.Run("Datadog 403 from search is a failed precondition the UI can show", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, datadog.ErrErrorTrackingForbidden), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, datadog.ErrorTrackingForbiddenMessage, message)
+	})
+
+	assertSearch := func(t *testing.T, sourceErr error) (codes.Code, string) {
+		t.Helper()
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		_, err := SearchFactoryIntakeItems(ctx, deps(nil, sourceErr), orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		return code, message
+	}
+
+	for _, source := range liveIntakeClientErrors() {
+		t.Run(source.name+" 403 from search is a failed precondition", func(t *testing.T) {
+			code, message := assertSearch(t, source.statusError(http.StatusForbidden))
+			assert.Equal(t, codes.FailedPrecondition, code)
+			assert.Equal(t, intakeConnectFirstMessage, message)
+		})
+	}
+
+	t.Run("a non-auth 4xx from search is a failed precondition", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusUnprocessableEntity})
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, intakeCouldNotLoadItemsMessage, message)
+	})
+
+	t.Run("a 5xx from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, sentry.StatusError(http.StatusBadGateway))
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("a 429 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusTooManyRequests})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("a 408 from search stays Internal", func(t *testing.T) {
+		code, message := assertSearch(t, &jira.APIError{StatusCode: http.StatusRequestTimeout})
+		assert.Equal(t, codes.Internal, code)
+		assert.Equal(t, "failed to search factory intake items", message)
+	})
+
+	t.Run("integration error description is returned instead of unsupported search", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+		created, err := CreateFactoryIntake(ctx, IntakeDependencies{
+			Registry:       r.Registry,
+			Encryptor:      r.Encryptor,
+			AuthService:    r.AuthService,
+			WebhookBaseURL: "http://localhost:8000",
+		}, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments",
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, database.DB(t.Context()).Model(&models.Integration{}).
+			Where("id = ?", uuid.MustParse(integrationID)).
+			Updates(map[string]any{
+				"state":             models.IntegrationStateError,
+				"state_description": "invalid credentials: Forbidden",
+			}).Error)
+
+		_, err = SearchFactoryIntakeItems(ctx, IntakeDependencies{
+			Registry:  r.Registry,
+			Encryptor: r.Encryptor,
+		}, orgID, &pb.SearchFactoryIntakeItemsRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  created.GetIntake().GetId(),
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "invalid credentials: Forbidden", message)
+		assert.NotContains(t, message, "This intake cannot search items yet.")
+		assert.NotContains(t, message, "Connect this intake first.")
 	})
 }
 
@@ -327,6 +449,130 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, jiraItem.Title, response.GetOrder().GetTitle())
 		require.NotNil(t, response.GetOrder().GetOrigin())
 		assert.Equal(t, jiraItem.URL, response.GetOrder().GetOrigin().GetUrl())
+	})
+
+	t.Run("stores the Datadog issue title as the source label", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		issueID := "da226b38-baac-11f1-bad1-da7ad0900005"
+		datadogItem := IntakeItem{
+			ID:    issueID,
+			Title: "TimeoutError: checkout timed out",
+			Body:  "checkout timed out",
+			URL:   "https://app.datadoghq.eu/error-tracking/issue/" + issueID,
+		}
+		datadogDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSource{items: []IntakeItem{datadogItem}}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, datadogDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    datadogItem.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, datadogItem.URL, response.GetOrder().GetOrigin().GetUrl())
+		assert.Equal(t, datadogItem.Title, response.GetOrder().GetOrigin().GetLabel())
+
+		orderID, err := uuid.Parse(response.GetOrder().GetId())
+		require.NoError(t, err)
+		stored, err := factory.FindWorkOrder(database.DB(t.Context()), orderID)
+		require.NoError(t, err)
+		require.NotNil(t, stored.OriginLabel)
+		assert.Equal(t, datadogItem.Title, *stored.OriginLabel)
+	})
+
+	t.Run("importing a Linear issue stores private files and keeps other links", func(t *testing.T) {
+		t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
+		t.Setenv("BASE_URL", "http://files.test")
+		store, err := filesystem.New(t.TempDir())
+		require.NoError(t, err)
+		blob.SetCurrent(store)
+		t.Cleanup(func() { blob.SetCurrent(nil) })
+
+		factory := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Linear issues")
+		intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, models.FactoryIntakeSourceLinearIssues)
+		require.NoError(t, err)
+
+		uploadURL := "https://uploads.linear.app/file/abc/shot.png"
+		linearItem := IntakeItem{
+			ID:    "issue-1",
+			Key:   "ENG-1",
+			Title: "Deploy pipeline fails",
+			Body:  "See " + uploadURL,
+			URL:   "https://linear.app/acme/issue/ENG-1",
+		}
+		linearDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return linearFileIntakeSource{
+					stubIntakeItemSource: stubIntakeItemSource{items: []IntakeItem{linearItem}},
+					files: []linear.IssueFile{{
+						Name:        "shot.png",
+						ContentType: "image/png",
+						Body:        []byte("png-bytes"),
+						ReplaceURLs: []string{uploadURL},
+					}},
+					links: []linear.IssueLink{{Title: "Pull request", URL: "https://github.com/acme/repo/pull/1"}},
+				}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, linearDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    linearItem.ID,
+		})
+		require.NoError(t, err)
+
+		orderID, err := uuid.Parse(response.GetOrder().GetId())
+		require.NoError(t, err)
+		stored, err := factory.FindWorkOrder(database.DB(t.Context()), orderID)
+		require.NoError(t, err)
+		assert.NotContains(t, stored.Description, uploadURL)
+		assert.Contains(t, stored.Description, blob.FileRefScheme+"://")
+		assert.Contains(t, stored.Description, "https://github.com/acme/repo/pull/1")
+	})
+
+	t.Run("a Linear file read failure does not create the task", func(t *testing.T) {
+		factory := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Linear issues")
+		intake, err := factory.CreateIntake(database.DB(t.Context()), canvas.ID, models.FactoryIntakeSourceLinearIssues)
+		require.NoError(t, err)
+
+		linearItem := IntakeItem{
+			ID:    "issue-1",
+			Key:   "ENG-1",
+			Title: "Deploy pipeline fails",
+			Body:  "See https://uploads.linear.app/file/abc/shot.png",
+			URL:   "https://linear.app/acme/issue/ENG-1",
+		}
+		linearDeps := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return linearFileIntakeSource{
+					stubIntakeItemSource: stubIntakeItemSource{items: []IntakeItem{linearItem}},
+					filesErr:             errors.New("linear attachments unavailable"),
+				}, nil
+			},
+		}
+
+		_, err = ImportFactoryIntakeItem(ctx, linearDeps, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    linearItem.ID,
+		})
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, linearIssueFilesMessage, message)
+
+		var count int64
+		require.NoError(t, database.DB(t.Context()).Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factory.ID).Count(&count).Error)
+		assert.Zero(t, count)
 	})
 
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {

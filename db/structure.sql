@@ -52,6 +52,7 @@ CREATE TABLE public.account_linked_accounts (
     linked_at timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    active boolean DEFAULT false NOT NULL,
     CONSTRAINT account_linked_accounts_provider_id_present CHECK ((btrim((provider_id)::text) <> ''::text)),
     CONSTRAINT account_linked_accounts_provider_present CHECK ((btrim((provider)::text) <> ''::text)),
     CONSTRAINT account_linked_accounts_username_present CHECK ((btrim((username)::text) <> ''::text))
@@ -322,6 +323,27 @@ CREATE TABLE public.data_migrations (
 
 
 --
+-- Name: datadog_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.datadog_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    event_type text DEFAULT ''::text NOT NULL,
+    alert_transition text DEFAULT ''::text NOT NULL,
+    alert_id text DEFAULT ''::text NOT NULL,
+    service text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    subscription_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: email_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -361,8 +383,15 @@ CREATE TABLE public.factories (
     planning_clarity boolean DEFAULT false NOT NULL,
     planning_confidence boolean DEFAULT true NOT NULL,
     planning_setup_completed boolean DEFAULT false NOT NULL,
+    planning_auto_start_line_id uuid,
+    public boolean DEFAULT false NOT NULL,
+    public_badge_enabled boolean DEFAULT false NOT NULL,
+    public_badge_show_cost boolean DEFAULT false NOT NULL,
+    public_badge_token text,
+    url_id text NOT NULL,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
-    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
+    CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
+    CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
 );
 
 
@@ -451,7 +480,7 @@ CREATE TABLE public.factory_llm_model_allowlists (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
-    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
 );
 
 
@@ -780,7 +809,8 @@ CREATE TABLE public.factory_work_order_executions (
     total_tokens bigint DEFAULT 0 NOT NULL,
     cost_cents bigint DEFAULT 0 NOT NULL,
     line_dispatch_id uuid NOT NULL,
-    duration_seconds bigint DEFAULT 0 NOT NULL
+    duration_seconds bigint DEFAULT 0 NOT NULL,
+    failure_reason text
 );
 
 
@@ -845,6 +875,9 @@ CREATE TABLE public.factory_work_orders (
     origin_label text,
     repository text,
     default_branch text,
+    auto_start_line_id uuid,
+    mcp_client_id text,
+    mcp_client_name text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -949,6 +982,81 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.linear_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    webhook_id uuid NOT NULL,
+    event_type text DEFAULT ''::text NOT NULL,
+    action text DEFAULT ''::text NOT NULL,
+    issue_identifier text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    team_key text DEFAULT ''::text NOT NULL,
+    workspace_key text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    subscription_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
+-- Name: mcp_oauth_clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_clients (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    client_id text NOT NULL,
+    client_name text DEFAULT ''::text NOT NULL,
+    redirect_uris jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: mcp_oauth_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_codes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    code_hash text NOT NULL,
+    client_id text NOT NULL,
+    redirect_uri text NOT NULL,
+    resource text NOT NULL,
+    code_challenge text NOT NULL,
+    code_challenge_method text NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: mcp_oauth_refresh_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_oauth_refresh_tokens (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    token_hash text NOT NULL,
+    client_id text NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    resource text NOT NULL,
+    scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: organization_billing_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -979,7 +1087,7 @@ CREATE TABLE public.organization_byok_model_allowlists (
     provider text NOT NULL,
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
 );
 
 
@@ -1249,6 +1357,27 @@ CREATE TABLE public.sentry_app_install_grants (
 
 
 --
+-- Name: sentry_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sentry_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    hook_resource text DEFAULT ''::text NOT NULL,
+    action text DEFAULT ''::text NOT NULL,
+    installation_uuid text DEFAULT ''::text NOT NULL,
+    organization_slug text DEFAULT ''::text NOT NULL,
+    project_slug text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    issue_short_id text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    integration_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1363,6 +1492,158 @@ CREATE TABLE public.users (
     api_key_expires_at timestamp without time zone,
     api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     is_owner boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_install_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_install_requests (
+    provider text NOT NULL,
+    request_id bigint NOT NULL,
+    account_id bigint,
+    account_login text DEFAULT ''::text NOT NULL,
+    account_type text DEFAULT ''::text NOT NULL,
+    requester_id bigint NOT NULL,
+    requester_login text DEFAULT ''::text NOT NULL,
+    requested_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installation_reconcile_jobs (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installation_reconcile_requesters (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    organization_id uuid NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_installations (
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    account_id bigint,
+    account_login text DEFAULT ''::text NOT NULL,
+    account_type text DEFAULT ''::text NOT NULL,
+    html_url text DEFAULT ''::text NOT NULL,
+    repository_selection text DEFAULT ''::text NOT NULL,
+    suspended_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_integration_bindings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_integration_bindings (
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    installation_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_integration_repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_integration_repositories (
+    integration_id uuid NOT NULL,
+    provider text NOT NULL,
+    repository_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_reconcile_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_reconcile_jobs (
+    provider text NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_repositories (
+    provider text NOT NULL,
+    repository_id bigint NOT NULL,
+    installation_id bigint NOT NULL,
+    full_name text NOT NULL,
+    private boolean DEFAULT false NOT NULL,
+    default_branch text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT vcs_provider_repositories_full_name_present CHECK ((btrim(full_name) <> ''::text))
+);
+
+
+--
+-- Name: vcs_provider_repository_collaborators; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_repository_collaborators (
+    provider text NOT NULL,
+    repository_id bigint NOT NULL,
+    provider_user_id bigint NOT NULL,
+    provider_login text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vcs_provider_repository_sync_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_repository_sync_jobs (
+    provider text NOT NULL,
+    repository_id bigint NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    locked_at timestamp with time zone,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    priority smallint DEFAULT 0 NOT NULL
 );
 
 
@@ -1802,6 +2083,14 @@ ALTER TABLE ONLY public.data_migrations
 
 
 --
+-- Name: datadog_webhook_receipts datadog_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.datadog_webhook_receipts
+    ADD CONSTRAINT datadog_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1831,6 +2120,14 @@ ALTER TABLE ONLY public.factories
 
 ALTER TABLE ONLY public.factories
     ADD CONSTRAINT factories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factories factories_public_badge_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_public_badge_token_key UNIQUE (public_badge_token);
 
 
 --
@@ -2122,6 +2419,38 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: linear_webhook_receipts linear_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.linear_webhook_receipts
+    ADD CONSTRAINT linear_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_clients mcp_oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_clients
+    ADD CONSTRAINT mcp_oauth_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_codes mcp_oauth_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_codes
+    ADD CONSTRAINT mcp_oauth_codes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_oauth_refresh_tokens mcp_oauth_refresh_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_oauth_refresh_tokens
+    ADD CONSTRAINT mcp_oauth_refresh_tokens_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_billing_plans organization_billing_plans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2290,6 +2619,14 @@ ALTER TABLE ONLY public.sentry_app_install_grants
 
 
 --
+-- Name: sentry_webhook_receipts sentry_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sentry_webhook_receipts
+    ADD CONSTRAINT sentry_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2375,6 +2712,86 @@ ALTER TABLE ONLY public.user_notification_settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vcs_provider_install_requests vcs_provider_install_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_install_requests
+    ADD CONSTRAINT vcs_provider_install_requests_pkey PRIMARY KEY (provider, request_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_jobs vcs_provider_installation_reconcile_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_jobs
+    ADD CONSTRAINT vcs_provider_installation_reconcile_jobs_pkey PRIMARY KEY (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_pkey PRIMARY KEY (provider, installation_id, organization_id);
+
+
+--
+-- Name: vcs_provider_installations vcs_provider_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installations
+    ADD CONSTRAINT vcs_provider_installations_pkey PRIMARY KEY (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_bindings
+    ADD CONSTRAINT vcs_provider_integration_bindings_pkey PRIMARY KEY (integration_id);
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_pkey PRIMARY KEY (integration_id, provider, repository_id);
+
+
+--
+-- Name: vcs_provider_reconcile_jobs vcs_provider_reconcile_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_reconcile_jobs
+    ADD CONSTRAINT vcs_provider_reconcile_jobs_pkey PRIMARY KEY (provider);
+
+
+--
+-- Name: vcs_provider_repositories vcs_provider_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repositories
+    ADD CONSTRAINT vcs_provider_repositories_pkey PRIMARY KEY (provider, repository_id);
+
+
+--
+-- Name: vcs_provider_repository_collaborators vcs_provider_repository_collaborators_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repository_collaborators
+    ADD CONSTRAINT vcs_provider_repository_collaborators_pkey PRIMARY KEY (provider, repository_id, provider_user_id);
+
+
+--
+-- Name: vcs_provider_repository_sync_jobs vcs_provider_repository_sync_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repository_sync_jobs
+    ADD CONSTRAINT vcs_provider_repository_sync_jobs_pkey PRIMARY KEY (provider, repository_id);
 
 
 --
@@ -2525,6 +2942,13 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 
 
 --
+-- Name: factories_url_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id);
+
+
+--
 -- Name: factory_work_orders_factory_id_number_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2539,10 +2963,17 @@ CREATE UNIQUE INDEX files_public_id_unique ON public.files USING btree (public_i
 
 
 --
--- Name: idx_account_linked_accounts_account_provider; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_linked_accounts_account_provider_identity; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.account_linked_accounts USING btree (account_id, provider);
+CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider_identity ON public.account_linked_accounts USING btree (account_id, provider, provider_id);
+
+
+--
+-- Name: idx_account_linked_accounts_active_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_linked_accounts_active_provider ON public.account_linked_accounts USING btree (account_id, provider) WHERE active;
 
 
 --
@@ -2711,6 +3142,13 @@ CREATE INDEX idx_casbin_rule_v1 ON public.casbin_rule USING btree (v1);
 --
 
 CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
+
+
+--
+-- Name: idx_datadog_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_datadog_webhook_receipts_received_at ON public.datadog_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -3099,6 +3537,13 @@ CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders
 
 
 --
+-- Name: idx_factory_work_orders_organization_state_result; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_organization_state_result ON public.factory_work_orders USING btree (organization_id, state, result);
+
+
+--
 -- Name: idx_factory_work_orders_source_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3138,6 +3583,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_linear_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_received_at ON public.linear_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -3194,6 +3646,13 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 --
 
 CREATE INDEX idx_sentry_app_install_grants_expires_at ON public.sentry_app_install_grants USING btree (expires_at);
+
+
+--
+-- Name: idx_sentry_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sentry_webhook_receipts_received_at ON public.sentry_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -3519,6 +3978,27 @@ CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (delete
 
 
 --
+-- Name: index_mcp_oauth_clients_on_client_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_clients_on_client_id ON public.mcp_oauth_clients USING btree (client_id);
+
+
+--
+-- Name: index_mcp_oauth_codes_on_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_codes_on_code_hash ON public.mcp_oauth_codes USING btree (code_hash);
+
+
+--
+-- Name: index_mcp_oauth_refresh_tokens_on_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_oauth_refresh_tokens_on_token_hash ON public.mcp_oauth_refresh_tokens USING btree (token_hash);
+
+
+--
 -- Name: index_organizations_on_created_by_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3628,6 +4108,83 @@ CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btre
 --
 
 CREATE UNIQUE INDEX usage_price_books_one_current ON public.usage_price_books USING btree ((true)) WHERE is_current;
+
+
+--
+-- Name: vcs_provider_bindings_organization_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_bindings_organization_installation_idx ON public.vcs_provider_integration_bindings USING btree (organization_id, provider, installation_id);
+
+
+--
+-- Name: vcs_provider_install_requests_requester_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_install_requests_requester_idx ON public.vcs_provider_install_requests USING btree (provider, requester_id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_installation_reconcile_jobs_due_idx ON public.vcs_provider_installation_reconcile_jobs USING btree (provider, run_at) WHERE (locked_at IS NULL);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters_organization_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_installation_reconcile_requesters_organization_idx ON public.vcs_provider_installation_reconcile_requesters USING btree (provider, organization_id);
+
+
+--
+-- Name: vcs_provider_installations_account_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX vcs_provider_installations_account_idx ON public.vcs_provider_installations USING btree (provider, account_id) WHERE (account_id IS NOT NULL);
+
+
+--
+-- Name: vcs_provider_integration_bindings_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_integration_bindings_installation_idx ON public.vcs_provider_integration_bindings USING btree (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_integration_repositories_repository_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_integration_repositories_repository_idx ON public.vcs_provider_integration_repositories USING btree (provider, repository_id);
+
+
+--
+-- Name: vcs_provider_repositories_full_name_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX vcs_provider_repositories_full_name_idx ON public.vcs_provider_repositories USING btree (provider, lower(full_name));
+
+
+--
+-- Name: vcs_provider_repositories_installation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_repositories_installation_idx ON public.vcs_provider_repositories USING btree (provider, installation_id);
+
+
+--
+-- Name: vcs_provider_repository_collaborators_user_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_repository_collaborators_user_idx ON public.vcs_provider_repository_collaborators USING btree (provider, provider_user_id);
+
+
+--
+-- Name: vcs_provider_repository_sync_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, priority DESC, run_at) WHERE (locked_at IS NULL);
 
 
 --
@@ -3778,6 +4335,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.canvas_subscriptions
     ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
+-- Name: factories factories_planning_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
 
 
 --
@@ -4229,6 +4794,14 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 
 --
+-- Name: factory_work_orders factory_work_orders_auto_start_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_orders
+    ADD CONSTRAINT factory_work_orders_auto_start_line_id_fkey FOREIGN KEY (auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_work_orders factory_work_orders_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4522,6 +5095,78 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_job_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
+    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_job_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installation_reconcile_jobs(provider, installation_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_installation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_bindings
+    ADD CONSTRAINT vcs_provider_integration_bindings_installation_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installations(provider, installation_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_bindings
+    ADD CONSTRAINT vcs_provider_integration_bindings_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_bindings
+    ADD CONSTRAINT vcs_provider_integration_bindings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_binding_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_binding_fkey FOREIGN KEY (integration_id) REFERENCES public.vcs_provider_integration_bindings(integration_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_integration_repositories vcs_provider_integration_repositories_repository_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_integration_repositories
+    ADD CONSTRAINT vcs_provider_integration_repositories_repository_fkey FOREIGN KEY (provider, repository_id) REFERENCES public.vcs_provider_repositories(provider, repository_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_repositories vcs_provider_repositories_installation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repositories
+    ADD CONSTRAINT vcs_provider_repositories_installation_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installations(provider, installation_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_repository_collaborators vcs_provider_repository_collaborators_repository_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repository_collaborators
+    ADD CONSTRAINT vcs_provider_repository_collaborators_repository_fkey FOREIGN KEY (provider, repository_id) REFERENCES public.vcs_provider_repositories(provider, repository_id) ON DELETE CASCADE;
+
+
+--
+-- Name: vcs_provider_repository_sync_jobs vcs_provider_repository_sync_jobs_repository_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_repository_sync_jobs
+    ADD CONSTRAINT vcs_provider_repository_sync_jobs_repository_fkey FOREIGN KEY (provider, repository_id) REFERENCES public.vcs_provider_repositories(provider, repository_id) ON DELETE CASCADE;
 
 
 --
@@ -4820,7 +5465,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260926140823	f
+20261002195100	f
 \.
 
 
@@ -4856,7 +5501,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260928151024	f
+20260925150940	f
 \.
 
 

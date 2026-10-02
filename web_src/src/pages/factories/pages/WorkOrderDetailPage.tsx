@@ -33,7 +33,7 @@ export function WorkOrderDetailPage() {
  */
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const location = useLocation();
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
@@ -45,9 +45,9 @@ export function LegacyWorkOrderDetailRedirect() {
   if (number) {
     // Carry the query string (e.g. `lineId`) so a bookmarked board line survives
     // the id-to-number redirect instead of falling back to the first line.
-    return <Navigate to={`${workOrderDetailPath(organizationId, factoryKey, number)}${location.search}`} replace />;
+    return <Navigate to={`${workOrderDetailPath(organizationId, routeSegment, number)}${location.search}`} replace />;
   }
-  return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
+  return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
 }
 
 export function WorkOrderDetailPanel({

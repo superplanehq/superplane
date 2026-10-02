@@ -13,6 +13,7 @@ export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
 export const CUSTOM_CATALOG_ID = "custom";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
+export const RISK_SCORE_CATALOG_ID = "risk-score";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -62,6 +63,18 @@ export const EVENT_CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   unique: false,
 };
 
+export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
+  id: RISK_SCORE_CATALOG_ID,
+  kind: "risk-score",
+  name: "Merge confidence",
+  description: "Score risk, performance, security, and drift on a pull request.",
+  trigger: "On pull request opened or updated",
+  action: "Score merge confidence",
+  iconSrc: "",
+  iconAlt: "",
+  unique: true,
+};
+
 export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   id: PR_CLOSURE_CATALOG_ID,
   kind: "pr-closure",
@@ -74,8 +87,12 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
-export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boolean }): ColumnAutomationCatalogEntry[] {
+export function catalogForColumn(
+  key: ColumnKey,
+  options?: { allowCustom?: boolean; allowRiskScore?: boolean },
+): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
+  const allowRiskScore = options?.allowRiskScore === true;
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -108,6 +125,7 @@ export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boole
           unique: true,
         };
       }),
+      ...(allowRiskScore ? [RISK_SCORE_ENTRY] : []),
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }

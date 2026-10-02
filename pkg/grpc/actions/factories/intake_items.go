@@ -14,9 +14,12 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -31,7 +34,9 @@ const (
 
 var (
 	errIntakeNotConnected       = errors.New("intake is not connected")
+	errIntakeConnectionBroken   = errors.New("intake connection failed")
 	errIntakeItemNotFound       = errors.New("intake item not found")
+	errLinearIssueFiles         = errors.New("linear issue files")
 	errIntakeSearchUnsupported  = errors.New("this intake cannot search items yet")
 	errIntakeRefreshUnsupported = errors.New("no intake supports backlog refresh")
 	intakeItemSourceByTrigger   = map[string]intakeItemSourceBuilder{}
@@ -57,6 +62,8 @@ func init() {
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
+	registerIntakeItemSource("datadog.onErrorTrackingAlert", newDatadogIntakeItemSource)
+	registerIntakeItemSource("linear.onIssue", newLinearIntakeItemSource)
 }
 
 type gitHubIntakeItemSource struct {
@@ -87,6 +94,17 @@ type productiveIntakeItemSource struct {
 type sentryIntakeItemSource struct {
 	sentry  *sentry.Client
 	project string
+}
+
+type datadogIntakeItemSource struct {
+	datadog *datadog.Client
+	service string
+}
+
+type linearIntakeItemSource struct {
+	linear     *linear.Client
+	projectIDs []string
+	labels     []string
 }
 
 type unsupportedIntakeItemSource struct{}
@@ -121,6 +139,10 @@ func newLiveIntakeItemSource(
 		settings := productiveIntakeSettings(tx, intake.CanvasID)
 		productiveSource.excludeKeyTasks = settings.ExcludeKeyTasks
 		productiveSource.taskListIDs = settings.TaskListIDs
+	}
+	if dependabotSource, ok := source.(*dependabotIntakeItemSource); ok {
+		settings := liveIntakeSettings(tx, models.FactoryIntakeSourceDependabotAlerts, intake.CanvasID, defaultDependabotIntakeSettings())
+		dependabotSource.severities = settings.DependabotSeverities
 	}
 	return source, nil
 }
@@ -286,21 +308,29 @@ func jiraIssueProjectKey(issueKey string) string {
 func jiraIssueItem(hit jira.IssueSearchHit, siteURL string) IntakeItem {
 	title := jiraIssueSummary(hit.Fields)
 	return IntakeItem{
-		ID:    hit.Key,
-		Key:   hit.Key,
-		Title: title,
-		URL:   jira.IssueURL(siteURL, hit.Key),
+		ID:        hit.Key,
+		Key:       hit.Key,
+		Title:     title,
+		URL:       jira.IssueURL(siteURL, hit.Key),
+		CreatedAt: jiraIssueCreatedTime(hit.Fields),
 	}
 }
 
 func jiraIssueFromFullIssue(issue *jira.Issue, siteURL string) IntakeItem {
 	return IntakeItem{
-		ID:    issue.Key,
-		Key:   issue.Key,
-		Title: jiraIssueSummary(issue.Fields),
-		Body:  jira.IssueDescriptionText(issue),
-		URL:   jira.IssueURL(siteURL, issue.Key),
+		ID:        issue.Key,
+		Key:       issue.Key,
+		Title:     jiraIssueSummary(issue.Fields),
+		Body:      jira.IssueDescriptionText(issue),
+		URL:       jira.IssueURL(siteURL, issue.Key),
+		CreatedAt: jiraIssueCreatedTime(issue.Fields),
 	}
+}
+
+func jiraIssueCreatedTime(fields map[string]any) time.Time {
+	raw, _ := fields["created"].(string)
+	createdAt, _ := jira.ParseJiraDateTime(raw)
+	return createdAt
 }
 
 func jiraIssueSummary(fields map[string]any) string {
@@ -386,6 +416,27 @@ func newSentryIntakeItemSource(
 	return &sentryIntakeItemSource{sentry: client, project: project}, nil
 }
 
+func newDatadogIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	service, _ := trigger.Configuration["service"].(string)
+	service = strings.TrimSpace(service)
+	if service == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeDatadogClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &datadogIntakeItemSource{datadog: client, service: service}, nil
+}
+
 func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
 	return nil, errIntakeSearchUnsupported
 }
@@ -444,9 +495,14 @@ func (s *gitHubIntakeItemSource) IsItemAvailable(ctx context.Context, id string)
 	return !strings.EqualFold(issue.GetState(), "closed"), nil
 }
 
+// dependabotIntakeItemSource lists one item per vulnerable package. GitHub
+// raises one alert per advisory per manifest, and one dependency update fixes
+// them all, so the picker and the import work on packages.
 type dependabotIntakeItemSource struct {
 	github     *common.Client
 	repository string
+	// Severities that still create a task. Empty means every severity.
+	severities []string
 }
 
 func newDependabotIntakeItemSource(
@@ -472,23 +528,14 @@ func newDependabotIntakeItemSource(
 
 func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
 	query = strings.ToLower(strings.TrimSpace(query))
-	var alerts []*github.DependabotAlert
-	var err error
-	if query == "" {
-		alerts, _, err = s.github.ListOpenDependabotAlerts(ctx, s.repository, limit)
-	} else {
-		alerts, err = s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
-	}
+	groups, err := s.packageGroups(ctx)
 	if err != nil {
-		return nil, ghdependabot.UnavailableError(err)
+		return nil, err
 	}
 
-	items := make([]IntakeItem, 0, len(alerts))
-	for _, alert := range alerts {
-		item, ok := dependabotAlertItem(alert)
-		if !ok {
-			continue
-		}
+	items := make([]IntakeItem, 0, len(groups))
+	for _, group := range groups {
+		item := dependabotPackageItem(group)
 		if query != "" && !strings.Contains(strings.ToLower(item.Title+" "+item.Body), query) {
 			continue
 		}
@@ -501,42 +548,109 @@ func (s *dependabotIntakeItemSource) Search(ctx context.Context, query string, l
 }
 
 func (s *dependabotIntakeItemSource) Get(ctx context.Context, id string) (*IntakeItem, error) {
-	number, err := strconv.Atoi(strings.TrimSpace(id))
-	if err != nil || number <= 0 {
-		return nil, errIntakeItemNotFound
-	}
-
-	alert, _, err := s.github.GetDependabotAlert(ctx, s.repository, number)
-	if err != nil {
-		if common.IsNotFoundError(err) {
-			return nil, errIntakeItemNotFound
-		}
-		return nil, ghdependabot.UnavailableError(err)
-	}
-
-	item, ok := dependabotAlertItem(alert)
+	ref, ok := dependabotPackageRefFromItemID(s.repository, id)
 	if !ok {
 		return nil, errIntakeItemNotFound
 	}
-	return &item, nil
+
+	groups, err := s.packageGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		if group.ref.Matches(ref) {
+			item := dependabotPackageItem(group)
+			return &item, nil
+		}
+	}
+	return nil, errIntakeItemNotFound
 }
 
-func dependabotAlertItem(alert *github.DependabotAlert) (IntakeItem, bool) {
+func (s *dependabotIntakeItemSource) packageGroups(ctx context.Context) ([]dependabotPackageGroup, error) {
+	alerts, err := s.github.ListAllOpenDependabotAlerts(ctx, s.repository)
+	if err != nil {
+		return nil, ghdependabot.UnavailableError(err)
+	}
+	return dependabotPackageGroups(s.repository, alerts, s.severities), nil
+}
+
+// dependabotPackageGroup is every open alert of one package, newest first.
+type dependabotPackageGroup struct {
+	ref    ghdependabot.PackageRef
+	alerts []*github.DependabotAlert
+}
+
+// dependabotPackageGroups folds open alerts into one group per package. It
+// keeps the order of first appearance, so a package with a newer alert
+// lists first. Alerts outside the configured severities are dropped.
+func dependabotPackageGroups(repository string, alerts []*github.DependabotAlert, severities []string) []dependabotPackageGroup {
+	groups := []dependabotPackageGroup{}
+	for _, alert := range alerts {
+		if !dependabotAlertImportable(alert, severities) {
+			continue
+		}
+		ref, ok := ghdependabot.PackageRefFromAlert(repository, alert)
+		if !ok {
+			continue
+		}
+		index := slices.IndexFunc(groups, func(group dependabotPackageGroup) bool {
+			return group.ref.Matches(ref)
+		})
+		if index < 0 {
+			groups = append(groups, dependabotPackageGroup{ref: ref})
+			index = len(groups) - 1
+		}
+		groups[index].alerts = append(groups[index].alerts, alert)
+	}
+	return groups
+}
+
+func dependabotAlertImportable(alert *github.DependabotAlert, severities []string) bool {
 	if alert == nil || alert.GetNumber() <= 0 || !strings.EqualFold(alert.GetState(), "open") {
-		return IntakeItem{}, false
+		return false
 	}
-	copy := ghdependabot.TaskCopyFromAlert(alert)
-	page := strings.TrimSpace(alert.GetHTMLURL())
-	if page == "" {
-		return IntakeItem{}, false
+	if strings.TrimSpace(alert.GetHTMLURL()) == "" {
+		return false
 	}
-	number := strconv.Itoa(alert.GetNumber())
+	if len(severities) == 0 {
+		return true
+	}
+	severity := ""
+	if alert.SecurityAdvisory != nil {
+		severity = strings.ToLower(strings.TrimSpace(alert.SecurityAdvisory.GetSeverity()))
+	}
+	return slices.Contains(severities, severity)
+}
+
+func dependabotPackageItem(group dependabotPackageGroup) IntakeItem {
+	copy := ghdependabot.TaskCopyFromAlerts(group.ref, group.alerts)
+	key := "1 alert"
+	if len(group.alerts) != 1 {
+		key = strconv.Itoa(len(group.alerts)) + " alerts"
+	}
 	return IntakeItem{
-		ID:    number,
-		Key:   "#" + number,
+		ID:    dependabotPackageItemID(group.ref),
+		Key:   key,
 		Title: copy.Title,
 		Body:  copy.Description,
-		URL:   page,
+		URL:   group.ref.OriginURL(),
+	}
+}
+
+// dependabotPackageItemID is `ecosystem:name`, such as `npm:lodash`.
+func dependabotPackageItemID(ref ghdependabot.PackageRef) string {
+	return ref.Ecosystem + ":" + ref.Name
+}
+
+func dependabotPackageRefFromItemID(repository, id string) (ghdependabot.PackageRef, bool) {
+	ecosystem, name, ok := strings.Cut(strings.TrimSpace(id), ":")
+	if !ok || strings.TrimSpace(name) == "" {
+		return ghdependabot.PackageRef{}, false
+	}
+	return ghdependabot.PackageRef{
+		Repository: repository,
+		Ecosystem:  strings.ToLower(strings.TrimSpace(ecosystem)),
+		Name:       strings.TrimSpace(name),
 	}, true
 }
 
@@ -703,15 +817,81 @@ func (s *sentryIntakeItemSource) ownsIssue(issue *sentry.Issue) bool {
 }
 
 func sentryIssueItem(issue sentry.Issue) IntakeItem {
+	createdAt, _ := time.Parse(time.RFC3339, issue.FirstSeen)
 	issueURL := strings.TrimSpace(issue.Permalink)
 	if issueURL == "" {
 		issueURL = strings.TrimSpace(issue.WebURL)
 	}
 	return IntakeItem{
-		ID:    issue.ID,
-		Key:   issue.ShortID,
-		Title: issue.Title,
-		URL:   issueURL,
+		ID:        issue.ID,
+		Key:       issue.ShortID,
+		Title:     issue.Title,
+		URL:       issueURL,
+		CreatedAt: createdAt,
+	}
+}
+
+func (s *datadogIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
+	issues, err := s.datadog.SearchErrorTrackingIssues(datadogServiceSearchQuery(s.service, query), limit)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(issues))
+	for _, issue := range issues {
+		if !s.ownsIssue(issue) {
+			continue
+		}
+		items = append(items, datadogIssueItem(s.datadog, issue))
+	}
+	return items, nil
+}
+
+func (s *datadogIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
+	issueID := strings.TrimSpace(id)
+	if issueID == "" {
+		return nil, errIntakeItemNotFound
+	}
+
+	issue, err := s.datadog.LoadErrorTrackingIssue(issueID, log.Warnf)
+	if err != nil {
+		return nil, err
+	}
+	if issue == nil || strings.TrimSpace(issue.ID) == "" || !s.ownsIssue(*issue) {
+		return nil, errIntakeItemNotFound
+	}
+
+	item := datadogIssueItem(s.datadog, *issue)
+	item.Body = datadog.DescribeErrorTrackingIssue(*issue, datadog.AlertDetails{})
+	if strings.TrimSpace(item.Body) == "" {
+		item.Body = item.Title
+	}
+	return &item, nil
+}
+
+func (s *datadogIntakeItemSource) ownsIssue(issue datadog.ErrorTrackingIssue) bool {
+	name := strings.TrimSpace(issue.Service)
+	return name != "" && strings.EqualFold(name, s.service)
+}
+
+func datadogServiceSearchQuery(service, query string) string {
+	service = strings.TrimSpace(service)
+	query = strings.TrimSpace(query)
+	scoped := "service:" + service
+	if query == "" {
+		return scoped
+	}
+	return scoped + " " + query
+}
+
+func datadogIssueItem(client *datadog.Client, issue datadog.ErrorTrackingIssue) IntakeItem {
+	return IntakeItem{
+		ID:        issue.ID,
+		Key:       issue.Service,
+		Title:     issue.IssueTitle(),
+		Body:      strings.TrimSpace(issue.ErrorMessage),
+		URL:       client.IssueURL(issue.ID),
+		CreatedAt: issue.FirstSeen,
 	}
 }
 
@@ -745,6 +925,11 @@ func resolveLiveIntakeTrigger(tx *gorm.DB, intake *models.FactoryIntake) (*model
 		return nil, nil, err
 	}
 	if integration.State != models.IntegrationStateReady {
+		if integration.State == models.IntegrationStateError {
+			if description := strings.TrimSpace(integration.StateDescription); description != "" {
+				return nil, nil, errors.Join(errIntakeConnectionBroken, errors.New(description))
+			}
+		}
 		return nil, nil, errIntakeNotConnected
 	}
 
@@ -767,11 +952,12 @@ func gitHubIssueItems(issues []*github.Issue, limit int) []IntakeItem {
 
 func gitHubIssueItem(issue *github.Issue) IntakeItem {
 	return IntakeItem{
-		ID:    strconv.Itoa(issue.GetNumber()),
-		Key:   fmt.Sprintf("#%d", issue.GetNumber()),
-		Title: issue.GetTitle(),
-		Body:  issue.GetBody(),
-		URL:   issue.GetHTMLURL(),
+		ID:        strconv.Itoa(issue.GetNumber()),
+		Key:       fmt.Sprintf("#%d", issue.GetNumber()),
+		Title:     issue.GetTitle(),
+		Body:      issue.GetBody(),
+		URL:       issue.GetHTMLURL(),
+		CreatedAt: issue.GetCreatedAt().Time,
 	}
 }
 

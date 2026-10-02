@@ -17,9 +17,11 @@ import (
 var extraRunnerComponents sync.Map
 
 const (
-	LiveLogStreamTokenPurpose  = "runner_live_logs"
-	LiveLogStreamTokenAudience = "task_broker"
-	liveLogStreamTokenTTL      = 5 * time.Minute
+	LiveLogStreamTokenPurpose       = "runner_live_logs"
+	LiveLogStreamTokenAudience      = "task_broker"
+	LiveLogErrorCodeHeader          = "X-Superplane-Error-Code"
+	LiveLogSessionNotReadyErrorCode = "live_log_session_not_ready"
+	liveLogStreamTokenTTL           = 5 * time.Minute
 )
 
 var (

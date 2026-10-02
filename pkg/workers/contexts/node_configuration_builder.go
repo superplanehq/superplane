@@ -104,7 +104,11 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
-	return b.applyLineDispatchOverrides(resolved)
+	resolved, err = b.applyLineDispatchOverrides(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return b.replaceClaudeModelAlias(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -1123,7 +1127,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 			return nil, fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
 		}
 		if usesURL {
-			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.Key)
+			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.RouteSegment())
 		}
 		if usesKey {
 			payload["key"] = owningFactory.WorkOrderKey(order.Number)
@@ -1226,9 +1230,6 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 }
 
 func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
-	if !workOrderRefinementEnabled(b.tx, order) {
-		return "", nil
-	}
 	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
 	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
 		return "", nil
@@ -1265,6 +1266,9 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 	if err != nil {
 		return fmt.Errorf("order() could not mint a file URL: %w", err)
 	}
+	// Local runner containers cannot fetch localhost file URLs. A remote
+	// broker skips this rewrite; public hosts stay unchanged.
+	_, files = runner.RewriteLoopbackTaskFileURLs("", files)
 
 	filePayloads := make([]any, 0, len(files))
 	for _, file := range files {
@@ -2303,6 +2307,74 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(
 
 	resolved["model"] = override
 	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]any) (map[string]any, error) {
+	model, _ := resolved["model"].(string)
+	if !models.IsClaudeFamilyAlias(model) {
+		return resolved, nil
+	}
+	candidates, err := b.claudeAliasCandidates(resolved)
+	if err != nil {
+		return nil, err
+	}
+	resolved["model"] = models.ConcreteClaudeModelID(model, candidates)
+	return resolved, nil
+}
+
+// claudeAliasCandidates lists models the executing node can run.
+// A Claude alias must not resolve to a model from another provider or funding source.
+func (b *NodeConfigurationBuilder) claudeAliasCandidates(resolved map[string]any) ([]string, error) {
+	if b.tx == nil || b.workflowID == uuid.Nil || b.nodeID == "" {
+		return nil, nil
+	}
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	provider, ok := claudeRunnerProvider(node.ComponentName())
+	if !ok {
+		return nil, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return models.ResolveSelectableLLMModels(
+		b.tx,
+		canvas.OrganizationID,
+		canvas.FactoryID,
+		provider,
+		llmFundingSource(resolved),
+	)
+}
+
+func claudeRunnerProvider(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func llmFundingSource(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }
 
 func applyLineDispatchThinking(resolved map[string]any, dispatchThinking string) map[string]any {

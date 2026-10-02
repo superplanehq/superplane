@@ -2,9 +2,12 @@ package factories
 
 import (
 	"context"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -62,6 +65,36 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	active, err := order.FindActiveLineDispatch(db)
 	require.NoError(t, err)
 	assert.Equal(t, dispatch.Id, active.ID.String())
+}
+
+func Test__DispatchWorkOrder__ClearsAutoStartLine(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Ship it", "", &r.User, nil, nil, &line.ID)
+	require.NoError(t, err)
+	require.NotNil(t, order.AutoStartLineID)
+
+	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Order.GetAutoStartLineId())
+
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Nil(t, reloaded.AutoStartLineID)
 }
 
 func Test__DispatchWorkOrder__CompletesActiveAnalysisRun(t *testing.T) {
@@ -432,4 +465,303 @@ func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
+func Test__DispatchWorkOrder__FillsMissingTitleBeforeStart(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	longLine := strings.Repeat("a", 300)
+	skippedLead := "\n\n  ![shot](sp-file://abc)\nnull\nUntitled task\nn/a\n"
+	tests := []struct {
+		name        string
+		title       string
+		description string
+		wantTitle   string
+	}{
+		{
+			name:        "empty title",
+			title:       "",
+			description: "Refunds fail on retry.\n\nMore context.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "null",
+			title:       "null",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "unknown",
+			title:       "unknown",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "Unknown",
+			title:       "Unknown",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "quoted null",
+			title:       `"null"`,
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "n/a",
+			title:       "n/a",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "quoted null with trailing punctuation",
+			title:       `"null."`,
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "meaningful title stays",
+			title:       "Ship the retry fix",
+			description: "A different first line.",
+			wantTitle:   "Ship the retry fix",
+		},
+		{
+			name:        "null pointer stays",
+			title:       "null pointer",
+			description: "A different first line.",
+			wantTitle:   "null pointer",
+		},
+		{
+			name:        "skips blank image and placeholder lines",
+			title:       "",
+			description: skippedLead + "Fix the checkout retry.",
+			wantTitle:   "Fix the checkout retry.",
+		},
+		{
+			name:        "heading line",
+			title:       "",
+			description: "## Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "fully wrapped emphasis",
+			title:       "null",
+			description: "## **Refunds fail on retry.**",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "collapses whitespace",
+			title:       "",
+			description: "Refunds   fail\ton retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "cuts a long derived title",
+			title:       "unknown",
+			description: longLine + "\nMore context.",
+			wantTitle:   longLine[:workOrderTitleMaxLength],
+		},
+		{
+			name:        "untitled task is still a placeholder",
+			title:       "Untitled task",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "skips a list placeholder",
+			title:       "null",
+			description: "- n/a\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "skips an attachment file link",
+			title:       "unknown",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)\nRefunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+		{
+			name:        "attachment only becomes untitled task",
+			title:       "",
+			description: "[notes.pdf](sp-file://aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee)",
+			wantTitle:   untitledWorkOrderTitle,
+		},
+		{
+			name:        "no real description line",
+			title:       "",
+			description: skippedLead,
+			wantTitle:   untitledWorkOrderTitle,
+		},
+		{
+			name:        "title with no letter or digit",
+			title:       "???",
+			description: "Refunds fail on retry.",
+			wantTitle:   "Refunds fail on retry.",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			order, err := factoryModel.CreateWorkOrder(db, "Seed title", tc.description, &r.User, nil, nil)
+			require.NoError(t, err)
+			title := tc.title
+			require.NoError(t, order.UpdateContent(db, &title, nil))
+
+			resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+				FactoryId: factoryModel.ID.String(),
+				OrderId:   order.ID.String(),
+				LineName:  line.Name,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTitle, resp.Order.Title)
+			require.NotEmpty(t, resp.Order.LineDispatches)
+			assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, resp.Order.LineDispatches[0].State)
+
+			reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantTitle, reloaded.Title)
+			assert.Equal(t, tc.description, reloaded.Description)
+			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+		})
+	}
+}
+
+func Test__DispatchWorkOrder__ReplaceActiveLogsAdmittedRunOnItsOrder(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	logs := capturePublishedRunLogs(t)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	limit := 1
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit},
+	})
+	require.NoError(t, err)
+
+	running, err := factoryModel.CreateWorkOrder(db, "Running", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	queued, err := factoryModel.CreateWorkOrder(db, "Queued", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   running.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   queued.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+
+	var queuedBefore int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderExecution{}).Where("work_order_id = ?", queued.ID).Count(&queuedBefore).Error)
+	require.Zero(t, queuedBefore, "the second order must wait for the step slot")
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId:     factoryModel.ID.String(),
+		OrderId:       running.ID.String(),
+		LineName:      line.Name,
+		ReplaceActive: true,
+	})
+	require.NoError(t, err)
+
+	var admitted models.FactoryWorkOrderExecution
+	require.NoError(t, db.Where("work_order_id = ?", queued.ID).First(&admitted).Error)
+	require.NotNil(t, admitted.RunID)
+
+	orderID, ok := logs.orderIDForRun(*admitted.RunID)
+	require.True(t, ok, "replacing a dispatch must log the admitted run")
+	assert.Equal(t, queued.ID, orderID)
+}
+
+type publishedRunLogHook struct {
+	mu      sync.Mutex
+	entries []map[string]any
+}
+
+func (h *publishedRunLogHook) Levels() []log.Level {
+	return []log.Level{log.InfoLevel, log.ErrorLevel}
+}
+
+func (h *publishedRunLogHook) Fire(entry *log.Entry) error {
+	if !strings.Contains(entry.Message, "pending canvas run") {
+		return nil
+	}
+
+	copied := make(map[string]any, len(entry.Data))
+	for key, value := range entry.Data {
+		copied[key] = value
+	}
+
+	h.mu.Lock()
+	h.entries = append(h.entries, copied)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *publishedRunLogHook) orderIDForRun(runID uuid.UUID) (uuid.UUID, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for _, entry := range h.entries {
+		loggedRun, ok := uuidField(entry["run_id"])
+		if !ok || loggedRun != runID {
+			continue
+		}
+		orderID, ok := uuidField(entry["order_id"])
+		return orderID, ok
+	}
+
+	return uuid.Nil, false
+}
+
+func capturePublishedRunLogs(t *testing.T) *publishedRunLogHook {
+	t.Helper()
+
+	hook := &publishedRunLogHook{}
+	logger := log.StandardLogger()
+	previous := logger.ReplaceHooks(make(log.LevelHooks))
+	for _, hooks := range previous {
+		for _, existing := range hooks {
+			logger.AddHook(existing)
+		}
+	}
+	logger.AddHook(hook)
+	t.Cleanup(func() {
+		logger.ReplaceHooks(previous)
+	})
+	return hook
+}
+
+func uuidField(value any) (uuid.UUID, bool) {
+	switch typed := value.(type) {
+	case uuid.UUID:
+		return typed, typed != uuid.Nil
+	case string:
+		parsed, err := uuid.Parse(typed)
+		if err != nil || parsed == uuid.Nil {
+			return uuid.Nil, false
+		}
+		return parsed, true
+	default:
+		return uuid.Nil, false
+	}
 }

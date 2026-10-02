@@ -1,8 +1,8 @@
 import { Text } from "@/components/Text/text";
-import { Building, Palette, User } from "lucide-react";
+import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import { formatDate } from "./formatDate";
@@ -11,13 +11,14 @@ import { SortableHeader, type SortDirection } from "./SortableHeader";
 interface AdminOrganization {
   id: string;
   name: string;
-  description: string;
   canvas_count: number;
+  task_count: number;
+  done_task_count: number;
   member_count: number;
   created_at?: string;
 }
 
-type SortField = "canvas_count" | "created_at" | "member_count" | "name";
+type SortField = "canvas_count" | "created_at" | "done_task_count" | "member_count" | "name" | "task_count";
 
 const PAGE_SIZE = 50;
 
@@ -28,7 +29,13 @@ interface OrganizationsTableProps {
   onSort: (field: SortField) => void;
 }
 
+function organizationPath(orgId: string): string {
+  return `/admin/organizations/${orgId}`;
+}
+
 function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
@@ -41,10 +48,23 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Description</th>
             <SortableHeader
-              label="Canvases"
+              label="Automations"
               field="canvas_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Tasks"
+              field="task_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Done Tasks"
+              field="done_task_count"
               currentSort={sortBy}
               currentDirection={sortDirection}
               onSort={onSort}
@@ -69,12 +89,21 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
           {organizations.map((org) => (
             <tr
               key={org.id}
-              className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+              className="relative cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+              onClick={(event) => {
+                const path = organizationPath(org.id);
+                if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                  window.open(path, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                navigate(path);
+              }}
             >
               <td className="px-4 py-2.5">
                 <Link
-                  to={`/admin/organizations/${org.id}`}
-                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium dark:text-gray-100 dark:hover:text-blue-400"
+                  to={organizationPath(org.id)}
+                  onClick={(event) => event.stopPropagation()}
+                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium before:absolute before:inset-0 before:z-10 before:content-[''] dark:text-gray-100 dark:hover:text-blue-400"
                 >
                   <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
                   {org.name || (
@@ -84,13 +113,22 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
                   )}
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-gray-500 max-w-xs truncate dark:text-gray-400">
-                {org.description || <span className="text-gray-300 dark:text-gray-600">—</span>}
-              </td>
               <td className="px-4 py-2.5">
                 <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                   <Palette size={13} />
                   {org.canvas_count}
+                </span>
+              </td>
+              <td className="px-4 py-2.5">
+                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                  <ClipboardList size={13} />
+                  {org.task_count}
+                </span>
+              </td>
+              <td className="px-4 py-2.5">
+                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                  <CircleCheck size={13} />
+                  {org.done_task_count}
                 </span>
               </td>
               <td className="px-4 py-2.5">
@@ -175,7 +213,7 @@ const OrganizationsList: React.FC = () => {
         subtitle={`${total} organization${total !== 1 ? "s" : ""} across this installation`}
         search={search}
         onSearchChange={setSearch}
-        placeholder="Search organizations..."
+        placeholder="Search by name or ID..."
       />
       {organizations.length === 0 ? (
         <div className="text-center py-12">

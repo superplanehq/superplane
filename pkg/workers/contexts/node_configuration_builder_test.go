@@ -503,7 +503,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	t.Run("permalink back to the work order", func(t *testing.T) {
 		expectedSuffix := fmt.Sprintf(
 			"/%s/workspaces/%s/work-order/%d",
-			r.Organization.ID.String(), factoryModel.Key, order.Number,
+			r.Organization.ID.String(), factoryModel.RouteSegment(), order.Number,
 		)
 
 		url, err := builder.ResolveExpression(`order().url`)
@@ -686,7 +686,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	})
 }
 
-func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T) {
+func Test_NodeConfigurationBuilder_OrderSpecReadsStoredArtifact(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -714,15 +714,7 @@ func Test_NodeConfigurationBuilder_OrderSpecRespectsRefinementFlag(t *testing.T)
 
 	spec, err := builder.ResolveExpression(`task().spec`)
 	require.NoError(t, err)
-	assert.Equal(t, "", spec)
-
-	payload, err := builder.ResolveExpression(`order()`)
-	require.NoError(t, err)
-	orderPayload, ok := payload.(map[string]any)
-	require.True(t, ok)
-	assert.NotContains(t, orderPayload, "spec")
-
-	require.NoError(t, factoryModel.UpdatePlanning(database.Conn(), models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+	assert.Equal(t, "# Retry refunds\n\n## Executive summary\n\nStop double charges.", spec)
 
 	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
 		Type: models.FactoryWorkOrderArtifactTypeMarkdown,

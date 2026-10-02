@@ -3,6 +3,7 @@ package factories
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -31,17 +33,17 @@ func ImportFactoryIntakeItem(
 ) (*pb.ImportFactoryIntakeItemResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	intakeID, err := parseIntakeID(req.GetIntakeId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	itemID := strings.TrimSpace(req.GetItemId())
 	if itemID == "" {
-		return nil, factoryErrorToStatus(invalidArgument("item id is required"), "failed to import factory intake item")
+		return nil, intakeErrorToStatus(invalidArgument("item id is required"), "failed to import factory intake item")
 	}
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -50,31 +52,31 @@ func ImportFactoryIntakeItem(
 	}
 	createdByID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to import factory intake item")
+		return nil, intakeErrorToStatus(invalidArgument("invalid user id"), "failed to import factory intake item")
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	intake, err := factory.FindIntake(db, intakeID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	source, err := deps.itemSource(ctx, db, intake)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	item, err := source.Get(ctx, itemID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
-	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
+	origin := models.OriginFromImportedIntakeItem(item.URL, item.Title)
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -161,6 +163,33 @@ func ImportFactoryIntakeItem(
 				}
 			}
 		}
+		if reader, ok := source.(interface {
+			IssueFiles(context.Context, string, string) ([]linear.IssueFile, []linear.IssueLink, error)
+		}); ok {
+			issueFiles, links, readErr := reader.IssueFiles(ctx, item.ID, body)
+			if readErr != nil {
+				return errors.Join(errLinearIssueFiles, readErr)
+			}
+			body = linear.DescriptionWithLinks(body, links)
+			if len(issueFiles) > 0 {
+				ingested, ingestErr := storedfiles.AppendTaskFiles(
+					ctx,
+					tx,
+					blob.Current(),
+					orgID,
+					factory.ID,
+					order.ID,
+					&createdByID,
+					body,
+					incomingLinearFiles(issueFiles),
+				)
+				bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
+				if ingestErr != nil {
+					return errors.Join(errLinearIssueFiles, ingestErr)
+				}
+				body = ingested.Markdown
+			}
+		}
 		if body != order.Description {
 			if err := order.UpdateContent(tx, nil, &body); err != nil {
 				return err
@@ -175,7 +204,7 @@ func ImportFactoryIntakeItem(
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)
@@ -190,10 +219,23 @@ func ImportFactoryIntakeItem(
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+		return nil, intakeErrorToStatus(err, "failed to import factory intake item")
 	}
 
 	return &pb.ImportFactoryIntakeItemResponse{Order: serialized}, nil
+}
+
+func incomingLinearFiles(files []linear.IssueFile) []storedfiles.IncomingFile {
+	incoming := make([]storedfiles.IncomingFile, 0, len(files))
+	for _, file := range files {
+		incoming = append(incoming, storedfiles.IncomingFile{
+			Filename:    file.Name,
+			ContentType: file.ContentType,
+			Body:        bytes.NewReader(file.Body),
+			ReplaceURLs: file.ReplaceURLs,
+		})
+	}
+	return incoming
 }
 
 func incomingJiraFiles(files []jira.IssueFile) []storedfiles.IncomingFile {

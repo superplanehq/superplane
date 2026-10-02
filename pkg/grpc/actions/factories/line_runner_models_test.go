@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -74,6 +75,39 @@ func Test__ListLineRunnerModels__OpenRouterLineUsesOpenRouterIds(t *testing.T) {
 	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6", "openai/gpt-5"}, ids)
 }
 
+func Test__ListLineRunnerModels__CustomProviderUsesItsAllowlistOnOpenCode(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenRouter, datatypes.JSONSlice[string]{"openrouter-only"})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{"zeta-model", "alpha-model"})
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerOpenRouter, "integration", "zeta-model")
+	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	for i := range live.Nodes {
+		if live.Nodes[i].ID != "agent" {
+			continue
+		}
+		live.Nodes[i].Configuration["llmProvider"] = models.UsageProviderCustom
+	}
+	require.NoError(t, db.Save(live).Error)
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"alpha-model", "zeta-model"}, ids)
+	assert.NotContains(t, ids, "openrouter-only")
+}
+
 func Test__ListLineRunnerModels__MixedLineUnionsProviders(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -111,7 +145,7 @@ func Test__ListLineRunnerModels__IncludesCanvasModelsWhenAllowlistEmpty(t *testi
 
 	ids, err := listLineRunnerModels(db, r.Organization.ID, factoryModel.ID, "ship")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"opus", "sonnet"}, ids)
+	assert.Equal(t, []string{"claude-opus-5-5", "claude-sonnet-4-6"}, ids)
 }
 
 func Test__ListLineRunnerModels__SuperPlaneLineUsesHostedSelectableKeys(t *testing.T) {
@@ -144,8 +178,8 @@ func Test__SerializeLineRunnerModels__NamesHostedSelectableKeys(t *testing.T) {
 	require.Len(t, modelsProto, 2)
 	assert.Equal(t, "hosted::openrouter::x-ai/grok-4.6", modelsProto[0].GetId())
 	assert.Equal(t, "x-ai/grok-4.6", modelsProto[0].GetName())
-	assert.Equal(t, "opus", modelsProto[1].GetId())
-	assert.Equal(t, "opus", modelsProto[1].GetName())
+	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetId())
+	assert.Equal(t, "claude-opus-5-5", modelsProto[1].GetName())
 }
 
 func Test__ListLineRunnerModels__NoRunnerNodesReturnsEmpty(t *testing.T) {

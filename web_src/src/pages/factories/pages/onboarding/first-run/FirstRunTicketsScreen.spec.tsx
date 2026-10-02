@@ -4,19 +4,6 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
-import { JIRA_COMPLETION_COLUMN_COPY } from "../../jiraCompletionColumnCopy";
-
-vi.mock("@/hooks/useIntegrations", () => ({
-  useIntegrationResources: () => ({
-    data: [
-      { id: "todo", name: "To Do" },
-      { id: "qa", name: "QA" },
-      { id: "done", name: "Done" },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
-}));
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -80,24 +67,59 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
 
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
   });
 
-  it("hides Jira and keeps GitHub Issues and Linear when Jira is unavailable", () => {
+  it("shows Jira and Linear as coming soon when Jira is unavailable", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
     render(
       <FirstRunTicketsScreen
         ticketSource={null}
-        onSelectTicketSource={vi.fn()}
+        onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={vi.fn()}
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
+  });
+
+  it("does not mark Jira as coming soon while the feature lookup is loading", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        jiraFeatureLoading
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={vi.fn()}
+        onConnectJira={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
+    expect(onSelectTicketSource).not.toHaveBeenCalled();
   });
 
   it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
@@ -115,7 +137,8 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-projects")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,
@@ -130,6 +153,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
+        jiraFeatureLoading
         jiraChoiceBlock="loading"
         jiraConnected
         jiraProjectId="PAY"
@@ -141,6 +165,103 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupLoading,
     );
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
+  it("lets the user select Linear when the feature is on and keeps scan stopped until a project is chosen", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+    const onConnectLinear = vi.fn();
+    const onToggleLinearProject = vi.fn();
+    const onAnalyzeTickets = vi.fn();
+
+    const { rerender } = render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        linearAvailable
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onConnectLinear={onConnectLinear}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Connect Linear" }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("linear");
+    expect(onConnectLinear).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjects={[{ id: "project-1", name: "Platform" }]}
+        linearProjectIds={[]}
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearProjectHeading)).toBeInTheDocument();
+    await user.click(screen.getByTestId("linear-project-project-1"));
+    expect(onToggleLinearProject).toHaveBeenCalledWith("project-1");
+
+    rerender(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjects={[{ id: "project-1", name: "Platform" }]}
+        linearProjectIds={["project-1"]}
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    const analyze = screen.getByTestId("first-run-analyze-tickets");
+    expect(analyze).toBeEnabled();
+    await user.click(analyze);
+    expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps scan stopped while Linear projects are still loading", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjectsLoading
+        linearProjectIds={["project-gone"]}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
+  it("keeps scan stopped when Linear projects fail to load", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjectsError
+        linearProjectIds={["project-gone"]}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
@@ -170,8 +291,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -191,8 +310,6 @@ describe("FirstRunTicketsScreen", () => {
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onSelectJiraProject={onSelectJiraProject}
@@ -235,8 +352,6 @@ describe("FirstRunTicketsScreen", () => {
           { id: "CORE", name: "Core" },
         ]}
         jiraProjectId="PAY"
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
         onSelectJiraProject={onSelectJiraProject}
@@ -260,32 +375,20 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue })).toBeEnabled();
   });
 
-  it("shows the completion column after a Jira project is chosen", async () => {
-    const user = userEvent.setup();
-    const onJiraCompletionChange = vi.fn();
-
+  it("does not show the completion column setting after a Jira project is selected", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
         jiraAvailable
         jiraConnected
-        organizationId="org-1"
-        jiraIntegrationId="jira-1"
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
-        onJiraCompletionChange={onJiraCompletionChange}
       />,
     );
 
-    expect(screen.getByTestId("jira-completion-column")).toBeInTheDocument();
-    expect(screen.getByText(JIRA_COMPLETION_COLUMN_COPY.section)).toBeInTheDocument();
-    expect(screen.getByTestId("jira-move-on-complete")).toBeChecked();
-    await user.click(screen.getByTestId("jira-move-on-complete"));
-    expect(onJiraCompletionChange).toHaveBeenCalledWith({
-      jiraMoveOnComplete: false,
-      jiraCompletionColumn: "",
-    });
+    expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
+    expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
   });
 });

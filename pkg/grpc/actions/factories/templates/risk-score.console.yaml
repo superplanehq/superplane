@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Merge confidence
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: About this app
+        body: |
+          > [!SECTION:setup] Merge confidence
+          >
+          > This app is not a factory line step. It listens for pull request
+          > events on the app repository.
+          >
+          > When a pull request opens or updates on the default branch:
+          > - The app reviews the diff.
+          > - It scores only the checks you turn on.
+          > - Risk, performance, security, and drift are stored on the task.
+  layout:
+    - i: about
+      x: 0
+      'y': 0
+      w: 12
+      h: 6
+      minW: 3
+      minH: 5

@@ -43,5 +43,12 @@ export function useSplitRunLiveCanvas(organizationId: string | undefined, phase:
     [canvasQuery.data, runQuery.data?.run],
   );
 
-  return { enabled, isError, isLoading, canvas, stream };
+  return {
+    enabled,
+    isError,
+    isLoading,
+    canvas,
+    stream,
+    rootEventId: runQuery.data?.run?.rootEvent?.id,
+  };
 }

@@ -33,6 +33,7 @@ type InstallationGrant struct {
 	Code    string
 	UUID    string
 	OrgSlug string
+	OrgID   string
 }
 
 type sentryAppAuthorizationResponse struct {
@@ -205,9 +206,7 @@ func (s *Sentry) adoptHostedInstall(
 	bound.SetupReturnPath = metadata.SetupReturnPath
 	bound.TokenExpiresAt = tokens.ExpiresAt
 	ctx.Integration.SetMetadata(bound)
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-	return nil
+	return s.markHostedInstallReady(ctx)
 }
 
 func tokensForKnownHostedInstall(httpCtx core.HTTPContext, app HostedApp, install hostedSentryInstall) (*sentryAppAuthorizationResponse, error) {
@@ -469,7 +468,8 @@ func ParseInstallationCreatedGrant(resource string, body []byte) (InstallationGr
 				Code         string `json:"code"`
 				UUID         string `json:"uuid"`
 				Organization struct {
-					Slug string `json:"slug"`
+					Slug string     `json:"slug"`
+					ID   jsonString `json:"id"`
 				} `json:"organization"`
 			} `json:"installation"`
 		} `json:"data"`
@@ -488,6 +488,7 @@ func ParseInstallationCreatedGrant(resource string, body []byte) (InstallationGr
 		Code:    strings.TrimSpace(payload.Data.Installation.Code),
 		UUID:    firstNonEmpty(strings.TrimSpace(payload.Data.Installation.UUID), strings.TrimSpace(payload.Installation.UUID)),
 		OrgSlug: strings.TrimSpace(payload.Data.Installation.Organization.Slug),
+		OrgID:   strings.TrimSpace(string(payload.Data.Installation.Organization.ID)),
 	}
 	if grant.UUID == "" {
 		return InstallationGrant{}, false

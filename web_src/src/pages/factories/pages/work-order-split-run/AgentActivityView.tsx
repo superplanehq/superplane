@@ -6,26 +6,65 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
 
 import type { AgentActivity, AgentActivityItem, AgentContentItem, AgentToolItem } from "./agentActivity";
+import { CommandLine } from "./AgentCommandLine";
 import { AnimatedThinkingState } from "./AnimatedThinkingState";
 import {
   activitySummaryLabel,
   completedActivitySummaryLabel,
+  flattenCommandToolGroups,
   groupToolRuns,
   type ToolActivityGroup,
 } from "./agentActivitySummary";
+import { isThinkingPlaceholder } from "./streamNotesFromLiveLog";
 
-export function AgentActivityView({ activity, live = false }: { activity: AgentActivity; live?: boolean }) {
-  const entries = visibleActivityItems(activity.items, live);
+const COMMAND_CLASSNAME =
+  "whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-foreground/90 [tab-size:2]";
+
+export function AgentActivityView({
+  activity,
+  live = false,
+  collapseCompleted = true,
+  collapseReasoning = true,
+  expandableCommands = false,
+  tone = "chat",
+}: {
+  activity: AgentActivity;
+  live?: boolean;
+  /** Refinement chat folds a finished turn. The run console keeps the full transcript. */
+  collapseCompleted?: boolean;
+  /** Analysis folds a finished thought. The run console keeps the thought text open. */
+  collapseReasoning?: boolean;
+  /** Finished console command rows. The run console uses this for live and settled steps. */
+  expandableCommands?: boolean;
+  /** `log` matches finished console type color. `chat` is the refinement thread. */
+  tone?: "chat" | "log";
+}) {
+  const entries = visibleActivityItems(activity.items, live, !collapseCompleted);
   if (entries.length === 0 && !activity.truncated) return null;
 
   const tools = activity.items.filter((item): item is AgentToolItem => item.type === "tool");
-  if (!live && tools.length > 0) {
-    return <CompletedActivity activity={activity} entries={entries} tools={tools} />;
+  if (!live && collapseCompleted && tools.length > 0) {
+    return (
+      <CompletedActivity
+        activity={activity}
+        entries={entries}
+        tools={tools}
+        tone={tone}
+        collapseReasoning={collapseReasoning}
+        expandableCommands={expandableCommands}
+      />
+    );
   }
 
   return (
     <div className="space-y-0 px-2" data-testid={`agent-activity-${activity.id}`}>
-      <ActivityEntries entries={entries} truncated={activity.truncated} />
+      <ActivityEntries
+        entries={entries}
+        truncated={activity.truncated}
+        tone={tone}
+        collapseReasoning={collapseReasoning}
+        expandableCommands={expandableCommands}
+      />
     </div>
   );
 }
@@ -34,10 +73,16 @@ function CompletedActivity({
   activity,
   entries,
   tools,
+  tone,
+  collapseReasoning,
+  expandableCommands,
 }: {
   activity: AgentActivity;
   entries: AgentActivityItem[];
   tools: AgentToolItem[];
+  tone: "chat" | "log";
+  collapseReasoning: boolean;
+  expandableCommands: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const label = completedActivitySummaryLabel(tools);
@@ -52,7 +97,13 @@ function CompletedActivity({
       />
       {open ? (
         <div className="space-y-0.5" data-testid={`agent-activity-details-${activity.id}`}>
-          <ActivityEntries entries={entries} truncated={activity.truncated} />
+          <ActivityEntries
+            entries={entries}
+            truncated={activity.truncated}
+            tone={tone}
+            collapseReasoning={collapseReasoning}
+            expandableCommands={expandableCommands}
+          />
         </div>
       ) : null}
     </div>
@@ -63,29 +114,42 @@ function ActivityEntries({
   entries,
   truncated,
   groupTools = true,
+  tone = "chat",
+  collapseReasoning = true,
+  expandableCommands = false,
 }: {
   entries: AgentActivityItem[];
   truncated: boolean;
   groupTools?: boolean;
+  tone?: "chat" | "log";
+  collapseReasoning?: boolean;
+  expandableCommands?: boolean;
 }) {
-  const displayEntries = groupTools ? groupToolRuns(entries) : entries;
+  const grouped = groupTools ? groupToolRuns(entries) : entries;
+  const displayEntries = groupTools && tone === "log" ? flattenCommandToolGroups(grouped) : grouped;
   return (
     <>
       {displayEntries.map((item) => {
         if (item.type === "tool_activity_group") {
-          return <ToolGroup key={item.id} group={item} />;
+          return <ToolGroup key={item.id} group={item} tone={tone} expandableCommands={expandableCommands} />;
         }
         if (item.type === "tool") {
-          return <ToolLine key={item.id} tool={item} />;
+          return <ToolLine key={item.id} tool={item} tone={tone} expandableCommands={expandableCommands} />;
         }
         if (item.type === "content") {
           if (item.kind === "assistant") {
-            return <AssistantContent key={item.id} item={item} />;
+            return <AssistantContent key={item.id} item={item} tone={tone} />;
           }
-          return <ReasoningContent key={item.id} item={item} />;
+          return <ReasoningContent key={item.id} item={item} collapseReasoning={collapseReasoning} />;
         }
         return (
-          <p key={item.id} className="px-2 py-1 text-[12px] leading-5 text-muted-foreground">
+          <p
+            key={item.id}
+            className={cn(
+              "px-2 py-1 text-[13px] leading-5",
+              tone === "log" ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
             {item.text}
           </p>
         );
@@ -97,7 +161,15 @@ function ActivityEntries({
   );
 }
 
-function ToolGroup({ group }: { group: ToolActivityGroup }) {
+function ToolGroup({
+  group,
+  tone,
+  expandableCommands,
+}: {
+  group: ToolActivityGroup;
+  tone: "chat" | "log";
+  expandableCommands: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const label = activitySummaryLabel(group.tools);
   const running = group.tools.some((tool) => tool.status === "running");
@@ -113,7 +185,7 @@ function ToolGroup({ group }: { group: ToolActivityGroup }) {
       {open ? (
         <div className="space-y-0.5" data-testid={`${group.id}-details`}>
           {group.tools.map((tool) => (
-            <ToolLine key={tool.id} tool={tool} />
+            <ToolLine key={tool.id} tool={tool} tone={tone} expandableCommands={expandableCommands} />
           ))}
         </div>
       ) : null}
@@ -151,16 +223,43 @@ function ActivitySummaryButton({
   );
 }
 
-function ToolLine({ tool }: { tool: AgentToolItem }) {
-  if (isCommandTool(tool)) {
-    return <CommandLine tool={tool} />;
+function ToolLine({
+  tool,
+  tone,
+  expandableCommands,
+}: {
+  tool: AgentToolItem;
+  tone: "chat" | "log";
+  expandableCommands: boolean;
+}) {
+  const command = isCommandTool(tool);
+  const line = command ? (
+    <CommandLine tool={tool} expandable={expandableCommands} showOutput={tone === "log"} />
+  ) : (
+    <ToolLabel tool={tool} tone={tone} />
+  );
+  if (tone !== "log" || command) {
+    return line;
   }
+  const output = tool.output.trim();
+  if (!output) {
+    return line;
+  }
+  return (
+    <div>
+      {line}
+      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{output}</pre>
+    </div>
+  );
+}
 
+function ToolLabel({ tool, tone }: { tool: AgentToolItem; tone: "chat" | "log" }) {
   const label = agentToolDisplayText(tool);
   return (
     <div
       className={cn(
-        "sp-tool-enter flex min-w-0 items-baseline gap-2 px-1 py-0.5 text-[12px] leading-5 text-muted-foreground",
+        "sp-tool-enter flex min-w-0 items-baseline gap-2 px-1 py-0.5 text-[12px] leading-5",
+        tone === "log" ? "text-foreground/90" : "text-muted-foreground",
         failedTool(tool) && "text-destructive",
       )}
       data-testid={`agent-tool-${tool.id}`}
@@ -173,27 +272,8 @@ function ToolLine({ tool }: { tool: AgentToolItem }) {
   );
 }
 
-function CommandLine({ tool }: { tool: AgentToolItem }) {
-  const command = agentToolDisplayText(tool);
-  return (
-    <div className="flex min-w-0 items-center px-1 py-0.5">
-      <code
-        className={cn(
-          "block min-w-0 flex-1 truncate font-mono text-[12px] leading-5 whitespace-nowrap text-muted-foreground",
-          failedTool(tool) && "text-destructive",
-        )}
-        data-testid={`agent-tool-${tool.id}`}
-        data-status={tool.status}
-        title={command}
-      >
-        {command}
-      </code>
-    </div>
-  );
-}
-
-function visibleActivityItems(items: AgentActivityItem[], live: boolean): AgentActivityItem[] {
-  return items.filter((item, index) => isVisibleActivityItem(item, index, items, live));
+function visibleActivityItems(items: AgentActivityItem[], live: boolean, keepAssistant: boolean): AgentActivityItem[] {
+  return items.filter((item, index) => isVisibleActivityItem(item, index, items, live, keepAssistant));
 }
 
 function isVisibleActivityItem(
@@ -201,18 +281,23 @@ function isVisibleActivityItem(
   index: number,
   items: AgentActivityItem[],
   live: boolean,
+  keepAssistant: boolean,
 ): boolean {
   if (item.type === "content" && item.kind === "assistant") {
-    if (!item.text.trim()) return false;
-    return live || items.slice(index + 1).some((candidate) => candidate.type === "tool");
+    if (!item.text.trim() || isThinkingPlaceholder(item.text)) return false;
+    return live || keepAssistant || items.slice(index + 1).some((candidate) => candidate.type === "tool");
   }
   return item.type !== "content" || item.kind !== "reasoning" || item.status === "running" || Boolean(item.text.trim());
 }
 
-function ReasoningContent({ item }: { item: AgentContentItem }) {
+function ReasoningContent({ item, collapseReasoning = true }: { item: AgentContentItem; collapseReasoning?: boolean }) {
   const [manualOpen, setManualOpen] = useState<boolean | null>(null);
   const running = item.status === "running";
   const label = reasoningLabel(item);
+
+  if (running && !item.text.trim() && !collapseReasoning) {
+    return null;
+  }
 
   if (running) {
     return (
@@ -231,6 +316,16 @@ function ReasoningContent({ item }: { item: AgentContentItem }) {
             {item.truncated ? <p className="text-[11px] text-muted-foreground">Reasoning was truncated.</p> : null}
           </div>
         ) : null}
+      </div>
+    );
+  }
+
+  if (!collapseReasoning) {
+    if (!item.text.trim()) return null;
+    return (
+      <div className="px-2 py-1 text-[13px] leading-5 whitespace-pre-wrap text-muted-foreground [overflow-wrap:anywhere]">
+        {item.text}
+        {item.truncated ? <p className="mt-1 text-[11px]">Reasoning was truncated.</p> : null}
       </div>
     );
   }
@@ -265,11 +360,17 @@ function reasoningLabel(item: AgentContentItem): string {
   return `Thought for ${Math.max(10, Math.round(item.durationMs / 1000))} seconds`;
 }
 
-function AssistantContent({ item }: { item: AgentContentItem }) {
-  if (!item.text) return null;
+function AssistantContent({ item, tone }: { item: AgentContentItem; tone: "chat" | "log" }) {
+  if (!item.text || isThinkingPlaceholder(item.text)) return null;
   return (
     <div
-      className={cn("px-2 py-1 text-[14px] leading-6 text-foreground", item.status === "running" && "sp-stream-text")}
+      className={cn(
+        "px-2 text-foreground",
+        tone === "log"
+          ? "py-0.5 text-[13px] leading-5 [&_.workspace-markdown]:text-[13px] [&_.workspace-markdown]:leading-5 [&_.workspace-markdown]:text-foreground [&_.workspace-markdown_p]:my-0"
+          : "py-1 text-[14px] leading-6",
+        item.status === "running" && "sp-stream-text",
+      )}
       data-testid={`agent-assistant-${item.id}`}
     >
       <MarkdownContent content={item.text} variant="workspace" className="max-w-none font-sans" />

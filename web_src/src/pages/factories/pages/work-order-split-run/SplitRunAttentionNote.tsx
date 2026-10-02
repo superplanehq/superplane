@@ -24,54 +24,46 @@ import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { StartEmphasis } from "../../lib/draftReadiness";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
-import { noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
+import { attentionToneClassName, noteActionClassName, noteActionDisabled } from "./splitRunNoteActionStyle";
 import { WaitingPullRequestReview } from "./SplitRunPullRequestReviewNote";
 
 const TONE = {
   draft: {
-    strip: "border-[color:var(--status-draft-border)] bg-[color:var(--status-draft-bg)]",
     iconWrap: "bg-[color:var(--status-draft-dot)]/15",
     icon: "text-[color:var(--status-draft-fg)]",
     Icon: FileText,
   },
   "draft-blocked": {
-    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
     iconWrap: "bg-[color:var(--status-failed-dot)]/15",
     icon: "text-[color:var(--status-failed-fg)]",
     Icon: CircleAlert,
   },
   "draft-caution": {
-    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
     iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
     icon: "text-[color:var(--status-waiting-fg)]",
     Icon: TriangleAlert,
   },
   "draft-ready": {
-    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
     iconWrap: "bg-[color:var(--status-completed-dot)]/15",
     icon: "text-[color:var(--status-completed-fg)]",
     Icon: CheckCircle2,
   },
   waiting: {
-    strip: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
     iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
     icon: "text-[color:var(--status-waiting-fg)]",
     Icon: Hourglass,
   },
   failed: {
-    strip: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
     iconWrap: "bg-[color:var(--status-failed-dot)]/15",
     icon: "text-[color:var(--status-failed-fg)]",
     Icon: CircleX,
   },
   done: {
-    strip: "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)]",
     iconWrap: "bg-[color:var(--status-completed-dot)]/15",
     icon: "text-[color:var(--status-completed-fg)]",
     Icon: CheckCircle2,
   },
   rejected: {
-    strip: "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)]",
     iconWrap: "bg-[color:var(--status-cancelled-dot)]/15",
     icon: "text-[color:var(--status-cancelled-fg)]",
     Icon: CircleX,
@@ -105,7 +97,9 @@ export function SplitRunAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
+  ctaOnly = false,
   startEmphasis = "filled",
   organizationId,
   factoryId,
@@ -113,6 +107,7 @@ export function SplitRunAttentionNote({
   pullRequests,
   canAct = true,
   onAction,
+  children,
 }: {
   note: SplitRunFooterNote;
   tone?: SplitRunDecisionTone;
@@ -123,8 +118,12 @@ export function SplitRunAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  /** Compact note in a narrow column: full-width text, actions below. */
+  stacked?: boolean;
   /** Refine strip: actions only, no note. The strip shows its own verdict. */
   actionsOnly?: boolean;
+  /** Pull request title, then scores, then the review action. */
+  ctaOnly?: boolean;
   /** Weight of Start on the refine strip. The verdict decides it. */
   startEmphasis?: StartEmphasis;
   organizationId?: string;
@@ -133,6 +132,7 @@ export function SplitRunAttentionNote({
   pullRequests?: FactoriesFactoryPullRequest[];
   canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
+  children?: ReactNode;
 }) {
   const pullRequestNote = WaitingPullRequestReview({
     note,
@@ -140,13 +140,16 @@ export function SplitRunAttentionNote({
     actions,
     actionBusy,
     compact,
+    stacked,
     actionsOnly,
+    ctaOnly,
     organizationId,
     factoryId,
     orderId,
     pullRequests,
     canAct,
     onAction,
+    children,
   });
   if (pullRequestNote) {
     return pullRequestNote;
@@ -163,6 +166,7 @@ export function SplitRunAttentionNote({
       startDisabled={startDisabled}
       modelSelect={modelSelect}
       compact={compact}
+      stacked={stacked}
       actionsOnly={actionsOnly}
       startEmphasis={startEmphasis}
       onAction={onAction}
@@ -180,6 +184,7 @@ function StandardAttentionNote({
   startDisabled = false,
   modelSelect,
   compact = false,
+  stacked = false,
   actionsOnly = false,
   startEmphasis = "filled",
   onAction,
@@ -193,6 +198,7 @@ function StandardAttentionNote({
   startDisabled?: boolean;
   modelSelect?: ReactNode;
   compact?: boolean;
+  stacked?: boolean;
   actionsOnly?: boolean;
   startEmphasis?: StartEmphasis;
   onAction?: (action: SplitRunFooterAction) => void;
@@ -220,6 +226,7 @@ function StandardAttentionNote({
         startBusy={startBusy}
         startDisabled={startDisabled}
         modelSelect={modelSelect}
+        stacked={stacked}
         onAction={onAction}
       />
     );
@@ -229,7 +236,7 @@ function StandardAttentionNote({
   const Icon = actions.some((action) => action.kind === "reopen") ? RotateCcw : visual.Icon;
 
   return (
-    <div className={cn("border-t px-5 py-4", visual.strip)} data-testid="split-run-attention-note">
+    <div className={cn("border-t px-5 py-4", attentionToneClassName(tone))} data-testid="split-run-attention-note">
       <div className="flex items-center gap-3.5">
         <span
           className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
@@ -267,6 +274,7 @@ function StandardAttentionNote({
   );
 }
 
+/** In a narrow column `stacked` gives the text the full width and moves the actions below it. */
 function CompactAttentionNote({
   note,
   actions,
@@ -275,6 +283,7 @@ function CompactAttentionNote({
   startBusy,
   startDisabled,
   modelSelect,
+  stacked = false,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -284,10 +293,14 @@ function CompactAttentionNote({
   startBusy: boolean;
   startDisabled: boolean;
   modelSelect?: ReactNode;
+  stacked?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-3" data-testid="split-run-attention-note">
+    <div
+      className={cn("flex min-w-0 flex-1 gap-3", stacked ? "flex-col" : "items-center")}
+      data-testid="split-run-attention-note"
+    >
       <div
         key={`${note.headline}-${note.text ?? ""}`}
         className="sp-stream-text min-w-0 flex-1"
@@ -331,7 +344,7 @@ function NoteActionRow({
   modelSelect?: ReactNode;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
-  const href = note.cta?.href ?? runHref ?? undefined;
+  const href = note.cta?.destination === "billing" ? note.cta.href : (note.cta?.href ?? runHref ?? undefined);
   const showCta = Boolean(note.cta && href);
   if (!showCta && actions.length === 0 && !modelSelect) {
     return null;

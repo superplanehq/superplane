@@ -8,11 +8,12 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
+  factoryRouteSegment,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
@@ -28,6 +29,13 @@ import { WorkspaceLoadingScreen } from "./WorkspaceLoadingScreen";
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
+}
+
+function workspaceLayoutKeys(factory: { key?: string; urlId?: string } | null | undefined, fallbackKey: string) {
+  return {
+    slug: factory?.key ?? fallbackKey,
+    routeSegment: factoryRouteSegment(factory) || fallbackKey,
+  };
 }
 
 /**
@@ -48,14 +56,18 @@ function shouldHideOnboardingSidebar(args: {
   return !args.hasStorybookOnboarding && args.canConfigure && !isFactoryOnboardingComplete(args.factory);
 }
 
-export function FactoriesLayout() {
+export function FactoriesLayout({ children }: { children?: ReactNode }) {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
 
   if (!organizationId || !factoryKey) {
     return null;
   }
 
-  return <FactoriesLayoutResolver organizationId={organizationId} factoryKey={factoryKey} />;
+  return (
+    <FactoriesLayoutResolver organizationId={organizationId} factoryKey={factoryKey}>
+      {children}
+    </FactoriesLayoutResolver>
+  );
 }
 
 /**
@@ -63,7 +75,15 @@ export function FactoriesLayout() {
  * off to `FactoriesLayoutContent`. Keeps the id/key resolution — and its
  * loading/not-found/redirect states — out of the main layout body.
  */
-function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationId: string; factoryKey: string }) {
+function FactoriesLayoutResolver({
+  organizationId,
+  factoryKey,
+  children,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  children?: ReactNode;
+}) {
   const location = useLocation();
   const {
     data: factories = [],
@@ -76,7 +96,12 @@ function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationI
   const resolution = resolveFactoryByKey(factories, factoryKey, factoriesLoading || factoriesFetching);
 
   if (factoryRouteNeedsCanonicalRedirect(resolution, factoryKey)) {
-    const target = replaceFactoryKeySegment(location.pathname, organizationId, factoryKey, resolution.factory!.key!);
+    const target = replaceFactoryKeySegment(
+      location.pathname,
+      organizationId,
+      factoryKey,
+      factoryRouteSegment(resolution.factory),
+    );
     return <Navigate to={`${target}${location.search}`} replace />;
   }
 
@@ -94,7 +119,9 @@ function FactoriesLayoutResolver({ organizationId, factoryKey }: { organizationI
       factoryId={resolution.factory.id}
       factoryKey={resolution.factory.key ?? factoryKey}
       factories={factories}
-    />
+    >
+      {children}
+    </FactoriesLayoutContent>
   );
 }
 
@@ -103,21 +130,24 @@ function FactoriesLayoutContent({
   factoryId,
   factoryKey,
   factories,
+  children,
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   factories: FactoriesFactory[];
+  children?: ReactNode;
 }) {
   useFactoriesThemeClass();
   const { account } = useAccount();
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
+  const { slug, routeSegment } = workspaceLayoutKeys(factory, factoryKey);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(
       organizationId,
-      factoryKey,
+      routeSegment,
       canAct("work_orders", "create"),
       firstFactoryLineId(factory),
     );
@@ -157,12 +187,13 @@ function FactoriesLayoutContent({
     () => ({
       organizationId,
       factoryId,
-      factoryKey,
+      factoryKey: slug,
+      routeSegment,
       factory: factory ?? null,
       factories,
       openCreateWorkOrder,
     }),
-    [organizationId, factoryId, factoryKey, factory, factories, openCreateWorkOrder],
+    [organizationId, factoryId, slug, routeSegment, factory, factories, openCreateWorkOrder],
   );
 
   if (factoryError) {
@@ -189,14 +220,12 @@ function FactoriesLayoutContent({
         {hideSidebar ? null : (
           <FactoriesSidebar
             organizationId={organizationId}
-            factoryKey={factoryKey}
+            factoryKey={routeSegment}
             factory={factory}
             factories={factories}
           />
         )}
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
-          <Outlet />
-        </main>
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children ?? <Outlet />}</main>
       </div>
 
       {canCreateWorkOrder ? (

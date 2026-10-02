@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -22,20 +24,27 @@ const (
 	productionAPIBaseURL = "https://api.polar.sh/v1"
 	creditPackMetadata   = "superplane_credit_pack"
 	httpTimeout          = 15 * time.Second
+
+	// Polar removes each API version about nine months after release.
+	// Upgrade before removal: see docs/prd/token-usage-and-billing.md.
+	defaultAPIVersion = "2026-10"
+	apiVersionHeader  = "Polar-Version"
 )
 
 var (
-	errNotFound           = fmt.Errorf("polar resource not found")
-	ErrNotCreditPack      = errors.New("product is not a hosted credit pack")
-	ErrRateLimited        = errors.New("polar rate limited")
-	ErrConflict           = errors.New("polar customer conflict")
-	ErrUnauthorized       = errors.New("polar unauthorized")
-	ErrTeamMemberRequired = errors.New("polar team member required")
+	errNotFound              = fmt.Errorf("polar resource not found")
+	ErrNotCreditPack         = errors.New("product is not a hosted credit pack")
+	ErrRateLimited           = errors.New("polar rate limited")
+	ErrConflict              = errors.New("polar customer conflict")
+	ErrUnauthorized          = errors.New("polar unauthorized")
+	ErrTeamMemberRequired    = errors.New("polar team member required")
+	ErrUnsupportedAPIVersion = errors.New("polar api version is not supported")
 )
 
 type Client struct {
 	baseURL     string
 	accessToken string
+	apiVersion  string
 	httpClient  *http.Client
 }
 
@@ -77,11 +86,15 @@ type CustomerSessionRequest struct {
 }
 
 type Order struct {
-	ID          string
-	CreatedAt   string
-	AmountCents int64
-	Status      string
-	ProductName string
+	CheckoutID     string
+	Currency       string
+	NetAmountCents int64
+	TaxAmountCents int64
+	ID             string
+	CreatedAt      string
+	AmountCents    int64
+	Status         string
+	ProductName    string
 }
 
 func Configured() bool {
@@ -112,8 +125,16 @@ func NewClient(baseURL, accessToken string, httpClient *http.Client) *Client {
 	return &Client{
 		baseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		accessToken: strings.TrimSpace(accessToken),
+		apiVersion:  APIVersion(),
 		httpClient:  httpClient,
 	}
+}
+
+func APIVersion() string {
+	if override := strings.TrimSpace(os.Getenv("POLAR_API_VERSION")); override != "" {
+		return override
+	}
+	return defaultAPIVersion
 }
 
 func APIBaseURL() string {
@@ -452,6 +473,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "SuperPlane")
+	req.Header.Set(apiVersionHeader, c.apiVersion)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -466,8 +488,21 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 	if err != nil {
 		return err
 	}
+	servedVersion := strings.TrimSpace(resp.Header.Get(apiVersionHeader))
+	// Polar echoes Polar-Version on every response it routes. A 404 without it
+	// means Polar rejected the pinned version, not that the resource is missing.
+	if resp.StatusCode == http.StatusNotFound && servedVersion == "" {
+		return fmt.Errorf("%w: %s", ErrUnsupportedAPIVersion, c.apiVersion)
+	}
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("%w: %s", errNotFound, strings.TrimSpace(string(payload)))
+	}
+	if servedVersion != "" && servedVersion != c.apiVersion {
+		log.WithFields(log.Fields{
+			"polar_api_version_pinned": c.apiVersion,
+			"polar_api_version_served": servedVersion,
+			"polar_path":               path,
+		}).Warn("polar served a different api version than the pinned one")
 	}
 	if resp.StatusCode == http.StatusConflict {
 		return fmt.Errorf("%w: %s", ErrConflict, strings.TrimSpace(string(payload)))
@@ -508,6 +543,10 @@ func IsRateLimited(err error) bool {
 
 func IsUnauthorized(err error) bool {
 	return err != nil && errors.Is(err, ErrUnauthorized)
+}
+
+func IsUnsupportedAPIVersion(err error) bool {
+	return err != nil && errors.Is(err, ErrUnsupportedAPIVersion)
 }
 
 func IsTeamMemberRequired(err error) bool {
@@ -648,6 +687,10 @@ type memberJSON struct {
 }
 
 type orderJSON struct {
+	CheckoutID  string `json:"checkout_id"`
+	Currency    string `json:"currency"`
+	NetAmount   int64  `json:"net_amount"`
+	TaxAmount   int64  `json:"tax_amount"`
 	ID          string `json:"id"`
 	CreatedAt   string `json:"created_at"`
 	Status      string `json:"status"`
@@ -666,11 +709,15 @@ func (o orderJSON) toOrder() Order {
 		}
 	}
 	return Order{
-		ID:          o.ID,
-		CreatedAt:   o.CreatedAt,
-		AmountCents: o.TotalAmount,
-		Status:      o.Status,
-		ProductName: name,
+		CheckoutID:     o.CheckoutID,
+		Currency:       o.Currency,
+		NetAmountCents: o.NetAmount,
+		TaxAmountCents: o.TaxAmount,
+		ID:             o.ID,
+		CreatedAt:      o.CreatedAt,
+		AmountCents:    o.TotalAmount,
+		Status:         o.Status,
+		ProductName:    name,
 	}
 }
 

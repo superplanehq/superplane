@@ -113,7 +113,8 @@ func intakeSourceSupportsPause(source string) bool {
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
-		source == models.FactoryIntakeSourceDependabotAlerts
+		source == models.FactoryIntakeSourceDependabotAlerts ||
+		source == models.FactoryIntakeSourceLinearIssues
 }
 
 func resolveUpdatedIntakeBinding(
@@ -272,6 +273,9 @@ func applyIntakeSettingsToGraph(
 ) ([]models.Node, []models.Edge, error) {
 	current := intakeSettingsFromGraph(source, graph, spec)
 	updated := parseIntakeSettings(current, settings)
+	if source == models.FactoryIntakeSourceLinearIssues && len(updated.LinearProjectIDs) == 0 {
+		return nil, nil, invalidArgument("at least one Linear project is required")
+	}
 	if intakeSourceHasFilterNode(source) &&
 		intakeSettingsChangeTrigger(source, current, updated) &&
 		graph.TriggerNodeID == "" {
@@ -301,10 +305,21 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
 				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceProductiveTasks:
+				configuration["actions"] = intakeProductiveTriggerActions(updated)
+				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)
 				nodes[i].Configuration = configuration
 				nodes[i].Metadata = mergeJiraCompletionMetadata(nodes[i].Metadata, updated)
+			case models.FactoryIntakeSourceDatadog:
+				configuration["alertTransitions"] = intakeDatadogAlertTransitions(updated)
+				nodes[i].Configuration = configuration
+			case models.FactoryIntakeSourceLinearIssues:
+				configuration["projects"] = configurationAnyStrings(updated.LinearProjectIDs)
+				configuration["labels"] = linearLabelPredicates(updated.LinearLabels)
+				configuration["actions"] = []any{"create", "update"}
+				nodes[i].Configuration = configuration
 			default:
 				continue
 			}

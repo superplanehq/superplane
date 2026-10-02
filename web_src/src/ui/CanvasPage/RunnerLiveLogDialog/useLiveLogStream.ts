@@ -23,6 +23,7 @@ import {
   startToolOnLatestSection,
   type CommandStart,
 } from "./liveLogSections";
+import { isBenignLiveLogWait, isBrowserTransportFailure } from "./liveLogErrors";
 import { LiveLogStream, type LiveLogStreamHandlers } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
@@ -31,11 +32,7 @@ const RECONNECT_DELAY_MS = 2000;
 
 type LiveLogFailureSource = "broker" | "request";
 
-type LiveLogFailureContext = {
-  organizationId: string;
-  canvasId: string;
-  executionId: string;
-};
+type LiveLogFailureContext = { organizationId: string; canvasId: string; executionId: string };
 
 const initialLogState: LogState = {
   sections: [],
@@ -126,20 +123,6 @@ function withClearedError(state: LogState): LogState {
   return { ...state, error: null };
 }
 
-// CloudWatch Logs raises ResourceNotFoundException for GetLogEvents when the
-// runner hasn't created its log stream yet (e.g. right after an execution
-// starts, or during the brief window between reconnect attempts). The
-// broker relays that as a stream error, but it's an expected, self-healing
-// condition rather than an application bug: the live log session already
-// reconnects automatically, and the log stream appears as soon as the
-// runner starts writing to it. Surfacing it as a failure (in the UI or in
-// Sentry) would just be noise, so it's ignored.
-const BENIGN_BROKER_ERROR_PATTERN = /ResourceNotFoundException.*log stream .*(does not exist|not found)/i;
-
-function isBenignBrokerError(message: string): boolean {
-  return BENIGN_BROKER_ERROR_PATTERN.test(message);
-}
-
 type StreamHandlerContext = {
   reconnecting: boolean;
   resetParsedLogs: boolean;
@@ -198,7 +181,7 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
       setState((prev) => appendReplayedLogLine(prev, text, replayLineSkip, index, reconnecting));
     },
     onStreamError: (message) => {
-      if (isBenignBrokerError(message)) {
+      if (isBenignLiveLogWait(message)) {
         return;
       }
       onFailure(message);
@@ -358,6 +341,16 @@ function errorFromUnknown(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function shouldReportLiveLogRequestFailure(error: Error, executionInFlight: boolean): boolean {
+  if (isBenignLiveLogWait(error)) {
+    return false;
+  }
+  if (executionInFlight && isBrowserTransportFailure(error)) {
+    return false;
+  }
+  return true;
+}
+
 async function waitForLiveLogReconnect(
   sessionAbort: AbortController,
   setState: Dispatch<SetStateAction<LogState>>,
@@ -400,7 +393,7 @@ async function pumpLiveLogConnection(
     if (streamError.name === "AbortError") {
       return "aborted";
     }
-    if (!sessionAbort.signal.aborted) {
+    if (!sessionAbort.signal.aborted && shouldReportLiveLogRequestFailure(streamError, params.executionInFlight)) {
       reportFailure("request", streamError);
       setState((prev) => applyStreamFailure(prev, streamError.message));
     }
@@ -453,10 +446,7 @@ export function liveLogScrollTrigger(state: Pick<LogState, "sections" | "orphanL
   return `${state.sections.length}:${state.orphanLines.length}:${lineCount}:${activityProgress}`;
 }
 
-export type LiveLogStreamSession = {
-  organizationId?: string;
-  canvasId?: string;
-};
+export type LiveLogStreamSession = { organizationId?: string; canvasId?: string };
 
 export function useLiveLogStream(
   executionId: string,

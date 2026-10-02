@@ -82,7 +82,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
 
 		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
-		assert.Equal(t, "Productive.io tasks", intake.GetName())
+		assert.Equal(t, "Productive tasks", intake.GetName())
 		assert.False(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
 		assert.True(t, intake.GetSettings().GetExcludeKeyTasks())
@@ -134,6 +134,64 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "payments", intake.GetResourceId())
 		assert.True(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
+	})
+
+	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
+	t.Run("a Datadog intake listens to the selected service", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_DATADOG,
+			IntegrationId: integrationID,
+			ResourceId:    "checkout",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "checkout", trigger.Configuration["service"])
+		assert.Equal(t, integrationID, intake.GetIntegrationId())
+		assert.Equal(t, "checkout", intake.GetResourceId())
+		assert.True(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
+	})
+
+	t.Run("a Datadog intake without a service stays unbound", func(t *testing.T) {
+		factory := newFactory(t)
+		createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_DATADOG})
+
+		assert.Empty(t, intake.GetIntegrationId())
+		assert.Empty(t, intake.GetResourceId())
+		assert.False(t, intake.GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_MISSING_INTEGRATION, intake.GetHealth())
+	})
+
+	t.Run("a Datadog intake rejects a connection without a service", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_DATADOG,
+			IntegrationId: integrationID,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
 	t.Run("a Sentry intake listens to the production project from setup", func(t *testing.T) {
@@ -1059,6 +1117,43 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NotNil(t, trigger.IntegrationID)
 		assert.Equal(t, newID, *trigger.IntegrationID)
 		assert.Equal(t, "checkout", trigger.Configuration["project"])
+	})
+
+	t.Run("update rebinds a Datadog intake to a ready integration", func(t *testing.T) {
+		factory := newFactory(t)
+		oldID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_DATADOG,
+			IntegrationId: oldID,
+			ResourceId:    "checkout",
+		})
+
+		integration, err := models.FindIntegrationInTransaction(
+			database.DB(t.Context()),
+			r.Organization.ID,
+			uuid.MustParse(oldID),
+		)
+		require.NoError(t, err)
+		require.NoError(t, integration.SoftDeleteInTransaction(database.DB(t.Context())))
+
+		newID := createReadyOnboardingIntegration(t, r.Organization.ID, "datadog")
+		resourceID := "billing"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &newID,
+			ResourceId:    &resourceID,
+		})
+		require.NoError(t, err)
+		assert.True(t, response.GetIntake().GetHealthy())
+		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, response.GetIntake().GetHealth())
+		assert.Equal(t, newID, response.GetIntake().GetIntegrationId())
+		assert.Equal(t, "billing", response.GetIntake().GetResourceId())
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, newID, *trigger.IntegrationID)
+		assert.Equal(t, "billing", trigger.Configuration["service"])
 	})
 
 	t.Run("update rejects a binding with only an integration", func(t *testing.T) {

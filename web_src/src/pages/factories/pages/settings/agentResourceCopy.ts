@@ -1,14 +1,39 @@
 /** User-facing copy for workspace MCP servers and skills. STE. */
 
+export type AgentResourceInstruction =
+  | string
+  | {
+      before: string;
+      href: string;
+      label: string;
+      after: string;
+    };
+
+export const GITHUB_PERSONAL_ACCESS_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+export const CIRCLECI_PERSONAL_API_TOKEN_URL = "https://app.circleci.com/settings/user/tokens";
+export const SEMAPHORE_API_TOKEN_URL =
+  "https://docs.semaphore.io/using-semaphore/ai/mcp-server#connect-with-an-api-token";
+
 export const AGENT_RESOURCES_COPY = {
+  agentTitle: "Agent",
+  agentPageSubtitle: "MCP servers and skills agents use during work.",
+  superplaneMcpServerTitle: "MCP Server",
+  superplaneMcpServerPageSubtitle: "Connect from Cursor, Claude, Codex, or any other external service.",
   mcpTitle: "MCP servers",
+  mcpPageSubtitle: "Manage MCP connections for agents and external clients in this workspace.",
+  mcpConnectionsSectionTitle: "MCP servers",
+  mcpConnectionsSectionDescription: "External services agents use during work.",
   skillsTitle: "Skills",
-  mcpHelper:
-    "Agents on every run in this workspace can use these MCP servers. One signed-in account is shared by every agent.",
-  skillsHelper: "Agents on every run in this workspace can use these skills.",
-  refinementNote:
-    "These MCP servers can change systems outside SuperPlane during refinement. The repository stays read-only.",
+  skillsHelper: "Instructions agents use during work.",
+  configure: "Configure",
+  backToMcpServers: "Back to Agent",
+  backToAgent: "Back to Agent",
+  mcpConnectionNotFound: "SuperPlane could not find this MCP server.",
+  mcpConnectionToolsTitle: "Tools",
+  mcpConnectionSettingsTitle: "Connection",
   addConnection: "Add MCP server",
+  connectMcpServer: "Connect",
+  addServerTitle: (label: string) => `Add ${label}`,
   editConnection: "Edit MCP server",
   dialogDescription: "Agents on every run in this workspace can use this MCP server.",
   catalogDescription: "Choose a common server, or add a custom MCP URL.",
@@ -20,13 +45,13 @@ export const AGENT_RESOURCES_COPY = {
   skillDialogDescription: "Agents on every run in this workspace can use this SKILL.md file.",
   skillExtraFilesNote: "Skills that need extra files are not supported.",
   emptyConnectionsTitle: "No MCP servers yet",
-  emptyConnectionsBody: "Add an MCP server so agents can use it on every run.",
+  emptyConnectionsBody: "Use Connect to add an external service.",
   unnamedResource: "MCP server",
   unnamedSkill: "skill",
   deleteDescription: "This removes the MCP server for every agent in this workspace.",
   deleteSkillDescription: "This removes the skill for every agent in this workspace.",
   emptySkillsTitle: "No skills yet",
-  emptySkillsBody: "Add a SKILL.md so agents can use it on every run.",
+  emptySkillsBody: "Use Add skill to add instructions.",
   skillSourceInline: "SKILL.md",
   skillCommandLabel: "Command",
   skillCommandHelper: (name: string) => `Agents can call this skill with /${name}.`,
@@ -36,7 +61,8 @@ export const AGENT_RESOURCES_COPY = {
   authSignIn: "Sign-in",
   statusConnected: "Connected",
   statusNotConnected: "Not connected",
-  statusReconnect: "Reconnect",
+  statusSkillDisabled: "Disabled",
+  statusReconnect: "Reconnection needed",
   statusReady: "Ready",
   statusFetchFailed: "Failed to fetch",
   toolsEmpty: "This server has no tools.",
@@ -50,9 +76,11 @@ export const AGENT_RESOURCES_COPY = {
   toolRead: "Read",
   toolWrite: "Write",
   toolsCount: (enabled: number, available: number) => `${enabled}/${available}`,
+  connectedToolsSummary: (enabled: number, available: number) => `${enabled}/${available} tools`,
   enableToolLabel: (name: string) => `Enable ${name}`,
   close: "Close",
   connect: "Connect",
+  signIn: "Sign in",
   reconnect: "Reconnect",
   disconnect: "Disconnect",
   edit: "Edit",
@@ -70,6 +98,8 @@ export const AGENT_RESOURCES_COPY = {
   headersLabel: "Headers",
   headerNameLabel: "Header name",
   headerSecretLabel: "Secret",
+  tokenLabel: "Personal access token",
+  tokenRequired: "Personal access token is required.",
   addHeader: "Add header",
   removeHeader: "Remove header",
   loading: "Loading MCP servers...",
@@ -84,6 +114,45 @@ export const AGENT_RESOURCES_COPY = {
   urlInvalid: "Enter an https URL.",
   markdownRequired: "SKILL.md content is required.",
   headersHelper: "Add a header only when the server needs a credential.",
+  githubInstruction: {
+    before: "Create a ",
+    href: GITHUB_PERSONAL_ACCESS_TOKEN_URL,
+    label: "GitHub personal access token",
+    after: " and paste it here.",
+  },
+  jiraInstruction: "Sign in with Atlassian to grant access to Jira.",
+  linearInstruction: "Sign in with Linear.",
+  circleciInstruction: {
+    before: "Create a ",
+    href: CIRCLECI_PERSONAL_API_TOKEN_URL,
+    label: "CircleCI personal API token",
+    after: " and paste it here.",
+  },
+  semaphoreInstruction: {
+    before: "Ask Semaphore support to enable MCP. Reset your ",
+    href: SEMAPHORE_API_TOKEN_URL,
+    label: "Semaphore API token",
+    after: " and paste it here.",
+  },
+  gitlabInstruction: "Sign in with GitLab.",
+  postmanInstruction: "Sign in with Postman.",
+  notionInstruction: "Sign in with Notion.",
+  figmaInstruction: "Sign in with Figma.",
+  slackInstruction: "Sign in with Slack.",
+  vercelInstruction: "Sign in with Vercel.",
+  renderInstruction: "Sign in with Render.",
+  railwayInstruction: "Sign in with Railway.",
+  grafanaInstruction: "Sign in with Grafana.",
+  cloudflareInstruction: "Sign in with Cloudflare.",
+  stripeInstruction: "Sign in with Stripe.",
+  supabaseInstruction: "Sign in with Supabase.",
+  mongodbInstruction: "Sign in with MongoDB Atlas.",
+  neonInstruction: "Sign in with Neon.",
+  prismaInstruction: "Sign in with Prisma.",
+  sentryInstruction: "Sign in with Sentry.",
+  datadogInstruction: "Sign in with Datadog.",
+  datadogSiteLabel: "Site",
+  datadogSiteHelper: "Choose the site from your Datadog URL.",
   headerIncomplete: "Each header needs a name and a secret.",
   created: "MCP server added.",
   updated: "MCP server updated.",
@@ -92,6 +161,7 @@ export const AGENT_RESOURCES_COPY = {
   skillUpdated: "Skill updated.",
   skillDeleted: "Skill deleted.",
   disconnected: "MCP server disconnected.",
+  urlTaken: "This MCP server is already connected.",
   createFailed: "SuperPlane could not add the MCP server.",
   updateFailed: "SuperPlane could not update the MCP server.",
   deleteFailed: "SuperPlane could not delete the MCP server.",

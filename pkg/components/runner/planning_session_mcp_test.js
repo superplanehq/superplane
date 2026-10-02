@@ -12,22 +12,35 @@ const {
   proposeSpec,
   proposeClarity,
   proposeConfidence,
-  createTask,
+  inspectAttachment,
   recordAgentMessage,
   writeAnalysisOutputs,
   parseFrames,
+  MAX_INSPECTABLE_ATTACHMENT_BYTES,
 } = require("./planning_session_mcp");
+
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const GIF_BYTES = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00]);
+const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0x00]);
 
 test("analysis protocol omits a disabled score tool", () => {
   const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
   assert.match(clarityOnly, /propose_clarity/);
   assert.doesNotMatch(clarityOnly, /propose_confidence/);
-  assert.match(clarityOnly, /Publish a Clarity score every turn/);
+  assert.match(clarityOnly, /Publish a Clarity score when this turn updates the plan, the score would change, or the user asks to update that score/);
+  assert.match(clarityOnly, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(clarityOnly, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(clarityOnly, /Confidence summary/);
+  assert.doesNotMatch(clarityOnly, / {2,}/);
 
   const confidenceOnly = analysisProtocol({ SUPERPLANE_PLANNING_CLARITY: "false" });
   assert.match(confidenceOnly, /propose_confidence/);
   assert.doesNotMatch(confidenceOnly, /propose_clarity/);
-  assert.match(confidenceOnly, /Publish a Confidence score every turn/);
+  assert.match(confidenceOnly, /Publish a Confidence score when this turn updates the plan, the score would change, or the user asks to update that score/);
+  assert.match(confidenceOnly, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(confidenceOnly, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(confidenceOnly, /Clarity summary/);
+  assert.doesNotMatch(confidenceOnly, / {2,}/);
 
   const neither = analysisProtocol({
     SUPERPLANE_PLANNING_CLARITY: "false",
@@ -36,24 +49,29 @@ test("analysis protocol omits a disabled score tool", () => {
   assert.doesNotMatch(neither, /propose_clarity/);
   assert.doesNotMatch(neither, /propose_confidence/);
   assert.match(neither, /Do not publish Clarity or Confidence scores/);
+  assert.match(neither, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(neither, /a score would change/);
+  assert.doesNotMatch(neither, /required score is 5/);
+  assert.doesNotMatch(neither, /Clarity summary/);
+  assert.doesNotMatch(neither, / {2,}/);
 });
 
 test("planningTools omits disabled score tools", () => {
   const { planningTools } = require("./planning_session_mcp");
   assert.deepEqual(
     planningTools({ SUPERPLANE_PLANNING_CLARITY: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_confidence", "survey", "inspect_attachment"],
   );
   assert.deepEqual(
     planningTools({ SUPERPLANE_PLANNING_CONFIDENCE: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "survey", "inspect_attachment"],
   );
   assert.deepEqual(
     planningTools({
       SUPERPLANE_PLANNING_CLARITY: "false",
       SUPERPLANE_PLANNING_CONFIDENCE: "false",
     }).map((tool) => tool.name),
-    ["propose_spec", "survey", "create_task"],
+    ["propose_spec", "survey", "inspect_attachment"],
   );
 });
 
@@ -80,12 +98,19 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /does not publish the specification or the score/);
   assert.match(pack, /only after those calls/);
   assert.match(pack, /Do not leave a written plan unpublished/);
-  assert.match(pack, /Call create_task only after the user confirms a split/);
-  assert.match(pack, /Never create a task the user did not confirm/);
-  assert.match(pack, /narrow the specification to the part that stays/);
-  assert.match(pack, /If create_task fails, say that SuperPlane could not create the task/);
+  assert.doesNotMatch(pack, /create_task/);
+  assert.match(pack, /inspect_attachment/);
+  assert.match(pack, /Do not curl a signed URL/);
+  assert.match(pack, /Do not use OCR/);
+  assert.doesNotMatch(pack, /Never create a task the user did not confirm/);
+  assert.doesNotMatch(pack, /narrow the specification to the part that stays/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
+  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
+  assert.match(pack, /Do not call the spec tool or a score tool/);
+  assert.match(pack, /Do not add that sentence on a turn that already updates the plan/);
   assert.match(pack, /Do not name files/);
+  assert.match(pack, /name one only when that name is the direct answer/);
+  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
   assert.match(pack, /Answer the questions in this session/);
   assert.match(pack, /Do not describe agent fit/);
   assert.match(pack, /Do not write a test or an acceptance check/);
@@ -115,20 +140,20 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /### Calibration/);
   assert.match(pack, /Start at 4 for a bounded change that has a pattern in the repository/);
   assert.match(pack, /### Raise Confidence through refinement/);
-  assert.match(pack, /Split into two or three tasks that each fit one run/);
+  assert.match(pack, /Narrow the scope so the remaining work fits one run/);
   assert.match(pack, /Be direct when the task is too big or too complex for one run/);
-  assert.match(pack, /### Split the task/);
-  assert.match(pack, /propose it in a survey question/);
-  assert.match(pack, /When the user confirms, create the other parts as new tasks/);
+  assert.doesNotMatch(pack, /### Split the task/);
   assert.doesNotMatch(pack, /create_task/);
-  assert.match(pack, /This task stays as the first part/);
-  assert.match(pack, /Do not create a task the user did not confirm/);
+  assert.match(pack, /Keep this task as one task/);
+  assert.match(pack, /Do not create another task/);
+  assert.match(pack, /Keep the original scope in the plan until the user confirms/);
+  assert.doesNotMatch(pack, /Drop the screens from this task/);
   assert.match(pack, /Do not use contractions/);
   assert.doesNotMatch(pack, /Contractions are fine/);
-  assert.match(pack, /### A part of a split/);
-  assert.match(pack, /that boundary is decided/);
-  assert.match(pack, /Do not lower Confidence because it is not in the repository yet/);
-  assert.match(pack, /Score only the work this task owns/);
+  assert.doesNotMatch(pack, /### A part of a split/);
+  assert.doesNotMatch(pack, /that boundary is decided/);
+  assert.doesNotMatch(pack, /Do not lower Confidence because it is not in the repository yet/);
+  assert.doesNotMatch(pack, /Score only the work this task owns/);
   assert.doesNotMatch(pack, /Do not push Confidence to 5/);
   assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
   assert.match(pack, /Confidence is provisional/);
@@ -138,7 +163,17 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /Blast radius/);
   assert.match(pack, /Skip Risks only when Clarity is 5 and Confidence is 4 or higher/);
   assert.doesNotMatch(pack, /how suitable the work is for an agent/);
-  assert.match(pack, /2 to 4 short sentences/);
+  assert.match(pack, /## Answer turn/);
+  assert.match(pack, /## Plan turn/);
+  assert.match(pack, /which file, type, test, command, or API owns a behavior, name it/);
+  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(pack, /do not rewrite the plan/);
+  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
+  assert.match(pack, /Do not use a survey to answer a question/);
+  assert.match(pack, /leave the plan unchanged/);
+  assert.doesNotMatch(pack, /five steps/);
+  assert.doesNotMatch(pack, /2 to 4 short sentences/);
+  assert.doesNotMatch(pack, /Every turn follows/);
   assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /If Clarity is 1 or 2/);
   assert.match(pack, /do not have enough Clarity to write a plan/);
@@ -344,17 +379,25 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const tools = replies[1].result.tools;
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "inspect_attachment"],
   );
-  const [spec, clarity, confidence, survey, createTaskTool] = tools;
+  const [spec, clarity, confidence, survey, inspectTool] = tools;
   assert.deepEqual(spec.inputSchema.required, ["body"]);
   assert.match(spec.description, /Do not leave a written plan unpublished/);
   assert.match(clarity.description, /how well the task is defined/);
-  assert.match(clarity.description, /every turn/);
+  assert.match(clarity.description, /when this turn updates the plan, the score would change, or the user asks to update this score/);
+  assert.match(clarity.description, /When every required score is 5/);
+  assert.match(clarity.description, /Do not call it on a question turn/);
+  assert.match(clarity.description, /An unchanged score stays on the card/);
+  assert.doesNotMatch(clarity.description, /every turn/);
   assert.match(clarity.description, /without propose_spec/);
   assert.match(clarity.inputSchema.properties.summary.description, /Follow the task prompt/);
   assert.match(confidence.description, /how likely a coding agent completes this task in one run/);
-  assert.match(confidence.description, /every turn/);
+  assert.match(confidence.description, /when this turn updates the plan, the score would change, or the user asks to update this score/);
+  assert.match(confidence.description, /When every required score is 5/);
+  assert.match(confidence.description, /Do not call it on a question turn/);
+  assert.match(confidence.description, /An unchanged score stays on the card/);
+  assert.doesNotMatch(confidence.description, /every turn/);
   assert.match(confidence.description, /without propose_spec/);
   assert.deepEqual(confidence.inputSchema.required, ["score", "summary"]);
   assert.match(survey.description, /short everyday options/);
@@ -367,10 +410,9 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
     undefined,
   );
   assert.doesNotMatch(clarity.description, /check copy/);
-  assert.deepEqual(createTaskTool.inputSchema.required, ["title", "description"]);
-  assert.match(createTaskTool.description, /only after the user confirms/i);
-  assert.match(createTaskTool.description, /one call per task/i);
-  assert.match(createTaskTool.inputSchema.properties.description.description, /self-contained/i);
+  assert.deepEqual(inspectTool.inputSchema.required, ["path"]);
+  assert.match(inspectTool.description, /user image/);
+  assert.match(inspectTool.description, /Do not use OCR/);
 });
 
 test("lists planning tools over Content-Length JSON-RPC", async () => {
@@ -385,56 +427,118 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "create_task"],
+    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "inspect_attachment"],
   );
 });
 
-test("createTask posts the new task with the activity id and rejects empty input", async () => {
-  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
-  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
-  const previousActivityID = process.env.SUPERPLANE_ACTIVITY_ID;
-  const previousFetch = global.fetch;
-  const calls = [];
-  process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
-  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
-  process.env.SUPERPLANE_ACTIVITY_ID = "activity-1";
-  global.fetch = async (url, options) => {
-    calls.push({ url, options });
-    return {
-      ok: true,
-      text: async () =>
-        '{"status":"created","work_order_id":"wo-1","key":"NEW-12","title":"Add the retry table"}',
-    };
-  };
+test("inspectAttachment returns an image block for a saved PNG", () => {
+  const value = attachmentFixture();
+  const result = inspectAttachment({ path: value.file }, value.env);
 
-  try {
-    const result = await createTask({
-      title: "  Add the retry table ",
-      description: " Schema and migration only. ",
-    });
-    assert.equal(result.status, "created");
-    assert.equal(result.key, "NEW-12");
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/tasks");
-    assert.equal(calls[0].options.method, "POST");
-    assert.deepEqual(JSON.parse(calls[0].options.body), {
-      title: "Add the retry table",
-      description: "Schema and migration only.",
-      activity_id: "activity-1",
-    });
-    await assert.rejects(() => createTask({ title: "", description: "x" }), /title is required/);
-    await assert.rejects(() => createTask({ title: "x", description: "  " }), /description is required/);
-    assert.equal(calls.length, 1, "invalid input never reaches the server");
-  } finally {
-    global.fetch = previousFetch;
-    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
-    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
-    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
-    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
-    if (previousActivityID === undefined)
-      delete process.env.SUPERPLANE_ACTIVITY_ID;
-    else process.env.SUPERPLANE_ACTIVITY_ID = previousActivityID;
-  }
+  assert.equal(result.content[0].type, "text");
+  assert.deepEqual(result.content[1], {
+    type: "image",
+    data: PNG_BYTES.toString("base64"),
+    mimeType: "image/png",
+  });
+  assert.equal(result.structuredContent.data, undefined);
+  assert.equal(result.structuredContent.filename, "01-shot.png");
+  assert.match(result.structuredContent.sha256, /^[a-f0-9]{64}$/);
+});
+
+test("inspectAttachment sniffs a PNG without an extension", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "02-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  fs.writeFileSync(file, PNG_BYTES);
+  const result = inspectAttachment({ path: file }, value.env);
+  assert.equal(result.content[1].mimeType, "image/png");
+});
+
+test("inspectAttachment sniffs GIF and JPEG bytes over the filename", () => {
+  const value = attachmentFixture();
+  const gif = path.join(value.attachments, "shot.png");
+  fs.writeFileSync(gif, GIF_BYTES);
+  assert.equal(inspectAttachment({ path: gif }, value.env).content[1].mimeType, "image/gif");
+
+  const jpeg = path.join(value.attachments, "shot.gif");
+  fs.writeFileSync(jpeg, JPEG_BYTES);
+  assert.equal(inspectAttachment({ path: jpeg }, value.env).content[1].mimeType, "image/jpeg");
+});
+
+test("inspectAttachment rejects a PNG filename that is not an image", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "fake.png");
+  fs.writeFileSync(file, Buffer.from("png"));
+  assert.throws(
+    () => inspectAttachment({ path: file }, value.env),
+    /PNG, JPEG, GIF, or WebP/,
+  );
+});
+
+test("inspectAttachment accepts a file at the work-order size limit", () => {
+  const value = attachmentFixture();
+  const file = path.join(value.attachments, "limit.png");
+  const descriptor = fs.openSync(file, "w");
+  fs.writeSync(descriptor, PNG_BYTES);
+  fs.ftruncateSync(descriptor, MAX_INSPECTABLE_ATTACHMENT_BYTES);
+  fs.closeSync(descriptor);
+  const result = inspectAttachment({ path: file }, value.env);
+  assert.equal(result.structuredContent.mimeType, "image/png");
+  assert.equal(result.structuredContent.sizeBytes, MAX_INSPECTABLE_ATTACHMENT_BYTES);
+});
+
+test("inspectAttachment rejects files above the work-order size limit", () => {
+  const value = attachmentFixture();
+  const oversized = path.join(value.attachments, "large.png");
+  const descriptor = fs.openSync(oversized, "w");
+  fs.ftruncateSync(descriptor, MAX_INSPECTABLE_ATTACHMENT_BYTES + 1);
+  fs.closeSync(descriptor);
+  assert.throws(
+    () => inspectAttachment({ path: oversized }, value.env),
+    /attachment exceeds/,
+  );
+});
+
+test("inspectAttachment accepts a filename relative to attachments", () => {
+  const value = attachmentFixture();
+  const result = inspectAttachment({ path: "01-shot.png" }, value.env);
+  assert.equal(result.content[1].mimeType, "image/png");
+});
+
+test("inspectAttachment rejects paths outside the attachments directory", () => {
+  const value = attachmentFixture();
+  const outside = path.join(value.taskDir, "outside.png");
+  fs.writeFileSync(outside, "png");
+  assert.throws(
+    () => inspectAttachment({ path: outside }, value.env),
+    /inside the task attachments directory/,
+  );
+});
+
+test("inspectAttachment rejects symlinks", () => {
+  const value = attachmentFixture();
+  const link = path.join(value.attachments, "linked.png");
+  fs.symlinkSync(value.file, link);
+  assert.throws(() => inspectAttachment({ path: link }, value.env), /regular file/);
+});
+
+test("returns inspect_attachment image content over JSON-RPC", async () => {
+  const value = attachmentFixture();
+  const replies = await exchangeMCP(
+    "ndjson",
+    [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "inspect_attachment", arguments: { path: value.file } },
+      },
+    ],
+    value.env,
+  );
+  assert.equal(replies[0].result.content[1].type, "image");
+  assert.equal(replies[0].result.content[1].data, PNG_BYTES.toString("base64"));
+  assert.equal(replies[0].result.structuredContent.data, undefined);
 });
 
 test("parseFrames keeps a partial Content-Length header", () => {
@@ -503,13 +607,13 @@ function feedParseFrames(frame, chunkSize) {
   return { messages, rest: buffer };
 }
 
-async function exchangeMCP(format, messages) {
+async function exchangeMCP(format, messages, extraEnv = {}) {
   const child = spawn(
     process.execPath,
     [path.join(__dirname, "planning_session_mcp.js")],
     {
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
+      env: { ...process.env, ...extraEnv },
     },
   );
   const replies = [];
@@ -579,4 +683,18 @@ function drainReplies(buffer, format) {
     }
   }
   return { messages, rest: Buffer.from(leftover, "utf8") };
+}
+
+function attachmentFixture() {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "planning-attachments-"));
+  const attachments = path.join(taskDir, "attachments");
+  fs.mkdirSync(attachments);
+  const file = path.join(attachments, "01-shot.png");
+  fs.writeFileSync(file, PNG_BYTES);
+  return {
+    taskDir,
+    attachments,
+    file,
+    env: { SUPERPLANE_TASK_DIR: taskDir },
+  };
 }

@@ -161,17 +161,19 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
-	dispatched, err := runner.MintStepsForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
+	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {
 		return err
 	}
-	dispatched = runner.AppendVisualEvidenceProtocol(dispatched, runner.HasArtifactUploadToken(environment))
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched)
+	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasArtifactUploadToken(environment))
+	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, dispatched.Steps, dispatched.Attachments)
 	if err != nil {
 		return err
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
 	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
+	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
 	files = runner.AppendTaskArtifactMCP(environment, files)
 
 	if runModel.Provider == models.UsageProviderOpenRouter {
@@ -288,6 +290,7 @@ func buildSuperPlaneBrokerTask(
 	setups []runner.IntegrationSetup,
 	environment []runner.BrokerEnvironmentVariable,
 	dispatched []runner.AgentStep,
+	attachments []runner.TaskAttachment,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
@@ -299,8 +302,8 @@ func buildSuperPlaneBrokerTask(
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
-		task := claude.ApplyPlanningFollowUp(claude.BuildDispatchedBrokerTask(claudeSpec, usage, setups, dispatched), environment, claudeSpec)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		task := claude.ApplyPlanningFollowUp(claude.BuildDispatchedBrokerTask(claudeSpec, usage, setups, dispatched, attachments, runner.HasPlanningSessionToken(environment)), environment, claudeSpec)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	case models.UsageProviderOpenAI:
 		codexSpec := codex.RunCodexSpec{
 			MachineType:             spec.MachineType,
@@ -310,8 +313,8 @@ func buildSuperPlaneBrokerTask(
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
-		task := codex.ApplyPlanningFollowUp(codex.BuildDispatchedBrokerTask(codexSpec, usage, setups, dispatched), environment, codexSpec)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		task := codex.ApplyPlanningFollowUp(codex.BuildDispatchedBrokerTask(codexSpec, usage, setups, dispatched, attachments, runner.HasPlanningSessionToken(environment)), environment, codexSpec)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	case models.UsageProviderOpenRouter:
 		openRouterSpec := openrouter.RunOpenRouterSpec{
 			MachineType:             spec.MachineType,
@@ -322,11 +325,11 @@ func buildSuperPlaneBrokerTask(
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
 		task := openrouter.ApplyPlanningFollowUp(
-			openrouter.BuildDispatchedBrokerTask(openRouterSpec, usage, setups, dispatched),
+			openrouter.BuildDispatchedBrokerTask(openRouterSpec, usage, setups, dispatched, attachments, runner.HasPlanningSessionToken(environment)),
 			environment,
 			openRouterSpec,
 		)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment)
 	default:
 		return nil, nil, fmt.Errorf("unsupported SuperPlane agent provider: %s", provider)
 	}
@@ -336,10 +339,9 @@ func withPlanningSessionFiles(
 	commands []runner.BrokerCommand,
 	files []runner.BrokerTaskFile,
 	environment []runner.BrokerEnvironmentVariable,
-	extra ...runner.BrokerTaskFile,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	if runner.HasPlanningSessionToken(environment) {
-		files = append(files, extra...)
+		files = runner.AppendPlanningSessionMCPFiles(files)
 	}
 	return commands, files, nil
 }

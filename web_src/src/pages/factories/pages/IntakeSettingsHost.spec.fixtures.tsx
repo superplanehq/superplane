@@ -7,7 +7,11 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
-import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
+import {
+  DEFAULT_DATADOG_INTAKE_SETTINGS,
+  DEFAULT_GITHUB_INTAKE_SETTINGS,
+  type IntakeSettingsTab,
+} from "./intakeSourceSettingsModel";
 import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
 export const GITHUB_INTAKE: ConfiguredLineIntakeSource = {
@@ -64,8 +68,19 @@ export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
   appId: "app-productive-intake",
   healthy: true,
   paused: false,
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive.io tasks" },
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive tasks" },
   source: lineIntakeSourceById("productive-tasks")!,
+};
+
+export const DATADOG_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-datadog",
+  appId: "app-datadog-intake",
+  healthy: true,
+  paused: false,
+  settings: { ...DEFAULT_DATADOG_INTAKE_SETTINGS, datadogService: "checkout" },
+  source: lineIntakeSourceById("datadog")!,
+  integrationId: "datadog-1",
+  resourceId: "checkout",
 };
 
 export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSource> = {}): ConfiguredLineIntakeSource {

@@ -13,10 +13,11 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_DEPENDABOT_INTAKE,
+  FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_SENTRY_INTAKE,
+  FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -29,20 +30,23 @@ vi.mock("@monaco-editor/react", () => {
 import {
   factoryAppConfigurePath,
   factoryColumnAutomationViewPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
+  factoryRiskScoreSetupPath,
   factorySentryIntakeSetupPath,
   firstFactoryLineId,
 } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
-  ACME_ONBOARDING_FACTORY_KEY,
+  ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
   ACME_ONBOARDING_LINE_ID,
   DEFAULT_FACTORY_PLANNING,
   DRAFT_WORK_ORDER,
@@ -50,17 +54,14 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
-  PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import {
-  BOARD_DONE_REJECTED_ORDER,
-  BOARD_IMPLEMENT_FAILED_ORDER,
-  BOARD_IMPLEMENT_NOTIFY_ORDER,
-} from "../__fixtures__/lineMetricsBoardOrders";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "../__fixtures__/workOrderCheckFixtures";
 import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
@@ -94,7 +95,7 @@ const ICON_VIEW: FactoryPreviewFlags = {
 };
 
 function renderLinesBoard(
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
   openCreateWorkOrder = vi.fn(),
   factory: FactoriesFactory = REFUND_FACTORY,
   previewFlags: FactoryPreviewFlags | null = null,
@@ -199,6 +200,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryWorkOrdersPage: () => ({
+    orders: [],
+    isLoading: false,
+    isPlaceholderData: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -264,6 +274,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
+const canvasStagingRefetch = vi.hoisted(() => vi.fn());
+const discardCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useCanvasData", () => {
   const actual = unmockedSrc<typeof canvasData>("hooks/useCanvasData");
@@ -271,8 +283,14 @@ vi.mock("@/hooks/useCanvasData", () => {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
       useCanvasMock(organizationId, canvasId, options),
+    useCanvasStaging: () => ({
+      data: { hasStaging: false, stale: false },
+      isPending: false,
+      refetch: canvasStagingRefetch,
+    }),
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
+    useDiscardCanvasStaging: () => ({ mutateAsync: discardCanvasStagingMutateAsync, isPending: false }),
   };
 });
 
@@ -318,6 +336,8 @@ async function resetLinesBoardMocks() {
   });
   updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
   commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+  canvasStagingRefetch.mockReset().mockResolvedValue({ data: { hasStaging: false, stale: false } });
+  discardCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
 
 describe("LinesPage board", () => {
@@ -394,7 +414,9 @@ describe("LinesPage board", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     expect(screen.queryByRole("status", { name: "Loading tasks" })).not.toBeInTheDocument();
@@ -404,7 +426,7 @@ describe("LinesPage board", () => {
 
   it("sets a pastel colour on the backlog from circular swatches", async () => {
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-color-lime"));
@@ -415,12 +437,12 @@ describe("LinesPage board", () => {
   it("shows a score on a draft card and hides it on other columns", () => {
     const draft = withBoardChecks(REVIEW_CANDIDATE_WORK_ORDERS)[0];
     useFactoryWorkOrders.mockReturnValue({
-      data: [draft, { ...BOARD_IMPLEMENT_FAILED_ORDER, checkScores: draft.checkScores }],
+      data: [draft, { ...BOARD_IMPLEMENT_NOTIFY_ORDER, checkScores: draft.checkScores }],
     });
     renderLinesBoard();
 
     expect(screen.getByTestId("work-order-card-score-wo-review-pay-842")).toBeInTheDocument();
-    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-failed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-board-implement-notify")).not.toBeInTheDocument();
   });
 
   it("shows a verdict on a review-candidate backlog card and opens the split run", async () => {
@@ -435,7 +457,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5Confidence5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -457,7 +479,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
@@ -466,7 +488,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
   });
@@ -501,20 +523,20 @@ describe("LinesPage board", () => {
 
   it("opens the split run from a task permalink", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`);
 
     const popup = await screen.findByTestId("work-order-split-run");
     expect(within(popup).getByTestId("popup-work-order-title")).toHaveTextContent(
       "Add retry handling to webhook delivery",
     );
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/842`,
     );
   });
 
   it("keeps the line board without a popup when the permalink is unknown", () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/999`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/999`);
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
@@ -523,12 +545,12 @@ describe("LinesPage board", () => {
   it("keeps the current line when a card opens from a second line", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`);
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
@@ -536,7 +558,7 @@ describe("LinesPage board", () => {
       expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_HOTFIX_ID}`,
     );
   });
 
@@ -556,16 +578,16 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-test-back"));
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
   });
 
   it("redirects to the first board when a missing line id is opened", async () => {
     const user = userEvent.setup();
-    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/line-missing`;
+    const missingLinePath = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/line-missing`;
     render(
       <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
         factory={REFUND_FACTORY}
         navigateTo={missingLinePath}
       />,
@@ -576,7 +598,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-test-navigate"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryHomePath("org-1", PRIMARY_FACTORY_KEY, firstFactoryLineId(REFUND_FACTORY)),
+      factoryHomePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, firstFactoryLineId(REFUND_FACTORY)),
     );
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
   });
@@ -632,7 +654,7 @@ describe("LinesPage board", () => {
   it("opens intake settings on the first tab when an automation icon is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId(`lines-backlog-automation-rows-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
@@ -646,14 +668,19 @@ describe("LinesPage board", () => {
   it("opens an existing phase automation in the board view popup", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     const location = screen.getByTestId("lines-test-location");
     expect(location).toHaveTextContent(
-      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-implementer"),
+      factoryColumnAutomationViewPath(
+        "org-1",
+        PRIMARY_FACTORY_ROUTE_SEGMENT,
+        REFUND_LINE_PLAN_ID,
+        "app-refund-implementer",
+      ),
     );
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
@@ -668,7 +695,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("column-automation-view-tab-automation"));
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "app-refund-implementer", {
         from: "lines",
         lineId: REFUND_LINE_PLAN_ID,
       }),
@@ -678,34 +705,34 @@ describe("LinesPage board", () => {
   it("opens Planning settings from the Task analysis row", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
 
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPlanningPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
-  it("opens the Planning setup wizard from the Task analysis row until setup is confirmed", async () => {
+  it("opens Planning settings from the Task analysis row before setup is confirmed", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
       vi.fn(),
       PLANNING_OPEN_FACTORY,
     );
 
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
-    expect(screen.getByTestId("planning-setup")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-setup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPlanningSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryPlanningPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
-    expect(screen.queryByTestId("planning-settings")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
   });
 
   it("opens the phase automation view from the header icon", async () => {
@@ -744,7 +771,13 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, undefined, "handler-discussion"),
+      factoryPRFeedbackPath(
+        "org-1",
+        PRIMARY_FACTORY_ROUTE_SEGMENT,
+        REFUND_LINE_PLAN_ID,
+        undefined,
+        "handler-discussion",
+      ),
     );
 
     unmount();
@@ -752,7 +785,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-pr-closure"),
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "app-pr-closure"),
     );
   });
 
@@ -778,7 +811,7 @@ describe("LinesPage board", () => {
     await user.click(within(verify).getByTestId("lines-verify-listener-handler-checks"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
     );
   });
 
@@ -807,7 +840,7 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -821,7 +854,7 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "comments"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -942,7 +975,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "comments"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "comments"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -958,7 +991,7 @@ describe("LinesPage next steps", () => {
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "checks"),
+      factoryPRFeedbackSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, "checks"),
     );
     expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
@@ -990,35 +1023,59 @@ describe("LinesPage board extras", () => {
     expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
   });
 
-  it("hides Add automation when custom automations are off", async () => {
+  it("shows Add automation on Verify when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-verify-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
   });
 
-  it("keeps the Verify plus when custom automations are off", async () => {
+  it("opens the Verify catalog when custom automations are off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
-    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
-    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+
+    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
+  });
+
+  it("opens the risk score setup page from the Verify catalog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    await user.click(screen.getByTestId("lines-verify-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-risk-score"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryRiskScoreSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
   });
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
       ],
       isPending: false,
+    });
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1050,7 +1107,7 @@ describe("LinesPage board extras", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-custom`,
+        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
       );
     });
   });
@@ -1088,22 +1145,18 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
   });
 
-  it("creates an intake from the picker and opens its canvas", async () => {
-    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+  it("opens GitHub intake setup from the picker", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true, columnAutomations: false });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
 
-    await waitFor(() => {
-      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/automations/canvas-new`,
-      );
-    });
+    expect(screen.getByTestId("github-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryGitHubIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("offers Add intake from the overflow menu", async () => {
@@ -1148,23 +1201,73 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-dependabot-alerts")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
+      ADD_INTAKE_COPY.comingSoon,
+    );
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
+      ADD_INTAKE_COPY.comingSoon,
+    );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
+    await user.click(screen.getByTestId("add-intake-template-datadog"));
+    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
 
-    expect(screen.queryByTestId("sentry-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Datadog setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DATADOG_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const datadog = screen.getByTestId("add-intake-template-datadog");
+    expect(datadog).toBeEnabled();
+    expect(datadog).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(datadog);
+
+    expect(screen.getByTestId("datadog-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryDatadogIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("opens guided Linear setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const linear = screen.getByTestId("add-intake-template-linear-issues");
+    expect(linear).toBeEnabled();
+    expect(linear).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(linear);
+
+    expect(screen.getByTestId("linear-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryLinearIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("opens guided Sentry setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_SENTRY_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1175,6 +1278,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1183,13 +1287,12 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("sentry-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factorySentryIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("opens guided Dependabot setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DEPENDABOT_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1199,7 +1302,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("dependabot-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryDependabotIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
@@ -1241,7 +1344,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
   });
 
@@ -1260,14 +1363,14 @@ describe("LinesPage board extras", () => {
     await user.click(productive);
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
+      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("sends a legacy Jira OAuth return to the setup page", () => {
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?jiraIntake=1&jiraIntegrationId=int-new`,
       vi.fn(),
       REFUND_FACTORY,
       LANE_BANNERS,
@@ -1275,14 +1378,16 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, { integrationId: "int-new" }),
+      factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, {
+        integrationId: "int-new",
+      }),
     );
   });
 
   it("shows only declared intakes", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}/lines/${ACME_ONBOARDING_LINE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
       LANE_BANNERS,
@@ -1305,7 +1410,7 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, GITHUB_ISSUES_INTAKE_APP.id!, {
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, GITHUB_ISSUES_INTAKE_APP.id!, {
         from: "lines",
         lineId: REFUND_LINE_PLAN_ID,
       }),
@@ -1332,7 +1437,7 @@ describe("LinesPage board extras", () => {
   it("does not list intake runs under the GitHub issues row", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
       vi.fn(),
       REFUND_FACTORY,
       LANE_BANNERS,
@@ -1353,14 +1458,14 @@ describe("LinesPage board pull request", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...BOARD_IMPLEMENT_NOTIFY_ORDER,
           pullRequests: [
             {
-              id: "pr-106",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              id: "pr-114",
+              workOrderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+              number: "114",
+              url: "https://github.com/acme/payments/pull/114",
+              title: "Notify on status change after a reopen",
               state: "STATE_CLOSED",
             },
           ],
@@ -1369,10 +1474,10 @@ describe("LinesPage board pull request", () => {
     });
     renderLinesBoard();
 
-    const card = screen.getByTestId("work-order-card-wo-board-implement-failed");
-    const pill = within(card).getByRole("link", { name: "Closed pull request #106." });
-    expect(pill).toHaveTextContent("Closed #106");
-    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/106");
+    const card = screen.getByTestId("work-order-card-wo-board-implement-notify");
+    const pill = within(card).getByRole("link", { name: "Closed pull request #114." });
+    expect(pill).toHaveTextContent("Closed #114");
+    expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/114");
   });
 });
 
@@ -1417,7 +1522,7 @@ describe("LinesPage board editing", () => {
 
   it("opens backlog settings in a modal and does not open a canvas", async () => {
     const user = userEvent.setup();
-    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`;
+    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
@@ -1555,7 +1660,7 @@ describe("LinesPage board editing", () => {
       updateLineIsPending.value = true;
       view.rerender(
         <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
           factory={REFUND_FACTORY}
         />,
       );
@@ -1563,7 +1668,7 @@ describe("LinesPage board editing", () => {
       updateLineIsPending.value = false;
       view.rerender(
         <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
           factory={REFUND_FACTORY}
         />,
       );
@@ -1665,6 +1770,21 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
+  it("opens closed tasks from the Status filter", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-filter-trigger"));
+    await user.hover(screen.getByTestId("work-orders-filter-statuses"));
+    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
+
+    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+  });
+
   it("treats a leftover Active scope as All and keeps every card", () => {
     window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "active");
     useFactoryWorkOrders.mockReturnValue({
@@ -1695,11 +1815,11 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1708,7 +1828,7 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Source is GitHub issues")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
@@ -1717,14 +1837,14 @@ describe("LinesPage board editing", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
-          ...BOARD_IMPLEMENT_FAILED_ORDER,
+          ...dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!),
           pullRequests: [
             {
               id: "pr-review",
-              workOrderId: BOARD_IMPLEMENT_FAILED_ORDER.id,
-              number: "106",
-              url: "https://github.com/acme/payments/pull/106",
-              title: "Fix refund dispatcher timeout loop",
+              workOrderId: OPEN_WORK_ORDER.id,
+              number: "101",
+              url: "https://github.com/acme/payments/pull/101",
+              title: "Reconcile duplicate refunds in ledger",
               state: "STATE_OPEN",
             },
           ],
@@ -1734,7 +1854,7 @@ describe("LinesPage board editing", () => {
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
@@ -1743,25 +1863,25 @@ describe("LinesPage board editing", () => {
 
     const board = screen.getByTestId("lines-detail-page");
     expect(within(board).getByText("Label is Review")).toBeInTheDocument();
-    expect(within(board).getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
+    expect(within(board).getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
     expect(within(board).queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("narrows the board when the search query changes", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrders.mockReturnValue({
-      data: [BOARD_IMPLEMENT_FAILED_ORDER, BOARD_DONE_REJECTED_ORDER],
+      data: [dispatchDraftToImplement(OPEN_WORK_ORDER, OPEN_WORK_ORDER.updatedAt!), BOARD_IMPLEMENT_NOTIFY_ORDER],
     });
     renderLinesBoard();
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.getByText("Replace the refund batch exporter")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("work-orders-search-trigger"));
-    await user.type(screen.getByTestId("work-orders-search-input"), "timeout");
+    await user.type(screen.getByTestId("work-orders-search-input"), "reconcile");
 
-    expect(screen.getByText("Fix refund dispatcher timeout loop")).toBeInTheDocument();
-    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
+    expect(screen.getByText("Reconcile duplicate refunds in ledger")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
   });
 
   it("does not show a line overflow Edit menu", () => {
@@ -1925,7 +2045,9 @@ describe("LinesPage Implement phase window", () => {
       orders[index] = dispatchDraftToImplement(drafts[index], at);
       useFactoryWorkOrders.mockReturnValue({ data: [...orders] });
       view.rerender(
-        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+        />,
       );
 
       await waitFor(() => {
@@ -2026,7 +2148,9 @@ describe("LinesPage Implement phase window", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     const pending = screen.getByTestId("lines-phase-column-scroll-0");
@@ -2042,7 +2166,9 @@ describe("LinesPage Implement phase window", () => {
       done: idleBoardPage(),
     });
     view.rerender(
-      <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />,
+      <LinesBoardSpecHarness
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+      />,
     );
 
     expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
@@ -2055,8 +2181,8 @@ describe("LinesPage Implement phase window", () => {
     const user = userEvent.setup();
     render(
       <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
-        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`}
+        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`}
+        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`}
       />,
     );
 
@@ -2068,14 +2194,14 @@ describe("LinesPage Implement phase window", () => {
     await user.click(screen.getByTestId("lines-test-navigate"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
     );
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
 
     await user.click(screen.getByTestId("lines-test-back"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(1760);
   });

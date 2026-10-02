@@ -37,6 +37,11 @@ const (
 	analysisRewindMessageCharacterLimit = 24_000
 	analysisRewindRetentionPercent      = 80
 	analysisRewindTruncationMarker      = "\n… middle omitted from this rewind …\n"
+
+	// leftoverPlanningTaskRole is the role stored for tasks a refine session
+	// split off before SuperPlane removed that path. Old rows stay in the
+	// transcript table. They must not enter the rewind prompt.
+	leftoverPlanningTaskRole = "task"
 )
 
 type analysisMessageWindow struct {
@@ -205,7 +210,7 @@ func appendMissingDescriptionFileRefs(tx *gorm.DB, order *FactoryWorkOrder, spec
 func markdownFileRef(file File) string {
 	ref := blob.FileRef(file.ID)
 	label := blob.MarkdownLinkLabel(file.Filename)
-	if IsInlineImageContentType(file.ContentType) {
+	if IsInlineMediaContentType(file.ContentType) {
 		return fmt.Sprintf("![%s](%s)", label, ref)
 	}
 	return fmt.Sprintf("[%s](%s)", label, ref)
@@ -310,6 +315,13 @@ func planningSpecArtifactKey(orderID uuid.UUID) string {
 	return PlanningSpecArtifactKey + ":" + orderID.String()
 }
 
+func (o *FactoryWorkOrder) StorePlanningSpec(tx *gorm.DB, body string) error {
+	if o == nil {
+		return ErrFactoryWorkOrderNotFound
+	}
+	return upsertPlanningSpecArtifact(tx, o, strings.TrimSpace(body), nil)
+}
+
 func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body string, runID *uuid.UUID) error {
 	key := planningSpecArtifactKey(order.ID)
 	data := map[string]any{
@@ -344,19 +356,21 @@ func planningScoreLevel(score float64) string {
 }
 
 func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
+	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
+	const startCue = "When every required score is 5, publish each required score on that plan turn. "
 	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
 	if err != nil {
-		return "Call propose_clarity and propose_confidence every turn. "
+		return "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
 	}
 	switch {
 	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
-		return "Call propose_clarity and propose_confidence every turn. "
+		return "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
 	case factoryModel.PlanningClarity:
-		return "Call propose_clarity every turn. "
+		return "Publish the specification only when this turn updates the plan. Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
 	case factoryModel.PlanningConfidence:
-		return "Call propose_confidence every turn. "
+		return "Publish the specification only when this turn updates the plan. Publish the Confidence score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
 	default:
-		return ""
+		return "Publish the specification only when this turn updates the plan. " + updateCue
 	}
 }
 
@@ -376,18 +390,12 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if err != nil {
 		return "", err
 	}
-	var b strings.Builder
-	if err := writeSplitSiblingsBlock(&b, tx, session); err != nil {
-		return "", err
-	}
 	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && len(messages) == 0 {
-		return b.String(), nil
+		return "", nil
 	}
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
-	if b.Len() > 0 {
-		b.WriteString("\n")
-	}
+	var b strings.Builder
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
 	b.WriteString(planningScoreCallSentence(tx, session))
 	b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
@@ -411,54 +419,8 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 			fmt.Fprintf(&b, "\n%s: %s\n", rewindMessageRole(message), rewindMessageText(message))
 		}
 	}
-	if err := writeCreatedTasksBlock(&b, tx, session); err != nil {
-		return "", err
-	}
 	b.WriteString("\nApply the latest user message. Do not rewrite the specification from scratch unless the new context requires it.\n")
 	return b.String(), nil
-}
-
-// writeCreatedTasksBlock lists every task this session split off its draft.
-// It reads the durable session links, not the chat, so a task stays listed
-// after its chat message falls out of the bounded rewind window.
-func writeCreatedTasksBlock(b *strings.Builder, tx *gorm.DB, session *FactoryPlanningSession) error {
-	created, err := session.SplitTaskOrders(tx)
-	if err != nil || len(created) == 0 {
-		return err
-	}
-	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
-	if err != nil {
-		return err
-	}
-	b.WriteString("\nTasks this session already created. Do not create them again:\n")
-	for _, order := range created {
-		fmt.Fprintf(b, "\n- %s: %s", factoryModel.WorkOrderKey(order.Number), order.Title)
-	}
-	b.WriteString("\n\nCreate a task only for a part that is not listed above.\n")
-	return nil
-}
-
-// writeSplitSiblingsBlock tells the agent that its draft is one part of a
-// split and names the other parts, so it plans against that boundary
-// instead of asking about work another part owns.
-func writeSplitSiblingsBlock(b *strings.Builder, tx *gorm.DB, session *FactoryPlanningSession) error {
-	siblings, err := session.SplitSiblings(tx)
-	if err != nil || len(siblings) == 0 {
-		return err
-	}
-	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
-	if err != nil {
-		return err
-	}
-	b.WriteString("This task is one part of a split. The other parts are separate tasks, each with its own refinement and its own run:\n")
-	for _, sibling := range siblings {
-		fmt.Fprintf(b, "\n- %s: %s", factoryModel.WorkOrderKey(sibling.Order.Number), sibling.Order.Title)
-		if sibling.Parent {
-			b.WriteString(" (the task it was split from)")
-		}
-	}
-	b.WriteString("\n\nTreat the boundary between the parts as decided. Work that another part owns is not missing and is not an open question: do not ask how to handle it, do not propose a stub for it, and do not lower Confidence because it is not in the repository yet. Plan against the interface the task description gives. Say once, in chat, which part you depend on. Do not create a task for work a listed part already owns.\n")
-	return nil
 }
 
 func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int) analysisMessageWindow {
@@ -496,7 +458,7 @@ func analysisConversationWindow(messages []PlanningSessionMessage, hardLimit int
 func filterPlanningRewindMessages(messages []PlanningSessionMessage) []PlanningSessionMessage {
 	filtered := make([]PlanningSessionMessage, 0, len(messages))
 	for _, message := range messages {
-		if message.Role == PlanningSessionMessageRolePlan {
+		if message.Role == PlanningSessionMessageRolePlan || message.Role == leftoverPlanningTaskRole {
 			continue
 		}
 		filtered = append(filtered, message)
@@ -520,30 +482,15 @@ func analysisMessageEnvelopeCharacters(message PlanningSessionMessage) int {
 	return len([]rune(rewindMessageRole(message))) + len(": \n")
 }
 
-// rewindMessageRole names the speaker of a message in the rewind prompt.
-// Task messages come from SuperPlane, not from either side of the chat.
 func rewindMessageRole(message PlanningSessionMessage) string {
-	switch message.Role {
-	case PlanningSessionMessageRoleAgent:
+	if message.Role == PlanningSessionMessageRoleAgent {
 		return "Agent"
-	case PlanningSessionMessageRoleTask:
-		return "SuperPlane"
-	default:
-		return "User"
 	}
+	return "User"
 }
 
-// rewindMessageText renders a message for the rewind prompt. A task message
-// becomes a short sentence, so the agent sees the key and title, not JSON.
 func rewindMessageText(message PlanningSessionMessage) string {
-	if message.Role != PlanningSessionMessageRoleTask {
-		return strings.TrimSpace(message.Text)
-	}
-	task, ok := ParsePlanningTaskMessage(message.Text)
-	if !ok {
-		return "Created a task."
-	}
-	return fmt.Sprintf("Created task %s: %s", task.Key, task.Title)
+	return strings.TrimSpace(message.Text)
 }
 
 func truncateAnalysisMessageForRewind(text string, limit int) string {
@@ -616,6 +563,92 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	state.clarity = planningScoreTextFromChecks(checks, PlanningClarityCheckKey)
 	state.confidence = planningScoreTextFromChecks(checks, PlanningConfidenceCheckKey)
 	return state, nil
+}
+
+func WorkOrderReadyForAutoStart(
+	tx *gorm.DB,
+	factoryModel *Factory,
+	order *FactoryWorkOrder,
+	session *FactoryPlanningSession,
+) (bool, error) {
+	if factoryModel == nil || order == nil || session == nil {
+		return false, nil
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return false, nil
+	}
+	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {
+		return false, nil
+	}
+	if len(session.CurrentSurvey().Questions) > 0 {
+		return false, nil
+	}
+	checks, err := order.ListChecks(tx)
+	if err != nil {
+		return false, err
+	}
+	turn, err := currentPlanningTurn(tx, session)
+	if err != nil {
+		return false, err
+	}
+	if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
+		return false, nil
+	}
+	spec, err := planningSpecBody(tx, order)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(spec) != "", nil
+}
+
+type planningTurn struct {
+	runID        uuid.UUID
+	latestUserAt time.Time
+	hasUser      bool
+}
+
+func currentPlanningTurn(tx *gorm.DB, session *FactoryPlanningSession) (planningTurn, error) {
+	var turn planningTurn
+	if session.CanvasRunID == nil || *session.CanvasRunID == uuid.Nil {
+		return turn, nil
+	}
+	turn.runID = *session.CanvasRunID
+	var message PlanningSessionMessage
+	err := tx.
+		Where("session_id = ? AND role = ?", session.ID, PlanningSessionMessageRoleUser).
+		Order("created_at DESC, id DESC").
+		First(&message).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return turn, nil
+	}
+	if err != nil {
+		return planningTurn{}, err
+	}
+	turn.latestUserAt = message.CreatedAt
+	turn.hasUser = true
+	return turn, nil
+}
+
+func (turn planningTurn) reportedScore(checks []FactoryWorkOrderCheck, key string, score float64) bool {
+	if turn.runID == uuid.Nil {
+		return false
+	}
+	for i := range checks {
+		if checks[i].Key != key {
+			continue
+		}
+		if checks[i].Score != score || checks[i].RunID == nil || *checks[i].RunID != turn.runID {
+			return false
+		}
+		if turn.hasUser && !checks[i].UpdatedAt.After(turn.latestUserAt) {
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {

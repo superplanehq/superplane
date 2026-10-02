@@ -13,7 +13,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { collectSplitRunArtifacts, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
-import { sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
+import { addedByForSource, sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
 
 describe("sourceTicketLabel", () => {
   it("uses owner/repo#number for GitHub issues", () => {
@@ -34,6 +34,7 @@ describe("sourceTicketLabel", () => {
 
   it("uses the issue key for Jira browse links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/browse/DEV-3")).toBe("DEV-3");
+    expect(sourceTicketLabel("https://linear.app/acme/issue/ENG-142/fix-login-redirect")).toBe("ENG-142");
   });
 
   it("uses the issue key for Jira project issue links", () => {
@@ -85,6 +86,7 @@ describe("splitRunSourceForOrder", () => {
         kind: "intake",
         name: "GitHub issues",
         ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+        addedBy: { kind: "imported", personName: "Leonardo DiCaprio" },
       }),
     );
   });
@@ -105,6 +107,7 @@ describe("splitRunSourceForOrder", () => {
         kind: "intake",
         name: "GitHub issues",
         ticket: { label: "acme/payments-service#103", href: expect.stringContaining("/issues/103") },
+        addedBy: { kind: "intake", name: "GitHub issues" },
       }),
     );
     expect(splitRunSourceForOrder(SENTRY_DRAFT_WORK_ORDER)).toEqual(
@@ -131,9 +134,9 @@ describe("splitRunSourceForOrder", () => {
       splitRunSourceForOrder({
         ...DRAFT_WORK_ORDER,
         origin: undefined,
-        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive.io tasks" } },
+        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive tasks" } },
       }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks", iconAlt: "Productive.io" }));
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks", iconAlt: "Productive" }));
   });
 
   it("names the Productive.io intake from a task link", () => {
@@ -142,7 +145,7 @@ describe("splitRunSourceForOrder", () => {
         ...DRAFT_WORK_ORDER,
         origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
       }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks" }));
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks" }));
   });
 
   it("names the Jira intake from a browse link", () => {
@@ -177,8 +180,24 @@ describe("splitRunSourceForOrder", () => {
         kind: "manual",
         detail: "Created manually",
         person: expect.objectContaining({ name: "Leonardo DiCaprio" }),
+        addedBy: { kind: "manual" },
       }),
     );
+  });
+
+  it("names the MCP client when the task has an MCP source", () => {
+    const source = splitRunSourceForOrder({
+      ...DRAFT_WORK_ORDER,
+      mcpClient: { id: "superplane-local", name: "Cursor" },
+    });
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Cursor",
+        iconAlt: "SuperPlane",
+      }),
+    );
+    expect(addedByForSource(source)).toEqual({ kind: "mcp", name: "Cursor" });
   });
 
   it("resolves the source person's avatar from the org members list when one is available", () => {
@@ -227,6 +246,8 @@ describe("splitRunSourceForOrder", () => {
           expect(source.ticket.href, order.id).toMatch(/^https?:/);
           expect(source.ticket.label, order.id).toBeTruthy();
         }
+      } else if (source.kind === "mcp") {
+        expect(source.name, order.id).toBeTruthy();
       } else {
         expect(source.person.name, order.id).toBeTruthy();
         expect(source.detail, order.id).toBe("Created manually");

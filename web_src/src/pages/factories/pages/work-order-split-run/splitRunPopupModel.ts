@@ -16,10 +16,8 @@ import {
   toArtifactDataRecord,
 } from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import type { SplitRunFixture, SplitRunPhase } from "./splitRunMocks";
+import { type SplitRunFixture, type SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
-
-export type SplitRunPopupTab = "description" | "log";
 
 export function refinePopupShowsAutomations(args: {
   footerKind: SplitRunFixture["footer"]["kind"];
@@ -46,20 +44,11 @@ export const SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME =
   "flex shrink-0 items-center border-t border-border bg-background px-5 py-3 min-h-[5.5rem]";
 
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
+
+export function isWorkOrderDescriptionName(name: string): boolean {
+  return DESCRIPTION_NAMES.includes(name);
+}
 const PLAN_NAMES = ["plan.md"];
-
-export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  const hasRunningLineStep = fixture.phases.some((phase) => phase.stepIndex != null && phase.status === "running");
-  return hasRunningLineStep || hasActivePullRequestActivity(fixture) ? "log" : "description";
-}
-
-export function hasActivePullRequestActivity(fixture: SplitRunFixture): boolean {
-  return fixture.phases.some(
-    (phase) =>
-      Boolean(phase.pullRequestActivity) &&
-      (phase.status === "running" || phase.status === "pending" || phase.status === "waiting"),
-  );
-}
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {
   const appId = phase?.appId;
@@ -226,6 +215,18 @@ export function splitRunSourceDescription(args: {
   return artifact || workOrder;
 }
 
+/**
+ * Every artifact on the task for the console summary panel, including
+ * document markdowns such as description.md and spec.md. Only the origin
+ * ticket stays out, because the Source row already links it. Oldest first.
+ */
+export function splitRunPanelArtifacts(
+  artifacts: FactoriesWorkOrderArtifact[],
+  source?: SplitRunSource,
+): FactoriesWorkOrderArtifact[] {
+  return artifacts.filter((artifact) => !isOriginTicketArtifact(artifact, source)).sort(compareArtifactsByCreatedAt);
+}
+
 /** Files and links that are not already the description body. Oldest first. */
 export function splitRunLinkedArtifacts(
   artifacts: FactoriesWorkOrderArtifact[],
@@ -251,7 +252,9 @@ function compareArtifactsByCreatedAt(left: FactoriesWorkOrderArtifact, right: Fa
 
 function artifactCreatedAtMs(artifact: FactoriesWorkOrderArtifact): number {
   const parsed = Date.parse(artifact.createdAt ?? "");
-  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+  // MAX_SAFE_INTEGER, not Infinity: undated artifacts sort last, and the
+  // comparator stays finite so the stable sort keeps their input order.
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
 function firstArtifactMarkdown(artifacts: FactoriesWorkOrderArtifact[], names: readonly string[]): string {

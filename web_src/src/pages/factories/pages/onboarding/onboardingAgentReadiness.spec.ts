@@ -33,6 +33,7 @@ describe("isAgentStepReady", () => {
     expect(isAgentStepReady(connected("claude"), 0)).toBe(true);
     expect(isAgentStepReady(connected("openai"), 0)).toBe(true);
     expect(isAgentStepReady(connected("openrouter"), 0)).toBe(true);
+    expect(isAgentStepReady(connected("customLlm"), 0)).toBe(true);
   });
 
   it("is not ready when credit is empty and no provider is connected", () => {
@@ -42,6 +43,35 @@ describe("isAgentStepReady", () => {
 });
 
 describe("resolveOnboardingAgent", () => {
+  it("plans a custom provider with the first model id", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: ["zeta-model", "alpha-model"],
+      }),
+    ).toEqual({
+      providerId: "customLlm",
+      component: "runnerOpenRouter",
+      credentialsSource: "integration",
+      integrationName: "customLlm",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "alpha-model",
+      planningModel: "alpha-model",
+      llmProvider: "custom",
+    });
+  });
+
+  it("does not invent an OpenRouter model when the custom provider returns none", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: [],
+      }),
+    ).toBeUndefined();
+  });
+
   it("uses a connected OpenRouter integration and an allowlisted model", () => {
     expect(
       resolveOnboardingAgent({
@@ -74,8 +104,7 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  // With no allowlist to read, the agent CLI resolves the alias itself.
-  it("gives planning the Opus alias when no allowlist applies", () => {
+  it("uses versioned model ids when no allowlist applies", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("claude"),
@@ -83,8 +112,43 @@ describe("resolveOnboardingAgent", () => {
       }),
     ).toMatchObject({
       credentialsSource: "integration",
-      model: "sonnet",
-      planningModel: "opus",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("gives a Claude key the newest Sonnet for implementation and the newest Opus for planning", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: {
+          ...noHostedModels,
+          anthropic: [
+            "claude-sonnet-4-20250514",
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-6",
+            "claude-opus-4-1-20250805",
+            "claude-opus-5-5",
+            "claude-haiku-4-5-20251001",
+          ],
+        },
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("falls back to another model when a Claude key has no Sonnet or Opus", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: { ...noHostedModels, anthropic: ["claude-haiku-4-5-20251001"] },
+      }),
+    ).toMatchObject({
+      model: "claude-haiku-4-5-20251001",
+      planningModel: "claude-haiku-4-5-20251001",
     });
   });
 
@@ -135,7 +199,7 @@ describe("resolveOnboardingAgent", () => {
     ).toMatchObject({
       providerId: "claude",
       credentialsSource: "integration",
-      model: "sonnet",
+      model: "claude-sonnet-4-6",
     });
   });
 

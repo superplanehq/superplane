@@ -7,7 +7,10 @@ import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 
 const SAMPLE = `$ Prepare Claude Code
 Claude Code ready
+$ Fetch task attachments
+$ Set up GitHub
 $ Clone Repo
+~ 3s
 Cloning into 'superplane'...
 remote: Enumerating objects: 7181, done.
 $ Provide description
@@ -45,6 +48,7 @@ describe("parseClaudeCodeLog", () => {
       { name: "Use plan as output", type: "bash", status: "passed" },
       { name: "Run Tests", type: "bash", status: "failed" },
     ]);
+    expect(steps[0].duration).toBe("3s");
     expect(steps[0]).toMatchObject({
       commands: [],
       output: "Cloning into 'superplane'...\nremote: Enumerating objects: 7181, done.",
@@ -71,6 +75,41 @@ describe("parseClaudeCodeLog", () => {
         status: "passed",
       },
     ]);
+  });
+
+  it("shows tool paths relative to the checkout and drops write sizes", () => {
+    const steps = parseClaudeCodeLog(
+      `$ Implementation
+-> [write] /home/ubuntu/repo/web_src/src/hooks/useSpokenPhraseDictation.ts (2264 chars)
+    Wrote file successfully.
+-> [read] /home/ubuntu/.superplane/skills/ui-copy/SKILL.md
+-> [edit] /home/ubuntu/repo/web_src/src/pages/factories/DictateButton.tsx
+`,
+      [{ name: "Implementation", type: "prompt" }],
+    );
+
+    expect(steps[0].commands.map((command) => command.name)).toEqual([
+      "web_src/src/hooks/useSpokenPhraseDictation.ts",
+      ".superplane/skills/ui-copy/SKILL.md",
+      "web_src/src/pages/factories/DictateButton.tsx",
+    ]);
+  });
+
+  it("marks a failed tool call without failing the step", () => {
+    const steps = parseClaudeCodeLog(
+      `$ Implementation
+-> [edit] /tmp/opencode/capture-dictation.cjs
+    oldString cannot be empty
+✗ tool failed
+-> [write] /tmp/opencode/capture-dictation.cjs
+    Wrote file successfully.
+✓ done
+`,
+      [{ name: "Implementation", type: "prompt" }],
+    );
+
+    expect(steps[0].status).toBe("passed");
+    expect(steps[0].commands.map((command) => command.status)).toEqual(["failed", "passed"]);
   });
 
   it("reads the planning runner example without keeping file dumps", () => {

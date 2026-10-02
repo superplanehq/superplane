@@ -43,8 +43,22 @@ export type AgentResourceConnectionDraft = {
   headers: FactoriesFactoryAgentResourceHeader[];
 };
 
+export type AgentResourceConnectionDefaults = Partial<AgentResourceConnectionDraft>;
+
 function emptyHeader(): HeaderDraft {
   return { name: "", secretName: "", secretKey: "" };
+}
+
+function headersFromDefaults(defaults?: AgentResourceConnectionDefaults): HeaderDraft[] {
+  const headers = defaults?.headers ?? [];
+  if (headers.length === 0) {
+    return [emptyHeader()];
+  }
+  return headers.map((header) => ({
+    name: header.name ?? "",
+    secretName: header.secretName ?? "",
+    secretKey: header.secretKey ?? "",
+  }));
 }
 
 function headersFromResource(resource?: FactoriesFactoryAgentResource): HeaderDraft[] {
@@ -111,7 +125,7 @@ export function AgentResourceConnectionDialog({
   open: boolean;
   organizationId: string;
   resource?: FactoriesFactoryAgentResource;
-  defaults?: Partial<AgentResourceConnectionDraft>;
+  defaults?: AgentResourceConnectionDefaults;
   isSaving: boolean;
   onClose: () => void;
   onSave: (draft: AgentResourceConnectionDraft) => Promise<void>;
@@ -134,7 +148,7 @@ export function AgentResourceConnectionDialog({
     setAuth(
       resource ? (resource.auth === "AUTH_OAUTH" ? "AUTH_OAUTH" : "AUTH_HEADERS") : (defaults?.auth ?? "AUTH_OAUTH"),
     );
-    setHeaders(headersFromResource(resource));
+    setHeaders(resource ? headersFromResource(resource) : headersFromDefaults(defaults));
     setNameError("");
     setUrlError("");
     setHeaderError("");

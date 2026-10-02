@@ -203,7 +203,27 @@ function planningSystemPrompt(env = process.env) {
 function catalogModelId(model) {
   return String(model || "")
     .trim()
-    .replace(/^openrouter\//, "");
+    .replace(/^(?:openrouter|custom)\//, "");
+}
+
+const CUSTOM_API_PACKAGES = {
+  anthropic: "@ai-sdk/anthropic",
+  openai: "@ai-sdk/openai",
+  "openai-compatible": "@ai-sdk/openai-compatible",
+};
+
+function customLLMFromEnv(env) {
+  if (!env) {
+    return null;
+  }
+  const baseURL = String(env.CUSTOM_LLM_BASE_URL || "").trim();
+  const apiKey = String(env.CUSTOM_LLM_API_KEY || "").trim();
+  const apiType = String(env.CUSTOM_LLM_API_TYPE || "").trim();
+  const npm = CUSTOM_API_PACKAGES[apiType];
+  if (!baseURL || !apiKey || !npm) {
+    return null;
+  }
+  return { baseURL, apiKey, apiType, npm };
 }
 
 function openRouterModelId(model) {
@@ -211,10 +231,19 @@ function openRouterModelId(model) {
   if (!trimmed) {
     return "";
   }
-  if (trimmed.startsWith("openrouter/")) {
+  if (trimmed.startsWith("openrouter/") || trimmed.startsWith("custom/")) {
     return trimmed;
   }
   return `openrouter/${trimmed}`;
+}
+
+function agentModelId(model, env) {
+  const custom = customLLMFromEnv(env);
+  if (!custom) {
+    return openRouterModelId(model);
+  }
+  const id = catalogModelId(model);
+  return id ? `custom/${id}` : "";
 }
 
 function classifyOpenRouterError(text) {
@@ -323,8 +352,8 @@ function retryWaitLine(kind, model, waitMs, nextAttempt) {
   return `${errorKindLabel(kind)} on ${catalogModelId(model)}. Waiting ${waitSecondsLabel(waitMs)}, then retrying (attempt ${nextAttempt} of ${MAX_ATTEMPTS}).`;
 }
 
-function callingOpenCodeLine(model, attempt) {
-  const labeled = openRouterModelId(model) || String(model || "").trim();
+function callingOpenCodeLine(model, attempt, env) {
+  const labeled = agentModelId(model, env) || String(model || "").trim();
   if (labeled) {
     return `Calling OpenCode · ${labeled} (attempt ${attempt} of ${MAX_ATTEMPTS})`;
   }
@@ -365,9 +394,9 @@ function thinkingArgs(thinking) {
   return [];
 }
 
-function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking }) {
+function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
   const args = ["--pure", "run", "--format", "json", "--thinking", "--auto"];
-  const prefixed = openRouterModelId(model);
+  const prefixed = agentModelId(model, env);
   if (prefixed) {
     args.push("-m", prefixed);
   }
@@ -394,34 +423,63 @@ function buildOpenCodeConfig({
       ? { "*": "allow", edit: "deny", question: "deny" }
       : { "*": "allow" },
   };
-  const options = {};
-  const apiKey = String((env && env.OPENROUTER_API_KEY) || "").trim();
-  const baseURL = String((env && env.OPENROUTER_BASE_URL) || "").trim();
-  if (apiKey) {
-    options.apiKey = apiKey;
-  }
-  if (baseURL) {
-    options.baseURL = baseURL;
-  }
+  const custom = customLLMFromEnv(env);
   const modelIds = uniqueCatalogModels(models);
-  const modelEntries = {};
-  for (const id of modelIds) {
-    modelEntries[id] = {
-      options: {
-        provider: {
-          allow_fallbacks: false,
-          sort: "throughput",
+  if (custom) {
+    const modelEntries = {};
+    for (const id of modelIds) {
+      modelEntries[id] = {
+        name: id,
+        attachment: true,
+        modalities: {
+          input: ["text", "image"],
         },
+      };
+    }
+    config.provider = {
+      custom: {
+        npm: custom.npm,
+        name: "Custom",
+        options: {
+          apiKey: custom.apiKey,
+          baseURL: custom.baseURL,
+        },
+        models: modelEntries,
       },
     };
-  }
-  if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
-    config.provider = { openrouter: {} };
-    if (Object.keys(options).length > 0) {
-      config.provider.openrouter.options = options;
+  } else {
+    const options = {};
+    const apiKey = String((env && env.OPENROUTER_API_KEY) || "").trim();
+    const baseURL = String((env && env.OPENROUTER_BASE_URL) || "").trim();
+    if (apiKey) {
+      options.apiKey = apiKey;
     }
-    if (Object.keys(modelEntries).length > 0) {
-      config.provider.openrouter.models = modelEntries;
+    if (baseURL) {
+      options.baseURL = baseURL;
+    }
+    const modelEntries = {};
+    for (const id of modelIds) {
+      modelEntries[id] = {
+        attachment: true,
+        modalities: {
+          input: ["text", "image"],
+        },
+        options: {
+          provider: {
+            allow_fallbacks: false,
+            sort: "throughput",
+          },
+        },
+      };
+    }
+    if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
+      config.provider = { openrouter: {} };
+      if (Object.keys(options).length > 0) {
+        config.provider.openrouter.options = options;
+      }
+      if (Object.keys(modelEntries).length > 0) {
+        config.provider.openrouter.models = modelEntries;
+      }
     }
   }
   if ((planning || artifactEnabled(env)) && taskDir) {
@@ -524,6 +582,9 @@ function ensureOpenCodeModelCatalog(
   childEnv,
   run = spawnSync,
 ) {
+  if (customLLMFromEnv(childEnv)) {
+    return "config";
+  }
   if (!model) {
     return "skipped";
   }
@@ -690,10 +751,10 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const continuing = promptCount > 0 && Boolean(sessionID);
   if (continuing) {
     printLiveLogLine(
-      `Continuing OpenCode session on ${openRouterModelId(currentModel) || currentModel}`,
+      `Continuing OpenCode session on ${agentModelId(currentModel, env) || currentModel}`,
     );
   } else {
-    const startModel = openRouterModelId(currentModel) || model;
+    const startModel = agentModelId(currentModel, env) || model;
     if (startModel) {
       printLiveLogLine(`Starting OpenCode · ${startModel}`);
     } else {
@@ -721,7 +782,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let attempt = 1;
 
   while (true) {
-    printLiveLogLine(callingOpenCodeLine(currentModel, attempt));
+    printLiveLogLine(callingOpenCodeLine(currentModel, attempt, env));
     const sessionBeforeAttempt = sessionID;
     const args = opencodeRunArgs({
       model: currentModel,
@@ -729,6 +790,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
       prompt,
       cwd,
       thinking,
+      env,
     });
     const spawnResult = await spawnOpenCodeTurn(
       args,

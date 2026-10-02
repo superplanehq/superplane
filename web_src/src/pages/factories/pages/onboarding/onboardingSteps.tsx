@@ -89,6 +89,7 @@ export function ConnectOptionRow({
           className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", unavailable && "cursor-not-allowed")}
           onClick={select}
           disabled={unavailable}
+          aria-pressed={selected}
         >
           <span className="mt-0.5 shrink-0">{icon}</span>
           <span className="min-w-0 flex-1">
@@ -162,6 +163,7 @@ export function RepositoryPicker({
   title,
   description,
   disabled,
+  listClassName,
 }: {
   host: VcsHostId;
   repos: string[];
@@ -171,6 +173,7 @@ export function RepositoryPicker({
   title?: string;
   description?: string;
   disabled?: boolean;
+  listClassName?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -200,7 +203,7 @@ export function RepositoryPicker({
         />
       </div>
       <div
-        className="max-h-56 overflow-y-auto rounded-lg border border-border"
+        className={cn(listClassName ?? "max-h-56", "overflow-y-auto rounded-lg border border-border")}
         role="listbox"
         aria-label="Repositories"
       >

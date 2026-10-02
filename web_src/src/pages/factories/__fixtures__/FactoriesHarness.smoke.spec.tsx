@@ -4,8 +4,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
-import { FIRST_RUN_COPY } from "../pages/onboarding/first-run/firstRunCopy";
-import { factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
+import { factoryRouteSegment, factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
@@ -16,14 +15,15 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY,
   REFUND_FACTORY_LINES,
   defaultFactoriesFixture,
 } from "./factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import {
   CONNECTED_SETUP_INTEGRATIONS,
-  PENDING_PICKER_INTEGRATION,
   SETUP_ANSWERS,
+  factoriesFixtureWithGithubAccess,
   factoriesFixtureWithSetupAnswers,
 } from "./setupStoryFixtures";
 
@@ -205,7 +205,7 @@ describe("FactoriesHarness tasks", () => {
     const settingsLink = await screen.findByTestId("factories-workspace-settings-link");
     expect(settingsLink).toHaveAttribute(
       "href",
-      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY),
+      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(REFUND_FACTORY)),
     );
     expect(settingsLink).not.toHaveClass("pointer-events-none");
   }, 10000);
@@ -253,9 +253,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 10000);
 
-  // The connect screen offers no connected state. Workspace setup starts a
-  // new connect even when the organization already has a GitHub connection.
-  it("asks to connect GitHub even when the organization already has a connection", async () => {
+  it("does not infer global GitHub access from an organization integration", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -273,10 +271,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
   }, 15000);
 
-  // Regression: initial onboarding auto-selected the single ready GitHub
-  // connection on the forward pass, so Get started skipped straight to the
-  // repository list. Only the install-request return may auto-select.
-  it("stays on the connect screen after Get started during initial onboarding", async () => {
+  it("skips installation when initial onboarding already has repository access", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -289,61 +284,21 @@ describe("FactoriesHarness workspace setup", () => {
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
 
-    expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   }, 15000);
 
-  it("opens the repository list when GitHub sends the browser back to the VCS step", async () => {
+  it("opens the repository list when the VCS step already has repository access", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs&pick=newest`}
-        factoriesFixture={defaultFactoriesFixture}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs`}
+        factoriesFixture={factoriesFixtureWithGithubAccess()}
         onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
         orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
       />,
     );
 
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
-  }, 15000);
-
-  // Regression: the OAuth account choice returns with `pick=newest` while the
-  // new connect is still pending. Setup auto-selected the organization's old
-  // ready connection and skipped the account picker.
-  it("shows the account picker on the vcs return instead of picking an old connection", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs&pick=newest`}
-        factoriesFixture={defaultFactoriesFixture}
-        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
-        orgIntegrations={[...CONNECTED_SETUP_INTEGRATIONS, PENDING_PICKER_INTEGRATION]}
-      />,
-    );
-
-    expect(await screen.findByTestId("first-run-github-account-picker", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-use-forestileao")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
-    );
-    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
-  }, 15000);
-
-  // Regression: on a direct repo-step load the selection sync ran before the
-  // connection list arrived, dropped the saved connection, and the repository
-  // list stayed empty until the user re-picked the account.
-  // Leftover githubSetup=request on step=repo used to reopen Connect and
-  // bounce. The step in the URL must win.
-  it("stays on the repository screen when an install-request flag is leftover on step=repo", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo&githubSetup=request`}
-        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.vcs)}
-        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
-        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-      />,
-    );
-
-    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
   }, 15000);
 
   it("restores the saved connection's repositories on a direct repo-step load", async () => {

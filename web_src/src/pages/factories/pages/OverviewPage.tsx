@@ -19,7 +19,7 @@ import {
 const MAX_ROWS = 8;
 
 export function OverviewPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   usePageTitle(["Overview", factory?.name ?? "Workspace"]);
   const {
     data: workOrders = [],
@@ -49,13 +49,13 @@ export function OverviewPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}
-            factoryKey={factoryKey}
+            factoryKey={routeSegment}
             lineId={firstFactoryLineId(factory)}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
           />
-          <LinesOverviewCard organizationId={organizationId} factoryKey={factoryKey} lines={lines} />
+          <LinesOverviewCard organizationId={organizationId} factoryKey={routeSegment} lines={lines} />
         </div>
       </div>
     </>

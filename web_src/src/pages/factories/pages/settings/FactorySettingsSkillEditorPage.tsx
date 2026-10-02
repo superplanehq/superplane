@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/useTheme";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
@@ -18,7 +19,7 @@ export function FactorySettingsSkillEditorPage() {
   const { resolvedTheme } = useTheme();
   usePageTitle([
     editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : editor.name || AGENT_RESOURCES_COPY.editSkill,
-    AGENT_RESOURCES_COPY.skillsTitle,
+    AGENT_RESOURCES_COPY.agentTitle,
     editor.factory.name ?? "Workspace",
   ]);
 
@@ -65,8 +66,21 @@ export function FactorySettingsSkillEditorPage() {
 }
 
 function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEditorPage> }) {
+  const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
   return (
     <div className="flex items-center gap-2">
+      {!editor.isCreate && editor.resource ? (
+        <div className="mr-1 flex items-center gap-3">
+          <span className="text-[12px] text-muted-foreground">Enabled</span>
+          <Switch
+            checked={editor.resource.enabled !== false}
+            disabled={!editor.canUpdate}
+            onCheckedChange={editor.toggleEnabled}
+            aria-label={`Enable ${displayName}`}
+            data-testid="skill-editor-enabled"
+          />
+        </div>
+      ) : null}
       {!editor.isCreate ? (
         <Button
           type="button"

@@ -1,25 +1,11 @@
-import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
+import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useMe } from "@/hooks/useMe";
-import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
+import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
-import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
-import {
-  GITHUB_SETUP_INTEGRATION_PARAM,
-  GITHUB_SETUP_ORG_PARAM,
-  GITHUB_SETUP_REQUEST_PARAM,
-  GITHUB_SETUP_REQUEST_VALUE,
-} from "@/lib/integrationSetupReturn";
-import {
-  githubAccountPickerFromConnection,
-  pendingGitHubAccountPicker,
-  pendingGitHubRequestConnection,
-  type PendingGitHubAccountPicker,
-} from "@/lib/startDirectGitHubConnect";
+import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
@@ -36,17 +22,19 @@ import {
   type OnboardingAgentGate,
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
+import { onboardingStepPath } from "./onboardingStepPath";
+import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 export type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
 type FirstRunBlockingAction =
   | "opening-github"
-  | "binding-github"
-  | "saving-github-connection"
+  | "switching-github-account"
   | "saving-repository"
   | "saving-ticket-source"
   | "connecting-jira"
+  | "connecting-linear"
   | "finishing-setup";
 
 export { DEFAULT_TICKET_SOURCE };
@@ -67,13 +55,7 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
 function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen {
   const requestedStep = searchParams.get("step");
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
-  return searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ? "connect" : "welcome";
-}
-
-function startConnectOnPicker(searchParams: URLSearchParams): boolean {
-  const step = searchParams.get("step");
-  if (step === "vcs") return true;
-  return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
+  return "welcome";
 }
 
 function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
@@ -131,75 +113,34 @@ function useFirstRunBlockingAction() {
   return { action, busy: action !== null, begin, finish, setAction, run, runUntilNavigation };
 }
 
-function useGitHubConnectionState(model: OnboardingPageModel, organizationId: string) {
-  const { data: me, isPending: meLoading } = useMe(true, organizationId);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const callbackIntegrationId = searchParams.get(GITHUB_SETUP_INTEGRATION_PARAM)?.trim() || undefined;
-  const resolved = resolveGitHubConnection(model, me?.id, callbackIntegrationId);
-  const requestConnection = resolved.requestConnection;
-  const callbackRequestPending = model.githubConnectionsLoading && hasRequestMarker(searchParams);
-
-  useEffect(() => {
-    if (model.githubConnectionsLoading || requestConnection || !hasRequestMarker(searchParams)) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete(GITHUB_SETUP_REQUEST_PARAM);
-    next.delete(GITHUB_SETUP_ORG_PARAM);
-    next.delete(GITHUB_SETUP_INTEGRATION_PARAM);
-    setSearchParams(next, { replace: true });
-  }, [model.githubConnectionsLoading, requestConnection, searchParams, setSearchParams]);
-
+function useGitHubConnectionState(organizationId: string, options?: { poll?: boolean }) {
+  const [searchParams] = useSearchParams();
+  const onboarding = useGitHubOnboarding(organizationId, options);
+  const repositories = onboarding.data?.repositories ?? [];
   return {
-    ...resolved,
-    callbackIntegrationId,
-    installRequested: Boolean(requestConnection) || callbackRequestPending,
-    githubOrganizations: requestedOrganizations(requestConnection, callbackRequestPending, searchParams),
-    sourcesLoading: meLoading || model.githubConnectionsLoading,
-    startOnPicker: startConnectOnPicker(searchParams),
+    onboarding,
+    identity: onboarding.data?.identity,
+    identities: onboarding.data?.identities ?? [],
+    repositories,
+    pendingOrganizations: (onboarding.data?.pendingRequests ?? [])
+      .map((request) => request.accountLogin?.trim())
+      .filter((organization): organization is string => Boolean(organization)),
+    synchronizing: Boolean(onboarding.data?.synchronizing),
+    appConfigured: Boolean(onboarding.data?.providerConfigured),
     initialScreen: initialFirstRunScreen(searchParams),
   };
 }
 
-function resolveGitHubConnection(model: OnboardingPageModel, userId?: string, callbackIntegrationId?: string) {
-  const requestConnection = pendingGitHubRequestConnection(
-    model.githubConnections.allInstances,
-    userId,
-    callbackIntegrationId,
-  );
-  const preferredId = requestConnection?.id ?? callbackIntegrationId;
-  const preferredConnection = model.githubConnections.allInstances.find((item) => item.metadata?.id === preferredId);
-  const selectedConnection = model.githubConnections.readyInstances.find(
-    (item) => item.metadata?.id === model.selectedVcsConnectionId,
-  );
-  const accountPicker = preferredId
-    ? githubAccountPickerFromConnection(preferredConnection, userId)
-    : (pendingGitHubAccountPicker(model.githubConnections.allInstances, userId) ??
-      githubAccountPickerFromConnection(selectedConnection, userId));
-  return { requestConnection, accountPicker };
-}
-
-function hasRequestMarker(searchParams: URLSearchParams): boolean {
-  return searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
-}
-
-function requestedOrganizations(
-  request: ReturnType<typeof pendingGitHubRequestConnection>,
-  callbackRequestPending: boolean,
-  searchParams: URLSearchParams,
-): string[] {
-  if (request) return request.requests.map((item) => item.accountLogin).filter(Boolean);
-  if (!callbackRequestPending) return [];
-  const account = searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim();
-  return account ? [account] : [];
-}
-
-function screenWithoutIncompleteJira(
+function screenWithoutIncompleteBacklog(
   screen: FirstRunScreen,
   agentGate: OnboardingAgentGate,
   issuesChoice: IssuesChoiceId | null,
   jiraProjectId: string,
+  linearProjectIds: string[],
 ): FirstRunScreen {
   if (screen !== "agent" || agentGate !== "show") return screen;
   if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
+  if (issuesChoice === "linear" && linearProjectIds.length === 0) return "tickets";
   return screen;
 }
 
@@ -209,7 +150,6 @@ function useFirstRunNavigation(
   connection: ReturnType<typeof useGitHubConnectionState>,
 ) {
   const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(connection.initialScreen);
-  const [pickerOpen, setPickerOpen] = useState(connection.startOnPicker);
   const openStep = useRef(model.openSection);
 
   useEffect(() => {
@@ -218,8 +158,7 @@ function useFirstRunNavigation(
     setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const goToScreen = (next: FirstRunScreen, connectStage: "button" | "picker" = "button") => {
-    if (next === "connect") setPickerOpen(connectStage === "picker" || Boolean(connection.requestConnection));
+  const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
     if (step) {
       openStep.current = step;
@@ -228,16 +167,20 @@ function useFirstRunNavigation(
     setOpenedScreen(next);
   };
 
+  let availableScreen = openedScreen;
+  if (!connection.onboarding.isPending && openedScreen !== "welcome") {
+    if (!connection.identity) availableScreen = "connect";
+    else if (openedScreen === "connect") availableScreen = "choose";
+  }
+
   return {
-    screen: screenWithoutIncompleteJira(
-      screenWithModelSource(screenWithoutAgent(openedScreen, agentGate), agentGate, model.agentCredentialChoice),
+    screen: screenWithoutIncompleteBacklog(
+      screenWithModelSource(screenWithoutAgent(availableScreen, agentGate), agentGate, model.agentCredentialChoice),
       agentGate,
       model.setup.issuesChoice,
       model.jiraProjectId,
+      model.linearProjectIds,
     ),
-    pickerShowing: pickerOpen && Boolean(connection.accountPicker),
-    pickerLoading: pickerOpen && !connection.accountPicker && connection.sourcesLoading,
-    closePicker: () => setPickerOpen(false),
     goToScreen,
   };
 }
@@ -246,16 +189,38 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(model: OnboardingPageModel, jiraAvailable: boolean): IssuesChoiceId | null {
+function openGitHubWindow(): Window | null {
+  const popup = window.open("about:blank", "_blank");
+  if (popup) popup.opener = null;
+  return popup;
+}
+
+function navigateGitHubWindow(popup: Window | null, url: string) {
+  if (popup) {
+    popup.location.replace(url);
+    return;
+  }
+  window.location.assign(url);
+}
+
+function selectedIssuesChoice(
+  model: OnboardingPageModel,
+  jiraAvailable: boolean,
+  linearAvailable: boolean,
+): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
   if (issuesChoice === "jira" && !jiraAvailable) return null;
+  if (issuesChoice === "linear" && !linearAvailable) return null;
+  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({
       ticketSource,
       jiraConnected: model.setup.connected.has("jira"),
       jiraProjectId: model.jiraProjectId,
+      linearConnected: model.setup.connected.has("linear"),
+      linearProjectIds: model.linearProjectIds,
     })
   ) {
     return null;
@@ -270,18 +235,22 @@ function useFirstRunCommands(args: {
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: ReturnType<typeof useFirstRunBlockingAction>;
   jiraAvailable: boolean;
+  linearAvailable: boolean;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable, linearAvailable } = args;
+  const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
-      const repository = model.setup.selectedRepo;
+      const repository = connection.repositories.find((candidate) => candidate.fullName === model.setup.selectedRepo);
       if (!repository) return;
       model.setup.commitRepoStep();
-      if (await model.saveRepository(repository)) navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
+      if (await model.selectCatalogRepository(repository)) {
+        navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
+      }
     });
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model, jiraAvailable);
+      const issuesChoice = selectedIssuesChoice(model, jiraAvailable, linearAvailable);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
@@ -293,8 +262,25 @@ function useFirstRunCommands(args: {
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
-      await waitForBrowserPaint();
-      return model.requestConnect("github", connection.requestConnection?.id ?? connection.callbackIntegrationId);
+      const returnPath = onboardingStepPath(`${location.pathname}${location.search}`, "repo");
+      window.location.assign(linkedAccountConnectHref("github", returnPath));
+      return true;
+    });
+  const selectGitHubIdentity = (userId: string) =>
+    blocking.run("switching-github-account", async () => {
+      await connection.onboarding.selectIdentity.mutateAsync(userId);
+      model.setup.clearRepository();
+    });
+  const grantGitHubAccess = () =>
+    blocking.run("opening-github", async () => {
+      const popup = openGitHubWindow();
+      try {
+        const url = await connection.onboarding.startInstallation.mutateAsync();
+        navigateGitHubWindow(popup, url);
+      } catch (error) {
+        popup?.close();
+        throw error;
+      }
     });
   const connectJira = () =>
     blocking.runUntilNavigation("connecting-jira", async () => {
@@ -304,6 +290,14 @@ function useFirstRunCommands(args: {
       await waitForBrowserPaint();
       return model.requestConnect("jira");
     });
+  const connectLinear = () =>
+    blocking.runUntilNavigation("connecting-linear", async () => {
+      if (!linearAvailable) return false;
+      model.setup.setIssuesChoice("linear");
+      if (!(await model.saveIssues("linear"))) return false;
+      await waitForBrowserPaint();
+      return model.requestConnect("linear");
+    });
   const finishSetup = () =>
     blocking.run("finishing-setup", async () => {
       await model.finish();
@@ -312,109 +306,53 @@ function useFirstRunCommands(args: {
     if (agentGate === "first") return navigation.goToScreen("tickets");
     return finishSetup();
   };
-  const installOnAnotherAccount = () => {
-    const state = connection.accountPicker?.state;
-    const slug = connection.accountPicker?.appSlug;
-    if (!state || !slug) return Promise.resolve();
-    return blocking.runUntilNavigation("opening-github", async () => {
-      await waitForBrowserPaint();
-      window.location.assign(hostedGitHubInstallURL(slug, state));
-      return true;
-    });
-  };
   const selectTicketSource = (source: FirstRunTicketSource) => {
     if (source === "jira" && !jiraAvailable) return;
+    if (source === "linear" && !linearAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
   return {
     connectGitHub,
     connectJira,
+    connectLinear,
     continueFromRepository,
     continueFromTickets,
     continueFromAgent,
-    installOnAnotherAccount,
+    grantGitHubAccess,
+    selectGitHubIdentity,
     selectTicketSource,
   };
 }
 
-function useSelectBoundGithubConnection(
-  boundIntegrationId: string | null,
-  model: OnboardingPageModel,
-  onSelected: () => void,
-  onFinished: () => void,
-) {
-  const selecting = useRef<string | null>(null);
-  useEffect(() => {
-    if (!boundIntegrationId || selecting.current === boundIntegrationId) return;
-    if (!model.githubConnections.readyInstances.some((item) => item.metadata?.id === boundIntegrationId)) return;
-    selecting.current = boundIntegrationId;
-    void model
-      .selectVcsConnection(boundIntegrationId)
-      .then((saved) => {
-        if (saved) onSelected();
-      })
-      .finally(() => {
-        selecting.current = null;
-        onFinished();
-      });
-  }, [boundIntegrationId, model, onFinished, onSelected]);
+const ORGANIZATION_NOT_FOUND = "Not Found";
+
+function githubOnboardingMessage(error: unknown, fallback: string): string {
+  const message = getApiErrorMessage(error, fallback);
+  if (message === ORGANIZATION_NOT_FOUND) return fallback;
+  return message;
 }
 
-function useGitHubInstallationBinding(
-  organizationId: string,
-  model: OnboardingPageModel,
-  accountPicker: PendingGitHubAccountPicker | undefined,
-  goToScreen: (screen: FirstRunScreen) => void,
-  blocking: ReturnType<typeof useFirstRunBlockingAction>,
-) {
-  const bindInstallation = useBindGitHubInstallation(organizationId);
-  const [boundIntegrationId, setBoundIntegrationId] = useState<string | null>(null);
-  const [bindingInstallationId, setBindingInstallationId] = useState<string>();
-  const finish = () => {
-    setBoundIntegrationId(null);
-    setBindingInstallationId(undefined);
-    blocking.finish();
-  };
-  useSelectBoundGithubConnection(
-    boundIntegrationId,
-    model,
-    () => {
-      blocking.setAction("saving-github-connection");
-      goToScreen("choose");
-    },
-    finish,
-  );
-
-  const useInstallation = async (installation: PendingGitHubInstallation) => {
-    if (!accountPicker?.state || !blocking.begin("binding-github")) return;
-    setBindingInstallationId(installation.id);
-    try {
-      await bindInstallation.mutateAsync({ state: accountPicker.state, installationId: installation.id });
-      if (accountPicker.id) return setBoundIntegrationId(accountPicker.id);
-      goToScreen("choose");
-      finish();
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account"));
-      finish();
-    }
-  };
-  return { bindingInstallationId, useInstallation };
-}
-
-function useRepositoryErrorToast(error: unknown) {
+function useRepositoryErrorToast(error: unknown, reportErrors: boolean) {
   const reported = useRef<unknown>(null);
   useEffect(() => {
-    if (!error || reported.current === error) return;
+    if (!reportErrors || !error || reported.current === error) return;
     reported.current = error;
-    showErrorToast(getApiErrorMessage(error, "Failed to load repositories"));
-  }, [error]);
+    showErrorToast(githubOnboardingMessage(error, "Failed to load repositories"));
+  }, [error, reportErrors]);
 }
 
-export function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refresh: () => Promise<unknown>) {
-  useEffect(() => {
-    if (screen === "connect") void refresh();
-  }, [screen, refresh]);
+type FlaggedIssuesChoice = "jira" | "linear";
+
+function shouldClearSavedFlaggedChoice(args: {
+  issuesChoice: IssuesChoiceId | null;
+  source: FlaggedIssuesChoice;
+  featureLoading: boolean;
+  available: boolean;
+  organizationReady: boolean;
+}): boolean {
+  if (args.featureLoading || args.available || args.issuesChoice !== args.source) return false;
+  return args.organizationReady;
 }
 
 export function shouldClearSavedJiraChoice(args: {
@@ -423,11 +361,44 @@ export function shouldClearSavedJiraChoice(args: {
   jiraAvailable: boolean;
   organizationReady: boolean;
 }): boolean {
-  if (args.featureLoading || args.jiraAvailable || args.issuesChoice !== "jira") return false;
-  return args.organizationReady;
+  return shouldClearSavedFlaggedChoice({
+    issuesChoice: args.issuesChoice,
+    source: "jira",
+    featureLoading: args.featureLoading,
+    available: args.jiraAvailable,
+    organizationReady: args.organizationReady,
+  });
 }
 
-export type SavedJiraChoiceBlock = "loading" | "lookup-failed";
+export function shouldClearSavedLinearChoice(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  linearAvailable: boolean;
+  organizationReady: boolean;
+}): boolean {
+  return shouldClearSavedFlaggedChoice({
+    issuesChoice: args.issuesChoice,
+    source: "linear",
+    featureLoading: args.featureLoading,
+    available: args.linearAvailable,
+    organizationReady: args.organizationReady,
+  });
+}
+
+export type SavedFlaggedChoiceBlock = "loading" | "lookup-failed";
+
+function savedFlaggedChoiceBlock(args: {
+  issuesChoice: IssuesChoiceId | null;
+  source: FlaggedIssuesChoice;
+  featureLoading: boolean;
+  available: boolean;
+  organizationReady: boolean;
+}): SavedFlaggedChoiceBlock | null {
+  if (args.available || args.issuesChoice !== args.source) return null;
+  if (args.featureLoading) return "loading";
+  if (!args.organizationReady) return "lookup-failed";
+  return null;
+}
 
 /** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
 export function savedJiraChoiceBlock(args: {
@@ -435,19 +406,43 @@ export function savedJiraChoiceBlock(args: {
   featureLoading: boolean;
   jiraAvailable: boolean;
   organizationReady: boolean;
-}): SavedJiraChoiceBlock | null {
-  if (args.jiraAvailable || args.issuesChoice !== "jira") return null;
-  if (args.featureLoading) return "loading";
-  if (!args.organizationReady) return "lookup-failed";
-  return null;
+}): SavedFlaggedChoiceBlock | null {
+  return savedFlaggedChoiceBlock({
+    issuesChoice: args.issuesChoice,
+    source: "jira",
+    featureLoading: args.featureLoading,
+    available: args.jiraAvailable,
+    organizationReady: args.organizationReady,
+  });
+}
+
+/** A saved Linear choice cannot continue until the feature lookup confirms Linear. */
+export function savedLinearChoiceBlock(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  linearAvailable: boolean;
+  organizationReady: boolean;
+}): SavedFlaggedChoiceBlock | null {
+  return savedFlaggedChoiceBlock({
+    issuesChoice: args.issuesChoice,
+    source: "linear",
+    featureLoading: args.featureLoading,
+    available: args.linearAvailable,
+    organizationReady: args.organizationReady,
+  });
 }
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
+  const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
-  const connection = useGitHubConnectionState(model, organizationId);
-  const jiraFeature = useExperimentalFeature(organizationId);
-  const jiraAvailable = !jiraFeature.isLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
+  const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
+  const intakeFeatures = useExperimentalFeature(organizationId);
+  const intakeFeatureLoading = intakeFeatures.isLoading;
+  const jiraFeatureLoading = intakeFeatureLoading;
+  const linearFeatureLoading = intakeFeatureLoading;
+  const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
+  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -455,46 +450,46 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection);
-  const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
-  const binding = useGitHubInstallationBinding(
-    organizationId,
+  const commands = useFirstRunCommands({
     model,
-    connection.accountPicker,
-    navigation.goToScreen,
+    agentGate,
+    connection,
+    navigation,
     blocking,
-  );
-  useRepositoryErrorToast(model.repositoriesError);
+    jiraAvailable,
+    linearAvailable,
+  });
+  useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms
   // the feature is off. A failed lookup has no organization data and must not
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
+  const organizationReady = intakeFeatures.organizationReady;
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: jiraFeature.isLoading,
+    featureLoading: jiraFeatureLoading,
     jiraAvailable,
-    organizationReady: jiraFeature.organizationReady,
+    organizationReady,
+  };
+  const linearChoiceArgs = {
+    issuesChoice,
+    featureLoading: linearFeatureLoading,
+    linearAvailable,
+    organizationReady,
   };
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
+  const clearSavedLinearChoice = shouldClearSavedLinearChoice(linearChoiceArgs);
   const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
+  const linearChoiceBlock = savedLinearChoiceBlock(linearChoiceArgs);
   useEffect(() => {
-    if (!clearSavedJiraChoice) return;
+    if (!clearSavedJiraChoice && !clearSavedLinearChoice) return;
     setIssuesChoice(null);
-  }, [clearSavedJiraChoice, setIssuesChoice]);
-  // Recheck while a request waits, and also while the picker is open: an
-  // install request made on GitHub without a callback (for example when the
-  // callback URL was unreachable) only surfaces through this sync.
-  useRecheckGitHubInstallRequest(
-    organizationId,
-    connection.requestConnection?.id ?? connection.accountPicker?.id,
-    navigation.screen === "connect" && (connection.installRequested || navigation.pickerShowing),
-  );
-
+  }, [clearSavedJiraChoice, clearSavedLinearChoice, setIssuesChoice]);
   return {
     ...navigation,
     ...commands,
-    ...binding,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
@@ -504,11 +499,24 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
+    jiraFeatureLoading,
     jiraChoiceBlock,
-    installRequested: connection.installRequested,
-    githubOrganizations: connection.githubOrganizations,
-    requestIntegrationId: connection.requestConnection?.id ?? connection.callbackIntegrationId,
-    accountPicker: connection.accountPicker,
+    linearAvailable,
+    linearFeatureLoading,
+    linearChoiceBlock,
+    repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
+    repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
+    repositoriesLoading: connection.onboarding.isPending,
+    identityConnected: Boolean(connection.identity),
+    githubLogin: connection.identity?.login ?? "",
+    githubUserId: connection.identity?.userId ?? "",
+    githubIdentities: connection.identities,
+    pendingOrganizations: connection.pendingOrganizations,
+    synchronizing: connection.synchronizing,
+    appConfigured: connection.appConfigured,
+    connectError: connection.onboarding.error
+      ? githubOnboardingMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
+      : undefined,
     blockingAction: blocking.action,
     busy: blocking.busy || model.saving,
   };

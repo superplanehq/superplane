@@ -14,6 +14,8 @@ const intakeGitHubAppName = "github"
 const intakeJiraAppName = "jira"
 const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
+const intakeDatadogAppName = "datadog"
+const intakeLinearAppName = "linear"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -68,6 +70,12 @@ func resolveIntakeBinding(
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return resolveJiraIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return resolveDatadogIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return resolveLinearIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
@@ -152,23 +160,23 @@ func resolveProductiveIntakeBinding(
 		return nil, nil
 	}
 	if integrationID == "" || projectID == "" {
-		return nil, invalidArgument("Productive.io integration and project are required")
+		return nil, invalidArgument("Productive integration and project are required")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration is invalid")
+		return nil, invalidArgument("Productive integration is invalid")
 	}
 
 	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
 	if err != nil {
-		return nil, invalidArgument("Productive.io integration was not found")
+		return nil, invalidArgument("Productive integration was not found")
 	}
 	if integration.AppName != intakeProductiveAppName {
-		return nil, invalidArgument("selected integration is not Productive.io")
+		return nil, invalidArgument("selected integration is not Productive")
 	}
 	if integration.State != models.IntegrationStateReady {
-		return nil, invalidArgument("Productive.io integration is not ready")
+		return nil, invalidArgument("Productive integration is not ready")
 	}
 
 	return &intakeBinding{
@@ -177,6 +185,88 @@ func resolveProductiveIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"project": projectID},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveDatadogIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	serviceName string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	serviceName = strings.TrimSpace(serviceName)
+	if integrationID == "" && serviceName == "" {
+		return nil, nil
+	}
+	if integrationID == "" || serviceName == "" {
+		return nil, invalidArgument("Datadog integration and service are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Datadog integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Datadog integration was not found")
+	}
+	if integration.AppName != intakeDatadogAppName {
+		return nil, invalidArgument("selected integration is not Datadog")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Datadog integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"service": serviceName},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveLinearIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	resourceID string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	projectIDs := linearProjectIDsFromResource(resourceID)
+	if integrationID == "" && len(projectIDs) == 0 {
+		return nil, nil
+	}
+	if integrationID == "" || len(projectIDs) == 0 {
+		return nil, invalidArgument("Linear integration and project are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Linear integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Linear integration was not found")
+	}
+	if integration.AppName != intakeLinearAppName {
+		return nil, invalidArgument("selected integration is not Linear")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Linear integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"projects": projectIDs},
 		Installation:  integration,
 	}, nil
 }

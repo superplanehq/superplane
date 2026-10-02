@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import {
   useCreateFactoryAgentResource,
   useDeleteFactoryAgentResource,
@@ -11,13 +12,22 @@ import {
   useStartFactoryAgentResourceOAuth,
   useUpdateFactoryAgentResource,
 } from "@/hooks/useFactoryAgentResources";
+import { useCreateSecret } from "@/hooks/useSecrets";
+import { FEATURE_WORKSPACE_MCP } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-import type { MCPCatalogEntry } from "./mcpCatalog";
+import {
+  catalogEntryForResource,
+  catalogEntryIsConnected,
+  catalogOAuthResourceForEntry,
+  type MCPCatalogEntry,
+} from "./mcpCatalog";
+import { bearerAuthorizationValue, catalogHeaderSecretName, MCP_HEADER_SECRET_KEY } from "./mcpHeaderAuth";
+import { canonicalMCPServerURL, connectedMCPResourceForURL } from "./mcpServerMatch";
 
 function useMCPAddDialog() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,6 +58,7 @@ function useMCPMutations(organizationId: string, factoryId: string) {
     deleteResource: useDeleteFactoryAgentResource(organizationId, factoryId),
     startOAuth: useStartFactoryAgentResourceOAuth(organizationId, factoryId),
     disconnectOAuth: useDisconnectFactoryAgentResourceOAuth(organizationId, factoryId),
+    createSecret: useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION"),
   };
 }
 
@@ -55,17 +66,22 @@ export function useMCPPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;
+  const { has } = useExperimentalFeature(organizationId);
+  const showAgentMCP = has(FEATURE_WORKSPACE_MCP);
   const { addPickerOpen, setAddPickerOpen } = useMCPAddDialog();
-  const [catalogDefaults, setCatalogDefaults] = useState<Partial<AgentResourceConnectionDraft> | undefined>();
+  const [catalogEntry, setCatalogEntry] = useState<MCPCatalogEntry | undefined>();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [editResource, setEditResource] = useState<FactoriesFactoryAgentResource | undefined>();
   const [pendingDelete, setPendingDelete] = useState<FactoriesFactoryAgentResource | undefined>();
-  const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
+  const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER", showAgentMCP);
   const mutations = useMCPMutations(organizationId, factoryId);
   const closeConnection = () => {
     setEditResource(undefined);
     setConnectionOpen(false);
-    setCatalogDefaults(undefined);
+  };
+  const closeCatalogSetup = () => {
+    setCatalogEntry(undefined);
+    setEditResource(undefined);
   };
 
   return {
@@ -73,37 +89,73 @@ export function useMCPPage() {
     factoryId,
     factory,
     canUpdate,
+    showAgentMCP,
     addPickerOpen,
-    connectionOpen: connectionOpen || Boolean(editResource),
-    catalogDefaults,
+    connectionOpen: (connectionOpen || Boolean(editResource)) && !catalogEntry,
+    catalogSetupOpen: Boolean(catalogEntry),
+    catalogEntry,
     editResource,
     pendingDelete,
     connections,
-    isSaving: mutations.createResource.isPending || mutations.updateResource.isPending,
+    isSaving:
+      mutations.createResource.isPending ||
+      mutations.updateResource.isPending ||
+      mutations.createSecret.isPending ||
+      mutations.startOAuth.isPending,
     isDeleting: mutations.deleteResource.isPending,
     setAddPickerOpen,
     openCatalogEntry: (entry?: MCPCatalogEntry) => {
       setAddPickerOpen(false);
       closeConnection();
-      setCatalogDefaults(entry ? { name: entry.name, url: entry.url, auth: entry.auth } : undefined);
-      setConnectionOpen(true);
+      if (!entry) {
+        setCatalogEntry(undefined);
+        setConnectionOpen(true);
+        return;
+      }
+      if (catalogEntryIsConnected(connections.data ?? [], entry)) {
+        showInfoToast(AGENT_RESOURCES_COPY.urlTaken);
+        return;
+      }
+      setEditResource(catalogOAuthResourceForEntry(connections.data ?? [], entry));
+      setCatalogEntry(entry);
     },
-    startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startOAuthRedirect(mutations, resource),
+    startOAuthRedirect: (resource: FactoriesFactoryAgentResource) => startMCPOAuthRedirect(mutations, resource),
     saveConnection: (draft: AgentResourceConnectionDraft) =>
-      saveConnection(mutations, editResource, draft, closeConnection),
-    disconnectResource: (resource: FactoriesFactoryAgentResource) => disconnectResource(mutations, resource),
+      saveMCPConnection(mutations, connections.data ?? [], editResource, draft, closeConnection),
+    saveCatalogToken: (entry: MCPCatalogEntry, token: string) =>
+      saveCatalogToken(mutations, connections.data ?? [], entry, token, closeCatalogSetup),
+    startCatalogOAuth: (entry: MCPCatalogEntry) =>
+      startCatalogOAuth(mutations, entry, editResource ?? catalogOAuthResourceForEntry(connections.data ?? [], entry), {
+        rememberResource: setEditResource,
+        onRedirecting: closeCatalogSetup,
+      }),
+    disconnectResource: (resource: FactoriesFactoryAgentResource) => disconnectMCPResource(mutations, resource),
     toggleEnabled: (resource: FactoriesFactoryAgentResource, enabled: boolean) =>
-      toggleEnabled(mutations, resource, enabled),
+      toggleMCPEnabled(mutations, resource, enabled),
     toggleTools: (resource: FactoriesFactoryAgentResource, disabledTools: string[]) =>
-      toggleTools(mutations, resource, disabledTools),
+      toggleMCPTools(mutations, resource, disabledTools),
     setEditResource: (resource?: FactoriesFactoryAgentResource) => {
-      setCatalogDefaults(undefined);
+      setAddPickerOpen(false);
+      if (!resource) {
+        closeCatalogSetup();
+        closeConnection();
+        return;
+      }
+      const catalog = catalogEntryForResource(resource);
+      if (catalog?.auth === "AUTH_OAUTH") {
+        setConnectionOpen(false);
+        setEditResource(resource);
+        setCatalogEntry(catalog);
+        return;
+      }
+      setCatalogEntry(undefined);
       setEditResource(resource);
-      setConnectionOpen(Boolean(resource));
+      setConnectionOpen(true);
     },
     setPendingDelete,
     closeConnection,
-    confirmDelete: () => confirmDelete(mutations, pendingDelete),
+    closeCatalogSetup,
+    confirmDelete: () => confirmMCPDelete(mutations, pendingDelete),
   };
 }
 
@@ -113,9 +165,10 @@ type MCPMutations = {
   deleteResource: ReturnType<typeof useDeleteFactoryAgentResource>;
   startOAuth: ReturnType<typeof useStartFactoryAgentResourceOAuth>;
   disconnectOAuth: ReturnType<typeof useDisconnectFactoryAgentResourceOAuth>;
+  createSecret: ReturnType<typeof useCreateSecret>;
 };
 
-async function startOAuthRedirect(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
+export async function startMCPOAuthRedirect(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
   if (!resource.id) {
     return;
   }
@@ -129,12 +182,106 @@ async function startOAuthRedirect(mutations: MCPMutations, resource: FactoriesFa
   }
 }
 
-async function saveConnection(
+export async function startCatalogOAuth(
   mutations: MCPMutations,
+  entry: MCPCatalogEntry,
+  existing: FactoriesFactoryAgentResource | undefined,
+  callbacks: {
+    rememberResource: (resource: FactoriesFactoryAgentResource) => void;
+    onRedirecting: () => void;
+  },
+) {
+  let resource = existing;
+  try {
+    if (!resource?.id) {
+      resource = await mutations.createResource.mutateAsync({
+        kind: "KIND_MCP_SERVER",
+        name: entry.name,
+        enabled: true,
+        url: entry.url,
+        auth: "AUTH_OAUTH",
+        headers: [],
+      });
+      callbacks.rememberResource(resource);
+    }
+    if (!resource?.id) {
+      return;
+    }
+    if (canonicalMCPServerURL(resource.url ?? "") !== canonicalMCPServerURL(entry.url)) {
+      resource = await mutations.updateResource.mutateAsync({
+        resourceId: resource.id,
+        url: entry.url,
+      });
+      callbacks.rememberResource(resource);
+    }
+    if (!resource.id) {
+      return;
+    }
+    const result = await mutations.startOAuth.mutateAsync(resource.id);
+    if (!result.authorizationUrl) {
+      return;
+    }
+    callbacks.onRedirecting();
+    window.location.assign(result.authorizationUrl);
+  } catch (error) {
+    showErrorToast(
+      getApiErrorMessage(error, resource?.id ? AGENT_RESOURCES_COPY.connectFailed : AGENT_RESOURCES_COPY.createFailed),
+    );
+    throw error;
+  }
+}
+
+export async function saveCatalogToken(
+  mutations: MCPMutations,
+  resources: FactoriesFactoryAgentResource[],
+  entry: MCPCatalogEntry,
+  token: string,
+  onSaved: () => void,
+) {
+  if (connectedMCPResourceForURL(resources, entry.url)) {
+    showInfoToast(AGENT_RESOURCES_COPY.urlTaken);
+    onSaved();
+    return;
+  }
+  try {
+    const secretName = catalogHeaderSecretName(entry.name, crypto.randomUUID());
+    const secretResult = await mutations.createSecret.mutateAsync({
+      name: secretName,
+      environmentVariables: [{ name: MCP_HEADER_SECRET_KEY, value: bearerAuthorizationValue(token) }],
+    });
+    await mutations.createResource.mutateAsync({
+      kind: "KIND_MCP_SERVER",
+      name: entry.name,
+      enabled: true,
+      url: entry.url,
+      auth: "AUTH_HEADERS",
+      headers: [
+        {
+          name: entry.headerName ?? "Authorization",
+          secretName: secretResult.data?.secret?.metadata?.name ?? secretName,
+          secretKey: MCP_HEADER_SECRET_KEY,
+        },
+      ],
+    });
+    showSuccessToast(AGENT_RESOURCES_COPY.created);
+    onSaved();
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.createFailed));
+    throw error;
+  }
+}
+
+export async function saveMCPConnection(
+  mutations: MCPMutations,
+  resources: FactoriesFactoryAgentResource[],
   editResource: FactoriesFactoryAgentResource | undefined,
   draft: AgentResourceConnectionDraft,
   onSaved: () => void,
 ) {
+  if (connectedMCPResourceForURL(resources, draft.url, editResource?.id)) {
+    showInfoToast(AGENT_RESOURCES_COPY.urlTaken);
+    return;
+  }
   try {
     if (editResource?.id) {
       await mutations.updateResource.mutateAsync({
@@ -166,7 +313,7 @@ async function saveConnection(
   }
 }
 
-function disconnectResource(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
+export function disconnectMCPResource(mutations: MCPMutations, resource: FactoriesFactoryAgentResource) {
   if (!resource.id) {
     return;
   }
@@ -176,7 +323,7 @@ function disconnectResource(mutations: MCPMutations, resource: FactoriesFactoryA
   );
 }
 
-function toggleEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, enabled: boolean) {
+export function toggleMCPEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, enabled: boolean) {
   if (!resource.id) {
     return;
   }
@@ -187,7 +334,11 @@ function toggleEnabled(mutations: MCPMutations, resource: FactoriesFactoryAgentR
 
 const mcpToolUpdateQueues = new Map<string, Promise<unknown>>();
 
-function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentResource, disabledTools: string[]) {
+export function toggleMCPTools(
+  mutations: MCPMutations,
+  resource: FactoriesFactoryAgentResource,
+  disabledTools: string[],
+) {
   if (!resource.id) {
     return;
   }
@@ -203,7 +354,7 @@ function toggleTools(mutations: MCPMutations, resource: FactoriesFactoryAgentRes
   mcpToolUpdateQueues.set(resourceId, next);
 }
 
-async function confirmDelete(mutations: MCPMutations, pendingDelete?: FactoriesFactoryAgentResource) {
+export async function confirmMCPDelete(mutations: MCPMutations, pendingDelete?: FactoriesFactoryAgentResource) {
   if (!pendingDelete?.id) {
     return;
   }

@@ -191,7 +191,13 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
 	assert.Contains(t, text, "Follow the task prompt")
-	assert.Contains(t, text, "Call propose_clarity and propose_confidence every turn")
+	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
+	assert.Contains(t, text, "Publish the scores when the plan changes, a score would change, or the user asks to update a score")
+	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.Contains(t, text, "You may update a score without rewriting the specification")
+	assert.NotContains(t, text, "Publish the specification and the scores only when this turn updates the plan")
+	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
+	assert.NotContains(t, text, "every turn")
 	assert.Contains(t, text, "Do not leave a written plan unpublished")
 	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
@@ -200,121 +206,18 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Contains(t, text, "I found the retry seam in billing/retry.go.")
 	assert.Contains(t, text, "Keep the existing retry helper.")
 	assert.Equal(t, 1, strings.Count(text, "Keep the existing retry helper."))
-}
 
-func TestAnalysisContinuationTextListsSplitTasks(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-split")
-	db := database.DB(t.Context())
-	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
-	require.NoError(t, err)
-	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		Repository:  "acme/payments",
-		CanvasID:    canvas.ID,
-		CanvasRunID: run.ID,
-		WorkOrderID: order.ID,
-	})
-	require.NoError(t, err)
-	require.NoError(t, session.SendUserMessage(db, "Yes, split it.", uuid.Nil))
-	created, err := session.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the retry table", Description: "Schema only."}, uuid.Nil)
-	require.NoError(t, err)
-
-	text, err := AnalysisContinuationText(db, session)
-	require.NoError(t, err)
-	key := factoryModel.WorkOrderKey(created.Number)
-	assert.Contains(t, text, "SuperPlane: Created task "+key+": Add the retry table")
-	assert.Contains(t, text, "Tasks this session already created. Do not create them again:\n\n- "+key+": Add the retry table")
-	assert.NotContains(t, text, created.ID.String(), "the raw JSON body stays out of the prompt")
-
-	// Push the task message out of the bounded rewind window. The durable list still names the task.
-	require.NoError(t, session.SendUserMessage(db, strings.Repeat("more context ", analysisRewindMessageCharacterLimit/12), uuid.Nil))
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
-	assert.NotContains(t, text, "SuperPlane: Created task", "the old task message fell out of the window")
-	assert.Contains(t, text, "Tasks this session already created. Do not create them again:\n\n- "+key+": Add the retry table")
-}
-
-func TestAnalysisContinuationTextNamesSplitSiblingsForANewPart(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-sibling")
-	db := database.DB(t.Context())
-	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
-	parent, err := factoryModel.CreateWorkOrder(db, "Duplicate a task", "Copy and rerun.", &userID, nil, nil)
-	require.NoError(t, err)
-	parentRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	parentSession, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		Repository:  "acme/payments",
-		CanvasID:    canvas.ID,
-		CanvasRunID: parentRun.ID,
-		WorkOrderID: parent.ID,
-	})
-	require.NoError(t, err)
-	require.NoError(t, parentSession.SendUserMessage(db, "Yes, split it.", uuid.Nil))
-	first, err := parentSession.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the duplicate operation", Description: "Back end."}, uuid.Nil)
-	require.NoError(t, err)
-	second, err := parentSession.CreateSplitTask(db, factoryModel, PlanningSplitTask{Title: "Add the duplicate action", Description: "Front end."}, uuid.Nil)
-	require.NoError(t, err)
-
-	childRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	childSession, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		Repository:  "acme/payments",
-		CanvasID:    canvas.ID,
-		CanvasRunID: childRun.ID,
-		WorkOrderID: second.ID,
-	})
-	require.NoError(t, err)
-
-	text, err := AnalysisContinuationText(db, childSession)
-	require.NoError(t, err)
-	assert.Contains(t, text, "This task is one part of a split.")
-	assert.Contains(t, text, factoryModel.WorkOrderKey(parent.Number)+": Duplicate a task (the task it was split from)")
-	assert.Contains(t, text, factoryModel.WorkOrderKey(first.Number)+": Add the duplicate operation")
-	assert.NotContains(t, text, factoryModel.WorkOrderKey(second.Number)+": Add the duplicate action", "the task itself is not a sibling")
-	assert.Contains(t, text, "Treat the boundary between the parts as decided")
-	assert.NotContains(t, text, "Continue this SuperPlane analysis session", "a new part has no prior turn to continue")
-
-	parentText, err := AnalysisContinuationText(db, parentSession)
-	require.NoError(t, err)
-	assert.NotContains(t, parentText, "This task is one part of a split.", "the parent lists the parts it created instead")
-}
-
-func TestAnalysisContinuationTextIgnoresTaskCreationSessionsAsSplitParents(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-analysis-creation-parent")
-	db := database.DB(t.Context())
-	planningCanvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-	creation, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        planningCanvas.ID,
-		Entrypoint:      entrypoint,
-	})
-	require.NoError(t, err)
-	first, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
-	require.NoError(t, err)
-	second, err := factoryModel.CreateWorkOrder(db, "Add the audit log", "Track refunds.", &userID, nil, nil)
-	require.NoError(t, err)
-	require.NoError(t, creation.attachCreatedWorkOrder(db, first.ID))
-	require.NoError(t, creation.attachRefineDraft(db, second))
-
-	run, err := CreateCanvasRunInTransaction(db, planningCanvas.ID, entrypoint, CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
-		Repository:  "acme/payments",
-		CanvasID:    planningCanvas.ID,
-		CanvasRunID: run.ID,
-		WorkOrderID: first.ID,
-	})
-	require.NoError(t, err)
-
-	text, err := AnalysisContinuationText(db, session)
-	require.NoError(t, err)
-	assert.Empty(t, text, "tasks created together in one planning session are not a split")
+	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
+	assert.Contains(t, text, "Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score")
+	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.NotContains(t, text, "Publish the specification and the Clarity score only when this turn updates the plan")
+	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
+	assert.NotContains(t, text, "propose_confidence")
+	assert.Contains(t, text, "Stop double charges.")
+	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")
 }
 
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {
@@ -897,6 +800,145 @@ func TestFactoryPlanningSession_AnalysisFollowUpKeepsTheRequest(t *testing.T) {
 	assert.Equal(t, "The retry lives in billing/retry.ts.", session.Wait().Text)
 	assert.NotContains(t, session.Wait().Text, "propose_spec")
 	assert.NotContains(t, session.Wait().Text, "propose_draft")
+}
+
+func TestWorkOrderReadyForAutoStart(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-ready")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	order.State = FactoryWorkOrderStateOpen
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	order.State = FactoryWorkOrderStateDraft
+	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{{Prompt: "Which service?", Options: []string{"Payments"}}},
+	}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-earlier-score")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+
+	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 5, "The new path is covered."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeClarity(db, 5, "The new path is covered."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+
+	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, nextRun.ID, ""))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 5, "The new run is ready."))
+	require.NoError(t, session.ProposeClarity(db, 5, "The new run is ready."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartRequiresSpec(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-spec")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-clarity")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeClarity(db, 4, "One decision is still open."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+}
+
+func mustAnalysisOrder(
+	t *testing.T,
+	db *gorm.DB,
+	factoryModel *Factory,
+	canvasID, userID uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, *FactoryPlanningSession) {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrderWithAutoStart(db, "Retry refunds", "Stop double charges.", &userID, nil, nil, autoStartLineID)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvasID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvasID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
+	})
+	require.NoError(t, err)
+	return order, session
 }
 
 func mustReadyTaskFile(

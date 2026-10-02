@@ -12,7 +12,7 @@ import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
   useFactoryBoardWorkOrders,
-  type FactoryWorkOrdersPageOptions,
+  type FactoryBoardWorkOrdersOptions,
   useUpdateFactoryLine,
   useWorkOrder,
   useWorkOrderArtifacts,
@@ -32,12 +32,12 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
+import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -52,7 +52,6 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
-import { factoryPlanningSetupCompleted } from "./planningSettingsModel";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -101,6 +100,7 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  displayedBoardLineId,
   peekOrderFromNavigationState,
   resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
@@ -117,7 +117,7 @@ import {
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
@@ -126,6 +126,7 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
+import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -136,21 +137,25 @@ import {
 import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
-import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
+  factoryRouteSegment,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
   intakeIdFromSearch,
@@ -230,13 +235,31 @@ function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
   return scope === "my" ? "my" : "all";
 }
 
-function boardWorkOrdersPageOptions(state: WorkOrderListState, currentUserId?: string): FactoryWorkOrdersPageOptions {
+function boardWorkOrdersPageOptions(
+  state: WorkOrderListState,
+  lineId: string | undefined,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
   const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
   const scope = lineBoardWorkOrderScope(state.scope);
   return {
     userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
     unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
     requireUser: scope === "my" && ownerIds.length !== 1,
+    done: {
+      lineId,
+      results: boardDoneResultsForStatuses(state.filters.statuses),
+    },
+  };
+}
+
+function boardWorkOrdersWhileTaskLineLoads(
+  state: WorkOrderListState,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  return {
+    ...boardWorkOrdersPageOptions(state, undefined, currentUserId),
+    done: { enabled: false },
   };
 }
 
@@ -285,10 +308,11 @@ function prFeedbackSetupHref(
 }
 
 export function LinesPage() {
-  const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
   const showColumnAutomations = useFactoryPreviewFlag("columnAutomations");
   const canChooseAutomationView = useFactoryPreviewFlag("columnAutomationRows") && showColumnAutomations;
@@ -305,6 +329,22 @@ export function LinesPage() {
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
+  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
+    organizationId,
+    factoryId,
+    taskLineOrderId,
+  );
+  const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
+  const selectedLineId = displayedBoardLineId(
+    routeLineId,
+    boardLineId,
+    lines,
+    taskForBoardLine,
+    taskLinePending ? undefined : firstFactoryLineId(factory),
+  );
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -312,7 +352,13 @@ export function LinesPage() {
     backlog: backlogPage,
     open: openPage,
     done: donePage,
-  } = useFactoryBoardWorkOrders(organizationId, factoryId, boardWorkOrdersPageOptions(listState, currentUserId));
+  } = useFactoryBoardWorkOrders(
+    organizationId,
+    factoryId,
+    taskLinePending
+      ? boardWorkOrdersWhileTaskLineLoads(listState, currentUserId)
+      : boardWorkOrdersPageOptions(listState, selectedLineId, currentUserId),
+  );
   const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
   const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
@@ -323,7 +369,6 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const customAutomationsEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
@@ -352,7 +397,7 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
 
-  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, factoryKey);
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -360,7 +405,6 @@ export function LinesPage() {
     () => applyVisibleWorkOrders(workOrders, factory, listState, currentUserId, showPullRequestMerge),
     [currentUserId, factory, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders],
   );
-  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const listPermalink = useMemo(
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
@@ -386,13 +430,6 @@ export function LinesPage() {
     }
     return listPermalink;
   }, [describePermalinkId, describedPermalink, describedPermalinkLoading, listPermalink]);
-  const boardLineId = workOrderBoardLineIdFromSearch(search);
-  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
-  const selectedLineId =
-    routeLineId ??
-    searchLineId ??
-    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
-    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
@@ -432,24 +469,24 @@ export function LinesPage() {
   const overlayHoldsBoard = useWorkspaceLoading(WORKSPACE_LOADING_COPY.board, holdBoard);
 
   if (redirectCanonical && canonicalNumber) {
-    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
+    return <Navigate to={workOrderDetailPath(organizationId, routeSegment, canonicalNumber, boardLineId)} replace />;
   }
 
   if (!selectedLine) {
-    if (routeOrderNumber && permalink.status === "loading") {
+    if (taskLinePending || (routeOrderNumber && permalink.status === "loading")) {
       return (
-        <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        <div className="flex h-full min-h-0 min-w-0 w-full">
           <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
     }
-    return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
+    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
   }
 
   if (isJiraIntakeSetupSearchOpen(search) && selectedLine.id) {
     return (
       <Navigate
-        to={factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id, {
+        to={factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id, {
           integrationId: jiraIntakeIntegrationIdFromSearch(search) || undefined,
         })}
         replace
@@ -469,7 +506,7 @@ export function LinesPage() {
         sources: configuredIntakes,
         showAddIntake: showAddIntakeControl,
         onOpenSettings: (intake) =>
-          navigate(factoryIntakePath(organizationId, factoryKey, selectedLine.id, intake.intakeId)),
+          navigate(factoryIntakePath(organizationId, routeSegment, selectedLine.id, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
@@ -488,7 +525,7 @@ export function LinesPage() {
         settingsLabel: "Open PR feedback settings",
         testId: `lines-verify-listener-${handler.id}`,
         onOpenSettings: () =>
-          navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id)),
+          navigate(factoryPRFeedbackPath(organizationId, routeSegment, selectedLine.id, undefined, handler.id)),
       },
     ];
   });
@@ -497,7 +534,7 @@ export function LinesPage() {
     if (!isPRFeedbackSetupAvailable(source.id) || takenPRFeedbackSources.includes(source.id)) {
       return;
     }
-    const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, source.id);
+    const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, source.id);
     if (!href) {
       return;
     }
@@ -510,27 +547,45 @@ export function LinesPage() {
     if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
       return;
     }
+    if (template.id === "github-issues") {
+      if (selectedLine.id) {
+        navigate(factoryGitHubIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
-        navigate(factorySentryIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factorySentryIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "dependabot-alerts") {
       if (selectedLine.id) {
-        navigate(factoryDependabotIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryDependabotIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "productive-tasks") {
       if (selectedLine.id) {
-        navigate(factoryProductiveIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryProductiveIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
     if (template.id === "jira-issues") {
       if (selectedLine.id) {
-        navigate(factoryJiraIntakeSetupPath(organizationId, factoryKey, selectedLine.id));
+        navigate(factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "datadog") {
+      if (selectedLine.id) {
+        navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "linear-issues") {
+      if (selectedLine.id) {
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
@@ -545,7 +600,7 @@ export function LinesPage() {
           return;
         }
         navigate(
-          factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
+          factoryAppConfigurePath(organizationId, routeSegment, intake.canvasId, {
             from: "lines",
             lineId: selectedLine.id,
           }),
@@ -563,20 +618,20 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, factoryKey, number, selectedLine.id), {
+    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
       state: { peekOrder: target },
     });
   };
 
   const closePeek = () => {
     setPeekHint(null);
-    navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id), { replace: true });
+    navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id), { replace: true });
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
   const canDeleteViewedCustom =
     canUpdate && (viewedAutomation?.columnKey === "verify" || viewedAutomation?.columnKey === "done");
-  const closeAutomationView = () => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id));
+  const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
   const deleteViewedCustomAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
@@ -598,13 +653,13 @@ export function LinesPage() {
           key={settingsIntake.intakeId}
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           intake={settingsIntake}
           repository={factory?.onboarding?.backlogRepository}
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       <AddIntakePicker
@@ -624,7 +679,7 @@ export function LinesPage() {
         <ColumnAutomationViewHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           canvasId={automationViewCanvasId}
           title={viewedAutomation?.name?.trim() || "Automation"}
@@ -637,24 +692,24 @@ export function LinesPage() {
         <PlanningSettingsHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           lineId={selectedLine.id}
           initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
           factoryId={factoryId}
-          factoryKey={factoryKey}
+          factoryKey={routeSegment}
           githubIntegrationId={githubIntegrationId}
           repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
       <div className={factoryKanbanPageClassName}>
@@ -689,7 +744,7 @@ export function LinesPage() {
             onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
                 openPRFeedbackSetup: (sourceId) => {
-                  const href = prFeedbackSetupHref(organizationId, factoryKey, selectedLine.id, sourceId);
+                  const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, sourceId);
                   if (href) {
                     navigate(href);
                   }
@@ -707,7 +762,7 @@ export function LinesPage() {
           <LineDetail
             organizationId={organizationId}
             factoryId={factoryId}
-            factoryKey={factoryKey}
+            factoryKey={routeSegment}
             line={selectedLine}
             apps={factoryApps}
             workOrders={visibleWorkOrders}
@@ -719,11 +774,7 @@ export function LinesPage() {
             onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={showColumnAutomations ? [] : verifyListeners}
             onAddPRFeedback={
-              showColumnAutomations && customAutomationsEnabled
-                ? undefined
-                : canAddPRFeedback
-                  ? () => setAddPRFeedbackOpen(true)
-                  : undefined
+              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
             }
             factoryIntakes={factoryIntakes}
             prFeedbackHandlers={prFeedbackHandlers}
@@ -754,7 +805,7 @@ export function LinesPage() {
             workOrderCardContext={{
               organizationId,
               factoryId,
-              factoryKey,
+              factoryKey: routeSegment,
               factoryLines: lines,
               canDispatch: canUpdateWorkOrders,
               preferredLineName: selectedLine.name,
@@ -772,7 +823,6 @@ export function LinesPage() {
             onOpenWorkOrder={openWorkOrder}
             onClosePeek={closePeek}
             planningEnabled={factory?.planning?.enabled !== false}
-            planningSetupCompleted={factoryPlanningSetupCompleted(factory)}
           />
         </div>
       </div>
@@ -831,6 +881,8 @@ function LineDetailHeader({
   const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
+  const factoryKey = factoryRouteSegment(factory);
 
   const handleRename = async (name: string) => {
     if (!line.id) {
@@ -844,69 +896,87 @@ function LineDetailHeader({
   };
 
   return (
-    <WorkspacePageHeader
-      className={factorySectionHeaderClassName}
-      data-testid="lines-detail-header"
-      title={
-        <ClickToRename
-          value={title}
-          onSave={(name) => void handleRename(name)}
-          canEdit={canUpdate && Boolean(line.id)}
-          busy={updateLine.isPending}
-          testId="lines-board-title"
-          ariaLabel="Line name"
-          inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-        />
-      }
-      leading={
-        nextStepsRestore || hostedCreditHeaderKicker ? (
+    <>
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        data-testid="lines-detail-header"
+        title={
+          <ClickToRename
+            value={title}
+            onSave={(name) => void handleRename(name)}
+            canEdit={canUpdate && Boolean(line.id)}
+            busy={updateLine.isPending}
+            testId="lines-board-title"
+            ariaLabel="Line name"
+            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
+          />
+        }
+        leading={
+          nextStepsRestore || hostedCreditHeaderKicker ? (
+            <>
+              {hostedCreditHeaderKicker}
+              {nextStepsRestore}
+            </>
+          ) : undefined
+        }
+        actions={
           <>
-            {hostedCreditHeaderKicker}
-            {nextStepsRestore}
+            <ScopePills
+              value={lineBoardWorkOrderScope(state.scope)}
+              onChange={state.setScope}
+              options={LINE_BOARD_SCOPES}
+              testIdPrefix="work-orders-scope"
+            />
+            <FilterMenu
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
+            />
+            <SearchField
+              inputRef={searchRef}
+              open={state.searchOpen}
+              value={state.search}
+              onOpen={state.openSearch}
+              onChange={state.setSearch}
+              onClose={state.closeSearch}
+            />
+            <LineBoardViewMenu
+              view={automationView}
+              onViewChange={onAutomationViewChange}
+              colorView={colorView}
+              onColorViewChange={onColorViewChange}
+            />
           </>
-        ) : undefined
-      }
-      actions={
-        <>
-          <ScopePills
-            value={lineBoardWorkOrderScope(state.scope)}
-            onChange={state.setScope}
-            options={LINE_BOARD_SCOPES}
-            testIdPrefix="work-orders-scope"
-          />
-          <FilterMenu
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-          <SearchField
-            inputRef={searchRef}
-            open={state.searchOpen}
-            value={state.search}
-            onOpen={state.openSearch}
-            onChange={state.setSearch}
-            onClose={state.closeSearch}
-          />
-          <LineBoardViewMenu
-            view={automationView}
-            onViewChange={onAutomationViewChange}
-            colorView={colorView}
-            onColorViewChange={onColorViewChange}
-          />
-        </>
-      }
-      belowRow={
-        visibleFilterCount > 0 ? (
-          <FilterChips
-            state={state}
-            sourceOptions={sourceOptions}
-            assigneeOptions={assigneeOptions}
-            showPullRequestMerge={showPullRequestMerge}
-          />
-        ) : undefined
-      }
-    />
+        }
+        belowRow={
+          visibleFilterCount > 0 ? (
+            <FilterChips
+              state={state}
+              sourceOptions={sourceOptions}
+              assigneeOptions={assigneeOptions}
+              showPullRequestMerge={showPullRequestMerge}
+            />
+          ) : undefined
+        }
+      />
+      {closedStatusDialogOpen ? (
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={line.id}
+          canManage={canUpdate}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialogOpen(false);
+            }
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -940,7 +1010,6 @@ function LineDetail({
   onOpenWorkOrder,
   onClosePeek,
   planningEnabled,
-  planningSetupCompleted,
 }: {
   organizationId: string;
   factoryId: string;
@@ -971,7 +1040,6 @@ function LineDetail({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
   planningEnabled: boolean;
-  planningSetupCompleted: boolean;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -984,6 +1052,10 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const creditFailureLabels = useMemo(
+    () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
+    [backlogAnalysis.runsByWorkOrder],
+  );
   const navigate = useNavigate();
   const [overlay, setOverlay] = useState<{
     disabledIds: string[];
@@ -1018,6 +1090,7 @@ function LineDetail({
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
+  const canAddVerifyAutomation = showColumnAutomations && canUpdate;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -1025,7 +1098,6 @@ function LineDetail({
         organizationId,
         factoryKey,
         lineId: line.id,
-        planningSetupCompleted,
       });
       if (href) {
         navigate(href);
@@ -1074,12 +1146,13 @@ function LineDetail({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           showColumnAutomations={showColumnAutomations}
           showAutomationRows={showAutomationRows}
           colorView={colorView}
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
-          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}
@@ -1116,6 +1189,7 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
+          factoryApps={apps}
           onClose={onClosePeek}
         />
       ) : null}
@@ -1137,6 +1211,7 @@ function LineBoardSplitRunPopup({
   onDispatch,
   analysisRuns,
   isAnalyzing,
+  factoryApps,
   onClose,
 }: {
   organizationId: string;
@@ -1152,6 +1227,7 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string; thinkingLevel?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   isAnalyzing: boolean;
+  factoryApps: Array<{ id?: string; name?: string; columnKey?: string }>;
   onClose: () => void;
 }) {
   const { data: describedOrder } = useWorkOrder(organizationId, factoryId, peekOrderId);
@@ -1180,6 +1256,7 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        columnApps: columnAppsFromFactoryApps(factoryApps),
         isAnalyzing,
         stoppedBy: closer.actor,
         closer,
@@ -1322,6 +1399,7 @@ function PhaseBoard({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  creditFailureLabels,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1350,6 +1428,7 @@ function PhaseBoard({
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
+  creditFailureLabels: ReadonlyMap<string, string>;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1486,6 +1565,7 @@ function PhaseBoard({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
+          creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           automations={backlogAutomations}

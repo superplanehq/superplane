@@ -1,8 +1,12 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useState, type ReactNode } from "react";
+
+import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
 import {
   COLUMN_AUTOMATIONS_COPY,
@@ -12,6 +16,11 @@ import {
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import { mergeConfidenceFromDraft } from "./mergeConfidenceChecks";
+import { MergeConfidenceSettingsForm } from "./MergeConfidenceSettingsForm";
+import type { PlanningReviewDraft } from "./planningReviewMockup";
+import { riskScoreCategoriesFromDraft } from "./riskScoreCategories";
+import { RiskScoreSettingsForm } from "./RiskScoreSettingsForm";
 import {
   SettingsAutomationCanvasEdit,
   SettingsAutomationHeaderRow,
@@ -61,36 +70,41 @@ export function ColumnAutomationViewPopup({
     initialTab && tabs.includes(initialTab) ? initialTab : undefined,
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
   const tab = userTab && tabs.includes(userTab) ? userTab : (tabs[0] ?? "automation");
+  const footerSlotValue = onDelete ? (confirmDelete ? null : footerSlot) : undefined;
 
   return (
-    <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
-      <PopupHeader title={title} onClose={onClose}>
-        <SettingsAutomationHeaderRow
-          tabs={<ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />}
+    <ColumnAutomationFooterSlotProvider slot={footerSlotValue}>
+      <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
+        <PopupHeader title={title} onClose={onClose}>
+          <SettingsAutomationHeaderRow
+            tabs={<ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />}
+          />
+        </PopupHeader>
+        <ColumnAutomationViewBody
+          tab={tab}
+          graph={graph}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          canvasId={canvasId}
+          runHrefFor={runHrefFor}
+          editHref={editHref}
+          general={general}
+          agent={agent}
         />
-      </PopupHeader>
-      <ColumnAutomationViewBody
-        tab={tab}
-        graph={graph}
-        loading={loading}
-        error={error}
-        onRetry={onRetry}
-        canvasId={canvasId}
-        runHrefFor={runHrefFor}
-        editHref={editHref}
-        general={general}
-        agent={agent}
-      />
-      {onDelete ? (
-        <ColumnAutomationViewFooter
-          confirmDelete={confirmDelete}
-          deletePending={deletePending}
-          onDelete={onDelete}
-          onConfirmDelete={setConfirmDelete}
-        />
-      ) : null}
-    </PopupShell>
+        {onDelete ? (
+          <ColumnAutomationViewFooter
+            confirmDelete={confirmDelete}
+            deletePending={deletePending}
+            onDelete={onDelete}
+            onConfirmDelete={setConfirmDelete}
+            onActionsSlot={setFooterSlot}
+          />
+        ) : null}
+      </PopupShell>
+    </ColumnAutomationFooterSlotProvider>
   );
 }
 
@@ -99,48 +113,54 @@ function ColumnAutomationViewFooter({
   deletePending,
   onDelete,
   onConfirmDelete,
+  onActionsSlot,
 }: {
   confirmDelete: boolean;
   deletePending: boolean;
   onDelete: () => Promise<void> | void;
   onConfirmDelete: (next: boolean) => void;
+  onActionsSlot: (slot: HTMLDivElement | null) => void;
 }) {
-  if (confirmDelete) {
-    return (
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-        <p className="workspace-body-text text-destructive" role="alert">
-          {COLUMN_AUTOMATIONS_COPY.confirmDelete}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
-            {COLUMN_AUTOMATIONS_COPY.keepLabel}
-          </Button>
+  return (
+    <footer
+      className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3"
+      data-testid="column-automation-view-footer"
+    >
+      {confirmDelete ? (
+        <>
+          <p className="workspace-body-text text-destructive" role="alert">
+            {COLUMN_AUTOMATIONS_COPY.confirmDelete}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
+              {COLUMN_AUTOMATIONS_COPY.keepLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={deletePending}
+              onClick={() => void onDelete()}
+              data-testid="column-automation-view-delete-confirm"
+            >
+              {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
           <Button
             type="button"
-            variant="destructive"
+            variant="ghost"
             size="sm"
-            disabled={deletePending}
-            onClick={() => void onDelete()}
-            data-testid="column-automation-view-delete-confirm"
+            onClick={() => onConfirmDelete(true)}
+            data-testid="column-automation-view-delete"
           >
-            {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
+            {COLUMN_AUTOMATIONS_COPY.deleteLabel}
           </Button>
-        </div>
-      </footer>
-    );
-  }
-
-  return (
-    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => onConfirmDelete(true)}
-        data-testid="column-automation-view-delete"
-      >
-        {COLUMN_AUTOMATIONS_COPY.deleteLabel}
-      </Button>
+          <div ref={onActionsSlot} className="flex items-center gap-3" />
+        </>
+      )}
     </footer>
   );
 }
@@ -210,7 +230,7 @@ function ColumnAutomationViewBody({
   if (tab === "agent" && agent) {
     return (
       <PlanningReviewEditor
-        key={agent.draft?.components[0]?.id ?? "agent"}
+        key={`${agent.draft?.components[0]?.id ?? "agent"}:${JSON.stringify(agent.draft?.components[0]?.configuration.steps ?? [])}`}
         initialDraft={agent.draft}
         onSave={agent.onSave}
         organizationId={agent.organizationId}
@@ -263,6 +283,14 @@ export function ColumnAutomationViewHost({
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
+  const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
+  const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
+  const riskScoreGeneral = mergeConfidenceGeneral({
+    allow: allowRiskScore,
+    isCanvas: isRiskScoreCanvas,
+    draft: agent.draft,
+    onSave: agent.save,
+  });
   return (
     <ColumnAutomationViewPopup
       title={automation.name?.trim() || title}
@@ -274,7 +302,7 @@ export function ColumnAutomationViewHost({
       canvasId={canvasId}
       runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
-      general={general}
+      general={general ?? riskScoreGeneral}
       agent={
         agent.agentNode
           ? {
@@ -293,6 +321,29 @@ export function ColumnAutomationViewHost({
       deletePending={deletePending}
     />
   );
+}
+
+function mergeConfidenceGeneral({
+  allow,
+  isCanvas,
+  draft,
+  onSave,
+}: {
+  allow: boolean;
+  isCanvas: boolean;
+  draft: PlanningReviewDraft | null | undefined;
+  onSave: (next: PlanningReviewDraft) => Promise<void> | void;
+}): ReactNode {
+  if (!allow || !isCanvas || !draft) {
+    return undefined;
+  }
+  if (mergeConfidenceFromDraft(draft)) {
+    return <MergeConfidenceSettingsForm draft={draft} onSave={onSave} />;
+  }
+  if (riskScoreCategoriesFromDraft(draft)) {
+    return <RiskScoreSettingsForm draft={draft} onSave={onSave} />;
+  }
+  return undefined;
 }
 
 function AutomationViewBody({

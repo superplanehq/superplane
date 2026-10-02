@@ -28,7 +28,7 @@ const CARD_CLASSES =
   "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center";
 
 export function VelocityPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const model = useVelocityPageModel(organizationId, factoryId, factory?.onboarding);
   usePageTitle(["Velocity", factory?.name ?? "Workspace"]);
 
@@ -43,7 +43,7 @@ export function VelocityPage() {
   }
 
   if (model.velocity.isEmpty) {
-    return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, factoryKey)} />);
+    return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, routeSegment)} />);
   }
 
   return renderShell(
@@ -52,7 +52,7 @@ export function VelocityPage() {
       model={model}
       report={model.velocity.report}
       organizationId={organizationId}
-      factoryKey={factoryKey}
+      factoryKey={routeSegment}
     />,
   );
 }

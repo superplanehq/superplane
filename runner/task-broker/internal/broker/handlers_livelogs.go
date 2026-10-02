@@ -2,14 +2,17 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/task-broker/internal/livelogs"
 )
 
@@ -101,11 +104,24 @@ func (s *Server) getTaskLiveLogs(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
 		region := strings.TrimSpace(taskLog.CloudWatch.Region)
-		if err := livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, g, stName, region); err != nil && s.Log != nil {
+		isTaskTerminal := func(ctx context.Context) (bool, error) {
+			task, err := s.Store.GetTask(ctx, id)
+			if err != nil || task == nil {
+				return false, err
+			}
+			switch task.Status {
+			case models.StatusSucceeded, models.StatusFailed, models.StatusCanceled:
+				return true, nil
+			default:
+				return false, nil
+			}
+		}
+		if err := livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, g, stName, region, isTaskTerminal); err != nil && s.Log != nil {
 			s.Log.Warn("live logs stream", slog.Any("err", err))
 		}
 		return
@@ -113,6 +129,7 @@ func (s *Server) getTaskLiveLogs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
@@ -123,8 +140,24 @@ func (s *Server) getTaskLiveLogs(w http.ResponseWriter, r *http.Request) {
 
 func streamLocalLiveLogs(ctx context.Context, w io.Writer, flusher http.Flusher, hub *livelogs.Hub, taskID string) error {
 	from := 0
+	lastFlush := time.Now()
 	for {
-		records, next, closed, err := hub.Wait(ctx, taskID, from)
+		waitCtx, cancel := context.WithDeadline(ctx, lastFlush.Add(livelogs.HeartbeatInterval))
+		records, next, closed, err := hub.Wait(waitCtx, taskID, from)
+		cancel()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			if _, err := io.WriteString(w, "{\"type\":\"ping\"}\n"); err != nil {
+				return err
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+			lastFlush = time.Now()
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -133,8 +166,11 @@ func streamLocalLiveLogs(ctx context.Context, w io.Writer, flusher http.Flusher,
 				return err
 			}
 		}
-		if len(records) > 0 && flusher != nil {
-			flusher.Flush()
+		if len(records) > 0 {
+			if flusher != nil {
+				flusher.Flush()
+			}
+			lastFlush = time.Now()
 		}
 		from = next
 		if closed {

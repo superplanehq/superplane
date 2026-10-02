@@ -107,6 +107,12 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		}
 	}
 
+	if req.GetLineId() != "" {
+		if lineID, err := uuid.Parse(req.GetLineId()); err == nil {
+			filters.LineID = &lineID
+		}
+	}
+
 	return filters
 }
 
@@ -128,6 +134,10 @@ func workOrderStateFromProto(state pb.WorkOrder_State) (string, bool) {
 		return models.FactoryWorkOrderStateClosed, true
 	}
 	return "", false
+}
+
+func WorkOrderStateFromProto(state pb.WorkOrder_State) (string, bool) {
+	return workOrderStateFromProto(state)
 }
 
 func workOrderResultFromProto(result pb.WorkOrder_Result) (string, bool) {

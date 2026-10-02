@@ -11,9 +11,6 @@ import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
 import type { FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
-import { DEFAULT_JIRA_COMPLETION_SETTINGS } from "../../intakeSourceSettingsModel";
-import type { JiraCompletionColumnValue } from "../../jiraCompletionColumn";
-
 const STORY_JIRA_PROJECTS = [
   { id: "PAY", name: "Payments" },
   { id: "CORE", name: "Core" },
@@ -42,9 +39,6 @@ export function FirstRunFlow({
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
-  const [jiraCompletion, setJiraCompletion] = useState<JiraCompletionColumnValue>({
-    ...DEFAULT_JIRA_COMPLETION_SETTINGS,
-  });
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
 
@@ -86,10 +80,14 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        organizationName="acme"
+        githubLogin="octocat"
+        githubUserId="1"
+        githubIdentities={[{ userId: "1", login: "octocat" }]}
         chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
-        onEditConnection={() => setScreen("connect")}
+        onSelectGitHubIdentity={() => undefined}
+        onConnectAnotherGitHubAccount={() => undefined}
+        onGrantAccess={() => undefined}
         onContinue={() => {
           if (selectedRepository) setScreen("tickets");
         }}
@@ -106,19 +104,12 @@ export function FirstRunFlow({
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
-        jiraCompletion={jiraCompletion}
-        organizationId="org-1"
-        jiraIntegrationId={jiraConnected ? "jira-story" : ""}
         onSelectTicketSource={setTicketSource}
         onConnectJira={() => {
           setTicketSource("jira");
           setJiraConnected(true);
         }}
-        onSelectJiraProject={(id) => {
-          setJiraProjectId(id);
-          setJiraCompletion({ ...DEFAULT_JIRA_COMPLETION_SETTINGS });
-        }}
-        onJiraCompletionChange={setJiraCompletion}
+        onSelectJiraProject={setJiraProjectId}
         onAnalyzeTickets={() => {
           if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
           setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });

@@ -8,6 +8,7 @@ import {
   type AgentPromptUsageSeries,
 } from "@/lib/agentRunTelemetry";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { liveLogRequestErrorFromResponse } from "./liveLogErrors";
 
 export type LiveLogRecordEnvelope = {
   type?: string;
@@ -88,8 +89,7 @@ async function fetchRunnerLiveLogSession(
   );
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+    throw liveLogRequestErrorFromResponse(res, await res.text());
   }
 
   return (await res.json()) as LiveLogSessionResponse;
@@ -124,7 +124,14 @@ async function fetchRunnerLiveLogResponse(
             "Accept-Encoding": "identity",
           },
         };
-  return fetch(streamUrl, init);
+  const res = await fetch(streamUrl, init);
+  const isIntegratedReset =
+    session.backend === "integrated" && res.status === 409 && res.headers.get(LOG_RESET_HEADER) === "true";
+  if (!res.ok && !isIntegratedReset) {
+    throw liveLogRequestErrorFromResponse(res, await res.text());
+  }
+
+  return res;
 }
 
 function requireBodyReader(res: Response): ReadableStreamDefaultReader<Uint8Array> {
@@ -249,6 +256,9 @@ function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStrea
 }
 
 function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
+  if (rec.type === "ping") {
+    return;
+  }
   if (rec.schema_version === 2) {
     handlers.onRecord?.(rec);
     return;

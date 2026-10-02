@@ -23,6 +23,8 @@ const (
 	FactoryWorkOrderResultCompleted = "completed"
 	FactoryWorkOrderResultRejected  = "rejected"
 	FactoryWorkOrderResultFailed    = "failed"
+
+	DefaultMCPClientName = "MCP client"
 )
 
 var (
@@ -50,30 +52,34 @@ var (
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
-	// open` is reopen; `draft → closed` is "abandon before dispatch"
-	// (rejected only). See TransitionOnDispatch for the draft → open promotion.
+	// open` is reopen; `closed → draft` is send to backlog; `draft → closed`
+	// is "abandon before dispatch" (rejected only). See TransitionOnDispatch
+	// for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
 		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
-		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen, FactoryWorkOrderStateDraft},
 	}
 )
 
 type FactoryWorkOrder struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	Number         int64
-	Title          string
-	Description    string
-	State          string
-	Result         string
-	CreatedByID    *uuid.UUID
-	SourceRunID    *uuid.UUID
-	OriginURL      *string
-	OriginLabel    *string
-	Repository     *string
-	DefaultBranch  *string
+	ID              uuid.UUID
+	OrganizationID  uuid.UUID
+	FactoryID       uuid.UUID
+	Number          int64
+	Title           string
+	Description     string
+	State           string
+	Result          string
+	CreatedByID     *uuid.UUID
+	SourceRunID     *uuid.UUID
+	OriginURL       *string
+	OriginLabel     *string
+	Repository      *string
+	DefaultBranch   *string
+	AutoStartLineID *uuid.UUID
+	MCPClientID     *string
+	MCPClientName   *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -88,11 +94,18 @@ func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
 }
 
+// WorkOrderMCPClient is the MCP OAuth client that handed this task off.
+type WorkOrderMCPClient struct {
+	ID   string
+	Name string
+}
+
 // URLPath is the canonical UI permalink of the work order, relative to the
-// server base URL. The factory key is part of the path, so callers that only
-// hold the order must load the factory that owns it.
-func (o *FactoryWorkOrder) URLPath(factoryKey string) string {
-	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryKey, o.Number)
+// server base URL. `factoryRouteSegment` is the workspace URL segment
+// (`key-urlId`). Callers that only hold the order must load the factory
+// that owns it and pass Factory.RouteSegment().
+func (o *FactoryWorkOrder) URLPath(factoryRouteSegment string) string {
+	return fmt.Sprintf("/%s/workspaces/%s/work-order/%d", o.OrganizationID, factoryRouteSegment, o.Number)
 }
 
 func (o *FactoryWorkOrder) IsOpen() bool {
@@ -123,11 +136,52 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 	if o.OriginLabel != nil {
 		label = strings.TrimSpace(*o.OriginLabel)
 	}
+	if title := datadogWorkOrderOriginLabel(url, label, o.Title); title != "" {
+		label = title
+	}
 	if label == "" {
 		label = OriginLabelFromURL(url)
 	}
 
 	return &WorkOrderOrigin{URL: url, Label: label}
+}
+
+func (o *FactoryWorkOrder) MCPClient() *WorkOrderMCPClient {
+	if o == nil {
+		return nil
+	}
+
+	id := ""
+	if o.MCPClientID != nil {
+		id = strings.TrimSpace(*o.MCPClientID)
+	}
+	name := ""
+	if o.MCPClientName != nil {
+		name = strings.TrimSpace(*o.MCPClientName)
+	}
+	if id == "" && name == "" {
+		return nil
+	}
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+	return &WorkOrderMCPClient{ID: id, Name: name}
+}
+
+func (o *FactoryWorkOrder) SetMCPClient(tx *gorm.DB, id, name string) error {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+
+	o.MCPClientID = &id
+	o.MCPClientName = &name
+	return tx.Model(o).Updates(map[string]any{
+		"mcp_client_id":   id,
+		"mcp_client_name": name,
+		"updated_at":      time.Now(),
+	}).Error
 }
 
 type FactoryWorkOrderAssignee struct {
@@ -495,6 +549,50 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 	return o, nil
 }
 
+func (o *FactoryWorkOrder) ClaimAutoStart(tx *gorm.DB, lineID uuid.UUID) (bool, error) {
+	if o == nil || lineID == uuid.Nil {
+		return false, nil
+	}
+
+	now := time.Now()
+	result := tx.Model(&FactoryWorkOrder{}).
+		Where("id = ? AND state = ? AND auto_start_line_id IS NULL", o.ID, FactoryWorkOrderStateDraft).
+		Updates(map[string]any{
+			"auto_start_line_id": lineID,
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+	o.AutoStartLineID = &lineID
+	o.UpdatedAt = now
+	return true, nil
+}
+
+func (o *FactoryWorkOrder) ClearAutoStart(tx *gorm.DB) (bool, error) {
+	if o == nil || o.AutoStartLineID == nil {
+		return false, nil
+	}
+
+	lineID := *o.AutoStartLineID
+	now := time.Now()
+	result := tx.Model(&FactoryWorkOrder{}).
+		Where("id = ? AND auto_start_line_id = ?", o.ID, lineID).
+		Updates(map[string]any{
+			"auto_start_line_id": gorm.Expr("NULL"),
+			"updated_at":         now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	o.AutoStartLineID = nil
+	o.UpdatedAt = now
+	return result.RowsAffected > 0, nil
+}
+
 func (o *FactoryWorkOrder) LockForUpdate(tx *gorm.DB) error {
 	var locked FactoryWorkOrder
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -692,6 +790,18 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
+}
+
+func (o *FactoryWorkOrder) RecordArtifactsCleared(tx *gorm.DB, count int, actor *uuid.UUID) error {
+	data := factory.WorkOrderArtifactsCleared{
+		Order: o.Ref(),
+		Count: count,
+	}
+	if actor != nil {
+		data.User = &factory.UserRef{ID: *actor}
+	}
+
+	return o.recordEvent(tx, factory.EventTypeOrderArtifactsCleared, data)
 }
 
 func (o *FactoryWorkOrder) RecordPullRequestAdded(

@@ -12,11 +12,13 @@ export function useHostedCreditReturnRefresh({
   creditAdded,
   grantTotalCents,
   refetch,
+  pollingEnabled = true,
 }: {
   organizationId: string;
   creditAdded: boolean;
   grantTotalCents: number;
-  refetch: () => Promise<unknown>;
+  refetch?: () => Promise<unknown>;
+  pollingEnabled?: boolean;
 }): HostedCreditRefreshStatus {
   const [timedOut, setTimedOut] = useState(false);
   const [snapshotCents, setSnapshotCents] = useState<number | null>(null);
@@ -44,16 +46,16 @@ export function useHostedCreditReturnRefresh({
     }
 
     const startedAt = Date.now();
-    void refetch();
+    if (pollingEnabled) void refetch?.();
     const intervalId = window.setInterval(() => {
-      void refetch();
+      if (pollingEnabled) void refetch?.();
       if (Date.now() - startedAt >= HOSTED_CREDIT_REFRESH_TIMEOUT_MS) {
         setTimedOut(true);
       }
     }, HOSTED_CREDIT_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [creditAdded, refetch, status]);
+  }, [creditAdded, refetch, status, pollingEnabled]);
 
   return status;
 }

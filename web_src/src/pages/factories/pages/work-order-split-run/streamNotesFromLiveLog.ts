@@ -1,6 +1,7 @@
-import type { AgentActivity, AgentActivityItem } from "@/lib/agentActivity";
+import type { AgentActivity, AgentActivityItem, AgentActivityStatus } from "@/lib/agentActivity";
 import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
-import { agentToolDisplayText } from "@/lib/agentToolLabels";
+import { agentToolDisplayText, isCommandKind } from "@/lib/agentToolLabels";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
@@ -21,6 +22,11 @@ export const RUNNER_COMPONENTS = new Set([
 
 export function isRunnerComponent(component?: string): boolean {
   return Boolean(component && RUNNER_COMPONENTS.has(component));
+}
+
+/** OpenCode emits a bare "Thinking" note before the thought. Do not render it as a message. */
+export function isThinkingPlaceholder(text: string): boolean {
+  return /^(thinking|thought)[.…]?$/i.test(text.trim());
 }
 
 /** Spreads `orderKey` only when known, so untimed lines stay comparable-key-free. */
@@ -54,20 +60,33 @@ function noteFromCommandSection(
   orderKey: number | undefined,
   section: CommandSection,
 ): SplitRunStreamLine {
+  const name = section.text.trim();
+  const preview = section.preview?.trim() ?? "";
+  const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);
+  const distinctPreview = preview !== name ? preview : "";
+  const detail = [distinctPreview, output].filter(Boolean).join("\n\n");
+  const bashScript = section.kind === "bash" ? preview : "";
   return {
     id: stepId,
     nodeId,
     at: "",
     note: true,
     componentType: section.kind,
-    componentName: section.preview?.trim() || section.text,
+    componentName: name || preview,
     status: streamStatus(section.status),
-    detail:
-      section.kind === "prompt"
-        ? undefined
-        : section.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n"),
+    detail: detail || undefined,
+    commandScript: bashScript || undefined,
+    commandStdout: bashScript ? output || undefined : undefined,
+    duration: commandSectionDuration(section.duration_ms),
     ...orderKeyProps(orderKey),
   };
+}
+
+function commandSectionDuration(durationMs: number | null): string | undefined {
+  if (durationMs === null || durationMs <= 0) {
+    return undefined;
+  }
+  return formatMinutesSecondsDuration(durationMs) || undefined;
 }
 
 function notesFromSectionEvents(
@@ -107,7 +126,7 @@ function notesFromSectionEvents(
         componentType: tool.kind,
         componentName: agentToolDisplayText({ kind: tool.kind, name: tool.kind, input: tool.text }),
         status: streamStatus(tool.status),
-        detail: tool.lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n") || undefined,
+        detail: visibleLogText(tool.lines) || undefined,
         ...orderKeyProps(orderKey),
       });
     }
@@ -272,6 +291,91 @@ function streamAlreadyHasText(notes: SplitRunStreamLine[], text: string): boolea
   }
   const prefix = needle.slice(0, 48);
   return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
+/**
+ * OpenCode and other runners often send command-section events, not
+ * schema-v2 activity records. Turn those events into the same activity
+ * shape the refinement chat already renders.
+ */
+export function activitiesFromLiveLogSections(sections: CommandSection[]): AgentActivity[] {
+  const items: AgentActivityItem[] = [];
+  let running = false;
+  for (const section of sections) {
+    if (section.kind && HIDDEN_KINDS.has(section.kind)) {
+      continue;
+    }
+    if (section.status === "running") {
+      running = true;
+    }
+    items.push(...itemsFromSectionEvents(section));
+  }
+  if (items.length === 0) {
+    return [];
+  }
+  return [
+    {
+      id: "live-log",
+      provider: "runner",
+      status: running ? "running" : "passed",
+      sequence: items.length,
+      items,
+      truncated: false,
+    },
+  ];
+}
+
+function itemsFromSectionEvents(section: CommandSection): AgentActivityItem[] {
+  const items: AgentActivityItem[] = [];
+  for (const [eventIndex, event] of section.events.entries()) {
+    if (event.kind === "note") {
+      const text = event.text.trim();
+      if (!text || isHiddenAgentLiveLogText(text) || isThinkingPlaceholder(text)) {
+        continue;
+      }
+      items.push({
+        type: "content",
+        id: `${section.index}-note-${eventIndex}`,
+        kind: "assistant",
+        text,
+        status: "passed",
+        truncated: false,
+      });
+      continue;
+    }
+    for (const tool of event.tools) {
+      items.push({
+        type: "tool",
+        id: tool.id,
+        kind: tool.kind,
+        name: tool.kind,
+        input: tool.text,
+        output: isCommandKind(tool.kind) ? visibleLogText(tool.lines) : "",
+        outputStreams: [],
+        status: activityStatus(tool.status),
+        durationMs: tool.duration_ms ?? undefined,
+        truncated: false,
+      });
+    }
+  }
+  return items;
+}
+
+function visibleLogText(lines: string[]): string {
+  return lines.filter((line) => line.trim() && !isHiddenAgentLiveLogText(line)).join("\n");
+}
+
+function activityStatus(status: string): AgentActivityStatus {
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "cancelled") {
+    return "cancelled";
+  }
+  if (status === "running") {
+    return "running";
+  }
+  return "passed";
 }
 
 export function notesForLiveStream(input: {

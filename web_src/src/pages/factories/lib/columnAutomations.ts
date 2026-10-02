@@ -17,13 +17,14 @@ import {
   EVENT_CUSTOM_ENTRY,
   PR_CLOSURE_CATALOG_ID,
   PR_CLOSURE_ENTRY,
+  RISK_SCORE_CATALOG_ID,
+  RISK_SCORE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
@@ -41,7 +42,8 @@ export type ColumnAutomationKind =
   | "custom"
   | "pr-discussion"
   | "pr-checks"
-  | "pr-closure";
+  | "pr-closure"
+  | "risk-score";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -148,9 +150,12 @@ function automationsForColumn(
     ];
   }
   if (key === "verify") {
+    const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
+    const skip = new Set(riskScore.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders),
-      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, new Set()),
+      ...riskScore,
+      ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip),
     ];
   }
   if (key === "done") {
@@ -288,6 +293,46 @@ function customColumnAutomations(
   });
 }
 
+function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
+  if (app.columnKey !== "verify") {
+    return false;
+  }
+  const name = app.name?.trim() ?? "";
+  return (
+    name === RISK_SCORE_ENTRY.name ||
+    name === "Risk score" ||
+    /^Merge confidence \(\d+\)$/.test(name) ||
+    /^Risk score \(\d+\)$/.test(name)
+  );
+}
+
+function riskScoreAutomation(
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    if (!id || !isRiskScoreApp(app)) {
+      return [];
+    }
+    return [
+      {
+        id: `risk-score-${id}`,
+        kind: "risk-score" as const,
+        name: app.name?.trim() || RISK_SCORE_ENTRY.name,
+        trigger: RISK_SCORE_ENTRY.trigger,
+        action: RISK_SCORE_ENTRY.action,
+        iconSrc: RISK_SCORE_ENTRY.iconSrc,
+        iconAlt: RISK_SCORE_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(id, workOrders),
+        catalogId: RISK_SCORE_CATALOG_ID,
+        canvasId: id,
+      },
+    ];
+  });
+}
+
 function closureAutomation(
   apps: Array<{ id?: string; name?: string }>,
   workOrders: FactoriesWorkOrder[],
@@ -363,11 +408,11 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
 
 /**
  * Path for an existing column automation. Opens the popup on the first tab.
- * Task analysis opens the Planning setup wizard until the factory confirms it.
+ * Task analysis opens Planning settings.
  */
 export function columnAutomationOpenPath(
   automation: ColumnAutomation,
-  args: { organizationId: string; factoryKey: string; lineId?: string; planningSetupCompleted?: boolean },
+  args: { organizationId: string; factoryKey: string; lineId?: string },
 ): string | undefined {
   if (automation.kind === "intake") {
     return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
@@ -376,9 +421,6 @@ export function columnAutomationOpenPath(
     return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
   }
   if (automation.kind === "analysis") {
-    if (args.planningSetupCompleted === false && args.lineId) {
-      return factoryPlanningSetupPath(args.organizationId, args.factoryKey, args.lineId);
-    }
     return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
   }
   if (!automation.canvasId) {

@@ -1,4 +1,6 @@
-import { replaceFactoryKeySegment } from "./factoryKeyResolution";
+import { factoryRouteSegment, replaceFactoryKeySegment } from "./factoryKeyResolution";
+
+export { factoryRouteSegment, workspaceRouteSegment } from "./factoryKeyResolution";
 
 export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
@@ -11,9 +13,9 @@ export function newFactoryPath(organizationId: string) {
 
 /**
  * Every workspace-scoped path is built from this function, so lowercasing the
- * key here makes lowercase the canonical URL form everywhere: the stored
- * `factory.key` (and the settings page that displays it) stay uppercase —
- * only the URL segment is lowercased.
+ * segment here makes lowercase the canonical URL form everywhere. Pass the
+ * workspace route segment (`key-urlId`) from `factoryRouteSegment`. The stored
+ * `factory.key` (and the settings page that displays it) stay uppercase.
  */
 export function factoryDetailPath(organizationId: string, factoryKey: string) {
   return `${factoryListPath(organizationId)}/${factoryKey.toLowerCase()}`;
@@ -72,24 +74,21 @@ export function pathAfterWorkspaceSwitch({
   pathname: string;
   organizationId: string;
   currentFactoryKey: string;
-  nextFactory: { key?: string; lines?: Array<{ id?: string }> | null };
+  nextFactory: { key?: string; urlId?: string; lines?: Array<{ id?: string }> | null };
 }): string {
-  const nextKey = nextFactory.key;
-  if (!nextKey) {
+  const nextSegment = factoryRouteSegment(nextFactory);
+  if (!nextSegment) {
     return pathname;
   }
 
-  // `currentFactoryKey` (from `factory.key`) is always uppercase, but the
-  // `pathname` segment is the canonical (lowercase) URL form — normalize
-  // before comparing so the prefix match doesn't fail on case alone.
   const currentKeySegment = currentFactoryKey.toLowerCase();
   const prefix = `/${organizationId}/workspaces/${currentKeySegment}`;
-  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+  const rest = pathname === prefix || pathname.startsWith(`${prefix}/`) ? pathname.slice(prefix.length) : "";
   if (workspacePageToKeep(rest)) {
-    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextKey);
+    return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextSegment);
   }
 
-  return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
+  return factoryHomePath(organizationId, nextSegment, firstFactoryLineId(nextFactory));
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */
@@ -363,14 +362,49 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
   return sourceId === "checks" ? "checks" : "comments";
 }
 
-/** Dedicated setup page for the post-onboarding Backlog Refinement wizard. */
-export function factoryPlanningSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/planning`;
+/** Dedicated setup page for the Verify risk score automation. */
+export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/risk-score`;
+}
+
+/** Dedicated setup page for GitHub issue intake. */
+export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/github`;
 }
 
 /** Dedicated setup page for Sentry exception intake. */
 export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+}
+
+/** Dedicated setup page for Datadog Error Tracking intake. */
+export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
+}
+
+/** Connection created in this Linear OAuth round trip. The Linear callback appends it. */
+export const LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM = "linearIntegrationId";
+
+/** Dedicated setup page for Linear issue intake. */
+export function factoryLinearIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  options?: { integrationId?: string },
+) {
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/linear`;
+  const integrationId = options?.integrationId?.trim();
+  if (!integrationId) {
+    return path;
+  }
+  const params = new URLSearchParams();
+  params.set(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
+}
+
+export function linearIntakeIntegrationIdFromSearch(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
 }
 
 /** Dedicated setup page for Dependabot alert intake. */

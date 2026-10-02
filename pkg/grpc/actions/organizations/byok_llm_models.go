@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -24,8 +26,11 @@ func ListBYOKLLMModels(
 	req *pb.ListBYOKLLMModelsRequest,
 ) (*pb.ListBYOKLLMModelsResponse, error) {
 	tx := database.DB(ctx)
-	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list byok models")
+	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list byok models", models.NormalizeBYOKLLMProvider)
 	if err != nil {
+		return nil, err
+	}
+	if err := ensureCustomProviderEnabled(tx, scope.OrganizationID, scope.Provider, "failed to list byok models"); err != nil {
 		return nil, err
 	}
 
@@ -83,6 +88,13 @@ func UpdateBYOKLLMModels(
 ) (*pb.UpdateBYOKLLMModelsResponse, error) {
 	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
+		return nil, err
+	}
+	provider, err := models.NormalizeBYOKLLMProvider(req.GetProvider())
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, err.Error())
+	}
+	if err := ensureCustomProviderEnabled(database.DB(ctx), organizationID, provider, "failed to update byok models"); err != nil {
 		return nil, err
 	}
 
@@ -158,12 +170,53 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 	return out, nil
 }
 
+// ListConnectedBYOKModelIDs returns the model ids that the integration key can use.
+func ListConnectedBYOKModelIDs(tx *gorm.DB, reg *registry.Registry, integration *models.Integration) ([]string, error) {
+	if integration == nil {
+		return nil, grpcerrors.Internal(fmt.Errorf("integration is required"), "failed to list byok models")
+	}
+
+	candidates, err := listBYOKCandidateModels(tx, reg, integration)
+	if err != nil {
+		return nil, classifyBYOKListError(err)
+	}
+
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		id := strings.TrimSpace(candidate.GetId())
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // classifyBYOKListError maps a failure from listBYOKCandidateModels to a
 // client-safe gRPC error. Provider auth failures, transport errors, timeouts,
 // and provider outages are user-fixable or transient, so they are reported as
 // FailedPrecondition rather than Internal. Rate-limited requests are reported
 // as ResourceExhausted. Anything else keeps the safe Internal default so real
 // bugs still surface as a 500 and page the on-call.
+func ensureCustomProviderEnabled(tx *gorm.DB, orgID uuid.UUID, provider, internalMessage string) error {
+	if provider != models.UsageProviderCustom {
+		return nil
+	}
+	enabled, err := models.OrganizationHasExperimentalFeatures(
+		tx,
+		orgID,
+		features.FeatureOrganizationBYOK,
+		features.FeatureOrganizationBYOKCustomProvider,
+	)
+	if err != nil {
+		return grpcerrors.Internal(err, internalMessage)
+	}
+	if !enabled {
+		return grpcerrors.PermissionDenied(nil, "Custom provider is not enabled for this organization.")
+	}
+	return nil
+}
+
 func classifyBYOKListError(err error) error {
 	switch {
 	case core.IsProviderRateLimited(err):

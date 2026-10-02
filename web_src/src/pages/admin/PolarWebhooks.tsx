@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { Webhook } from "lucide-react";
+import { AlertTriangle, Webhook } from "lucide-react";
 import { useState } from "react";
 
 import AdminPagination from "./AdminPagination";
@@ -17,6 +17,9 @@ import {
   POLAR_WEBHOOKS_NOT_CONFIGURED,
   POLAR_WEBHOOKS_REDELIVER_FAILED,
   POLAR_WEBHOOKS_TITLE,
+  POLAR_WEBHOOKS_VERSION_CHECK_FAILED,
+  polarWebhookEndpointVersionWarning,
+  type PolarWebhookEndpoint,
   type PolarWebhookStatusFilter,
 } from "./polarWebhookDeliveries";
 import { usePolarWebhooks } from "./usePolarWebhooks";
@@ -108,6 +111,11 @@ function PolarWebhooksBody({
 
   return (
     <>
+      <PolarWebhookVersionWarnings
+        endpoints={pageState.mismatchedEndpoints}
+        pinnedVersion={pageState.pinnedApiVersion}
+        checkFailed={pageState.versionCheckFailed}
+      />
       <PolarWebhooksFilters
         statusFilter={pageState.statusFilter}
         eventType={pageState.eventType}
@@ -119,6 +127,7 @@ function PolarWebhooksBody({
       ) : (
         <PolarWebhooksTable
           groups={pageState.eventGroups}
+          pinnedApiVersion={pageState.pinnedApiVersion}
           expandedIds={expandedIds}
           redelivering={pageState.redelivering}
           onToggle={onToggle}
@@ -183,6 +192,42 @@ function PolarWebhooksFilters({
           </SelectContent>
         </Select>
       </div>
+    </div>
+  );
+}
+
+function PolarWebhookVersionWarnings({
+  endpoints,
+  pinnedVersion,
+  checkFailed,
+}: {
+  endpoints: PolarWebhookEndpoint[];
+  pinnedVersion: string;
+  checkFailed: boolean;
+}) {
+  if (checkFailed) {
+    return (
+      <Text data-testid="polar-webhook-version-check-failed" className="text-sm text-gray-500 dark:text-gray-400">
+        {POLAR_WEBHOOKS_VERSION_CHECK_FAILED}
+      </Text>
+    );
+  }
+  if (endpoints.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      data-testid="polar-webhook-version-warning"
+      className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/30"
+    >
+      {endpoints.map((endpoint) => (
+        <div key={endpoint.id} className="flex items-start gap-2">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <Text className="text-sm text-amber-800 dark:text-amber-300">
+            {polarWebhookEndpointVersionWarning(endpoint, pinnedVersion)}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }

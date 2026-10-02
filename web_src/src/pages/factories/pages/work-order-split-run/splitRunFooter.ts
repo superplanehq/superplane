@@ -1,5 +1,6 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
@@ -8,7 +9,15 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "s
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "archive" | "reject" | "refine" | "approve" | "rerun" | "reopen";
+export type SplitRunFooterActionKind =
+  | "start"
+  | "archive"
+  | "reject"
+  | "refine"
+  | "approve"
+  | "rerun"
+  | "reopen"
+  | "send-to-backlog";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -19,7 +28,7 @@ export type SplitRunStopChoiceItem = {
   label: string;
   actionLabel: string;
   description: string;
-  status: "cancelled" | "completed" | "draft" | "running";
+  status: "rejected" | "completed" | "draft" | "running";
 };
 
 export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
@@ -27,8 +36,8 @@ export const SPLIT_RUN_STOP_CHOICES: SplitRunStopChoiceItem[] = [
     id: "canceled",
     label: "Stop and Close",
     actionLabel: "Stop and Close",
-    description: "Marks this task as Canceled",
-    status: "cancelled",
+    description: "Marks this task as Rejected",
+    status: "rejected",
   },
   {
     id: "completed",
@@ -80,6 +89,10 @@ export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus):
   return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
 }
 
+export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
+  return footer.kind !== "running" && footer.status !== "running" && !isClosedWorkOrderDisplayStatus(footer.status);
+}
+
 export function isSplitRunStopChoiceAvailable(choice: SplitRunStopChoice, status?: WorkOrderDisplayStatus): boolean {
   if (choice === "reopen") {
     return isClosedWorkOrderDisplayStatus(status);
@@ -91,7 +104,7 @@ export function isSplitRunStopChoiceAvailable(choice: SplitRunStopChoice, status
     return status !== "completed";
   }
   if (choice === "canceled") {
-    return status !== "cancelled" && status !== "rejected";
+    return status !== "rejected";
   }
   return status !== "draft";
 }
@@ -130,7 +143,7 @@ export interface SplitRunFooterNote {
   sourceName?: string;
   sourceAppId?: string;
   updatedAt?: string;
-  cta?: { label: string; href?: string; icon?: "bug" };
+  cta?: { label: string; href?: string; icon?: "bug"; destination?: "billing" };
   actor?: OrgUserDisplay;
 }
 
@@ -159,6 +172,12 @@ const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+const SEND_TO_BACKLOG: SplitRunFooterAction = {
+  id: "send-to-backlog",
+  kind: "send-to-backlog",
+  label: "Send to backlog",
+  emphasis: "quiet",
+};
 
 export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
@@ -183,7 +202,7 @@ export const SPLIT_RUN_CLASSIC_DRAFT_NOTE: SplitRunFooterNote = {
 
 /** Restore the established draft controls outside live refinement mode. */
 export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
-  if (footer.kind !== "draft") {
+  if (footer.kind !== "draft" || footer.note?.cta?.destination === "billing") {
     return footer;
   }
   return {
@@ -216,7 +235,17 @@ export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore"
   return { clarity: footer.clarityScore, confidence: footer.confidenceScore };
 }
 
+function creditBillingNote(note?: SplitRunFooterNote): SplitRunFooterNote | undefined {
+  if (note?.cta?.destination !== "billing") {
+    return undefined;
+  }
+  return note;
+}
+
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
+  if (footer.kind === "draft" && creditBillingNote(footer.note)) {
+    return "failed";
+  }
   if (footer.kind === "draft") {
     return draftDecisionTone(draftReadiness(splitRunFooterScores(footer)).tone);
   }
@@ -226,7 +255,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "cancelled") {
+  if (footer.kind === "stopped" || footer.status === "rejected") {
     return "rejected";
   }
   return "done";
@@ -256,9 +285,6 @@ function closedDecisionNote(
       ...(closer?.actor ? { actor: closer.actor } : {}),
     };
   }
-  if (status === "cancelled") {
-    return { headline: "This task is canceled", text: "Reopen this task if the work should continue." };
-  }
   if (status === "failed") {
     return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
   }
@@ -273,10 +299,58 @@ function closedDecisionNote(
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "completed" || status === "rejected") {
-    return [];
+  if (status === "failed" || status === "rejected" || status === "cancelled") {
+    return [SEND_TO_BACKLOG, REOPEN];
   }
-  return [REOPEN];
+  return [];
+}
+
+/**
+ * A credit failure links to billing. Other notes stay unchanged. Without a
+ * billing path, drop the action so it does not open the run.
+ */
+export type ComposerCreditVerdict = {
+  headline: string;
+  text: string;
+  actionLabel: string;
+  href?: string;
+};
+
+/** The refine strip uses this when a draft did not start because credit is gone. */
+export function composerCreditVerdict(
+  note: SplitRunFooterNote | undefined,
+  billingHref: string | undefined,
+): ComposerCreditVerdict | undefined {
+  if (note?.cta?.destination !== "billing" || !note.text) {
+    return undefined;
+  }
+  return {
+    headline: note.headline,
+    text: note.text,
+    actionLabel: note.cta.label,
+    ...(billingHref ? { href: billingHref } : {}),
+  };
+}
+
+export function creditBillingHref(organizationId?: string, factoryKey?: string): string | undefined {
+  if (!organizationId || !factoryKey) {
+    return undefined;
+  }
+  return factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing");
+}
+
+export function creditBillingHrefForNote(
+  note: SplitRunFooterNote,
+  billingHref: string | undefined,
+): SplitRunFooterNote {
+  if (note.cta?.destination !== "billing") {
+    return note;
+  }
+  if (!billingHref) {
+    const { cta: _cta, ...rest } = note;
+    return rest;
+  }
+  return { ...note, cta: { label: note.cta.label, href: billingHref } };
 }
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
@@ -293,8 +367,8 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting shows Reject and Approve. Failed and stopped show Reject and Rerun.
- * Draft keeps Archive in the header. Build follows the confidence band. Closed
- * failed keeps Reopen. Completed and rejected explain the result only.
+ * Failed and rejected keep Send to backlog and Reopen. Completed explains
+ * the result only.
  */
 type FooterInput = {
   kind: SplitRunFooterKind;
@@ -352,16 +426,23 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   const hasScore = input.clarityScore != null || input.confidenceScore != null;
   const analyzing = Boolean(input.isAnalyzing) && !hasScore;
+  const creditNote = creditBillingNote(note);
+  const resolvedNote =
+    creditNote ?? (analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }));
   return withFooterMeta(input, {
     kind: "draft",
     sentence: analyzing ? "SuperPlane is analyzing this task." : "This task is a draft.",
-    note: analyzing || hasScore ? draftReadinessNote(input) : (note ?? { ...SPLIT_RUN_DRAFT_NOTE }),
+    note: resolvedNote,
     attentionCard: true,
     actions: draftDecisionActions(),
   });
 }
 
 function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooterNote {
+  const credit = creditBillingNote(note);
+  if (credit) {
+    return credit;
+  }
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }

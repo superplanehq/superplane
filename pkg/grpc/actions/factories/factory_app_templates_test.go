@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -66,6 +67,13 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "COMMIT_SHA")
 	assert.Contains(t, result.canvasYAML, "implement and wire the change into the production page or component")
 	assert.Contains(t, result.canvasYAML, "does not replace the product implementation unless the task explicitly requests")
+	implementationPrompt, ok := implementationStep(t, agent, "Implementation")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, implementationPrompt, runner.FactoryCommitIdentityPrompt)
+	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
+	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -110,6 +118,101 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "app-1", console.Metadata.CanvasID)
 	assert.Equal(t, "Implement refunds", console.Metadata.Name)
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestMaterializeRiskScoreTemplate(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Merge confidence",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+			"defaultBranch": "main",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Merge confidence", canvas.Metadata.Name)
+
+	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
+	assert.Equal(t, map[string]any{
+		"id":      "risk-score",
+		"version": float64(factoryTemplateVersion),
+	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
+
+	gate := findYAMLNode(t, canvas, "should-assess")
+	assert.Equal(
+		t,
+		`root().data.pull_request.base.ref == "main" && root().data.pull_request.draft != true`,
+		gate.Configuration["expression"],
+	)
+
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.NotContains(t, agent.Configuration, "credentials")
+	assert.NotContains(t, agent.Configuration, "model")
+	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
+	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
+	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift, reversibility.")
+	assert.NotContains(t, prompt, "install_params.riskRules")
+	assert.NotContains(t, prompt, "install_params.enabledChecks")
+	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
+	assert.Contains(t, result.canvasYAML, `/compare/${base_ref}...${revision}" > /tmp/pr.diff`)
+
+	format := findYAMLNode(t, canvas, "format-merge-confidence")
+	assert.Contains(t, format.Configuration["script"], "Math.min(5")
+
+	report := findYAMLNode(t, canvas, "report-risk-score")
+	assert.Equal(t, "risk-review", report.Configuration["checkKey"])
+	assert.Equal(t, "Blast radius", report.Configuration["name"])
+	assert.Equal(t, "5", report.Configuration["maxScore"])
+	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
+	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
+	assert.Equal(t, float64(4), report.Configuration["criticalAt"])
+
+	performance := findYAMLNode(t, canvas, "report-performance")
+	assert.Equal(t, "performance-review", performance.Configuration["checkKey"])
+	assert.Equal(t, "higherIsBetter", performance.Configuration["direction"])
+	assert.Equal(t, float64(3), performance.Configuration["cautionAt"])
+	assert.Equal(t, float64(2), performance.Configuration["criticalAt"])
+
+	security := findYAMLNode(t, canvas, "report-security")
+	assert.Equal(t, "security-review", security.Configuration["checkKey"])
+	assert.Equal(t, "higherIsBetter", security.Configuration["direction"])
+
+	drift := findYAMLNode(t, canvas, "report-drift")
+	assert.Equal(t, "drift-review", drift.Configuration["checkKey"])
+	assert.Equal(t, "Drift from Specification", drift.Configuration["name"])
+	assert.Equal(t, "lowerIsBetter", drift.Configuration["direction"])
+	assert.Equal(t, float64(3), drift.Configuration["cautionAt"])
+	assert.Equal(t, float64(4), drift.Configuration["criticalAt"])
+
+	reversibility := findYAMLNode(t, canvas, "report-reversibility")
+	assert.Equal(t, "reversibility-review", reversibility.Configuration["checkKey"])
+	assert.Equal(t, "Reversibility", reversibility.Configuration["name"])
+	assert.Equal(t, "higherIsBetter", reversibility.Configuration["direction"])
+	assert.Equal(t, float64(3), reversibility.Configuration["cautionAt"])
+	assert.Equal(t, float64(2), reversibility.Configuration["criticalAt"])
+
+	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
+	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
+	assert.NotContains(t, result.canvasYAML, "superplane-pr-risk-review")
+	assert.NotContains(t, result.canvasYAML, "discord")
+	assert.NotContains(t, result.canvasYAML, "git push")
+	assert.Contains(t, result.consoleYAML, "app-risk")
 
 	requireValidCanvasExpressions(t, canvas)
 }
@@ -500,6 +603,28 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, refinement.Configuration["credentials"])
+}
+
+func agentPrompt(t *testing.T, agent *yaml.Node) string {
+	t.Helper()
+	prompt, ok := implementationStep(t, agent, "Review Pull Request")["prompt"].(string)
+	require.True(t, ok)
+	return prompt
+}
+
+func implementationStep(t *testing.T, agent *yaml.Node, name string) map[string]any {
+	t.Helper()
+	steps, ok := agent.Configuration["steps"].([]any)
+	require.True(t, ok)
+	for _, step := range steps {
+		item, ok := step.(map[string]any)
+		if !ok || item["name"] != name {
+			continue
+		}
+		return item
+	}
+	t.Fatalf("step %q not found", name)
+	return nil
 }
 
 func findYAMLNode(t *testing.T, canvas *yaml.Canvas, id string) *yaml.Node {

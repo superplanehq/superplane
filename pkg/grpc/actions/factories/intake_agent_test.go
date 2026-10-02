@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -51,7 +52,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	t.Run("an agent on an installation still names the model it runs", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 
-		for app, model := range map[string]string{"claude": "opus", "openai": "gpt-5"} {
+		for app, model := range map[string]string{"claude": "claude-opus-5-5", "openai": "gpt-5"} {
 			factory := newFactoryIn(t, organization.ID)
 			agentID := createReadyOnboardingIntegration(t, organization.ID, app)
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
@@ -76,6 +77,30 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		require.NotNil(t, agent)
 		assert.Equal(t, "runnerOpenRouter", agent.Component)
 		assert.NotEmpty(t, agent.Model)
+	})
+
+	t.Run("a custom provider runs through OpenCode", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		agentID := createReadyOnboardingIntegration(t, organization.ID, models.CustomLLMAppName)
+		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOK))
+		require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+		_, err := models.UpsertOrganizationBYOKModelAllowlist(
+			db,
+			organization.ID,
+			models.UsageProviderCustom,
+			datatypes.JSONSlice[string]{"zeta-model", "alpha-model"},
+		)
+		require.NoError(t, err)
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, "runnerOpenRouter", agent.Component)
+		assert.Equal(t, models.UsageProviderCustom, agent.LLMProvider)
+		assert.Equal(t, "alpha-model", agent.Model)
 	})
 
 	t.Run("an agent without a runner falls back to the installations", func(t *testing.T) {

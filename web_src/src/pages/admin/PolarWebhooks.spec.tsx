@@ -236,6 +236,9 @@ describe("PolarWebhooks", () => {
       if (init?.method === "POST" && url.includes("/admin/api/polar/webhooks/evt_1/redeliver")) {
         return jsonResponse({ status: "accepted" });
       }
+      if (url.endsWith("/admin/api/polar/webhooks/endpoints")) {
+        return jsonResponse({ configured: true, api_version: "2026-10", endpoints: [] });
+      }
       expect(url).toContain("succeeded=false");
       return jsonResponse({
         configured: true,

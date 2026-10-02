@@ -16,9 +16,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -56,6 +59,9 @@ type FactoryContext struct {
 	// readJiraIssueFiles, when set, supplies Jira files without calling the
 	// Jira API.
 	readJiraIssueFiles jiraFileRead
+	// readLinearIssueFiles, when set, supplies Linear files without calling
+	// the Linear API.
+	readLinearIssueFiles linearFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -176,11 +182,27 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
-	skip, err = c.skipDuplicateDependabotWorkOrder(f)
+	skip, err = c.skipDuplicateProductiveWorkOrder(f)
 	if err != nil {
 		return nil, false, err
 	}
 	if skip {
+		return nil, false, nil
+	}
+
+	skip, err = c.skipDuplicateLinearWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
+	merged, err := c.mergeDependabotWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if merged {
 		return nil, false, nil
 	}
 
@@ -193,6 +215,9 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	if err := c.prepareWorkOrderFiles(order); err != nil {
 		return nil, false, err
 	}
+	c.recordSentryWebhookTask(order)
+	c.recordDatadogWebhookTask(order)
+	c.recordLinearWebhookTask(order)
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
@@ -256,7 +281,7 @@ func (c *FactoryContext) skipDuplicateJiraWorkOrder(factoryModel *models.Factory
 	return hasOrder, nil
 }
 
-func (c *FactoryContext) skipDuplicateDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
+func (c *FactoryContext) skipDuplicateProductiveWorkOrder(factoryModel *models.Factory) (bool, error) {
 	if c.execution == nil {
 		return false, nil
 	}
@@ -266,23 +291,72 @@ func (c *FactoryContext) skipDuplicateDependabotWorkOrder(factoryModel *models.F
 		return false, nil
 	}
 
-	ref, ok := ghdependabot.AlertRefFromEventData(event.Data.Data())
+	ref, ok := productive.TaskRefFromEventData(event.Data.Data())
 	if !ok {
 		return false, nil
 	}
 
-	if err := ghdependabot.LockAlertWorkOrder(c.tx, factoryModel, ref); err != nil {
+	if err := productive.LockTaskWorkOrder(c.tx, factoryModel, ref); err != nil {
 		return false, err
 	}
 
-	hasOrder, err := ghdependabot.AlertHasWorkOrder(c.tx, factoryModel, ref)
+	hasOrder, err := productive.TaskHasWorkOrder(c.tx, factoryModel, ref)
 	if err != nil {
 		return false, err
 	}
 	if hasOrder {
-		log.Infof("skipping Dependabot alert %s#%d: work order already exists", ref.Repository, ref.Number)
+		log.Infof("skipping Productive task %s in organization %s: work order already exists", ref.TaskID, ref.OrganizationID)
 	}
 	return hasOrder, nil
+}
+
+// mergeDependabotWorkOrder adds a Dependabot alert to the factory's open task
+// for the same package instead of opening a second task. GitHub raises one
+// alert per advisory per manifest, and one dependency update fixes them all.
+// It reports true when the alert was merged and no task must be created.
+func (c *FactoryContext) mergeDependabotWorkOrder(factoryModel *models.Factory) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil {
+		return false, nil
+	}
+
+	ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data())
+	if !ok {
+		return false, nil
+	}
+
+	if err := ghdependabot.LockPackageWorkOrder(c.tx, factoryModel, ref); err != nil {
+		return false, err
+	}
+
+	order, err := ghdependabot.FindOpenPackageWorkOrder(c.tx, factoryModel, ref)
+	if err != nil {
+		return false, err
+	}
+	if order == nil {
+		return false, nil
+	}
+
+	section, ok := ghdependabot.AlertSectionFromEventData(event.Data.Data())
+	if !ok {
+		return true, nil
+	}
+	next := ghdependabot.MergeAlertSection(order.Description, section)
+	if next == order.Description {
+		log.Infof("skipping Dependabot alert for %s in %s: task %s already lists it", ref.Name, ref.Repository, order.ID)
+		return true, nil
+	}
+
+	if err := order.UpdateContent(c.tx, nil, &next); err != nil {
+		return false, err
+	}
+	c.notifyWorkOrderUpdated(factoryModel.ID, order.ID, factory.EventTypeOrderUpdated)
+	log.Infof("merged Dependabot alert for %s in %s into task %s", ref.Name, ref.Repository, order.ID)
+	return true, nil
 }
 
 func (c *FactoryContext) createFactoryWorkOrder(
@@ -305,6 +379,66 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
 }
 
+func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := sentry.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendSentryWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Sentry webhook %s", order.ID, receiptID)
+	}
+}
+
+func (c *FactoryContext) recordLinearWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := linear.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendLinearWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Linear webhook %s", order.ID, receiptID)
+	}
+}
+
+func (c *FactoryContext) recordDatadogWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := datadog.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendDatadogWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Datadog webhook %s", order.ID, receiptID)
+	}
+}
+
 func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
 	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
 		return nil
@@ -315,6 +449,13 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 		return nil
 	}
 
+	// A Dependabot task collects every alert of one package, so its origin
+	// is the package's alerts page and not the first alert.
+	if ref, ok := ghdependabot.PackageRefFromEventData(event.Data.Data()); ok {
+		origin := ref.Origin()
+		return &origin
+	}
+
 	return models.OriginFromIntakeRootEvent(event)
 }
 
@@ -322,6 +463,7 @@ func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) e
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
 	c.ingestJiraFiles(order)
+	c.ingestLinearFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 

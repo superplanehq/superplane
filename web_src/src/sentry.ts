@@ -6,14 +6,19 @@ interface SentryWindow extends Window {
 }
 
 // Console messages emitted by third parties (our telemetry SDK, browser
-// extensions) that captureConsoleIntegration would otherwise forward to Sentry
-// as application errors. These are not bugs in our code, so we drop them.
+// extensions, the code editor) that captureConsoleIntegration would otherwise
+// forward to Sentry as application errors. These are not bugs in our code, so
+// we drop them.
 export const IGNORED_CONSOLE_MESSAGES = [
   // Dash0 Web SDK logs export failures to the console.
   /^(Failed to send telemetry to|Error sending telemetry to|Failed to fetch)/,
   // Vue Devtools browser extension warns when multiple versions are installed.
   // Our app is React-only; this noise originates from the user's extensions.
   /^Another version of Vue Devtools/,
+  // Monaco's gesture tracker logs these when a touch id was not seen at
+  // touchstart, then skips that touch. Sentry appends " [object Touch]".
+  /^move of an UNKNOWN touch\b/,
+  /^end of an UNKNOWN touch\b/,
 ];
 
 // True when a console message matches a known third-party pattern we ignore.

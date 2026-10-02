@@ -80,6 +80,13 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "danger zone",
     "delete workspace",
   ]),
+  entry("workspace", "general", "Public badge", "factory-settings-public-badge", [
+    "badge",
+    "svg",
+    "readme",
+    "share",
+    "pull requests",
+  ]),
 
   // Workspace · Repository
   entry("workspace", "repository", "Repository", "factory-settings-repository", [
@@ -90,19 +97,28 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "issue intake",
   ]),
 
-  // Workspace · MCP servers
-  entry("workspace", "mcp", "MCP servers", undefined, [
+  entry("workspace", "agent", "Agent", undefined, [
     "mcp server",
     "mcp",
     "oauth",
     "header",
-    "agent",
     "sign-in",
     "tools",
+    "skill",
+    "skill.md",
+    "github package",
   ]),
 
-  // Workspace · Skills
-  entry("workspace", "skills", "Skills", undefined, ["skill", "skill.md", "agent", "github package"]),
+  entry("workspace", "superplane-mcp-server", "MCP Server", undefined, [
+    "superplane mcp",
+    "mcp client",
+    "cursor",
+    "claude code",
+    "vscode",
+    "editor",
+    "ide",
+    "connect client",
+  ]),
 
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
@@ -144,6 +160,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "claude",
     "openai",
     "your keys",
+    "custom provider",
     "select models",
   ]),
 

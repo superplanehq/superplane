@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func MaterializeFactoryAppTemplate(
@@ -24,6 +27,9 @@ func MaterializeFactoryAppTemplate(
 	}
 
 	db := database.DB(ctx)
+	if err := requireRiskScoreFeature(db, orgID, req.GetTemplateId()); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
@@ -37,8 +43,17 @@ func MaterializeFactoryAppTemplate(
 	input := factoryTemplateInputFromRequest(req)
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name
+	// The template names the agent integration "claude". That is a type
+	// placeholder, not an installation. An install that omits the agent uses
+	// the workspace agent, the same one the other line apps already run.
+	if input.agent == nil {
+		input.agent = factoryTemplateAgentFromIntake(resolveIntakeAgent(db, factory))
+	}
 	result, err := materializeFactoryTemplate(req.GetTemplateId(), input)
 	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+	}
+	if err := attachFactoryTemplateColumn(db, canvas, req.GetTemplateId()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 
@@ -47,6 +62,20 @@ func MaterializeFactoryAppTemplate(
 		CanvasYaml:  result.canvasYAML,
 		ConsoleYaml: result.consoleYAML,
 	}, nil
+}
+
+func requireRiskScoreFeature(db *gorm.DB, orgID uuid.UUID, templateID string) error {
+	if templateID != "risk-score" {
+		return nil
+	}
+	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
+	if err != nil {
+		return err
+	}
+	if !organization.HasExperimentalFeature(features.FeatureFactoryRiskScore) {
+		return errRiskScoreDisabled
+	}
+	return nil
 }
 
 func MaterializeFactoryAutomationDefaults(

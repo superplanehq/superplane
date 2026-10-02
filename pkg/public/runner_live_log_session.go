@@ -101,6 +101,7 @@ func writeRunnerLiveLogSessionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, runneraction.ErrLiveLogNotRunner):
 		http.Error(w, "Live logs are only available for Runner components", http.StatusBadRequest)
 	case errors.Is(err, runneraction.ErrLiveLogBrokerTaskMissing):
+		w.Header().Set(runneraction.LiveLogErrorCodeHeader, runneraction.LiveLogSessionNotReadyErrorCode)
 		http.Error(
 			w,
 			"Logs are not available for this execution yet. Check again shortly.",

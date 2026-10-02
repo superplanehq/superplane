@@ -1,4 +1,8 @@
-import type { FactoriesFactoryPullRequest, FactoryPullRequestMergeabilityMergeMethod } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesFactoryPullRequestMergeability,
+  FactoryPullRequestMergeabilityMergeMethod,
+} from "@/api-client";
 
 import { selectWorkOrderCardPullRequest } from "../../lib/workOrderCardPullRequest";
 import { pullRequestLabel, pullRequestState } from "../../lib/workOrderPullRequest";
@@ -88,6 +92,44 @@ export function defaultMergeMethod(
 ): FactoryPullRequestMergeMethodChoice | undefined {
   const allowed = new Set(methods ?? []);
   return MERGE_METHOD_PREFERENCE.find((method) => allowed.has(method));
+}
+
+export interface PullRequestReviewCopy {
+  headline: string;
+  closing: string;
+}
+
+/**
+ * Headline and closing line for the review strip. The merge gate knows the
+ * checks state, so while checks run or fail the strip says that instead of
+ * calling the pull request ready.
+ */
+export function pullRequestReviewCopy(mergeability?: FactoriesFactoryPullRequestMergeability): PullRequestReviewCopy {
+  if (mergeability?.blockedReason === "BLOCKED_REASON_UNAVAILABLE") {
+    return {
+      headline: "Merge status is unavailable right now.",
+      closing: PULL_REQUEST_REVIEW_COPY.closing,
+    };
+  }
+  if (mergeability?.blockedReason === "BLOCKED_REASON_CHECKS_UNFINISHED") {
+    return {
+      headline: "The pull request waits for checks",
+      closing: "You can review it now. This task closes when the pull request is merged or closed.",
+    };
+  }
+  if (mergeability?.blockedReason === "BLOCKED_REASON_CHECK_FAILED") {
+    return {
+      headline: "A pull request check failed",
+      closing: "Review the failed check on the pull request.",
+    };
+  }
+  if (mergeability?.blockedReason === "BLOCKED_REASON_CONFLICTING") {
+    return {
+      headline: "The pull request has conflicts",
+      closing: "Resolve the conflicts on the pull request before merge.",
+    };
+  }
+  return { headline: PULL_REQUEST_REVIEW_COPY.headline, closing: PULL_REQUEST_REVIEW_COPY.closing };
 }
 
 export const PULL_REQUEST_REVIEW_COPY = {

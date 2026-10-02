@@ -24,6 +24,7 @@ import {
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
+import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -230,7 +231,7 @@ describe("IntakeSourceSettingsPopup", () => {
     ["jira-issues", "Jira issues", jiraIcon],
     ["sentry-exceptions", "Sentry exceptions", sentryIcon],
     ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
-    ["productive-tasks", "Productive.io tasks", productiveIcon],
+    ["productive-tasks", "Productive tasks", productiveIcon],
   ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
     renderPopup({ sourceId });
 
@@ -390,38 +391,48 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "hides connection, project, and pause controls for a %s intake",
-    (sourceId) => {
-      renderPopup({ sourceId });
+  it.each([
+    "github-issues",
+    "dependabot-alerts",
+    "sentry-exceptions",
+    "jira-issues",
+    "productive-tasks",
+    "datadog",
+    "linear-issues",
+  ] as const)("hides connection, project, and pause controls for a %s intake", (sourceId) => {
+    renderPopup({ sourceId });
 
-      expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
-    },
-  );
+    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings-resume")).not.toBeInTheDocument();
+  });
 
-  it.each(["github-issues", "dependabot-alerts", "sentry-exceptions", "jira-issues", "productive-tasks"] as const)(
-    "deletes a %s intake after confirmation",
-    async (sourceId) => {
-      const onDelete = vi.fn();
-      const user = userEvent.setup();
-      renderPopup({ sourceId, onDelete });
+  it.each([
+    "github-issues",
+    "dependabot-alerts",
+    "sentry-exceptions",
+    "jira-issues",
+    "productive-tasks",
+    "datadog",
+    "linear-issues",
+  ] as const)("deletes a %s intake after confirmation", async (sourceId) => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({ sourceId, onDelete });
 
-      expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
 
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-      expect(onDelete).not.toHaveBeenCalled();
-      await user.click(screen.getByTestId("intake-delete-cancel"));
-      expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
-      expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("intake-delete-cancel"));
+    expect(screen.queryByTestId("intake-delete-dialog")).not.toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
 
-      await user.click(screen.getByTestId("intake-source-settings-delete"));
-      await user.click(screen.getByTestId("intake-delete-confirm"));
-      expect(onDelete).toHaveBeenCalledTimes(1);
-    },
-  );
+    await user.click(screen.getByTestId("intake-source-settings-delete"));
+    await user.click(screen.getByTestId("intake-delete-confirm"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
 
   it("shows a delete error in the confirmation dialog", async () => {
     const user = userEvent.setup();
@@ -463,5 +474,21 @@ describe("IntakeSourceSettingsPopup", () => {
         jiraCompletionColumn: "QA",
       }),
     );
+  });
+
+  it("does not save a Linear intake with no project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearProjectIds: [] },
+      onSave,
+    });
+
+    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

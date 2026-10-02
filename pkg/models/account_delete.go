@@ -151,6 +151,9 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 		if err := SoftDeleteOrganizationInTransaction(tx, organization.ID.String()); err != nil {
 			return err
 		}
+		if err := SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {
+			return err
+		}
 	}
 
 	users, err := ListActiveHumanUsersForAccount(tx, a.ID)

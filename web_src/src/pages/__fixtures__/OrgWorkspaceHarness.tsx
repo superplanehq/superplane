@@ -11,7 +11,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -20,10 +20,14 @@ import {
   AutomationsPage,
   ChecksPRFeedbackSetupPage,
   CreateWorkOrderComposeRedirect,
+  DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
+  GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
+  LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
+  RiskScoreSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoriesLayout,
@@ -104,6 +108,8 @@ export interface OrgWorkspacePageOverrides {
   velocity?: ComponentType;
   /** Storybook-only Organization Spending explorer. Live app ignores this. */
   organizationSpending?: ComponentType;
+  /** Storybook-only LLM Models page. Live app ignores this. */
+  llmModels?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -242,12 +248,30 @@ function factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage: Comp
   );
 }
 
-function factorySettingsHarnessRoutes(OrganizationSpendingPage: ComponentType) {
+function factorySettingsOrganizationModelsRoute(LLMModelsPage: ComponentType) {
+  return (
+    <Route
+      key="factory-settings-organization-models"
+      path="organization/models"
+      element={
+        <RequirePermission resource="org" action="read">
+          <LLMModelsPage />
+        </RequirePermission>
+      }
+    />
+  );
+}
+
+function factorySettingsHarnessRoutes(OrganizationSpendingPage: ComponentType, LLMModelsPage?: ComponentType) {
   return [
     ...factorySettingsSectionRoutes.filter((route) => {
-      return route.key !== "factory-settings-organization-spending" && route.key !== "factory-settings-legacy";
+      if (route.key === "factory-settings-organization-spending" || route.key === "factory-settings-legacy") {
+        return false;
+      }
+      return !(LLMModelsPage && route.key === "factory-settings-organization-models");
     }),
     factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage),
+    ...(LLMModelsPage ? [factorySettingsOrganizationModelsRoute(LLMModelsPage)] : []),
     <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
   ];
 }
@@ -301,9 +325,20 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
                 <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+                <Route
+                  path=":lineId/setup/risk-score"
+                  element={
+                    <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
+                      <RiskScoreSetupPage />
+                    </RequireExperimentalFeature>
+                  }
+                />
+                <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
                 <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+                <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
                 <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
                 <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
+                <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
                 <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
                 <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
@@ -322,6 +357,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             {factorySettingsHarnessRoutes(
               pageOverrides?.organizationSpending ?? OrganizationSettingsWorkspaceUsagePage,
+              pageOverrides?.llmModels,
             )}
           </Route>
           <Route

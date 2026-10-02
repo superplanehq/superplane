@@ -79,39 +79,220 @@ spec:
         executionTimeoutSeconds: 3600
         includeVisualEvidence: false
         machineType: e1-large-amd64
-        model: sonnet
+        model: claude-opus-5-5
         steps:
           - name: Clone Repo
             type: bash
             command: |-
               set -euo pipefail
 
-              # Identify commits as SuperPlane Agent.
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
 
-              # Shallow clone of the default branch into ./repo.
-              git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo && cd repo
+              branch="${BASE:-main}"
+              heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
+              if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
+                git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
+              elif [ -z "$heads" ]; then
+                git clone "${REPO_URL}" repo
+              else
+                echo "Remote branch ${branch} not found. The repository has other branches." >&2
+                exit 1
+              fi
+              cd repo
 
-              # On every commit: add DCO sign-off, then Co-authored-by from COAUTHORS.
+              git config user.email "superplaneagent@superplane.com"
+              git config user.name "SuperPlane Agent"
+              export GIT_AUTHOR_NAME="SuperPlane Agent"
+              export GIT_AUTHOR_EMAIL="superplaneagent@superplane.com"
+              export GIT_COMMITTER_NAME="SuperPlane Agent"
+              export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
-              git interpret-trailers --in-place --if-exists doNothing \
-                --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"
+              #!/bin/sh
+              set -u
 
-              printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do
-                if [ -n "$trailer" ]; then
-                  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"
+              msg_file="${1:?}"
+              agent_email='superplaneagent@superplane.com'
+              signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
+              tmp="${msg_file}.sp-identity"
+              coauthors_file="${msg_file}.sp-coauthors"
+              kept_file="${msg_file}.sp-kept"
+              block_file="${msg_file}.sp-block"
+              filtered_file="${msg_file}.sp-filtered"
+
+              email_of() {
+                printf '%s\n' "$1" | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+              }
+
+              is_other_agent_email() {
+                case "$1" in
+                  agent@superplane.com|agent@superplane.ai|opencode@superplane.io)
+                    return 0
+                    ;;
+                esac
+                return 1
+              }
+
+              trailer_key() {
+                printf '%s\n' "$1" | sed -n '1s/^\([A-Za-z0-9-][A-Za-z0-9-]*\)[ \t]*:.*/\1/p' | tr '[:upper:]' '[:lower:]'
+              }
+
+              is_continuation_line() {
+                printf '%s\n' "$1" | grep -q '^[ 	][^ 	]'
+              }
+
+              keep_trailer() {
+                key=$(trailer_key "$1")
+                case "$key" in
+                  signed-off-by|co-authored-by) ;;
+                  *)
+                    return 0
+                    ;;
+                esac
+                email=$(email_of "$1")
+                if is_other_agent_email "$email"; then
+                  return 1
                 fi
-              done
+                if [ "$key" = "signed-off-by" ] && [ "$email" = "$agent_email" ]; then
+                  return 1
+                fi
+                if grep -qxF "$1" "$kept_file"; then
+                  return 1
+                fi
+                printf '%s\n' "$1" >> "$kept_file"
+                return 0
+              }
+
+              filter_trailer_block() {
+                block_in="$1"
+                block_out="$2"
+                : > "$block_out"
+                pending=""
+                pending_set=0
+                while IFS= read -r line || [ -n "$line" ]; do
+                  if [ "$pending_set" -eq 1 ] && is_continuation_line "$line"; then
+                    pending="${pending}
+              ${line}"
+                    continue
+                  fi
+                  if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+                    printf '%s\n' "$pending" >> "$block_out"
+                  fi
+                  pending="$line"
+                  pending_set=1
+                done < "$block_in"
+                if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+                  printf '%s\n' "$pending" >> "$block_out"
+                fi
+              }
+
+              rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"
+              trap 'rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"' EXIT
+              : > "$kept_file"
+
+              bounds=$(awk '
+              function is_blank(line) { return line ~ /^[ \t]*$/ }
+              function is_divider(line) { return line ~ /^---$/ || line ~ /^---[ \t]/ }
+              function is_comment(line) { return line ~ /^#/ }
+              function is_trailer(line) { return line ~ /^[A-Za-z0-9-]+[ \t]*:/ }
+              function is_continuation(line) { return line ~ /^[ \t][^ \t]/ }
+              {
+                lines[NR] = $0
+              }
+              END {
+                n = NR
+                limit = n + 1
+                for (i = 1; i <= n; i++) {
+                  if (is_divider(lines[i])) {
+                    limit = i
+                    break
+                  }
+                }
+                end = limit - 1
+                while (end >= 1 && is_blank(lines[end])) end--
+                while (end >= 1 && (is_comment(lines[end]) || is_blank(lines[end]))) end--
+                while (end >= 1 && is_blank(lines[end])) end--
+                block_end = end
+                block_start = end + 1
+                while (block_end >= 1 && (is_trailer(lines[block_end]) || is_continuation(lines[block_end]))) {
+                  block_start = block_end
+                  block_end--
+                }
+                block_end = end
+                if (block_start <= block_end && block_start > 1 && is_blank(lines[block_start - 1]) && is_trailer(lines[block_start])) {
+                  print block_start, block_end
+                } else {
+                  print 0, 0
+                }
+              }
+              ' "$msg_file")
+              block_start=${bounds%% *}
+              block_end=${bounds#* }
+
+              : > "$tmp"
+              if [ "$block_start" -eq 0 ]; then
+                cat "$msg_file" > "$tmp"
+              else
+                if [ "$block_start" -gt 1 ]; then
+                  sed -n "1,$((block_start - 1))p" "$msg_file" > "$tmp"
+                fi
+                sed -n "${block_start},${block_end}p" "$msg_file" > "$block_file"
+                filter_trailer_block "$block_file" "$filtered_file"
+                cat "$filtered_file" >> "$tmp"
+                line_count=$(awk 'END { print NR + 0 }' "$msg_file")
+                if [ "$block_end" -lt "$line_count" ]; then
+                  sed -n "$((block_end + 1)),\$p" "$msg_file" >> "$tmp"
+                fi
+              fi
+              mv "$tmp" "$msg_file"
+
+              printf '%s\n' "${COAUTHORS:-}" > "$coauthors_file"
+              while IFS= read -r trailer || [ -n "$trailer" ]; do
+                [ -n "$trailer" ] || continue
+                if is_other_agent_email "$(email_of "$trailer")"; then
+                  continue
+                fi
+                git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$msg_file" || exit 1
+              done < "$coauthors_file"
+
+              git interpret-trailers --in-place --if-exists addIfDifferent \
+                --trailer "$signoff" "$msg_file" || exit 1
 
               exit 0
               HOOK
               chmod +x .git/hooks/prepare-commit-msg
+
+              use_existing_branch() {
+                echo "Another run created ${branch}. Using that branch." >&2
+                git fetch origin "${branch}"
+                git checkout -B "${branch}" "origin/${branch}"
+              }
+
+              if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+                remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                if [ -n "$remote_head" ]; then
+                  use_existing_branch
+                else
+                  echo "Remote has no branches. Creating ${branch}." >&2
+                  git checkout -B "${branch}"
+                  git commit --allow-empty -s -m "chore: Initialize repository"
+                  if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+                    remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                    if [ -z "$remote_head" ]; then
+                      echo "Failed to create ${branch}." >&2
+                      exit 1
+                    fi
+                    use_existing_branch
+                  fi
+                fi
+              fi
           - name: Implementation
             type: prompt
             workingDirectory: repo
             prompt: |-
               You are implementing a SuperPlane task. The repository is cloned in the current working directory on {{ task().default_branch }}.
+
+              If the repository had no commits, the clone step already pushed an initial commit on {{ task().default_branch }}. Do not change that commit.
 
               Repository: {{ task().repository }}
               Task title: {{ task().title }}
@@ -131,6 +312,8 @@ spec:
               3/ Add tests where it makes sense.
               4/ For UI work, implement and wire the change into the production page or component.
               5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
+              6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              7/ Do not invent a token budget, a time budget, a step limit, or a remaining context size. The application does not set one unless the task text sets one. Do not stop early, skip work, or change the setup because of an imagined limit. If the task text sets a limit, follow that limit.
 
           - name: Commit and Push
             type: bash

@@ -2,15 +2,33 @@ package factories
 
 import (
 	"errors"
+	"net/http"
 
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
+	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+)
+
+const (
+	intakeConnectFirstMessage      = "Connect this intake first."
+	intakeCouldNotLoadItemsMessage = "SuperPlane could not load items from this intake."
+	linearIssueFilesMessage        = "SuperPlane could not store the Linear files. Try the import again."
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
 	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 		return err
+	}
+
+	var datadogAPIErr *datadog.APIError
+	if errors.As(err, &datadogAPIErr) {
+		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
 	switch {
@@ -28,6 +46,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.NotFound(err, "factory not found")
 	case errors.Is(err, models.ErrFactoryHostedSpendBudgetNegative):
 		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
+	case errors.Is(err, models.ErrFactoryOnboardingNotComplete):
+		return grpcerrors.FailedPrecondition(err, "finish workspace setup before you change visibility")
 	case errors.Is(err, models.ErrModelNotInParentList):
 		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
@@ -110,6 +130,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errCannotCloseBitbucketPullRequest):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, errCannotClosePullRequest):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
+	case errors.Is(err, errWorkOrderNotClosedForBacklog):
+		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
 		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
@@ -138,6 +164,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
+	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):
+		return grpcerrors.AlreadyExists(err, "This MCP server is already connected.")
 	case errors.Is(err, models.ErrFactoryAgentResourceAuthInvalid):
 		return grpcerrors.InvalidArgument(err, "auth must be headers or oauth")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLRequired):
@@ -160,14 +188,24 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
 	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
 		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
+	case errors.Is(err, ghdependabot.ErrAlertsDisabled):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsDisabledMessage)
+	case errors.Is(err, ghdependabot.ErrAlertsUnreadable):
+		return grpcerrors.FailedPrecondition(err, ghdependabot.AlertsUnreadableMessage)
 	case errors.Is(err, errIntakeNotConnected):
-		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
+		return grpcerrors.FailedPrecondition(err, intakeConnectFirstMessage)
+	case errors.Is(err, errIntakeConnectionBroken):
+		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, intakeConnectFirstMessage))
 	case errors.Is(err, errIntakeSearchUnsupported):
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
 	case errors.Is(err, errIntakeRefreshUnsupported):
 		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, errLinearIssueFiles):
+		return grpcerrors.FailedPrecondition(err, linearIssueFilesMessage)
+	case errors.Is(err, datadog.ErrErrorTrackingForbidden):
+		return grpcerrors.FailedPrecondition(err, datadog.ErrorTrackingForbiddenMessage)
 	case errors.Is(err, models.ErrFileNotFound):
 		return grpcerrors.NotFound(err, "file not found")
 	case errors.Is(err, models.ErrFileNotReady), errors.Is(err, models.ErrFileForeignReference), errors.Is(err, models.ErrFileInvalid), errors.Is(err, models.ErrFileContentType):
@@ -180,10 +218,16 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
+	case errors.Is(err, errRiskScoreDisabled):
+		return grpcerrors.FailedPrecondition(err, "Merge confidence is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
+	case errors.Is(err, errSuperPlaneMCPServerDisabled):
+		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
+	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
+		return grpcerrors.NotFound(err, "MCP client not found")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
@@ -198,9 +242,53 @@ var errCustomAutomationsDisabled = errors.New("custom automations are not enable
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
+var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
+var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
+var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
+var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
+var errCannotClosePullRequest = errors.New("could not close a previous pull request")
+var errWorkOrderNotClosedForBacklog = errors.New("only a closed task can move to the backlog")
+
+func intakeErrorToStatus(err error, internalMessage string) error {
+	if message, ok := liveIntakeClientRefusalMessage(err); ok {
+		return grpcerrors.FailedPrecondition(err, message)
+	}
+	return factoryErrorToStatus(err, internalMessage)
+}
+
+func liveIntakeClientRefusalMessage(err error) (string, bool) {
+	status, ok := liveIntakeSourceStatus(err)
+	if !ok {
+		return "", false
+	}
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return intakeConnectFirstMessage, true
+	case http.StatusRequestTimeout, http.StatusTooManyRequests:
+		return "", false
+	}
+	if status >= http.StatusBadRequest && status < http.StatusInternalServerError {
+		return intakeCouldNotLoadItemsMessage, true
+	}
+	return "", false
+}
+
+func liveIntakeSourceStatus(err error) (int, bool) {
+	if status := ghcommon.StatusCode(err); status != 0 {
+		return status, true
+	}
+	var jiraErr *jira.APIError
+	if errors.As(err, &jiraErr) {
+		return jiraErr.StatusCode, true
+	}
+	if status, ok := sentry.StatusCode(err); ok {
+		return status, true
+	}
+	return productive.StatusCode(err)
+}
 
 func invalidArgument(message string) error {
 	return errors.Join(errInvalidArgument, errors.New(message))

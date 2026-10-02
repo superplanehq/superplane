@@ -1,5 +1,10 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
-import { useFactoryWorkOrders, useWorkOrder, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
+import {
+  useFactoryAutomations,
+  useFactoryWorkOrders,
+  useWorkOrder,
+  useWorkOrderArtifacts,
+} from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
@@ -16,6 +21,7 @@ import { useWorkOrderPRFeedbackLog } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
+import { columnAppsFromFactoryApps } from "./splitRunMocks";
 import {
   fixtureForSplitRunPage,
   phaseForSplitRunCanvas,
@@ -55,6 +61,7 @@ function useSplitRunWorkOrderExtras(
   const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
   const pullRequests = firstWorkOrderPullRequests(liveOrder, order);
   const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const { data: factoryApps = [] } = useFactoryAutomations(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const { runsByWorkOrder, analyzingOrderIds } = useFactoryBacklogAnalysis(organizationId, factoryId);
   const analysisRuns = orderId ? (runsByWorkOrder.get(orderId) ?? []) : [];
@@ -62,18 +69,18 @@ function useSplitRunWorkOrderExtras(
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
-  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing };
+  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing };
 }
 
 export function useFactoryAppSplitRunPage() {
-  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const params = useParams<{ appId?: string; automationId?: string }>();
   const appId = params.automationId ?? params.appId ?? "";
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
-  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing } = useSplitRunWorkOrderExtras(
+  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing } = useSplitRunWorkOrderExtras(
     organizationId,
     factoryId,
     order,
@@ -85,11 +92,12 @@ export function useFactoryAppSplitRunPage() {
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
         prFeedbackRuns,
         analysisRuns,
+        columnApps: columnAppsFromFactoryApps(factoryApps),
         artifacts,
         isAnalyzing,
         resolveUser,
       }),
-    [order, orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [order, orderChecks, artifacts, factoryApps, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
@@ -105,7 +113,7 @@ export function useFactoryAppSplitRunPage() {
   );
   const back = useMemo(
     () =>
-      resolveFactoryAppBackNav(organizationId, factoryKey, {
+      resolveFactoryAppBackNav(organizationId, routeSegment, {
         from: query.from,
         appId,
         appName: visual.canvas.title,
@@ -116,7 +124,7 @@ export function useFactoryAppSplitRunPage() {
       }),
     [
       appId,
-      factoryKey,
+      routeSegment,
       lineName,
       order?.title,
       organizationId,
@@ -135,10 +143,10 @@ export function useFactoryAppSplitRunPage() {
     }),
     [query.from, query.lineId, query.orderNumber, query.runId],
   );
-  const editHref = factoryAppConfigurePath(organizationId, factoryKey, appId, configureNav);
+  const editHref = factoryAppConfigurePath(organizationId, routeSegment, appId, configureNav);
   const nodeEditHref = useCallback(
-    (nodeId: string) => factoryAppConfigurePath(organizationId, factoryKey, appId, { ...configureNav, nodeId }),
-    [appId, configureNav, factoryKey, organizationId],
+    (nodeId: string) => factoryAppConfigurePath(organizationId, routeSegment, appId, { ...configureNav, nodeId }),
+    [appId, configureNav, organizationId, routeSegment],
   );
 
   usePageTitle([splitRunPageTitle(!order, isLoading, visual.canvas.title), factory?.name ?? "Workspace"]);

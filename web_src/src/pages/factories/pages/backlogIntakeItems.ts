@@ -17,6 +17,7 @@ const INTAKE_NAME_SINGULAR: [RegExp, string][] = [
   [/ exceptions$/i, " exception"],
   [/ incidents$/i, " incident"],
   [/ tasks$/i, " task"],
+  [/ alerts$/i, " alert"],
 ];
 
 export function searchPlaceholderForIntake(name: string): string {
@@ -40,6 +41,7 @@ export interface BacklogIntakeItem {
   key: string;
   title: string;
   body: string;
+  createdAt?: string;
 }
 
 export interface BacklogIntakeItemCatalog {
@@ -52,6 +54,7 @@ export interface BacklogIntakeSource {
   name: string;
   iconSrc?: string;
   iconAlt: string;
+  tabLabel: string;
 }
 
 export interface BacklogIntakeGroup extends BacklogIntakeSource {
@@ -90,6 +93,7 @@ function sourceFromIntake(
     name,
     iconSrc: catalog?.iconSrcByIntakeId?.[intakeId] ?? known?.iconSrc,
     iconAlt: known?.iconAlt ?? name,
+    tabLabel: known?.tabLabel ?? name,
   };
 }
 

@@ -7,9 +7,11 @@ import { TooltipProvider } from "@/ui/tooltip";
 import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { factoryRouteSegment } from "../lib/factoryKeyResolution";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { LinesPage } from "./LinesPage";
@@ -33,7 +35,7 @@ export function LocationProbe({ navigateTo }: { navigateTo?: string } = {}) {
 }
 
 export function LinesBoardSpecHarness({
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
   openCreateWorkOrder = () => {},
   factory = REFUND_FACTORY,
   previewFlags = null,
@@ -56,6 +58,7 @@ export function LinesBoardSpecHarness({
                   organizationId: "org-1",
                   factoryId: factory.id ?? PRIMARY_FACTORY_ID,
                   factoryKey: factory.key ?? PRIMARY_FACTORY_KEY,
+                  routeSegment: factoryRouteSegment(factory) || PRIMARY_FACTORY_ROUTE_SEGMENT,
                   factory,
                   factories: [factory],
                   openCreateWorkOrder,
@@ -73,12 +76,20 @@ export function LinesBoardSpecHarness({
                     element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/planning"
-                    element={<div data-testid="planning-setup">Planning setup page</div>}
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/github"
+                    element={<div data-testid="github-intake-setup">GitHub setup page</div>}
                   />
                   <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/datadog"
+                    element={<div data-testid="datadog-intake-setup">Datadog setup page</div>}
+                  />
+                  <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/linear"
+                    element={<div data-testid="linear-intake-setup">Linear setup page</div>}
                   />
                   <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/dependabot"

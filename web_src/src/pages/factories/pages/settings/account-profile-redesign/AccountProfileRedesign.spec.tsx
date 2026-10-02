@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 import { ACCOUNT_REDESIGN_NOTIFICATIONS, ACCOUNT_REDESIGN_SECURE_PROFILE } from "./accountProfileRedesignMocks";
 import { AccountNotificationsRedesignPage } from "./AccountNotificationsRedesignPage";
+import { AccountProfileAssociatedAccountsCard } from "./AccountProfileAssociatedAccountsCard";
 import { AccountProfileRedesignPlayground } from "./AccountProfileRedesignPlayground";
 
 vi.mock("@/lib/toast", () => ({
@@ -136,10 +137,34 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(
       within(screen.getByTestId("account-redesign-associated-github")).getByRole("button", { name: "Remove" }),
     );
-    expect(screen.getByText(/Velocity reports stop crediting your pull requests/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Remove link" }));
+    expect(screen.getByText(/Velocity reports will no longer credit pull requests/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove account" }));
 
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+  });
+
+  it("shows and removes multiple associated GitHub accounts independently", async () => {
+    const user = userEvent.setup();
+    const onRemoveGithub = vi.fn();
+    render(
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[
+          { providerId: "101", username: "forestileao" },
+          { providerId: "202", username: "forestigamer" },
+        ]}
+        onLinkGithub={vi.fn()}
+        onRemoveGithub={onRemoveGithub}
+      />,
+    );
+
+    expect(screen.getByText(/Linked as forestileao/)).toBeInTheDocument();
+    expect(screen.getByText(/Linked as forestigamer/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link another GitHub account" })).toBeInTheDocument();
+
+    const secondAccount = screen.getByTestId("account-redesign-associated-github-202");
+    await user.click(within(secondAccount).getByRole("button", { name: "Remove" }));
+    await user.click(screen.getByRole("button", { name: "Remove account" }));
+    expect(onRemoveGithub).toHaveBeenCalledWith("202");
   });
 
   it("turns task emails off and hides events", async () => {

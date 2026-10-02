@@ -75,7 +75,7 @@ type CodexBrokerTask struct {
 	Files    []runner.BrokerTaskFile
 }
 
-func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
+func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexBrokerTask {
 	commands, files := runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
 		PrepareName:      "Prepare Codex",
 		PrepareScript:    runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
@@ -84,6 +84,8 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 		WorkingDirectory: spec.WorkingDirectory,
 		Steps:            spec.Steps,
 		DispatchedSteps:  dispatched,
+		Attachments:      attachments,
+		InspectImages:    inspectImages,
 		Usage:            usage,
 		Setups:           setups,
 		Model:            strings.TrimSpace(spec.Model),
@@ -95,11 +97,11 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 }
 
 func BuildBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) CodexBrokerTask {
-	return buildCodexBrokerTask(spec, usage, setups, nil)
+	return buildCodexBrokerTask(spec, usage, setups, nil, nil, false)
 }
 
-func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep) CodexBrokerTask {
-	return buildCodexBrokerTask(spec, usage, setups, dispatched)
+func BuildDispatchedBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup, dispatched []runner.AgentStep, attachments []runner.TaskAttachment, inspectImages bool) CodexBrokerTask {
+	return buildCodexBrokerTask(spec, usage, setups, dispatched, attachments, inspectImages)
 }
 
 func ApplyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunCodexSpec) CodexBrokerTask {
@@ -113,7 +115,7 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = append(task.Files, runner.FollowUpLoopFile())
+	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
 	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
 	return task
 }

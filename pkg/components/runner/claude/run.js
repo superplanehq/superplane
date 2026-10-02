@@ -103,7 +103,7 @@ const PLANNING_READONLY_TOOLS = "Read,Bash";
 const ANALYSIS_BASE_ALLOWED_TOOLS = [
   "mcp__superplane__propose_spec",
   "mcp__superplane__survey",
-  "mcp__superplane__create_task",
+  "mcp__superplane__inspect_attachment",
 ];
 
 function analysisAllowedTools(env = process.env) {

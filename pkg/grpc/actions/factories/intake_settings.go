@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/proto"
@@ -84,6 +85,18 @@ type intakeSettings struct {
 	// Task list ids that still create a task. Empty means every task list.
 	// Productive task intakes only.
 	TaskListIDs []string
+	// Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
+	DatadogTriggeredAlerts bool
+	// Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes only.
+	DatadogRetriggeredAlerts bool
+	// Environments that still create a task. Empty means every environment.
+	// Datadog intakes only.
+	DatadogEnvironments []string
+	// Projects that still create a task. Linear issue intakes only.
+	LinearProjectIDs []string
+	// Label names that still create a task. Empty means every label.
+	// Linear issue intakes only.
+	LinearLabels []string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -138,12 +151,22 @@ func defaultDependabotIntakeSettings() intakeSettings {
 	return settings
 }
 
+func defaultDatadogIntakeSettings() intakeSettings {
+	settings := defaultIntakeSettings()
+	settings.DatadogTriggeredAlerts = true
+	settings.DatadogRetriggeredAlerts = false
+	settings.DatadogEnvironments = []string{}
+	return settings
+}
+
 func intakeSourceHasFilterNode(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
-		source == models.FactoryIntakeSourceDependabotAlerts
+		source == models.FactoryIntakeSourceDependabotAlerts ||
+		source == models.FactoryIntakeSourceDatadog ||
+		source == models.FactoryIntakeSourceLinearIssues
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -168,6 +191,9 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
+	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
+	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
+	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
 
 	return s
 }
@@ -195,6 +221,18 @@ func normalizeSentryLevels(levels []string) []string {
 		if selected[level] {
 			normalized = append(normalized, level)
 		}
+	}
+	return normalized
+}
+
+func normalizeDatadogEnvironments(environments []string) []string {
+	normalized := make([]string, 0, len(environments))
+	for _, environment := range environments {
+		environment = strings.ToLower(strings.TrimSpace(environment))
+		if environment == "" || slices.Contains(normalized, environment) {
+			continue
+		}
+		normalized = append(normalized, environment)
 	}
 	return normalized
 }
@@ -233,9 +271,26 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeProductiveFilterExpression(settings)
 	case models.FactoryIntakeSourceDependabotAlerts:
 		return intakeDependabotFilterExpression(settings)
+	case models.FactoryIntakeSourceDatadog:
+		return intakeDatadogFilterExpression(settings)
+	case models.FactoryIntakeSourceLinearIssues:
+		return intakeLinearFilterExpression(settings)
 	default:
 		return "true"
 	}
+}
+
+func intakeDatadogFilterExpression(settings intakeSettings) string {
+	if len(settings.DatadogEnvironments) == 0 {
+		return "true"
+	}
+
+	environments, err := json.Marshal(settings.DatadogEnvironments)
+	if err != nil {
+		return "true"
+	}
+
+	return fmt.Sprintf(`(root().data.environment ?? "") in %s`, environments)
 }
 
 func intakeDependabotFilterExpression(settings intakeSettings) string {
@@ -336,6 +391,9 @@ func intakeProductiveFilterExpression(settings intakeSettings) string {
 	return strings.Join(conditions, " && ")
 }
 
+// intakeProductiveTaskListCondition keeps a task that is created on a
+// selected list, or an update that moves the task onto one. An edit that
+// leaves the task on the same list does not match.
 func intakeProductiveTaskListCondition(ids []string) string {
 	if len(ids) == 0 {
 		return ""
@@ -344,7 +402,14 @@ func intakeProductiveTaskListCondition(ids []string) string {
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+
+	onList := fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
+	createdOnList := fmt.Sprintf(`(root().data.meta?.event ?? "") != "task.updated" && %s`, onList)
+	movedOntoList := fmt.Sprintf(
+		`(root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in %s && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? "")`,
+		encoded,
+	)
+	return fmt.Sprintf(`(%s || %s)`, createdOnList, movedOntoList)
 }
 
 func intakeTriggerActionsFor(settings intakeSettings) []any {
@@ -357,6 +422,18 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 	}
 	if settings.SuperplaneLabelAdded {
 		actions = append(actions, "labeled")
+	}
+	return actions
+}
+
+// intakeProductiveTriggerActions listens for new tasks, and also for updates
+// when a task list filter is set. The filter keeps an update only when the
+// task list changed, so an edit of a task already on the list does not
+// create a task.
+func intakeProductiveTriggerActions(settings intakeSettings) []any {
+	actions := []any{"created"}
+	if len(settings.TaskListIDs) > 0 {
+		actions = append(actions, "updated")
 	}
 	return actions
 }
@@ -386,6 +463,17 @@ func intakeSentryActionsFor(settings intakeSettings) []any {
 	return actions
 }
 
+func intakeDatadogAlertTransitions(settings intakeSettings) []any {
+	transitions := []any{}
+	if settings.DatadogTriggeredAlerts {
+		transitions = append(transitions, datadog.AlertTransitionTriggered)
+	}
+	if settings.DatadogRetriggeredAlerts {
+		transitions = append(transitions, datadog.AlertTransitionRetriggered)
+	}
+	return transitions
+}
+
 func intakeSettingsChangeTrigger(source string, current, updated intakeSettings) bool {
 	if source == models.FactoryIntakeSourceJiraIssues {
 		return current.NewIssues != updated.NewIssues ||
@@ -395,6 +483,17 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 		return current.SentryNewIssues != updated.SentryNewIssues ||
 			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
 			current.SentryAssignedIssues != updated.SentryAssignedIssues
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return current.DatadogTriggeredAlerts != updated.DatadogTriggeredAlerts ||
+			current.DatadogRetriggeredAlerts != updated.DatadogRetriggeredAlerts
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
+			!slices.Equal(current.LinearLabels, updated.LinearLabels)
+	}
+	if source == models.FactoryIntakeSourceProductiveTasks {
+		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
 	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
@@ -423,6 +522,15 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if !slices.Equal(current.DependabotSeverities, updated.DependabotSeverities) {
 		return true
 	}
+	if !slices.Equal(current.DatadogEnvironments, updated.DatadogEnvironments) {
+		return true
+	}
+	if !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) {
+		return true
+	}
+	if !slices.Equal(current.LinearLabels, updated.LinearLabels) {
+		return true
+	}
 	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
 		return true
 	}
@@ -448,6 +556,10 @@ var intakeDependabotSeveritiesPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.alert\.security_advisory\.severity \?\? ""\) in (\[[^\]]*\])`,
 )
 
+var intakeDatadogEnvironmentsPattern = regexp.MustCompile(
+	`\(root\(\)\.data\.environment \?\? ""\) in (\[[^\]]*\])`,
+)
+
 var intakeProductiveTaskListsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.data\.relationships\.task_list\.data\.id \?\? ""\) in (\[[^\]]*\])`,
 )
@@ -466,6 +578,10 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultProductiveIntakeSettings()
 	case models.FactoryIntakeSourceDependabotAlerts:
 		settings = defaultDependabotIntakeSettings()
+	case models.FactoryIntakeSourceDatadog:
+		settings = defaultDatadogIntakeSettings()
+	case models.FactoryIntakeSourceLinearIssues:
+		settings = defaultLinearIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -482,6 +598,14 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryNewIssues = slices.Contains(actions, intakeSentryActionCreated)
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
+		case models.FactoryIntakeSourceDatadog:
+			settings = datadogAlertSettingsFromTransitions(
+				configurationStrings(trigger.Configuration["alertTransitions"]),
+				settings,
+			)
+		case models.FactoryIntakeSourceLinearIssues:
+			settings.LinearProjectIDs = configurationStrings(trigger.Configuration["projects"])
+			settings.LinearLabels = linearLabelsFromConfiguration(trigger.Configuration["labels"])
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -508,6 +632,20 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			var severities []string
 			if err := json.Unmarshal([]byte(match[1]), &severities); err == nil {
 				settings.DependabotSeverities = severities
+			}
+		}
+		return settings.normalized()
+	}
+
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return settings.normalized()
+	}
+
+	if source == models.FactoryIntakeSourceDatadog {
+		if match := intakeDatadogEnvironmentsPattern.FindStringSubmatch(expression); match != nil {
+			var environments []string
+			if err := json.Unmarshal([]byte(match[1]), &environments); err == nil {
+				settings.DatadogEnvironments = environments
 			}
 		}
 		return settings.normalized()
@@ -609,6 +747,15 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		serialized.DependabotSeverities = settings.DependabotSeverities
 	}
+	if source == models.FactoryIntakeSourceDatadog {
+		serialized.DatadogTriggeredAlerts = proto.Bool(settings.DatadogTriggeredAlerts)
+		serialized.DatadogRetriggeredAlerts = proto.Bool(settings.DatadogRetriggeredAlerts)
+		serialized.DatadogEnvironments = settings.DatadogEnvironments
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		serialized.LinearProjectIds = settings.LinearProjectIDs
+		serialized.LinearLabels = settings.LinearLabels
+	}
 	return serialized
 }
 
@@ -658,8 +805,34 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
 	}
 	updated.TaskListIDs = requested.GetTaskListIds()
+	if requested.DatadogTriggeredAlerts != nil {
+		updated.DatadogTriggeredAlerts = requested.GetDatadogTriggeredAlerts()
+	}
+	if requested.DatadogRetriggeredAlerts != nil {
+		updated.DatadogRetriggeredAlerts = requested.GetDatadogRetriggeredAlerts()
+	}
+	updated.DatadogEnvironments = requested.GetDatadogEnvironments()
+	updated.LinearProjectIDs = requested.GetLinearProjectIds()
+	updated.LinearLabels = requested.GetLinearLabels()
 
 	return updated.normalized()
+}
+
+func datadogAlertSettingsFromTransitions(transitions []string, settings intakeSettings) intakeSettings {
+	if len(transitions) == 0 {
+		settings.DatadogTriggeredAlerts = true
+		settings.DatadogRetriggeredAlerts = false
+		return settings
+	}
+	settings.DatadogTriggeredAlerts = containsAlertTransition(transitions, datadog.AlertTransitionTriggered)
+	settings.DatadogRetriggeredAlerts = containsAlertTransition(transitions, datadog.AlertTransitionRetriggered)
+	return settings
+}
+
+func containsAlertTransition(transitions []string, wanted string) bool {
+	return slices.ContainsFunc(transitions, func(transition string) bool {
+		return strings.EqualFold(strings.TrimSpace(transition), wanted)
+	})
 }
 
 func jiraCompletionSettingsFromMetadata(metadata map[string]any, settings intakeSettings) intakeSettings {
@@ -709,6 +882,16 @@ func metadataBool(value any, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+// configurationAnyStrings stores a string list in node configuration.
+// protobuf structs reject []string, so a Go string slice fails canvas creation.
+func configurationAnyStrings(values []string) []any {
+	items := make([]any, 0, len(values))
+	for _, value := range values {
+		items = append(items, value)
+	}
+	return items
 }
 
 func configurationStrings(value any) []string {

@@ -37,6 +37,13 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
 		return
 	}
+	if event.APIVersionMismatch() {
+		log.WithFields(log.Fields{
+			"polar_event_type":         event.Type,
+			"polar_api_version_pinned": polar.APIVersion(),
+			"polar_api_version_served": event.APIVersion,
+		}).Warn("polar webhook uses a different api version than the pinned one")
+	}
 
 	if event.Subscription != nil {
 		if err := polar.ApplySubscriptionEvent(r.Context(), database.DB(r.Context()), event.Subscription); err != nil {

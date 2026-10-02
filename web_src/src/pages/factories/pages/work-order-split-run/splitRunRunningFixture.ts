@@ -3,11 +3,13 @@ import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
 import { LINE_RUN_IMPLEMENT_ID } from "../../__fixtures__/factoryPageIds";
 import {
+  HOUR_AGO,
   OPEN_WORK_ORDER,
   RUNNING_WORK_ORDER,
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
+  TWO_HOURS_AGO,
 } from "../../__fixtures__/factoryPageResponses";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
 import { buildSplitRunFooter } from "./splitRunFooter";
@@ -26,7 +28,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   descriptionText: OPEN_WORK_ORDER.description ?? "",
   owner: OWNER,
   assigneeIds: [STORYBOOK_ME_USER_ID],
-  elapsed: "4 min so far",
+  elapsed: "4 min",
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
@@ -55,6 +57,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       name: "Backlog",
       status: "passed",
       duration: "2s",
+      startedAt: TWO_HOURS_AGO,
       componentName: "Ingest",
       artifacts: [DESCRIPTION_ARTIFACT],
       canvasKey: "intake",
@@ -87,6 +90,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       name: "Implement",
       status: "running",
       duration: "4m",
+      startedAt: HOUR_AGO,
       componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
       canvasKey: "implementation",
@@ -124,7 +128,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           at: "12:25:33",
           componentName: "Implementation",
           status: "running",
-          duration: "4m so far",
+          duration: "4m",
           detail: "reconciliation_worker_test.go",
         },
         {
@@ -152,7 +156,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           provider: "superplane",
           status: "running",
           detail: "reconciliation_worker_test.go",
-          duration: "4m so far",
+          duration: "4m",
         },
         {
           id: "open-pr",

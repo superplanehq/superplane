@@ -20,7 +20,6 @@ import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
@@ -242,6 +241,46 @@ describe("buildColumnAutomations", () => {
     ]);
   });
 
+  it("shows an installed risk score as its own Verify row", () => {
+    const automations = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-risk-2", name: "Risk score (2)", columnKey: "verify" },
+        { id: "app-merge", name: "Merge confidence", columnKey: "verify" },
+        { id: "app-merge-2", name: "Merge confidence (2)", columnKey: "verify" },
+        { id: "app-create-env", name: "Create env", columnKey: "verify" },
+        { id: "app-risk-payments", name: "Risk score payments", columnKey: "verify" },
+        { id: "app-merge-payments", name: "Merge confidence payments", columnKey: "verify" },
+        { id: "app-risk-done", name: "Risk score", columnKey: "done" },
+      ],
+    });
+
+    expect(automations.map((automation) => automation.kind)).toEqual([
+      "risk-score",
+      "risk-score",
+      "risk-score",
+      "risk-score",
+      "custom",
+      "custom",
+      "custom",
+    ]);
+    expect(automations[0]).toMatchObject({
+      catalogId: "risk-score",
+      name: "Risk score",
+      trigger: "On pull request opened or updated",
+      action: "Score merge confidence",
+      iconSrc: "",
+      canvasId: "app-risk",
+    });
+    expect(automations[1]).toMatchObject({ canvasId: "app-risk-2" });
+    expect(automations[2]).toMatchObject({ canvasId: "app-merge", name: "Merge confidence" });
+    expect(automations[3]).toMatchObject({ canvasId: "app-merge-2" });
+    expect(automations[4]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
+    expect(automations[5]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
+    expect(automations[6]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
+  });
+
   it("appends custom canvases attached to Verify or Done", () => {
     const verify = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -300,10 +339,19 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
   });
 
-  it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
+  it("offers risk score in the verify catalog when the feature is on", () => {
+    expect(catalogForColumn("verify", { allowRiskScore: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
+      "risk-score",
+    ]);
+  });
+
+  it("offers a custom canvas in the verify catalog when the feature is on", () => {
+    expect(catalogForColumn("verify", { allowCustom: true, allowRiskScore: true }).map((entry) => entry.id)).toEqual([
+      "discussion",
+      "checks",
+      "risk-score",
       "custom",
     ]);
   });
@@ -337,8 +385,13 @@ describe("catalogForColumn", () => {
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(true);
+    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
+  });
+
+  it("is false when risk score is still available", () => {
+    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 
   it("is false when custom automations are off", () => {
@@ -395,21 +448,12 @@ describe("columnAutomationOpenPath", () => {
   } as const;
 
   it("opens Planning settings for Task analysis", () => {
-    const href = columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: true });
+    const href = columnAutomationOpenPath(analysisAutomation, nav);
 
     expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
-  });
-
-  it("opens the Planning setup wizard for Task analysis until setup is confirmed", () => {
-    expect(columnAutomationOpenPath(analysisAutomation, { ...nav, planningSetupCompleted: false })).toBe(
-      factoryPlanningSetupPath("org-1", "RF", "line-plan"),
-    );
-  });
-
-  it("opens Planning settings for Task analysis when the setup state is unknown", () => {
-    expect(columnAutomationOpenPath(analysisAutomation, nav)).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
+    expect(href).not.toContain("/setup/planning");
   });
 
   it("opens the intake settings popup on the first tab", () => {

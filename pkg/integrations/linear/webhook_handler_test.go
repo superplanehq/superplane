@@ -33,6 +33,16 @@ func Test__WebhookHandler__CompareConfig(t *testing.T) {
 		assert.False(t, equal)
 	})
 
+	t.Run("the same teams match in any order", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{TeamIDs: []string{"t2", "t1"}, ResourceType: IssueResourceType},
+			WebhookConfiguration{TeamID: "t1", TeamIDs: []string{"t1", "t2"}, ResourceType: IssueResourceType},
+		)
+
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
+
 	t.Run("different resource types do not match", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
 			WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},

@@ -23,6 +23,7 @@ import type {
   FactoriesFactory,
   FactoriesFactoryAgentResource,
   FactoriesFactoryLine,
+  FactoriesFactoryMcpClient,
   FactoriesFactoryOnboarding,
   FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
@@ -30,6 +31,7 @@ import type {
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderRunUsageRow,
+  MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
 import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
@@ -74,6 +76,8 @@ interface RequestBody {
   key?: unknown;
   hostedSpendBudgetCents?: unknown;
   clearHostedSpendBudget?: unknown;
+  publicBadgeEnabled?: unknown;
+  publicBadgeShowCost?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -85,6 +89,8 @@ interface RequestBody {
   model?: unknown;
   result?: unknown;
   state?: unknown;
+  closePullRequests?: unknown;
+  clearArtifacts?: unknown;
   steps?: unknown;
   body?: unknown;
 }
@@ -119,6 +125,21 @@ function takenFactoryKeys(factories: FactoriesFactory[]): Set<string> {
   return new Set(factories.map((factory) => factory.key).filter((key): key is string => Boolean(key)));
 }
 
+function unusedFactoryUrlId(factories: FactoriesFactory[]): string {
+  const taken = new Set(factories.map((factory) => factory.urlId).filter((id): id is string => Boolean(id)));
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    let candidate = "";
+    for (let i = 0; i < 8; i += 1) {
+      candidate += alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+    }
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+  return "zzzzzzzz";
+}
+
 /** Same letter-only keys the live API derives when the client omits `key`. */
 function unusedFactoryKey(factories: FactoriesFactory[], name: string, requestedKey: string): string {
   const taken = takenFactoryKeys(factories);
@@ -150,6 +171,7 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
         id: `storybook-factory-${fixture.factories.length + 1}`,
         name,
         key: unusedFactoryKey(fixture.factories, name, stringOrEmpty(request.key)),
+        urlId: unusedFactoryUrlId(fixture.factories),
         description: stringOrEmpty(request.description),
         lines: [],
         onboarding: {},
@@ -313,6 +335,32 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
+function applyFactoryPut(factory: FactoriesFactory, body: Record<string, unknown> | null) {
+  const request = (body ?? {}) as RequestBody;
+  if (typeof request.name === "string" && request.name.trim()) {
+    factory.name = request.name.trim();
+  }
+  if (typeof request.description === "string") {
+    factory.description = request.description;
+  }
+  if (request.clearHostedSpendBudget === true) {
+    factory.hostedSpendBudgetCents = undefined;
+  } else if (typeof request.hostedSpendBudgetCents === "number") {
+    factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
+  } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
+    factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
+  }
+  if (typeof request.publicBadgeEnabled === "boolean") {
+    factory.publicBadgeEnabled = request.publicBadgeEnabled;
+    if (request.publicBadgeEnabled && !factory.publicBadgeToken) {
+      factory.publicBadgeToken = "public-badge-token";
+    }
+  }
+  if (typeof request.publicBadgeShowCost === "boolean") {
+    factory.publicBadgeShowCost = request.publicBadgeShowCost;
+  }
+}
+
 function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
@@ -324,20 +372,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
         if (method === "PUT") {
           if (!factory) return { json: {} };
-          const request = (body ?? {}) as RequestBody;
-          if (typeof request.name === "string" && request.name.trim()) {
-            factory.name = request.name.trim();
-          }
-          if (typeof request.description === "string") {
-            factory.description = request.description;
-          }
-          if (request.clearHostedSpendBudget === true) {
-            factory.hostedSpendBudgetCents = undefined;
-          } else if (typeof request.hostedSpendBudgetCents === "number") {
-            factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
-          } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
-            factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
-          }
+          applyFactoryPut(factory, body);
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
@@ -357,6 +392,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryPlanningSessionRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
     ...factoryAgentResourceRoutes(fixture),
+    ...factoryMCPClientRoutes(fixture),
     ...usageHistoryRoutes(fixture),
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
@@ -423,13 +459,15 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
 
 function mergedOnboarding(
   current: FactoriesFactoryOnboarding | undefined,
-  request: FactoriesUpdateFactoryOnboardingBody,
+  request: FactoriesUpdateFactoryOnboardingBody & Partial<FactoriesFactoryOnboarding>,
 ): FactoriesFactoryOnboarding {
   const next: FactoriesFactoryOnboarding = { ...current };
   if (request.vcsIntegrationId) next.vcsIntegrationId = request.vcsIntegrationId;
   if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
   if (request.appRepository) next.appRepository = request.appRepository;
+  if (request.appRepositoryId) next.appRepositoryId = request.appRepositoryId;
   if (request.backlogRepository) next.backlogRepository = request.backlogRepository;
+  if (request.backlogRepositoryId) next.backlogRepositoryId = request.backlogRepositoryId;
   if (request.defaultBranch) next.defaultBranch = request.defaultBranch;
   if (request.issuesSource) next.issuesSource = request.issuesSource;
   if (request.agentHarness) next.agentHarness = request.agentHarness;
@@ -596,6 +634,9 @@ function factoryAgentResourceListRoute(fixture: FactoriesFixture): FactoriesRout
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources"),
     resolve: (match, method, body, url) => {
+      if (method === "GET" && fixture.failAgentResourcesListForFactoryIds?.includes(match[1])) {
+        return { json: { message: "Storybook agent resources list failure." }, status: 503 };
+      }
       const resources = ensureAgentResources(fixture, match[1]);
       if (method === "POST") {
         const resource = createPostedAgentResource(
@@ -622,6 +663,39 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
   ];
 }
 
+function ensureMCPClients(fixture: FactoriesFixture, factoryId: string): FactoriesFactoryMcpClient[] {
+  fixture.mcpClientsByFactoryId ??= {};
+  fixture.mcpClientsByFactoryId[factoryId] ??= [];
+  return fixture.mcpClientsByFactoryId[factoryId];
+}
+
+function factoryMCPClientRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") return { json: {} };
+        const clients = ensureMCPClients(fixture, match[1]);
+        const index = clients.findIndex((entry) => entry.id === match[2]);
+        if (index >= 0) {
+          clients.splice(index, 1);
+        }
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-clients"),
+      resolve: (match, method) => {
+        if (method !== "GET") return { json: {} };
+        if (fixture.failMcpClientsListForFactoryIds?.includes(match[1])) {
+          return { json: { message: "Storybook MCP clients list failure." }, status: 503 };
+        }
+        return { json: { clients: ensureMCPClients(fixture, match[1]) } };
+      },
+    },
+  ];
+}
+
 const STORYBOOK_ORG_SECRETS = [
   {
     metadata: { id: "secret-vendor-mcp", name: "vendor-mcp" },
@@ -633,7 +707,21 @@ function organizationSecretsRoutes(): FactoriesRoute[] {
   return [
     {
       pattern: re("/api/v1/secrets"),
-      resolve: (_match, method) => {
+      resolve: (_match, method, body) => {
+        if (method === "POST") {
+          const request = (body ?? {}) as {
+            secret?: { metadata?: { name?: string }; spec?: { local?: { data?: Record<string, string> } } };
+          };
+          const name = request.secret?.metadata?.name ?? "created-secret";
+          return {
+            json: {
+              secret: {
+                metadata: { id: `secret-${name}`, name },
+                spec: { local: { data: request.secret?.spec?.local?.data ?? { token: "••••••••" } } },
+              },
+            },
+          };
+        }
         if (method !== "GET") return { json: {} };
         return { json: { secrets: STORYBOOK_ORG_SECRETS } };
       },
@@ -678,6 +766,31 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
       const factory = fixture.factories.find((entry) => entry.id === match[1]);
       if (!factory) return { json: {} };
       factory.onboarding = mergedOnboarding(factory.onboarding, (body ?? {}) as FactoriesUpdateFactoryOnboardingBody);
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
+}
+
+function factoryVCSProviderRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/onboarding/vcs-repository"),
+    resolve: (match, method, body) => {
+      if (method !== "POST") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      const request = (body ?? {}) as { repositoryId?: string };
+      const repository = fixture.githubOnboarding?.repositories?.find(
+        (entry) => entry.repositoryId === request.repositoryId,
+      );
+      if (!repository?.fullName) return { json: {} };
+      factory.onboarding = mergedOnboarding(factory.onboarding, {
+        vcsIntegrationId: factory.onboarding?.vcsIntegrationId ?? "storybook-github-connection",
+        appRepository: repository.fullName,
+        appRepositoryId: repository.repositoryId,
+        backlogRepository: repository.fullName,
+        backlogRepositoryId: repository.repositoryId,
+        defaultBranch: repository.defaultBranch,
+      });
       return { json: { factory: factoryWithLineMetrics(factory) } };
     },
   };
@@ -786,7 +899,15 @@ function orderWithListChecks(fixture: FactoriesFixture, order: FactoriesWorkOrde
 
 function findOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
   const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
-  return orders.find((entry) => entry.id === orderId);
+  const ref = orderId.trim();
+  return orders.find((entry) => entry.id === ref || orderNumberMatches(entry, ref) || entry.key === ref);
+}
+
+function orderNumberMatches(order: FactoriesWorkOrder, ref: string): boolean {
+  if (!/^\d+$/.test(ref) || order.number === undefined || order.number === null || order.number === "") {
+    return false;
+  }
+  return String(Number(order.number)) === String(Number(ref));
 }
 
 function buildDispatchedLineDispatch(
@@ -870,18 +991,68 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   return { json: { order } };
 }
 
+function isCloseableFixturePullRequest(state: string | undefined): boolean {
+  return state === "STATE_OPEN" || state === "STATE_DRAFT" || state === "open" || state === "draft";
+}
+
+function sendWorkOrderToBacklogFixture(
+  fixture: FactoriesFixture,
+  factoryId: string,
+  orderId: string,
+  request: RequestBody,
+): { json: { order?: FactoriesWorkOrder } } {
+  const order = findOrder(fixture, factoryId, orderId);
+  if (!order || order.state !== "STATE_CLOSED") {
+    return { json: {} };
+  }
+
+  const closePullRequests = request.closePullRequests === true;
+  const clearArtifacts = request.clearArtifacts === true;
+  if (closePullRequests) {
+    const current = orderPullRequests(fixture, orderId);
+    const next = current.map((pullRequest) =>
+      isCloseableFixturePullRequest(pullRequest.state)
+        ? { ...pullRequest, state: "STATE_CLOSED" as const }
+        : pullRequest,
+    );
+    fixture.pullRequestsByOrderId = { ...(fixture.pullRequestsByOrderId ?? {}), [orderId]: next };
+    order.pullRequests = next;
+  }
+  if (clearArtifacts) {
+    fixture.artifactsByOrderId = { ...(fixture.artifactsByOrderId ?? {}), [orderId]: [] };
+  }
+  order.state = "STATE_DRAFT";
+  order.result = "RESULT_UNSPECIFIED";
+  order.updatedAt = new Date().toISOString();
+  return { json: { order } };
+}
+
 function listWorkOrdersFixture(
   fixture: FactoriesFixture,
   orders: FactoriesWorkOrder[],
   url: URL,
 ): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
   const states = url.searchParams.getAll("states");
+  const results = url.searchParams.getAll("results");
   const userId = url.searchParams.get("userId");
   const unassigned = url.searchParams.get("unassigned") === "true";
   const limit = Number(url.searchParams.get("limit") ?? "0");
   const beforeId = url.searchParams.get("beforeId");
   let filtered =
     states.length > 0 ? orders.filter((order) => order.state && states.includes(order.state)) : [...orders];
+  if (results.length > 0) {
+    filtered = filtered.filter((order) => order.result && results.includes(order.result));
+  }
+  const lineId = url.searchParams.get("lineId");
+  if (lineId) {
+    filtered = filtered.filter((order) => {
+      const dispatches = order.lineDispatches ?? [];
+      if (dispatches.length === 0) {
+        return true;
+      }
+      return dispatches.some((dispatch) => dispatch.line?.id === lineId);
+    });
+  }
   if (userId || unassigned) {
     filtered = filtered.filter((order) => {
       const owners = (order.assignees ?? []).flatMap((assignee) => (assignee.id ? [assignee.id] : []));
@@ -988,6 +1159,13 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         order.result = stringOrEmpty(request.result) === "RESULT_REJECTED" ? "RESULT_REJECTED" : "RESULT_COMPLETED";
         order.updatedAt = new Date().toISOString();
         return { json: { order } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+)/backlog"),
+      resolve: (match, method, body) => {
+        if (method !== "PATCH") return null;
+        return sendWorkOrderToBacklogFixture(fixture, match[1], match[2], (body ?? {}) as RequestBody);
       },
     },
     {
@@ -1270,6 +1448,39 @@ function meRoute(organizationId: string): FactoriesRoute {
   };
 }
 
+function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
+    fixture.githubOnboarding ?? {
+      providerConfigured: true,
+      repositories: [],
+      pendingRequests: [],
+      synchronizing: false,
+    };
+
+  return [
+    {
+      pattern: re("/api/v1/me/vcs/github/onboarding"),
+      resolve: (_match, method) => (method === "GET" ? { json: onboarding() } : null),
+    },
+    {
+      pattern: re("/api/v1/me/vcs/github/installations:start"),
+      resolve: (_match, method) =>
+        method === "POST"
+          ? { json: { url: "https://github.com/apps/superplane/installations/new?state=o_storybook" } }
+          : null,
+    },
+    {
+      pattern: re("/api/v1/me/vcs/github/installations/([^/]+):configure"),
+      resolve: (_match, method) =>
+        method === "POST" ? { json: { url: "https://github.com/settings/installations/101" } } : null,
+    },
+    {
+      pattern: re("/api/v1/me/vcs/github/repositories:refresh"),
+      resolve: (_match, method) => (method === "POST" ? { json: {} } : null),
+    },
+  ];
+}
+
 function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
   const defaults = defaultNotificationSettings();
 
@@ -1289,9 +1500,11 @@ function notificationSettingsRoute(fixture: FactoriesFixture): FactoriesRoute {
 function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
+    ...githubOnboardingRoutes(fixture),
     meRoute(fixture.organizationId),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
+    factoryVCSProviderRepositoryRoute(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
     ...organizationSecretsRoutes(),

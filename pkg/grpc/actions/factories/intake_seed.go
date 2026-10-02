@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -46,6 +48,24 @@ const (
 	// intakeJiraSeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
 	intakeJiraSeedEventWindow = 200
+
+	// intakeDatadogSeedSize is how many open Datadog errors a new intake
+	// imports. The wizard tells the user this number. Datadog returns at
+	// most one page, so the seed is the newest of that page.
+	intakeDatadogSeedSize = 10
+
+	// intakeDatadogSearchPageSize is the Error Tracking search page. The
+	// seed sorts that page by last seen and keeps intakeDatadogSeedSize.
+	intakeDatadogSearchPageSize = 100
+
+	// intakeDatadogSeedBudget is how long setup waits while it loads issue
+	// details. Each call can otherwise wait 30 seconds, and one issue can
+	// make several calls. After the budget, the import keeps the search result.
+	intakeDatadogSeedBudget = 15 * time.Second
+
+	// intakeDatadogSeedEventWindow is how many recent trigger events a
+	// reseed reads so it can drop errors that already sit on the intake.
+	intakeDatadogSeedEventWindow = 200
 
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
@@ -92,6 +112,10 @@ func seedIntake(
 		return seedJiraIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceDependabotAlerts:
 		return seedDependabotAlerts(ctx, deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceDatadog:
+		return seedDatadogIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceLinearIssues:
+		return seedLinearIssues(deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -382,7 +406,7 @@ func seedProductiveTasks(
 		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
 	}
 
-	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents)); err != nil {
+	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents, client.OrganizationID)); err != nil {
 		return intakeSeedResult{}, err
 	}
 	return intakeSeedResult{itemCount: len(documents)}, nil
@@ -400,10 +424,10 @@ func newestProductiveSeedDocuments(
 // productiveTaskEvents shapes each task of a newest-first page like the event
 // the trigger emits when it polls, so the rest of the graph cannot tell a
 // seeded task from a polled one.
-func productiveTaskEvents(documents []map[string]any) []map[string]any {
+func productiveTaskEvents(documents []map[string]any, organizationID string) []map[string]any {
 	events := make([]map[string]any, 0, len(documents))
 	for _, document := range documents {
-		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document))
+		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document, organizationID))
 	}
 
 	// The intake lists its runs newest first. Emitting the oldest task first
@@ -414,16 +438,20 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 }
 
 func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
-	settings := defaultProductiveIntakeSettings()
+	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
+}
+
+// liveIntakeSettings reads the settings out of the intake's live canvas. It
+// returns fallback when the canvas cannot be read.
+func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {
 	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, []uuid.UUID{canvasID})
 	if err != nil {
-		return settings
+		return fallback
 	}
 	spec, ok := specs[canvasID]
 	if !ok {
-		return settings
+		return fallback
 	}
-	source := models.FactoryIntakeSourceProductiveTasks
 	return intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 }
 
@@ -647,7 +675,234 @@ func newIntakeProductiveClient(
 	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+		return nil, fmt.Errorf("failed to build Productive client: %w", err)
+	}
+
+	return client, nil
+}
+
+func seedDatadogIssues(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) (intakeSeedResult, error) {
+	client, err := newIntakeDatadogClient(deps, tx, installation)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	service, _ := binding.Configuration["service"].(string)
+	issues, err := newestDatadogSeedIssues(client, service)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	client.SetRequestDeadline(time.Now().Add(intakeDatadogSeedBudget))
+	return seedKnownDatadogIssues(tx, canvasID, hydrateDatadogSeedIssues(client, issues))
+}
+
+func hydrateDatadogSeedIssues(client *datadog.Client, issues []datadog.ErrorTrackingIssue) []datadog.ErrorTrackingIssue {
+	hydrated := make([]datadog.ErrorTrackingIssue, 0, intakeDatadogSeedSize)
+	for _, issue := range issues {
+		if len(hydrated) >= intakeDatadogSeedSize {
+			break
+		}
+		loaded, err := client.LoadErrorTrackingIssue(issue.ID, func(format string, args ...any) {
+			log.Warnf(format, args...)
+		})
+		if err != nil || loaded == nil {
+			log.Warnf("failed to load Datadog issue %s for intake import: %v", issue.ID, err)
+			hydrated = append(hydrated, issue)
+			continue
+		}
+		if !datadogDetailMatchesService(issue.Service, loaded.Service) {
+			log.Warnf("skipping Datadog issue %s: details report service %s", issue.ID, loaded.Service)
+			continue
+		}
+		if strings.TrimSpace(loaded.URL) == "" {
+			loaded.URL = issue.URL
+		}
+		if strings.TrimSpace(loaded.Service) == "" {
+			loaded.Service = issue.Service
+		}
+		hydrated = append(hydrated, *loaded)
+	}
+	return hydrated
+}
+
+func datadogDetailMatchesService(expected, actual string) bool {
+	actual = strings.TrimSpace(actual)
+	if actual == "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(expected), actual)
+}
+
+func newestDatadogSeedIssues(client *datadog.Client, service string) ([]datadog.ErrorTrackingIssue, error) {
+	service = strings.TrimSpace(service)
+	if service == "" {
+		return nil, fmt.Errorf("service is required")
+	}
+
+	issues, err := client.SearchErrorTrackingIssues(datadogServiceSearchQuery(service, ""), intakeDatadogSearchPageSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list the errors of service %s: %w", service, err)
+	}
+
+	matched := make([]datadog.ErrorTrackingIssue, 0, len(issues))
+	boundary := datadogIntakeItemSource{service: service}
+	for _, issue := range issues {
+		if strings.TrimSpace(issue.ID) == "" || !boundary.ownsIssue(issue) {
+			continue
+		}
+		issue.URL = client.IssueURL(issue.ID)
+		matched = append(matched, issue)
+	}
+
+	return datadog.NewestErrorTrackingIssues(matched, intakeDatadogSearchPageSize), nil
+}
+
+func seedKnownDatadogIssues(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	issues []datadog.ErrorTrackingIssue,
+) (intakeSeedResult, error) {
+	issues, err := filterDatadogIssuesForSeed(tx, canvasID, issues)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	events, err := datadogIssueEvents(issues)
+	if err != nil {
+		return intakeSeedResult{}, err
+	}
+
+	if err := emitIntakeEvents(tx, canvasID, datadog.ErrorTrackingAlertPayloadType, events); err != nil {
+		return intakeSeedResult{}, err
+	}
+	return intakeSeedResult{itemCount: len(issues)}, nil
+}
+
+func filterDatadogIssuesForSeed(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	issues []datadog.ErrorTrackingIssue,
+) ([]datadog.ErrorTrackingIssue, error) {
+	if len(issues) == 0 {
+		return issues, nil
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load intake canvas: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("intake canvas is not owned by a factory")
+	}
+
+	factory, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen, err := datadogIssueIDsOnTrigger(tx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
+	kept := make([]datadog.ErrorTrackingIssue, 0, len(issues))
+	for _, issue := range issues {
+		issueID := strings.ToLower(strings.TrimSpace(issue.ID))
+		if issueID == "" {
+			continue
+		}
+		if seen[issueID] {
+			log.Infof("skipping Datadog issue %s: already on intake", issueID)
+			continue
+		}
+
+		hasOrder, err := datadog.IssueHasWorkOrder(tx, factory, issueID)
+		if err != nil {
+			return nil, err
+		}
+		if hasOrder {
+			log.Infof("skipping Datadog issue %s: work order already exists", issueID)
+			continue
+		}
+
+		kept = append(kept, issue)
+	}
+
+	return kept, nil
+}
+
+func datadogIssueIDsOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, error) {
+	events, err := models.ListCanvasEvents(tx, canvasID, intakeTriggerNodeID, intakeDatadogSeedEventWindow, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]bool{}
+	for i := range events {
+		issueID, ok := datadog.IssueIDFromEventData(events[i].Data.Data())
+		if ok {
+			seen[issueID] = true
+		}
+	}
+	return seen, nil
+}
+
+// datadogIssueEvents shapes each issue of a newest-first page like the alert
+// the trigger emits, so the rest of the graph cannot tell a seeded error
+// from a received one.
+func datadogIssueEvents(issues []datadog.ErrorTrackingIssue) ([]map[string]any, error) {
+	events := make([]map[string]any, 0, len(issues))
+	for _, issue := range issues {
+		event, err := datadogIssueEvent(issue)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	// The intake lists its runs newest first. Emitting the oldest error first
+	// keeps the newest error at the top, where the reader expects it.
+	slices.Reverse(events)
+	return events, nil
+}
+
+func datadogIssueEvent(issue datadog.ErrorTrackingIssue) (map[string]any, error) {
+	encoded, err := json.Marshal(datadog.ErrorTrackingIssuePayload(issue))
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode datadog issue %s: %w", issue.ID, err)
+	}
+
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return nil, fmt.Errorf("failed to read datadog issue %s: %w", issue.ID, err)
+	}
+	return payload, nil
+}
+
+func newIntakeDatadogClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*datadog.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := datadog.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Datadog client: %w", err)
 	}
 
 	return client, nil

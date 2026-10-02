@@ -12,7 +12,7 @@ describe("AddColumnAutomationPicker", () => {
         open
         onClose={vi.fn()}
         onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true })}
+        catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
       />,
     );
 
@@ -21,6 +21,10 @@ describe("AddColumnAutomationPicker", () => {
       "Pull request discussion",
     );
     expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
+      "Score risk, performance, security, and drift on a pull request.",
+    );
   });
 
   it("reports the chosen entry and disables taken ones", async () => {

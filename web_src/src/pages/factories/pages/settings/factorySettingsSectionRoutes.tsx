@@ -2,13 +2,21 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
+  FactorySettingsAgentPage,
+  FactorySettingsConnectPage,
   FactorySettingsMCPPage,
+  FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
   FactorySettingsSkillEditorPage,
   FactorySettingsRepositoryPage,
@@ -91,15 +99,51 @@ export const factorySettingsSectionRoutes = [
     element={<LegacyAgentResourcesRedirect />}
   />,
   <Route
-    key="factory-settings-workspace-mcp"
-    path="workspace/mcp"
+    key="factory-settings-workspace-mcp-connection"
+    path="workspace/mcp/:resourceId"
     element={
       <RequirePermission resource="factories" action="update">
         <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
-          <FactorySettingsMCPPage />
+          <FactorySettingsMCPConnectionPage />
         </RequireExperimentalFeature>
       </RequirePermission>
     }
+  />,
+  <Route
+    key="factory-settings-workspace-mcp-legacy"
+    path="workspace/mcp"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <FactorySettingsMCPPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-agent"
+    path="workspace/agent"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
+          <FactorySettingsAgentPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-superplane-mcp-server"
+    path="workspace/superplane-mcp-server"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_SUPERPLANE_MCP_SERVER}>
+          <FactorySettingsConnectPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-connect-legacy"
+    path="workspace/connect"
+    element={<Navigate to="../superplane-mcp-server" replace />}
   />,
   <Route
     key="factory-settings-workspace-skills-new"
@@ -124,13 +168,11 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route
-    key="factory-settings-workspace-skills"
+    key="factory-settings-workspace-skills-legacy"
     path="workspace/skills"
     element={
       <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
-          <FactorySettingsSkillsPage />
-        </RequireExperimentalFeature>
+        <FactorySettingsSkillsPage />
       </RequirePermission>
     }
   />,

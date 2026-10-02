@@ -47,6 +47,18 @@ export interface IntakeSourceSettings {
   taskListIds: string[];
   /** Severities that still create a task. Empty means every severity. */
   dependabotSeverities: string[];
+  /** Create a task when Datadog reports a Triggered Error Tracking alert. */
+  datadogTriggeredAlerts: boolean;
+  /** Create a task when Datadog reports a Re-Triggered Error Tracking alert. */
+  datadogRetriggeredAlerts: boolean;
+  /** Environments that still create a task. Empty means every environment. */
+  datadogEnvironments: string[];
+  /** Datadog service the trigger watches. Saved as the intake resource, not in settings. */
+  datadogService: string;
+  /** Linear projects that still create a task. At least one is required. */
+  linearProjectIds: string[];
+  /** Linear labels that still create a task. Empty means every label. */
+  linearLabels: string[];
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -69,6 +81,12 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   excludeKeyTasks: true,
   taskListIds: [],
   dependabotSeverities: [],
+  datadogTriggeredAlerts: true,
+  datadogRetriggeredAlerts: false,
+  datadogEnvironments: [],
+  datadogService: "",
+  linearProjectIds: [],
+  linearLabels: [],
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -81,8 +99,6 @@ export const DEPENDABOT_INTAKE_SETTINGS_COPY = {
   high: "High",
   medium: "Medium",
   low: "Low",
-  severityHelp:
-    "All severities create a task when every box is selected. Turn on Dependabot alerts for the repository. A repository with alerts turned off gives no tasks.",
 } as const;
 
 export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -96,8 +112,16 @@ export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
 
 export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
   ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-  name: "Productive.io tasks",
+  name: "Productive tasks",
   excludeKeyTasks: true,
+};
+
+export const DEFAULT_DATADOG_INTAKE_SETTINGS: IntakeSourceSettings = {
+  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+  name: "Datadog errors",
+  datadogTriggeredAlerts: true,
+  datadogRetriggeredAlerts: false,
+  datadogEnvironments: [],
 };
 
 export const DEFAULT_JIRA_COMPLETION_SETTINGS = {
@@ -148,7 +172,9 @@ export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
     sourceId === "dependabot-alerts" ||
     sourceId === "sentry-exceptions" ||
     sourceId === "jira-issues" ||
-    sourceId === "productive-tasks"
+    sourceId === "productive-tasks" ||
+    sourceId === "datadog" ||
+    sourceId === "linear-issues"
   );
 }
 
@@ -173,6 +199,10 @@ export function normalizeIntakeSourceSettings(
   const hiddenSentryTriggers =
     sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
   const taskListIds = normalizeTaskListIds(draft.taskListIds);
+  const datadogEnvironments = normalizeDatadogEnvironments(draft.datadogEnvironments);
+  const datadogService = draft.datadogService.trim();
+  const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
+  const linearLabels = normalizeLinearValues(draft.linearLabels);
   if (!draft.filterByLabel) {
     return {
       ...draft,
@@ -183,9 +213,33 @@ export function normalizeIntakeSourceSettings(
       sentryLevels,
       dependabotSeverities,
       taskListIds,
+      datadogEnvironments,
+      datadogService,
+      linearProjectIds,
+      linearLabels,
     };
   }
-  return { ...draft, ...hiddenSentryTriggers, confidencePct, sentryLevels, dependabotSeverities, taskListIds };
+  return {
+    ...draft,
+    ...hiddenSentryTriggers,
+    confidencePct,
+    sentryLevels,
+    dependabotSeverities,
+    taskListIds,
+    datadogEnvironments,
+    datadogService,
+    linearProjectIds,
+    linearLabels,
+  };
+}
+
+export function addIntakeEnvironment(environments: string[], environment: string): string[] {
+  return normalizeDatadogEnvironments([...environments, environment]);
+}
+
+export function removeIntakeEnvironment(environments: string[], environment: string): string[] {
+  const next = environment.trim().toLowerCase();
+  return environments.filter((entry) => entry !== next);
 }
 
 export function normalizeDependabotSeverities(severities: string[]): string[] {
@@ -213,6 +267,34 @@ function normalizeTaskListIds(ids: string[]): string[] {
   const normalized: string[] = [];
   for (const id of ids) {
     const next = id.trim();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
+}
+
+function normalizeLinearValues(values: string[]): string[] {
+  const normalized: string[] = [];
+  for (const value of values) {
+    const next = value.trim();
+    if (next.length === 0 || normalized.includes(next)) {
+      continue;
+    }
+    normalized.push(next);
+  }
+  return normalized;
+}
+
+export function linearProjectIdsFromResource(resourceId: string | undefined): string[] {
+  return normalizeLinearValues((resourceId ?? "").split(","));
+}
+
+function normalizeDatadogEnvironments(environments: string[]): string[] {
+  const normalized: string[] = [];
+  for (const environment of environments) {
+    const next = environment.trim().toLowerCase();
     if (next.length === 0 || normalized.includes(next)) {
       continue;
     }
@@ -262,6 +344,13 @@ export function intakeSettingsFromApi(
     jiraCompletionColumn: settings?.jiraCompletionColumn?.trim() ?? "",
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => (settings?.sentryLevels ?? []).includes(level)),
     dependabotSeverities: normalizeDependabotSeverities(settings?.dependabotSeverities ?? []),
+    datadogTriggeredAlerts: settings?.datadogTriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogTriggeredAlerts,
+    datadogRetriggeredAlerts:
+      settings?.datadogRetriggeredAlerts ?? DEFAULT_DATADOG_INTAKE_SETTINGS.datadogRetriggeredAlerts,
+    datadogEnvironments: normalizeDatadogEnvironments(settings?.datadogEnvironments ?? []),
+    datadogService: "",
+    linearProjectIds: normalizeLinearValues(settings?.linearProjectIds ?? []),
+    linearLabels: normalizeLinearValues(settings?.linearLabels ?? []),
     ...productiveFiltersFromApi(settings),
   };
 }
@@ -300,6 +389,11 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
     excludeKeyTasks: settings.excludeKeyTasks,
     taskListIds: normalizeTaskListIds(settings.taskListIds),
+    datadogTriggeredAlerts: settings.datadogTriggeredAlerts,
+    datadogRetriggeredAlerts: settings.datadogRetriggeredAlerts,
+    datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),
+    linearProjectIds: normalizeLinearValues(settings.linearProjectIds),
+    linearLabels: normalizeLinearValues(settings.linearLabels),
   };
 }
 

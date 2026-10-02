@@ -5,15 +5,18 @@ import {
   factoryAppRunPath,
   factoryAppSplitRunPath,
   factoryAppViewPath,
+  factoryDatadogIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
+  linearIntakeIntegrationIdFromSearch,
   factoryDependabotIntakeSetupPath,
   factoryDetailPath,
   factoryHomePath,
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
+  factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
-  factoryPlanningSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -47,58 +50,73 @@ import {
   workOrderDetailPath,
   workOrderOpenPath,
   workOrdersPath,
+  workspaceRouteSegment,
 } from "./factoryPagePaths";
 
 describe("factoryDetailPath", () => {
-  it("builds the workspace URL from the workspace key", () => {
-    expect(factoryDetailPath("org-1", "SP")).toBe("/org-1/workspaces/sp");
+  it("builds the workspace URL from the workspace route segment", () => {
+    expect(factoryDetailPath("org-1", workspaceRouteSegment("SP", "k7m2xqab"))).toBe("/org-1/workspaces/sp-k7m2xqab");
   });
 });
 
 describe("factoryHomePath", () => {
   it("opens the first line board when a line id is present", () => {
-    expect(factoryHomePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/sp/lines/line-plan");
+    expect(factoryHomePath("org-1", workspaceRouteSegment("SP", "k7m2xqab"), "line-plan")).toBe(
+      "/org-1/workspaces/sp-k7m2xqab/lines/line-plan",
+    );
   });
 
   it("opens the workspace index when no line id is present", () => {
-    expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/sp");
+    expect(factoryHomePath("org-1", workspaceRouteSegment("SP", "k7m2xqab"))).toBe("/org-1/workspaces/sp-k7m2xqab");
   });
 });
 
 describe("pathAfterWorkspaceSwitch", () => {
-  const nextFactory = { key: "AO", lines: [{ id: "line-acme" }] };
+  const currentSegment = workspaceRouteSegment("RF", "p8n3wrcd");
+  const nextFactory = { key: "AO", urlId: "a1b2c3d4", lines: [{ id: "line-acme" }] };
 
   it("keeps the settings page", () => {
     expect(
       pathAfterWorkspaceSwitch({
-        pathname: "/org-1/workspaces/rf/settings/workspace/general",
+        pathname: "/org-1/workspaces/rf-p8n3wrcd/settings/workspace/general",
         organizationId: "org-1",
-        currentFactoryKey: "RF",
+        currentFactoryKey: currentSegment,
         nextFactory,
       }),
-    ).toBe("/org-1/workspaces/ao/settings/workspace/general");
+    ).toBe("/org-1/workspaces/ao-a1b2c3d4/settings/workspace/general");
   });
 
   it("keeps Velocity", () => {
     expect(
       pathAfterWorkspaceSwitch({
-        pathname: "/org-1/workspaces/rf/velocity",
+        pathname: "/org-1/workspaces/rf-p8n3wrcd/velocity",
         organizationId: "org-1",
-        currentFactoryKey: "RF",
+        currentFactoryKey: currentSegment,
         nextFactory,
       }),
-    ).toBe("/org-1/workspaces/ao/velocity");
+    ).toBe("/org-1/workspaces/ao-a1b2c3d4/velocity");
   });
 
   it("opens the new workspace board from a line that belongs to the previous workspace", () => {
     expect(
       pathAfterWorkspaceSwitch({
-        pathname: "/org-1/workspaces/rf/lines/line-plan",
+        pathname: "/org-1/workspaces/rf-p8n3wrcd/lines/line-plan",
+        organizationId: "org-1",
+        currentFactoryKey: currentSegment,
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/ao-a1b2c3d4/lines/line-acme");
+  });
+
+  it("does not split a key-urlId segment when the current key is a prefix of it", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/rf-p8n3wrcd/settings/workspace/general",
         organizationId: "org-1",
         currentFactoryKey: "RF",
         nextFactory,
       }),
-    ).toBe("/org-1/workspaces/ao/lines/line-acme");
+    ).toBe("/org-1/workspaces/ao-a1b2c3d4/lines/line-acme");
   });
 });
 
@@ -175,10 +193,10 @@ describe("factoryPRFeedbackSetupPath", () => {
   });
 });
 
-describe("factoryPlanningSetupPath", () => {
-  it("opens the Planning setup page on the line board", () => {
-    expect(factoryPlanningSetupPath("org-1", "SP", "line-plan")).toBe(
-      "/org-1/workspaces/sp/lines/line-plan/setup/planning",
+describe("factoryGitHubIntakeSetupPath", () => {
+  it("opens the GitHub intake setup page on the line board", () => {
+    expect(factoryGitHubIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/github",
     );
   });
 });
@@ -188,6 +206,29 @@ describe("factorySentryIntakeSetupPath", () => {
     expect(factorySentryIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/sentry",
     );
+  });
+});
+
+describe("factoryDatadogIntakeSetupPath", () => {
+  it("opens the Datadog intake setup page on the line board", () => {
+    expect(factoryDatadogIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/datadog",
+    );
+  });
+});
+
+describe("factoryLinearIntakeSetupPath", () => {
+  it("opens the Linear intake setup page on the line board", () => {
+    expect(factoryLinearIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/linear",
+    );
+  });
+
+  it("keeps the connection id from the Linear callback", () => {
+    expect(factoryLinearIntakeSetupPath("org-1", "SP", "line-plan", { integrationId: "int-new" })).toBe(
+      "/org-1/workspaces/sp/lines/line-plan/setup/linear?linearIntegrationId=int-new",
+    );
+    expect(linearIntakeIntegrationIdFromSearch("?linearIntegrationId=int-new")).toBe("int-new");
   });
 });
 

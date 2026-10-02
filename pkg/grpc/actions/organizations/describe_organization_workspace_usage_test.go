@@ -124,6 +124,10 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 					"created_at":   "2026-08-27T12:00:00Z",
 					"status":       "paid",
 					"total_amount": 10000,
+					"checkout_id":  "checkout_100",
+					"currency":     "usd",
+					"net_amount":   9000,
+					"tax_amount":   1000,
 					"product":      map[string]any{"name": "$100 pack"},
 				},
 			},
@@ -145,4 +149,8 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 	assert.Equal(t, int64(10000), resp.Invoices[0].AmountCents)
 	assert.Equal(t, "paid", resp.Invoices[0].Status)
 	assert.Equal(t, "$100 pack", resp.Invoices[0].ProductName)
+	assert.Equal(t, "checkout_100", resp.Invoices[0].CheckoutId)
+	assert.Equal(t, "usd", resp.Invoices[0].Currency)
+	assert.Equal(t, int64(9000), resp.Invoices[0].NetAmountCents)
+	assert.Equal(t, int64(1000), resp.Invoices[0].TaxAmountCents)
 }

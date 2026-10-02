@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { useFactoriesLayout, type FactoriesLayoutContextValue } from "../layout/factoriesLayoutContext";
+import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
@@ -40,7 +40,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
 
 function resolvePRFeedbackSetupModel(
   kind: "comments" | "checks",
-  layout: FactoriesLayoutContextValue,
+  layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
 ): {
@@ -56,11 +56,11 @@ function resolvePRFeedbackSetupModel(
     source: PRFeedbackSource;
   };
 } {
-  const { organizationId, factoryId, factoryKey, factory } = layout;
+  const { organizationId, factoryId, routeSegment, factory } = layout;
   const bindings = factoryPRFeedbackSetupBindings(factory);
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = bindings.lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
   const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
   const titleParts = [prFeedbackSetupPageTitle(kind), bindings.workspaceName];
   const redirectTo = prFeedbackSetupRedirect({
@@ -93,7 +93,7 @@ function resolvePRFeedbackSetupModel(
   };
 }
 
-function factoryPRFeedbackSetupBindings(factory: FactoriesLayoutContextValue["factory"]) {
+function factoryPRFeedbackSetupBindings(factory: ResolvedFactoriesLayout["factory"]) {
   return {
     workspaceName: factory?.name ?? "Workspace",
     lines: factory?.lines ?? [],

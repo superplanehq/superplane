@@ -1,9 +1,9 @@
-import { pickHostedModel, pickModelMatching } from "@/lib/hostedLLMModels";
+import { newestClaudeModelInFamily, pickHostedModel, pickNewestModelMatching } from "@/lib/hostedLLMModels";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 
 import type { IntegrationId } from "./onboardingFixtures";
 
-export const AGENT_PROVIDER_IDS = ["claude", "openai", "openrouter"] as const;
+export const AGENT_PROVIDER_IDS = ["claude", "openai", "openrouter", "customLlm"] as const;
 
 export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number];
 
@@ -20,6 +20,8 @@ export type OnboardingAgentPlan = {
   model: string;
   /** Model for agents that weigh evidence rather than write code, such as planning. */
   planningModel: string;
+  /** Set when the agent runs OpenCode against a custom provider. */
+  llmProvider?: "custom";
 };
 
 export type HostedModelsByProvider = Record<HostedLLMProviderId, string[]>;
@@ -33,6 +35,10 @@ type AgentProviderSpec = {
   defaultPlanningModel: string;
   /** Substring that finds the planning model on an allowlist. */
   planningModelHint: string;
+  /** Claude family whose newest model on the key runs implementation. */
+  modelFamily?: string;
+  /** Claude family whose newest model on the key runs planning. */
+  planningModelFamily?: string;
 };
 
 const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
@@ -40,9 +46,11 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
     component: "runnerClaudeCode",
     hostedProvider: "anthropic",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
-    defaultModel: "sonnet",
-    defaultPlanningModel: "opus",
+    defaultModel: "claude-sonnet-4-6",
+    defaultPlanningModel: "claude-opus-5-5",
     planningModelHint: "opus",
+    modelFamily: "sonnet",
+    planningModelFamily: "opus",
   },
   openai: {
     component: "runnerCodex",
@@ -57,17 +65,33 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
     hostedProvider: "openrouter",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
     defaultModel: "anthropic/claude-sonnet-4-6",
-    defaultPlanningModel: "anthropic/claude-opus-4-6",
+    defaultPlanningModel: "anthropic/claude-opus-5-5",
     planningModelHint: "opus",
+  },
+  customLlm: {
+    component: "runnerOpenRouter",
+    hostedProvider: "openrouter",
+    harness: "AGENT_HARNESS_CLAUDE_CODE",
+    defaultModel: "",
+    defaultPlanningModel: "",
+    planningModelHint: "",
   },
 };
 
 // A hosted run only accepts a model id from the allowlist, so the planning
 // model has to come from the same list as the standard model. An empty list
-// means no allowlist applies, and the agent CLI resolves the alias itself.
+// uses a versioned model id.
 function planningModelFor(spec: AgentProviderSpec, modelIds: string[], model: string): string {
   if (modelIds.length === 0) return spec.defaultPlanningModel;
-  return pickModelMatching(modelIds, spec.planningModelHint) ?? model;
+  if (spec.planningModelFamily) {
+    return newestClaudeModelInFamily(modelIds, spec.planningModelFamily) ?? model;
+  }
+  return pickNewestModelMatching(modelIds, spec.planningModelHint) ?? model;
+}
+
+function implementationModelFor(spec: AgentProviderSpec, modelIds: string[]): string {
+  const newest = spec.modelFamily ? newestClaudeModelInFamily(modelIds, spec.modelFamily) : undefined;
+  return newest ?? pickHostedModel(spec.hostedProvider, modelIds) ?? spec.defaultModel;
 }
 
 export function isAgentProviderConnected(connected: Set<IntegrationId>): boolean {
@@ -81,6 +105,8 @@ export function isAgentStepReady(connected: Set<IntegrationId>, remainingCreditC
 export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
   hostedModels: HostedModelsByProvider;
+  /** Model ids returned by a connected custom provider. */
+  customModels?: string[];
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
   /** When set, a connected provider key is used before the hosted model. */
@@ -101,10 +127,12 @@ export function resolveOnboardingAgent(args: {
 function connectedProviderPlan(args: {
   connected: Set<IntegrationId>;
   hostedModels: HostedModelsByProvider;
+  customModels?: string[];
 }): OnboardingAgentPlan | undefined {
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
-    return planForConnectedProvider(providerId, args.hostedModels);
+    const plan = planForConnectedProvider(providerId, args.hostedModels, args.customModels ?? []);
+    if (plan) return plan;
   }
   return undefined;
 }
@@ -219,10 +247,28 @@ export function hostedCreditGrantCopy(remainingCreditCents: number): string {
 function planForConnectedProvider(
   providerId: AgentProviderId,
   hostedModels: HostedModelsByProvider,
-): OnboardingAgentPlan {
+  customModels: string[],
+): OnboardingAgentPlan | undefined {
+  if (providerId === "customLlm") {
+    const model = [...customModels]
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .sort()[0];
+    if (!model) return undefined;
+    return {
+      providerId,
+      component: "runnerOpenRouter",
+      credentialsSource: "integration",
+      integrationName: providerId,
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model,
+      planningModel: model,
+      llmProvider: "custom",
+    };
+  }
   const spec = AGENT_PROVIDER_SPECS[providerId];
   const modelIds = hostedModels[spec.hostedProvider];
-  const model = pickHostedModel(spec.hostedProvider, modelIds) ?? spec.defaultModel;
+  const model = implementationModelFor(spec, modelIds);
   return {
     providerId,
     component: spec.component,

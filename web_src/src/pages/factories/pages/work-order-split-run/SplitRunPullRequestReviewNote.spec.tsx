@@ -150,6 +150,73 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
+  it("keeps no box of its own in the stacked panel section", () => {
+    renderNote({ compact: true, stacked: true });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(note.className || "").not.toContain("rounded-lg");
+    expect(note.className || "").not.toContain("border");
+  });
+
+  it("says the pull request waits for checks while checks run", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
+      message: "Checks are still running.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "The pull request waits for checks" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("You can review it now.");
+  });
+
+  it("reports unavailable merge status and keeps merge disabled", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_UNAVAILABLE",
+      message: "Merge status is unavailable right now.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "Merge status is unavailable right now." })).toBeInTheDocument();
+    expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+  });
+
+  it("says a check failed when a pull request check fails", () => {
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
+      message: "A check failed.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ pullRequests: [GITHUB_PR], compact: true });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "A pull request check failed" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("Review the failed check on the pull request.");
+  });
+
+  it("keeps the ready headline when the merge flag is off", () => {
+    experimentalFeatureHas.current = () => false;
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
+      message: "A check failed.",
+    };
+    renderNote({ pullRequests: [GITHUB_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+  });
+
   it("enables merge when mergeability is true", () => {
     renderNote({ pullRequests: [GITHUB_PR] });
 

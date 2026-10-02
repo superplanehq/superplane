@@ -39,6 +39,14 @@ func OriginFromIntakeRootEvent(event *CanvasEvent) *WorkOrderOrigin {
 	return OriginFromIntakePayload(payload)
 }
 
+func OriginFromImportedIntakeItem(itemURL, title string) WorkOrderOrigin {
+	if label := datadogTitleLabel(itemURL, title); label != "" {
+		return WorkOrderOrigin{URL: itemURL, Label: label}
+	}
+
+	return WorkOrderOrigin{URL: itemURL, Label: OriginLabelFromURL(itemURL)}
+}
+
 func OriginLabelFromURL(rawURL string) string {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || parsed.Host == "" {
@@ -126,8 +134,66 @@ func originLabelFromIntakePayload(originURL string, payload map[string]any) stri
 	if label := sentryOriginLabel(originURL, payload); label != "" {
 		return label
 	}
+	if label := datadogOriginLabel(originURL, payload); label != "" {
+		return label
+	}
 
 	return OriginLabelFromURL(originURL)
+}
+
+func datadogOriginLabel(originURL string, payload map[string]any) string {
+	title, _ := payload["title"].(string)
+	return datadogTitleLabel(originURL, title)
+}
+
+func datadogTitleLabel(rawURL, title string) string {
+	if !isDatadogErrorTrackingIssueURL(rawURL) {
+		return ""
+	}
+	return normalizeOriginLabel(title)
+}
+
+var datadogErrorTrackingDomains = []string{
+	"datadoghq.com",
+	"datadoghq.eu",
+	"ddog-gov.com",
+}
+
+func isDatadogErrorTrackingIssueURL(rawURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !isDatadogHost(parsed.Hostname()) {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(parsed.Path), "/error-tracking/issue/")
+}
+
+func isDatadogHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	for _, domain := range datadogErrorTrackingDomains {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return true
+		}
+	}
+	return false
+}
+
+func datadogIssueID(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	return lastPathSegment(parsed)
+}
+
+func datadogWorkOrderOriginLabel(rawURL, savedLabel, workOrderTitle string) string {
+	if !isDatadogErrorTrackingIssueURL(rawURL) {
+		return ""
+	}
+	if savedLabel != "" && !strings.EqualFold(savedLabel, datadogIssueID(rawURL)) {
+		return ""
+	}
+	return normalizeOriginLabel(workOrderTitle)
 }
 
 func sentryOriginLabel(originURL string, payload map[string]any) string {
@@ -228,6 +294,9 @@ func githubOriginLabel(parsed *url.URL) string {
 	if len(parts) >= 5 && parts[2] == "security" && parts[3] == "dependabot" && parts[4] != "" {
 		return owner + "/" + repo + " dependabot #" + parts[4]
 	}
+	if len(parts) == 4 && parts[2] == "security" && parts[3] == "dependabot" {
+		return dependabotPackageOriginLabel(parsed)
+	}
 
 	kind, number := parts[2], parts[3]
 	if number == "" {
@@ -238,6 +307,18 @@ func githubOriginLabel(parsed *url.URL) string {
 	}
 
 	return owner + "/" + repo + "#" + number
+}
+
+// dependabotPackageOriginLabel names the package of an alerts page filtered
+// with a `package:` qualifier, such as
+// https://github.com/acme/payments/security/dependabot?q=is%3Aopen+package%3Alodash.
+func dependabotPackageOriginLabel(parsed *url.URL) string {
+	for _, qualifier := range strings.Fields(parsed.Query().Get("q")) {
+		if name, ok := strings.CutPrefix(qualifier, "package:"); ok && name != "" {
+			return "Dependabot: " + name
+		}
+	}
+	return ""
 }
 
 func lastPathSegment(parsed *url.URL) string {

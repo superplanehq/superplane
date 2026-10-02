@@ -205,6 +205,25 @@ func Test__ApplyOrderPaidLooksUpMissingPackMetadata(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(2500), grant.AmountMicros)
 }
 
+func Test__ApplyOrderPaidRetriesWhenAPIVersionIsUnsupported(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	event := paidPackEvent(r.Organization.ID, orderID, 2500)
+	event.Data.Product.Metadata = nil
+	lookup := creditPackLookupFunc(func(_ context.Context, _ string) (*Product, error) {
+		return nil, ErrUnsupportedAPIVersion
+	})
+
+	err := ApplyOrderPaid(context.Background(), db, event, lookup)
+	require.Error(t, err)
+	assert.True(t, IsUnsupportedAPIVersion(err))
+	assert.False(t, IsPermanentApplyError(err))
+
+	_, err = models.FindLLMCreditGrantByPolarOrderID(db, orderID)
+	require.Error(t, err)
+}
+
 func Test__ApplyOrderPaidPermanentErrors(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

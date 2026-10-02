@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -45,7 +45,6 @@ import {
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
-  LinesPage,
   MissionsPage,
   NewWorkspacePage,
   OnboardingGate,
@@ -56,14 +55,20 @@ import {
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
+  DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
   DiscussionPRFeedbackSetupPage,
+  GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
+  LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
+  RiskScoreSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
+import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -78,6 +83,7 @@ import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
+import { isNotFoundError } from "./pages/app/workflowPageHelpers";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -86,6 +92,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
+import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
@@ -162,14 +169,24 @@ function organizationScopedRouteTree() {
             <Route path="lines">
               <Route index element={<FactoryHomeRedirect />} />
               <Route path="new" element={<FactoryLineEditPageGate />} />
-              <Route path=":lineId" element={<LinesPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+              <Route
+                path=":lineId/setup/risk-score"
+                element={
+                  <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
+                    <RiskScoreSetupPage />
+                  </RequireExperimentalFeature>
+                }
+              />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
+              <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
               <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
+              <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
             </Route>
             <Route path="automations">
@@ -183,6 +200,7 @@ function organizationScopedRouteTree() {
             <Route path="apps/:appId/split-run" element={<LegacyFactoryAppSplitRunRedirect />} />
           </Route>
         </Route>
+        <Route path=":factoryKey/lines/:lineId" element={<FactoryLineAccessGate />} />
         <Route
           path=":factoryKey/settings"
           element={withAuthPermissionAndFactoriesFeature(FactorySettingsLayout, "factories", "read")}
@@ -250,6 +268,8 @@ function AppRouter() {
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
+                <Route path="webhooks" element={<WebhooksAdmin />} />
+                <Route path="sentry-webhooks" element={<Navigate to="/admin/webhooks" replace />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
@@ -290,16 +310,22 @@ function PageObservabilityScope() {
 
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
-  const { account } = useAccount();
+  const { account, loading: accountLoading } = useAccount();
   const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
+  const publicLine = isPublicFactoryLinePath(location.pathname);
+  const guestLine = publicLine && (accountLoading || !account);
   // The route param accepts either the org slug or its UID, so resolve it
   // once here and self-correct any UID URL to the slug below. Every other
   // in-app link reuses this same `:organizationId` URL segment, so fixing
   // it at this single boundary keeps the rest of the app slug-only.
-  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const {
+    data: organization,
+    isLoading: organizationLoading,
+    error: organizationError,
+  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -330,6 +356,26 @@ export function OrganizationScope() {
 
   if (uidRedirectPath) {
     return <Navigate to={uidRedirectPath} replace />;
+  }
+
+  if (guestLine) {
+    return <Outlet />;
+  }
+
+  if (organizationLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500 dark:text-gray-400">Loading organization...</p>
+      </div>
+    );
+  }
+
+  if (isNotFoundError(organizationError) && !publicLine) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500 dark:text-gray-400">Organization not found</p>
+      </div>
+    );
   }
 
   return (

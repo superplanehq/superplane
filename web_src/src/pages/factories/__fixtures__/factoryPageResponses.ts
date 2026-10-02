@@ -7,11 +7,13 @@ import type {
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrderRunUsageRow,
+  MeDescribeVcsProviderOnboardingResponse,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
   FactoriesFactoryAgentResource,
+  FactoriesFactoryMcpClient,
   FactoryAutomation,
   FactoryLineStep,
   SuperplaneUsersUser,
@@ -32,12 +34,15 @@ import { DEFAULT_USAGE_HISTORY_ROWS } from "./usageHistoryFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_FACTORY_URL_ID,
   ACME_ONBOARDING_LINE_ID,
   GITHUB_ISSUES_INTAKE_APP_ID,
   EMPTY_FACTORY_ID,
+  EMPTY_FACTORY_URL_ID,
   FACTORIES_ORGANIZATION_ID,
   LAST_WEEK,
   PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_URL_ID,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
   YESTERDAY,
@@ -217,6 +222,7 @@ export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
   name: "Semaphore",
   key: "RF",
+  urlId: PRIMARY_FACTORY_URL_ID,
   description:
     "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
@@ -228,6 +234,7 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
   name: "SuperPlane",
   key: "PF",
+  urlId: EMPTY_FACTORY_URL_ID,
   description: "New factory. No lines or tasks configured yet.",
   lines: [],
   planning: { ...DEFAULT_FACTORY_PLANNING },
@@ -283,6 +290,7 @@ export const ACME_ONBOARDING_FACTORY: FactoriesFactory = {
   id: ACME_ONBOARDING_FACTORY_ID,
   name: "Acme onboarding",
   key: "AO",
+  urlId: ACME_ONBOARDING_FACTORY_URL_ID,
   description: "Empty first-run workspace. The board has no tickets yet.",
   lines: [ACME_ONBOARDING_LINE],
   onboarding: { completedAt: LAST_WEEK },
@@ -370,6 +378,8 @@ export interface FactoriesFixture {
   byokSelectedByProvider?: Record<string, string[]>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
+  /** Global GitHub App catalog state for Factory onboarding. */
+  githubOnboarding?: MeDescribeVcsProviderOnboardingResponse;
   /**
    * Per-order activity timelines. When an order id is absent, the handlers
    * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
@@ -387,8 +397,14 @@ export interface FactoriesFixture {
   intakeItemCatalog?: BacklogIntakeItemCatalog;
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  /** SuperPlane MCP clients connected to a workspace. */
+  mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
   agentResourceToolsById?: Record<string, Array<{ name: string; description?: string; readOnly?: boolean }>>;
+  /** Storybook: GET agent-resources list returns this HTTP status for these factory ids. */
+  failAgentResourcesListForFactoryIds?: string[];
+  /** Storybook: GET mcp-clients list returns this HTTP status for these factory ids. */
+  failMcpClientsListForFactoryIds?: string[];
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

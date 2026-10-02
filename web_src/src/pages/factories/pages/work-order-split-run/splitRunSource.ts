@@ -1,10 +1,13 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -24,7 +27,15 @@ export type SplitRunIntakeKind =
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
+  | "datadog"
+  | "linear-issues"
   | "slack";
+
+export type SplitRunAddedBy =
+  | { kind: "intake"; name: string }
+  | { kind: "manual" }
+  | { kind: "imported"; personName: string }
+  | { kind: "mcp"; name: string };
 
 export type SplitRunSource =
   | {
@@ -33,12 +44,33 @@ export type SplitRunSource =
       iconSrc: string;
       iconAlt: string;
       ticket?: { label: string; href: string };
+      addedBy?: SplitRunAddedBy;
+    }
+  | {
+      kind: "mcp";
+      name: string;
+      iconSrc: string;
+      iconAlt: string;
     }
   | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
+      addedBy?: SplitRunAddedBy;
     };
+
+export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
+  if (source.kind === "mcp") {
+    return { kind: "mcp", name: source.name };
+  }
+  if (source.addedBy) {
+    return source.addedBy;
+  }
+  if (source.kind === "manual") {
+    return { kind: "manual" };
+  }
+  return { kind: "intake", name: source.name };
+}
 
 export function isMonochromeSourceLogo(iconAlt: string): boolean {
   return iconAlt === "GitHub" || iconAlt === "SuperPlane";
@@ -56,7 +88,9 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
-  "productive-tasks": { name: "Productive.io tasks", iconSrc: productiveIcon, iconAlt: "Productive.io" },
+  "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
+  datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
+  "linear-issues": { name: "Linear", iconSrc: linearIcon, iconAlt: "Linear" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
@@ -67,6 +101,8 @@ const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = 
   { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
+  { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
+  { pattern: /linear/i, kind: "linear-issues" },
 ];
 
 export function sourceTicketLabel(url: string): string {
@@ -81,6 +117,10 @@ export function sourceTicketLabel(url: string): string {
   const jira = jiraTicketLabel(parsed);
   if (jira) {
     return jira;
+  }
+  const linear = linearTicketLabel(parsed);
+  if (linear) {
+    return linear;
   }
   const id = hostTicketId(parsed);
   // Productive.io links carry the organization id where other hosts carry a
@@ -102,28 +142,53 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
 export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSource {
   const originHref = order.origin?.url?.trim();
   if (originHref) {
-    return intakeSourceFromHref(
+    const source = intakeSourceFromHref(
       originHref,
       intakeKindFromHref(originHref),
       order.origin?.label?.trim() || sourceTicketLabel(originHref),
     );
+    return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
   }
 
   const candidate = reviewCandidateForWorkOrderId(order.id);
   if (candidate?.issue.url) {
-    return intakeSourceFromHref(candidate.issue.url);
+    const source = intakeSourceFromHref(candidate.issue.url);
+    return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
   }
 
   const automation = order.createdBy?.automation;
   if (automation) {
-    return intakeSourceFromKind(intakeKindForAutomation(automation));
+    const source = intakeSourceFromKind(intakeKindForAutomation(automation));
+    return { ...source, addedBy: { kind: "intake", name: source.name } };
+  }
+
+  const mcpName = order.mcpClient?.name?.trim();
+  if (mcpName) {
+    return {
+      kind: "mcp",
+      name: mcpName,
+      iconSrc: superplaneIcon,
+      iconAlt: "SuperPlane",
+    };
   }
 
   return {
     kind: "manual",
     person: sourcePerson(order, resolveUser),
     detail: CREATED_MANUALLY,
+    addedBy: { kind: "manual" },
   };
+}
+
+function addedByForIntakeOrder(order: FactoriesWorkOrder, intakeName: string): SplitRunAddedBy {
+  if (order.createdBy?.automation) {
+    return { kind: "intake", name: intakeName };
+  }
+  const personName = order.createdBy?.user?.name?.trim();
+  if (personName) {
+    return { kind: "imported", personName };
+  }
+  return { kind: "intake", name: intakeName };
 }
 
 export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, source?: SplitRunSource): boolean {
@@ -136,11 +201,13 @@ export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, sou
   return extractArtifactUrl(toArtifactDataRecord(artifact.data)) === source.ticket.href;
 }
 
+type SplitRunIntakeSource = Extract<SplitRunSource, { kind: "intake" }>;
+
 function intakeSourceFromHref(
   href: string,
   intakeKind = intakeKindFromHref(href),
   label = sourceTicketLabel(href),
-): SplitRunSource {
+): SplitRunIntakeSource {
   return {
     kind: "intake",
     ...INTAKE_PRESENTATION[intakeKind],
@@ -163,7 +230,7 @@ function intakeKindFromLabel(label: string): SplitRunIntakeKind {
   return INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind ?? "github-issues";
 }
 
-function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunSource {
+function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {
   return {
     kind: "intake",
     ...INTAKE_PRESENTATION[intakeKind],
@@ -180,6 +247,9 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   }
   if (host.includes("atlassian.net") || host.includes("jira.com")) {
     return "jira-issues";
+  }
+  if (host === "linear.app" || host.endsWith(".linear.app")) {
+    return "linear-issues";
   }
   return intakeKindFromLabel(host);
 }
@@ -221,6 +291,18 @@ function githubTicketLabel(parsed: URL): string | undefined {
     return undefined;
   }
   return `${owner}/${repo}#${number}`;
+}
+
+function linearTicketLabel(parsed: URL): string | undefined {
+  if (parsed.hostname !== "linear.app" && !parsed.hostname.endsWith(".linear.app")) {
+    return undefined;
+  }
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  const issueAt = parts.indexOf("issue");
+  if (issueAt >= 0 && parts[issueAt + 1]) {
+    return parts[issueAt + 1];
+  }
+  return undefined;
 }
 
 function jiraTicketLabel(parsed: URL): string | undefined {

@@ -31,7 +31,7 @@ describe("resolveFactoryNodeMetrics", () => {
         section: { eventSubtitle: "stale", showAutomaticTime: true },
         liveDurationMs: 9 * 60_000,
       }),
-    ).toBe("9m so far");
+    ).toBe("9m");
   });
 
   it("falls back to Timestamp from receivedAt when subtitle missing", () => {

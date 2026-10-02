@@ -40,6 +40,14 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
+  it("describes a task by number", async () => {
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${OPEN_WORK_ORDER.number}`,
+    );
+    const body = (await response.json()) as { order?: { id?: string; number?: string } };
+    expect(body.order).toMatchObject({ id: OPEN_WORK_ORDER.id, number: OPEN_WORK_ORDER.number });
+  });
+
   it("filters work orders by user", async () => {
     const unassigned = await fetchFactoryPageFixture(
       `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?limit=100&unassigned=true`,
@@ -63,6 +71,87 @@ describe("matchFactoryPageFixture", () => {
     expect(body.orders).toHaveLength(1);
     expect(body.orders[0]?.state).toBe("STATE_DRAFT");
     expect(body.hasNextPage).toBe(true);
+  });
+
+  it("filters closed tasks by result", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const failed = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_FAILED&limit=20`,
+      undefined,
+      fixture,
+    );
+    const failedBody = (await failed.json()) as { orders: Array<{ id?: string; result?: string }> };
+    expect(failedBody.orders.length).toBeGreaterThan(0);
+    expect(failedBody.orders.every((order) => order.result === "RESULT_FAILED")).toBe(true);
+
+    const rejected = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_REJECTED&limit=20`,
+      undefined,
+      fixture,
+    );
+    const rejectedBody = (await rejected.json()) as { orders: Array<{ result?: string }> };
+    expect(rejectedBody.orders.length).toBeGreaterThan(0);
+    expect(rejectedBody.orders.every((order) => order.result === "RESULT_REJECTED")).toBe(true);
+  });
+
+  it("filters listed tasks by line", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const page = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders?states=STATE_CLOSED&results=RESULT_FAILED&lineId=${REFUND_LINE_PLAN_ID}&limit=20`,
+      undefined,
+      fixture,
+    );
+    const body = (await page.json()) as {
+      orders: Array<{ id?: string; lineDispatches?: Array<{ line?: { id?: string } }> }>;
+    };
+    expect(body.orders.length).toBeGreaterThan(0);
+    expect(
+      body.orders.every((order) => {
+        const dispatches = order.lineDispatches ?? [];
+        return dispatches.length === 0 || dispatches.some((dispatch) => dispatch.line?.id === REFUND_LINE_PLAN_ID);
+      }),
+    ).toBe(true);
+  });
+
+  it("sends a closed task to the Backlog and can close pull requests and clear artifacts", async () => {
+    const fixture = structuredClone(lineMetricsFactoriesFixture);
+    const orderId = "wo-board-implement-failed";
+    fixture.pullRequestsByOrderId = {
+      ...(fixture.pullRequestsByOrderId ?? {}),
+      [orderId]: [
+        {
+          id: "pr-open",
+          workOrderId: orderId,
+          number: "106",
+          state: "STATE_OPEN",
+          url: "https://github.com/acme/app/pull/106",
+        },
+      ],
+    };
+    fixture.artifactsByOrderId = {
+      ...(fixture.artifactsByOrderId ?? {}),
+      [orderId]: [{ id: "art-1", type: "TYPE_MARKDOWN" }],
+    };
+
+    const moved = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${orderId}/backlog`,
+      { method: "PATCH", body: JSON.stringify({ closePullRequests: true, clearArtifacts: true }) },
+      fixture,
+    );
+    const body = (await moved.json()) as {
+      order: { state?: string; result?: string; pullRequests?: Array<{ state?: string }> };
+    };
+    expect(body.order.state).toBe("STATE_DRAFT");
+    expect(body.order.result).toBe("RESULT_UNSPECIFIED");
+    expect(body.order.pullRequests?.[0]?.state).toBe("STATE_CLOSED");
+
+    const artifacts = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${orderId}/artifacts`,
+      undefined,
+      fixture,
+    );
+    const artifactsBody = (await artifacts.json()) as { artifacts: unknown[] };
+    expect(artifactsBody.artifacts).toEqual([]);
   });
 
   it("serves factory usage, usage history, and organization workspace usage reports", async () => {

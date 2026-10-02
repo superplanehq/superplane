@@ -17,6 +17,7 @@ import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganiza
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
 import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
+import { describeGitHubInstallationName, selectionsWithGitHubInstallation } from "./githubIntegrationSelection";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import type { IssuesChoiceId } from "./onboardingFixtures";
@@ -47,12 +48,17 @@ export function finishOnboardingError(args: {
   issuesChoice?: IssuesChoiceId | null;
   jiraReady?: boolean;
   jiraProjectId?: string;
+  linearReady?: boolean;
+  linearProjectIds?: string[];
 }): string | null {
   if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
     return "Connect GitHub, then select both repositories.";
   }
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
+  }
+  if (args.issuesChoice === "linear" && (!args.linearReady || !args.linearProjectIds?.length)) {
+    return "Connect Linear, then choose a project.";
   }
   const agentError = firstWorkOrderAgentError({
     remainingCreditCents: args.remainingCreditCents,
@@ -141,6 +147,7 @@ export async function provisionWorkspace(args: {
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
   jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
+  linear?: { integrationId: string; projectIds: string[] };
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -192,6 +199,7 @@ export async function provisionWorkspace(args: {
     deleteIntake: args.deleteIntake,
     issuesChoice: args.issuesChoice,
     jira: args.jira,
+    linear: args.linear,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -199,6 +207,15 @@ export async function provisionWorkspace(args: {
     complete: true,
   });
   return { lineId };
+}
+
+function linearIntakeBinding(
+  issuesChoice: IssuesChoiceId | null,
+  linearId: string | undefined,
+  projectIds: string[] | undefined,
+): { integrationId: string; projectIds: string[] } | undefined {
+  if (issuesChoice !== "linear" || !linearId || !projectIds?.length) return undefined;
+  return { integrationId: linearId, projectIds };
 }
 
 function jiraIntakeBinding(
@@ -244,6 +261,7 @@ export function useFinishOnboarding(args: {
   githubOwner?: string;
   jiraProjectId?: string;
   jiraCompletion?: JiraCompletionColumnValue;
+  linearProjectIds?: string[];
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
@@ -262,6 +280,7 @@ export function useFinishOnboarding(args: {
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
     const github = args.selections.github;
     const jira = args.selections.jira;
+    const linear = args.selections.linear;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
@@ -273,6 +292,8 @@ export function useFinishOnboarding(args: {
       issuesChoice,
       jiraReady: Boolean(jira?.ready),
       jiraProjectId: args.jiraProjectId,
+      linearReady: Boolean(linear?.ready),
+      linearProjectIds: args.linearProjectIds,
     });
     if (error) {
       showErrorToast(error);
@@ -284,17 +305,21 @@ export function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
+      const installationName = await describeGitHubInstallationName(args.organizationId, github.id);
+      const selections = selectionsWithGitHubInstallation(args.selections, installationName);
       const provisioned = await provisionWorkspace({
         ...args,
+        selections,
         workspaceName,
         appRepository,
         backlogRepository,
         issuesChoice,
         github,
         agentPlan: args.plan,
-        agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
-        agentIntegrationId: agentIntegrationIdForPlan(args.plan, args.selections),
+        agentRewrite: agentRewriteFromPlan(args.plan, selections),
+        agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
+        linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearProjectIds),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,

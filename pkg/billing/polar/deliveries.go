@@ -40,6 +40,28 @@ type WebhookDelivery struct {
 	EventID        string
 	EventSucceeded *bool
 	Payload        string
+	APIVersion     string
+}
+
+type WebhookEndpoint struct {
+	ID         string
+	URL        string
+	APIVersion string
+	Format     string
+}
+
+type listWebhookEndpointsJSON struct {
+	Items      []webhookEndpointJSON `json:"items"`
+	Pagination struct {
+		MaxPage int `json:"max_page"`
+	} `json:"pagination"`
+}
+
+type webhookEndpointJSON struct {
+	ID         string `json:"id"`
+	URL        string `json:"url"`
+	APIVersion string `json:"api_version"`
+	Format     string `json:"format"`
 }
 
 type listWebhookDeliveriesJSON struct {
@@ -115,7 +137,38 @@ func (c *Client) RedeliverWebhookEvent(ctx context.Context, eventID string) erro
 	return c.post(ctx, "/webhooks/events/"+url.PathEscape(id)+"/redeliver", nil, nil)
 }
 
+func (c *Client) ListWebhookEndpoints(ctx context.Context) ([]WebhookEndpoint, error) {
+	var endpoints []WebhookEndpoint
+	page := 1
+	for {
+		query := url.Values{}
+		query.Set("limit", strconv.Itoa(maxWebhookDeliveryLimit))
+		query.Set("page", strconv.Itoa(page))
+		var payload listWebhookEndpointsJSON
+		if err := c.get(ctx, "/webhooks/endpoints?"+query.Encode(), &payload); err != nil {
+			return nil, err
+		}
+		for _, item := range payload.Items {
+			endpoints = append(endpoints, WebhookEndpoint{
+				ID:         strings.TrimSpace(item.ID),
+				URL:        strings.TrimSpace(item.URL),
+				APIVersion: strings.TrimSpace(item.APIVersion),
+				Format:     strings.TrimSpace(item.Format),
+			})
+		}
+		if len(payload.Items) < maxWebhookDeliveryLimit {
+			break
+		}
+		if payload.Pagination.MaxPage > 0 && page >= payload.Pagination.MaxPage {
+			break
+		}
+		page++
+	}
+	return endpoints, nil
+}
+
 func (item webhookDeliveryJSON) toDelivery() WebhookDelivery {
+	payload := payloadString(item.WebhookEvent.Payload)
 	return WebhookDelivery{
 		ID:             strings.TrimSpace(item.ID),
 		CreatedAt:      strings.TrimSpace(item.CreatedAt),
@@ -125,8 +178,19 @@ func (item webhookDeliveryJSON) toDelivery() WebhookDelivery {
 		EventType:      strings.TrimSpace(item.WebhookEvent.Type),
 		EventID:        strings.TrimSpace(item.WebhookEvent.ID),
 		EventSucceeded: item.WebhookEvent.Succeeded,
-		Payload:        payloadString(item.WebhookEvent.Payload),
+		Payload:        payload,
+		APIVersion:     payloadAPIVersion(payload),
 	}
+}
+
+func payloadAPIVersion(payload string) string {
+	var envelope struct {
+		APIVersion string `json:"api_version"`
+	}
+	if err := json.Unmarshal([]byte(payload), &envelope); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(envelope.APIVersion)
 }
 
 func payloadString(raw json.RawMessage) string {

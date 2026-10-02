@@ -29,6 +29,7 @@ import {
   VERIFY_STEP_CHECKS,
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
+import { splitRunDecisionTone } from "./splitRunFooter";
 import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 
@@ -154,11 +155,63 @@ describe("splitRunFixtureForWorkOrder", () => {
               },
             ]),
             model: "anthropic/claude-sonnet-4-6",
+            thinkingLevel: "medium",
           },
         ],
       }),
     );
-    expect(fixture.phases.find((phase) => phase.name === "Implement")?.model).toBe("openai/gpt-4.1");
+    const implement = fixture.phases.find((phase) => phase.name === "Implement");
+    expect(implement?.model).toBe("openai/gpt-4.1");
+    expect(implement?.thinkingLevel).toBe("medium");
+  });
+
+  it("keeps an older line's thinking when a later dispatch uses another level", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        lineDispatches: [
+          {
+            ...dispatch("STATE_FINISHED", [
+              {
+                id: "exec-old",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                models: ["openai/gpt-4.1"],
+                createdAt: "2026-08-28T12:00:00Z",
+              },
+            ]),
+            id: "dispatch-old",
+            thinkingLevel: "medium",
+          },
+          {
+            ...dispatch("STATE_ACTIVE", [
+              {
+                id: "exec-new",
+                step: "implement",
+                stepIndex: 0,
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                models: ["openai/gpt-5"],
+                createdAt: "2026-08-28T13:00:00Z",
+              },
+            ]),
+            id: "dispatch-new",
+            thinkingLevel: "high",
+          },
+        ],
+      }),
+      { demoArtifacts: false },
+    );
+
+    expect(fixture.phases.find((phase) => phase.historyRun && phase.name === "Implement")).toMatchObject({
+      model: "openai/gpt-4.1",
+      thinkingLevel: "medium",
+    });
+    expect(fixture.phases.find((phase) => !phase.historyRun && phase.name === "Implement")).toMatchObject({
+      model: "openai/gpt-5",
+      thinkingLevel: "high",
+    });
   });
 
   it("keeps a single Backlog ingest row on an ingest draft", () => {
@@ -320,10 +373,10 @@ describe("splitRunFixtureForWorkOrder", () => {
       { checks: OPEN_WORK_ORDER_CHECKS },
     );
     const verify = fixture.phases.find((phase) => phase.id === "verify-1");
-    expect(verify?.checks?.map((check) => check.name)).toEqual(["Risk score", "Code quality"]);
+    expect(verify?.checks?.map((check) => check.name)).toEqual(["Blast radius", "Code quality"]);
     expect(fixture.phases.find((phase) => phase.id === "implement-0")?.checks).toBeUndefined();
     expect(fixture.checks.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
       "Test coverage",
       "Confidence score",
@@ -512,7 +565,11 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
 
     expect(fixture.phases.map((phase) => phase.name)).toEqual(expect.arrayContaining(["Planning", "Implement"]));
-    expect(fixture.phases.find((phase) => phase.name === "Implement")?.status).toBe("running");
+    const current = fixture.phases.find((phase) => phase.id === fixture.currentPhaseId);
+    expect(current?.name).toBe("Implement");
+    expect(current?.status).toBe("running");
+    const implementRuns = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementRuns.map((phase) => phase.status).sort()).toEqual(["failed", "running"]);
   });
 
   it("gives a rerun of the same step its own phase and run", () => {
@@ -563,6 +620,58 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implementPhases[0].runId).toBe("run-old");
     expect(implementPhases[1].runId).toBe("run-new");
     expect(implementPhases[1].status).toBe("running");
+    expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
+  });
+
+  it("keeps runs from earlier dispatches as history phases", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Rerun history",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-old",
+            createdAt: "2026-08-26T05:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl-old",
+                step: "Implement",
+                stepIndex: 0,
+                createdAt: "2026-08-26T05:00:01.000Z",
+                state: "STATE_FINISHED",
+                result: "RESULT_CANCELLED",
+                run: { id: "run-old", appId: "app-impl" },
+              },
+            ],
+          },
+          {
+            id: "d-new",
+            createdAt: "2026-08-26T06:00:00.000Z",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              {
+                id: "e-impl-new",
+                step: "Implement",
+                stepIndex: 0,
+                createdAt: "2026-08-26T06:00:01.000Z",
+                state: "STATE_STARTED",
+                result: "RESULT_UNKNOWN",
+                run: { id: "run-new", appId: "app-impl" },
+              },
+            ],
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    const implementPhases = fixture.phases.filter((phase) => phase.name === "Implement");
+    expect(implementPhases.map((phase) => phase.runId)).toEqual(["run-old", "run-new"]);
+    expect(implementPhases[0].id).not.toBe(implementPhases[1].id);
+    expect(implementPhases[0].status).toBe("cancelled");
     expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
   });
 
@@ -685,10 +794,176 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("failed");
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
+    expect(fixture.waitingNotes[0]?.text).toBe(
+      "This automation did not finish. Fix the error, then run this step again.",
+    );
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
+  });
+
+  it("explains a hosted credit failure when backlog analysis does not start", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "test",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      }),
+      {
+        analysisRuns: [
+          {
+            canvasId: "canvas-1",
+            workOrderId: "wo-1",
+            run: {
+              id: "run-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-09-30T14:37:29Z",
+              executions: [
+                {
+                  id: "exec-1",
+                  result: "RESULT_FAILED",
+                  resultMessage: "This organization has no hosted credit.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(fixture.phases.find((phase) => phase.name === "Analysis")?.stream[0]?.detail).toBe(
+      "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+    );
+  });
+
+  it("keeps the credit failure note when an earlier score is still on the draft", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "test",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      }),
+      {
+        demoArtifacts: false,
+        checks: [
+          { id: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+          { id: "confidence", name: "Confidence score", score: 5, maxScore: 5 },
+        ],
+        analysisRuns: [
+          {
+            canvasId: "canvas-1",
+            workOrderId: "wo-1",
+            run: {
+              id: "run-1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-09-30T14:37:29Z",
+              executions: [
+                {
+                  id: "exec-1",
+                  result: "RESULT_FAILED",
+                  resultMessage: "This organization has no hosted credit.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(fixture.footer.clarityScore).toBe(5);
+    expect(fixture.footer.confidenceScore).toBe(5);
+    expect(fixture.footer.note).toMatchObject({
+      headline: "No credit",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(splitRunDecisionTone(fixture.footer)).toBe("failed");
+  });
+
+  it("explains a hosted credit failure on the failed note", () => {
+    const cases = [
+      {
+        failureReason: "no_hosted_credit",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        label: "Add credits",
+      },
+      {
+        failureReason: "hosted_subscription_required",
+        text: "This agent run is blocked. SuperPlane hosted runs need a Business plan.",
+        label: "Subscribe",
+      },
+      {
+        failureReason: "workspace_budget_empty",
+        text: "This agent run is blocked. This workspace has no hosted credit budget left.",
+        label: "Open billing",
+      },
+    ] as const;
+
+    for (const credit of cases) {
+      const fixture = splitRunFixtureForWorkOrder(
+        order({
+          title: "Failed job",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            dispatch("STATE_FINISHED", [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                failureReason: credit.failureReason,
+                run: { id: "run-1", appId: "app-1" },
+              },
+            ]),
+          ],
+        }),
+      );
+
+      expect(fixture.footer.note).toMatchObject({
+        headline: "Implement did not pass",
+        text: credit.text,
+        cta: { label: credit.label, destination: "billing" },
+      });
+    }
+  });
+
+  it("keeps the credit note after the task is closed as failed", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Failed job",
+        state: "STATE_CLOSED",
+        result: "RESULT_FAILED",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl",
+              step: "Implement",
+              stepIndex: 0,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              failureReason: "no_hosted_credit",
+              run: { id: "run-1", appId: "app-1" },
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Send to backlog", "Reopen"]);
   });
 
   it("marks a cancelled implement step as canceled, not waiting", () => {
@@ -774,6 +1049,47 @@ describe("splitRunFixtureForWorkOrder", () => {
       appId: "app-refund-slack",
     });
     expect(slack?.artifacts[0]?.data).toMatchObject({ name: "description.md" });
+  });
+
+  it("keeps a GitHub issues intake in the Backlog column under its automation name", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_DRAFT",
+        createdBy: { automation: { appId: "app-github-issues", appName: "GitHub issues", nodeName: "On Issue" } },
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      }),
+      { demoArtifacts: false },
+    );
+    const backlog = fixture.phases[0];
+
+    expect(backlog).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "GitHub issues",
+      appId: "app-github-issues",
+      description: "Created this task from [acme/payments#12](https://github.com/acme/payments/issues/12).",
+    });
+  });
+
+  it("records a person importing a GitHub issue as the Backlog creation stage", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+      },
+      { demoArtifacts: false },
+    );
+    const backlog = fixture.phases[0];
+
+    expect(backlog).toMatchObject({
+      id: "backlog",
+      name: "Backlog",
+      componentName: "Imported from GitHub",
+      description:
+        "Leonardo DiCaprio imported this task from [acme/payments#12](https://github.com/acme/payments/issues/12).",
+    });
+    expect(backlog?.appId).toBeUndefined();
+    expect(backlog?.stream[0]?.componentName).toBe("Leonardo DiCaprio imported this task from acme/payments#12.");
   });
 
   it("still prompts a draft with no creator to start", () => {
@@ -880,7 +1196,14 @@ describe("line board work-order examples", () => {
 
   it("keeps ingest analysis, a branch, and a pull request on the failed implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER);
-    expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
+    expect(fixture.phases.map((phase) => phase.id)).toEqual([
+      "ingest",
+      "analyze",
+      "plan",
+      "score",
+      "implement-0",
+      "done-closure",
+    ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-106", "#506"]);
     expect(fixture.footerTone).toBe("failed");
@@ -888,7 +1211,7 @@ describe("line board work-order examples", () => {
       headline: "This task is closed as failed",
       text: "Reopen this task to start the line again.",
     });
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Send to backlog", "Reopen"]);
   });
 
   it("keeps the branch and pull request on implement for the verify enum card", () => {
@@ -905,7 +1228,7 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-102", "#502"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
   });
@@ -916,10 +1239,10 @@ describe("line board work-order examples", () => {
     const failed = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER, { checks: VERIFY_STEP_CHECKS });
     const running = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { checks: RUNNING_WORK_ORDER_CHECKS });
 
-    expect(verify.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(done.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(failed.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "Code quality"]);
-    expect(running.checks.map((check) => check.name)).toEqual(["Confidence score", "Risk score", "CI"]);
+    expect(verify.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(done.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(failed.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "Code quality"]);
+    expect(running.checks.map((check) => check.name)).toEqual(["Confidence score", "Blast radius", "CI"]);
     expect(verify.checks[0]?.summary).toContain("fit for an agent");
     expect(running.checks.filter((check) => check.name === "Confidence score")).toHaveLength(1);
   });
@@ -941,7 +1264,7 @@ describe("line board work-order examples", () => {
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
@@ -1077,7 +1400,7 @@ describe("line board work-order examples", () => {
 
     expect(analysis?.name).toBe("Analysis");
     expect(analysis?.status).toBe("running");
-    expect(analysis?.componentName).toBe("Confidence score");
+    expect(analysis?.componentName).toBe("Backlog");
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
     expect(analysis?.durationRunning).toBe(true);
@@ -1139,6 +1462,9 @@ describe("line board work-order examples", () => {
       totalTokens: "1200",
       model: "anthropic/claude-sonnet-4-6",
     });
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.thinkingLevel).toBe(
+      undefined,
+    );
   });
 
   it("aggregates analysis usage across attempts without counting idle time", () => {
@@ -1865,6 +2191,130 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.attentionCard).toBe(true);
   });
 
+  it("uses the canvas run span for a column-app check card", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-26T11:00:00Z",
+                  finishedAt: "2026-08-26T11:04:00Z",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-merge",
+            key: "merge-confidence",
+            name: "Merge confidence",
+            score: 4,
+            maxScore: 5,
+            level: "LEVEL_POSITIVE",
+            automation: { appId: "app-merge", appName: "Merge confidence" },
+            runId: "run-merge",
+            updatedAt: "2026-08-26T11:04:00Z",
+          },
+        ],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("4m");
+  });
+
+  it("does not use check update times as a column-app duration", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-merge-risk",
+          key: "merge-risk",
+          name: "Blast radius",
+          score: 4,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-merge", appName: "Merge confidence" },
+          runId: "run-merge",
+          updatedAt: "2026-08-26T11:10:00Z",
+        },
+        {
+          id: "check-merge-diff",
+          key: "merge-diff",
+          name: "Diff size",
+          score: 1,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-merge", appName: "Merge confidence" },
+          runId: "run-merge",
+          updatedAt: "2026-08-26T11:04:00Z",
+        },
+      ],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("keeps a column-app check card live while the canvas run continues", () => {
+    const createdAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const updatedAt = new Date(Date.now() - 59 * 60 * 1000).toISOString();
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_STARTED",
+                  createdAt,
+                  updatedAt,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-merge",
+            key: "merge-confidence",
+            name: "Merge confidence",
+            score: 4,
+            maxScore: 5,
+            level: "LEVEL_POSITIVE",
+            automation: { appId: "app-merge", appName: "Merge confidence" },
+            runId: "run-merge",
+            updatedAt,
+          },
+        ],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      },
+    );
+    const phase = fixture.phases.find((entry) => entry.id === "column-app-run-merge");
+
+    expect(phase).toMatchObject({ status: "running", durationRunning: true });
+    expect(phase?.duration).not.toBe("1m");
+  });
+
   it("uses the canvas run span for PR feedback phase duration", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
@@ -1896,12 +2346,13 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-88", "#510"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
-      "Risk score",
+      "Blast radius",
       "Code quality",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#510"]);
@@ -1916,6 +2367,30 @@ describe("line board work-order examples", () => {
       text: "The work is done. The result met the goal.",
       actor,
     });
+    const closure = fixture.phases.find((phase) => phase.id === "done-closure");
+    expect(closure).toMatchObject({ name: "Done", componentName: "Completed", status: "passed" });
+    expect(closure?.description).toBe("Alex marked this task as successful.");
+  });
+
+  it("says the Completed card is resolved because the person merged the pull request", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...LINE_BOARD_DONE_RECEIPTS_ORDER,
+        pullRequests: [
+          {
+            number: "510",
+            title: LINE_BOARD_DONE_RECEIPTS_ORDER.title,
+            url: "https://github.com/example/ledger/pull/510",
+            state: "STATE_MERGED",
+          },
+        ],
+      },
+      { closer: { automationName: "Alex", automationHref: "https://github.com/alex" } },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "done-closure")?.description).toBe(
+      "Resolved because [Alex](https://github.com/alex) merged [#510 Send refund receipts after provider confirm](https://github.com/example/ledger/pull/510).",
+    );
   });
 
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
@@ -1928,6 +2403,7 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-112", "#512"]);
@@ -1940,7 +2416,10 @@ describe("line board work-order examples", () => {
       headline: "This task did not succeed",
       text: "The work is done. The result did not meet the goal.",
     });
-    expect(fixture.footer.actions).toEqual([]);
+    expect(fixture.footer.actions).toEqual([
+      { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+      { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" },
+    ]);
   });
 
   it("keeps ingest analysis and a cancel note on the canceled done card", () => {
@@ -1953,6 +2432,7 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
       "done-2",
+      "done-closure",
     ]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-113", "#513"]);

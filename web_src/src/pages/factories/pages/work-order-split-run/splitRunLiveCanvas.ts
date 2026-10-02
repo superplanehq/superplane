@@ -291,6 +291,7 @@ function streamLineForNode(
     iconSrc: presentation.iconSrc,
     component: node.component,
     executionId: execution?.id,
+    detail: execution?.resultMessage?.trim() || undefined,
   };
 }
 

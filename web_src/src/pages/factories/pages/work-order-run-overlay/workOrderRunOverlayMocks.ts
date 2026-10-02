@@ -131,7 +131,7 @@ export const IMPLEMENT_RUN_OVERLAY: RunOverlayFixture = {
           provider: "superplane",
           status: "running",
           detail: "RefundDispatcher · 4 files",
-          duration: "9m so far",
+          duration: "9m",
         },
         {
           id: "coverage-report",

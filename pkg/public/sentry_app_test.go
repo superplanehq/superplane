@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -79,10 +81,22 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 	t.Run("a delivered event is accepted", func(t *testing.T) {
 		body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
 		rec := httptest.NewRecorder()
+		logs := captureSentryWebhookLogs(t)
 
 		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+		received := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook received")
+		payload, ok := received["payload"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "created", payload["action"])
+
+		var receipts []models.SentryWebhookReceipt
+		require.NoError(t, database.Conn().Where("installation_uuid = ? AND issue_id = ?", "install-1", "1").Find(&receipts).Error)
+		require.NotEmpty(t, receipts)
+		assert.Equal(t, models.SentryWebhookOutcomeAccepted, receipts[0].Outcome)
+		assert.Equal(t, "issue", receipts[0].HookResource)
+		assert.Equal(t, "created", receipts[0].Action)
 	})
 
 	t.Run("a rejected event is accepted, because Sentry cannot fix it", func(t *testing.T) {
@@ -92,6 +106,35 @@ func TestHandleSentryAppWebhook_answersSentryWithTheDeliveryResult(t *testing.T)
 		server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
 
 		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var receipts []models.SentryWebhookReceipt
+		require.NoError(t, database.Conn().
+			Where("installation_uuid = ? AND outcome = ?", "install-1", models.SentryWebhookOutcomeRejected).
+			Find(&receipts).Error)
+		require.NotEmpty(t, receipts)
+	})
+
+	t.Run("an invalid signature does not store a receipt", func(t *testing.T) {
+		var before int64
+		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
+
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/sentry/app/webhook", bytes.NewReader([]byte(`{"action":"created","secret":"caller-chosen"}`)))
+		request.Header.Set("Sentry-Hook-Signature", "not-a-signature")
+		request.Header.Set("Sentry-Hook-Resource", "issue")
+		rec := httptest.NewRecorder()
+		logs := captureSentryWebhookLogs(t)
+
+		server.HandleSentryAppWebhook(rec, request)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		var after int64
+		require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
+		assert.Equal(t, before, after)
+
+		rejected := sentryWebhookLogLine(t, logs.String(), "Sentry app webhook was rejected")
+		_, hasPayload := rejected["payload"]
+		assert.False(t, hasPayload)
+		assert.Equal(t, "issue", rejected["hook_resource"])
 	})
 }
 
@@ -153,6 +196,40 @@ func TestHandleSentryAppWebhook_listenerCannotStartRun(t *testing.T) {
 	})
 }
 
+func TestHandleSentryAppWebhook_unclaimedInstallWithoutCodeLogsSentryOrganization(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
+	r := support.Setup(t)
+	server, err := NewServer(
+		r.Encryptor, r.Registry, jwt.NewSigner("test-client-secret"), support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	body := []byte(`{
+		"action": "created",
+		"installation": {"uuid": "unclaimed-install"},
+		"data": {"installation": {
+			"status": "installed",
+			"uuid": "unclaimed-install",
+			"organization": {"slug": "acme-sentry", "id": 127789}
+		}}
+	}`)
+	rec := httptest.NewRecorder()
+	logs := captureSentryWebhookLogs(t)
+
+	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "installation"))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	failed := sentryWebhookLogLine(t, logs.String(), "failed to store unclaimed Sentry app install")
+	assert.Equal(t, "unclaimed-install", failed["installation_uuid"])
+	assert.Equal(t, "acme-sentry", failed["sentry_organization_slug"])
+	assert.Equal(t, "127789", failed["sentry_organization_id"])
+	assert.Equal(t, "installation grant code is required", failed["error"])
+}
+
 func createSentryIssueListener(t *testing.T, r *support.ResourceRegistry, integration *models.Integration) *models.Canvas {
 	t.Helper()
 
@@ -195,6 +272,36 @@ func sentryWebhookRequest(body []byte, resource string) *http.Request {
 	request.Header.Set("Sentry-Hook-Signature", hex.EncodeToString(mac.Sum(nil)))
 	request.Header.Set("Sentry-Hook-Resource", resource)
 	return request
+}
+
+func captureSentryWebhookLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	logger := logging.SentryWebhookLogger()
+	previous := logger.Out
+	buffer := &bytes.Buffer{}
+	logger.SetOutput(buffer)
+	t.Cleanup(func() {
+		logger.SetOutput(previous)
+	})
+	return buffer
+}
+
+func sentryWebhookLogLine(t *testing.T, raw string, message string) map[string]any {
+	t.Helper()
+
+	for _, line := range bytes.Split([]byte(raw), []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal(line, &payload))
+		if payload["message"] == message {
+			return payload
+		}
+	}
+	t.Fatalf("missing Sentry webhook log %q", message)
+	return nil
 }
 
 func Test__isHostedSentryAppBrowserCallback(t *testing.T) {

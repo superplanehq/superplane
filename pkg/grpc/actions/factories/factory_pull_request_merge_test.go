@@ -2,9 +2,14 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"testing"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +21,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -30,6 +36,10 @@ type fakeFactoryGitHub struct {
 	mergedMethod  string
 	mergedSHA     string
 	mergeCalls    int
+	editErr       error
+	editFailAfter int
+	editCalls     int
+	onEdit        func()
 	getPullErr    error
 	combinedErr   error
 	checkRunsErr  error
@@ -103,6 +113,31 @@ func (f *fakeFactoryGitHub) MergePullRequest(_ context.Context, _ string, _ int,
 		return nil, nil, f.mergeErr
 	}
 	return &github.PullRequestMergeResult{Merged: github.Ptr(true)}, nil, nil
+}
+
+func (f *fakeFactoryGitHub) EditPullRequest(_ context.Context, _ string, _ int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
+	f.editCalls++
+	if f.onEdit != nil {
+		f.onEdit()
+	}
+	if f.editFailAfter > 0 {
+		if f.editCalls > f.editFailAfter {
+			return nil, nil, f.editErr
+		}
+		return pullRequest, nil, nil
+	}
+	if f.editErr != nil {
+		return nil, nil, f.editErr
+	}
+	return pullRequest, nil, nil
+}
+
+func githubRateLimitedResponse() *http.Response {
+	request, err := http.NewRequest(http.MethodGet, "https://api.github.com/rate_limit", nil)
+	if err != nil {
+		panic(err)
+	}
+	return &http.Response{StatusCode: http.StatusForbidden, Request: request}
 }
 
 func mergeableGitHubPullRequest(sha string) *github.PullRequest {
@@ -578,6 +613,125 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		return resp.GetMergeability()
 	}
 
+	for _, test := range []struct {
+		name      string
+		configure func(*fakeFactoryGitHub)
+	}{
+		{"pull request forbidden", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+		}},
+		{"check listing unavailable", func(api *fakeFactoryGitHub) {
+			api.checkRunsErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}}
+		}},
+		{"combined status unavailable", func(api *fakeFactoryGitHub) {
+			api.combinedErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusServiceUnavailable}}
+		}},
+		{"repository lookup failed", func(api *fakeFactoryGitHub) {
+			api.repositoryErr = fmt.Errorf("failed to get repository: %w", &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusNotFound}})
+		}},
+		{"network timeout", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &net.DNSError{Err: "timeout", IsTimeout: true}
+		}},
+		{"installation rejected", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &ghinstallation.HTTPError{Response: &http.Response{StatusCode: http.StatusUnauthorized}}
+		}},
+		{"primary rate limit", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &github.RateLimitError{Response: githubRateLimitedResponse(), Message: "rate limit exceeded"}
+		}},
+		{"secondary rate limit", func(api *fakeFactoryGitHub) {
+			api.getPullErr = &github.AbuseRateLimitError{Response: githubRateLimitedResponse(), Message: "secondary rate limit"}
+		}},
+	} {
+		t.Run("reports unavailable without caching for "+test.name, func(t *testing.T) {
+			factory := newFactory(t)
+			pr := createPR(t, factory)
+			combined, checks := successChecks()
+			api := &fakeFactoryGitHub{pullRequest: mergeableGitHubPullRequest(headSHA), combined: combined, checkRuns: checks, repository: allMethodsRepository()}
+			test.configure(api)
+			useGitHub(t, api)
+
+			got := describe(t, factory, pr)
+			assert.False(t, got.GetCanMerge())
+			assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, got.GetBlockedReason())
+			assert.Equal(t, "Merge status is unavailable right now.", got.GetMessage())
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+			require.NoError(t, err)
+			assert.False(t, stored.HasCachedMergeability())
+
+			api.getPullErr, api.combinedErr, api.checkRunsErr, api.repositoryErr = nil, nil, nil, nil
+			assert.True(t, describe(t, factory, pr).GetCanMerge())
+		})
+	}
+
+	t.Run("keeps database failures internal", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		cause := errors.New("database unavailable")
+		const callback = "test:mergeability_database_failure"
+		require.NoError(t, database.Conn().Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+			tx.AddError(cause)
+		}))
+		t.Cleanup(func() { require.NoError(t, database.Conn().Callback().Query().Remove(callback)) })
+
+		_, err := DescribeFactoryPullRequestMergeability(ctx, deps, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{FactoryId: factory.ID.String(), PrId: pr.GetId()})
+		require.ErrorIs(t, err, cause)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, code)
+	})
+
+	t.Run("reports installation setup failure with its cause", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		cause := &ghinstallation.HTTPError{Response: &http.Response{StatusCode: http.StatusForbidden}}
+		original := newFactoryGitHubAPI
+		newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+			return nil, cause
+		}
+		t.Cleanup(func() { newFactoryGitHubAPI = original })
+		var captured *sentry.Event
+		client, err := sentry.NewClient(sentry.ClientOptions{
+			Dsn: "https://public@localhost/1",
+			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				captured = event
+				assert.ErrorIs(t, hint.OriginalException.(error), cause)
+				return nil
+			},
+		})
+		require.NoError(t, err)
+		requestCtx := sentry.SetHubOnContext(ctx, sentry.NewHub(client, sentry.NewScope()))
+		resp, err := DescribeFactoryPullRequestMergeability(requestCtx, deps, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{FactoryId: factory.ID.String(), PrId: pr.GetId()})
+		require.NoError(t, err)
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, resp.GetMergeability().GetBlockedReason())
+		require.NotNil(t, captured)
+		assert.NotEmpty(t, captured.Exception)
+		assert.Equal(t, factory.ID.String(), captured.Tags["factory_id"])
+		assert.Equal(t, pr.GetId(), captured.Tags["pull_request_id"])
+		assert.Equal(t, "acme/app", captured.Tags["repository"])
+	})
+
+	t.Run("preserves request cancellation", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{getPullErr: context.Canceled})
+		_, err := DescribeFactoryPullRequestMergeability(ctx, deps, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{FactoryId: factory.ID.String(), PrId: pr.GetId()})
+		require.ErrorIs(t, err, context.Canceled)
+		ok, statusErr := grpcerrors.StatusFromContextError(ctx, err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Canceled, status.Code(statusErr))
+	})
+
+	t.Run("ignores a cached unavailable snapshot", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{BlockedReason: "UNAVAILABLE", HeadSHA: headSHA}))
+		combined, checks := successChecks()
+		useGitHub(t, &fakeFactoryGitHub{pullRequest: mergeableGitHubPullRequest(headSHA), combined: combined, checkRuns: checks, repository: allMethodsRepository()})
+		assert.True(t, describe(t, factory, pr).GetCanMerge())
+	})
+
 	t.Run("reports exclusive mutation access", func(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
@@ -954,6 +1108,19 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		assert.True(t, second.GetCanMerge())
 		assert.Equal(t, headSHA, second.GetHeadSha())
 		assert.Equal(t, first.GetAllowedMethods(), second.GetAllowedMethods())
+	})
+
+	t.Run("returns an error when GitHub omits the pull request", func(t *testing.T) {
+		factory := newFactory(t)
+		pr := createPR(t, factory)
+		useGitHub(t, &fakeFactoryGitHub{})
+
+		_, err := DescribeFactoryPullRequestMergeability(ctx, deps, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errFactoryPullRequestMissing)
 	})
 
 	t.Run("reuses stored allowed merge methods", func(t *testing.T) {

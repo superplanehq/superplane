@@ -1,4 +1,17 @@
+import { FileImage, FileText, FileVideo } from "lucide-react";
+
 export type ArtifactData = Record<string, unknown> | undefined;
+
+/** Image, video, or document icon. Same choice the artifact row already uses. */
+export function fileArtifactIcon(contentType?: string): typeof FileText {
+  if (contentType?.startsWith("image/")) {
+    return FileImage;
+  }
+  if (contentType?.startsWith("video/")) {
+    return FileVideo;
+  }
+  return FileText;
+}
 
 /** GitHub-style pull request lifecycle states a PR artifact's chip can render. */
 export type PrArtifactState = "open" | "draft" | "closed" | "merged";
@@ -80,6 +93,50 @@ export function extractArtifactFilename(data: ArtifactData): string | undefined 
 
 export function extractArtifactContentType(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "contentType");
+}
+
+/** Byte count from `sizeBytes`, or a numeric `size`. */
+export function extractArtifactSizeBytes(data: ArtifactData): number | undefined {
+  if (!data) {
+    return undefined;
+  }
+  return readPositiveBytes(data.sizeBytes) ?? readPositiveBytes(data.size);
+}
+
+/** Compact size for a file row badge: `348 B`, `12 KB`, `1.2 MB`. */
+export function formatArtifactSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${formatSizeNumber(kb)} KB`;
+  }
+  const mb = kb / 1024;
+  if (mb < 1024) {
+    return `${formatSizeNumber(mb)} MB`;
+  }
+  return `${formatSizeNumber(mb / 1024)} GB`;
+}
+
+/**
+ * Label for the artifact size badge. Prefers stored bytes, then an already
+ * formatted `size` string, then the markdown body length.
+ */
+export function artifactSizeLabel(data: ArtifactData): string | undefined {
+  const bytes = extractArtifactSizeBytes(data);
+  if (bytes !== undefined) {
+    return formatArtifactSize(bytes);
+  }
+  if (typeof data?.size === "string" && /[A-Za-z]/.test(data.size)) {
+    const label = data.size.trim();
+    return label !== "" ? label : undefined;
+  }
+  const body = extractArtifactMarkdownBody(data);
+  if (body) {
+    return formatArtifactSize(new TextEncoder().encode(body).length);
+  }
+  return undefined;
 }
 
 /**
@@ -197,6 +254,24 @@ function extractArtifactBoolean(data: ArtifactData, key: string): boolean | unde
  */
 export function toArtifactDataRecord(data: unknown): Record<string, unknown> | undefined {
   return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
+}
+
+function readPositiveBytes(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "" && !/[A-Za-z]/.test(value)) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function formatSizeNumber(value: number): string {
+  const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+  return String(rounded);
 }
 
 function extractArtifactField(data: ArtifactData, key: string): string | undefined {

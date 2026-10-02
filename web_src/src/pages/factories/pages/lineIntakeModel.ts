@@ -5,8 +5,11 @@ import type {
   FactoryIntakeHealth,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -14,6 +17,7 @@ import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
+import { parseWorkspaceRouteSegment } from "../lib/factoryKeyResolution";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -29,7 +33,11 @@ import {
 } from "../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
-import { intakeSettingsFromApi, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import {
+  intakeSettingsFromApi,
+  linearProjectIdsFromResource,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
@@ -49,7 +57,9 @@ export type LineIntakeSourceId =
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
-  | "productive-tasks";
+  | "productive-tasks"
+  | "datadog"
+  | "linear-issues";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -59,6 +69,7 @@ export interface LineIntakeSource {
   description: string;
   iconSrc: string;
   iconAlt: string;
+  tabLabel: string;
   /** How SuperPlane receives events from this source. */
   listen: {
     kind: LineIntakeListenKind;
@@ -87,6 +98,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
+    tabLabel: "GitHub",
     listen: {
       kind: "webhook",
       label: "On GitHub issue",
@@ -104,8 +116,9 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     id: "dependabot-alerts",
     name: "Dependabot alerts",
     description: "Creates tasks from Dependabot alerts.",
-    iconSrc: githubIcon,
-    iconAlt: "GitHub",
+    iconSrc: dependabotIcon,
+    iconAlt: "Dependabot",
+    tabLabel: "Dependabot",
     listen: {
       kind: "webhook",
       label: "On Dependabot alert",
@@ -125,6 +138,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
     iconAlt: "Jira",
+    tabLabel: "Jira",
     listen: {
       kind: "webhook",
       label: "On Jira issue",
@@ -144,6 +158,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
     iconAlt: "Sentry",
+    tabLabel: "Sentry",
     listen: {
       kind: "webhook",
       label: "On Sentry exception",
@@ -163,6 +178,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
     iconAlt: "PagerDuty",
+    tabLabel: "PagerDuty",
     listen: {
       kind: "webhook",
       label: "On PagerDuty incident",
@@ -178,17 +194,58 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   },
   {
     id: "productive-tasks",
-    name: "Productive.io tasks",
-    description: "Create tasks from Productive.io tasks.",
+    name: "Productive tasks",
+    description: "Create tasks from Productive tasks.",
     iconSrc: productiveIcon,
     iconAlt: "Productive",
+    tabLabel: "Productive",
     listen: {
       kind: "webhook",
-      label: "On Productive.io task",
+      label: "On Productive task",
     },
     evaluate: {
       label: "Create a task",
-      rule: "A matching Productive.io task becomes a task in Backlog. SuperPlane scores it there.",
+      rule: "A matching Productive task becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "datadog",
+    name: "Datadog errors",
+    description: "Creates tasks from Datadog Error Tracking alerts.",
+    iconSrc: datadogIcon,
+    iconAlt: "Datadog",
+    tabLabel: "Datadog",
+    listen: {
+      kind: "webhook",
+      label: "On Error Tracking alert",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Datadog Error Tracking alert becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
+  {
+    id: "linear-issues",
+    name: "Linear issues",
+    description: "Create a task when a Linear issue is added to a selected project.",
+    iconSrc: linearIcon,
+    iconAlt: "Linear",
+    tabLabel: "Linear",
+    listen: {
+      kind: "webhook",
+      label: "On Linear issue",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Linear issue becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -210,7 +267,12 @@ export function lineIntakeSourceForApiSource(apiSource: string | undefined): Lin
 }
 
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
-  return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
+  if (!factoryKey) {
+    return false;
+  }
+  const parsed = parseWorkspaceRouteSegment(factoryKey);
+  const key = (parsed?.prefix ?? factoryKey).toUpperCase();
+  return key === ACME_ONBOARDING_FACTORY_KEY;
 }
 
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {
@@ -245,6 +307,8 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
+  SOURCE_DATADOG: "datadog",
+  SOURCE_LINEAR_ISSUES: "linear-issues",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
@@ -254,6 +318,8 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
+  datadog: "SOURCE_DATADOG",
+  "linear-issues": "SOURCE_LINEAR_ISSUES",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
@@ -269,13 +335,20 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
     }
 
     const name = intake.name?.trim() || source.name;
+    const settings = intakeSettingsFromApi(name, intake.settings);
+    if (source.id === "linear-issues" && settings.linearProjectIds.length === 0) {
+      settings.linearProjectIds = linearProjectIdsFromResource(intake.resourceId);
+    }
     return [
       {
         intakeId,
         appId: intake.canvasId?.trim() ?? "",
         healthy: intake.healthy !== false,
         paused: intake.paused === true,
-        settings: intakeSettingsFromApi(name, intake.settings),
+        settings: {
+          ...settings,
+          datadogService: intake.resourceId?.trim() ?? "",
+        },
         source: { ...source, name },
         health: intake.health,
         integrationId: intake.integrationId?.trim() || undefined,
@@ -353,7 +426,7 @@ const OWNER = {
 const ANALYSIS_PHASE_DURATION = {
   ingest: "2s",
   analyze: "3m 45s",
-  analyzeRunning: "3m 12s so far",
+  analyzeRunning: "3m 12s",
   plan: "18s",
   score: "7s",
 } as const;

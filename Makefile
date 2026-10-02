@@ -258,7 +258,7 @@ dev.down:
 doctor-local:
 	$(COMPOSE_RUNNER) run --rm -T --no-deps --entrypoint sh runner -c '\
 	  missing=0; \
-	  for cmd in claude codex opencode playwright node git gh jq python3 bash; do \
+	  for cmd in claude codex opencode playwright node git gh jq python3 bash ffmpeg ffprobe whisper-cli; do \
 	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
 	      echo "$$cmd missing" >&2; \
 	      missing=1; \
@@ -273,6 +273,16 @@ doctor-local:
 	  playwright cli --help >/dev/null 2>&1 || missing=1; \
 	  echo "node=$$(node --version 2>/dev/null)"; \
 	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
+	  echo "ffmpeg=$$(ffmpeg -version 2>/dev/null | head -n1)"; \
+	  echo "ffprobe=$$(ffprobe -version 2>/dev/null | head -n1)"; \
+	  whisper-cli --help >/dev/null 2>&1 || missing=1; \
+	  model=$${WHISPER_MODEL:-/usr/local/share/whisper/ggml-tiny.bin}; \
+	  if [ ! -s "$$model" ]; then \
+	    echo "whisper model missing: $$model" >&2; \
+	    missing=1; \
+	  else \
+	    echo "whisper-model=$$model"; \
+	  fi; \
 	  shot=$$(mktemp /tmp/playwright-doctor.XXXXXX.png); \
 	  playwright screenshot about:blank "$$shot" >/dev/null 2>&1 || missing=1; \
 	  test -s "$$shot" || missing=1; \

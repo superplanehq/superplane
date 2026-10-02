@@ -1,12 +1,16 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	dependabotcomp "github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
+	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func Test__BuildIntakeCanvas(t *testing.T) {
@@ -18,6 +22,8 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
+			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
+			models.FactoryIntakeSourceLinearIssues:       "linear.onIssue",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -26,6 +32,32 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			assert.Equal(t, expected, trigger.Component)
 			assert.Equal(t, yaml.NodeTypeTrigger, trigger.Type)
 		}
+	})
+
+	t.Run("a Linear intake listens to the selected projects", func(t *testing.T) {
+		settings := defaultLinearIntakeSettings()
+		settings.LinearProjectIDs = []string{"project-1", "project-2"}
+		settings.LinearLabels = []string{"bug"}
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:   models.FactoryIntakeSourceLinearIssues,
+			Settings: settings,
+			Binding: &intakeBinding{
+				Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "Acme Linear"},
+				Configuration: map[string]any{"projects": []string{"project-1", "project-2"}},
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"project-1", "project-2"}, trigger.Configuration["projects"])
+		_, err = structpb.NewStruct(trigger.Configuration)
+		require.NoError(t, err)
+		assert.Equal(t, []any{"create", "update"}, trigger.Configuration["actions"])
+		assert.Equal(t, "integration-1", trigger.Integration.ID)
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Contains(t, filter.Configuration["expression"], `"project-1"`)
+		assert.Contains(t, filter.Configuration["expression"], `"bug"`)
 	})
 
 	t.Run("a GitHub issue flows from the trigger through the filter to the work order", func(t *testing.T) {
@@ -113,6 +145,52 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, "true", filter.Configuration["expression"])
 	})
 
+	t.Run("a Datadog issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDatadog})
+		require.NoError(t, err)
+
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()), trigger.Configuration["alertTransitions"])
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "true", filter.Configuration["expression"])
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "{{ root().data.title }}", create.Configuration["title"])
+		assert.Equal(t, "{{ root().data.description }}", create.Configuration["description"])
+	})
+
+	t.Run("a Dependabot work order matches the Go copy so later alerts merge in", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceDependabotAlerts})
+		require.NoError(t, err)
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+
+		example := (&dependabotcomp.OnAlert{}).ExampleData()
+		data, ok := example["data"].(map[string]any)
+		require.True(t, ok)
+		alert, ok := data["alert"].(map[string]any)
+		require.True(t, ok)
+		ref, ok := ghdependabot.PackageRefFromEventData(example)
+		require.True(t, ok)
+
+		title := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["title"].(string)), data)
+		assert.Equal(t, ghdependabot.TaskTitle(ref), title)
+
+		description := evalRootDataExpression(t, templateExpressionSource(t, create.Configuration["description"].(string)), data)
+		require.IsType(t, "", description)
+		text := description.(string)
+		assert.True(t, strings.HasSuffix(text, "\n\n"+ghdependabot.AlertSection(alert)), text)
+		assert.Contains(t, text, "Relationship: transitive")
+		assert.Contains(t, text, "find the direct dependency that requires it")
+		assert.Less(t, strings.Index(text, "find the direct dependency"), strings.Index(text, "## Alerts"))
+	})
+
 	t.Run("PagerDuty creates a work order without a filter", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourcePagerDutyIncidents})
 		require.NoError(t, err)
@@ -131,6 +209,22 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		}, canvas.Spec.Edges)
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
+	})
+
+	t.Run("a Productive.io task list filter also listens for updates", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceProductiveTasks,
+			Settings: intakeSettings{
+				ExcludeKeyTasks: true,
+				TaskListIDs:     []string{"list-bugs"},
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
@@ -160,7 +254,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("an unknown source has no graph", func(t *testing.T) {
-		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "linear-issues"})
+		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "notion"})
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
 	})
 

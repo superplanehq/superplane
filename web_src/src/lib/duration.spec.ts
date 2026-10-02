@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import {
   formatClockDuration,
   formatClockDurationLabel,
+  formatCompactDuration,
   formatDuration,
   formatGoDuration,
   formatGoDurationLabel,
@@ -45,6 +46,10 @@ describe("duration", () => {
     expect(formatDuration(5_400_000)).toBe("1h 30m");
   });
 
+  it("keeps minutes and seconds for multi-day durations at millisecond precision", () => {
+    expect(formatDuration(5 * 86_400_000 + 8 * 3_600_000 + 12 * 60_000 + 18 * 1_000)).toBe("5d 8h 12m 18s");
+  });
+
   it("falls back to zero milliseconds for zero or negative durations", () => {
     expect(formatDuration(0)).toBe("");
     expect(formatDuration(-500)).toBe("");
@@ -70,6 +75,26 @@ describe("duration", () => {
     expect(formatMinutesSecondsDuration(51_988)).toBe("51s");
     expect(formatMinutesSecondsDuration(61_500)).toBe("1m 1s");
     expect(formatMinutesSecondsDuration(5_400_000)).toBe("90m");
+  });
+});
+
+describe("formatCompactDuration", () => {
+  const second = 1_000;
+  const minute = 60 * second;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+
+  it("keeps at most two units and steps min+sec, hour+min, day+hour, week+day", () => {
+    expect(formatCompactDuration(0)).toBe("");
+    expect(formatCompactDuration(482)).toBe("< 1s");
+    expect(formatCompactDuration(16 * second)).toBe("16s");
+    expect(formatCompactDuration(2 * minute + 5 * second)).toBe("2m 5s");
+    expect(formatCompactDuration(hour + 30 * minute + 40 * second)).toBe("1h 31m");
+    expect(formatCompactDuration(23 * hour + 13 * minute + 40 * second)).toBe("23h 14m");
+    expect(formatCompactDuration(day + 2 * hour + 12 * minute)).toBe("1d 2h");
+    expect(formatCompactDuration(week + 3 * day + 5 * hour)).toBe("1w 3d");
+    expect(formatCompactDuration(week)).toBe("1w");
   });
 });
 
@@ -129,6 +154,10 @@ describe("formatGoDurationLabel", () => {
 describe("formatDuration with { precision: 'second' }", () => {
   const seconds = (durationMs: number) => formatDuration(durationMs, { precision: "second" });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns an empty string for zero, negative, or non-finite durations", () => {
     expect(seconds(0)).toBe("");
     expect(seconds(-500)).toBe("");
@@ -156,5 +185,82 @@ describe("formatDuration with { precision: 'second' }", () => {
 
   it("rolls over into days for multi-day durations", () => {
     expect(seconds(90_000_000)).toBe("1d 1h");
+  });
+
+  it("keeps a duration under 24 hours exact", () => {
+    const hour = 3_600_000;
+    const minute = 60_000;
+    const second = 1_000;
+
+    expect(seconds(23 * hour + 30 * minute)).toBe("23h 30m");
+    expect(seconds(23 * hour + 59 * minute + 59 * second)).toBe("23h 59m 59s");
+  });
+
+  it("rounds a duration of 24 hours or more to days and hours", () => {
+    const hour = 3_600_000;
+    const minute = 60_000;
+    const second = 1_000;
+    const day = 24 * hour;
+
+    expect(seconds(day)).toBe("1d");
+    expect(seconds(day + 29 * minute)).toBe("1d");
+    expect(seconds(day + 30 * minute)).toBe("1d 1h");
+    expect(seconds(5 * day + 8 * hour + 12 * minute + 18 * second)).toBe("5d 8h");
+    expect(seconds(5 * day + 23 * hour + 30 * minute)).toBe("6d");
+  });
+
+  it("passes only days and hours to Intl.DurationFormat for a rounded multi-day value", () => {
+    const format = vi.fn((duration: { days?: number; hours?: number; minutes?: number; seconds?: number }) => {
+      return [
+        duration.days ? `${duration.days}d` : "",
+        duration.hours ? `${duration.hours}h` : "",
+        duration.minutes ? `${duration.minutes}m` : "",
+        duration.seconds ? `${duration.seconds}s` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    });
+    const DurationFormat = vi.fn().mockImplementation(function () {
+      return { format };
+    });
+
+    vi.stubGlobal("Intl", {
+      ...Intl,
+      DurationFormat,
+    });
+
+    const hour = 3_600_000;
+    const minute = 60_000;
+    const second = 1_000;
+    const day = 24 * hour;
+
+    expect(seconds(5 * day + 8 * hour + 12 * minute + 18 * second)).toBe("5d 8h");
+    expect(DurationFormat).toHaveBeenCalledWith(undefined, { style: "narrow" });
+    expect(format).toHaveBeenCalledWith({ days: 5, hours: 8 });
+    expect(seconds(day)).toBe("1d");
+    expect(format).toHaveBeenCalledWith({ days: 1 });
+    expect(seconds(day + 30 * minute)).toBe("1d 1h");
+    expect(format).toHaveBeenCalledWith({ days: 1, hours: 1 });
+    expect(seconds(5 * day + 23 * hour + 30 * minute)).toBe("6d");
+    expect(format).toHaveBeenCalledWith({ days: 6 });
+  });
+
+  it("formats a rounded multi-day value when Intl.DurationFormat is absent", () => {
+    vi.stubGlobal("Intl", {
+      ...Intl,
+      DurationFormat: undefined,
+    });
+
+    const hour = 3_600_000;
+    const minute = 60_000;
+    const second = 1_000;
+    const day = 24 * hour;
+
+    expect(seconds(23 * hour + 59 * minute + 59 * second)).toBe("23h 59m 59s");
+    expect(seconds(day)).toBe("1d");
+    expect(seconds(day + 29 * minute)).toBe("1d");
+    expect(seconds(day + 30 * minute)).toBe("1d 1h");
+    expect(seconds(5 * day + 8 * hour + 12 * minute + 18 * second)).toBe("5d 8h");
+    expect(seconds(5 * day + 23 * hour + 30 * minute)).toBe("6d");
   });
 });

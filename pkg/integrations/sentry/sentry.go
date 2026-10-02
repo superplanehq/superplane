@@ -1,6 +1,7 @@
 package sentry
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,11 +13,14 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -142,6 +146,34 @@ type WebhookInstallation struct {
 	UUID string `json:"uuid" mapstructure:"uuid"`
 }
 
+const (
+	// HeaderWebhookReceipt carries the stored receipt ID from the public
+	// webhook handler into the integration message. It is not a Sentry header.
+	HeaderWebhookReceipt = "X-Superplane-Sentry-Receipt"
+	// SuperplaneReceiptField is the canvas payload key for that receipt ID.
+	SuperplaneReceiptField = "superplaneReceiptId"
+)
+
+type hostedSentryWebhookLoggedKey struct{}
+
+// WithHostedSentryWebhookLogged marks a request the public Sentry app
+// handler already logged. A client cannot set this mark with a header.
+func WithHostedSentryWebhookLogged(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, hostedSentryWebhookLoggedKey{}, true)
+}
+
+// hostedSentryWebhookLogged reports that mark.
+func hostedSentryWebhookLogged(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	logged, _ := ctx.Value(hostedSentryWebhookLoggedKey{}).(bool)
+	return logged
+}
+
 type WebhookMessage struct {
 	Resource     string              `json:"resource" mapstructure:"resource"`
 	Action       string              `json:"action" mapstructure:"action"`
@@ -149,6 +181,7 @@ type WebhookMessage struct {
 	Installation WebhookInstallation `json:"installation" mapstructure:"installation"`
 	Data         map[string]any      `json:"data" mapstructure:"data"`
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
+	ReceiptID    string              `json:"superplaneReceiptId,omitempty" mapstructure:"superplaneReceiptId"`
 }
 
 func (s *Sentry) Name() string {
@@ -354,9 +387,7 @@ func (s *Sentry) syncHostedApp(ctx core.SyncContext, config Configuration) error
 			ctx.Integration.Error(err.Error())
 			return nil
 		}
-		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.Ready()
-		return nil
+		return s.markHostedInstallReady(ctx)
 	}
 
 	existing.SetupReturnPath = returnPath
@@ -412,6 +443,82 @@ func (s *Sentry) refreshHostedMetadata(ctx core.SyncContext, metadata Metadata) 
 		return err
 	}
 	return s.populateMetadataFromOrg(ctx, client)
+}
+
+// markHostedInstallReady confirms the public Sentry app sends issue events
+// before the connection is ready. A missing owner token keeps the previous
+// behavior and logs once.
+func (s *Sentry) markHostedInstallReady(ctx core.SyncContext) error {
+	ctx.Integration.RemoveBrowserAction()
+	if problem := s.hostedIssueWebhookProblem(ctx); problem != "" {
+		ctx.Integration.Error(problem)
+		return nil
+	}
+	ctx.Integration.Ready()
+	return nil
+}
+
+var hostedWebhookUnverifiedOnce sync.Once
+
+func (s *Sentry) hostedIssueWebhookProblem(ctx core.SyncContext) string {
+	app, ok := HostedAppFromEnv()
+	if !ok || strings.TrimSpace(app.APIToken) == "" {
+		logHostedWebhookUnverified(ctx)
+		return ""
+	}
+	if ctx.HTTP == nil {
+		return hostedIssueWebhookUnreadMessage
+	}
+
+	client := NewAPIClient(ctx.HTTP, DefaultBaseURL, app.APIToken)
+	remote, err := client.GetSentryApp(app.Slug)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.WithError(err).Error("failed to read the hosted Sentry app webhook")
+		}
+		return hostedIssueWebhookUnreadMessage
+	}
+
+	expectedURL := hostedIssueWebhookURL(ctx)
+	problem := hostedIssueWebhookMismatch(remote.WebhookURL, remote.Events, expectedURL)
+	if problem != "" && ctx.Logger != nil {
+		ctx.Logger.WithFields(logrus.Fields{
+			"webhook_url":          remote.WebhookURL,
+			"events":               remote.Events,
+			"expected_webhook_url": expectedURL,
+		}).Error("hosted Sentry app is not sending issue events")
+	}
+	return problem
+}
+
+func logHostedWebhookUnverified(ctx core.SyncContext) {
+	hostedWebhookUnverifiedOnce.Do(func() {
+		logger := ctx.Logger
+		if logger == nil {
+			logger = logrus.NewEntry(logrus.StandardLogger())
+		}
+		logger.Info("hosted Sentry app webhook was not verified because SUPERPLANE_SENTRY_APP_API_TOKEN is not set")
+	})
+}
+
+func hostedIssueWebhookURL(ctx core.SyncContext) string {
+	baseURL := ctx.WebhooksBaseURL
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = ctx.BaseURL
+	}
+	return HostedAppWebhookURL(baseURL)
+}
+
+const hostedIssueWebhookUnreadMessage = "SuperPlane could not confirm that Sentry sends issue events. Try again later."
+
+func hostedIssueWebhookMismatch(webhookURL string, events []string, expectedURL string) string {
+	if strings.TrimSpace(webhookURL) == expectedURL && slices.Contains(events, "issue") {
+		return ""
+	}
+	return fmt.Sprintf(
+		"Sentry is not sending issue events. In Sentry, open Settings, then Developer Settings for this app. Set the webhook URL to %s and enable the issue event.",
+		expectedURL,
+	)
 }
 
 func (s *Sentry) reconcileWebhook(ctx core.SyncContext, config Configuration) (string, error) {
@@ -649,6 +756,16 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	// The hosted app handler logs the body before it calls this handler.
+	// A receipt header on a direct webhook is not that call.
+	if !hostedSentryWebhookLogged(ctx.Request.Context()) {
+		logging.LogSentryWebhookInfo("Sentry webhook received", logging.WithWebhookPayload(logrus.Fields{
+			"hook_resource":     resource,
+			"action":            payload.Action,
+			"installation_uuid": payload.Installation.UUID,
+		}, body))
+	}
+
 	message := WebhookMessage{
 		Resource:     resource,
 		Action:       payload.Action,
@@ -656,6 +773,7 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		Installation: payload.Installation,
 		Data:         payload.Data,
 		Actor:        payload.Actor,
+		ReceiptID:    strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)),
 	}
 
 	if err := s.dispatchWebhookMessage(ctx, message); err != nil {

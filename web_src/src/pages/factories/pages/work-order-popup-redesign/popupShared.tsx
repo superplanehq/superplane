@@ -80,6 +80,7 @@ function PopupFullScreenButton({ expanded, onToggle }: { expanded: boolean; onTo
 
 export function PopupHeader({
   title,
+  titlePrefix,
   children,
   onClose,
   actions,
@@ -94,6 +95,8 @@ export function PopupHeader({
   titleAriaLabel = "Task title",
 }: {
   title: string;
+  /** Non-editable task key shown before the title. Omitted when empty. */
+  titlePrefix?: string;
   children?: ReactNode;
   onClose?: () => void;
   actions?: ReactNode;
@@ -107,27 +110,45 @@ export function PopupHeader({
   titleTestId?: string;
   titleAriaLabel?: string;
 }) {
+  const prefix = titlePrefix?.trim();
+  const titleControl =
+    canEditTitle && onTitleSave ? (
+      <ClickToRename
+        value={title}
+        onSave={onTitleSave}
+        canEdit={canEditTitle}
+        busy={titleBusy}
+        testId={titleTestId}
+        ariaLabel={titleAriaLabel}
+        className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
+        inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
+      />
+    ) : (
+      title
+    );
+
   return (
     <header className="relative shrink-0 border-b border-border px-5 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-3">
             {leading}
-            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
-              {canEditTitle && onTitleSave ? (
-                <ClickToRename
-                  value={title}
-                  onSave={onTitleSave}
-                  canEdit={canEditTitle}
-                  busy={titleBusy}
-                  testId={titleTestId}
-                  ariaLabel={titleAriaLabel}
-                  className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
-                  inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
-                />
-              ) : (
-                title
+            <h2
+              className={cn(
+                "min-w-0 flex-1 text-[16px] font-semibold tracking-[-0.02em] text-foreground",
+                prefix ? "flex items-center gap-2" : "truncate",
               )}
+              aria-label={prefix ? `${prefix} ${title}` : undefined}
+            >
+              {prefix ? (
+                <span
+                  className="shrink-0 font-mono text-[13px] font-normal text-muted-foreground"
+                  data-testid="popup-work-order-key"
+                >
+                  {prefix}
+                </span>
+              ) : null}
+              {prefix ? <span className="min-w-0 truncate">{titleControl}</span> : titleControl}
             </h2>
           </div>
           {children}
@@ -225,7 +246,8 @@ export function OwnerTimeCostRow({
   );
 }
 
-function OwnerSpendValue({
+/** Underlined spend total; hovering shows the per-model and machine-time breakdown. */
+export function OwnerSpendValue({
   costUsd,
   usageByModel,
   usageByMachineType,

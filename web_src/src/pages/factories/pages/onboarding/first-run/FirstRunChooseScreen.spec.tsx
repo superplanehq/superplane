@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -6,22 +6,22 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 
 describe("FirstRunChooseScreen", () => {
-  it("calls onEditConnection when the edit connection link is clicked", async () => {
+  it("calls onGrantAccess when the grant access link is clicked", async () => {
     const user = userEvent.setup();
-    const onEditConnection = vi.fn();
+    const onGrantAccess = vi.fn();
 
     render(
       <FirstRunChooseScreen
         repositories={["octo/repo"]}
         selectedRepository={null}
         onSelectRepository={vi.fn()}
-        onEditConnection={onEditConnection}
+        onGrantAccess={onGrantAccess}
         onContinue={vi.fn()}
       />,
     );
 
-    await user.click(screen.getByText(FIRST_RUN_COPY.choose.editConnection));
-    expect(onEditConnection).toHaveBeenCalled();
+    await user.click(screen.getByText(FIRST_RUN_COPY.choose.grantAccess));
+    expect(onGrantAccess).toHaveBeenCalled();
   });
 
   it("calls onBack from the shell when Back is clicked", async () => {
@@ -34,7 +34,7 @@ describe("FirstRunChooseScreen", () => {
         selectedRepository="octo/repo"
         chrome={{ stepIndex: 2, onBack }}
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
@@ -52,7 +52,7 @@ describe("FirstRunChooseScreen", () => {
         selectedRepository={null}
         loading
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
@@ -70,7 +70,7 @@ describe("FirstRunChooseScreen", () => {
         repositories={["octo/repo"]}
         selectedRepository={null}
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
@@ -86,7 +86,7 @@ describe("FirstRunChooseScreen", () => {
         repositories={["octo/repo"]}
         selectedRepository="octo/repo"
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
@@ -104,14 +104,14 @@ describe("FirstRunChooseScreen", () => {
         saving
         chrome={{ stepIndex: 2, onBack: vi.fn() }}
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
 
     expect(screen.getByTestId("first-run-continue-to-tickets")).toHaveTextContent(FIRST_RUN_COPY.choose.saving);
     expect(screen.getByRole("option", { name: /octo\/repo/ })).toBeDisabled();
-    expect(screen.getByText(FIRST_RUN_COPY.choose.editConnection)).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.choose.grantAccess)).toBeDisabled();
   });
 
   it("shows the finished GitHub steps above the repository picker on the stepper card", () => {
@@ -119,18 +119,113 @@ describe("FirstRunChooseScreen", () => {
       <FirstRunChooseScreen
         repositories={["puppies-inc/app"]}
         selectedRepository={null}
-        organizationName="puppies-inc"
         onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
+        onGrantAccess={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
 
     expect(screen.getByTestId("first-run-github-stepper")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.stepConnected)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.stepOrganizationDone("puppies-inc"))).toBeInTheDocument();
-    expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(2);
+    expect(screen.getByText(FIRST_RUN_COPY.connect.connectGitHub)).toBeInTheDocument();
+    expect(screen.queryByText("Grant access")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(1);
+    const repositoryList = screen.getByRole("listbox");
+    expect(repositoryList).toHaveClass("max-h-48");
+    expect(repositoryList).not.toHaveClass("max-h-56");
     expect(screen.getByRole("option", { name: /puppies-inc\/app/ })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-continue-to-tickets")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-content")).toHaveClass("py-16");
+    expect(screen.getByTestId("first-run-content")).not.toHaveClass("py-24");
+  });
+
+  it("switches between linked GitHub accounts and can connect another account", async () => {
+    const user = userEvent.setup();
+    const onSelectGitHubIdentity = vi.fn();
+    const onConnectAnotherGitHubAccount = vi.fn();
+
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository={null}
+        githubLogin="forestileao"
+        githubUserId="101"
+        githubIdentities={[
+          { userId: "101", login: "forestileao" },
+          { userId: "202", login: "forestigamer" },
+        ]}
+        onSelectRepository={vi.fn()}
+        onSelectGitHubIdentity={onSelectGitHubIdentity}
+        onConnectAnotherGitHubAccount={onConnectAnotherGitHubAccount}
+        onGrantAccess={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    const switchButton = screen.getByTestId("first-run-switch-github-account");
+    expect(switchButton).toHaveTextContent(FIRST_RUN_COPY.choose.switchAccount);
+    expect(switchButton).toHaveClass("text-muted-foreground");
+
+    await user.click(switchButton);
+    await user.click(screen.getByRole("menuitemradio", { name: "forestigamer" }));
+    expect(onSelectGitHubIdentity).toHaveBeenCalledWith("202");
+
+    await user.click(switchButton);
+    await user.click(screen.getByRole("menuitem", { name: FIRST_RUN_COPY.choose.connectAnotherAccount }));
+    expect(onConnectAnotherGitHubAccount).toHaveBeenCalled();
+  });
+
+  it("keeps repositories available while more repositories synchronize", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository={null}
+        synchronizing
+        onSelectRepository={vi.fn()}
+        onGrantAccess={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("option", { name: /octo\/repo/ })).toBeInTheDocument();
+    const repositoryHeader = screen.getByTestId("first-run-step-repository-header");
+    const status = within(repositoryHeader).getByTestId("first-run-repositories-synchronizing");
+    expect(status).toHaveTextContent(FIRST_RUN_COPY.choose.synchronizing);
+    expect(status).toHaveClass("sp-ai-thinking");
+  });
+
+  it("shows each repository without hiding earlier synchronization results", () => {
+    const props = {
+      selectedRepository: null,
+      synchronizing: true,
+      onSelectRepository: vi.fn(),
+      onGrantAccess: vi.fn(),
+      onContinue: vi.fn(),
+    };
+    const view = render(<FirstRunChooseScreen {...props} repositories={[]} />);
+
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+
+    view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api"]} />);
+    expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
+
+    view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api", "acme/web"]} />);
+    expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /acme\/web/ })).toBeInTheDocument();
+  });
+
+  it("shows every pending organization approval in the repository step", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={[]}
+        selectedRepository={null}
+        pendingOrganizations={["acme", "example"]}
+        onSelectRepository={vi.fn()}
+        onGrantAccess={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Waiting for approval for acme.")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for approval for example.")).toBeInTheDocument();
   });
 });

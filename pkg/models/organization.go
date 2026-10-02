@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -51,8 +52,10 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount int64 `gorm:"column:canvas_count"`
-	MemberCount int64 `gorm:"column:member_count"`
+	CanvasCount   int64 `gorm:"column:canvas_count"`
+	TaskCount     int64 `gorm:"column:task_count"`
+	DoneTaskCount int64 `gorm:"column:done_task_count"`
+	MemberCount   int64 `gorm:"column:member_count"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
@@ -60,8 +63,14 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
+	search = strings.TrimSpace(search)
 	if search != "" {
-		query = query.Where("organizations.name ILIKE ?", "%"+search+"%")
+		pattern := "%" + search + "%"
+		query = query.Where(
+			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+			pattern,
+			pattern,
+		)
 	}
 
 	var total int64
@@ -111,6 +120,20 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Where("deleted_at IS NULL").
 		Group("organization_id")
 
+	taskCountsQuery := tx.
+		Table("factory_work_orders").
+		Select("factory_work_orders.organization_id, COUNT(*) AS count").
+		Joins("JOIN factories ON factories.id = factory_work_orders.factory_id AND factories.deleted_at IS NULL").
+		Group("factory_work_orders.organization_id")
+
+	doneTaskCountsQuery := tx.
+		Table("factory_work_orders").
+		Select("factory_work_orders.organization_id, COUNT(*) AS count").
+		Joins("JOIN factories ON factories.id = factory_work_orders.factory_id AND factories.deleted_at IS NULL").
+		Where("factory_work_orders.state = ?", FactoryWorkOrderStateClosed).
+		Where("factory_work_orders.result IN ?", []string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed}).
+		Group("factory_work_orders.organization_id")
+
 	memberCountsQuery := tx.
 		Table("users").
 		Select("organization_id, COUNT(*) AS count").
@@ -122,9 +145,13 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Select(`
 			organizations.*,
 			COALESCE(canvas_counts.count, 0) AS canvas_count,
+			COALESCE(task_counts.count, 0) AS task_count,
+			COALESCE(done_task_counts.count, 0) AS done_task_count,
 			COALESCE(member_counts.count, 0) AS member_count
 		`).
 		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
+		Joins("LEFT JOIN (?) AS task_counts ON task_counts.organization_id = organizations.id", taskCountsQuery).
+		Joins("LEFT JOIN (?) AS done_task_counts ON done_task_counts.organization_id = organizations.id", doneTaskCountsQuery).
 		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
 }
 
@@ -141,6 +168,10 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "organizations.created_at " + direction
 	case "canvas_count":
 		return "COALESCE(canvas_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "task_count":
+		return "COALESCE(task_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "done_task_count":
+		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
 	default:
@@ -411,6 +442,24 @@ func DisableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featu
 			"updated_at":                    &now,
 		}).
 		Error
+}
+
+// OrganizationHasExperimentalFeatures reports whether every feature is active
+// for the organization. Released features count as active.
+func OrganizationHasExperimentalFeatures(tx *gorm.DB, orgID uuid.UUID, featureIDs ...string) (bool, error) {
+	if tx == nil {
+		return false, fmt.Errorf("transaction is required")
+	}
+	organization, err := FindOrganizationByIDInTransaction(tx, orgID.String())
+	if err != nil {
+		return false, err
+	}
+	for _, featureID := range featureIDs {
+		if !organization.HasExperimentalFeature(featureID) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // HasExperimentalFeature reports whether the given feature id is active for

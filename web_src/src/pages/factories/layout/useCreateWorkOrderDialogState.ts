@@ -36,8 +36,11 @@ export function useCreateWorkOrderDialogState(
   const completeCreateWorkOrder = useCallback(
     (orderNumber: string, order?: FactoriesWorkOrder) => {
       setCreateWorkOrderOpen(false);
-      const lineId = lineIdFromPathname(location.pathname) ?? firstLineId;
-      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId), {
+      const boardLineId = lineIdFromPathname(location.pathname);
+      if (boardLineId && !isCreateWorkOrderRoute) {
+        return;
+      }
+      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber, boardLineId ?? firstLineId), {
         replace: isCreateWorkOrderRoute,
         state: order?.id ? { peekOrder: order } : undefined,
       });
@@ -45,7 +48,12 @@ export function useCreateWorkOrderDialogState(
     [factoryKey, firstLineId, isCreateWorkOrderRoute, location.pathname, navigate, organizationId],
   );
 
-  return { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder };
+  return {
+    createWorkOrderOpen,
+    openCreateWorkOrder,
+    closeCreateWorkOrder,
+    completeCreateWorkOrder,
+  };
 }
 
 function lineIdFromPathname(pathname: string): string | undefined {

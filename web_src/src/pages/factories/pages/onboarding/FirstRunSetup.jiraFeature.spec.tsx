@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -13,12 +13,21 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true }));
+const feature = vi.hoisted(() => ({
+  jiraIntake: true,
+  linearIntake: false,
+  organizationReady: true,
+  isLoading: false,
+}));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (id: string) => id === FEATURE_FACTORY_JIRA_INTAKE && feature.jiraIntake,
-    isLoading: false,
+    has: (id: string) => {
+      if (id === FEATURE_FACTORY_JIRA_INTAKE) return feature.jiraIntake;
+      if (id === FEATURE_FACTORY_LINEAR_INTAKE) return feature.linearIntake;
+      return false;
+    },
+    isLoading: feature.isLoading,
     organizationReady: feature.organizationReady,
   }),
 }));
@@ -28,6 +37,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     organizationId: "org-1",
     factoryId: "factory-1",
     factoryKey: "PAY",
+    routeSegment: "pay",
     factory: { id: "factory-1", key: "PAY", name: "New workspace", onboarding: { vcsIntegrationId: "github-1" } },
     factories: [{ id: "factory-1", key: "PAY", name: "New workspace", onboarding: { vcsIntegrationId: "github-1" } }],
   }),
@@ -57,12 +67,20 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
-  useRecheckGitHubInstallRequest: vi.fn(),
-}));
-
-vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined) }),
+vi.mock("./useGitHubOnboarding", () => ({
+  useGitHubOnboarding: () => ({
+    data: {
+      appConfigured: true,
+      identity: { userId: "42", login: "octocat" },
+      repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
+      pendingRequests: [],
+      synchronizing: false,
+    },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+    configureInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -102,29 +120,18 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
-    refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
-    githubConnectionsLoading: false,
-    requestPrivateGitHubConnect: vi.fn(),
-    offersPrivateGitHubAppSetup: false,
-    createVcsConnection: vi.fn(),
-    selectVcsConnection: vi.fn().mockResolvedValue(true),
-    githubConnections: { name: "github", allInstances: [], readyInstances: [] },
-    selectedVcsConnectionId: "github-1",
-    requestConfigure: vi.fn(),
+    selectCatalogRepository: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
-    repositories: ["acme/payments-service"],
-    repositoriesLoading: false,
-    repositoriesError: null,
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
-    saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,
@@ -133,11 +140,17 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectId: "",
     setJiraProjectId: vi.fn(),
     jiraCompletion: { jiraMoveOnComplete: true, jiraCompletionColumn: "" },
-    setJiraCompletion: vi.fn(),
     jiraProjects: [],
     jiraProjectsLoading: false,
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
+    linearIntegrationId: "",
+    linearProjectIds: [],
+    toggleLinearProject: vi.fn(),
+    linearProjects: [],
+    linearProjectsLoading: false,
+    linearProjectsError: false,
+    retryLinearProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -155,7 +168,9 @@ function renderLiveSetup(model: OnboardingPageModel, setupOptions: SetupOptions)
 describe("FirstRunSetup Jira intake feature", () => {
   beforeEach(() => {
     feature.jiraIntake = true;
+    feature.linearIntake = false;
     feature.organizationReady = true;
+    feature.isLoading = false;
   });
 
   it("hides Jira and does not provision a Jira intake when the feature is off", async () => {
@@ -175,9 +190,11 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
@@ -207,7 +224,7 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
       FIRST_RUN_COPY.tickets.jiraLookupFailed,
@@ -223,6 +240,47 @@ describe("FirstRunSetup Jira intake feature", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
     expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("does not mark Jira as coming soon while the feature lookup is loading", () => {
+    feature.isLoading = true;
+    feature.jiraIntake = true;
+
+    renderLiveSetup(pageModel(), { simulateDiscovery: false });
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearLookupLoading)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+  });
+
+  it("shows Linear when the organization feature is on", async () => {
+    feature.linearIntake = true;
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      linearIntegrationId: "linear-1",
+      linearProjectIds: ["project-1"],
+      linearProjects: [{ id: "project-1", name: "Platform" }],
+    });
+
+    renderLiveSetup(model, {
+      simulateDiscovery: false,
+      connected: new Set(["linear"]),
+      initial: { issuesChoice: "linear" },
+    });
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("linear-project-project-1"));
+    expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
   });
 });
 

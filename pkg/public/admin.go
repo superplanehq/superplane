@@ -785,6 +785,60 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"})
 }
 
+// adminDeleteAccount deletes an account, its sign-in methods, and every
+// organization where it is the only owner, including their workspaces.
+func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
+	admin, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	targetID := mux.Vars(r)["accountId"]
+	if admin.ID.String() == targetID {
+		http.Error(w, "Cannot delete your own account from the admin panel", http.StatusBadRequest)
+		return
+	}
+
+	target, err := models.FindAccountByID(targetID)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+	targetEmail := target.Email
+
+	deletedOrganizations, err := s.softDeleteAccount(r.Context(), target)
+	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
+		http.Error(w, "Promote another installation admin before you delete this account.", http.StatusConflict)
+		return
+	}
+	if err != nil {
+		log.Errorf("admin: failed to delete account %s: %v", targetID, err)
+		http.Error(w, "Failed to delete account", http.StatusInternalServerError)
+		return
+	}
+
+	deletedOrganizationIDs := make([]string, 0, len(deletedOrganizations))
+	for _, organization := range deletedOrganizations {
+		deletedOrganizationIDs = append(deletedOrganizationIDs, organization.ID.String())
+	}
+
+	log.WithFields(log.Fields{
+		"admin_account_id":         admin.ID.String(),
+		"admin_email":              admin.Email,
+		"target_account_id":        target.ID.String(),
+		"target_email":             targetEmail,
+		"deleted_organization_ids": deletedOrganizationIDs,
+		"action":                   "delete_account",
+		"client_ip":                r.RemoteAddr,
+	}).Info("account deleted")
+
+	respondJSON(w, map[string]any{
+		"status":                   "deleted",
+		"deleted_organization_ids": deletedOrganizationIDs,
+	})
+}
+
 // adminListOrgExperimentalFeatures returns the installation feature registry
 // plus the features enabled for the given organization. Installation admins
 // are not always members of the org, so this must not go through the member
@@ -869,14 +923,16 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description string  `json:"description"`
-	CanvasCount int64   `json:"canvas_count"`
-	MemberCount int64   `json:"member_count"`
-	CreatedAt   *string `json:"created_at,omitempty"`
-	UpdatedAt   *string `json:"updated_at,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Slug          string  `json:"slug"`
+	Description   string  `json:"description"`
+	CanvasCount   int64   `json:"canvas_count"`
+	TaskCount     int64   `json:"task_count"`
+	DoneTaskCount int64   `json:"done_task_count"`
+	MemberCount   int64   `json:"member_count"`
+	CreatedAt     *string `json:"created_at,omitempty"`
+	UpdatedAt     *string `json:"updated_at,omitempty"`
 }
 
 func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
@@ -905,12 +961,14 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 
 func serializeAdminOrganization(org models.OrganizationWithCounts) adminOrgItem {
 	item := adminOrgItem{
-		ID:          org.ID.String(),
-		Name:        org.Name,
-		Slug:        org.Slug,
-		Description: org.Description,
-		CanvasCount: org.CanvasCount,
-		MemberCount: org.MemberCount,
+		ID:            org.ID.String(),
+		Name:          org.Name,
+		Slug:          org.Slug,
+		Description:   org.Description,
+		CanvasCount:   org.CanvasCount,
+		TaskCount:     org.TaskCount,
+		DoneTaskCount: org.DoneTaskCount,
+		MemberCount:   org.MemberCount,
 	}
 
 	if org.CreatedAt != nil {

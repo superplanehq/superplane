@@ -56,9 +56,24 @@ func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactor
 	return actions.UpdateFactory(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SetFactoryVisibility(ctx context.Context, req *pb.SetFactoryVisibilityRequest) (*pb.SetFactoryVisibilityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SetFactoryVisibility(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.UpdateFactoryOnboardingRequest) (*pb.UpdateFactoryOnboardingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryOnboarding(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) SelectFactoryVCSProviderRepository(ctx context.Context, req *pb.SelectFactoryVCSProviderRepositoryRequest) (*pb.SelectFactoryVCSProviderRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SelectFactoryVCSProviderRepository(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SwitchFactoryModelSource(ctx context.Context, req *pb.SwitchFactoryModelSourceRequest) (*pb.SwitchFactoryModelSourceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SwitchFactoryModelSource(ctx, s.registry, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
@@ -181,6 +196,11 @@ func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.S
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) SearchDependabotIntakeSetupItems(ctx context.Context, req *pb.SearchDependabotIntakeSetupItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchDependabotIntakeSetupItems(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
@@ -240,6 +260,11 @@ func (s *FactoryService) CloseWorkOrder(ctx context.Context, req *pb.CloseWorkOr
 func (s *FactoryService) UpdateWorkOrderStatus(ctx context.Context, req *pb.UpdateWorkOrderStatusRequest) (*pb.UpdateWorkOrderStatusResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateWorkOrderStatus(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SendWorkOrderToBacklog(ctx context.Context, req *pb.SendWorkOrderToBacklogRequest) (*pb.SendWorkOrderToBacklogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendWorkOrderToBacklog(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) AddWorkOrderComment(ctx context.Context, req *pb.AddWorkOrderCommentRequest) (*pb.AddWorkOrderCommentResponse, error) {
@@ -329,7 +354,7 @@ func (s *FactoryService) ListFactoryAgentResources(ctx context.Context, req *pb.
 
 func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb.CreateFactoryAgentResourceRequest) (*pb.CreateFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateFactoryAgentResource(ctx, organizationID, req)
+	return actions.CreateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {
@@ -355,4 +380,14 @@ func (s *FactoryService) DisconnectFactoryAgentResourceOAuth(ctx context.Context
 func (s *FactoryService) ListFactoryAgentResourceTools(ctx context.Context, req *pb.ListFactoryAgentResourceToolsRequest) (*pb.ListFactoryAgentResourceToolsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryAgentResourceTools(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.ListFactoryMCPClientsRequest) (*pb.ListFactoryMCPClientsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryMCPClients(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }

@@ -1,38 +1,30 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
-import { offersPrivateGitHubAppSetup } from "@/lib/integrations";
-import { CREATE_PRIVATE_GITHUB_APP_LABEL, startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
-import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
-import { useNavigate } from "react-router";
+import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
 
 interface GitHubConnectControlsProps {
-  organizationId: string;
   definition: IntegrationsIntegrationDefinition | undefined;
   canCreateIntegrations: boolean;
   permissionsLoading: boolean;
   onConnect: () => void;
-  onCreatePrivateApp?: () => void;
-  /** Offer the "Create your own GitHub App" path beside hosted Connect. Defaults to `true`. */
+  /** Show private GitHub App and PAT setup. Factory onboarding owns the public App flow. */
   allowPrivateApp?: boolean;
 }
 
 export function GitHubConnectControls({
-  organizationId,
   definition,
   canCreateIntegrations,
   permissionsLoading,
   onConnect,
-  onCreatePrivateApp,
   allowPrivateApp = true,
 }: GitHubConnectControlsProps) {
-  const navigate = useNavigate();
-  const integrationsBasePath = useIntegrationsBasePath(organizationId);
+  if (!allowPrivateApp) return null;
+
   const canCreate = Boolean(definition) && canCreateIntegrations;
-  const showPrivateApp = allowPrivateApp && offersPrivateGitHubAppSetup(definition) && canCreateIntegrations;
 
   return (
-    <div className="flex shrink-0 flex-col items-end gap-2">
+    <div className="flex shrink-0">
       <PermissionTooltip
         allowed={Boolean(definition) && (canCreateIntegrations || permissionsLoading)}
         message={
@@ -49,31 +41,9 @@ export function GitHubConnectControls({
           disabled={!canCreate}
           data-testid="integrations-connect-github"
         >
-          {definition ? "Connect" : "Unavailable"}
+          {definition ? CREATE_PRIVATE_GITHUB_APP_LABEL : "Unavailable"}
         </Button>
       </PermissionTooltip>
-      {showPrivateApp ? (
-        <Button
-          type="button"
-          variant="link"
-          className="h-auto p-0 text-xs text-gray-500 dark:text-gray-400"
-          data-testid="integrations-create-private-github-app"
-          onClick={() => {
-            if (onCreatePrivateApp) {
-              onCreatePrivateApp();
-              return;
-            }
-            startPrivateGitHubAppSetup({
-              organizationId,
-              returnTo: integrationsBasePath,
-              integrationsBasePath,
-              goTo: navigate,
-            });
-          }}
-        >
-          {CREATE_PRIVATE_GITHUB_APP_LABEL}
-        </Button>
-      ) : null}
     </div>
   );
 }

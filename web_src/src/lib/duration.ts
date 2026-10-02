@@ -1,3 +1,9 @@
+const MS_PER_SECOND = 1_000;
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 3_600_000;
+const MS_PER_DAY = 86_400_000;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
+
 type DurationParts = {
   days?: number;
   hours?: number;
@@ -20,17 +26,17 @@ type IntlWithDurationFormat = typeof Intl & {
 function toDurationParts(durationMs: number): DurationParts {
   let remainingMs = Math.max(0, Math.round(durationMs));
 
-  const days = Math.floor(remainingMs / 86_400_000);
-  remainingMs -= days * 86_400_000;
+  const days = Math.floor(remainingMs / MS_PER_DAY);
+  remainingMs -= days * MS_PER_DAY;
 
-  const hours = Math.floor(remainingMs / 3_600_000);
-  remainingMs -= hours * 3_600_000;
+  const hours = Math.floor(remainingMs / MS_PER_HOUR);
+  remainingMs -= hours * MS_PER_HOUR;
 
-  const minutes = Math.floor(remainingMs / 60_000);
-  remainingMs -= minutes * 60_000;
+  const minutes = Math.floor(remainingMs / MS_PER_MINUTE);
+  remainingMs -= minutes * MS_PER_MINUTE;
 
-  const seconds = Math.floor(remainingMs / 1_000);
-  remainingMs -= seconds * 1_000;
+  const seconds = Math.floor(remainingMs / MS_PER_SECOND);
+  remainingMs -= seconds * MS_PER_SECOND;
 
   const duration: DurationParts = {};
 
@@ -62,21 +68,36 @@ export type FormatDurationOptions = {
    *
    * `"second"` rounds to the nearest whole second and never renders
    * milliseconds. Durations under one second render as `"< 1s"` instead of
-   * `"0s"` or raw millisecond values. Useful for contexts like the work
-   * order timeline where sub-second precision is noise.
+   * `"0s"` or raw millisecond values. A raw duration of 24 hours or more
+   * rounds to the nearest hour and shows days and hours only. Useful for
+   * contexts like the work order timeline where sub-second precision is noise.
    */
   precision?: "millisecond" | "second";
 };
 
 export function formatDuration(durationMs: number, options?: FormatDurationOptions): string {
   if (options?.precision === "second") {
-    if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
-    if (durationMs < 1000) return "< 1s";
-
-    durationMs = Math.round(durationMs / 1000) * 1000;
+    return formatSecondPrecision(durationMs);
   }
 
-  const duration = toDurationParts(durationMs);
+  return formatResolvedDuration(toDurationParts(durationMs));
+}
+
+function formatSecondPrecision(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "";
+  if (durationMs < MS_PER_SECOND) return "< 1s";
+  if (durationMs >= MS_PER_DAY) {
+    return formatResolvedDuration(toDurationParts(roundToNearestHour(durationMs)));
+  }
+
+  return formatResolvedDuration(toDurationParts(Math.round(durationMs / MS_PER_SECOND) * MS_PER_SECOND));
+}
+
+function roundToNearestHour(durationMs: number): number {
+  return Math.floor((durationMs + MS_PER_HOUR / 2) / MS_PER_HOUR) * MS_PER_HOUR;
+}
+
+function formatResolvedDuration(duration: DurationParts): string {
   const DurationFormat = (Intl as IntlWithDurationFormat).DurationFormat;
 
   if (typeof DurationFormat === "function") {
@@ -84,6 +105,87 @@ export function formatDuration(durationMs: number, options?: FormatDurationOptio
   }
 
   return formatDurationFallback(duration);
+}
+
+/**
+ * At most two units: `2m 5s`, `1h 30m`, `1d 2h`, or `1w 3d`.
+ * Rounds the smaller unit. A lone remainder is omitted (`2h`, not `2h 0m`).
+ */
+export function formatCompactDuration(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return "";
+  }
+  if (durationMs < MS_PER_SECOND) {
+    return "< 1s";
+  }
+  if (durationMs >= MS_PER_WEEK) {
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_WEEK,
+      majorUnit: "w",
+      minorMs: MS_PER_DAY,
+      minorUnit: "d",
+      minorPerMajor: 7,
+    });
+  }
+  if (durationMs >= MS_PER_DAY) {
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_DAY,
+      majorUnit: "d",
+      minorMs: MS_PER_HOUR,
+      minorUnit: "h",
+      minorPerMajor: 24,
+    });
+  }
+  if (durationMs >= MS_PER_HOUR) {
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_HOUR,
+      majorUnit: "h",
+      minorMs: MS_PER_MINUTE,
+      minorUnit: "m",
+      minorPerMajor: 60,
+    });
+  }
+  if (durationMs >= MS_PER_MINUTE) {
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_MINUTE,
+      majorUnit: "m",
+      minorMs: MS_PER_SECOND,
+      minorUnit: "s",
+      minorPerMajor: 60,
+    });
+  }
+  return `${Math.round(durationMs / MS_PER_SECOND)}s`;
+}
+
+function formatTwoUnits({
+  durationMs,
+  majorMs,
+  majorUnit,
+  minorMs,
+  minorUnit,
+  minorPerMajor,
+}: {
+  durationMs: number;
+  majorMs: number;
+  majorUnit: string;
+  minorMs: number;
+  minorUnit: string;
+  minorPerMajor: number;
+}): string {
+  let major = Math.floor(durationMs / majorMs);
+  let minor = Math.round((durationMs % majorMs) / minorMs);
+  if (minor >= minorPerMajor) {
+    major += 1;
+    minor = 0;
+  }
+  if (minor > 0) {
+    return `${major}${majorUnit} ${minor}${minorUnit}`;
+  }
+  return `${major}${majorUnit}`;
 }
 
 /** Clock time for a scan column: `02:59`, or `1:10:22` after one hour. */
@@ -102,8 +204,16 @@ export function formatClockDuration(durationMs: number): string {
 
 const KNOWN_DURATION_WORDS = new Set(["—", "-", "Running", "Waiting", "Pending"]);
 
+function withoutRunningDurationSuffix(label: string): string {
+  return label.replace(/\s+so far$/i, "").trim();
+}
+
+export function isSubSecondDurationLabel(label: string): boolean {
+  return /^<\s*1s$/i.test(withoutRunningDurationSuffix(label));
+}
+
 function parseSpokenDurationMs(label: string): number | null {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
     return null;
   }
@@ -133,7 +243,7 @@ export function durationLabelMs(label: string): number {
 
 /** Turn a stored label such as `2m 59s` into a clock column value. */
 export function formatClockDurationLabel(label: string): string {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed) {
     return "—";
   }
@@ -166,7 +276,7 @@ export function formatGoDuration(durationMs: number): string {
 
 /** Turn a stored label such as `1m 12s` or `4m so far` into `1m12s` / `4m`. */
 export function formatGoDurationLabel(label: string): string {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
     return "";
   }

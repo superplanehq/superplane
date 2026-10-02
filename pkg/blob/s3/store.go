@@ -86,6 +86,33 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 	return output.Body, nil
 }
 
+func (s *Store) GetRange(ctx context.Context, key string, offset, length int64) (io.ReadCloser, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	input := &awss3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}
+	if length < 0 {
+		input.Range = aws.String(fmt.Sprintf("bytes=%d-", offset))
+	} else {
+		end := offset + length - 1
+		if end < offset {
+			end = offset - 1
+		}
+		input.Range = aws.String(fmt.Sprintf("bytes=%d-%d", offset, end))
+	}
+	output, err := s.client.GetObject(ctx, input)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, blob.ErrNotFound
+		}
+		return nil, fmt.Errorf("read S3 object range: %w", err)
+	}
+	return output.Body, nil
+}
+
 func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) {
 	output, err := s.client.HeadObject(ctx, &awss3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),

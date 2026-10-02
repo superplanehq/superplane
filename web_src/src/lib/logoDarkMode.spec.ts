@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
@@ -8,6 +10,14 @@ import { logoDarkInvertClass } from "./logoDarkMode";
 describe("logoDarkInvertClass", () => {
   it("returns the dark-mode invert class for the Sentry logo", () => {
     expect(logoDarkInvertClass(sentryIcon)).toBe("dark:brightness-0 dark:invert");
+  });
+
+  it("returns the dark-mode invert class for the Datadog logo", () => {
+    expect(logoDarkInvertClass(datadogIcon)).toBe("dark:brightness-0 dark:invert");
+  });
+
+  it("returns the dark-mode invert class for the Dependabot logo", () => {
+    expect(logoDarkInvertClass(dependabotIcon)).toBe("dark:brightness-0 dark:invert");
   });
 
   it("returns nothing for an unrelated logo", () => {

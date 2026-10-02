@@ -113,11 +113,11 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
 	models.FactoryIntakeSourceProductiveTasks: {
-		name:                 "Productive.io tasks",
-		description:          "Create a work order when a Productive.io task is created.",
+		name:                 "Productive tasks",
+		description:          "Create a work order when a Productive task is created.",
 		triggerComponent:     "productive.onTask",
 		triggerName:          "On Task",
-		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		triggerConfiguration: map[string]any{"actions": intakeProductiveTriggerActions(defaultProductiveIntakeSettings())},
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
@@ -137,7 +137,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourceDependabotAlerts: {
 		name:             "Dependabot alerts",
-		description:      "Create a task when GitHub reports a Dependabot alert. Turn on Dependabot alerts for the repository.",
+		description:      "Create a task when GitHub reports a Dependabot alert.",
 		triggerComponent: "github.onDependabotAlert",
 		triggerName:      "On Dependabot Alert",
 		triggerConfiguration: map[string]any{
@@ -146,15 +146,41 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       dependabotAlertCreateTitle,
 		createDescription: dependabotAlertCreateDescription,
 	},
+	models.FactoryIntakeSourceDatadog: {
+		name:             "Datadog errors",
+		description:      "Create a work order when Datadog reports a new Error Tracking issue.",
+		triggerComponent: "datadog.onErrorTrackingAlert",
+		triggerName:      "On Error Tracking Alert",
+		triggerConfiguration: map[string]any{
+			"alertTransitions": intakeDatadogAlertTransitions(defaultDatadogIntakeSettings()),
+		},
+		createTitle:       "{{ root().data.title }}",
+		createDescription: "{{ root().data.description }}",
+	},
+	models.FactoryIntakeSourceLinearIssues: {
+		name:             "Linear issues",
+		description:      "Create a work order when a Linear issue is added to a selected project.",
+		triggerComponent: "linear.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"actions": []any{"create", "update"},
+		},
+		createTitle:       `{{ root().data.data.identifier }}: {{ root().data.data.title }}`,
+		createDescription: `{{ root().data.data.description }}`,
+	},
 }
 
-// dependabotAlertCreateTitle names the package and the manifest file.
-const dependabotAlertCreateTitle = `Bump {{ root().data.alert.dependency.package.name ?? "dependency" }} in {{ root().data.alert.dependency.manifest_path ?? "the manifest" }}`
+// dependabotAlertCreateTitle names the package, not the manifest, because
+// every alert for one package lands on one task. It must match
+// dependabot.TaskTitle.
+const dependabotAlertCreateTitle = `{{ "Fix Dependabot alerts for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") }}`
 
-// dependabotAlertCreateDescription carries the fields an agent needs to
-// apply the patched version. One expression keeps a missing field from
+// dependabotAlertCreateDescription opens the task with the fix guidance and
+// the first alert. A later alert for the same package is appended, so the
+// alert block must match dependabot.AlertSection and the guidance must match
+// dependabot.packageFixGuidance. One expression keeps a missing field from
 // failing the whole description.
-const dependabotAlertCreateDescription = `{{ (root().data.alert.security_advisory.summary ?? "") + "\n\nPackage: " + (root().data.alert.dependency.package.name ?? "") + " (" + (root().data.alert.dependency.package.ecosystem ?? "") + ")\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\n" + (root().data.alert.html_url ?? "") }}`
+const dependabotAlertCreateDescription = `{{ "Fix every open Dependabot alert for " + (root().data.alert.dependency.package.name ?? "a dependency") + ((root().data.alert.dependency.package.ecosystem ?? "") != "" ? " (" + root().data.alert.dependency.package.ecosystem + ")" : "") + ".\nFirst check if the package is a direct dependency in the manifest.\nIf it is direct, update it to the patched version or later.\nIf it is transitive, find the direct dependency that requires it.\nUpdate that direct dependency to a release that requires the patched version.\nUse a version override or resolution only when no such release exists, and say so in the pull request.\nUpdate the lockfile so every listed manifest is fixed.\n\n## Alerts\n\n### #" + string(root().data.alert.number ?? 0) + " " + (root().data.alert.security_advisory.summary ?? "") + "\nSeverity: " + (root().data.alert.security_advisory.severity ?? "") + "\nManifest: " + (root().data.alert.dependency.manifest_path ?? "") + "\nVulnerable versions: " + (root().data.alert.security_vulnerability.vulnerable_version_range ?? "") + "\nPatched version: " + (root().data.alert.security_vulnerability.first_patched_version?.identifier ?? "") + ((root().data.alert.dependency.relationship ?? "") in ["direct", "transitive"] ? "\nRelationship: " + root().data.alert.dependency.relationship : "") + "\n" + (root().data.alert.html_url ?? "") }}`
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {
 	for source, spec := range intakeSpecsBySource {
@@ -194,7 +220,7 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Name:          spec.triggerName,
 			Type:          yaml.NodeTypeTrigger,
 			Component:     spec.triggerComponent,
-			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Configuration: intakeTriggerConfiguration(spec, request),
 			Metadata:      intakeTriggerMetadata(request.Source, request.Settings),
 			Integration:   request.Binding.integrationRef(),
 			Position:      yaml.Position{X: 160, Y: 80},
@@ -416,13 +442,26 @@ func ensureIntakeEdge(edges []models.Edge, expected models.Edge) []models.Edge {
 // intakeTriggerConfiguration lays the binding over the template so the trigger
 // listens on a concrete resource. The template map is shared between intakes,
 // so it is copied rather than written to.
-func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[string]any {
+func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) map[string]any {
+	binding := request.Binding
 	configuration := make(map[string]any, len(spec.triggerConfiguration)+len(binding.configuration()))
 	for name, value := range spec.triggerConfiguration {
 		configuration[name] = value
 	}
 	for name, value := range binding.configuration() {
 		configuration[name] = value
+	}
+	if request.Source == models.FactoryIntakeSourceProductiveTasks {
+		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
+	}
+	if request.Source == models.FactoryIntakeSourceLinearIssues {
+		projects := request.Settings.LinearProjectIDs
+		if len(projects) == 0 {
+			projects = configurationStrings(configuration["projects"])
+		}
+		configuration["projects"] = configurationAnyStrings(projects)
+		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
+		configuration["actions"] = []any{"create", "update"}
 	}
 
 	return configuration
@@ -450,6 +489,12 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		return defaultDependabotIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceDatadog {
+		return defaultDatadogIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return defaultLinearIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }
@@ -508,6 +553,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 	if model := agent.model(); model != "" {
 		configuration["model"] = model
 	}
+	agent.applyLLMProvider(configuration)
 
 	return configuration
 }
@@ -525,7 +571,22 @@ func intakeAnalysisCloneCommand() string {
 		"fi",
 		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
 		"rm -rf repo",
-		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+		cloneRepositoryCommand(),
+	}, "\n")
+}
+
+func cloneRepositoryCommand() string {
+	return strings.Join([]string{
+		`branch="${BASE:-main}"`,
+		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
+		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
+		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
+		`elif [ -z "$heads" ]; then`,
+		`  git clone "${REPO_URL}" repo`,
+		`else`,
+		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
+		`  exit 1`,
+		`fi`,
 	}, "\n")
 }
 

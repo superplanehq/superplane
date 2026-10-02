@@ -6,7 +6,15 @@ import { getIntegrationIconSrc } from "./integrationIconMaps";
 const DEFAULT_ICON_SIZE = 16;
 
 /** Monochrome SVG logos that need inversion on dark surfaces. */
-const INTEGRATION_LOGO_INVERT_IN_DARK = new Set(["github", "openrouter", "sentry"]);
+const INTEGRATION_LOGO_INVERT_IN_DARK = new Set([
+  "github",
+  "notion",
+  "openrouter",
+  "prisma",
+  "railway",
+  "sentry",
+  "vercel",
+]);
 
 interface IntegrationIconProps {
   integrationName: string | undefined;

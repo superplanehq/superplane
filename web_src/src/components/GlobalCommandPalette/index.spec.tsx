@@ -183,6 +183,40 @@ function openPalette() {
   openGlobalCommandPalette();
 }
 
+function declaredPointerEvents(element: Element) {
+  let current: Element | null = element;
+  while (current) {
+    const pointerEvents = window.getComputedStyle(current).pointerEvents;
+    if (pointerEvents && pointerEvents !== "inherit" && pointerEvents !== "unset") {
+      return pointerEvents;
+    }
+    current = current.parentElement;
+  }
+  return "auto";
+}
+
+async function waitUntilPointerEventsAllow(element: Element) {
+  await waitFor(() => {
+    expect(declaredPointerEvents(element)).not.toBe("none");
+  });
+}
+
+function setupUser() {
+  const user = userEvent.setup();
+  return {
+    async click(element: Element) {
+      if (!element.closest("[data-disabled='true']")) {
+        await waitUntilPointerEventsAllow(element);
+      }
+      await user.click(element);
+    },
+    async type(element: Element, text: string) {
+      await waitUntilPointerEventsAllow(element);
+      await user.type(element, text);
+    },
+  };
+}
+
 function renderPalette(path = "/org-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -269,7 +303,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("shows a loading state while searchable data loads", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     paletteQueryState.loading = true;
     renderPalette();
 
@@ -308,7 +342,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("expands app list when clicking Apps", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -319,7 +353,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("navigates to an app when selected from expanded list", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -330,7 +364,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches apps by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -340,7 +374,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches apps by description", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -350,7 +384,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches integrations by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -360,7 +394,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches integrations by provider name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -370,7 +404,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches API keys by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -380,7 +414,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("does not match every result by shared category labels", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -391,7 +425,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches canvas nodes from the canvas page", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const selectNode = vi.fn();
     unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
       searchNodes: (query) =>
@@ -436,7 +470,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("disables invite copy when the invite link is inactive", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     inviteLinkState.data = { token: "test-invite-token", enabled: false };
     renderPalette();
@@ -450,7 +484,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("closes after copying the invite link successfully", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     renderPalette();
 
@@ -470,7 +504,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("stays open when invite link copy fails", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     writeTextMock.mockRejectedValue(new Error("Clipboard unavailable"));
     renderPalette();
@@ -504,7 +538,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("collapses expanded section when back is clicked", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();

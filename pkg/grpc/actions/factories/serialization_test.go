@@ -287,6 +287,27 @@ func TestSerializeWorkOrderExecution_OmitsRunWhenRunIDNil(t *testing.T) {
 	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, out.GetState())
 	assert.Equal(t, pb.WorkOrderExecution_RESULT_PASSED, out.GetResult())
 	assert.Equal(t, "implement", out.GetStep())
+	assert.Empty(t, out.GetFailureReason())
+}
+
+func TestSerializeWorkOrderExecution_IncludesFailureReason(t *testing.T) {
+	now := time.Now()
+	reason := models.WorkOrderExecutionFailureReasonNoHostedCredit
+	out := serializeWorkOrderExecution(models.FactoryWorkOrderExecutionRecord{
+		FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{
+			ID:            uuid.New(),
+			LineID:        uuid.New(),
+			StepName:      "implement",
+			Status:        models.FactoryWorkOrderExecutionStatusFinished,
+			Result:        models.CanvasRunResultFailed,
+			FailureReason: &reason,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+	}, nil)
+
+	assert.Equal(t, pb.WorkOrderExecution_RESULT_FAILED, out.GetResult())
+	assert.Equal(t, "no_hosted_credit", out.GetFailureReason())
 }
 
 func TestSerializeWorkOrderExecution_IncludesRunWhenRunIDSet(t *testing.T) {
@@ -423,6 +444,7 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 		ID:                 uuid.New(),
 		Name:               "Payments",
 		Key:                "PAY",
+		URLID:              "pay1id01",
 		PlanningEnabled:    true,
 		PlanningClarity:    true,
 		PlanningConfidence: false,
@@ -434,4 +456,16 @@ func TestSerializeFactory_IncludesPlanningDefaults(t *testing.T) {
 	assert.True(t, serialized.Planning.Clarity)
 	assert.False(t, serialized.Planning.Confidence)
 	assert.False(t, serialized.Planning.SetupCompleted)
+	assert.Equal(t, "pay1id01", serialized.UrlId)
+}
+
+func TestWorkOrderStateProtoMapping(t *testing.T) {
+	assert.Equal(t, pb.WorkOrder_STATE_DRAFT, WorkOrderStateToProto(models.FactoryWorkOrderStateDraft))
+	assert.Equal(t, pb.WorkOrder_STATE_OPEN, WorkOrderStateToProto(models.FactoryWorkOrderStateOpen))
+	assert.Equal(t, pb.WorkOrder_STATE_CLOSED, WorkOrderStateToProto(models.FactoryWorkOrderStateClosed))
+	assert.Equal(t, pb.WorkOrder_STATE_UNSPECIFIED, WorkOrderStateToProto("unknown"))
+
+	name, ok := WorkOrderStateFromProto(pb.WorkOrder_STATE_DRAFT)
+	assert.True(t, ok)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, name)
 }

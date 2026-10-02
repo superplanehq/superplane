@@ -79,6 +79,8 @@ func Test__FactoryIntake(t *testing.T) {
 			models.FactoryIntakeSourceProductiveTasks,
 			models.FactoryIntakeSourceJiraIssues,
 			models.FactoryIntakeSourceDependabotAlerts,
+			models.FactoryIntakeSourceDatadog,
+			models.FactoryIntakeSourceLinearIssues,
 		} {
 			assert.True(t, models.ValidFactoryIntakeSource(source))
 
@@ -95,7 +97,7 @@ func Test__FactoryIntake(t *testing.T) {
 			assert.Equal(t, source, found.Source)
 		}
 
-		assert.False(t, models.ValidFactoryIntakeSource("linear-issues"))
+		assert.False(t, models.ValidFactoryIntakeSource("notion"))
 	})
 
 	t.Run("source must be one we know how to run", func(t *testing.T) {
@@ -103,7 +105,7 @@ func Test__FactoryIntake(t *testing.T) {
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Unknown source")
 
-		_, err = factory.CreateIntake(db, canvas.ID, "linear-issues")
+		_, err = factory.CreateIntake(db, canvas.ID, "notion")
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
 	})
 

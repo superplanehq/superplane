@@ -466,6 +466,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 	if model := request.Agent.model(); model != "" {
 		configuration["model"] = model
 	}
+	request.Agent.applyLLMProvider(configuration)
 
 	return configuration
 }
@@ -511,8 +512,8 @@ func prFeedbackRunnerSteps() []any {
 			"name": "Set Up Git User",
 			"type": "bash",
 			"command": strings.Join([]string{
-				"git config --global user.email \"superplaneagent@superplane.com\"",
-				"git config --global user.name \"SuperPlane Agent\"",
+				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
+				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
 			}, "\n"),
 		},
 		map[string]any{
@@ -538,22 +539,7 @@ func prFeedbackRunnerSteps() []any {
 			"name":             "Set Up DCO Signing",
 			"type":             "bash",
 			"workingDirectory": "repo",
-			"command": strings.Join([]string{
-				"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
-				`git interpret-trailers --in-place --if-exists doNothing \`,
-				`  --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"`,
-				"",
-				`printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do`,
-				`  if [ -n "$trailer" ]; then`,
-				`    git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"`,
-				"  fi",
-				"done",
-				"",
-				"exit 0",
-				"HOOK",
-				"",
-				"chmod +x .git/hooks/prepare-commit-msg",
-			}, "\n"),
+			"command":          runner.FactoryRepoCommitSetup(),
 		},
 		map[string]any{
 			"name":             "Address PR feedback",
@@ -606,5 +592,6 @@ func prFeedbackPrompt() string {
 		"Do not post a separate visual evidence comment.",
 		"Stop after current feedback is addressed.",
 		"Keep the change focused. Add tests where they are needed.",
+		runner.FactoryCommitIdentityPrompt,
 	}, "\n")
 }

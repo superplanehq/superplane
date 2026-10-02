@@ -121,13 +121,17 @@ for a personal token. See
 runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
 testing legacy or remote broker routing (see `.env.example`).
 
-The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
-`jq`. Factory line apps run on that worker. Do not install those CLIs on the
-host. Connect GitHub and Claude integrations in the organization before you
+The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
+`jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
+line apps run on that worker. Do not install those CLIs on the host.
+Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. Check tools with `make doctor-local` after `make
 dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 SuperPlane does not download OpenCode in the prompt prepare step.
+Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
+Whisper model. Missing media tools fail the setup step. Do not download
+models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See
@@ -147,7 +151,7 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - One-shot backend tests: `make test` (Go).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
-  (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
+  (or `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19` for a single test).
 - UI unit tests: `make check.test.ui` (Bun + Happy DOM).
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
@@ -203,7 +207,9 @@ Further reading:
 
 - Always write clean code: work test-first by default, then keep names clear,
   functions focused, side effects explicit, control flow shallow, and error
-  handling useful.
+  handling useful. Load
+  [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
+  when you write, change, review, or sweep tests.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
 - Go: prefer `any` over `interface{}`.

@@ -91,13 +91,17 @@ Contributor setup is Docker-based. Start with the repository instructions in
 [`AGENTS.md`](./AGENTS.md) and the development section of
 [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-## Community
+## Community and license
 
 - [Discord](https://discord.superplane.com) for discussions and support
 - [Blog](https://superplane.com/blog/) for engineering notes and releases
 - [Community events](https://luma.com/superplane) for maintainer sessions
 - [X](https://x.com/superplanehq) for product updates
 
-## License
-
 SuperPlane is available under the [Apache License 2.0](./LICENSE).
+
+## Factory activity
+
+<a href="https://app.superplane.com/superplane/workspaces/super/lines/9f2a291c-057d-4159-8eba-b4c59a125df2">
+  <img src="https://app.superplane.com/api/v1/public/badges/haMI0i2GHXrK7G0QADjtSY8jsHWtA4efC3M3zQ82eOo.svg?period=30&size=wide&theme=gruvbox&accent=f5b914&muted=ffffff" alt="SuperPlane Factory activity in the last 30 days" width="100%">
+</a>

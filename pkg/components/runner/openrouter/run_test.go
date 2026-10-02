@@ -82,6 +82,51 @@ func TestOpencodeRunArgsContinuesSession(t *testing.T) {
 	assert.Contains(t, args, "openrouter/anthropic/claude-sonnet-4-6")
 }
 
+func TestBuildOpenCodeConfigWritesCustomProvider(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{
+		"taskDir": "/task",
+		"env": map[string]string{
+			"CUSTOM_LLM_API_KEY":  "token",
+			"CUSTOM_LLM_BASE_URL": "https://models.example/v1",
+			"CUSTOM_LLM_API_TYPE": "openai-compatible",
+		},
+		"models": []string{"kimi-k3"},
+	})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); process.stdout.write(JSON.stringify(buildOpenCodeConfig(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(out, &config))
+
+	provider, _ := config["provider"].(map[string]any)
+	custom, _ := provider["custom"].(map[string]any)
+	assert.Equal(t, "@ai-sdk/openai-compatible", custom["npm"])
+	assert.Equal(t, "Custom", custom["name"])
+	options, _ := custom["options"].(map[string]any)
+	assert.Equal(t, "token", options["apiKey"])
+	assert.Equal(t, "https://models.example/v1", options["baseURL"])
+	models, _ := custom["models"].(map[string]any)
+	assert.Contains(t, models, "kimi-k3")
+	_, hasOpenRouter := provider["openrouter"]
+	assert.False(t, hasOpenRouter)
+
+	args := jsOpencodeArgs(t, map[string]any{
+		"model":  "kimi-k3",
+		"prompt": "do the work",
+		"cwd":    "/tmp/repo",
+		"env": map[string]string{
+			"CUSTOM_LLM_API_KEY":  "token",
+			"CUSTOM_LLM_BASE_URL": "https://models.example/v1",
+			"CUSTOM_LLM_API_TYPE": "openai-compatible",
+		},
+	})
+	assert.Contains(t, args, "custom/kimi-k3")
+	assert.NotContains(t, args, "openrouter/kimi-k3")
+}
+
 func TestBuildOpenCodeConfigWritesBaseURLAndAnalysisMCP(t *testing.T) {
 	config := jsBuildConfig(t, "/task", map[string]string{
 		"OPENROUTER_API_KEY":               "sk-or",
@@ -229,6 +274,9 @@ func TestBuildOpenCodeConfigDisablesFallbacksForSelectedModel(t *testing.T) {
 	routing, _ := options["provider"].(map[string]any)
 	assert.Equal(t, false, routing["allow_fallbacks"])
 	assert.Equal(t, "throughput", routing["sort"])
+	assert.Equal(t, true, grok["attachment"])
+	modalities, _ := grok["modalities"].(map[string]any)
+	assert.Equal(t, []any{"text", "image"}, modalities["input"])
 }
 
 func TestEnsureOpenCodeModelCatalogRefreshesOnce(t *testing.T) {

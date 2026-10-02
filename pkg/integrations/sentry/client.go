@@ -32,6 +32,18 @@ func (e *apiError) Error() string {
 	return fmt.Sprintf("sentry API returned status %d: %s", e.StatusCode, e.Body)
 }
 
+func StatusCode(err error) (int, bool) {
+	var sentryAPIError *apiError
+	if !errors.As(err, &sentryAPIError) {
+		return 0, false
+	}
+	return sentryAPIError.StatusCode, true
+}
+
+func StatusError(statusCode int) error {
+	return &apiError{StatusCode: statusCode}
+}
+
 func wrapReleaseScopeError(err error) error {
 	var sentryAPIError *apiError
 	if errors.As(err, &sentryAPIError) && sentryAPIError.StatusCode == http.StatusForbidden {
@@ -54,14 +66,14 @@ func IsRetryableAPIError(err error) bool {
 		return false
 	}
 
-	var sentryAPIError *apiError
-	if !errors.As(err, &sentryAPIError) {
+	status, ok := StatusCode(err)
+	if !ok {
 		return true
 	}
 
-	return sentryAPIError.StatusCode == http.StatusTooManyRequests ||
-		sentryAPIError.StatusCode == http.StatusRequestTimeout ||
-		sentryAPIError.StatusCode >= http.StatusInternalServerError
+	return status == http.StatusTooManyRequests ||
+		status == http.StatusRequestTimeout ||
+		status >= http.StatusInternalServerError
 }
 
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
@@ -992,6 +1004,20 @@ func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {
 	}
 
 	return apps, nil
+}
+
+func (c *Client) GetSentryApp(appSlug string) (*SentryApp, error) {
+	responseBody, err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/0/sentry-apps/%s/", url.PathEscape(appSlug)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	app := SentryApp{}
+	if err := json.Unmarshal(responseBody, &app); err != nil {
+		return nil, err
+	}
+
+	return &app, nil
 }
 
 func (c *Client) UpdateSentryApp(appSlug string, request UpdateSentryAppRequest) (*SentryApp, error) {
