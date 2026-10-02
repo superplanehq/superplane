@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -11,7 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func ListFactoryAgentResourceTools(
@@ -52,6 +55,9 @@ func ListFactoryAgentResourceTools(
 	if err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
+	if err := saveDefaultMCPWriteTools(db, resource, tools); err != nil {
+		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
+	}
 
 	out := make([]*pb.FactoryAgentResourceTool, 0, len(tools))
 	for _, tool := range tools {
@@ -62,6 +68,82 @@ func ListFactoryAgentResourceTools(
 		})
 	}
 	return &pb.ListFactoryAgentResourceToolsResponse{Tools: out}, nil
+}
+
+func applyDefaultMCPWriteTools(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+) {
+	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
+		return
+	}
+	if resource.Config.Data().ToolsDefaultApplied {
+		return
+	}
+
+	headers, err := mcpHeadersForResource(ctx, deps, db, resource.OrganizationID, resource)
+	if err != nil {
+		return
+	}
+	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), resource.Config.Data().URL, headers)
+	if err != nil {
+		return
+	}
+	_ = saveDefaultMCPWriteTools(db, resource, tools)
+}
+
+func saveDefaultMCPWriteTools(db *gorm.DB, resource *models.FactoryAgentResource, tools []mcp.Tool) error {
+	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
+		return nil
+	}
+	if resource.Config.Data().ToolsDefaultApplied {
+		return nil
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var current models.FactoryAgentResource
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).
+			First(&current).Error
+		if err != nil || current.Config.Data().ToolsDefaultApplied {
+			return err
+		}
+		config := current.Config.Data()
+		config.DisabledTools = writeToolNames(tools)
+		config.ToolsDefaultApplied = true
+		normalized := config.NormalizedMCP()
+		now := time.Now()
+		result := tx.Model(&models.FactoryAgentResource{}).
+			Where("organization_id = ? AND id = ?", current.OrganizationID, current.ID).
+			Where("COALESCE(config->>'toolsDefaultApplied', 'false') <> 'true'").
+			Updates(map[string]any{
+				"config":     datatypes.NewJSONType(normalized),
+				"updated_at": now,
+			})
+		if result.Error != nil || result.RowsAffected == 0 {
+			return result.Error
+		}
+		resource.Config = datatypes.NewJSONType(normalized)
+		resource.UpdatedAt = now
+		return nil
+	})
+}
+
+func writeToolNames(tools []mcp.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if tool.ReadOnly {
+			continue
+		}
+		name := strings.TrimSpace(tool.Name)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return models.NormalizeDisabledTools(names)
 }
 
 func mcpHTTPClient(deps IntakeDependencies) mcp.HTTPDoer {
