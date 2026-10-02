@@ -26,6 +26,29 @@ function stageWithStep(step: AgentStep): AutomationStage {
 }
 
 describe("AgentStepMarkers", () => {
+  it("keeps the step duration on one line and shows it on hover", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep({
+          id: "implementation",
+          title: "Implementation",
+          type: "prompt",
+          status: "passed",
+          duration: "23m 34s",
+          summary: "",
+          toolCount: 0,
+          events: [],
+        })}
+      />,
+    );
+
+    const duration = screen.getByText("23m 34s");
+    expect(duration).toHaveClass("whitespace-nowrap");
+    expect(duration).toHaveClass("opacity-0");
+    expect(duration).toHaveClass("group-hover/step:opacity-100");
+    expect(duration).not.toHaveClass("w-12");
+  });
+
   it("keeps a long prompt subtitle on one truncated line", () => {
     render(
       <AgentStepMarkers

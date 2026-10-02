@@ -157,7 +157,7 @@ function checksPhase(): SplitRunPhase {
   };
 }
 
-function mockChecksCanvas(nodes: Array<{ id: string; component: string }> = []) {
+function mockChecksCanvas(nodes: Array<{ id: string; component: string; configuration?: unknown }> = []) {
   useSplitRunLiveCanvas.mockReturnValue({
     enabled: true,
     isError: false,
@@ -255,6 +255,32 @@ describe("AgentRunsPage pull request checks", () => {
     expect(screen.getByText("Waiting for checks on the commit.")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Pull request checks" })).not.toBeInTheDocument();
     expect(screen.queryByText("build")).not.toBeInTheDocument();
+  });
+
+  it("lists configured checks as pending when GitHub has not posted them", () => {
+    mockChecksCanvas([
+      {
+        id: WAIT_NODE_ID,
+        component: "github.waitForPullRequestChecks",
+        configuration: { checkNames: ["ci/semaphoreci/pr: CI"] },
+      },
+    ]);
+    mockExecutions([
+      {
+        nodeId: WAIT_NODE_ID,
+        state: "STATE_STARTED",
+        metadata: {
+          selectedChecks: [],
+          checks: [{ name: "DCO", status: "completed", conclusion: "success" }],
+        },
+      },
+    ]);
+
+    renderChecksCard(checksRun(`Waiting for checks on [3fc0c4c](${COMMIT_URL})`, "Waiting for checks on the commit."));
+
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["ci/semaphoreci/pr: CIPending"]);
+    expect(screen.queryByText("DCO")).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for checks on the commit.")).toBeInTheDocument();
   });
 
   it("maps check conclusions with the wait component rules", () => {

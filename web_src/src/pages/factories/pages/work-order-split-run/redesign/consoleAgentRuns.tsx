@@ -14,7 +14,7 @@ import { LiveAgentSteps } from "./LiveAgentSteps";
 import { formatClock, META_TEXT_CLASSNAME } from "./redesignFormat";
 import { StaticStatusGlyph } from "./redesignShared";
 import {
-  waitForPullRequestChecksNodeId,
+  waitForPullRequestChecksNode,
   watchedPullRequestChecksFromExecutions,
   type WatchedCheckStatus,
   type WatchedPullRequestCheck,
@@ -211,12 +211,12 @@ function useWatchedPullRequestChecks(
   organizationId?: string,
 ): WatchedPullRequestCheck[] {
   const live = useSplitRunLiveCanvas(organizationId, phase);
-  const nodeId = waitForPullRequestChecksNodeId(live.canvas?.nodes);
-  const executions = useEventExecutions(phase?.appId ?? "", nodeId ? (live.rootEventId ?? null) : null);
-  if (!nodeId || (executions.isError && !executions.data)) {
+  const node = waitForPullRequestChecksNode(live.canvas?.nodes);
+  const executions = useEventExecutions(phase?.appId ?? "", node ? (live.rootEventId ?? null) : null);
+  if (!node || (executions.isError && !executions.data)) {
     return [];
   }
-  return watchedPullRequestChecksFromExecutions(executions.data?.executions, nodeId);
+  return watchedPullRequestChecksFromExecutions(executions.data?.executions, node.id, node.checkNames);
 }
 
 const CHECK_GLYPH: Record<WatchedCheckStatus, SplitRunPhaseStatus> = {
