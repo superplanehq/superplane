@@ -95,6 +95,26 @@ func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, 
 	return &metadata, nil
 }
 
+// FindGroupMetadataByNames loads metadata for several groups in one query.
+// Groups without a row are omitted so callers can use defaults.
+func FindGroupMetadataByNames(tx *gorm.DB, groupNames []string, domainType, domainID string) (map[string]*GroupMetadata, error) {
+	result := make(map[string]*GroupMetadata)
+	if len(groupNames) == 0 {
+		return result, nil
+	}
+
+	var metadata []GroupMetadata
+	err := tx.Where("group_name IN ? AND domain_type = ? AND domain_id = ?", groupNames, domainType, domainID).Find(&metadata).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range metadata {
+		result[metadata[i].GroupName] = &metadata[i]
+	}
+	return result, nil
+}
+
 func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description string) error {
 	return UpsertRoleMetadataInTransaction(database.Conn(), roleName, domainType, domainID, displayName, description)
 }

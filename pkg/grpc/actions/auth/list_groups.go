@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -12,51 +13,47 @@ import (
 )
 
 func ListGroups(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
-	groupNames, err := authService.GetGroups(ctx, domainID, domainType)
+	groupDetails, err := authService.GetGroupsWithDetails(ctx, domainID, domainType)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get groups")
 	}
 
-	groups := make([]*pb.Group, len(groupNames))
-	for i, groupName := range groupNames {
-		role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "failed to get group roles")
-		}
+	groupNames := make([]string, len(groupDetails))
+	for i, detail := range groupDetails {
+		groupNames[i] = detail.Name
+	}
 
-		groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "failed to get group members count")
-		}
+	metadataByGroup, err := models.FindGroupMetadataByNames(database.DB(ctx), groupNames, domainType, domainID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to get group metadata")
+	}
 
-		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
+	groups := make([]*pb.Group, len(groupDetails))
+	for i, detail := range groupDetails {
 		var createdAt, updatedAt *timestamppb.Timestamp
-		var displayName, description string
-		if err == nil {
-			createdAt = timestamppb.New(groupMetadata.CreatedAt)
-			updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
-			displayName = groupMetadata.DisplayName
-			description = groupMetadata.Description
-		} else {
-			displayName = groupName
-			description = ""
+		displayName, description := detail.Name, ""
+		if metadata := metadataByGroup[detail.Name]; metadata != nil {
+			createdAt = timestamppb.New(metadata.CreatedAt)
+			updatedAt = timestamppb.New(metadata.UpdatedAt)
+			displayName = metadata.DisplayName
+			description = metadata.Description
 		}
 
 		groups[i] = &pb.Group{
 			Metadata: &pb.Group_Metadata{
-				Name:       groupName,
+				Name:       detail.Name,
 				DomainType: actions.DomainTypeToProto(domainType),
 				DomainId:   domainID,
 				CreatedAt:  createdAt,
 				UpdatedAt:  updatedAt,
 			},
 			Spec: &pb.Group_Spec{
-				Role:        role,
+				Role:        detail.Role,
 				DisplayName: displayName,
 				Description: description,
 			},
 			Status: &pb.Group_Status{
-				MembersCount: int32(len(groupUsers)),
+				MembersCount: int32(len(detail.Members)),
 			},
 		}
 	}
