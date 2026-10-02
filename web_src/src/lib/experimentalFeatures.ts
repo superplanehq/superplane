@@ -37,8 +37,5 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 /** Organization experimental feature: merge confidence automation on the Verify column. */
 export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
 
-/** Organization experimental feature: unified task popup with one console timeline instead of tabs. */
-export const FEATURE_FACTORY_TASK_CONSOLE = "factory_task_console";
-
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
