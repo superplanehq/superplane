@@ -242,6 +242,7 @@ var errCustomAutomationsDisabled = errors.New("custom automations are not enable
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
+var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")

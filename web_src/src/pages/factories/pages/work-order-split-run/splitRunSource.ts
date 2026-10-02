@@ -7,6 +7,7 @@ import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -33,7 +34,8 @@ export type SplitRunIntakeKind =
 export type SplitRunAddedBy =
   | { kind: "intake"; name: string }
   | { kind: "manual" }
-  | { kind: "imported"; personName: string };
+  | { kind: "imported"; personName: string }
+  | { kind: "mcp"; name: string };
 
 export type SplitRunSource =
   | {
@@ -45,6 +47,12 @@ export type SplitRunSource =
       addedBy?: SplitRunAddedBy;
     }
   | {
+      kind: "mcp";
+      name: string;
+      iconSrc: string;
+      iconAlt: string;
+    }
+  | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
@@ -52,6 +60,9 @@ export type SplitRunSource =
     };
 
 export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
+  if (source.kind === "mcp") {
+    return { kind: "mcp", name: source.name };
+  }
   if (source.addedBy) {
     return source.addedBy;
   }
@@ -149,6 +160,16 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
   if (automation) {
     const source = intakeSourceFromKind(intakeKindForAutomation(automation));
     return { ...source, addedBy: { kind: "intake", name: source.name } };
+  }
+
+  const mcpName = order.mcpClient?.name?.trim();
+  if (mcpName) {
+    return {
+      kind: "mcp",
+      name: mcpName,
+      iconSrc: superplaneIcon,
+      iconAlt: "SuperPlane",
+    };
   }
 
   return {

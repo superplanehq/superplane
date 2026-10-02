@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -266,7 +267,14 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	runtime := &mcpserver.Runtime{Auth: s.authService}
+	runtime := &mcpserver.Runtime{
+		Auth: s.authService,
+		Intake: factoryactions.IntakeDependencies{
+			Registry:    s.registry,
+			Encryptor:   s.encryptor,
+			AuthService: s.authService,
+		},
+	}
 	response := mcpserver.HandleJSONRPC(r.Context(), runtime, claims, message)
 	if response == nil {
 		w.WriteHeader(http.StatusAccepted)
