@@ -7,7 +7,9 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { MergeConfidenceCanvasListeners } from "@/hooks/MergeConfidenceCanvasListeners";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useFactoryMergeConfidenceRuns } from "@/hooks/useMergeConfidenceRuns";
 import {
   useDeleteFactoryAutomation,
   useFactoryAutomations,
@@ -1228,44 +1230,60 @@ function LineBoardSplitRunPopup({
   const peekPullRequests = describedOrder?.pullRequests ?? peekOrder.pullRequests ?? [];
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
+  const mergeConfidence = useFactoryMergeConfidenceRuns(
+    organizationId,
+    factoryId,
+    peekPullRequests,
+    peekOrderId,
+    describedOrder?.checks,
+  );
   const popupOrder = describedOrder ?? peekOrder;
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
-    <WorkOrderSplitRunPopup
-      key={peekOrderId}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={peekOrderId}
-      orderNumber={popupOrder.number}
-      lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(popupOrder, {
-        checks: describedOrder?.checks,
-        artifacts: peekArtifacts,
-        lineId,
-        lineName: resolvedLineName,
-        demoArtifacts: false,
-        prFeedbackRuns,
-        analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
-        isAnalyzing,
-        stoppedBy: closer.actor,
-        closer,
-        resolveUser,
-      })}
-      canDispatch={canDispatch && Boolean(resolvedLineName)}
-      canUpdate={canUpdate}
-      isDispatching={isDispatching}
-      onDispatch={
-        resolvedLineName
-          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
-          : undefined
-      }
-      onClose={onClose}
-      fixed
-    />
+    <>
+      <MergeConfidenceCanvasListeners
+        organizationId={organizationId}
+        canvasIds={mergeConfidence.canvasIds}
+        taskKey={mergeConfidence.taskKey}
+        pullRequests={peekPullRequests}
+      />
+      <WorkOrderSplitRunPopup
+        key={peekOrderId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+        orderNumber={popupOrder.number}
+        lineId={lineId}
+        fixture={splitRunFixtureForWorkOrder(popupOrder, {
+          checks: describedOrder?.checks,
+          artifacts: peekArtifacts,
+          lineId,
+          lineName: resolvedLineName,
+          demoArtifacts: false,
+          prFeedbackRuns,
+          analysisRuns,
+          mergeConfidenceRuns: mergeConfidence.runs,
+          columnApps: columnAppsFromFactoryApps(factoryApps),
+          isAnalyzing,
+          stoppedBy: closer.actor,
+          closer,
+          resolveUser,
+        })}
+        canDispatch={canDispatch && Boolean(resolvedLineName)}
+        canUpdate={canUpdate}
+        isDispatching={isDispatching}
+        onDispatch={
+          resolvedLineName
+            ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+            : undefined
+        }
+        onClose={onClose}
+        fixed
+      />
+    </>
   );
 }
 

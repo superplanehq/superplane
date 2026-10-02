@@ -151,6 +151,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
+	assert.Equal(t, []any{"opened", "synchronize", "reopened", "ready_for_review"}, entrypoint.Configuration["actions"])
 
 	gate := findYAMLNode(t, canvas, "should-assess")
 	assert.Equal(

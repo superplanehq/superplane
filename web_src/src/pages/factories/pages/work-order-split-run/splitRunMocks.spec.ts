@@ -30,8 +30,45 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunDecisionTone } from "./splitRunFooter";
-import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { splitRunFixtureForWorkOrder, splitRunStatusLabel, type SplitRunFixture } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
+import { automationsFromStages, stagesByConsoleColumn, stagesFromFixture } from "./redesign/automationsViewModel";
+import { consolePages } from "./redesign/consolePages";
+
+function mergeConfidenceRun(id: string, createdAt: string, state: "STATE_FINISHED" | "STATE_STARTED") {
+  return {
+    canvasId: "app-merge",
+    canvasName: "Merge confidence",
+    run: {
+      id,
+      canvasId: "app-merge",
+      state,
+      result: state === "STATE_FINISHED" ? ("RESULT_PASSED" as const) : undefined,
+      createdAt,
+      finishedAt: state === "STATE_FINISHED" ? createdAt : undefined,
+    },
+  };
+}
+
+function mergeConfidenceCheck(id: string, runId: string, updatedAt: string) {
+  return {
+    id,
+    key: "risk-review",
+    name: "Blast radius",
+    score: 2,
+    maxScore: 5,
+    level: "LEVEL_POSITIVE" as const,
+    automation: { appId: "app-merge", appName: "Merge confidence" },
+    runId,
+    updatedAt,
+  };
+}
+
+function mergeConfidenceCards(fixture: SplitRunFixture) {
+  return automationsFromStages(stagesByConsoleColumn(stagesFromFixture(fixture)).verify).filter(
+    (automation) => automation.name === "Merge confidence",
+  );
+}
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
   return {
@@ -2313,6 +2350,64 @@ describe("line board work-order examples", () => {
 
     expect(phase).toMatchObject({ status: "running", durationRunning: true });
     expect(phase?.duration).not.toBe("1m");
+  });
+
+  it("lists every merge confidence score as a run on one card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      mergeConfidenceRuns: [
+        mergeConfidenceRun("run-first", "2026-08-26T11:00:00Z", "STATE_FINISHED"),
+        mergeConfidenceRun("run-second", "2026-08-26T12:00:00Z", "STATE_FINISHED"),
+      ],
+    });
+    const cards = mergeConfidenceCards(fixture);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.runs.map((run) => run.id)).toEqual(["merge-confidence-run-first", "merge-confidence-run-second"]);
+    expect(consolePages(cards[0]!.latest, undefined, cards[0]?.runs)).toContain("agent");
+  });
+
+  it("lists a started merge confidence score while it is still in progress", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      mergeConfidenceRuns: [
+        mergeConfidenceRun("run-done", "2026-08-26T11:00:00Z", "STATE_FINISHED"),
+        mergeConfidenceRun("run-live", "2026-08-26T12:00:00Z", "STATE_STARTED"),
+      ],
+    });
+    const card = mergeConfidenceCards(fixture)[0];
+    const live = card?.runs.find((run) => run.id === "merge-confidence-run-live");
+
+    expect(card?.runs).toHaveLength(2);
+    expect(live?.status).toBe("running");
+    expect(splitRunStatusLabel(live?.status ?? "pending")).toBe("Running");
+  });
+
+  it("does not create a second card when checks already belong to those runs", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      mergeConfidenceRuns: [
+        mergeConfidenceRun("run-first", "2026-08-26T11:00:00Z", "STATE_FINISHED"),
+        mergeConfidenceRun("run-second", "2026-08-26T12:00:00Z", "STATE_FINISHED"),
+      ],
+      checks: [
+        mergeConfidenceCheck("check-first", "run-first", "2026-08-26T11:04:00Z"),
+        mergeConfidenceCheck("check-second", "run-second", "2026-08-26T12:04:00Z"),
+      ],
+    });
+    const cards = mergeConfidenceCards(fixture);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.runs).toHaveLength(2);
+    expect(fixture.phases.filter((phase) => phase.runId === "run-first")).toHaveLength(1);
+    expect(fixture.phases.filter((phase) => phase.runId === "run-second")).toHaveLength(1);
+    expect(fixture.phases.find((phase) => phase.runId === "run-first")?.checks).toEqual([
+      expect.objectContaining({ id: "check-first" }),
+    ]);
+    expect(fixture.phases.some((phase) => phase.id === "column-app-run-first")).toBe(false);
   });
 
   it("uses the canvas run span for PR feedback phase duration", () => {
