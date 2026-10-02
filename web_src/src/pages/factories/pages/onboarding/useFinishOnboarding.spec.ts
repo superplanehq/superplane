@@ -46,6 +46,23 @@ describe("finishOnboardingError", () => {
       }),
     ).toBe("Connect Jira, then choose a project.");
   });
+
+  it("requires a Linear connection and project when the ticket source is Linear", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: "acme/web",
+        workspaceName: "Web",
+        githubReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+        issuesChoice: "linear",
+        linearReady: false,
+        linearProjectIds: [],
+      }),
+    ).toBe("Connect Linear, then choose a project.");
+  });
 });
 
 // Regression: provisioning used to read the issues answer off `setup`, which
@@ -157,6 +174,31 @@ describe("provisionWorkspace", () => {
       resourceId: "PAY",
       settings: { jiraMoveOnComplete: true, jiraCompletionColumn: "QA" },
     });
+  });
+
+  it("creates a Linear intake instead of GitHub issues when the ticket source is Linear", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-linear" });
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        issuesChoice: "linear",
+        createIntake,
+        updateOnboarding,
+        linear: { integrationId: "linear-1", projectIds: ["project-1"] },
+      }),
+    );
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_LINEAR_ISSUES",
+      integrationId: "linear-1",
+      resourceId: "project-1",
+      settings: { linearProjectIds: ["project-1"] },
+    });
+    const issuesSourceCalls = updateOnboarding.mock.calls
+      .map(([input]) => input.issuesSource)
+      .filter((value) => value !== undefined);
+    expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_LINEAR"]);
   });
 
   it("does not create a comments handler during workspace setup", async () => {

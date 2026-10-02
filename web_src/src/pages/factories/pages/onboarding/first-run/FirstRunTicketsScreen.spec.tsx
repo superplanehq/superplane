@@ -86,6 +86,7 @@ describe("FirstRunTicketsScreen", () => {
 
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
@@ -166,6 +167,70 @@ describe("FirstRunTicketsScreen", () => {
     );
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
+  it("lets the user select Linear when the feature is on and keeps scan stopped until a project is chosen", async () => {
+    const user = userEvent.setup();
+    const onSelectTicketSource = vi.fn();
+    const onConnectLinear = vi.fn();
+    const onToggleLinearProject = vi.fn();
+    const onAnalyzeTickets = vi.fn();
+
+    const { rerender } = render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        linearAvailable
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onConnectLinear={onConnectLinear}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Connect Linear" }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("linear");
+    expect(onConnectLinear).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjects={[{ id: "project-1", name: "Platform" }]}
+        linearProjectIds={[]}
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearProjectHeading)).toBeInTheDocument();
+    await user.click(screen.getByTestId("linear-project-project-1"));
+    expect(onToggleLinearProject).toHaveBeenCalledWith("project-1");
+
+    rerender(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjects={[{ id: "project-1", name: "Platform" }]}
+        linearProjectIds={["project-1"]}
+        onSelectTicketSource={onSelectTicketSource}
+        onAnalyzeTickets={onAnalyzeTickets}
+        onToggleLinearProject={onToggleLinearProject}
+      />,
+    );
+
+    const analyze = screen.getByTestId("first-run-analyze-tickets");
+    expect(analyze).toBeEnabled();
+    await user.click(analyze);
+    expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
 
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
