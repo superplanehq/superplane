@@ -461,6 +461,10 @@ type HTTPContext struct {
 	Requests  []*http.Request
 	Responses []*http.Response
 
+	// ResponsesByPath routes concurrent requests by URL path. Use it when
+	// the caller issues requests in parallel. A nil map keeps the FIFO queue.
+	ResponsesByPath map[string][]*http.Response
+
 	// mu guards Requests and Responses so components that issue concurrent
 	// requests (e.g. metric fan-out) can safely share a single mock context.
 	mu sync.Mutex
@@ -471,6 +475,16 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	defer c.mu.Unlock()
 
 	c.Requests = append(c.Requests, request)
+
+	if c.ResponsesByPath != nil {
+		queue := c.ResponsesByPath[request.URL.Path]
+		if len(queue) == 0 {
+			return nil, fmt.Errorf("no response mocked for %s", request.URL.Path)
+		}
+		response := queue[0]
+		c.ResponsesByPath[request.URL.Path] = queue[1:]
+		return response, nil
+	}
 
 	if len(c.Responses) == 0 {
 		return nil, fmt.Errorf("no response mocked")
