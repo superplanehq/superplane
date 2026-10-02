@@ -2,18 +2,48 @@ package linear
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type WebhookConfiguration struct {
-	TeamID       string `json:"teamId" mapstructure:"teamId"`
-	ResourceType string `json:"resourceType" mapstructure:"resourceType"`
+	// TeamID is the single team used by triggers that listen to one team.
+	TeamID string `json:"teamId" mapstructure:"teamId"`
+	// TeamIDs is the set of teams a project-scoped trigger listens on.
+	// Linear cannot subscribe a webhook to a project, so each team gets
+	// its own webhook and SuperPlane filters by project.
+	TeamIDs      []string `json:"teamIds" mapstructure:"teamIds"`
+	ResourceType string   `json:"resourceType" mapstructure:"resourceType"`
 }
 
 type WebhookMetadata struct {
+	// ID is the first Linear webhook. Older rows store only this field.
 	ID string `json:"id" mapstructure:"id"`
+	// IDs holds every Linear webhook this subscription created.
+	IDs []string `json:"ids" mapstructure:"ids"`
+}
+
+func (c WebhookConfiguration) resolvedTeamIDs() []string {
+	ids := normalizeIDs(c.TeamIDs)
+	if len(ids) > 0 {
+		slices.Sort(ids)
+		return ids
+	}
+	if teamID := strings.TrimSpace(c.TeamID); teamID != "" {
+		return []string{teamID}
+	}
+	return nil
+}
+
+func (m WebhookMetadata) webhookIDs() []string {
+	ids := normalizeIDs(m.IDs)
+	if id := strings.TrimSpace(m.ID); id != "" && !slices.Contains(ids, id) {
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 type LinearWebhookHandler struct{}
@@ -34,7 +64,7 @@ func (h *LinearWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	if configA.TeamID != configB.TeamID {
+	if !slices.Equal(configA.resolvedTeamIDs(), configB.resolvedTeamIDs()) {
 		return false, nil
 	}
 
@@ -61,19 +91,30 @@ func (h *LinearWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	webhook, err := client.CreateWebhook(
-		ctx.Webhook.GetURL(),
-		string(secret),
-		"SuperPlane",
-		config.TeamID,
-		[]string{config.ResourceType},
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("error creating webhook: %v", err)
+	teamIDs := config.resolvedTeamIDs()
+	if len(teamIDs) == 0 {
+		teamIDs = []string{""}
 	}
 
-	return &WebhookMetadata{ID: webhook.ID}, nil
+	ids := make([]string, 0, len(teamIDs))
+	for _, teamID := range teamIDs {
+		webhook, err := client.CreateWebhook(
+			ctx.Webhook.GetURL(),
+			string(secret),
+			"SuperPlane",
+			teamID,
+			[]string{config.ResourceType},
+		)
+		if err != nil {
+			for _, id := range ids {
+				_ = client.DeleteWebhook(id)
+			}
+			return nil, fmt.Errorf("error creating webhook: %v", err)
+		}
+		ids = append(ids, webhook.ID)
+	}
+
+	return &WebhookMetadata{ID: ids[0], IDs: ids}, nil
 }
 
 func (h *LinearWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
@@ -82,8 +123,8 @@ func (h *LinearWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return fmt.Errorf("failed to decode webhook metadata: %v", err)
 	}
 
-	// If the webhook was never created (Setup failed), there's nothing to clean up.
-	if metadata.ID == "" {
+	ids := metadata.webhookIDs()
+	if len(ids) == 0 {
 		return nil
 	}
 
@@ -92,8 +133,10 @@ func (h *LinearWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	if err := client.DeleteWebhook(metadata.ID); err != nil {
-		return fmt.Errorf("error deleting webhook: %v", err)
+	for _, id := range ids {
+		if err := client.DeleteWebhook(id); err != nil {
+			return fmt.Errorf("error deleting webhook: %v", err)
+		}
 	}
 
 	return nil
