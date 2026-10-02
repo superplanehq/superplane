@@ -1,3 +1,4 @@
+import { MergeConfidenceCanvasListeners } from "@/hooks/MergeConfidenceCanvasListeners";
 import { cn } from "@/lib/utils";
 
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
@@ -17,18 +18,25 @@ import { useFollowLogScroll } from "./useFollowLogScroll";
  */
 export function FactoryAppSplitRunPage() {
   const model = useFactoryAppSplitRunPage();
-  if (!model.fixture || model.liveError) {
-    return (
-      <SplitRunMissingPage
-        back={model.back}
-        editHref={model.editHref}
-        failed={model.liveError}
-        isLoading={model.isLoading}
-        subtitle={model.subtitle}
+  return (
+    <>
+      <MergeConfidenceCanvasListeners
+        organizationId={model.organizationId}
+        canvasIds={model.mergeConfidenceCanvasIds}
       />
-    );
-  }
-  return <SplitRunLoadedPage model={model} />;
+      {model.fixture && !model.liveError ? (
+        <SplitRunLoadedPage model={model} />
+      ) : (
+        <SplitRunMissingPage
+          back={model.back}
+          editHref={model.editHref}
+          failed={model.liveError}
+          isLoading={model.isLoading}
+          subtitle={model.subtitle}
+        />
+      )}
+    </>
+  );
 }
 
 function SplitRunMissingPage({
