@@ -13,20 +13,6 @@ type AgentCredentialsOptions struct {
 	IntegrationLabel string
 }
 
-func AgentMachineTypeField() configuration.Field {
-	return configuration.Field{
-		Name:     "machineType",
-		Label:    "Machine type",
-		Type:     configuration.FieldTypeSelect,
-		Required: true,
-		TypeOptions: &configuration.TypeOptions{
-			Select: &configuration.SelectTypeOptions{
-				Options: MachineTypeOptions(),
-			},
-		},
-	}
-}
-
 func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
 	options := []configuration.FieldOption{
 		{Label: "Secret", Value: CredentialsSourceSecret},

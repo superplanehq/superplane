@@ -65,7 +65,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — a Codex turn. Later prompts continue in the same working directory.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
@@ -82,7 +82,7 @@ Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 func (c *RunCodex) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "OpenAI API Key",
 			IntegrationName:  "openai",
@@ -136,9 +136,9 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
@@ -159,7 +159,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
@@ -172,7 +172,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {

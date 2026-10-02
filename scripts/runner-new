@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${repo_root}"
+
+runner_image="${LOCAL_RUNNER_IMAGE:-superplane-runner-local:dev}"
+runner_network="${LOCAL_RUNNER_NETWORK:-superplane_default}"
+runner_api_url="${LOCAL_RUNNER_API_URL:-http://app:8000}"
+compose=(docker compose -f docker-compose.dev.yml)
+runner_compose=(
+  "${compose[@]}"
+  --profile local-runner
+  --profile local-runner-image
+)
+admin=(
+  "${compose[@]}" exec -T -e INSTALLATION_ADMIN_TOKEN app
+  go run ./cmd/admin/main.go
+  --url http://localhost:8000
+  --output text
+)
+
+if [[ -z "${INSTALLATION_ADMIN_TOKEN:-}" ]]; then
+  echo "INSTALLATION_ADMIN_TOKEN is required." >&2
+  exit 1
+fi
+
+if [[ -z "$("${compose[@]}" ps --status running -q app 2>/dev/null)" ]]; then
+  echo "Run \`make dev.up\` and \`make dev.server\` first." >&2
+  exit 1
+fi
+
+echo "Building the local runner image."
+"${compose[@]}" build runner
+
+if ! docker image inspect "${runner_image}" >/dev/null 2>&1; then
+  echo "Runner image ${runner_image} does not exist. Run \`make dev.up\` first." >&2
+  exit 1
+fi
+
+fleet="${RUNNER_FLEET:-e1-large-amd64}"
+fleets="$("${admin[@]}" fleets list)"
+if ! awk -v fleet="${fleet}" 'NR > 1 && $1 == fleet { found = 1 } END { exit !found }' <<<"${fleets}"; then
+  echo "Runner fleet ${fleet} does not exist." >&2
+  exit 1
+fi
+
+fleet_manager_was_running=false
+restore_fleet_manager() {
+  local status=$?
+  trap - EXIT
+  if [[ "${fleet_manager_was_running}" == true ]]; then
+    echo "Restarting the local Fleet Manager."
+    if ! "${runner_compose[@]}" up -d --no-build fleet-manager; then
+      if [[ "${status}" -eq 0 ]]; then
+        status=1
+      fi
+    fi
+  fi
+  exit "${status}"
+}
+
+if [[ -n "$("${runner_compose[@]}" ps --status running -q fleet-manager 2>/dev/null)" ]]; then
+  echo "Pausing the local Fleet Manager."
+  fleet_manager_was_running=true
+  trap restore_fleet_manager EXIT
+  "${runner_compose[@]}" stop fleet-manager
+fi
+
+created="$("${admin[@]}" runners create --fleet "${fleet}" --ephemeral)"
+
+read -r runner_id registration_token <<<"$(
+  printf '%s\n' "${created}" | awk 'NR == 2 { print $1, $2 }'
+)"
+if [[ -z "${runner_id}" || -z "${registration_token}" ]]; then
+  echo "Admin CLI did not return runner registration credentials." >&2
+  exit 1
+fi
+
+echo "Starting runner ${runner_id} in fleet ${fleet}."
+echo "Press Ctrl-C to request a controlled shutdown."
+
+docker run --rm \
+  --name "superplane-runner-${runner_id}" \
+  --label superplane.managed-runner=true \
+  --label "superplane.fleet-id=${fleet}" \
+  --label "superplane.runner-id=${runner_id}" \
+  --label superplane.runner-version=dev \
+  --network "${runner_network}" \
+  --volume /var/run/docker.sock:/var/run/docker.sock \
+  --add-host host.docker.internal:host-gateway \
+  "${runner_image}" \
+  --url "${runner_api_url}" \
+  --registration-token "${registration_token}"

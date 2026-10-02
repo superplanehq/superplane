@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -27,6 +28,7 @@ func testGRPCServices(
 		AuthService:     authService,
 		Registry:        registry,
 		OIDCProvider:    oidcProvider,
+		JWTSigner:       jwt.NewSigner("test-runner-registration-secret"),
 	})
 	require.NoError(t, err)
 	return services
