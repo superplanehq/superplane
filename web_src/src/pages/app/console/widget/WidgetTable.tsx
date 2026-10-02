@@ -16,12 +16,14 @@ import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { WidgetTableCell } from "./WidgetTableCell";
 import { WidgetRowActionButton } from "./WidgetRowActionButton";
 import { rowKeyForRow } from "./rowKey";
-import type { WidgetTableRender } from "./types";
+import type { WidgetDataSourceKind, WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
   render: WidgetTableRender;
   rows: unknown[];
   isLoading: boolean;
+  /** Data source behind `rows`; lets run-id columns link to the run inspector. */
+  dataSourceKind?: WidgetDataSourceKind;
   /**
    * Progressive-pagination affordances. When `hasMore` is true the footer
    * shows a "Load more" button and the scrollable area auto-fetches as the
@@ -46,6 +48,7 @@ export function WidgetTable({
   render,
   rows,
   isLoading,
+  dataSourceKind,
   hasMore,
   isFetchingMore,
   onLoadMore,
@@ -148,6 +151,7 @@ export function WidgetTable({
         filtered={filtered}
         filteredAll={filteredAll}
         resolveRowStyle={resolveRowStyle}
+        dataSourceKind={dataSourceKind}
         hasMore={hasMore}
         isFetchingMore={isFetchingMore}
         onLoadMore={onLoadMore}
@@ -163,6 +167,7 @@ interface WidgetTableGridProps {
   /** Full filter+sort result; may be longer than `filtered` when displayCount slices. */
   filteredAll: Record<string, unknown>[];
   resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
+  dataSourceKind?: WidgetDataSourceKind;
   hasMore?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
@@ -174,6 +179,7 @@ function WidgetTableGrid({
   filtered,
   filteredAll,
   resolveRowStyle,
+  dataSourceKind,
   hasMore,
   isFetchingMore,
   onLoadMore,
@@ -236,6 +242,7 @@ function WidgetTableGrid({
                     row={row}
                     nextRow={nextRow}
                     hasMoreBelow={hasMoreBelow}
+                    dataSourceKind={dataSourceKind}
                   />
                 ))}
                 {hasActions ? (
