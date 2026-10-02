@@ -66,12 +66,6 @@ export function runMetaLine(stage: AutomationStage, runs: AutomationStage[] = [s
     formatMinutesSecondsDuration(totalMs) ||
     (runs.some((run) => isSubSecondDuration(run.duration)) ? "<1s" : "") ||
     (runs.length <= 1 ? (stage.duration ?? "") : "");
-  if (!duration) {
-    return "";
-  }
-  if (stage.status === "running" || runs.some((run) => run.status === "running")) {
-    return `${duration} so far`;
-  }
   return duration;
 }
 
