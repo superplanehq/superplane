@@ -40,7 +40,6 @@ export function footerMutationHandlers(
 export function draftStartAction(
   kind: SplitRunFixture["footer"]["kind"],
   onDispatch: ((model?: string, thinkingLevel?: string) => Promise<void>) | undefined,
-  openAutomations: () => void,
   selectedModel: string,
   selectedThinking?: string,
 ) {
@@ -49,7 +48,6 @@ export function draftStartAction(
   }
   return async () => {
     await onDispatch?.(draftStartModelPayload(selectedModel), startThinkingPayload(selectedThinking));
-    openAutomations();
   };
 }
 

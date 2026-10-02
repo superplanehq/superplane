@@ -64,10 +64,6 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
 
-// FeatureFactoryTaskConsole gates the unified task popup: one console
-// timeline with a summary panel instead of the Task and Automations tabs.
-const FeatureFactoryTaskConsole = "factory_task_console"
-
 // FeatureSuperPlaneMCPServer gates the public workspace MCP server.
 // Organizations with this flag can authorize Cursor and other MCP clients
 // against one workspace. Without it, POST /mcp returns 404.
@@ -92,7 +88,6 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
-	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }
 

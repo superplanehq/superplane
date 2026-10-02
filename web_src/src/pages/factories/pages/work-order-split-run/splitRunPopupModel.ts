@@ -16,20 +16,8 @@ import {
   toArtifactDataRecord,
 } from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import { SPLIT_RUN_CLOSURE_PHASE_ID, type SplitRunFixture, type SplitRunPhase } from "./splitRunMocks";
+import { type SplitRunFixture, type SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
-
-export type SplitRunPopupTab = "description" | "log";
-
-/**
- * The classic tabbed popup predates the console. Drop the console-only
- * phases (runs from earlier dispatches and the closure card) so orgs
- * without the Task Console feature see the original timeline.
- */
-export function classicSplitRunFixture(fixture: SplitRunFixture): SplitRunFixture {
-  const phases = fixture.phases.filter((phase) => !phase.historyRun && phase.id !== SPLIT_RUN_CLOSURE_PHASE_ID);
-  return phases.length === fixture.phases.length ? fixture : { ...fixture, phases };
-}
 
 export function refinePopupShowsAutomations(args: {
   footerKind: SplitRunFixture["footer"]["kind"];
@@ -61,19 +49,6 @@ export function isWorkOrderDescriptionName(name: string): boolean {
   return DESCRIPTION_NAMES.includes(name);
 }
 const PLAN_NAMES = ["plan.md"];
-
-export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
-  const hasRunningLineStep = fixture.phases.some((phase) => phase.stepIndex != null && phase.status === "running");
-  return hasRunningLineStep || hasActivePullRequestActivity(fixture) ? "log" : "description";
-}
-
-export function hasActivePullRequestActivity(fixture: SplitRunFixture): boolean {
-  return fixture.phases.some(
-    (phase) =>
-      Boolean(phase.pullRequestActivity) &&
-      (phase.status === "running" || phase.status === "pending" || phase.status === "waiting"),
-  );
-}
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {
   const appId = phase?.appId;
