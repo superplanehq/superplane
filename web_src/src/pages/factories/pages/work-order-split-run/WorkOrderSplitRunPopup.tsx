@@ -1,12 +1,16 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useFactory } from "@/hooks/useFactoryData";
+import { useFactory, useCreateWorkOrder } from "@/hooks/useFactoryData";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
@@ -136,6 +140,11 @@ function AnalysisWorkOrderPopup({
   const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
   const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
+  const navigate = useNavigate();
+  const { canAct } = usePermissions();
+  const canCreateTasks = canAct("work_orders", "create");
+  const createWorkOrder = useCreateWorkOrder(organizationId ?? "", factoryId ?? "");
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
   const draftStart = draftStartAction(
     fixture.footer.kind,
     onDispatch,
@@ -183,15 +192,40 @@ function AnalysisWorkOrderPopup({
   });
   const review = analysisPopupReview(reviewArgs);
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
-  const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
-  const stripAnalysis = draftChrome.stripAnalysis;
-  const descriptionReview = taskConsole
-    ? !unified && !showSidebarNote
-      ? review
-      : undefined
-    : showsDescriptionReview(sourceOnly, showSidebarNote, tab)
-      ? review
-      : undefined;
+   const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
+   const stripAnalysis = draftChrome.stripAnalysis;
+   const descriptionReview = taskConsole
+     ? !unified && !showSidebarNote
+       ? review
+       : undefined
+     : showsDescriptionReview(sourceOnly, showSidebarNote, tab)
+       ? review
+       : undefined;
+
+  const handleDuplicate = async () => {
+    if (!canCreateTasks || !organizationId || !factoryId) {
+      showErrorToast("Unable to duplicate task");
+      return;
+    }
+
+    setDuplicateBusy(true);
+    try {
+      const newOrder = await createWorkOrder.mutateAsync({
+        title: edits.title,
+        description: edits.description,
+      });
+
+      showSuccessToast("Task duplicated");
+      onClose?.();
+
+      const newPath = workOrderDetailPath(organizationId, factoryKey, newOrder.number ?? "");
+      navigate(newPath);
+    } catch (error) {
+      showErrorToast("Failed to duplicate task");
+    } finally {
+      setDuplicateBusy(false);
+    }
+  };
 
   return (
     <PopupShell
@@ -222,27 +256,30 @@ function AnalysisWorkOrderPopup({
           analysis={stripAnalysis}
           sourceOnly={sourceOnly}
           sessionLookupError={analysis.queryError?.message}
-          panelReview={panelReview}
-          header={(views) => (
-            <AnalysisPopupHeader
-              edits={edits}
-              fixture={fixture}
-              titlePrefix={titlePrefix}
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              orderNumber={orderNumber}
-              lineId={lineId}
-              onClose={onClose}
-              fullPage={fullPage}
-              toggleFullPage={toggleFullPage}
-              onArchive={mutations.onArchive}
-              footerBusy={footerActions.busy}
-              reviewActions={reviewActions}
-              showOwnerRow={!unified}
-              planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
-              views={views}
-            />
-          )}
+           panelReview={panelReview}
+           header={(views) => (
+             <AnalysisPopupHeader
+               edits={edits}
+               fixture={fixture}
+               titlePrefix={titlePrefix}
+               organizationId={organizationId}
+               factoryKey={factoryKey}
+               orderNumber={orderNumber}
+               lineId={lineId}
+               onClose={onClose}
+               fullPage={fullPage}
+               toggleFullPage={toggleFullPage}
+               onArchive={mutations.onArchive}
+               onDuplicate={handleDuplicate}
+               duplicateBusy={duplicateBusy}
+               canDuplicate={canCreateTasks}
+               footerBusy={footerActions.busy}
+               reviewActions={reviewActions}
+               showOwnerRow={!unified}
+               planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
+               views={views}
+             />
+           )}
         />
         {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
