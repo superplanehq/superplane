@@ -1337,6 +1337,58 @@ func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
 		assert.NotContains(t, got.GetMessage(), "could not register a webhook")
 	})
 
+	t.Run("keeps checking while the webhook row does not exist yet", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      true,
+			HeadSHA:        headSHA,
+			AllowedMethods: "SQUASH",
+		}))
+
+		got := describe(t)
+		assert.True(t, got.GetCanMerge())
+		assert.True(t, got.GetWebhookSetupPending())
+		assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
+
+		webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+		require.NoError(t, err)
+		assert.Empty(t, webhooks)
+	})
+
+	t.Run("starts setup when the webhook row does not exist yet", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+
+		resp, err := DescribeFactoryPullRequestMergeability(ctx, IntakeDependencies{Encryptor: r.Encryptor}, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.GetMergeability())
+		assert.True(t, resp.GetMergeability().GetWebhookSetupPending())
+		assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, resp.GetMergeability().GetBlockedReason())
+
+		webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+		require.NoError(t, err)
+		require.Len(t, webhooks, 1)
+		assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	})
+
+	t.Run("does not keep checking when GitHub is not ready", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		require.NoError(t, db.Model(integration).Update("state", "error").Error)
+		t.Cleanup(func() {
+			require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+		})
+
+		got := describe(t)
+		assert.False(t, got.GetWebhookSetupPending())
+	})
+
 	t.Run("reports setup still in progress without blocking a cached merge result", func(t *testing.T) {
 		useMergeableGitHub(t)
 		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})

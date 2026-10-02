@@ -20,6 +20,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -355,15 +356,23 @@ func ensureGitHubFactoryMergeabilityWebhook(
 		return nil
 	}
 
-	hook, err := findFactoryMergeabilityWebhook(tx, integration.ID, repository)
-	if err != nil {
-		return err
-	}
-	if hook != nil {
-		return nil
-	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var locked models.Integration
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", integration.ID).
+			First(&locked).Error; err != nil {
+			return fmt.Errorf("lock integration for factory mergeability webhook: %w", err)
+		}
 
-	return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
+		hook, err := findFactoryMergeabilityWebhook(tx, integration.ID, repository)
+		if err != nil {
+			return err
+		}
+		if hook != nil {
+			return nil
+		}
+		return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
+	})
 }
 
 func factoryMergeabilityWebhookConfiguration(repository string) map[string]any {
@@ -458,11 +467,31 @@ func factoryWebhookSetupMessage(stored string) string {
 	return webhookSetupFallbackMessage
 }
 
-func webhookSetupInProgress(hook *models.Webhook) bool {
+func webhookSetupInProgress(hook *models.Webhook, creationExpected bool) bool {
 	if hook == nil {
-		return false
+		return creationExpected
 	}
 	return hook.State == models.WebhookStatePending || hook.State == models.WebhookStateProvisioning
+}
+
+func factoryMergeabilityWebhookExpected(tx *gorm.DB, factory *models.Factory, repository string) bool {
+	if factory == nil {
+		return false
+	}
+	repository = strings.TrimSpace(repository)
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
+	if repository == "" || integrationID == "" {
+		return false
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return false
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return false
+	}
+	return integration.State == models.IntegrationStateReady && integration.AppName == "github"
 }
 
 func failedFactoryMergeabilityResult(pullRequest *models.FactoryPullRequest, hook *models.Webhook) *factoryPullRequestMergeability {
