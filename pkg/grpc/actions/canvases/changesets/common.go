@@ -8,6 +8,14 @@ import (
 
 // Verify if the workflow is acyclic using
 // topological sort algorithm - kahn's - to detect cycles
+//
+// Edges into a loop component are skipped, so a loop can receive a feedback
+// edge from its own body without that counting as a cycle.
+//
+// Edges are only considered when both of their ends are in nodes. The check
+// below compares the number of visited nodes against len(nodes), so an edge
+// pointing at an id that is not in nodes would otherwise add an entry that
+// skews that count in either direction.
 func CheckForCycles(nodes []models.Node, edges []models.Edge) error {
 	loopNodeIDs := loopNodeIDSet(nodes)
 
@@ -21,6 +29,14 @@ func CheckForCycles(nodes []models.Node, edges []models.Edge) error {
 
 	for _, edge := range edges {
 		if _, isLoopNode := loopNodeIDs[edge.TargetID]; isLoopNode {
+			continue
+		}
+
+		if _, sourceExists := graph[edge.SourceID]; !sourceExists {
+			continue
+		}
+
+		if _, targetExists := graph[edge.TargetID]; !targetExists {
 			continue
 		}
 
