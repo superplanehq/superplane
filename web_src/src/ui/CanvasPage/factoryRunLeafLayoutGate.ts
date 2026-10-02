@@ -1,11 +1,8 @@
-/** True when the factory canvas should use ephemeral leaf-right run layout. */
-export function shouldUseFactoryRunLeafLayout(input: {
+/** Canvases keep saved node positions in edit and read-only modes. */
+export function shouldUseFactoryRunLeafLayout(_input: {
   factoryEmbed: boolean;
   isRunInspectionMode: boolean;
   factoryDisplayLayout?: boolean;
 }): boolean {
-  if (!input.factoryEmbed) {
-    return false;
-  }
-  return input.isRunInspectionMode || Boolean(input.factoryDisplayLayout);
+  return false;
 }

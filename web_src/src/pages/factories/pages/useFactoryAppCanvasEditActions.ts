@@ -252,19 +252,22 @@ function useFactoryAppCanvasWorkspaceSync({
     requestBuildingBlocksSidebar(appId, componentsOpen);
   }, [appId, componentsOpen, isConfigure]);
 
+  // Skip URL writes that change nothing. After Configure Save navigates to
+  // the view URL, the canvas re-broadcasts its sidebar state. A write with the
+  // stale `configure=1` params would put the user back into Configure.
   useEffect(() => {
     if (!isConfigure || !appId) return;
     return subscribeCanvasAgentSidebarChanged((canvasId, open) => {
-      if (canvasId !== appId) return;
+      if (canvasId !== appId || open === agentOpen) return;
       onAgentOpenChange(open);
     });
-  }, [appId, isConfigure, onAgentOpenChange]);
+  }, [agentOpen, appId, isConfigure, onAgentOpenChange]);
 
   useEffect(() => {
     if (!isConfigure || !appId) return;
     return subscribeBuildingBlocksSidebarChanged((canvasId, open) => {
-      if (canvasId !== appId) return;
+      if (canvasId !== appId || open === componentsOpen) return;
       onComponentsOpenChange(open);
     });
-  }, [appId, isConfigure, onComponentsOpenChange]);
+  }, [appId, componentsOpen, isConfigure, onComponentsOpenChange]);
 }

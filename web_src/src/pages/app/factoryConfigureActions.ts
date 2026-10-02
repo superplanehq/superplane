@@ -39,9 +39,8 @@ export type FactoryConfigureSaveDeps = {
   setDraftCanvasSpec: Dispatch<SetStateAction<CanvasesCanvas["spec"] | null>>;
   setLastSavedWorkflowSnapshot: (workflow: CanvasesCanvas | null) => void;
   handleCommitStaging: (commitMessage: string, options?: { versionId?: string }) => Promise<boolean | void>;
+  /** Called after Save finishes. The factory shell leaves Configure here. */
   onDone?: () => void;
-  /** After a real commit tears down the edit session, allow Configure to seed again. */
-  onAfterCommit?: () => void;
   canvasName?: string;
 };
 
@@ -105,9 +104,10 @@ async function stageAndCommitFactoryConfigure(
     return;
   }
 
+  // Do not re-seed the Configure session after the commit. The caller leaves
+  // Configure in onDone; a re-seed would write configure=1 back into the URL.
   const committed = await deps.handleCommitStaging("Update automation", { versionId: savingVersionId });
   if (committed) {
-    deps.onAfterCommit?.();
     deps.onDone?.();
   }
 }

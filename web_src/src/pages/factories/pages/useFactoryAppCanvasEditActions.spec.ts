@@ -2,7 +2,9 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { CanvasesCanvas } from "@/api-client";
+import { publishCanvasAgentSidebarChanged } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import type { FactoryConfigureActions } from "@/pages/app";
+import { publishBuildingBlocksSidebarChanged } from "@/ui/CanvasPage/buildingBlocksSidebarRequest";
 
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 
@@ -101,6 +103,44 @@ function baseOptions(overrides: Partial<Parameters<typeof useFactoryAppCanvasEdi
     ...overrides,
   };
 }
+
+describe("useFactoryAppCanvasEditActions workspace sidebar sync", () => {
+  // Configure Save navigates to the view URL, then the canvas re-broadcasts
+  // its sidebar state. A URL write with the stale `configure=1` params would
+  // put the user back into Configure. Skip writes that change nothing.
+  it("does not write the URL when the agent flag already matches", () => {
+    const setSearchParams = vi.fn();
+    renderHook(() => useFactoryAppCanvasEditActions(baseOptions({ agentOpen: true, setSearchParams })));
+
+    act(() => {
+      publishCanvasAgentSidebarChanged("app-1", true);
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("writes the URL when the agent flag changes", () => {
+    const setSearchParams = vi.fn();
+    renderHook(() => useFactoryAppCanvasEditActions(baseOptions({ agentOpen: true, setSearchParams })));
+
+    act(() => {
+      publishCanvasAgentSidebarChanged("app-1", false);
+    });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not write the URL when the components flag already matches", () => {
+    const setSearchParams = vi.fn();
+    renderHook(() => useFactoryAppCanvasEditActions(baseOptions({ componentsOpen: false, setSearchParams })));
+
+    act(() => {
+      publishBuildingBlocksSidebarChanged("app-1", false);
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+});
 
 describe("useFactoryAppCanvasEditActions reset to factory defaults", () => {
   beforeEach(() => {

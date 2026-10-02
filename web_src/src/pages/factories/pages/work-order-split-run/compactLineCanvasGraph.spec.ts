@@ -1,16 +1,9 @@
-import { Position, type Edge } from "@xyflow/react";
 import { describe, expect, it } from "bun:test";
 
 import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
-import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
 
 import { compactLineCanvasGraph } from "./compactLineCanvasGraph";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
-
-type RoutedEdge = Edge & {
-  sourcePosition?: Position;
-  targetPosition?: Position;
-};
 
 function messyIfCanvas(): SplitRunCanvasModel {
   return {
@@ -62,44 +55,29 @@ function messyIfCanvas(): SplitRunCanvasModel {
 }
 
 describe("compactLineCanvasGraph", () => {
-  it("lays out the factory spine like the main run canvas and badges channel names", () => {
+  it("keeps saved node positions and the original edge channels", () => {
     const { nodes, edges } = compactLineCanvasGraph(messyIfCanvas(), null, undefined, false);
     const byId = new Map(nodes.map((node) => [node.id, node]));
 
     const onRun = byId.get("on-run")!;
     const ifNode = byId.get("if")!;
-    const comment = byId.get("comment")!;
-    const label = byId.get("label")!;
-    const trueAgent = byId.get("true-agent")!;
-    const artifact = byId.get("artifact")!;
     const falseAgent = byId.get("false-agent")!;
+    const artifact = byId.get("artifact")!;
+    const trueAgent = byId.get("true-agent")!;
 
-    expect(ifNode.position.x).toBe(onRun.position.x);
-    expect(comment.position.x).toBe(onRun.position.x);
-    expect(label.position.x).toBe(onRun.position.x);
-    expect(ifNode.position.y).toBeGreaterThan(onRun.position.y);
-    expect(comment.position.y).toBeGreaterThan(ifNode.position.y);
-    expect(label.position.y).toBeGreaterThan(comment.position.y);
-    expect(trueAgent.position.y).toBeGreaterThan(label.position.y);
-    expect(artifact.position.x).not.toBe(-40);
-    expect(falseAgent.position.x).toBeGreaterThan(ifNode.position.x);
-    expect(falseAgent.position.y).toBe(ifNode.position.y);
-    expect(falseAgent.data.isSideTarget).toBe(true);
+    expect(onRun.position).toEqual({ x: 52, y: 0 });
+    expect(ifNode.position).toEqual({ x: 80, y: 180 });
+    expect(falseAgent.position).toEqual({ x: 520, y: 400 });
+    expect(artifact.position).toEqual({ x: 0, y: 900 });
+    expect(falseAgent.data.isSideTarget).toBe(false);
     expect(falseAgent.data.steps).toEqual(["Clone Repo", "Write Implementation Plan", "Use plan as output"]);
     expect({ width: falseAgent.width, height: falseAgent.height }).toEqual(factoryNodeCardSize(3));
     expect({ width: trueAgent.width, height: trueAgent.height }).toEqual(factoryNodeCardSize());
 
+    const falseEdge = edges.find((edge) => edge.source === "if" && edge.target === "false-agent");
     const trueEdge = edges.find((edge) => edge.source === "if" && edge.target === "comment");
-    const falseEdge = edges.find((edge) => edge.source === "if" && edge.target === "false-agent") as
-      | RoutedEdge
-      | undefined;
-    const mergeEdge = edges.find((edge) => edge.source === "false-agent" && edge.target === "true-agent");
-    expect(trueEdge?.sourceHandle).toBe(FACTORY_SPINE_HANDLE_ID);
-    expect(falseEdge?.sourceHandle).toBe(FACTORY_SIDE_HANDLE_ID);
-    expect(falseEdge?.sourcePosition).toBe(Position.Right);
-    expect(falseEdge?.targetPosition).toBe(Position.Left);
-    expect(falseEdge?.data).toMatchObject({ channelLabel: "false" });
-    expect(mergeEdge?.data).toMatchObject({ channelLabel: "passed" });
+    expect(falseEdge?.sourceHandle).toBe("false");
+    expect(trueEdge?.sourceHandle).toBe("true");
     expect(trueEdge?.type).toBe("custom");
   });
 

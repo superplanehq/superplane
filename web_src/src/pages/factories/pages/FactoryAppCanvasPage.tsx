@@ -138,7 +138,7 @@ function FactoryAppCanvasWorkspace({ model }: { model: FactoryAppCanvasPageModel
           factoryConfigureActionsRef={model.configureActionsRef}
           onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
           onFactoryConfigureDone={model.handleConfigureDone}
-          onFactoryConfigureSaved={model.handleConfigureSaved}
+          onFactoryConfigureSaved={model.handleConfigureDone}
         />
       </div>
     </div>

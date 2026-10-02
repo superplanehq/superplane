@@ -14,9 +14,8 @@ interface SettingsAutomationCanvasProps {
 }
 
 /**
- * Read-only factory automation preview. Uses the same leaf-right layout as
- * factory run inspection and fits every node into the popup. Edit lives
- * as a pencil on the canvas.
+ * Read-only factory automation preview. Shows saved node positions.
+ * Edit lives as a pencil on the canvas.
  */
 export function SettingsAutomationCanvas({
   graph,
@@ -33,7 +32,6 @@ export function SettingsAutomationCanvas({
       edges={graph.edges}
       factoryId={graph.factoryId}
       factoryEmbed
-      factoryDisplayLayout
       isEditing={false}
       readOnly
       hidePageChrome
