@@ -8,6 +8,7 @@ import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
 const HIDDEN_KINDS = new Set(["setup"]);
 const TOOL_LINE = /^-> \[([^\]]+)\]/;
+const ANALYSIS_WAIT_COMMAND = "Wait for the next message";
 
 export const RUNNER_COMPONENTS = new Set([
   "runnerSuperPlane",
@@ -34,7 +35,11 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
-export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
+export function notesFromLiveLogSections(
+  nodeId: string,
+  sections: CommandSection[],
+  analysisStatus?: SplitRunPhaseStatus,
+): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
     if (section.kind && HIDDEN_KINDS.has(section.kind)) {
@@ -47,7 +52,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section));
+    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section, analysisStatus));
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
@@ -59,6 +64,7 @@ function noteFromCommandSection(
   stepId: string,
   orderKey: number | undefined,
   section: CommandSection,
+  analysisStatus?: SplitRunPhaseStatus,
 ): SplitRunStreamLine {
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
@@ -73,7 +79,7 @@ function noteFromCommandSection(
     note: true,
     componentType: section.kind,
     componentName: name || preview,
-    status: streamStatus(section.status),
+    status: streamStatus(commandSectionStatus(section, analysisStatus)),
     detail: detail || undefined,
     commandScript: bashScript || undefined,
     commandStdout: bashScript ? output || undefined : undefined,
@@ -385,9 +391,10 @@ export function notesForLiveStream(input: {
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
-    const notes = notesFromLiveLogSections(input.nodeId, input.sections);
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.analysisStatus);
     if (notes.length > 0) {
       return notes;
     }
@@ -436,12 +443,24 @@ function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatu
   };
 }
 
-function streamStatus(status: string): SplitRunPhaseStatus {
-  if (status === "failed") {
-    return "failed";
+function commandSectionStatus(section: CommandSection, analysisStatus?: SplitRunPhaseStatus): string {
+  if (isCanceledAnalysisWait(section, analysisStatus)) {
+    return "cancelled";
   }
-  if (status === "running") {
-    return "running";
+  return section.status;
+}
+
+function isCanceledAnalysisWait(section: CommandSection, analysisStatus?: SplitRunPhaseStatus): boolean {
+  return (
+    section.status === "failed" &&
+    section.text.trim() === ANALYSIS_WAIT_COMMAND &&
+    (analysisStatus === "passed" || analysisStatus === "cancelled")
+  );
+}
+
+function streamStatus(status: string): SplitRunPhaseStatus {
+  if (status === "failed" || status === "running" || status === "cancelled") {
+    return status;
   }
   return "passed";
 }
