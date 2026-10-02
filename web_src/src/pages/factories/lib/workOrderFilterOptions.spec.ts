@@ -84,11 +84,16 @@ describe("buildSourceFilterOptions", () => {
       { id: "jira-1", source: "SOURCE_JIRA_ISSUES" },
     ];
     const entries = buildWorkOrderListEntries(
-      [order({ id: "wo-slack", origin: { url: "https://acme.slack.com/archives/C1/p1" } }), order({ id: "wo-hand" })],
+      [
+        order({ id: "wo-slack", origin: { url: "https://acme.slack.com/archives/C1/p1" } }),
+        order({ id: "wo-hand" }),
+        order({ id: "wo-mcp", mcpClient: { name: "Cursor" } }),
+      ],
       factory,
     );
 
     expect(buildSourceFilterOptions(intakes, entries)).toEqual([
+      { value: "mcp:Cursor", label: "Cursor" },
       { value: "github-issues", label: "GitHub issues" },
       { value: "jira-issues", label: "Jira issues" },
       { value: "slack", label: "Slack" },
