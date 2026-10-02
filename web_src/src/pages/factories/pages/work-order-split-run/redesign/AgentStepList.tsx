@@ -190,7 +190,9 @@ function AgentStepMarker({
 }) {
   const running = step.status === "running";
   const bash = step.type === "bash";
-  const expandable = bash ? bashStepCanOpen(step) : step.events.length > 0 || Boolean(step.output) || liveActive;
+  const expandable = bash
+    ? bashStepCanOpen(step) || liveActive
+    : step.events.length > 0 || Boolean(step.output) || liveActive;
   const [open, setOpen] = useState(running || defaultOpen);
   const userToggled = useRef(false);
   useEffect(() => {

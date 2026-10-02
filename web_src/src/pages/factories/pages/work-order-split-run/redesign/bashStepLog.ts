@@ -18,10 +18,8 @@ export function bashStepCommand(step: AgentStep): { script: string; stdout: stri
   if (step.commandScript?.trim()) {
     return { script: step.commandScript, stdout: step.commandStdout ?? "" };
   }
-  if (step.output?.trim()) {
-    return { script: step.output, stdout: "" };
-  }
-  return { script: "", stdout: "" };
+  const stdout = step.commandStdout?.trim() ? step.commandStdout : (step.output ?? "");
+  return { script: "", stdout };
 }
 
 export function bashTitleIsCommand(step: AgentStep, script: string): boolean {

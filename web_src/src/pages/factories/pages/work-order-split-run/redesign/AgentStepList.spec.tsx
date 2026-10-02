@@ -386,6 +386,123 @@ describe("AgentStepMarkers", () => {
     expect(screen.queryByText(logStatusTimeLabel("2s"))).not.toBeInTheDocument();
   });
 
+  it("keeps live notes open while an SSH command runs", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep(
+          bashStep({
+            id: "setup",
+            title: "echo hi",
+            status: "running",
+            commandScript: "echo hi",
+          }),
+        )}
+        liveActive
+        liveActivity={{
+          id: "live-1",
+          provider: "runner",
+          status: "running",
+          sequence: 1,
+          truncated: false,
+          items: [
+            {
+              type: "content",
+              id: "note-1",
+              kind: "assistant",
+              text: "Waiting for the command.",
+              status: "passed",
+              truncated: false,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Waiting for the command.")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Planning next step…" })).toBeInTheDocument();
+  });
+
+  it("shows Starting agent while a running SSH command has no output", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep(
+          bashStep({
+            id: "setup",
+            title: "echo hi",
+            status: "running",
+            commandScript: "echo hi",
+          }),
+        )}
+        liveActive
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Starting agent…" })).toBeInTheDocument();
+  });
+
+  it("keeps captured SSH output separate when the command is unknown", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep(
+          bashStep({
+            id: "clone",
+            title: "Clone Repo",
+            output: "Cloning into 'repo'...",
+          }),
+        )}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Clone Repo/ }));
+
+    expect(screen.getByText("Cloning into 'repo'...")).toBeInTheDocument();
+    expect(screen.queryByText("$")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-tool-clone-command")).not.toBeInTheDocument();
+  });
+
+  it("opens captured SSH output that matches the row title", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep(
+          bashStep({
+            id: "echo",
+            title: "echo hi",
+            output: "echo hi",
+          }),
+        )}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /echo hi/ }));
+
+    expect(screen.getAllByText("echo hi")).toHaveLength(2);
+    expect(screen.queryByText("$")).not.toBeInTheDocument();
+  });
+
+  it("marks a failed named SSH command as failed", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep(
+          bashStep({
+            id: "git-user",
+            title: "Set Up Git User",
+            status: "failed",
+            commandScript: "git config user.email a\ngit config user.name b",
+            commandStdout: "permission denied",
+          }),
+        )}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Set Up Git User/ }));
+
+    expect(screen.getByTestId("agent-tool-git-user-command")).toHaveAttribute("data-status", "failed");
+    expect(screen.getByText("permission denied")).toHaveClass("text-destructive");
+  });
+
   it("keeps an agent summary on a prompt row", async () => {
     const user = userEvent.setup();
     render(

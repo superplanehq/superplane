@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-import type { AgentActivity, AgentToolItem } from "../agentActivity";
+import type { AgentActivity, AgentActivityStatus, AgentToolItem } from "../agentActivity";
 import { AgentActivityView } from "../AgentActivityView";
 import { CommandLine } from "../AgentCommandLine";
 import { AgentLiveStatus } from "../IntentAnalysisLiveWork";
@@ -30,7 +30,7 @@ export function StepMarkerDetail({
   defaultOpen: boolean;
   follow: ReturnType<typeof useFollowLogScroll<HTMLDivElement>>;
 }) {
-  if (step.type === "bash") {
+  if (step.type === "bash" && !running) {
     return (
       <div className="min-w-0 py-0.5 pl-6">
         <BashStepBody step={step} />
@@ -44,6 +44,8 @@ export function StepMarkerDetail({
       </div>
     );
   }
+  const liveTranscript = step.type === "bash" ? liveActivity : activity;
+  const statusActivity = step.type === "bash" ? liveActivity : (liveActivity ?? activity);
   return (
     <div className="relative min-w-0" data-testid={liveActive ? liveTestId : undefined}>
       <div
@@ -52,15 +54,15 @@ export function StepMarkerDetail({
         className={cn("min-w-0 overflow-y-auto py-0.5", defaultOpen ? "max-h-[60vh]" : "max-h-80")}
         data-testid={`redesign-step-log-${step.id}`}
       >
-        <StepActivity activity={activity} live={liveActive} />
+        {step.type === "bash" ? (
+          <div className="min-w-0 pl-6">
+            <BashStepBody step={step} />
+          </div>
+        ) : null}
+        <StepActivity activity={liveTranscript} live={liveActive} />
       </div>
       {liveActive ? (
-        <AgentLiveStatus
-          active
-          activity={liveActivity ?? activity}
-          startingLabel="Starting agent…"
-          collapseReasoning={false}
-        />
+        <AgentLiveStatus active activity={statusActivity} startingLabel="Starting agent…" collapseReasoning={false} />
       ) : null}
       {follow.showJumpToLatest ? (
         <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId={`redesign-step-older-${step.id}`} />
@@ -106,6 +108,13 @@ function BashCapturedOutput({ text, failed }: { text: string; failed: boolean })
   );
 }
 
+function commandStatus(status: AgentStep["status"]): AgentActivityStatus {
+  if (status === "failed" || status === "cancelled" || status === "running") {
+    return status;
+  }
+  return "passed";
+}
+
 function bashTool(step: AgentStep, script: string, stdout: string): AgentToolItem {
   return {
     type: "tool",
@@ -115,7 +124,7 @@ function bashTool(step: AgentStep, script: string, stdout: string): AgentToolIte
     input: script,
     output: stdout,
     outputStreams: [],
-    status: "passed",
+    status: commandStatus(step.status),
     truncated: false,
   };
 }
