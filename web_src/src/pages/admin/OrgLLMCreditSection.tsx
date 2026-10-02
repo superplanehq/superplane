@@ -8,13 +8,16 @@ import { bpsToPercentInput, dollarInputToCents } from "@/lib/hostedCredit";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Wallet } from "lucide-react";
 
-import { useOrgLLMCredit, type OrganizationLLMCredit } from "./useOrgLLMCredit";
+import { useOrgLLMCredit, formatUtcTrialEnd, utcCalendarDate, type OrganizationLLMCredit } from "./useOrgLLMCredit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
   "This organization uses Polar for billing. Cancel or change the subscription in Polar.";
 export const ADMIN_LOCAL_PLAN_COPY = "No Polar subscription. Set Trial, Business, or None for this organization.";
 export const ADMIN_PLAN_UNKNOWN_COPY = "SuperPlane could not load the billing plan. Refresh the page and try again.";
+export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
+export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
+export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
 
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
   const credit = useOrgLLMCredit(orgId);
@@ -35,6 +38,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
           planKnown={credit.plan != null}
+          savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
         />
       ) : null}
     </div>
@@ -46,10 +50,17 @@ function OrgBillingPlanField(args: {
   planKnown: boolean;
   planValue: string;
   setPlanValue: (value: string) => void;
+  savedTrialEndsAt: string | null;
+  trialEndsOn: string;
+  setTrialEndsOn: (value: string) => void;
+  trialEndInvalid: boolean;
   savingPlan: boolean;
   savePlan: () => void;
 }) {
   const planLocked = !args.planKnown || args.polarManaged;
+  const showTrialEndField = args.planKnown && !args.polarManaged && args.planValue === "trial";
+  const savedTrialEnd = formatUtcTrialEnd(args.savedTrialEndsAt);
+  const showTrialEnd = args.planKnown && !args.polarManaged && (showTrialEndField || savedTrialEnd != null);
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
@@ -66,6 +77,34 @@ function OrgBillingPlanField(args: {
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {billingPlanHelp(args.planKnown, args.polarManaged)}
       </Text>
+      {showTrialEnd ? (
+        <div className="mt-3">
+          <Label className="mb-2 block text-left" htmlFor="admin-org-trial-ends-input">
+            {ADMIN_TRIAL_ENDS_LABEL}
+          </Label>
+          {showTrialEndField ? (
+            <>
+              <Input
+                id="admin-org-trial-ends-input"
+                type="date"
+                data-testid="admin-org-trial-ends-input"
+                value={args.trialEndsOn}
+                min={utcCalendarDate(new Date())}
+                aria-invalid={args.trialEndInvalid}
+                onChange={(event) => args.setTrialEndsOn(event.target.value)}
+              />
+              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
+              {args.trialEndInvalid ? (
+                <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text data-testid="admin-org-trial-ends" className="text-sm text-gray-900 dark:text-gray-100">
+              {savedTrialEnd}
+            </Text>
+          )}
+        </div>
+      ) : null}
       {planLocked ? null : (
         <Button
           type="button"
@@ -103,6 +142,10 @@ function OrgHostedCreditCard(args: {
   setMarkupPercent: (value: string) => void;
   planValue: string;
   setPlanValue: (value: string) => void;
+  savedTrialEndsAt: string | null;
+  trialEndsOn: string;
+  setTrialEndsOn: (value: string) => void;
+  trialEndInvalid: boolean;
   savingGrant: boolean;
   savingMarkup: boolean;
   savingPlan: boolean;
@@ -117,6 +160,10 @@ function OrgHostedCreditCard(args: {
         planKnown={args.planKnown}
         planValue={args.planValue}
         setPlanValue={args.setPlanValue}
+        savedTrialEndsAt={args.savedTrialEndsAt}
+        trialEndsOn={args.trialEndsOn}
+        setTrialEndsOn={args.setTrialEndsOn}
+        trialEndInvalid={args.trialEndInvalid}
         savingPlan={args.savingPlan}
         savePlan={args.savePlan}
       />
