@@ -153,6 +153,34 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
+		case messageTypeShutdownRequest:
+			var shutdown shutdownRequestMessage
+			if err := json.Unmarshal(raw, &shutdown); err != nil {
+				s.writeConnectionError(connection, errInvalidRunnerMessage, "")
+				continue
+			}
+			taskID, shouldShutdown, err := s.requestRunnerShutdown(
+				r.Context(),
+				authenticatedRunner,
+				connectionID,
+				shutdown,
+			)
+			if err != nil {
+				s.writeConnectionError(connection, err, shutdown.RequestID)
+				continue
+			}
+			if shouldShutdown {
+				_ = connection.write(typedMessage{Type: messageTypeShutdown})
+				return
+			}
+			if err := connection.write(taskControlMessage{
+				Type:      messageTypeCancel,
+				TaskID:    taskID.String(),
+				RequestID: shutdown.RequestID,
+				Reason:    shutdown.Reason,
+			}); err != nil {
+				return
+			}
 		case messageTypeComplete:
 			var complete completeMessage
 			if err := json.Unmarshal(raw, &complete); err != nil {
@@ -174,7 +202,8 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 			}); err != nil {
 				return
 			}
-			if authenticatedRunner.Ephemeral {
+			if authenticatedRunner.State == models.RunnerStateTerminated {
+				_ = connection.write(typedMessage{Type: messageTypeShutdown})
 				return
 			}
 			if err := s.reconcileRunnerConnection(
@@ -191,6 +220,61 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 			s.writeConnectionError(connection, errInvalidRunnerMessage, "")
 		}
 	}
+}
+
+func (s *Server) requestRunnerShutdown(
+	ctx context.Context,
+	runner *models.Runner,
+	connectionID uuid.UUID,
+	request shutdownRequestMessage,
+) (uuid.UUID, bool, error) {
+	if _, err := uuid.Parse(request.RequestID); err != nil ||
+		request.Reason != shutdownReasonSignal {
+		return uuid.Nil, false, errInvalidRunnerMessage
+	}
+	reportedTaskID, err := optionalRunnerTaskID(request.CurrentTaskID)
+	if err != nil {
+		return uuid.Nil, false, errInvalidRunnerMessage
+	}
+
+	var taskID uuid.UUID
+	var shouldShutdown bool
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		current, err := models.FindRunner(tx, runner.ID)
+		if err != nil {
+			return err
+		}
+		*runner = *current
+		if runner.CurrentConnectionID == nil || *runner.CurrentConnectionID != connectionID {
+			return models.ErrRunnerConnectionReplaced
+		}
+		if runner.State == models.RunnerStateTerminated {
+			shouldShutdown = true
+			return nil
+		}
+		if runner.State == models.RunnerStateIdle && reportedTaskID == nil {
+			if err := runner.Terminate(tx, models.RunnerTerminationInterrupted); err != nil {
+				return err
+			}
+			shouldShutdown = true
+			return nil
+		}
+		if runner.State != models.RunnerStateBusy || !runner.Ephemeral {
+			return errRunnerStateMismatch
+		}
+		task, err := runner.FindActiveTask(tx)
+		if err != nil ||
+			reportedTaskID == nil ||
+			task.ID != *reportedTaskID {
+			return errRunnerStateMismatch
+		}
+		if err := task.RequestCancel(tx, time.Now()); err != nil {
+			return err
+		}
+		taskID = task.ID
+		return nil
+	})
+	return taskID, shouldShutdown, err
 }
 
 var (

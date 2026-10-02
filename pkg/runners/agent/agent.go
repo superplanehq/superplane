@@ -21,7 +21,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/runners/protocol"
 )
 
-const defaultExecutionTimeoutSeconds = 3600
+const (
+	defaultExecutionTimeoutSeconds = 3600
+	defaultShutdownGrace           = 30 * time.Second
+)
 
 type Config struct {
 	BaseURL      string
@@ -37,9 +40,11 @@ type Config struct {
 	LogChunkBytes     int64
 	LogSpoolMaxBytes  int64
 
-	ReconnectMin time.Duration
-	ReconnectMax time.Duration
-	Log          *slog.Logger
+	ReconnectMin  time.Duration
+	ReconnectMax  time.Duration
+	Shutdown      <-chan struct{}
+	ShutdownGrace time.Duration
+	Log           *slog.Logger
 }
 
 func DefaultConfig() Config {
@@ -49,6 +54,7 @@ func DefaultConfig() Config {
 		LogSpoolMaxBytes: 10 * 1024 * 1024,
 		ReconnectMin:     time.Second,
 		ReconnectMax:     5 * time.Second,
+		ShutdownGrace:    defaultShutdownGrace,
 	}
 }
 
@@ -104,37 +110,99 @@ func (a *Agent) Run(ctx context.Context) error {
 		sessionStatus.err = session.Run(sessionContext)
 		close(sessionStatus.done)
 	}()
+	var shutdownRequested atomic.Bool
+	if a.Config.Shutdown != nil {
+		go a.monitorShutdown(
+			sessionContext,
+			stopSession,
+			session,
+			&shutdownRequested,
+		)
+	}
 
-	receivedTask := false
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-sessionContext.Done():
+			return sessionContext.Err()
 		case <-sessionStatus.done:
-			err := sessionStatus.err
-			if err == nil && !receivedTask {
-				return errors.New("runner stopped before receiving a task")
-			}
-			return err
+			return a.sessionResult(sessionStatus, &shutdownRequested)
 		case rawTask := <-session.Tasks():
-			receivedTask = true
-			if err := a.runTask(ctx, session, sessionStatus, rawTask); err != nil {
+			if err := a.runTask(sessionContext, session, sessionStatus, rawTask); err != nil {
 				return err
 			}
-			if !a.Config.Registration.Ephemeral {
+			if !a.Config.Registration.Ephemeral && !shutdownRequested.Load() {
 				continue
 			}
 			a.logger().Info(
-				"ephemeral runner finished",
+				"runner waiting for shutdown",
 				slog.String("runner_id", a.Config.Registration.RunnerID),
 			)
-			stopSession()
 			select {
+			case <-sessionContext.Done():
+				return sessionContext.Err()
 			case <-sessionStatus.done:
-			case <-time.After(time.Second):
+				return a.sessionResult(sessionStatus, &shutdownRequested)
 			}
-			return nil
 		}
+	}
+}
+
+func (a *Agent) sessionResult(
+	status *sessionStatus,
+	shutdownRequested *atomic.Bool,
+) error {
+	if status.err == nil && shutdownRequested.Load() {
+		a.logger().Info(
+			"runner received shutdown instruction",
+			slog.String("runner_id", a.Config.Registration.RunnerID),
+		)
+	}
+	return status.err
+}
+
+func (a *Agent) monitorShutdown(
+	ctx context.Context,
+	stop context.CancelFunc,
+	session *protocol.Session,
+	requested *atomic.Bool,
+) {
+	select {
+	case <-ctx.Done():
+		return
+	case _, ok := <-a.Config.Shutdown:
+		if !ok {
+			return
+		}
+	}
+
+	requested.Store(true)
+	a.logger().Info(
+		"runner requesting controlled shutdown",
+		slog.String("runner_id", a.Config.Registration.RunnerID),
+		slog.String("reason", protocol.ShutdownReasonSignal),
+	)
+	session.RequestShutdown(protocol.ShutdownReasonSignal)
+	grace := a.Config.ShutdownGrace
+	if grace <= 0 {
+		grace = defaultShutdownGrace
+	}
+	timer := time.NewTimer(grace)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+		a.logger().Warn(
+			"runner shutdown grace period expired",
+			slog.String("runner_id", a.Config.Registration.RunnerID),
+			slog.Duration("grace", grace),
+		)
+		stop()
+	case <-a.Config.Shutdown:
+		a.logger().Warn(
+			"runner received a second shutdown signal",
+			slog.String("runner_id", a.Config.Registration.RunnerID),
+		)
+		stop()
 	}
 }
 

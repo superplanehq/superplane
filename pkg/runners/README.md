@@ -14,11 +14,33 @@ The runner:
 5. Sends task completion only after all retained chunks receive `204 No
    Content`.
 6. Waits for the WebSocket completion acknowledgement.
+7. Requests a controlled shutdown when it receives `SIGINT` or `SIGTERM`.
 
 An ephemeral runner exits after one acknowledged task. A reusable runner waits
 for another task.
 
-From the repository root, run it with:
+## Local development
+
+Start the development environment and set `INSTALLATION_ADMIN_TOKEN` in
+`.env`. Use this command to test runner or runner API changes:
+
+```sh
+make runner.new
+```
+
+The target rebuilds the local runner image and starts one attached ephemeral
+runner. It pauses the local Fleet Manager and restores it after the runner
+exits. It uses the `e1-large-amd64` fleet by default. Set a different existing
+fleet when necessary:
+
+```sh
+make runner.new RUNNER_FLEET=e1-tiny-arm64
+```
+
+Use a different terminal to start tasks and inspect runner behavior. Press
+Ctrl-C to test a controlled shutdown.
+
+To run the runner directly from the development container, use:
 
 ```sh
 docker compose -f docker-compose.dev.yml exec app go run ./cmd/runner \
@@ -37,3 +59,14 @@ Run focused checks with:
 docker compose -f docker-compose.dev.yml exec app go test ./pkg/runners/...
 docker compose -f docker-compose.dev.yml exec app go build ./cmd/runner
 ```
+
+## Controlled shutdown
+
+The runner sends a `shutdown_request` WebSocket message after the first signal.
+If the runner is idle, SuperPlane terminates the runner and sends `shutdown`.
+If a task is running, SuperPlane records a cancellation and sends `cancel`.
+The runner stops the task, uploads its retained logs, and sends `complete`.
+SuperPlane acknowledges the completion and then sends `shutdown`.
+
+The runner waits up to 30 seconds for this sequence. A second signal or the
+timeout stops the runner immediately.

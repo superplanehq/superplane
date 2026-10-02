@@ -332,12 +332,26 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 		if err != nil {
 			return err
 		}
+		if runner.State == models.RunnerStateBusy {
+			if !runner.Ephemeral {
+				return models.ErrRunnerBusy
+			}
+			task, taskErr := runner.FindActiveTask(tx)
+			if errors.Is(taskErr, models.ErrRunnerTaskNotFound) {
+				return models.ErrRunnerBusy
+			}
+			if taskErr != nil {
+				return taskErr
+			}
+			return task.RequestCancel(tx, time.Now())
+		}
 		return runner.Terminate(tx, models.RunnerTerminationRequested)
 	})
 	if errors.Is(err, models.ErrRunnerNotFound) {
 		return nil, grpcerrors.NotFound(err, "runner not found")
 	}
-	if errors.Is(err, models.ErrRunnerBusy) {
+	if errors.Is(err, models.ErrRunnerBusy) ||
+		errors.Is(err, models.ErrRunnerTaskNotCompletable) {
 		return nil, grpcerrors.Conflict(err, "busy runner cannot be terminated")
 	}
 	if err != nil {

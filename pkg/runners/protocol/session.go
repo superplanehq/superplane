@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -58,10 +59,12 @@ type Session struct {
 	mu          sync.Mutex
 	currentTask string
 	completion  *pendingCompletion
+	shutdown    *shutdownRequestMessage
 
 	tasks             chan json.RawMessage
 	cancellations     chan string
 	completionChanged chan struct{}
+	shutdownChanged   chan struct{}
 }
 
 func NewSession(config SessionConfig) (*Session, error) {
@@ -109,6 +112,7 @@ func NewSession(config SessionConfig) (*Session, error) {
 		tasks:             make(chan json.RawMessage),
 		cancellations:     make(chan string, 1),
 		completionChanged: make(chan struct{}, 1),
+		shutdownChanged:   make(chan struct{}, 1),
 	}, nil
 }
 
@@ -118,6 +122,23 @@ func (s *Session) Tasks() <-chan json.RawMessage {
 
 func (s *Session) Cancellations() <-chan string {
 	return s.cancellations
+}
+
+func (s *Session) RequestShutdown(reason string) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = ShutdownReasonSignal
+	}
+	s.mu.Lock()
+	if s.shutdown == nil {
+		s.shutdown = &shutdownRequestMessage{
+			Type:      messageTypeShutdownRequest,
+			RequestID: uuid.NewString(),
+			Reason:    reason,
+		}
+	}
+	s.mu.Unlock()
+	s.signalShutdownChanged()
 }
 
 func (s *Session) Run(ctx context.Context) error {
@@ -294,6 +315,17 @@ func (s *Session) writeLoop(
 			return
 		}
 	}
+	if shutdown := s.pendingShutdown(); shutdown != nil {
+		if err := write(shutdown); err != nil {
+			done <- fmt.Errorf("write runner shutdown request: %w", err)
+			_ = socket.Close()
+			return
+		}
+		select {
+		case <-s.shutdownChanged:
+		default:
+		}
+	}
 
 	for {
 		select {
@@ -313,6 +345,16 @@ func (s *Session) writeLoop(
 			}
 			if err := write(completion.message); err != nil {
 				done <- fmt.Errorf("write task completion: %w", err)
+				_ = socket.Close()
+				return
+			}
+		case <-s.shutdownChanged:
+			shutdown := s.pendingShutdown()
+			if shutdown == nil {
+				continue
+			}
+			if err := write(shutdown); err != nil {
+				done <- fmt.Errorf("write runner shutdown request: %w", err)
 				_ = socket.Close()
 				return
 			}
@@ -453,9 +495,27 @@ func (s *Session) pendingCompletion() *pendingCompletion {
 	return s.completion
 }
 
+func (s *Session) pendingShutdown() *shutdownRequestMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.shutdown == nil {
+		return nil
+	}
+	message := *s.shutdown
+	message.CurrentTaskID = s.currentTask
+	return &message
+}
+
 func (s *Session) signalCompletionChanged() {
 	select {
 	case s.completionChanged <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Session) signalShutdownChanged() {
+	select {
+	case s.shutdownChanged <- struct{}{}:
 	default:
 	}
 }

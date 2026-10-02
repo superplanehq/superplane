@@ -97,6 +97,26 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	require.Equal(t, http.StatusOK, incremental.Code)
 	assert.Equal(t, "second\n", incremental.Body.String())
 
+	t.Run("does not return logs across organizations", func(t *testing.T) {
+		otherOrganization := support.CreateOrganization(t, resource, resource.UserModel.ID)
+		otherUser := support.CreateUser(t, resource, otherOrganization.ID)
+		require.NotNil(t, otherUser.AccountID)
+
+		response := runnerTaskLogsGETAs(
+			t,
+			server,
+			signer,
+			*otherUser.AccountID,
+			otherOrganization.ID,
+			canvasID,
+			executionID,
+			"",
+		)
+
+		require.Equal(t, http.StatusNotFound, response.Code)
+		require.NotContains(t, response.Body.String(), "first")
+	})
+
 	var compressed bytes.Buffer
 	gzipWriter := gzip.NewWriter(&compressed)
 	_, err = gzipWriter.Write([]byte("final\n"))

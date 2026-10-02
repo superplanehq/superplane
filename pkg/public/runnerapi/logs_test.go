@@ -77,6 +77,49 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	defer httpServer.Close()
 	chunkURL := httpServer.URL + "/runner/v1/tasks/" + task.ID.String() + "/logs/chunks/"
 
+	t.Run("rejects a runner not assigned to another organization's task", func(t *testing.T) {
+		otherOrganization, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		otherRunner := &models.Runner{
+			ID:            uuid.New(),
+			FleetID:       fleet.ID,
+			State:         models.RunnerStateIdle,
+			RunnerVersion: fleet.RunnerVersion,
+			Ephemeral:     true,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		require.NoError(t, db.Create(otherRunner).Error)
+		otherTask := &models.RunnerTask{
+			ID:                uuid.New(),
+			OrganizationID:    otherOrganization.ID,
+			FleetID:           fleet.ID,
+			Backend:           models.RunnerTaskBackendIntegrated,
+			State:             models.RunnerTaskStateQueued,
+			PayloadCiphertext: []byte("{}"),
+			QueuedAt:          time.Now(),
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+		}
+		require.NoError(t, db.Create(otherTask).Error)
+		require.NoError(t, otherTask.Reserve(db, otherRunner.ID))
+		require.NoError(t, store.Initialize(t.Context(), otherTask.ID))
+		t.Cleanup(func() {
+			require.NoError(t, store.Delete(context.Background(), otherTask.ID))
+		})
+		require.NoError(t, otherTask.Start(db, otherRunner, runnerlogs.StoreFS, time.Now()))
+
+		otherChunkURL := httpServer.URL + "/runner/v1/tasks/" + otherTask.ID.String() + "/logs/chunks/0"
+		assertUploadStatus(t, otherChunkURL, accessToken, "cross-org\n", http.StatusNotFound)
+
+		read, err := store.ReadAfter(t.Context(), otherTask.ID, "")
+		require.NoError(t, err)
+		defer read.Content.Close()
+		content, err := io.ReadAll(read.Content)
+		require.NoError(t, err)
+		require.Empty(t, content)
+	})
+
 	maxUploadBytes := runnerclientapi.DefaultLogUploadPolicy().MaxUploadBytes()
 	oversized := strings.Repeat("x", int(maxUploadBytes)+1)
 	assertUploadStatus(t, chunkURL+"0", accessToken, oversized, http.StatusRequestEntityTooLarge)

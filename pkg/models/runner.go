@@ -18,6 +18,7 @@ const (
 	RunnerStateTerminated = "terminated"
 
 	RunnerTerminationRequested           = "requested"
+	RunnerTerminationInterrupted         = "interrupted"
 	RunnerTerminationRegistrationExpired = "registration_timeout"
 	RunnerTerminationProvisioningFailed  = "provisioning_failed"
 	RunnerTerminationVersionMismatch     = "version_mismatch"

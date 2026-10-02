@@ -24,6 +24,26 @@ func runnerTaskLogsGET(
 	cursor string,
 ) *httptest.ResponseRecorder {
 	t.Helper()
+	return runnerTaskLogsGETAs(
+		t,
+		server,
+		signer,
+		resource.Account.ID,
+		resource.Organization.ID,
+		canvasID,
+		executionID,
+		cursor,
+	)
+}
+
+func runnerTaskLogsGETAs(
+	t *testing.T,
+	server *Server,
+	signer *jwt.Signer,
+	accountID, organizationID, canvasID, executionID uuid.UUID,
+	cursor string,
+) *httptest.ResponseRecorder {
+	t.Helper()
 	request := httptest.NewRequest(
 		http.MethodGet,
 		fmt.Sprintf(
@@ -34,10 +54,10 @@ func runnerTaskLogsGET(
 		),
 		nil,
 	)
-	request.Header.Set("x-organization-id", resource.Organization.ID.String())
+	request.Header.Set("x-organization-id", organizationID.String())
 	token, err := authentication.GenerateAccountToken(
 		signer,
-		resource.Account.ID.String(),
+		accountID.String(),
 		time.Now(),
 		time.Hour,
 	)

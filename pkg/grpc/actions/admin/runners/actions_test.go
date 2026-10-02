@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
@@ -368,7 +369,43 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 	assert.Equal(t, installationRunner.ID.String(), response.Runners[0].Id)
 }
 
-func TestDeleteRunnerRejectsBusyRunnerWithConflict(t *testing.T) {
+func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
+	now := time.Now()
+	runner := &models.Runner{
+		ID:            uuid.New(),
+		FleetID:       fleet.ID,
+		State:         models.RunnerStateIdle,
+		RunnerVersion: "0.1.0",
+		Ephemeral:     true,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	require.NoError(t, db.Create(runner).Error)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, now))
+
+	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
+	service := newTestRunnerService()
+	response, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
+		FleetId:  fleet.Slug,
+		RunnerId: runner.ID.String(),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerStateBusy, response.Runner.State)
+
+	reloadedTask, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, reloadedTask.CancelRequestedAt)
+	reloadedRunner, err := models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
+}
+
+func TestDeleteRunnerRejectsBusyReusableRunnerWithConflict(t *testing.T) {
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)

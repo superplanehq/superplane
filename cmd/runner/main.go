@@ -86,15 +86,15 @@ func run() error {
 		)
 	}
 
-	ctx, stop := signal.NotifyContext(
+	startupContext, stopStartup := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,
 		syscall.SIGTERM,
 	)
-	defer stop()
+	defer stopStartup()
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
-	registrationContext, cancelRegistration := context.WithTimeout(ctx, 30*time.Second)
+	registrationContext, cancelRegistration := context.WithTimeout(startupContext, 30*time.Second)
 	registration, err := protocol.Register(
 		registrationContext,
 		httpClient,
@@ -106,6 +106,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	stopStartup()
+
+	shutdown := make(chan struct{}, 2)
+	signals := make(chan os.Signal, 2)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	go forwardShutdownSignals(signals, shutdown, slog.Default())
 
 	config := agent.DefaultConfig()
 	config.BaseURL = *apiURL
@@ -117,6 +124,7 @@ func run() error {
 	config.LogSpoolDirectory = *spoolDirectory
 	config.LogChunkBytes = *logChunkBytes
 	config.LogSpoolMaxBytes = *logSpoolMaxBytes
+	config.Shutdown = shutdown
 	config.Log = slog.Default()
 
 	slog.Info(
@@ -126,7 +134,21 @@ func run() error {
 		slog.String("version", Version),
 	)
 	runner := &agent.Agent{HTTP: httpClient, Config: config}
-	return runner.Run(ctx)
+	return runner.Run(context.Background())
+}
+
+func forwardShutdownSignals(
+	signals <-chan os.Signal,
+	shutdown chan<- struct{},
+	log *slog.Logger,
+) {
+	for received := range signals {
+		log.Info(
+			"runner received shutdown signal",
+			slog.String("signal", received.String()),
+		)
+		shutdown <- struct{}{}
+	}
 }
 
 func env(name, fallback string) string {

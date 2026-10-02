@@ -1,6 +1,7 @@
 package runners
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +9,42 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 	clitest "github.com/superplanehq/superplane/test/support/cli"
 )
+
+func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
+	var request openapi_client.RunnersCreateRunnerBody
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/admin/api/installation/fleets/e1-large-arm64/runners", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{
+			"runner":{"id":"runner-1","fleetId":"e1-large-arm64","state":"pending","runnerVersion":"dev","ephemeral":true},
+			"registrationToken":"registration-token",
+			"registrationExpiresAt":"2026-10-02T19:00:00Z",
+			"runnerApiUrl":"http://localhost:8000"
+		}`)
+	}))
+	defer server.Close()
+
+	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	err := (&createCommand{
+		FleetID:        "e1-large-arm64",
+		TaskID:         "task-1",
+		IdempotencyKey: "request-1",
+		Ephemeral:      true,
+	}).Execute(ctx)
+
+	require.NoError(t, err)
+	assert.Equal(t, "task-1", request.GetTaskId())
+	assert.Equal(t, "request-1", request.GetIdempotencyKey())
+	assert.True(t, request.GetEphemeral())
+	assert.Contains(t, stdout.String(), "runner-1")
+	assert.Contains(t, stdout.String(), "registration-token")
+	assert.Contains(t, stdout.String(), "http://localhost:8000")
+}
 
 func TestListRunnersPassesFleetAndFilters(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

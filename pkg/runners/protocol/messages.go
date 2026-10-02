@@ -3,17 +3,20 @@ package protocol
 import "encoding/json"
 
 const (
-	messageTypeHello     = "hello"
-	messageTypeComplete  = "complete"
-	messageTypePong      = "pong"
-	messageTypeTask      = "task"
-	messageTypeCancel    = "cancel"
-	messageTypeShutdown  = "shutdown"
-	messageTypeReconnect = "reconnect"
-	messageTypePing      = "ping"
-	messageTypeAck       = "ack"
-	messageTypeError     = "error"
+	messageTypeHello           = "hello"
+	messageTypeComplete        = "complete"
+	messageTypePong            = "pong"
+	messageTypeShutdownRequest = "shutdown_request"
+	messageTypeTask            = "task"
+	messageTypeCancel          = "cancel"
+	messageTypeShutdown        = "shutdown"
+	messageTypeReconnect       = "reconnect"
+	messageTypePing            = "ping"
+	messageTypeAck             = "ack"
+	messageTypeError           = "error"
 )
+
+const ShutdownReasonSignal = "signal"
 
 type messageEnvelope struct {
 	Type string `json:"type"`
@@ -43,8 +46,17 @@ type taskMessage struct {
 }
 
 type taskControlMessage struct {
-	Type   string `json:"type"`
-	TaskID string `json:"task_id"`
+	Type      string `json:"type"`
+	TaskID    string `json:"task_id"`
+	RequestID string `json:"request_id,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+type shutdownRequestMessage struct {
+	Type          string `json:"type"`
+	RequestID     string `json:"request_id"`
+	Reason        string `json:"reason"`
+	CurrentTaskID string `json:"current_task_id,omitempty"`
 }
 
 type ackMessage struct {

@@ -20,10 +20,81 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Use:   "runners",
 		Short: "Manage runners",
 	}
+	root.AddCommand(newCreateCommand(options))
 	root.AddCommand(newListCommand(options))
 	root.AddCommand(newDescribeCommand(options))
 	root.AddCommand(newDeleteCommand(options))
 	return root
+}
+
+type createCommand struct {
+	FleetID        string
+	TaskID         string
+	IdempotencyKey string
+	Ephemeral      bool
+}
+
+func newCreateCommand(options core.BindOptions) *cobra.Command {
+	handler := &createCommand{}
+	cmd := &cobra.Command{Use: "create", Short: "Create a runner", Args: cobra.NoArgs}
+	cmd.Flags().StringVar(&handler.FleetID, "fleet", "", "fleet ID")
+	cmd.Flags().StringVar(&handler.TaskID, "task", "", "task ID")
+	cmd.Flags().StringVar(
+		&handler.IdempotencyKey,
+		"idempotency-key",
+		"",
+		"idempotency key",
+	)
+	cmd.Flags().BoolVar(&handler.Ephemeral, "ephemeral", false, "terminate after one task")
+	_ = cmd.MarkFlagRequired("fleet")
+	core.Bind(cmd, handler, options)
+	return cmd
+}
+
+func (c *createCommand) Execute(ctx core.CommandContext) error {
+	request := openapi_client.RunnersCreateRunnerBody{}
+	request.SetEphemeral(c.Ephemeral)
+	if taskID := strings.TrimSpace(c.TaskID); taskID != "" {
+		request.SetTaskId(taskID)
+	}
+	if key := strings.TrimSpace(c.IdempotencyKey); key != "" {
+		request.SetIdempotencyKey(key)
+	}
+
+	response, _, err := ctx.API.RunnersAPI.
+		RunnersCreateRunner(ctx.Context, c.FleetID).
+		Body(request).
+		Execute()
+	if err != nil {
+		return core.FormatCommandError(err)
+	}
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(response)
+	}
+	if response == nil || response.Runner == nil {
+		return fmt.Errorf("server returned an empty runner")
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+		if _, err := fmt.Fprintln(
+			writer,
+			"ID\tREGISTRATION_TOKEN\tEXPIRES_AT\tRUNNER_API_URL",
+		); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(
+			writer,
+			"%s\t%s\t%s\t%s\n",
+			response.Runner.GetId(),
+			response.GetRegistrationToken(),
+			formatTime(response.RegistrationExpiresAt),
+			response.GetRunnerApiUrl(),
+		); err != nil {
+			return err
+		}
+		return writer.Flush()
+	})
 }
 
 type listCommand struct {
