@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -43,7 +42,7 @@ To configure Datadog to work with SuperPlane:
 - ` + "`monitors_read`" + ` finds an existing Error Tracking monitor for a service.
 - ` + "`monitors_write`" + ` creates and removes the Error Tracking monitor for a service.
 
-Grant these optional permissions to add the error sample and related logs to each task:
+Grant these optional permissions. ` + "`apm_read`" + ` or ` + "`logs_read_data`" + ` lists services that have no open issues. These permissions also add the error sample and related logs to each task:
 
 - ` + "`apm_read`" + ` reads the sample error span: trace, request, user, and environment.
 - ` + "`logs_read_data`" + ` reads log samples and the logs that share the sample trace.
@@ -121,7 +120,7 @@ func (d *Datadog) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.",
+			Description: "A restricted key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write. Add apm_read or logs_read_data to list services that have no open issues. Add apm_read, logs_read_data, and rum_apps_read to include the error sample and related logs.",
 		},
 	}
 }
@@ -418,36 +417,12 @@ func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesConte
 		return environmentResources(names), nil
 	}
 
-	issues, err := client.SearchErrorTrackingIssues("*", maxErrorTrackingSearchLimit)
+	names, err := client.ListServices()
 	if err != nil {
 		return nil, err
 	}
 
-	return serviceResources(issues), nil
-}
-
-func serviceResources(issues []ErrorTrackingIssue) []core.IntegrationResource {
-	seen := map[string]bool{}
-	names := make([]string, 0, len(issues))
-	for _, issue := range issues {
-		name := strings.TrimSpace(issue.Service)
-		if name == "" || seen[name] {
-			continue
-		}
-		seen[name] = true
-		names = append(names, name)
-	}
-	slices.Sort(names)
-
-	resources := make([]core.IntegrationResource, 0, len(names))
-	for _, name := range names {
-		resources = append(resources, core.IntegrationResource{
-			Type: ResourceTypeService,
-			ID:   name,
-			Name: name,
-		})
-	}
-	return resources
+	return serviceResources(names), nil
 }
 
 func (d *Datadog) Hooks() []core.Hook {
