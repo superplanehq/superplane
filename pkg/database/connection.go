@@ -86,6 +86,7 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 
 	q := url.Values{}
 	q.Set("sslmode", c.Ssl)
+	q.Set("default_query_exec_mode", "describe_exec")
 	if c.ApplicationName != "" {
 		q.Set("application_name", c.ApplicationName)
 	}

@@ -876,6 +876,8 @@ CREATE TABLE public.factory_work_orders (
     repository text,
     default_branch text,
     auto_start_line_id uuid,
+    mcp_client_id text,
+    mcp_client_name text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 

@@ -315,6 +315,13 @@ func planningSpecArtifactKey(orderID uuid.UUID) string {
 	return PlanningSpecArtifactKey + ":" + orderID.String()
 }
 
+func (o *FactoryWorkOrder) StorePlanningSpec(tx *gorm.DB, body string) error {
+	if o == nil {
+		return ErrFactoryWorkOrderNotFound
+	}
+	return upsertPlanningSpecArtifact(tx, o, strings.TrimSpace(body), nil)
+}
+
 func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body string, runID *uuid.UUID) error {
 	key := planningSpecArtifactKey(order.ID)
 	data := map[string]any{
