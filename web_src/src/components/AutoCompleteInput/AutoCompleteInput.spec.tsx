@@ -4,11 +4,14 @@ import { AutoCompleteInput } from "./AutoCompleteInput";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
 describe("calculateDropdownPosition", () => {
-  it("anchors the dropdown top to the cursor y coordinate", () => {
+  it("anchors the dropdown top to the cursor y coordinate when there is room below", () => {
     const position = calculateDropdownPosition({
       cursor: { x: 120, y: 240 },
+      cursorTop: 220,
       viewportWidth: 1000,
+      viewportHeight: 800,
       dropdownWidth: 350,
+      dropdownHeight: 244,
       valuePreviewWidth: 200,
       showValuePreview: false,
     });
@@ -16,11 +19,30 @@ describe("calculateDropdownPosition", () => {
     expect(position.top).toBe(244);
   });
 
+  it("flips the dropdown above the cursor when there is not enough room below", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 720 },
+      cursorTop: 700,
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      dropdownWidth: 350,
+      dropdownHeight: 244,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+    });
+
+    // Should flip above: cursorTop(700) - gap(4) - dropdownHeight(244) = 452
+    expect(position.top).toBe(452);
+  });
+
   it("keeps the dropdown inside the viewport horizontally", () => {
     const position = calculateDropdownPosition({
       cursor: { x: 980, y: 80 },
+      cursorTop: 60,
       viewportWidth: 1000,
+      viewportHeight: 800,
       dropdownWidth: 350,
+      dropdownHeight: 244,
       valuePreviewWidth: 200,
       showValuePreview: false,
     });
