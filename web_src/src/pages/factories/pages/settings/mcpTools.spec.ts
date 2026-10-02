@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { enabledToolCount, mcpToolItems, nextDisabledTools, sortMCPTools, workspaceDisabledTools } from "./mcpTools";
+import {
+  effectiveDisabledTools,
+  enabledToolCount,
+  mcpToolItems,
+  nextDisabledTools,
+  sortMCPTools,
+  workspaceDisabledTools,
+} from "./mcpTools";
 
 const tools = mcpToolItems([
   { name: "write_issue", readOnly: false },
@@ -20,5 +27,10 @@ describe("mcpTools", () => {
     expect(workspaceDisabledTools({ disabledTools: [" create_issue ", ""] })).toEqual(["create_issue"]);
     expect(nextDisabledTools(["search"], "create_issue", false)).toEqual(["search", "create_issue"]);
     expect(nextDisabledTools(["search", "create_issue"], "search", true)).toEqual(["create_issue"]);
+    expect(effectiveDisabledTools(["create_issue", "search"], ["create_issue"], ["update_issue"])).toEqual([
+      "search",
+      "update_issue",
+    ]);
+    expect(effectiveDisabledTools(["create_issue"], ["create_issue"], ["create_issue"])).toEqual(["create_issue"]);
   });
 });
