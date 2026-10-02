@@ -191,7 +191,13 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
 	assert.Contains(t, text, "Follow the task prompt")
-	assert.Contains(t, text, "Call propose_clarity and propose_confidence every turn")
+	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
+	assert.Contains(t, text, "Publish the scores when the plan changes, a score would change, or the user asks to update a score")
+	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.Contains(t, text, "You may update a score without rewriting the specification")
+	assert.NotContains(t, text, "Publish the specification and the scores only when this turn updates the plan")
+	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
+	assert.NotContains(t, text, "every turn")
 	assert.Contains(t, text, "Do not leave a written plan unpublished")
 	assert.NotContains(t, text, "If Clarity is still 1 or 2")
 	assert.Contains(t, text, "Stop double charges.")
@@ -200,6 +206,18 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Contains(t, text, "I found the retry seam in billing/retry.go.")
 	assert.Contains(t, text, "Keep the existing retry helper.")
 	assert.Equal(t, 1, strings.Count(text, "Keep the existing retry helper."))
+
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
+	text, err = AnalysisContinuationText(db, session)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
+	assert.Contains(t, text, "Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score")
+	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.NotContains(t, text, "Publish the specification and the Clarity score only when this turn updates the plan")
+	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
+	assert.NotContains(t, text, "propose_confidence")
+	assert.Contains(t, text, "Stop double charges.")
+	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")
 }
 
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {

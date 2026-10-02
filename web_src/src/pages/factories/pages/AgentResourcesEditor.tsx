@@ -15,7 +15,13 @@ import { connectionIsEstablished } from "./settings/agentResourceDisplay";
 import { AGENT_RESOURCES_COPY } from "./settings/agentResourceCopy";
 import { skillDisplayTitle, skillListDescription } from "./settings/skillFrontmatter";
 import { MCPToolsList } from "./settings/MCPToolsList";
-import { enabledToolCount, mcpToolItems, nextDisabledTools, workspaceDisabledTools } from "./settings/mcpTools";
+import {
+  effectiveDisabledTools,
+  enabledToolCount,
+  mcpToolItems,
+  nextDisabledTools,
+  workspaceDisabledTools,
+} from "./settings/mcpTools";
 import { PLANNING_REVIEW_RESOURCES_COPY } from "./planningReviewResourcesCopy";
 
 export function AgentResourcesEditor({
@@ -24,8 +30,10 @@ export function AgentResourcesEditor({
   factoryKey,
   disabledIds,
   disabledTools,
+  enabledTools,
   onDisabledIdsChange,
   onDisabledToolsChange,
+  onEnabledToolsChange,
   compact = false,
 }: {
   organizationId?: string;
@@ -33,8 +41,10 @@ export function AgentResourcesEditor({
   factoryKey?: string;
   disabledIds: string[];
   disabledTools: Record<string, string[]>;
+  enabledTools: Record<string, string[]>;
   onDisabledIdsChange: (ids: string[]) => void;
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
+  onEnabledToolsChange: (tools: Record<string, string[]>) => void;
   compact?: boolean;
 }) {
   const features = useExperimentalFeature(organizationId);
@@ -53,8 +63,10 @@ export function AgentResourcesEditor({
           factoryKey={factoryKey!}
           disabledIds={disabledIds}
           disabledTools={disabledTools}
+          enabledTools={enabledTools}
           onDisabledIdsChange={onDisabledIdsChange}
           onDisabledToolsChange={onDisabledToolsChange}
+          onEnabledToolsChange={onEnabledToolsChange}
           compact={compact}
         />
       ) : null}
@@ -78,8 +90,10 @@ function MCPAutomationSection({
   factoryKey,
   disabledIds,
   disabledTools,
+  enabledTools,
   onDisabledIdsChange,
   onDisabledToolsChange,
+  onEnabledToolsChange,
   compact,
 }: {
   organizationId: string;
@@ -87,8 +101,10 @@ function MCPAutomationSection({
   factoryKey: string;
   disabledIds: string[];
   disabledTools: Record<string, string[]>;
+  enabledTools: Record<string, string[]>;
   onDisabledIdsChange: (ids: string[]) => void;
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
+  onEnabledToolsChange: (tools: Record<string, string[]>) => void;
   compact: boolean;
 }) {
   const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
@@ -115,8 +131,10 @@ function MCPAutomationSection({
               resource={resource}
               disabledIds={disabledIds}
               disabledTools={disabledTools}
+              enabledTools={enabledTools}
               onDisabledIdsChange={onDisabledIdsChange}
               onDisabledToolsChange={onDisabledToolsChange}
+              onEnabledToolsChange={onEnabledToolsChange}
             />
           ))}
         </ul>
@@ -131,16 +149,20 @@ function MCPAutomationRow({
   resource,
   disabledIds,
   disabledTools,
+  enabledTools,
   onDisabledIdsChange,
   onDisabledToolsChange,
+  onEnabledToolsChange,
 }: {
   organizationId: string;
   factoryId: string;
   resource: FactoriesFactoryAgentResource;
   disabledIds: string[];
   disabledTools: Record<string, string[]>;
+  enabledTools: Record<string, string[]>;
   onDisabledIdsChange: (ids: string[]) => void;
   onDisabledToolsChange: (tools: Record<string, string[]>) => void;
+  onEnabledToolsChange: (tools: Record<string, string[]>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const id = resource.id ?? "";
@@ -151,8 +173,9 @@ function MCPAutomationRow({
   const toolsQuery = useFactoryAgentResourceTools(organizationId, factoryId, id, showTools && !workspaceOff);
   const workspaceDisabled = workspaceDisabledTools(resource);
   const automationDisabled = disabledTools[id] ?? [];
+  const enabledOverride = enabledTools[id] ?? [];
   const tools = mcpToolItems(toolsQuery.data);
-  const effectiveDisabled = [...new Set([...workspaceDisabled, ...automationDisabled])];
+  const effectiveDisabled = effectiveDisabledTools(workspaceDisabled, enabledOverride, automationDisabled);
   const count =
     showTools && !workspaceOff && !toolsQuery.isLoading && !toolsQuery.isError && tools.length > 0
       ? AGENT_RESOURCES_COPY.toolsCount(enabledToolCount(tools, effectiveDisabled), tools.length)
@@ -196,14 +219,24 @@ function MCPAutomationRow({
             tools={toolsQuery.data ?? []}
             isLoading={toolsQuery.isLoading}
             isError={toolsQuery.isError}
-            disabledTools={automationDisabled}
-            lockedTools={workspaceDisabled}
+            disabledTools={effectiveDisabled}
             canUpdate
-            onToggleTool={(toolName, enabled) =>
+            onToggleTool={(toolName, enabled) => {
+              if (workspaceDisabled.includes(toolName)) {
+                onEnabledToolsChange(
+                  nextResourceTools(enabledTools, id, nextDisabledTools(enabledOverride, toolName, !enabled)),
+                );
+                if (enabled) {
+                  onDisabledToolsChange(
+                    nextResourceTools(disabledTools, id, nextDisabledTools(automationDisabled, toolName, true)),
+                  );
+                }
+                return;
+              }
               onDisabledToolsChange(
                 nextResourceTools(disabledTools, id, nextDisabledTools(automationDisabled, toolName, enabled)),
-              )
-            }
+              );
+            }}
           />
         </div>
       ) : null}
