@@ -118,7 +118,14 @@ func SerializeCanvasRuns(
 	parentRunsByRunID map[string]models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) ([]*pb.CanvasRun, error) {
-	inputEvents, err := loadInputEventsForQueueItems(db, queueItemsForRuns(runs, queueItemsByRunID))
+	allQueueItems := queueItemsForRuns(runs, queueItemsByRunID)
+
+	inputEvents, err := loadInputEventsForQueueItems(db, allQueueItems)
+	if err != nil {
+		return nil, err
+	}
+
+	blockingInfo, err := loadBlockingExecutionsInfo(db, workflowIDForRuns(runs), allQueueItems)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +139,7 @@ func SerializeCanvasRuns(
 			executionsByRunID[run.ID.String()],
 			queueItemsByRunID[run.ID.String()],
 			inputEvents,
+			blockingInfo,
 			parentRunsByRunID[run.ID.String()],
 			childRunsByExecutionID,
 		)
@@ -143,6 +151,14 @@ func SerializeCanvasRuns(
 	}
 
 	return result, nil
+}
+
+func workflowIDForRuns(runs []models.CanvasRun) uuid.UUID {
+	if len(runs) == 0 {
+		return uuid.Nil
+	}
+
+	return runs[0].WorkflowID
 }
 
 func SerializeCanvasRun(
@@ -159,12 +175,17 @@ func SerializeCanvasRun(
 		return nil, err
 	}
 
+	blockingInfo, err := loadBlockingExecutionsInfo(db, run.WorkflowID, queueItems)
+	if err != nil {
+		return nil, err
+	}
+
 	var parent models.CanvasRun
 	if parentRun != nil {
 		parent = *parentRun
 	}
 
-	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, parent, childRunsByExecutionID)
+	return serializeCanvasRunWithQueueItemInputs(run, rootEvent, executions, queueItems, inputEvents, blockingInfo, parent, childRunsByExecutionID)
 }
 
 func serializeCanvasRunWithQueueItemInputs(
@@ -173,6 +194,7 @@ func serializeCanvasRunWithQueueItemInputs(
 	executions []models.CanvasNodeExecution,
 	queueItems []models.CanvasNodeQueueItem,
 	inputEvents []models.CanvasEvent,
+	blockingInfo blockingExecutionsInfo,
 	parentRun models.CanvasRun,
 	childRunsByExecutionID map[string][]models.CanvasRun,
 ) (*pb.CanvasRun, error) {
@@ -193,7 +215,7 @@ func serializeCanvasRunWithQueueItemInputs(
 		))
 	}
 
-	serializedQueueItems, err := serializeNodeQueueItemsWithInputEvents(queueItems, inputEvents)
+	serializedQueueItems, err := serializeNodeQueueItemsWithInputEvents(queueItems, inputEvents, blockingInfo)
 	if err != nil {
 		return nil, err
 	}
