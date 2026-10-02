@@ -980,6 +980,29 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.linear_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    webhook_id uuid NOT NULL,
+    event_type text DEFAULT ''::text NOT NULL,
+    action text DEFAULT ''::text NOT NULL,
+    issue_identifier text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    team_key text DEFAULT ''::text NOT NULL,
+    workspace_key text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    subscription_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
 -- Name: mcp_oauth_clients; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2272,6 +2295,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: linear_webhook_receipts linear_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.linear_webhook_receipts
+    ADD CONSTRAINT linear_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mcp_oauth_clients mcp_oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3372,6 +3403,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_linear_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_received_at ON public.linear_webhook_receipts USING btree (received_at DESC);
 
 
 --
@@ -5106,7 +5144,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261002133436	f
+20261002160020	f
 \.
 
 

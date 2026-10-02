@@ -20,6 +20,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -216,6 +217,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
+	c.recordLinearWebhookTask(order)
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
@@ -394,6 +396,26 @@ func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder)
 
 	if err := models.AppendSentryWebhookTask(c.tx, receiptID, order.ID); err != nil {
 		log.WithError(err).Warnf("failed to record task %s on Sentry webhook %s", order.ID, receiptID)
+	}
+}
+
+func (c *FactoryContext) recordLinearWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := linear.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendLinearWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Linear webhook %s", order.ID, receiptID)
 	}
 }
 

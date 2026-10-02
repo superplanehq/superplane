@@ -70,9 +70,16 @@ func adminIntegrationDetails(metadata map[string]any) map[string]string {
 	addAdminDetail(details, "installation_uuid", metadata["installationUUID"])
 	addAdminDetail(details, "installation_id", metadata["installationId"])
 	addAdminDetail(details, "hosted_app", metadata["hostedApp"])
+	if hosted, ok := metadata["hostedOAuth"].(bool); ok && hosted {
+		addAdminDetail(details, "hosted_app", true)
+	}
 	if organization, ok := metadata["organization"].(map[string]any); ok {
 		addAdminDetail(details, "external_organization", organization["slug"])
 	}
+	if name, ok := metadata["organization"].(string); ok {
+		addAdminDetail(details, "external_organization", name)
+	}
+	addAdminDetail(details, "workspace_key", metadata["urlKey"])
 	return details
 }
 

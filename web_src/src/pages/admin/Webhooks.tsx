@@ -2,10 +2,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams } from "react-router";
 
 import { DatadogWebhooks } from "./DatadogWebhooks";
+import { LinearWebhooks } from "./LinearWebhooks";
 import { SentryWebhooks } from "./SentryWebhooks";
 
 const WEBHOOKS_TITLE = "Webhooks";
-const WEBHOOK_SERVICES = ["sentry", "datadog"] as const;
+const WEBHOOK_SERVICES = ["sentry", "datadog", "linear"] as const;
 
 type WebhookService = (typeof WEBHOOK_SERVICES)[number];
 
@@ -37,12 +38,16 @@ export function Webhooks() {
         <TabsList>
           <TabsTrigger value="sentry">Sentry</TabsTrigger>
           <TabsTrigger value="datadog">Datadog</TabsTrigger>
+          <TabsTrigger value="linear">Linear</TabsTrigger>
         </TabsList>
         <TabsContent value="sentry" className="mt-4">
           <SentryWebhooks />
         </TabsContent>
         <TabsContent value="datadog" className="mt-4">
           <DatadogWebhooks />
+        </TabsContent>
+        <TabsContent value="linear" className="mt-4">
+          <LinearWebhooks />
         </TabsContent>
       </Tabs>
     </div>
