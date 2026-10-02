@@ -11,7 +11,7 @@ import {
   ADMIN_TRIAL_ENDS_LABEL,
   OrgLLMCreditSection,
 } from "./OrgLLMCreditSection";
-import { prefilledTrialEndDate, utcTrialEndTimestamp } from "./useOrgLLMCredit";
+import { prefilledTrialEndDate } from "./useOrgLLMCredit";
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
@@ -28,6 +28,13 @@ const credit = {
   markup_override_bps: null,
   warning: false,
 };
+
+function futureUtcDate(daysAhead: number): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysAhead))
+    .toISOString()
+    .slice(0, 10);
+}
 
 function billingPlan(
   polarManaged: boolean,
@@ -114,7 +121,8 @@ describe("OrgLLMCreditSection billing plan", () => {
   });
 
   it("shows the trial end and date field only for Trial", async () => {
-    const trialEndsAt = "2026-12-20T23:59:59Z";
+    const trialDate = futureUtcDate(40);
+    const trialEndsAt = `${trialDate}T23:59:59Z`;
     mockOrgBillingFetch(false);
     vi.stubGlobal(
       "fetch",
@@ -138,7 +146,7 @@ describe("OrgLLMCreditSection billing plan", () => {
     const user = userEvent.setup();
     render(<OrgLLMCreditSection orgId="org-1" />);
 
-    expect(await screen.findByTestId("admin-org-trial-ends-input")).toHaveValue("2026-12-20");
+    expect(await screen.findByTestId("admin-org-trial-ends-input")).toHaveValue(trialDate);
     expect(screen.getByText(ADMIN_TRIAL_ENDS_LABEL)).toBeInTheDocument();
     expect(screen.getByText(ADMIN_TRIAL_ENDS_HELP)).toBeInTheDocument();
 
@@ -146,7 +154,7 @@ describe("OrgLLMCreditSection billing plan", () => {
     await user.click(await screen.findByRole("option", { name: "Business" }));
 
     expect(screen.queryByTestId("admin-org-trial-ends-input")).not.toBeInTheDocument();
-    expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent("2026-12-20");
+    expect(screen.getByTestId("admin-org-trial-ends")).toHaveTextContent(trialDate);
     expect(screen.queryByText(ADMIN_TRIAL_ENDS_HELP)).not.toBeInTheDocument();
   });
 
@@ -186,6 +194,7 @@ describe("OrgLLMCreditSection billing plan", () => {
   });
 
   it("sends the chosen UTC day end and rejects a past date", async () => {
+    const futureDate = futureUtcDate(30);
     const requests: Array<{ url: string; body: string | null }> = [];
     vi.stubGlobal(
       "fetch",
@@ -194,7 +203,7 @@ describe("OrgLLMCreditSection billing plan", () => {
         const method = init?.method ?? "GET";
         if (method === "PUT") {
           requests.push({ url, body: typeof init?.body === "string" ? init.body : null });
-          return new Response(JSON.stringify(billingPlan(false, "2026-12-01T23:59:59Z", "trial")), {
+          return new Response(JSON.stringify(billingPlan(false, `${futureDate}T23:59:59Z`, "trial")), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
@@ -206,7 +215,7 @@ describe("OrgLLMCreditSection billing plan", () => {
           });
         }
         if (url.includes("/billing-plan")) {
-          return new Response(JSON.stringify(billingPlan(false, "2026-12-20T23:59:59Z", "trial")), {
+          return new Response(JSON.stringify(billingPlan(false, `${futureUtcDate(40)}T23:59:59Z`, "trial")), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
@@ -223,14 +232,14 @@ describe("OrgLLMCreditSection billing plan", () => {
     await user.click(screen.getByTestId("admin-org-billing-plan-save"));
     expect(requests).toHaveLength(0);
 
-    fireEvent.change(input, { target: { value: "2026-12-01" } });
+    fireEvent.change(input, { target: { value: futureDate } });
     expect(screen.queryByText(ADMIN_TRIAL_ENDS_ERROR)).not.toBeInTheDocument();
     await user.click(screen.getByTestId("admin-org-billing-plan-save"));
     await waitFor(() => expect(requests).toHaveLength(1));
     expect(requests[0]?.url).toContain("/billing-plan");
     expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({
       plan: "trial",
-      trial_ends_at: utcTrialEndTimestamp("2026-12-01"),
+      trial_ends_at: `${futureDate}T23:59:59Z`,
     });
   });
 });
