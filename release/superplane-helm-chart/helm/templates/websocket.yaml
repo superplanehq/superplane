@@ -87,6 +87,10 @@ spec:
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}
             {{- end }}
+            {{- if .Values.linear.enabled }}
+            - secretRef:
+                name: {{ include "secrets.linear.name" . }}
+            {{- end }}
           env:
             - name: START_PUBLIC_API
               value: "yes"
