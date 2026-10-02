@@ -113,7 +113,7 @@ func MergeFactoryPullRequest(
 			return err
 		}
 
-		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true)
+		outcome, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, true, nil)
 		if err != nil {
 			return err
 		}

@@ -13,7 +13,6 @@ import { TooltipProvider } from "@/ui/tooltip";
 import type { PlanningSessionPayload } from "../planningSessionView";
 
 const factoryPlanning = { current: { enabled: true, clarity: true, confidence: true } };
-const taskConsoleEnabled = { current: true };
 const { closeMutateAsync } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
 }));
@@ -59,7 +58,7 @@ const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSe
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: () => taskConsoleEnabled.current,
+    has: () => true,
     enabledExperimentalFeatures: [],
     isLoading: false,
   }),
@@ -257,7 +256,6 @@ describe("WorkOrderSplitRunPopup", () => {
   beforeEach(() => {
     window.localStorage.clear();
     factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
-    taskConsoleEnabled.current = true;
     useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
     findPlanningSessionMock.mockReset();
@@ -473,7 +471,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(header).queryByRole("button", { name: /agent run/ })).not.toBeInTheDocument();
   });
 
-  it("shows agent run, artifact, and check counts as badges on the card", () => {
+  it("shows the agent run count as a badge on the card", () => {
     renderSplitRun();
 
     const implement = screen
@@ -482,8 +480,9 @@ describe("WorkOrderSplitRunPopup", () => {
     const header = within(implement).getByTestId(/^redesign-console-card-header-/);
 
     expect(within(header).getByText("1 agent run")).toBeInTheDocument();
-    expect(within(header).getByText(/\d+ artifacts?/)).toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: /agent run|artifact|check/ })).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ artifacts?/)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ checks?/)).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: /agent run/ })).not.toBeInTheDocument();
     expect(within(header).queryByRole("button", { name: "Full log" })).not.toBeInTheDocument();
   });
 
@@ -902,27 +901,23 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
-  it("shows the original task above the timeline before the Backlog card opens", async () => {
-    const user = userEvent.setup();
+  it("shows Intake with the original task before Backlog", () => {
     renderSplitRun();
 
-    const description = screen.getByTestId("redesign-console-task-description");
+    const intake = screen.getByTestId("redesign-console-column-intake");
+    expect(within(intake).getByText("Intake")).toBeInTheDocument();
+    expect(within(intake).getByTestId("redesign-console-column-marker-intake")).toHaveTextContent("GitHub");
+    const description = within(intake).getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("Users see duplicate refund entries");
-    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
-    const backlog = screen.getByTestId("redesign-console-column-backlog");
-    expect(description.compareDocumentPosition(backlog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-
-    const header = within(backlog).getAllByTestId(/^redesign-console-card-header-/)[0];
-    const card = header.closest("[data-testid^='redesign-console-automation-']") as HTMLElement;
-    expect(within(card).queryByText("1 artifact")).not.toBeInTheDocument();
-    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
-
-    await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
-
-    expect(within(card).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: "Download description.md" })).not.toBeInTheDocument();
-    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
-    expect(within(card).getByTestId("redesign-console-card-source")).toBeInTheDocument();
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
+      "Intake GitHub issues",
+    );
+    expect(
+      intake.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
     const summary = screen.getByTestId("redesign-console-summary");
     expect(within(summary).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(within(summary).getByText("Source")).toBeInTheDocument();
@@ -1582,20 +1577,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
-  it("shows Archive in the header of a started open popup with Task and Automations", () => {
-    taskConsoleEnabled.current = false;
-    renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
-
-    expect(screen.getByRole("tab", { name: "Task" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Automations" })).toBeInTheDocument();
-    const archive = screen.getByTestId("popup-work-order-archive-button");
-    const share = screen.getByTestId("popup-work-order-copy-link-button");
-    expect(archive).toHaveAttribute("aria-label", "Archive");
-    expect(archive.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-  });
-
   it("archives a started open task as rejected and closes the popup", async () => {
-    taskConsoleEnabled.current = false;
     const user = userEvent.setup();
     const onClose = vi.fn();
     renderPopup({
@@ -1704,13 +1686,18 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
-    expect(screen.getByTestId("redesign-console-task-description")).toHaveTextContent("emoji reactions");
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(description).toHaveTextContent("emoji reactions");
+    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent("Created manually");
     expect(screen.getByTestId("split-run-description-edit")).toBeInTheDocument();
     const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(note).toHaveTextContent("This task is ready to start");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-split-run").className).toContain("w-[min(70rem");
+    expect(screen.getByTestId("work-order-split-run").className).not.toContain("w-[min(72rem");
   });
 
   it("tells a draft is under analysis and keeps Archive in the header", () => {

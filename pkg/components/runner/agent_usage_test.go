@@ -140,6 +140,27 @@ func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	assert.Equal(t, models.UsageIdempotencyKeyRunner, recorder.records[0].IdempotencyKey)
 }
 
+func TestRecordRunnerLLMUsageFromCustomProvider(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	RecordRunnerLLMUsage(
+		recorder,
+		nil,
+		"runnerOpenRouter.finished",
+		map[string]any{
+			"llmProvider": models.UsageProviderCustom,
+			"model":       "kimi-k3",
+			"credentials": map[string]any{"source": "integration"},
+		},
+		json.RawMessage(`{"usage":{"input_tokens":5,"output_tokens":2},"model":"custom/kimi-k3"}`),
+	)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, models.UsageProviderCustom, recorder.records[0].Provider)
+	assert.Equal(t, "kimi-k3", recorder.records[0].Model)
+	assert.Equal(t, "byok", recorder.records[0].FundingSource)
+}
+
 func TestRecordRunnerLLMUsageFromSuperPlaneFinishedEvent(t *testing.T) {
 	t.Parallel()
 

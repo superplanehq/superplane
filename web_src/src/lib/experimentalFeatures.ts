@@ -13,9 +13,6 @@ export const FEATURE_FACTORY_JIRA_INTAKE = "factory_jira_intake";
 /** Organization experimental feature: manual "Add intake" entry for Productive.io in the Backlog column menu. */
 export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 
-/** Organization experimental feature: Dependabot alert intake from the Backlog column menu. */
-export const FEATURE_FACTORY_DEPENDABOT_INTAKE = "factory_dependabot_intake";
-
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
@@ -31,6 +28,9 @@ export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 /** Organization experimental feature: organization LLM Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
+/** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
+export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
+
 /** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
@@ -39,9 +39,6 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 
 /** Organization experimental feature: merge confidence automation on the Verify column. */
 export const FEATURE_FACTORY_RISK_SCORE = "factory_risk_score";
-
-/** Organization experimental feature: unified task popup with one console timeline instead of tabs. */
-export const FEATURE_FACTORY_TASK_CONSOLE = "factory_task_console";
 
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";

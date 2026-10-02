@@ -90,7 +90,8 @@ func validateFactoryOnboardingResources(
 			return err
 		}
 		expectedNames := map[string][]string{
-			models.FactoryOnboardingAgentHarnessClaudeCode: {"claude", "openrouter"},
+			// OpenCode agents (OpenRouter and a custom provider) use this harness.
+			models.FactoryOnboardingAgentHarnessClaudeCode: {"claude", "openrouter", models.CustomLLMAppName},
 			models.FactoryOnboardingAgentHarnessCursor:     {"cursor"},
 			models.FactoryOnboardingAgentHarnessCodex:      {"openai"},
 		}[config.AgentHarness]

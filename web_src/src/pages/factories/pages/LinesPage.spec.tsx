@@ -14,7 +14,6 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
@@ -1202,6 +1201,10 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-dependabot-alerts")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
+      ADD_INTAKE_COPY.comingSoon,
+    );
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
@@ -1290,7 +1293,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Dependabot setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DEPENDABOT_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 

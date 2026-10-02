@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
+	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -45,8 +46,15 @@ func organizationIDFromContext(ctx context.Context) (uuid.UUID, error) {
 }
 
 func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
-	out := make([]*pb.IntegrationDefinition, len(in))
-	for i, integration := range in {
+	visible := make([]core.Integration, 0, len(in))
+	for _, integration := range in {
+		if integration.Name() == models.CustomLLMAppName {
+			continue
+		}
+		visible = append(visible, integration)
+	}
+	out := make([]*pb.IntegrationDefinition, len(visible))
+	for i, integration := range visible {
 		configFields := integration.Configuration()
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {

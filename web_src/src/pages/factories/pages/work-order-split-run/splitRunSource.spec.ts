@@ -86,6 +86,7 @@ describe("splitRunSourceForOrder", () => {
         kind: "intake",
         name: "GitHub issues",
         ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+        addedBy: { kind: "imported", personName: "Leonardo DiCaprio" },
       }),
     );
   });
@@ -106,6 +107,7 @@ describe("splitRunSourceForOrder", () => {
         kind: "intake",
         name: "GitHub issues",
         ticket: { label: "acme/payments-service#103", href: expect.stringContaining("/issues/103") },
+        addedBy: { kind: "intake", name: "GitHub issues" },
       }),
     );
     expect(splitRunSourceForOrder(SENTRY_DRAFT_WORK_ORDER)).toEqual(
@@ -178,6 +180,7 @@ describe("splitRunSourceForOrder", () => {
         kind: "manual",
         detail: "Created manually",
         person: expect.objectContaining({ name: "Leonardo DiCaprio" }),
+        addedBy: { kind: "manual" },
       }),
     );
   });

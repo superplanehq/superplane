@@ -1,6 +1,7 @@
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
+import { findClosureAutomationApp } from "../../../lib/linePhaseRuns";
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
@@ -173,6 +174,11 @@ export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">)
   return Boolean(stage.appId) || stage.id === "backlog" || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID;
 }
 
+/** The synthetic create-task stage. The console Intake event shows it. */
+export function isConsoleCreationStage(stage: Pick<AutomationStage, "id">): boolean {
+  return stage.id === "backlog";
+}
+
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
   return [...groups.taskStages, ...groups.pullRequestGroups.flatMap((group) => group.stages)];
 }
@@ -187,20 +193,29 @@ export type ConsoleColumnId = "backlog" | "implement" | "verify" | "done";
  * name still appears, in Implement, so the run does not drop off the
  * timeline.
  */
-export function consoleColumnIdForStage(stage: Pick<AutomationStage, "id" | "name" | "columnKey">): ConsoleColumnId {
+export function consoleColumnIdForStage(
+  stage: Pick<AutomationStage, "id" | "name" | "columnKey" | "appId" | "componentName" | "pullRequestActivity">,
+): ConsoleColumnId {
   if (stage.columnKey) {
     return stage.columnKey;
   }
-  if (stage.id === SPLIT_RUN_CLOSURE_PHASE_ID || stage.name === "Done") {
+  if (isFactoryClosureStage(stage) || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID || stage.name === "Done") {
     return "done";
   }
-  if (stage.name === "Verify") {
+  if (stage.name === "Verify" || stage.pullRequestActivity) {
     return "verify";
   }
   if (stage.name === "Backlog" || stage.name === "Analysis") {
     return "backlog";
   }
   return "implement";
+}
+
+/** Built-in PR Closure has no column key. It still belongs in Done. */
+function isFactoryClosureStage(stage: Pick<AutomationStage, "appId" | "componentName" | "columnKey">): boolean {
+  return Boolean(
+    findClosureAutomationApp([{ id: stage.appId, name: stage.componentName, columnKey: stage.columnKey }]),
+  );
 }
 
 /**
@@ -260,7 +275,7 @@ export function stagesByConsoleColumn(
       columns.done.push(stage);
       continue;
     }
-    columns[stage.columnKey ?? "verify"].push(stage);
+    columns[consoleColumnIdForStage(stage)].push(stage);
   }
   return columns;
 }
@@ -331,6 +346,7 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
     duration: line.duration,
     summary: "",
     toolCount: 0,
+    output: line.detail?.trim() || undefined,
     events: [],
     iconSlug: line.iconSlug,
   };

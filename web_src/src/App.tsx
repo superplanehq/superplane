@@ -83,6 +83,7 @@ import { NewAppPage } from "./pages/home/NewAppPage";
 import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
+import { isNotFoundError } from "./pages/app/workflowPageHelpers";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -314,12 +315,17 @@ export function OrganizationScope() {
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
-  const guestLine = isPublicFactoryLinePath(location.pathname) && (accountLoading || !account);
+  const publicLine = isPublicFactoryLinePath(location.pathname);
+  const guestLine = publicLine && (accountLoading || !account);
   // The route param accepts either the org slug or its UID, so resolve it
   // once here and self-correct any UID URL to the slug below. Every other
   // in-app link reuses this same `:organizationId` URL segment, so fixing
   // it at this single boundary keeps the rest of the app slug-only.
-  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
+  const {
+    data: organization,
+    isLoading: organizationLoading,
+    error: organizationError,
+  } = useOrganization(segment ?? "", !isReserved && !!segment && !guestLine);
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
   useRedirectIntegrationSetupReturn(segment, resolvedSlug);
@@ -354,6 +360,22 @@ export function OrganizationScope() {
 
   if (guestLine) {
     return <Outlet />;
+  }
+
+  if (organizationLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500 dark:text-gray-400">Loading organization...</p>
+      </div>
+    );
+  }
+
+  if (isNotFoundError(organizationError) && !publicLine) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500 dark:text-gray-400">Organization not found</p>
+      </div>
+    );
   }
 
   return (

@@ -108,7 +108,7 @@ function ProviderBYOKModelField({
     return status;
   }
 
-  const provider = field.typeOptions?.hostedModel?.provider ?? "";
+  const provider = byokModelProvider(field.typeOptions?.hostedModel?.provider ?? "", allValues?.llmProvider);
   const providerModels = selectableLLMModelsForProvider(selection.models, provider);
   const current = typeof value === "string" ? value : "";
   const resolved = defaultByokRunnerModel(
@@ -217,6 +217,14 @@ function ModelThinkingSelect({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/** OpenCode agents store llmProvider "custom" while the component field still says openrouter. */
+function byokModelProvider(fieldProvider: string, llmProvider: unknown): string {
+  if (typeof llmProvider === "string" && llmProvider.trim() === "custom") {
+    return "custom";
+  }
+  return fieldProvider;
 }
 
 function modelFieldStatus(organizationId: string | undefined, isLoading: boolean, isError: boolean) {

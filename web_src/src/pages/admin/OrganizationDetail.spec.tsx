@@ -84,6 +84,25 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+          return jsonResponse({
+            items: [
+              {
+                id: "integration-1",
+                app_name: "sentry",
+                installation_name: "acme-sentry",
+                state: "error",
+                state_description: "Sentry is not sending issue events.",
+                details: { installation_uuid: "install-uuid-1", external_organization: "acme-sentry-org" },
+                created_at: "2024-01-15T12:00:00Z",
+                updated_at: "2024-02-20T12:00:00Z",
+              },
+            ],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          });
+        }
         if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
           return jsonResponse({
             features: [{ id: "factories", label: "Factories", description: "Software factories", released: false }],
@@ -128,6 +147,7 @@ describe("OrganizationDetail", () => {
       "Overview",
       "Users",
       "Automations",
+      "Connections",
       "Features",
       "Credits",
     ]);

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ type intakeAgentSpec struct {
 	component      string
 	integrationApp string
 	model          string
+	llmProvider    string
 }
 
 var intakeAgentSpecs = []intakeAgentSpec{
@@ -35,6 +37,11 @@ var intakeAgentSpecs = []intakeAgentSpec{
 		integrationApp: "openrouter",
 		model:          "anthropic/claude-sonnet-4-6",
 	},
+	{
+		component:      "runnerOpenRouter",
+		integrationApp: models.CustomLLMAppName,
+		llmProvider:    models.UsageProviderCustom,
+	},
 }
 
 // intakeAgent is the runner a generated analysis node uses.
@@ -42,6 +49,7 @@ type intakeAgent struct {
 	Component   string
 	Credentials map[string]any
 	Model       string
+	LLMProvider string
 }
 
 func (a *intakeAgent) component() string {
@@ -65,6 +73,9 @@ func (a *intakeAgent) model() string {
 	if a != nil && a.Model != "" {
 		return a.Model
 	}
+	if a != nil && a.LLMProvider == models.UsageProviderCustom {
+		return ""
+	}
 	return defaultIntakeAgentModel(a.component())
 }
 
@@ -83,7 +94,7 @@ func defaultIntakeAgentModel(component string) string {
 // Older workspaces with no harness still fall back to those installations.
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
-	if agent := intakeAgentFromSetup(tx, factory, config.AgentIntegrationID); agent != nil {
+	if agent := fillCustomProviderModel(tx, factory, intakeAgentFromSetup(tx, factory, config.AgentIntegrationID)); agent != nil {
 		return agent
 	}
 
@@ -91,7 +102,7 @@ func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 		return intakeAgentFromHostedProvider(tx, factory)
 	}
 
-	if agent := intakeAgentFromInstallations(tx, factory); agent != nil {
+	if agent := fillCustomProviderModel(tx, factory, intakeAgentFromInstallations(tx, factory)); agent != nil {
 		return agent
 	}
 
@@ -226,6 +237,66 @@ func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
 			"source":      runner.CredentialsSourceIntegration,
 			"integration": map[string]any{"name": integration.InstallationName},
 		},
-		Model: intakeAgentSpecs[index].model,
+		Model:       intakeAgentSpecs[index].model,
+		LLMProvider: intakeAgentSpecs[index].llmProvider,
 	}
+}
+
+func (a *intakeAgent) applyLLMProvider(configuration map[string]any) {
+	if a == nil || configuration == nil || a.LLMProvider != models.UsageProviderCustom {
+		return
+	}
+	configuration["llmProvider"] = models.UsageProviderCustom
+}
+
+func fillCustomProviderModel(tx *gorm.DB, factory *models.Factory, agent *intakeAgent) *intakeAgent {
+	if agent == nil || agent.LLMProvider != models.UsageProviderCustom || strings.TrimSpace(agent.Model) != "" {
+		return agent
+	}
+	if model := customModelFromFactory(tx, factory); model != "" {
+		agent.Model = model
+		return agent
+	}
+	if tx == nil || factory == nil {
+		return agent
+	}
+	ids, err := models.ResolveSelectableLLMModels(tx, factory.OrganizationID, &factory.ID, models.UsageProviderCustom, models.UsageFundingSourceBYOK)
+	if err != nil || len(ids) == 0 {
+		return agent
+	}
+	sort.Strings(ids)
+	agent.Model = ids[0]
+	return agent
+}
+
+func customModelFromFactory(tx *gorm.DB, factory *models.Factory) string {
+	if tx == nil || factory == nil {
+		return ""
+	}
+	canvases, err := factory.ListCanvases(tx)
+	if err != nil {
+		return ""
+	}
+	for i := range canvases {
+		if canvases[i].LiveVersionID == nil {
+			continue
+		}
+		version, err := models.FindLiveCanvasVersionInTransaction(tx, canvases[i].ID)
+		if err != nil {
+			continue
+		}
+		for _, node := range version.Nodes {
+			if node.ComponentName() != "runnerOpenRouter" {
+				continue
+			}
+			provider, _ := node.Configuration["llmProvider"].(string)
+			if provider != models.UsageProviderCustom {
+				continue
+			}
+			if model := strings.TrimSpace(configString(node.Configuration, "model")); model != "" {
+				return model
+			}
+		}
+	}
+	return ""
 }
