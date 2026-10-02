@@ -29,13 +29,14 @@ import (
 const publicBoardPageSize = 100
 const publicBoardMaxPages = 10
 
-var riskScoreCanvasName = regexp.MustCompile(`^Risk score \(\d+\)$`)
+var riskScoreCanvasName = regexp.MustCompile(`^(?:Merge confidence|Risk score) \(\d+\)$`)
 
 var errPublicBoardNotFound = errors.New("public board not found")
 
 type publicBoard struct {
 	WorkspaceName  string         `json:"workspaceName"`
 	WorkspaceKey   string         `json:"workspaceKey"`
+	URLId          string         `json:"urlId"`
 	ShowClarity    bool           `json:"showClarity"`
 	ShowConfidence bool           `json:"showConfidence"`
 	LineName       string         `json:"lineName"`
@@ -205,7 +206,7 @@ func authorizePublicFactoryLine(ctx context.Context, vars map[string]string) (*m
 		return nil, nil, errPublicBoardNotFound
 	}
 
-	factory, err := models.FindFactoryByKey(db, org.ID, models.NormalizeFactoryKey(vars["key"]))
+	factory, err := models.FindFactoryByRef(db, org.ID, vars["key"])
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryNotFound) {
 			return nil, nil, errPublicBoardNotFound
@@ -384,6 +385,7 @@ func assemblePublicBoard(
 	return &publicBoard{
 		WorkspaceName:  factory.Name,
 		WorkspaceKey:   factory.Key,
+		URLId:          factory.URLID,
 		ShowClarity:    planning.Clarity,
 		ShowConfidence: planning.Confidence,
 		LineName:       line.Name,
@@ -800,7 +802,6 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 			Kind:      "risk-score",
 			Name:      strings.TrimSpace(canvas.Name),
 			CatalogID: "risk-score",
-			Icon:      publicIconGitHub,
 			Health:    "healthy",
 		})
 	}
@@ -896,7 +897,7 @@ func isRiskScoreCanvas(canvas models.Canvas) bool {
 		return false
 	}
 	name := strings.TrimSpace(canvas.Name)
-	return name == "Risk score" || riskScoreCanvasName.MatchString(name)
+	return name == "Merge confidence" || name == "Risk score" || riskScoreCanvasName.MatchString(name)
 }
 
 func intakeSourceName(source string) string {
@@ -922,6 +923,7 @@ func intakeSourceName(source string) string {
 
 const (
 	publicIconGitHub     = "github"
+	publicIconDependabot = "dependabot"
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
 	publicIconPagerDuty  = "pagerduty"
@@ -931,8 +933,10 @@ const (
 
 func intakeIcon(source string) string {
 	switch source {
-	case models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceDependabotAlerts:
+	case models.FactoryIntakeSourceGitHubIssues:
 		return publicIconGitHub
+	case models.FactoryIntakeSourceDependabotAlerts:
+		return publicIconDependabot
 	case models.FactoryIntakeSourceSentryExceptions:
 		return publicIconSentry
 	case models.FactoryIntakeSourceJiraIssues:

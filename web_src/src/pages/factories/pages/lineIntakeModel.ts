@@ -6,6 +6,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
@@ -16,6 +17,7 @@ import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import { ACME_ONBOARDING_FACTORY_KEY } from "../__fixtures__/factoryPageIds";
+import { parseWorkspaceRouteSegment } from "../lib/factoryKeyResolution";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_ID,
@@ -114,8 +116,8 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     id: "dependabot-alerts",
     name: "Dependabot alerts",
     description: "Creates tasks from Dependabot alerts.",
-    iconSrc: githubIcon,
-    iconAlt: "GitHub",
+    iconSrc: dependabotIcon,
+    iconAlt: "Dependabot",
     tabLabel: "Dependabot",
     listen: {
       kind: "webhook",
@@ -265,7 +267,12 @@ export function lineIntakeSourceForApiSource(apiSource: string | undefined): Lin
 }
 
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
-  return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
+  if (!factoryKey) {
+    return false;
+  }
+  const parsed = parseWorkspaceRouteSegment(factoryKey);
+  const key = (parsed?.prefix ?? factoryKey).toUpperCase();
+  return key === ACME_ONBOARDING_FACTORY_KEY;
 }
 
 export function isLineIntakeSourceId(id: string | null | undefined): id is LineIntakeSourceId {

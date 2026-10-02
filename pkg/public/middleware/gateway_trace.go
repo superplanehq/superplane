@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
@@ -10,6 +11,24 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 )
+
+/*
+ * CloneGatewayRequest copies the request the gateway handler forwards.
+ * The copy keeps the caller context so a later error report can still find it.
+ */
+func CloneGatewayRequest(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+
+	cloned := new(http.Request)
+	*cloned = *r
+	if r.URL != nil {
+		cloned.URL = new(url.URL)
+		*cloned.URL = *r.URL
+	}
+	return cloned
+}
 
 /*
  * TraceGatewayServe wraps grpc-gateway handling so the encode/write tail after

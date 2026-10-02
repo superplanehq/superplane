@@ -1,6 +1,6 @@
 import type { FactoriesFactory } from "@/api-client";
 
-import { factorySetupPath } from "../../lib/factoryPagePaths";
+import { factoryRouteSegment, factorySetupPath } from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 
 const RESUME_SEARCH_PARAMS = ["step"] as const;
@@ -35,5 +35,5 @@ export function incompleteWorkspaceSetupPath(
     return null;
   }
 
-  return factorySetupPath(organizationSlug, factory.key);
+  return factorySetupPath(organizationSlug, factoryRouteSegment(factory));
 }

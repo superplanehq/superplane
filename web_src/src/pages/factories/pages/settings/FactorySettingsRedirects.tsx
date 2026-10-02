@@ -2,6 +2,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useFactories } from "@/hooks/useFactoryData";
 import {
   automationsPath,
+  factoryRouteSegment,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
   type FactorySettingsScope,
@@ -166,7 +167,7 @@ export function LegacyOrganizationSettingsRedirect({ destination = "general" }: 
   const targetRest = rest || destination;
   const path = factorySettingsDestination(
     organizationId,
-    factory.key,
+    factoryRouteSegment(factory),
     LEGACY_ORGANIZATION_SETTINGS,
     targetRest,
     ORGANIZATION_GENERAL,

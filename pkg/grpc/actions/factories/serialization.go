@@ -18,6 +18,7 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 		Name:        factory.Name,
 		Description: factory.Description,
 		Key:         factory.Key,
+		UrlId:       factory.URLID,
 		Onboarding:  serializeFactoryOnboarding(factory),
 	}
 	if factory.HostedSpendBudgetCents != nil {

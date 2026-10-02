@@ -19,11 +19,11 @@ function planningSetupRedirectTarget(input: {
 
 export function PlanningSetupPage() {
   const { canAct } = usePermissions();
-  const { organizationId, factoryKey, factory } = useFactoriesLayout();
+  const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { lineId } = useParams<{ lineId?: string }>();
   const line = factory?.lines?.find((entry) => entry.id === lineId);
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
-  const settingsHref = line?.id ? factoryPlanningPath(organizationId, factoryKey, line.id) : boardHref;
+  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
+  const settingsHref = line?.id ? factoryPlanningPath(organizationId, routeSegment, line.id) : boardHref;
 
   return (
     <Navigate

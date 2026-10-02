@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "lucide-react";
 
-import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factoryRouteSegment, factorySetupPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
@@ -59,7 +59,7 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
           // An empty key lets the server derive a free key from the name.
           save: (name) => createFactory.mutateAsync({ name, description: "", key: "" }),
         });
-        if (!factory.id || !factory.key) {
+        if (!factory.id || !factoryRouteSegment(factory)) {
           throw new Error("The workspace was created without a key");
         }
         // Storybook gates setup on this pending pointer. Production uses the
@@ -68,7 +68,7 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
           workspaceId: factory.id,
           workspaceName: factory.name ?? "",
         });
-        navigate(factorySetupPath(organizationId, factory.key), { replace: true });
+        navigate(factorySetupPath(organizationId, factoryRouteSegment(factory)), { replace: true });
       } catch (creationError) {
         setError(getApiErrorMessage(creationError, "Failed to create workspace"));
       } finally {

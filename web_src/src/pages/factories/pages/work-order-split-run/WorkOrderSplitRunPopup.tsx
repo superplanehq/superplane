@@ -35,7 +35,7 @@ import { useCurrentPopupDismiss } from "./useCurrentPopupDismiss";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import { useWorkOrderFullPagePreference } from "./workOrderFullPagePreference";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
-import { createdTaskHref, draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
+import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
 import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHeader";
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
@@ -350,6 +350,7 @@ function analysisPopupReview(args: {
   canDispatch: boolean;
   compact: boolean | "stacked";
   actionsOnly?: boolean;
+  ctaOnly?: boolean;
   modelSelect?: ReactNode;
   confirmUnclearStart?: boolean;
 }) {
@@ -372,6 +373,7 @@ function analysisPopupReview(args: {
       startDisabled={!args.canDispatch}
       compact={args.compact}
       actionsOnly={args.actionsOnly}
+      ctaOnly={args.ctaOnly}
       confirmUnclearStart={args.confirmUnclearStart}
       modelSelect={args.modelSelect}
     />
@@ -445,8 +447,7 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSour
 }
 
 /**
- * The refine strip only shows for a draft. It gets the ghost model select
- * and a permalink builder for tasks the agent splits off this one.
+ * The refine strip only shows for a draft.
  */
 function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
   const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
@@ -464,7 +465,6 @@ function draftStripAnalysis(args: AnalysisDraftChromeArgs, modelSelect: ReactNod
   return {
     ...args.analysis,
     modelSelect,
-    taskHref: createdTaskHref(args.organizationId, args.factoryKey, args.lineId),
     showClarity: factoryShowsClarity(args.factory),
     showConfidence: factoryShowsConfidence(args.factory),
     creditVerdict: composerCreditVerdict(args.fixture.footer.note, billingHref),

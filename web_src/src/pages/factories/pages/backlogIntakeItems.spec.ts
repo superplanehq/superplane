@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake } from "@/api-client";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
@@ -140,7 +141,7 @@ describe("searchBacklogIntakeItems", () => {
     ]);
   });
 
-  it("labels a Dependabot alerts intake Dependabot and keeps the GitHub icon", () => {
+  it("labels a Dependabot alerts intake Dependabot and uses the Dependabot mark", () => {
     const sources = listBacklogIntakeSources({
       intakes: [
         {
@@ -155,8 +156,8 @@ describe("searchBacklogIntakeItems", () => {
       {
         intakeId: "intake-dependabot",
         name: "Dependabot alerts",
-        iconSrc: githubIcon,
-        iconAlt: "GitHub",
+        iconSrc: dependabotIcon,
+        iconAlt: "Dependabot",
         tabLabel: "Dependabot",
       },
     ]);

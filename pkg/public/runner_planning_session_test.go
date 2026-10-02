@@ -608,55 +608,6 @@ func TestRunnerPlanningSessionRecordsAgentMessage(t *testing.T) {
 	assert.True(t, messages[0].Delivered)
 }
 
-func TestRunnerPlanningSessionCreatesSplitTask(t *testing.T) {
-	r := support.Setup(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
-	db := database.DB(t.Context())
-
-	body := `{"title":"Add the retry table","description":"Schema and migration only."}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code, "no user reply yet, so nothing confirms a split")
-	assert.Contains(t, rec.Body.String(), "user has not replied")
-
-	require.NoError(t, session.SendUserMessage(db, "Split: table first. Yes.", r.User))
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(body)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec = httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-
-	var response struct {
-		Status      string `json:"status"`
-		WorkOrderID string `json:"work_order_id"`
-		Key         string `json:"key"`
-		Title       string `json:"title"`
-	}
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, "created", response.Status)
-	assert.Equal(t, "Add the retry table", response.Title)
-
-	split, err := session.SplitTaskOrders(db)
-	require.NoError(t, err)
-	require.Len(t, split, 1)
-	assert.Equal(t, split[0].ID.String(), response.WorkOrderID)
-	assert.Equal(t, factoryModel.WorkOrderKey(split[0].Number), response.Key)
-	assert.Equal(t, "Schema and migration only.", split[0].Description)
-
-	messages, err := models.ListPlanningSessionMessages(db, session.ID)
-	require.NoError(t, err)
-	require.Len(t, messages, 2)
-	assert.Equal(t, models.PlanningSessionMessageRoleTask, messages[1].Role)
-
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/tasks", bytes.NewReader([]byte(`{"title":"","description":"x"}`)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec = httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-}
-
 func TestRunnerPlanningSessionStoresActivityAndLinksAgentMessage(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)

@@ -15,6 +15,7 @@ func GatewayRecoveryMiddleware() runtime.Middleware {
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					_ = sentryRecoveryHandler(recovered)
+					markServerErrorReported(r.Context())
 					log.Errorf("recovered from panic in grpc-gateway handler: %v. Stack: %s", recovered, debug.Stack())
 					http.Error(w, "internal server error", http.StatusInternalServerError)
 				}
@@ -32,5 +33,7 @@ func SanitizedGatewayErrorHandler(
 	r *http.Request,
 	err error,
 ) {
-	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, SanitizeError(r.Context(), err))
+	sanitized := SanitizeError(r.Context(), err)
+	noteReportableServerError(r.Context(), err, sanitized)
+	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, sanitized)
 }
