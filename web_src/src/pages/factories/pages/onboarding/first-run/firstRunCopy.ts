@@ -64,6 +64,8 @@ export const FIRST_RUN_COPY = {
     jiraLookupLoading: "Checking whether Jira is available…",
     jiraLookupFailed: "SuperPlane could not confirm that Jira is available. Choose GitHub Issues to continue.",
     linearHelper: "Scan your Linear backlog.",
+    intakeSoonHelper: "SuperPlane cannot scan this backlog yet.",
+    beta: "Beta",
     analyze: "Scan my backlog",
     continue: "Continue",
     saving: "Saving ticket source…",

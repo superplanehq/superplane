@@ -15,30 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryJiraIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
-		assert.Equal(t, "Factory Jira Intake", f.Label)
-		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
-	})
-
-	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryProductiveIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
-		assert.Equal(t, "Factory Productive Intake", f.Label)
-		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
-	})
-
-	t.Run("known id returns factory datadog intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryDatadogIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryDatadogIntake, f.ID)
-		assert.Equal(t, "Factory Datadog Intake", f.Label)
-		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
-	})
-
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -149,9 +125,6 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryJiraIntake))
-	assert.True(t, Exists(FeatureFactoryProductiveIntake))
-	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
@@ -165,6 +138,9 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("factory_dependabot_intake"))
+	assert.False(t, Exists("factory_jira_intake"))
+	assert.False(t, Exists("factory_productive_intake"))
+	assert.False(t, Exists("factory_datadog_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
