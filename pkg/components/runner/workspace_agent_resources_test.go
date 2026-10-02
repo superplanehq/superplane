@@ -337,6 +337,82 @@ func TestAttachWorkspaceAgentResourcesMergesDisabledTools(t *testing.T) {
 	assert.Equal(t, []string{"search", "create_issue"}, payload.Servers[0].DisabledTools)
 }
 
+func TestAttachWorkspaceAgentResourcesOmitsEnabledOverride(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport:     "http",
+		URL:           "https://mcp.example.com/mcp",
+		Auth:          models.FactoryAgentResourceAuthHeaders,
+		DisabledTools: []string{"create_issue", "search"},
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"enabledAgentResourceTools": map[string]any{
+				resource.ID.String(): []any{"create_issue"},
+			},
+			"disabledAgentResourceTools": map[string]any{
+				resource.ID.String(): []any{"update_issue"},
+			},
+		},
+	}, nil, nil)
+	require.Len(t, files, 1)
+	var payload struct {
+		Servers []struct {
+			DisabledTools []string `json:"disabledTools"`
+		} `json:"servers"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.Len(t, payload.Servers, 1)
+	assert.Equal(t, []string{"search", "update_issue"}, payload.Servers[0].DisabledTools)
+}
+
+func TestAttachWorkspaceAgentResourcesKeepsToolOffWhenBothListsNameIt(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport:     "http",
+		URL:           "https://mcp.example.com/mcp",
+		Auth:          models.FactoryAgentResourceAuthHeaders,
+		DisabledTools: []string{"create_issue"},
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"enabledAgentResourceTools": map[string]any{
+				resource.ID.String(): []any{"create_issue"},
+			},
+			"disabledAgentResourceTools": map[string]any{
+				resource.ID.String(): []any{"create_issue"},
+			},
+		},
+	}, nil, nil)
+	require.Len(t, files, 1)
+	var payload struct {
+		Servers []struct {
+			DisabledTools []string `json:"disabledTools"`
+		} `json:"servers"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(files[0].Content), &payload))
+	require.Len(t, payload.Servers, 1)
+	assert.Equal(t, []string{"create_issue"}, payload.Servers[0].DisabledTools)
+}
+
 func TestAttachWorkspaceAgentResourcesAttachesMCPOnlyWhenSkillsFlagIsOff(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))

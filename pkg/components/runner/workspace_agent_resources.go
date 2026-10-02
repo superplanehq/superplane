@@ -98,11 +98,12 @@ func AttachWorkspaceAgentResources(
 
 	disabled := disabledAgentResourceIDs(ctx.Configuration)
 	disabledTools := disabledAgentResourceTools(ctx.Configuration)
+	enabledTools := enabledAgentResourceTools(ctx.Configuration)
 	mcpServers = rejectDisabledAgentResources(mcpServers, disabled)
 	skills = rejectDisabledAgentResources(skills, disabled)
 
 	var mcpNames []string
-	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, environment, files)
+	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	var skillNames []string
 	files, skillNames = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, skillNames)
@@ -114,6 +115,7 @@ func attachWorkspaceMCPServers(
 	db *gorm.DB,
 	resources []models.FactoryAgentResource,
 	disabledTools map[string][]string,
+	enabledTools map[string][]string,
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
 ) ([]BrokerEnvironmentVariable, []BrokerTaskFile, []string) {
@@ -125,7 +127,15 @@ func attachWorkspaceMCPServers(
 	httpClient := mcp.DoerFromCore(ctx.HTTP)
 	servers := make([]workspaceMCPServer, 0, len(resources))
 	for i := range resources {
-		server, ok := assembleWorkspaceMCPServer(ctx, encryptor, httpClient, db, &resources[i], disabledTools[resources[i].ID.String()])
+		server, ok := assembleWorkspaceMCPServer(
+			ctx,
+			encryptor,
+			httpClient,
+			db,
+			&resources[i],
+			disabledTools[resources[i].ID.String()],
+			enabledTools[resources[i].ID.String()],
+		)
 		if !ok {
 			continue
 		}
@@ -191,6 +201,7 @@ func assembleWorkspaceMCPServer(
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
 	automationDisabledTools []string,
+	enabledOverride []string,
 ) (workspaceMCPServer, bool) {
 	logger := workspaceAgentResourcesLogger(ctx)
 	config := resource.Config.Data()
@@ -233,7 +244,7 @@ func assembleWorkspaceMCPServer(
 		Name:          resource.Name,
 		URL:           config.URL,
 		Headers:       headers,
-		DisabledTools: models.NormalizeDisabledTools(append(append([]string{}, config.DisabledTools...), automationDisabledTools...)),
+		DisabledTools: effectiveMCPDisabledTools(config.DisabledTools, enabledOverride, automationDisabledTools),
 	}, true
 }
 
@@ -269,12 +280,20 @@ func disabledAgentResourceIDs(configuration any) map[string]struct{} {
 }
 
 func disabledAgentResourceTools(configuration any) map[string][]string {
+	return agentResourceToolNames(configuration, "disabledAgentResourceTools")
+}
+
+func enabledAgentResourceTools(configuration any) map[string][]string {
+	return agentResourceToolNames(configuration, "enabledAgentResourceTools")
+}
+
+func agentResourceToolNames(configuration any, field string) map[string][]string {
 	out := map[string][]string{}
 	config, ok := configuration.(map[string]any)
 	if !ok {
 		return out
 	}
-	raw, ok := config["disabledAgentResourceTools"]
+	raw, ok := config[field]
 	if !ok {
 		return out
 	}
@@ -295,6 +314,36 @@ func disabledAgentResourceTools(configuration any) map[string][]string {
 			}
 			out[id] = models.NormalizeDisabledTools(stringSlice(value))
 		}
+	}
+	return out
+}
+
+func effectiveMCPDisabledTools(workspaceDisabled, enabledOverride, automationDisabled []string) []string {
+	enabled := map[string]struct{}{}
+	for _, name := range models.NormalizeDisabledTools(enabledOverride) {
+		enabled[name] = struct{}{}
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(workspaceDisabled)+len(automationDisabled))
+	for _, name := range models.NormalizeDisabledTools(workspaceDisabled) {
+		if _, skip := enabled[name]; skip {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	for _, name := range models.NormalizeDisabledTools(automationDisabled) {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }

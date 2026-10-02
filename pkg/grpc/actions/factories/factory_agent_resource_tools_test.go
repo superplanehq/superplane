@@ -48,6 +48,11 @@ func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
 	assert.True(t, response.GetTools()[0].GetReadOnly())
 	assert.Equal(t, "create_issue", response.GetTools()[1].GetName())
 	assert.False(t, response.GetTools()[1].GetReadOnly())
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Equal(t, []string{"create_issue"}, saved.Config.Data().DisabledTools)
 }
 
 func Test__ListFactoryAgentResourceToolsRejectsSkills(t *testing.T) {
@@ -126,6 +131,120 @@ func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
 	assert.Equal(t, "SuperPlane could not load the tools. Try again.", message)
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.False(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Empty(t, saved.Config.Data().DisabledTools)
+}
+
+func Test__ListFactoryAgentResourceToolsDoesNotRestoreRemovedWriteTools(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	server := httptest.NewServer(mcpToolsHandler(t, []map[string]any{
+		{"name": "search", "annotations": map[string]any{"readOnlyHint": true}},
+		{"name": "create_issue"},
+		{"name": "write_issue", "annotations": map[string]any{"readOnlyHint": false}},
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       server.URL,
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	_, err = ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	config := saved.Config.Data()
+	config.DisabledTools = []string{"write_issue"}
+	require.NoError(t, saved.Update(db, nil, nil, &config))
+
+	_, err = ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+
+	saved, err = factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Equal(t, []string{"write_issue"}, saved.Config.Data().DisabledTools)
+}
+
+func Test__ListFactoryAgentResourceToolsKeepsExistingDenylist(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	server := httptest.NewServer(mcpToolsHandler(t, []map[string]any{
+		{"name": "search", "annotations": map[string]any{"readOnlyHint": true}},
+		{"name": "create_issue"},
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport:           "http",
+		URL:                 server.URL,
+		Auth:                models.FactoryAgentResourceAuthHeaders,
+		DisabledTools:       []string{"search"},
+		ToolsDefaultApplied: true,
+	})
+	require.NoError(t, err)
+
+	_, err = ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"search"}, saved.Config.Data().DisabledTools)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+}
+
+func Test__ListFactoryAgentResourceToolsMarksEmptyListApplied(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	server := httptest.NewServer(mcpToolsHandler(t, nil))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       server.URL,
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	response, err := ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, response.GetTools())
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, saved.Config.Data().ToolsDefaultApplied)
+	assert.Empty(t, saved.Config.Data().DisabledTools)
 }
 
 func mcpToolsHandler(t *testing.T, tools []map[string]any) http.Handler {

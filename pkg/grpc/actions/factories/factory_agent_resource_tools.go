@@ -52,6 +52,7 @@ func ListFactoryAgentResourceTools(
 	if err != nil {
 		return nil, factoryErrorToStatus(errors.Join(errListMCPTools, err), "failed to list MCP tools")
 	}
+	applyDefaultMCPWriteTools(ctx, deps, db, resource)
 
 	out := make([]*pb.FactoryAgentResourceTool, 0, len(tools))
 	for _, tool := range tools {
@@ -62,6 +63,58 @@ func ListFactoryAgentResourceTools(
 		})
 	}
 	return &pb.ListFactoryAgentResourceToolsResponse{Tools: out}, nil
+}
+
+func applyDefaultMCPWriteTools(
+	ctx context.Context,
+	deps IntakeDependencies,
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+) {
+	if resource == nil || resource.Kind != models.FactoryAgentResourceKindMCPServer {
+		return
+	}
+	if resource.Config.Data().ToolsDefaultApplied {
+		return
+	}
+
+	headers, err := mcpHeadersForResource(ctx, deps, db, resource.OrganizationID, resource)
+	if err != nil {
+		return
+	}
+	tools, err := mcp.ListTools(ctx, mcpHTTPClient(deps), resource.Config.Data().URL, headers)
+	if err != nil {
+		return
+	}
+
+	var current models.FactoryAgentResource
+	err = db.Where("organization_id = ? AND id = ?", resource.OrganizationID, resource.ID).First(&current).Error
+	if err != nil || current.Config.Data().ToolsDefaultApplied {
+		return
+	}
+	config := current.Config.Data()
+	config.DisabledTools = writeToolNames(tools)
+	config.ToolsDefaultApplied = true
+	if err := current.Update(db, nil, nil, &config); err != nil {
+		return
+	}
+	resource.Config = current.Config
+	resource.UpdatedAt = current.UpdatedAt
+}
+
+func writeToolNames(tools []mcp.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if tool.ReadOnly {
+			continue
+		}
+		name := strings.TrimSpace(tool.Name)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return models.NormalizeDisabledTools(names)
 }
 
 func mcpHTTPClient(deps IntakeDependencies) mcp.HTTPDoer {

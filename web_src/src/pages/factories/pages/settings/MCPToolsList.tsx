@@ -11,7 +11,6 @@ export function MCPToolsList({
   isLoading,
   isError,
   disabledTools,
-  lockedTools,
   canUpdate,
   onToggleTool,
   testId,
@@ -21,7 +20,6 @@ export function MCPToolsList({
   isLoading: boolean;
   isError: boolean;
   disabledTools: string[];
-  lockedTools?: string[];
   canUpdate: boolean;
   onToggleTool: (toolName: string, enabled: boolean) => void;
   testId?: string;
@@ -29,7 +27,6 @@ export function MCPToolsList({
 }) {
   const [sort, setSort] = useState<MCPToolSort>(initialSort);
   const items = useMemo(() => sortMCPTools(mcpToolItems(tools), sort), [sort, tools]);
-  const locked = new Set(lockedTools ?? []);
 
   if (isLoading) {
     return (
@@ -57,7 +54,7 @@ export function MCPToolsList({
     <div className="flex flex-col gap-2" data-testid={testId ?? "mcp-tools-list"}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[12px] text-muted-foreground">
-          {AGENT_RESOURCES_COPY.toolsCount(enabledToolCount(items, [...disabledTools, ...locked]), items.length)}
+          {AGENT_RESOURCES_COPY.toolsCount(enabledToolCount(items, disabledTools), items.length)}
         </p>
         <Select value={sort} onValueChange={(value) => setSort(value as MCPToolSort)}>
           <SelectTrigger
@@ -77,8 +74,7 @@ export function MCPToolsList({
       </div>
       <ul className="divide-y divide-border">
         {items.map((tool) => {
-          const workspaceOff = locked.has(tool.name);
-          const checked = !workspaceOff && !disabledTools.includes(tool.name);
+          const checked = !disabledTools.includes(tool.name);
           return (
             <li key={tool.name} className="flex items-center gap-3 py-2">
               <div className="min-w-0 flex-1">
@@ -89,7 +85,7 @@ export function MCPToolsList({
               </div>
               <Switch
                 checked={checked}
-                disabled={!canUpdate || workspaceOff}
+                disabled={!canUpdate}
                 onCheckedChange={(enabled) => onToggleTool(tool.name, enabled)}
                 aria-label={AGENT_RESOURCES_COPY.enableToolLabel(tool.name)}
                 data-testid={`mcp-tool-enabled-${tool.name}`}
