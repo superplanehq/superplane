@@ -10,11 +10,36 @@ import (
 	"net/textproto"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const discordAPIBase = "https://discord.com/api/v10"
+
+const (
+	// requestTimeout bounds a single Discord API call. http.DefaultClient has no
+	// timeout, so without this a stalled connection blocks the worker running
+	// the component forever.
+	requestTimeout = 30 * time.Second
+
+	// uploadTimeout is the budget for multipart message uploads, which carry up
+	// to maxMessageFiles attachments of maxMessageFileSize each and so need more
+	// room than a plain JSON call.
+	uploadTimeout = 2 * time.Minute
+
+	// maxResponseSize bounds how much of an API response we buffer in memory.
+	// The largest response we ask for is a 100-message channel page, which stays
+	// well below this. Attachment downloads are bounded separately by
+	// maxMessageFileSize.
+	maxResponseSize = 4 * 1024 * 1024 // 4MB
+)
+
+// Clients are shared by all requests so connections are reused across calls.
+var (
+	httpClient       = &http.Client{Timeout: requestTimeout}
+	uploadHTTPClient = &http.Client{Timeout: uploadTimeout}
+)
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
@@ -274,15 +299,19 @@ func (c *Client) CreateMessageWithFiles(channelID string, req CreateMessageReque
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bot %s", c.BotToken))
 	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := uploadHTTPClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if len(responseBody) > maxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -355,15 +384,19 @@ func (c *Client) doRequest(method, endpoint string, body io.Reader) ([]byte, err
 	req.Header.Set("Authorization", fmt.Sprintf("Bot %s", c.BotToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if len(responseBody) > maxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
