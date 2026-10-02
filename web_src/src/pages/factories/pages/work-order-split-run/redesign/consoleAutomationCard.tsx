@@ -48,13 +48,25 @@ export function ConsoleAutomationCard({
   const shownPhase = phase && shownStatus !== phase.status ? { ...phase, status: shownStatus } : phase;
   const live = isLiveAutomationStatus(shownStatus);
   const [open, setOpen] = useState(live || expandIdle);
+  const closedByUser = useRef(false);
   useEffect(() => {
-    if (live || expandIdle) {
+    if (live) {
       setOpen(true);
+      return;
+    }
+    if (closedByUser.current) {
+      setOpen(false);
+      return;
+    }
+    if (expandIdle) {
       return;
     }
     setOpen(false);
   }, [expandIdle, live]);
+  const handleOpenChange = (next: boolean) => {
+    closedByUser.current = !next;
+    setOpen(next);
+  };
   const stopRun =
     canStopRun && onStopRun && shownStatus === "running" && shownPhase?.appId && shownPhase.runId
       ? () => {
@@ -75,7 +87,7 @@ export function ConsoleAutomationCard({
       className="[--frame-radius:var(--radius-lg)]"
       data-testid={`redesign-console-automation-${automation.id}`}
     >
-      <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible">
+      <Collapsible open={open} onOpenChange={handleOpenChange} className="group/collapsible">
         <FrameHeader
           className="relative flex min-w-0 flex-row items-center gap-2 py-2"
           data-testid={`redesign-console-card-header-${automation.id}`}

@@ -2,11 +2,7 @@ import type { AgentPromptUsageSeries } from "@/lib/agentRunTelemetry";
 import { cn } from "@/lib/utils";
 import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
-import { Link } from "@/components/Link/link";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/reui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/ui/skeleton";
-import { Bug } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { LOADING_REVEAL_CLASSNAME } from "../../../lib/loadingReveal";
@@ -22,8 +18,9 @@ import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
+import { FailedNodeAlerts } from "./failedNodeAlerts";
+import { failedNonRunnerErrors, type FailedNodeError } from "./failedNodeErrors";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
-import { NodeIcon } from "./redesignShared";
 
 const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
 const AGENT_LOG_SKELETON_LABEL = "Waiting for logs";
@@ -34,13 +31,6 @@ type RunnerLive = {
   activities: AgentActivity[];
   isStreaming: boolean;
   isLoading: boolean;
-};
-
-type FailedNodeError = {
-  id: string;
-  name: string;
-  message: string;
-  iconSlug?: string;
 };
 
 export function LiveAgentSteps({
@@ -380,51 +370,6 @@ function useRunnerLiveNotes(
     isStreaming,
     isLoading,
   };
-}
-
-function failedNonRunnerErrors(lines: SplitRunStreamLine[]): FailedNodeError[] {
-  return lines
-    .filter((line) => !line.note && line.status === "failed" && !isRunnerComponent(line.component))
-    .map((line) => ({
-      id: line.id,
-      name: line.componentName,
-      message: line.detail?.trim() || "This node failed.",
-      iconSlug: line.iconSlug,
-    }));
-}
-
-function FailedNodeAlerts({ nodes, runHref }: { nodes: FailedNodeError[]; runHref?: string | null }) {
-  return (
-    <div className="space-y-2">
-      {nodes.map((node) => (
-        <FailedNodeAlert key={node.id} node={node} runHref={runHref} />
-      ))}
-    </div>
-  );
-}
-
-function FailedNodeAlert({ node, runHref }: { node: FailedNodeError; runHref?: string | null }) {
-  return (
-    <Alert variant="destructive" data-testid="redesign-run-node-error">
-      <NodeIcon iconSlug={node.iconSlug} />
-      <AlertTitle>{node.name}</AlertTitle>
-      <AlertDescription>
-        <pre className="max-h-40 w-full overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap text-destructive">
-          {node.message}
-        </pre>
-      </AlertDescription>
-      {runHref ? (
-        <AlertAction>
-          <Button asChild size="sm" variant="outline">
-            <Link href={runHref}>
-              <Bug className="size-3.5" aria-hidden />
-              Debug
-            </Link>
-          </Button>
-        </AlertAction>
-      ) : null}
-    </Alert>
-  );
 }
 
 function AgentLogSkeleton() {
