@@ -256,7 +256,11 @@ func (s *Server) claimPendingHostedSentryInstall(r *http.Request, app sentryinte
 	}
 
 	if err := s.rememberHostedSentryGrant(app, grant); err != nil {
-		logging.LogSentryWebhookError("failed to store unclaimed Sentry app install", nil, err)
+		logging.LogSentryWebhookError("failed to store unclaimed Sentry app install", log.Fields{
+			"installation_uuid":        grant.UUID,
+			"sentry_organization_slug": grant.OrgSlug,
+			"sentry_organization_id":   grant.OrgID,
+		}, err)
 	}
 }
 
