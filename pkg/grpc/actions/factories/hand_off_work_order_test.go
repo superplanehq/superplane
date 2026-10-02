@@ -91,6 +91,7 @@ func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	doneApp, doneEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "done", "start-done")
 	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
 	require.NoError(t, doneApp.StampFactoryAppTemplate(db, doneEntry, "pr-closure", 1))
+	renameCanvas(t, db, doneApp, "Done")
 	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: planApp.ID, Entrypoint: planEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
@@ -138,6 +139,99 @@ func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	var runCount int64
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id IN ?", []any{planApp.ID, implApp.ID, doneApp.ID}).Count(&runCount).Error)
 	assert.Zero(t, runCount)
+}
+
+func Test__HandOffWorkOrder__VerifyUsesBoardLastStageWhenClosureIsRenamed(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedHandOffFactory(t, r, db)
+	planApp, planEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "plan", "start-plan")
+	implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	closureApp, closureEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "close", "start-close")
+	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
+	require.NoError(t, closureApp.StampFactoryAppTemplate(db, closureEntry, "pr-closure", 1))
+	renameCanvas(t, db, closureApp, "Close work")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: planApp.ID, Entrypoint: planEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: closureApp.ID, Entrypoint: closureEntry},
+	})
+	require.NoError(t, err)
+
+	useGitHub(t, openHandOffPullRequest("acme/app", 42, "feat/refunds"))
+
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID:      factoryModel.ID.String(),
+		Title:          "Review renamed closure",
+		Plan:           "# Retry refunds",
+		Column:         HandOffColumnVerify,
+		PullRequestURL: "https://github.com/acme/app/pull/42",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetLineDispatches(), 1)
+	require.Len(t, result.Order.GetLineDispatches()[0].GetStepExecutions(), 1)
+	assert.Equal(t, int32(2), result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetStepIndex())
+}
+
+func Test__HandOffWorkOrder__VerifyStoresForkHeadRepository(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedHandOffFactory(t, r, db)
+	implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
+	})
+	require.NoError(t, err)
+
+	useGitHub(t, forkHandOffPullRequest("acme/app", "contributor/app", 42, "feat/refunds"))
+
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID:      factoryModel.ID.String(),
+		Title:          "Review fork pull request",
+		Plan:           "# Retry refunds",
+		Column:         HandOffColumnVerify,
+		PullRequestURL: "https://github.com/acme/app/pull/42",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetPullRequests(), 1)
+	assert.Equal(t, "acme/app", result.Order.GetPullRequests()[0].GetRepository())
+
+	order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
+	require.NoError(t, err)
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.True(t, hasBranchArtifact(artifacts, "feat/refunds", "contributor/app"))
+}
+
+func Test__HandOffWorkOrder__ImplementFailedDispatchLeavesNoTask(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedHandOffFactory(t, r, db)
+	implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: "missing-node"},
+	})
+	require.NoError(t, err)
+
+	_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship refund retries",
+		Plan:      "# Retry refunds",
+		Column:    HandOffColumnImplement,
+	})
+	require.Error(t, err)
+
+	orders, err := factoryModel.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Empty(t, orders)
 }
 
 func Test__HandOffWorkOrder__RejectsInvalidInput(t *testing.T) {
@@ -225,6 +319,26 @@ func Test__HandOffWorkOrder__RejectsInvalidInput(t *testing.T) {
 		assert.Contains(t, grpcerrors.StatusMessage(err), first.Name)
 		assert.Contains(t, grpcerrors.StatusMessage(err), second.Name)
 	})
+
+	t.Run("one-step done line", func(t *testing.T) {
+		otherFactory := seedHandOffFactory(t, r, db)
+		doneApp, doneEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, otherFactory.ID, "done", "start-done")
+		require.NoError(t, doneApp.StampFactoryAppTemplate(db, doneEntry, "pr-closure", 1))
+		renameCanvas(t, db, doneApp, "Done")
+		_, err := otherFactory.CreateLine(db, "ship", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: doneApp.ID, Entrypoint: doneEntry},
+		})
+		require.NoError(t, err)
+		_, err = HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID: otherFactory.ID.String(),
+			Title:     "Ship it",
+			Plan:      "# Plan",
+			Column:    HandOffColumnImplement,
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "Cannot choose an implementation stage")
+	})
 }
 
 func seedHandOffFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
@@ -250,15 +364,28 @@ func useGitHub(t *testing.T, pullRequest *github.PullRequest) {
 }
 
 func openHandOffPullRequest(repository string, number int, headRef string) *github.PullRequest {
+	return forkHandOffPullRequest(repository, repository, number, headRef)
+}
+
+func forkHandOffPullRequest(baseRepository, headRepository string, number int, headRef string) *github.PullRequest {
 	return &github.PullRequest{
 		ID:      github.Ptr(int64(1000 + number)),
 		Number:  github.Ptr(number),
 		Title:   github.Ptr("Ready"),
 		State:   github.Ptr("open"),
-		HTMLURL: github.Ptr("https://github.com/" + repository + "/pull/" + strconv.Itoa(number)),
-		Head:    &github.PullRequestBranch{Ref: github.Ptr(headRef)},
-		Base:    &github.PullRequestBranch{Repo: &github.Repository{FullName: github.Ptr(repository)}},
+		HTMLURL: github.Ptr("https://github.com/" + baseRepository + "/pull/" + strconv.Itoa(number)),
+		Head: &github.PullRequestBranch{
+			Ref:  github.Ptr(headRef),
+			Repo: &github.Repository{FullName: github.Ptr(headRepository)},
+		},
+		Base: &github.PullRequestBranch{Repo: &github.Repository{FullName: github.Ptr(baseRepository)}},
 	}
+}
+
+func renameCanvas(t *testing.T, db *gorm.DB, canvas *models.Canvas, name string) {
+	t.Helper()
+	require.NoError(t, db.Model(canvas).Update("name", name).Error)
+	canvas.Name = name
 }
 
 func planningSpecBody(t *testing.T, artifact *models.FactoryWorkOrderArtifact) string {

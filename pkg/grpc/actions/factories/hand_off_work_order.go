@@ -53,6 +53,7 @@ type handOffStage struct {
 	Name             string
 	AppID            uuid.UUID
 	IsDone           bool
+	IsClosure        bool
 	IsImplementation bool
 }
 
@@ -144,6 +145,7 @@ func HandOffWorkOrder(
 	var order *models.FactoryWorkOrder
 	var bound storedfiles.BindResult
 	var trackedPR *models.FactoryPullRequest
+	var dispatched *workOrderLineDispatchResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		created, err := factory.CreateWorkOrder(tx, title, req.Description, &createdByID, assigneeIDs, nil)
 		if err != nil {
@@ -169,7 +171,14 @@ func HandOffWorkOrder(
 		if bindErr != nil {
 			return bindErr
 		}
-		if column != HandOffColumnVerify {
+		if column == HandOffColumnImplement {
+			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, "", "")
+			if err != nil {
+				return err
+			}
+			dispatched = started
+			factory = started.factory
+			order = started.order
 			return nil
 		}
 		return recordVerifyHandOff(tx, factory, order, line, &actor, githubPR, prRepository, verifyIndex)
@@ -181,11 +190,16 @@ func HandOffWorkOrder(
 		return nil, factoryErrorToStatus(err, "failed to hand off work order")
 	}
 
-	if column == HandOffColumnImplement {
-		factory, order, err = DispatchWorkOrderOnLine(db, factory, order.ID, line, &actor, implementIndex, false, "", "")
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to hand off work order")
-		}
+	if dispatched != nil {
+		publishDispatchedWorkOrder(
+			dispatched.logger,
+			dispatched.factory.OrganizationID,
+			dispatched.factory.ID,
+			dispatched.order,
+			&actor,
+			dispatched.fromState,
+			dispatched.startedSteps,
+		)
 	} else {
 		if err := messages.PublishFactoryWorkOrderUpdated(
 			factory.ID.String(),
@@ -260,6 +274,7 @@ func recordVerifyHandOff(
 	if headRef == "" {
 		return invalidArgument("The pull request has no head branch.")
 	}
+	headRepo := pullRequestHeadRepository(githubPR, taskRepo)
 
 	if _, err := order.CreatePullRequest(tx, models.FactoryPullRequestParams{
 		Provider:   models.FactoryPullRequestProviderGitHub,
@@ -277,7 +292,7 @@ func recordVerifyHandOff(
 		Type: models.FactoryWorkOrderArtifactTypeBranch,
 		Data: map[string]any{
 			"name":       headRef,
-			"repository": taskRepo,
+			"repository": headRepo,
 		},
 	}); err != nil {
 		return err
@@ -380,7 +395,8 @@ func classifyHandOffStages(tx *gorm.DB, factory *models.Factory, line *models.Fa
 			Name:             name,
 			AppID:            step.AppID,
 			IsImplementation: templateID == lineImplementationTemplateID,
-			IsDone:           isHandOffDoneStage(name, columnKey, templateID, step.AppID),
+			IsClosure:        templateID == prClosureTemplateID,
+			IsDone:           isBoardDoneStage(name, columnKey, step.AppID),
 		}
 		if stage.Name == "" {
 			stage.Name = fmt.Sprintf("step %d", i+1)
@@ -390,34 +406,50 @@ func classifyHandOffStages(tx *gorm.DB, factory *models.Factory, line *models.Fa
 	return stages, nil
 }
 
-func isHandOffDoneStage(name, columnKey, templateID string, appID uuid.UUID) bool {
-	if columnKey == models.CanvasColumnKeyDone {
-		return true
-	}
-	if templateID == prClosureTemplateID {
-		return true
-	}
+func isBoardDoneStage(name, columnKey string, appID uuid.UUID) bool {
 	if strings.EqualFold(strings.TrimSpace(name), "done") {
+		return true
+	}
+	if columnKey == models.CanvasColumnKeyDone {
 		return true
 	}
 	return strings.Contains(strings.ToLower(appID.String()), "pr-closure")
 }
 
-func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
-	if len(stages) == 1 {
-		return stages[0].Index, nil
-	}
+func isRunnableHandOffStage(stage handOffStage) bool {
+	return !stage.IsDone && !stage.IsClosure
+}
 
+func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
+	runnable := make([]handOffStage, 0, len(stages))
 	matches := make([]handOffStage, 0, len(stages))
 	for _, stage := range stages {
+		if !isRunnableHandOffStage(stage) {
+			continue
+		}
+		runnable = append(runnable, stage)
 		if stage.IsImplementation {
 			matches = append(matches, stage)
 		}
+	}
+	if len(runnable) == 1 {
+		return runnable[0].Index, nil
 	}
 	if len(matches) == 1 {
 		return matches[0].Index, nil
 	}
 	return 0, invalidArgument("Cannot choose an implementation stage. Stages: " + joinStageNames(stages))
+}
+
+func pullRequestHeadRepository(githubPR *github.PullRequest, taskRepo string) string {
+	if githubPR == nil {
+		return taskRepo
+	}
+	headRepo := strings.TrimSpace(githubPR.GetHead().GetRepo().GetFullName())
+	if headRepo != "" {
+		return headRepo
+	}
+	return taskRepo
 }
 
 func resolveVerifyStageIndex(stages []handOffStage) (int, error) {
