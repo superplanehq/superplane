@@ -94,8 +94,8 @@ What not to do:
 
 ## Frontend Implementation
 
-The frontend implementation should include mappers in `web_src/src/pages/workflowv2/mappers/<name>/`.
-e.g. for a Rootly integration, the mappers would be in `web_src/src/pages/workflowv2/mappers/rootly/`.
+The frontend implementation should include mappers in `web_src/src/pages/app/mappers/<name>/`.
+e.g. for a Rootly integration, the mappers would be in `web_src/src/pages/app/mappers/rootly/`.
 
 What to do:
 
