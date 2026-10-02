@@ -73,6 +73,18 @@ func (VCSProviderInstallRequest) TableName() string {
 	return "vcs_provider_install_requests"
 }
 
+// VCSProviderInstallRequestRefresh asks the catalog worker to read the
+// provider's install request list often until RefreshUntil.
+type VCSProviderInstallRequestRefresh struct {
+	Provider     string `gorm:"primaryKey"`
+	RefreshUntil time.Time
+	UpdatedAt    time.Time
+}
+
+func (VCSProviderInstallRequestRefresh) TableName() string {
+	return "vcs_provider_install_request_refreshes"
+}
+
 type VCSProviderRepositorySyncPriority int16
 
 const (
@@ -797,6 +809,27 @@ func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID in
 func HasVCSProviderInstallRequests(tx *gorm.DB, provider string) (bool, error) {
 	var count int64
 	err := tx.Model(&VCSProviderInstallRequest{}).Where("provider = ?", provider).Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
+func RequestVCSProviderInstallRequestRefresh(tx *gorm.DB, provider string, until time.Time) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	refresh := VCSProviderInstallRequestRefresh{Provider: provider, RefreshUntil: until, UpdatedAt: time.Now()}
+	return tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "provider"}},
+		DoUpdates: clause.AssignmentColumns([]string{"refresh_until", "updated_at"}),
+	}).Create(&refresh).Error
+}
+
+func VCSProviderInstallRequestRefreshRequested(tx *gorm.DB, provider string, now time.Time) (bool, error) {
+	var count int64
+	err := tx.Model(&VCSProviderInstallRequestRefresh{}).
+		Where("provider = ? AND refresh_until > ?", provider, now).
+		Count(&count).
+		Error
 	return count > 0, err
 }
 

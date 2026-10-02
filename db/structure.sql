@@ -1349,6 +1349,17 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: vcs_provider_install_request_refreshes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_install_request_refreshes (
+    provider text NOT NULL,
+    refresh_until timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_install_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2502,6 +2513,14 @@ ALTER TABLE ONLY public.user_notification_settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vcs_provider_install_request_refreshes vcs_provider_install_request_refreshes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_install_request_refreshes
+    ADD CONSTRAINT vcs_provider_install_request_refreshes_pkey PRIMARY KEY (provider);
 
 
 --
@@ -5099,7 +5118,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261002212633	f
+20261002215932	f
 \.
 
 

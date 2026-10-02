@@ -21,20 +21,20 @@ import (
 
 func TestHandleGitHubAppSetup(t *testing.T) {
 	setGitHubAppEnvironment(t)
-	previousReconciliation := enqueueGitHubAppReconciliation
+	previousRequestRefresh := requestGitHubAppInstallRequestRefresh
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
 	previousHasInstallationRequest := hasGitHubAppInstallationRequest
-	previousRefreshInstallRequests := refreshGitHubAppInstallRequests
 	organizationID := uuid.New()
 	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
 	require.NoError(t, err)
 	var installationIDs []int64
 	var organizationIDs []uuid.UUID
 	installationRequested := true
-	reconciliationCount := 0
-	enqueueGitHubAppReconciliation = func(context.Context, time.Time) error {
-		reconciliationCount++
-		return nil
+	var refreshDeadlines []time.Time
+	var requestRefreshError error
+	requestGitHubAppInstallRequestRefresh = func(_ context.Context, until time.Time) error {
+		refreshDeadlines = append(refreshDeadlines, until)
+		return requestRefreshError
 	}
 	enqueueGitHubAppInstallationReconciliation = func(
 		_ context.Context,
@@ -49,17 +49,10 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 	hasGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
 		return installationRequested, nil
 	}
-	installRequestRefreshes := 0
-	var installRequestRefreshError error
-	refreshGitHubAppInstallRequests = func(context.Context) error {
-		installRequestRefreshes++
-		return installRequestRefreshError
-	}
 	t.Cleanup(func() {
-		enqueueGitHubAppReconciliation = previousReconciliation
+		requestGitHubAppInstallRequestRefresh = previousRequestRefresh
 		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
 		hasGitHubAppInstallationRequest = previousHasInstallationRequest
-		refreshGitHubAppInstallRequests = previousRefreshInstallRequests
 	})
 
 	t.Run("direct installation returns to the app", func(t *testing.T) {
@@ -74,7 +67,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070}, installationIDs)
 		assert.Equal(t, []uuid.UUID{organizationID}, organizationIDs)
-		assert.Zero(t, reconciliationCount)
+		assert.Empty(t, refreshDeadlines)
 	})
 
 	t.Run("direct listing installation returns to the app", func(t *testing.T) {
@@ -90,7 +83,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070, 159131070}, installationIDs)
 		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil}, organizationIDs)
-		assert.Zero(t, reconciliationCount)
+		assert.Empty(t, refreshDeadlines)
 	})
 
 	t.Run("approved request opens the confirmation page", func(t *testing.T) {
@@ -106,7 +99,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070, 159131070, 159131070}, installationIDs)
 		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil}, organizationIDs)
-		assert.Zero(t, reconciliationCount)
+		assert.Empty(t, refreshDeadlines)
 	})
 
 	t.Run("repository update returns to the app", func(t *testing.T) {
@@ -121,10 +114,10 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
 		assert.Equal(t, []int64{159131070, 159131070, 159131070, 159131070}, installationIDs)
 		assert.Equal(t, []uuid.UUID{organizationID, uuid.Nil, uuid.Nil, organizationID}, organizationIDs)
-		assert.Zero(t, reconciliationCount)
+		assert.Empty(t, refreshDeadlines)
 	})
 
-	t.Run("approval request saves the request before it returns to the app", func(t *testing.T) {
+	t.Run("approval request asks for a short request refresh", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
@@ -134,13 +127,13 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, recorder.Code)
 		assert.Equal(t, "/", recorder.Header().Get("Location"))
-		assert.Equal(t, 1, installRequestRefreshes)
-		assert.Zero(t, reconciliationCount)
+		require.Len(t, refreshDeadlines, 1)
+		assert.WithinDuration(t, time.Now().Add(githubInstallRequestRefreshWindow), refreshDeadlines[0], 5*time.Second)
 	})
 
-	t.Run("approval request queues reconciliation when GitHub does not answer", func(t *testing.T) {
-		installRequestRefreshError = errors.New("GitHub is unavailable")
-		t.Cleanup(func() { installRequestRefreshError = nil })
+	t.Run("approval request fails when the refresh cannot be saved", func(t *testing.T) {
+		requestRefreshError = errors.New("database is unavailable")
+		t.Cleanup(func() { requestRefreshError = nil })
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
@@ -148,9 +141,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 			nil,
 		))
 
-		assert.Equal(t, http.StatusFound, recorder.Code)
-		assert.Equal(t, "/", recorder.Header().Get("Location"))
-		assert.Equal(t, 1, reconciliationCount)
+		assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 	})
 
 	t.Run("installation id is required", func(t *testing.T) {

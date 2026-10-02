@@ -111,17 +111,45 @@ func TestVCSProviderCatalogWorkerRefreshesInstallRequestsOnlyWhileOnePending(t *
 	catalog := &recordingVCSProviderCatalog{}
 	worker := newTestVCSProviderCatalogWorker(catalog)
 
-	worker.refreshPendingInstallRequests(t.Context())
+	now := time.Now()
+
+	worker.refreshInstallRequests(t.Context(), now)
 	assert.Zero(t, catalog.requestRefreshes)
 
 	require.NoError(t, models.ReplaceVCSProviderInstallRequests(database.Conn(), models.ProviderGitHub, []models.VCSProviderInstallRequest{{
 		RequestID:    401,
 		AccountLogin: "acme",
 		RequesterID:  9,
-		RequestedAt:  time.Now(),
+		RequestedAt:  now,
 	}}))
-	worker.refreshPendingInstallRequests(t.Context())
+	worker.refreshInstallRequests(t.Context(), now)
 	assert.Equal(t, 1, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestPollInterval))
+	assert.Equal(t, 1, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestRefreshInterval))
+	assert.Equal(t, 2, catalog.requestRefreshes)
+}
+
+func TestVCSProviderCatalogWorkerRefreshesInstallRequestsOnEveryPollWhileRequested(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	catalog := &recordingVCSProviderCatalog{}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+	now := time.Now()
+	require.NoError(t, models.RequestVCSProviderInstallRequestRefresh(
+		database.Conn(),
+		models.ProviderGitHub,
+		now.Add(time.Minute),
+	))
+
+	worker.refreshInstallRequests(t.Context(), now)
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestPollInterval))
+	assert.Equal(t, 2, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(2*time.Minute))
+	assert.Equal(t, 2, catalog.requestRefreshes)
 }
 
 func TestVCSProviderCatalogWorkerReconcilesRequestedInstallation(t *testing.T) {

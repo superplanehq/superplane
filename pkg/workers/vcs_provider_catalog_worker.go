@@ -14,6 +14,7 @@ import (
 
 const (
 	vcsProviderReconcileInterval              = 5 * time.Minute
+	vcsProviderInstallRequestPollInterval     = 5 * time.Second
 	vcsProviderInstallRequestRefreshInterval  = 15 * time.Second
 	vcsProviderInstallationRequesterRetention = time.Hour
 	vcsProviderJobPollInterval                = time.Second
@@ -32,13 +33,14 @@ type vcsProviderCatalog interface {
 }
 
 type VCSProviderCatalogWorker struct {
-	provider          string
-	catalog           vcsProviderCatalog
-	logger            *log.Entry
-	installationSlots chan struct{}
-	installationJobs  sync.WaitGroup
-	repositorySlots   chan struct{}
-	repositoryJobs    sync.WaitGroup
+	provider                  string
+	catalog                   vcsProviderCatalog
+	logger                    *log.Entry
+	installationSlots         chan struct{}
+	installationJobs          sync.WaitGroup
+	repositorySlots           chan struct{}
+	repositoryJobs            sync.WaitGroup
+	lastInstallRequestRefresh time.Time
 }
 
 func NewVCSProviderCatalogWorker(provider string, catalog vcsProviderCatalog) *VCSProviderCatalogWorker {
@@ -74,34 +76,54 @@ func (w *VCSProviderCatalogWorker) Start(ctx context.Context) {
 	loops.Wait()
 }
 
-// GitHub sends no webhook when a member cancels an approval request, so the
-// worker reads the request list again while any request is pending.
+// GitHub sends no webhook when a member requests or cancels an approval, and
+// its request list can lag behind the setup redirect. The worker reads the
+// list often while a refresh is requested, and less often while any request
+// is pending.
 func (w *VCSProviderCatalogWorker) startInstallRequestRefresh(ctx context.Context) {
-	ticker := time.NewTicker(vcsProviderInstallRequestRefreshInterval)
+	ticker := time.NewTicker(vcsProviderInstallRequestPollInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			w.refreshPendingInstallRequests(ctx)
+		case now := <-ticker.C:
+			w.refreshInstallRequests(ctx, now)
 		}
 	}
 }
 
-func (w *VCSProviderCatalogWorker) refreshPendingInstallRequests(ctx context.Context) {
-	pending, err := models.HasVCSProviderInstallRequests(database.Conn(), w.provider)
-	if err != nil {
-		w.logger.WithError(err).Error("failed to check pending VCS installation requests")
-		return
-	}
-	if !pending {
+func (w *VCSProviderCatalogWorker) refreshInstallRequests(ctx context.Context, now time.Time) {
+	if !w.installRequestRefreshDue(now) {
 		return
 	}
 	if err := w.catalog.ReconcileInstallRequests(ctx); err != nil {
-		w.logger.WithError(err).Error("failed to refresh pending VCS installation requests")
+		w.logger.WithError(err).Error("failed to refresh VCS installation requests")
+		return
 	}
+	w.lastInstallRequestRefresh = now
+}
+
+func (w *VCSProviderCatalogWorker) installRequestRefreshDue(now time.Time) bool {
+	db := database.Conn()
+	requested, err := models.VCSProviderInstallRequestRefreshRequested(db, w.provider, now)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to check requested VCS installation request refresh")
+		return false
+	}
+	if requested {
+		return true
+	}
+	if now.Sub(w.lastInstallRequestRefresh) < vcsProviderInstallRequestRefreshInterval {
+		return false
+	}
+	pending, err := models.HasVCSProviderInstallRequests(db, w.provider)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to check pending VCS installation requests")
+		return false
+	}
+	return pending
 }
 
 func (w *VCSProviderCatalogWorker) startInstallationReconciliation(ctx context.Context) {
