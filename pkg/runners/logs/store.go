@@ -14,9 +14,12 @@ import (
 )
 
 const (
+	StoreFS                = "fs"
 	StorePostgres          = "postgres"
 	MaxRetainedBytes int64 = 10 * 1024 * 1024
 	SafetyExpiration       = 7 * 24 * time.Hour
+
+	TruncationRecord = `{"type":"line","text":"SuperPlane stopped retaining logs because this task reached the 10 MiB log limit."}` + "\n"
 
 	HeaderCursor = "X-SuperPlane-Log-Cursor"
 	HeaderState  = "X-SuperPlane-Log-State"
@@ -71,7 +74,15 @@ type Store interface {
 	Setup(SetupContext) error
 
 	/*
+	 * Initialize creates the active-store metadata for a task before the runner
+	 * receives it. It is idempotent. Implementations with multiple storage
+	 * locations use this call to pin the task to the current primary location.
+	 */
+	Initialize(context.Context, uuid.UUID) error
+
+	/*
 	 * Append durably stores one runner chunk and its sequence metadata before returning success.
+	 * Initialize must complete before the first append.
 	 * It accepts only the next sequence, treats an already accepted sequence as an idempotent duplicate,
 	 * and returns ErrSequenceConflict for a future sequence.
 	 * It also enforces the retained log limit and reports when truncation occurs.
@@ -82,6 +93,11 @@ type Store interface {
 	 * ReadAfter returns an ordered snapshot of retained NDJSON records after an opaque cursor.
 	 * An empty cursor reads from the beginning. Callers pass the returned cursor to a later call
 	 * to receive only newer records. ErrNotFound means that the task has no active-store record.
+	 *
+	 * The cursor is independent from the runner chunk sequence passed to Append.
+	 * Callers must not create a cursor from a chunk sequence or interpret its value.
+	 * PostgreSQL currently uses the next chunk sequence, while FS uses a committed
+	 * byte offset. A client only stores and returns the latest cursor from ReadAfter.
 	 */
 	ReadAfter(context.Context, uuid.UUID, string) (*ReadResult, error)
 

@@ -36,7 +36,8 @@ services:
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
       START_RUNNER_API: "yes"
-      RUNNER_ACTIVE_LOG_STORE: "postgres"
+      RUNNER_ACTIVE_LOG_STORE: "fs"
+      RUNNER_ACTIVE_LOG_FS_PATH: "/var/lib/superplane/active-runner-logs"
       START_RUNNER_LOG_COMPACTOR: "yes"
       START_RUNNER_CLEANUP_WORKER: "yes"
       START_CONSUMERS: "yes"
@@ -176,6 +177,7 @@ services:
       - .:/app
       - /tmp:/tmp
       - blob-data:/var/lib/superplane/blobs
+      - runner-active-log-data:/var/lib/superplane/active-runner-logs
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -266,4 +268,7 @@ volumes:
     driver: local
 
   blob-data:
+    driver: local
+
+  runner-active-log-data:
     driver: local

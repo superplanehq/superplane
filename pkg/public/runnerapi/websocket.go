@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -206,6 +207,7 @@ func (s *Server) reconcileRunnerConnection(
 ) error {
 	var task *models.RunnerTask
 	var shouldSendTask bool
+	var shouldStartTask bool
 	var shouldShutdown bool
 	var shouldCancel bool
 
@@ -252,9 +254,7 @@ func (s *Server) reconcileRunnerConnection(
 				return errRunnerStateMismatch
 			}
 			if active.State == models.RunnerTaskStateReserved {
-				if err := active.Start(tx, runner, s.activeLogStoreName, time.Now()); err != nil {
-					return err
-				}
+				shouldStartTask = true
 			}
 			task = active
 			shouldCancel = active.CancelRequestedAt != nil
@@ -288,6 +288,14 @@ func (s *Server) reconcileRunnerConnection(
 		return err
 	}
 
+	if shouldStartTask {
+		if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
+			return err
+		}
+		if err := s.startRunnerTask(ctx, runner, task.ID, connectionID); err != nil {
+			return err
+		}
+	}
 	if shouldShutdown {
 		return connection.write(typedMessage{Type: messageTypeShutdown})
 	}
@@ -298,6 +306,9 @@ func (s *Server) reconcileRunnerConnection(
 		return nil
 	}
 
+	if err := s.initializeTaskLogs(ctx, task.ID); err != nil {
+		return err
+	}
 	payload, err := s.encryptor.Decrypt(ctx, task.PayloadCiphertext, []byte(task.ID.String()))
 	if err != nil {
 		return fmt.Errorf("decrypt runner task payload: %w", err)
@@ -312,12 +323,21 @@ func (s *Server) reconcileRunnerConnection(
 		return err
 	}
 
+	return s.startRunnerTask(ctx, runner, task.ID, connectionID)
+}
+
+func (s *Server) startRunnerTask(
+	ctx context.Context,
+	runner *models.Runner,
+	taskID uuid.UUID,
+	connectionID uuid.UUID,
+) error {
 	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
 			return err
 		}
-		currentTask, err := models.FindRunnerTask(tx, task.ID)
+		currentTask, err := models.FindRunnerTask(tx, taskID)
 		if err != nil {
 			return err
 		}
@@ -331,6 +351,14 @@ func (s *Server) reconcileRunnerConnection(
 		*runner = *currentRunner
 		return nil
 	})
+}
+
+func (s *Server) initializeTaskLogs(ctx context.Context, taskID uuid.UUID) error {
+	store := runnerlogs.Current()
+	if store == nil || store.Name() != s.activeLogStoreName {
+		return models.ErrRunnerTaskLogStoreRequired
+	}
+	return store.Initialize(ctx, taskID)
 }
 
 func (s *Server) completeRunnerTask(

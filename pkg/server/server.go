@@ -23,7 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -41,6 +41,7 @@ import (
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -857,7 +858,7 @@ func newBlobProvider() (blob.Provider, error) {
 		return s3blob.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
-		return filesystem.NewProvider()
+		return blobfilesystem.NewProvider()
 	default:
 		return nil, fmt.Errorf("unsupported blob storage provider %q", name)
 	}
@@ -874,6 +875,9 @@ func newRunnerActiveLogStore() (runnerlogs.Store, error) {
 	}
 
 	switch name {
+	case runnerlogs.StoreFS:
+		log.Println("Creating FS runner active log store")
+		return runnerlogsfs.NewProvider()
 	case runnerlogs.StorePostgres:
 		log.Println("Creating PostgreSQL runner active log store")
 		return runnerlogspostgres.New(), nil

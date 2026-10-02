@@ -71,18 +71,7 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cursor := r.URL.Query().Get("after")
-	if cursor == "" {
-		if value := r.URL.Query().Get("after_chunk"); value != "" {
-			afterChunk, parseErr := strconv.ParseInt(value, 10, 64)
-			if parseErr != nil || afterChunk < -1 {
-				http.Error(w, "Invalid after_chunk", http.StatusBadRequest)
-				return
-			}
-			cursor = strconv.FormatInt(afterChunk+1, 10)
-		}
-	}
-	s.serveRunnerTaskLogs(w, r, task, cursor)
+	s.serveRunnerTaskLogs(w, r, task, r.URL.Query().Get("after"))
 }
 
 func (s *Server) serveRunnerTaskLogs(

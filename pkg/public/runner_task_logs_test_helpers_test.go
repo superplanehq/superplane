@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -25,7 +26,12 @@ func runnerTaskLogsGET(
 	t.Helper()
 	request := httptest.NewRequest(
 		http.MethodGet,
-		fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-logs?after=%s", canvasID, executionID, cursor),
+		fmt.Sprintf(
+			"/api/v1/canvases/%s/node-executions/%s/runner-logs?after=%s",
+			canvasID,
+			executionID,
+			url.QueryEscape(cursor),
+		),
 		nil,
 	)
 	request.Header.Set("x-organization-id", resource.Organization.ID.String())

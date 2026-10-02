@@ -69,6 +69,7 @@ func TestOperationsRecordPostgresMetrics(t *testing.T) {
 		MeterProvider: provider,
 	}))
 	taskID := uuid.New()
+	require.NoError(t, store.Initialize(t.Context(), taskID))
 	_, err := store.Append(t.Context(), taskID, 0, []byte("line\n"))
 	require.NoError(t, err)
 	readResult(t, store, taskID, "")
@@ -90,6 +91,7 @@ func TestAppendReadAndDelete(t *testing.T) {
 	store := newTestStore(t)
 	taskID := uuid.New()
 	t.Cleanup(func() { require.NoError(t, store.Delete(context.Background(), taskID)) })
+	require.NoError(t, store.Initialize(t.Context(), taskID))
 
 	result, err := store.Append(t.Context(), taskID, 0, []byte("first\n"))
 	require.NoError(t, err)
@@ -119,10 +121,32 @@ func TestAppendReadAndDelete(t *testing.T) {
 	require.ErrorIs(t, err, runnerlogs.ErrNotFound)
 }
 
+func TestAppendRequiresInitialization(t *testing.T) {
+	store := newTestStore(t)
+
+	_, err := store.Append(t.Context(), uuid.New(), 0, []byte("line\n"))
+
+	require.ErrorIs(t, err, runnerlogs.ErrNotFound)
+}
+
+func TestInitializeIsIdempotent(t *testing.T) {
+	store := newTestStore(t)
+	taskID := uuid.New()
+	t.Cleanup(func() { require.NoError(t, store.Delete(context.Background(), taskID)) })
+	require.NoError(t, store.Initialize(t.Context(), taskID))
+	_, err := store.Append(t.Context(), taskID, 0, []byte("line\n"))
+	require.NoError(t, err)
+
+	require.NoError(t, store.Initialize(t.Context(), taskID))
+
+	assert.Equal(t, "line\n", readResult(t, store, taskID, "").content)
+}
+
 func TestAppendTruncatesAtRetainedLimit(t *testing.T) {
 	store := newTestStore(t)
 	taskID := uuid.New()
 	t.Cleanup(func() { require.NoError(t, store.Delete(context.Background(), taskID)) })
+	require.NoError(t, store.Initialize(t.Context(), taskID))
 
 	line := `{"type":"line","text":"` + strings.Repeat("x", 1024) + `"}` + "\n"
 	content := []byte(strings.Repeat(line, int(runnerlogs.MaxRetainedBytes/int64(len(line)))+2))
@@ -133,7 +157,7 @@ func TestAppendTruncatesAtRetainedLimit(t *testing.T) {
 
 	read := readResult(t, store, taskID, "")
 	assert.LessOrEqual(t, int64(len(read.content)), runnerlogs.MaxRetainedBytes)
-	assert.True(t, strings.HasSuffix(read.content, string(truncationRecord)))
+	assert.True(t, strings.HasSuffix(read.content, runnerlogs.TruncationRecord))
 	assert.True(t, read.truncated)
 
 	result, err = store.Append(t.Context(), taskID, 0, content)
@@ -149,6 +173,8 @@ func TestDeleteExpired(t *testing.T) {
 		_ = store.Delete(context.Background(), expiredID)
 		_ = store.Delete(context.Background(), activeID)
 	})
+	require.NoError(t, store.Initialize(t.Context(), expiredID))
+	require.NoError(t, store.Initialize(t.Context(), activeID))
 
 	_, err := store.Append(t.Context(), expiredID, 0, []byte("old\n"))
 	require.NoError(t, err)

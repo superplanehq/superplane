@@ -57,7 +57,6 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	accessToken := registrationResponse.AccessToken
 	runner, err = models.FindRunner(db, runner.ID)
 	require.NoError(t, err)
-	require.NoError(t, task.Start(db, runner, runnerlogs.StorePostgres, time.Now()))
 
 	store := runnerlogspostgres.New()
 	require.NoError(t, store.Setup(runnerlogs.SetupContext{
@@ -71,6 +70,8 @@ func TestUploadTaskLogChunk(t *testing.T) {
 		require.NoError(t, store.Delete(context.Background(), task.ID))
 		runnerlogs.SetCurrent(previousStore)
 	})
+	require.NoError(t, store.Initialize(t.Context(), task.ID))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StorePostgres, time.Now()))
 
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()

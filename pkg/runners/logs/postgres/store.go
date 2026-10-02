@@ -21,10 +21,6 @@ const (
 	schemaVersion  = 1
 )
 
-var truncationRecord = []byte(
-	`{"type":"line","text":"SuperPlane stopped retaining logs because this task reached the 10 MiB log limit."}` + "\n",
-)
-
 type Store struct {
 	setupMu sync.Mutex
 	db      *gorm.DB
@@ -150,6 +146,24 @@ func (s *Store) Setup(ctx api.SetupContext) error {
 	return nil
 }
 
+func (s *Store) Initialize(ctx context.Context, taskID uuid.UUID) (err error) {
+	startedAt := time.Now()
+	defer func() {
+		s.metrics.recordOperation(ctx, startedAt, "initialize", err)
+	}()
+
+	result := s.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&activeLog{
+			TaskID:    taskID,
+			UpdatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		return fmt.Errorf("initialize active runner log: %w", result.Error)
+	}
+	return nil
+}
+
 func (s *Store) Append(ctx context.Context, taskID uuid.UUID, sequence int64, content []byte) (result api.AppendResult, err error) {
 	startedAt := time.Now()
 	defer func() {
@@ -162,7 +176,7 @@ func (s *Store) Append(ctx context.Context, taskID uuid.UUID, sequence int64, co
 
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
-		log, err := lockOrCreateActiveLog(tx, taskID, now)
+		log, err := lockActiveLog(tx, taskID)
 		if err != nil {
 			return err
 		}
@@ -181,7 +195,7 @@ func (s *Store) Append(ctx context.Context, taskID uuid.UUID, sequence int64, co
 			return nil
 		}
 
-		stored, truncated := retainedContent(log.TotalBytes, content)
+		stored, truncated := api.RetainContent(log.TotalBytes, content)
 		if err := tx.Create(&activeLogChunk{
 			TaskID:    taskID,
 			Sequence:  sequence,
@@ -214,33 +228,14 @@ func (s *Store) Append(ctx context.Context, taskID uuid.UUID, sequence int64, co
 	return result, nil
 }
 
-func lockOrCreateActiveLog(tx *gorm.DB, taskID uuid.UUID, now time.Time) (activeLog, error) {
+func lockActiveLog(tx *gorm.DB, taskID uuid.UUID) (activeLog, error) {
 	var log activeLog
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("task_id = ?", taskID).
 		First(&log).Error
-	if err == nil {
-		return log, nil
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return activeLog{}, api.ErrNotFound
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return activeLog{}, err
-	}
-
-	log = activeLog{
-		TaskID:    taskID,
-		UpdatedAt: now,
-	}
-	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&log)
-	if result.Error != nil {
-		return activeLog{}, result.Error
-	}
-	if result.RowsAffected == 1 {
-		return log, nil
-	}
-
-	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("task_id = ?", taskID).
-		First(&log).Error
 	return log, err
 }
 
@@ -315,38 +310,6 @@ func (s *Store) DeleteExpired(ctx context.Context, before time.Time) (deleted in
 		return 0, fmt.Errorf("delete expired active runner logs: %w", result.Error)
 	}
 	return result.RowsAffected, nil
-}
-
-func retainedContent(totalBytes int64, content []byte) ([]byte, bool) {
-	contentLimit := api.MaxRetainedBytes - int64(len(truncationRecord))
-	if totalBytes+int64(len(content)) < contentLimit {
-		return append([]byte(nil), content...), false
-	}
-
-	available := contentLimit - totalBytes
-	if available < 0 {
-		available = 0
-	}
-	retained := completeRecordsWithin(content, available)
-	retained = append(retained, truncationRecord...)
-	return retained, true
-}
-
-func completeRecordsWithin(content []byte, limit int64) []byte {
-	var retained []byte
-	for len(content) > 0 {
-		newline := bytes.IndexByte(content, '\n')
-		if newline < 0 {
-			break
-		}
-		recordBytes := int64(newline + 1)
-		if int64(len(retained))+recordBytes > limit {
-			break
-		}
-		retained = append(retained, content[:newline+1]...)
-		content = content[newline+1:]
-	}
-	return retained
 }
 
 func parseCursor(cursor string) (int64, error) {

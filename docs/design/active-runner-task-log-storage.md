@@ -1,14 +1,14 @@
 # Active Runner Task Log Storage
 
-This document defines the target design for active runner task logs.
-It does not describe the current implementation.
+This document defines the design for active runner task logs.
+It also describes the PostgreSQL and filesystem store implementations.
 
 ## Decision Summary
 
 - SuperPlane will use a configurable active log store.
 - SuperPlane will set up only the selected active log store during startup.
 - PostgreSQL is intended for small and medium installations.
-- Bigtable is available for larger installations.
+- A shared filesystem is available for larger installations.
 - Blob storage will continue to hold completed task logs.
 - A task log will have a maximum retained size of 10 MiB.
 - Active stores will initially keep log chunks uncompressed.
@@ -78,11 +78,12 @@ The expected installation sizes are:
 | --- | ---: | --- |
 | Small | 10 to 100 | PostgreSQL |
 | Medium | 100 to 1,000 | PostgreSQL |
-| Large | 1,000 to 10,000 | Bigtable |
-| Huge | More than 10,000 | Bigtable with additional capacity |
+| Large | 1,000 to 10,000 | Shared filesystem |
+| Huge | More than 10,000 | Shared filesystem with measured capacity |
 
 Multi-tenant installations combine workloads from many organizations.
 Operators must size the active log store for the combined workload.
+Load tests must confirm filesystem capacity for each installation.
 
 ## Storage Lifecycle
 
@@ -93,32 +94,34 @@ flowchart LR
     Runner[Runner disk spool] -->|ordered chunks| API[Runner API]
     API --> Active[Active log store]
     Active --> Live[Live log API]
-    Active --> Finalizer[Log finalizer]
-    Finalizer --> Blob[Compressed blob object]
+    Active --> Archiver[Log archiver]
+    Archiver --> Blob[Compressed blob object]
     Blob --> Completed[Completed log API]
-    Finalizer --> Cleanup[Active data cleanup]
+    Archiver --> Cleanup[Active data cleanup]
 ```
 
 The lifecycle has these states:
 
 1. `active`: The runner can append data, and readers use the active store.
-2. `finalizing`: The finalizer creates the compressed object. Readers continue to use the active store.
-3. `archived`: The compressed object is available. New readers use blob storage.
+2. `archivable`: The task is terminal, and the archiver can claim its log.
+3. `archiving`: The archiver creates the compressed object.
+4. `archived`: The compressed object is available. New readers use blob storage.
    Existing readers can finish reading from the active store.
 
 SuperPlane stores this lifecycle in PostgreSQL.
 The lifecycle record has one row for each runner task.
+Task start creates the record in the `active` state.
 
 The record includes:
 
 - Task ID
-- Organization ID
 - Active store name
 - State
 - Final object key
 - Final cursor
 - Truncation status
 - Active-data cleanup time
+- Archiving lease time
 - Creation and update times
 
 An archived lifecycle with a cleanup time still has active data available for
@@ -134,27 +137,37 @@ The active log store is an internal interface.
 Its logical operations are:
 
 - `Setup`: Prepare and validate the selected store during application startup.
+- `Initialize`: Create store metadata before SuperPlane sends the task to a runner.
 - `Append`: Persist one ordered runner chunk.
 - `ReadAfter`: Read data after an opaque cursor.
-- `Seal`: Stop new appends and return a stable ordered stream and final cursor.
 - `Delete`: Remove all active data for one task.
+- `DeleteExpired`: Remove abandoned active data after the safety period.
 
 The implementation must provide these guarantees:
 
 - `Setup` is idempotent and safe when multiple application replicas call it.
+- `Initialize` is idempotent.
 - An acknowledged append is durable.
 - Appends for one task are ordered.
 - A retry of an accepted append succeeds without adding duplicate data.
 - An append with a future sequence fails.
 - A read returns complete NDJSON records in order.
 - A cursor identifies the last returned position.
-- `Seal` is idempotent.
 - `Delete` is idempotent.
+- `DeleteExpired` is safe to call repeatedly.
 - One task cannot exceed the configured retained-size limit.
 - Multiple API replicas can use the store safely.
 
 The cursor is opaque outside the store implementation.
-This rule permits different physical layouts in PostgreSQL and Bigtable.
+This rule permits different physical layouts in PostgreSQL and the filesystem.
+The append sequence and read cursor are independent:
+
+- The append sequence identifies runner upload chunks for ordering and deduplication.
+- The read cursor identifies a store-specific position in the combined active log.
+
+PostgreSQL uses the next chunk sequence as its current read cursor.
+The filesystem uses a committed byte offset.
+Clients must not construct or interpret cursors.
 
 SuperPlane calls `Setup` before it starts runner API handlers and log workers.
 Startup fails if the selected store cannot complete setup.
@@ -162,6 +175,10 @@ SuperPlane does not set up stores that the installation did not select.
 The setup context supplies store dependencies, including the application
 database and the metrics provider. Each implementation uses only the
 dependencies that it needs.
+
+SuperPlane calls `Initialize` before it sends a task to a runner.
+This call creates the store metadata and selects the filesystem path.
+An append fails with `ErrNotFound` if initialization did not complete.
 
 ## Upload Flow
 
@@ -225,9 +242,9 @@ They also increase HTTP requests, storage mutations, and stored chunk metadata.
 Larger chunks reduce request rates but can increase write latency and live-log
 latency.
 
-SuperPlane selects a policy from active-store guidance and current system load.
+SuperPlane initially uses one default policy for all active stores.
 During high load, SuperPlane can increase the target size or flush intervals.
-Load tests must determine the default policy for each active store.
+Load tests can determine if a future store needs a different policy.
 
 ## Log Size Limit
 
@@ -256,22 +273,33 @@ It immediately returns only data that follows that cursor.
 
 The response includes the next cursor and log state.
 The client stores this cursor for the next request.
+The client sends the cursor back unchanged:
+
+```text
+response header:
+X-SuperPlane-Log-Cursor: 65536
+
+next request:
+?after=65536
+```
+
+The `after` value is not a runner chunk index.
 
 The client must not replay all active data after each reconnect.
 An initial request can read the complete active log.
 Later requests read only new data.
 
 The browser requests new data at a configured interval.
-The API reads the active store with one query or one row scan.
+The API reads the active store with one query or one bounded file read.
 An empty response keeps the same cursor.
 This flow does not require a notification system.
 
 ### Final-log transition
 
-The final cursor identifies the end of the sealed active log.
-The finalizer stores this cursor in the lifecycle record.
+The final cursor identifies the end of the active log after task completion.
+The archiver stores this cursor in the lifecycle record.
 
-During finalization, readers continue to read new data from the active store.
+During archiving, readers continue to read data from the active store.
 The API uses these rules after the final object becomes available:
 
 - A client at the final cursor receives the `archived` state and no additional
@@ -289,31 +317,35 @@ For a reset, the client clears its current log state and reads the complete
 final object.
 The API does not seek into the gzip-compressed final object.
 
-## Finalization Flow
+## Archiving Flow
 
-The finalizer processes terminal runner tasks.
-It uses a lease so only one worker finalizes a task.
+Task completion changes the lifecycle from `active` to `archivable`.
+The runner sends completion only after the final chunk receives acknowledgement.
+The runner API accepts appends only while the lifecycle is `active`.
+The store does not need a separate seal operation.
 
-For each task, the finalizer:
+The archiver uses a lease so only one worker processes a task.
 
-1. Changes the lifecycle state to `finalizing`.
-2. Calls `Seal` on the active store and records the final cursor.
-3. Reads the active log in order.
+For each task, the archiver:
+
+1. Claims an `archivable` lifecycle and changes it to `archiving`.
+2. Calls `ReadAfter` with an empty cursor.
+3. Records the returned cursor as the final cursor.
 4. Writes one gzip-compressed NDJSON object to blob storage.
 5. Confirms that the blob write succeeded.
 6. Changes the lifecycle state to `archived`.
-7. Schedules explicit deletion after a one-minute grace period.
+7. Schedules explicit deletion after the live-reader grace period.
 
 The final object key remains:
 
 ```text
-runner-logs/v1/{organizationID}/{taskID}/logs.ndjson.gz
+{installationID}/orgs/{organizationID}/runner-tasks/{taskID}/logs/v1/logs.ndjson.gz
 ```
 
-The finalizer can safely retry each step.
+The archiver can safely retry each step.
 It can overwrite the same final object after an interrupted attempt.
 
-Readers continue to use the active store during finalization.
+Readers continue to use the active store during archiving.
 SuperPlane changes the read source only after the final object is available.
 
 Cleanup failure does not make the completed log unavailable.
@@ -345,7 +377,7 @@ It should not have unrelated secondary indexes.
 The chunk table belongs to the PostgreSQL active store.
 Application database migrations do not create this table.
 The PostgreSQL store creates and upgrades its table through `Setup`.
-This rule prevents installations that select Bigtable from creating an unused
+This rule prevents installations that select the filesystem from creating an unused
 chunk table.
 
 PostgreSQL setup must use versioned and concurrency-safe schema changes.
@@ -373,92 +405,237 @@ Operators must monitor dead tuples, WAL volume, and vacuum delay.
 This store targets small and medium self-hosted organizations.
 Large installations can select another active store.
 
-## Bigtable Store
+## Filesystem Store
 
-Bigtable is an optional active store for large installations.
-It removes active log bytes and per-chunk metadata from PostgreSQL.
+The filesystem store is the default local development store.
+Larger installations can use the same implementation with a shared filesystem.
+All runner API and archiver replicas must mount the same paths.
+
+The shared filesystem must provide these features:
+
+- Read-write access from multiple pods.
+- POSIX-compatible file behavior.
+- Advisory file locks across clients.
+- Atomic file replacement through `rename`.
+- Durable file synchronization.
+
+Google Cloud Filestore with NFSv4.1 provides these capabilities for GKE.
+Other shared filesystems can be used if they provide the same behavior.
 
 ### Physical layout
 
-The proposed layout uses one Bigtable row for each task.
-The 10 MiB task limit stays below Bigtable's recommended 100 MiB row limit.
-
-The row key starts with a hash of the task identity:
+The store creates one directory for each task:
 
 ```text
-{taskHash}#{organizationID}#{taskID}
+{root}/{taskID}/
+  logs.ndjson
+  manifest.json
 ```
 
-The hash distributes tasks across tablets.
-The organization and task IDs support investigation and repair.
+`logs.ndjson` is one append-only file.
+`manifest.json` contains this append-frequency metadata:
 
-The row contains two column families:
+- Next sequence.
+- Total committed bytes.
+- Truncation status.
+- Last update time.
 
-- `metadata`: next sequence, total bytes, state, truncation status, and update time.
-- `chunks`: one cell for each fixed-width sequence number.
+The store keeps this metadata outside the application database.
+An append to the filesystem does not write to PostgreSQL.
+
+`Setup` creates `{root}/.locks` for each configured root.
+The store can create up to 4,096 fixed lock shard files in this directory.
+It creates each shard file when an operation first uses it and retains the file.
+The task ID selects one lock shard.
+
+```text
+task UUID
+    |
+    v
+first two UUID bytes as a 16-bit number
+    |
+    v
+value modulo 4,096
+    |
+    v
+shard 0-4,095
+    |
+    v
+.locks/xxxx.lock
+```
+
+For example, a UUID that starts with `f2f7` produces this result:
+
+```text
+0xf2f7 = 62,199
+62,199 modulo 4,096 = 759
+759 = 0x02f7
+lock path = .locks/02f7.lock
+```
+
+Prefixes `02f7`, `12f7`, through `f2f7` select the same shard.
+Random UUIDs distribute tasks evenly across the shards.
+
+One lock file for each task would accumulate indefinitely.
+Deleting these files during task cleanup would be unsafe.
+A process can still hold the deleted inode while another process creates and
+locks a new file at the same path.
+The processes would then hold different locks for the same task.
+
+Fixed shards do not require lock-file deletion and keep the file count bounded.
+Tasks that select the same shard serialize briefly, but their data stays
+separate.
+The 4,096 shard count balances lock-file count against collision contention.
+
+### Write consistency
+
+Each operation takes an in-process shard lock and a filesystem advisory lock.
+The in-process lock serializes goroutines in one application process.
+The filesystem lock also serializes separate processes and pods on shared storage.
+Local development uses both locks on its Docker volume.
+It follows the same operation path without requiring shared storage.
+
+Ordering and deduplication use `next_sequence`.
+They do not use `total_bytes`.
+
+| Incoming sequence | Result |
+| --- | --- |
+| Less than `next_sequence` | The chunk is a duplicate. Return success without writing. |
+| Equal to `next_sequence` | Append the chunk and increment `next_sequence`. |
+| Greater than `next_sequence` | An earlier chunk is missing. Return a conflict. |
 
 For example:
 
 ```text
-metadata:next_sequence
-metadata:total_bytes
-metadata:state
-metadata:truncated
-chunks:00000000000000000000
-chunks:00000000000000000001
+before:
+  file = "abc"
+  next_sequence = 1
+  total_bytes = 3
+
+receive:
+  sequence = 1
+  content = "hello"
+
+after data synchronization:
+  file = "abchello"
+  next_sequence = 1
+  total_bytes = 3
+
+after manifest commit:
+  file = "abchello"
+  next_sequence = 2
+  total_bytes = 8
 ```
 
-All mutations for one task affect one row.
-Bigtable can apply conditional row mutations atomically.
+An append uses this sequence:
 
-An append reads or checks the current metadata.
-It then writes the chunk cell and new metadata in one conditional mutation.
+1. Locate the task manifest.
+2. Read the current manifest.
+3. Repair uncommitted file bytes if a previous append stopped early.
+4. Append data to `logs.ndjson`.
+5. Synchronize the data file.
+6. Write a temporary manifest.
+7. Synchronize the temporary manifest.
+8. Replace `manifest.json` atomically.
+9. Synchronize the task directory.
 
-A duplicate sequence returns success.
-A future sequence returns a conflict.
+The manifest defines the committed byte count.
+Extra file bytes are not committed if the process fails before manifest replacement.
+A later append truncates these extra bytes before it writes new data.
 
-An active read fetches one row.
-A column filter returns only chunk cells after the supplied cursor.
+```text
+failure before manifest commit:
+  manifest still has next_sequence = 1 and total_bytes = 3
+  retry truncates the file to 3 bytes and appends sequence 1 again
 
-The table keeps one cell version.
-An age-based garbage collection policy removes abandoned active logs.
-Explicit deletion still occurs after successful finalization.
+failure after manifest commit but before HTTP acknowledgement:
+  manifest has next_sequence = 2 and total_bytes = 8
+  retry of sequence 1 returns success without another append
+```
 
-Bigtable infrastructure can be provisioned outside the application.
-The Bigtable `Setup` implementation validates the table, column families, and
-seven-day garbage collection policy.
-This validation does not require the runtime service account to create or
-administer Bigtable resources.
+Task locks prevent two replicas from accepting the same next sequence.
+Duplicate detection uses only the sequence.
+It assumes the runner's durable spool sends the same content for each retry.
+The store applies the 10 MiB limit before it writes data.
 
-### Capacity and scaling
+### Reads and cleanup
 
-Representative load tests must confirm the required capacity.
+`ReadAfter` reads the manifest and opens a bounded section of `logs.ndjson`.
+The returned cursor is the committed byte offset.
+Later appends do not change the bounded read result.
 
-SuperPlane connects with project, instance, table, and application-profile
-identifiers.
-The application profile controls cluster routing.
-Infrastructure configuration controls capacity and availability.
-This document does not define the cluster or node topology.
+```text
+manifest total bytes: 13
+requested cursor:      6
+returned section:      [6,13)
+returned cursor:       13
+
+later append extends file to byte 20
+existing section:      [6,13)
+next request section:  [13,20)
+next cursor:           20
+```
+
+The section is a view over an open file, not an in-memory copy.
+The store never modifies committed bytes in place.
+It can release the task lock after it opens the bounded section.
+
+`Delete` removes the task directory.
+`DeleteExpired` scans all configured roots and removes expired task directories.
+Both operations use the same locks as append and read operations.
+
+### Filesystem migration
+
+The store accepts one primary path and zero or more fallback paths.
+`Initialize` creates each new task in the primary path.
+Other operations locate the task manifest across all configured paths.
+
+Existing tasks stay in their original path during a storage migration.
+New tasks use the new primary path.
+A task manifest in more than one path is an error.
+
+Use this deployment sequence:
+
+1. Mount the old and new filesystems on all applicable deployments.
+2. Configure the old path as primary and make both paths readable.
+3. Deploy the configuration to runner API and archiver replicas.
+4. Change the primary path to the new filesystem.
+5. Keep the old path as a fallback.
+6. Wait until tasks on the old path finish and active data cleanup completes.
+7. Remove the old fallback path and volume mount.
+
+This flow does not move active files.
+It routes each task to the path selected during initialization.
 
 ## Configuration
 
 Each installation selects one active log store.
-The exact configuration names are an implementation detail.
-
-The expected choices are:
+The available choices are:
 
 - `postgres`: Intended for small and medium installations.
-- `bigtable`: Intended for larger installations.
+- `fs`: Intended for local development and shared filesystem deployments.
 
 PostgreSQL configuration uses the existing application database.
-Bigtable configuration requires project, instance, table, and application-profile identifiers.
+The filesystem configuration uses these variables:
+
+```text
+RUNNER_ACTIVE_LOG_STORE=fs
+RUNNER_ACTIVE_LOG_FS_PATH=/primary/path
+RUNNER_ACTIVE_LOG_FS_FALLBACK_PATHS=/old/path,/another/old/path
+```
+
+`RUNNER_ACTIVE_LOG_FS_PATH` is the primary path.
+`RUNNER_ACTIVE_LOG_FS_FALLBACK_PATHS` is an optional comma-separated list.
+Local Docker uses `/var/lib/superplane/active-runner-logs` on a named volume.
+It does not configure fallback paths.
 
 The task lifecycle record stores the selected backend.
-An installation can change its default without losing access to active older tasks.
+An installation must drain active tasks before it changes the backend.
+Filesystem fallback paths support volume changes without a backend change.
 
 The task lifecycle table belongs to the application schema.
 Application database migrations create it for every installation.
-It coordinates finalization and records pending active-data cleanup for all
+It coordinates archiving and records pending active-data cleanup for all
 active store implementations.
 
 Final log storage continues to use the existing blob provider configuration.
@@ -470,12 +647,11 @@ Active logs are temporary, so compression does not materially reduce their
 storage cost.
 
 Compression could reduce the data transferred between SuperPlane and an active
-store. It could also improve Bigtable throughput when uncompressed chunks are
-large. JSONL compresses well, but compression adds CPU work and implementation
+store. JSONL compresses well, but compression adds CPU work and implementation
 complexity.
 
 Add active-store compression only after benchmarks show that transfer volume
-or Bigtable throughput is a constraint.
+is a constraint.
 Completed log objects remain gzip-compressed.
 
 ## Failure Handling
@@ -493,17 +669,17 @@ The active store returns success without adding duplicate data.
 ### Runner fails
 
 SuperPlane marks the task as lost through the existing runner lifecycle.
-The finalizer archives all acknowledged chunks.
+The archiver archives all acknowledged chunks.
 
 ### Final blob write fails
 
-The lifecycle remains `finalizing`.
+The lifecycle remains `archiving`.
 Readers continue to use the active store.
-The finalizer retries the blob write.
+The archiver retries the blob write.
 
 ### Lifecycle update fails after blob write
 
-The finalizer writes the same object again or verifies the existing object.
+The archiver writes the same object again or verifies the existing object.
 It then retries the lifecycle update.
 
 ### Active cleanup fails
@@ -518,11 +694,8 @@ The public API authorizes every read through the task's organization.
 The runner API authorizes every append through the assigned runner.
 
 The active store is not directly accessible to runners or browsers.
-Only the configured SuperPlane service account can access Bigtable.
-
-Bigtable uses one shared table for all organizations.
-The application enforces organization isolation.
-The organization ID in the row key supports audits and cleanup.
+Only SuperPlane services can access the PostgreSQL or filesystem store.
+The application enforces organization isolation for all active stores.
 
 Logs can contain secrets.
 The store must use encryption in transit and at rest.
@@ -543,24 +716,24 @@ Useful logical metrics include:
 - Reads, returned bytes, latency, and errors
 - Cursor lag
 - Truncated task count
-- Finalization attempts, latency, and errors
+- Archiving attempts, latency, and errors
 - Cleanup attempts, latency, and errors
-- Age of the oldest active and finalizing task
+- Age of the oldest active and archiving task
 
-The PostgreSQL implementation also reports:
+PostgreSQL deployments should also monitor:
 
 - Live and dead chunk tuples
 - Chunk-table size
 - WAL bytes from log storage
 - Autovacuum runs and delay
 
-The Bigtable implementation also reports:
+Filesystem deployments should also monitor:
 
-- Node CPU utilization
-- Read and write latency
-- Read and write throughput
-- Storage utilization
-- Throttled and failed requests
+- Operation latency and errors
+- Bytes read and written
+- Lock wait time
+- Filesystem capacity and utilization
+- Age of the oldest active task
 
 ## Alternatives
 
@@ -580,14 +753,6 @@ It rewrites the growing value and creates excessive WAL and dead data.
 Redis Streams can provide low-latency active log reads.
 Redis memory and persistence costs make it a poor authoritative store for all active bytes.
 Redis can remain an optional active store or cache layer.
-
-### Shared filesystem
-
-A shared filesystem permits one append-only file for each task.
-It also adds locking, availability, scaling, and metadata-operation concerns.
-
-This option does not fit a stateless multi-zone API.
-A filesystem implementation can remain useful for local development.
 
 ### Multipart uploads
 
@@ -609,12 +774,13 @@ Their APIs, availability models, and costs differ.
 4. Add cursor-based active reads.
 5. Update the client to preserve and send its cursor.
 6. Enforce the 10 MiB retained-size limit.
-7. Update finalization to read through the active store.
+7. Update archiving to read through the active store.
 8. Add common metrics and failure tests.
+9. Implement the filesystem store and volume migration routing.
 
 ## Validation Plan
 
-Test PostgreSQL with:
+Test PostgreSQL and the filesystem store with:
 
 - 100 concurrent logging tasks
 - 500 concurrent logging tasks
@@ -623,7 +789,7 @@ Test PostgreSQL with:
 - Ten-minute, one-hour, and 24-hour task durations
 - Initial full-log reads
 - Incremental cursor reads
-- Finalization during active reads
+- Archiving during active reads
 - Duplicate, missing, and future sequences
 - API failure after a durable append
 - Store unavailability and recovery
@@ -637,3 +803,12 @@ Test PostgreSQL with:
 
 Record database or store utilization during each test.
 Confirm that normal SuperPlane API latency stays stable.
+
+Also test the filesystem store with:
+
+- Concurrent appends from multiple application replicas.
+- Shared-volume advisory locks.
+- Process failure between data synchronization and manifest replacement.
+- Primary and fallback path routing.
+- Duplicate manifests across configured paths.
+- Cleanup across primary and fallback paths.

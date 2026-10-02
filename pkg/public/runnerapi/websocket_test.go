@@ -1,6 +1,7 @@
 package runnerapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	runnerlogspostgres "github.com/superplanehq/superplane/pkg/runners/logs/postgres"
 	"github.com/superplanehq/superplane/test/support"
+	"go.opentelemetry.io/otel"
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
@@ -47,6 +50,19 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 	}
 	require.NoError(t, db.Create(task).Error)
 	require.NoError(t, task.Reserve(db, runner.ID))
+
+	activeStore := runnerlogspostgres.New()
+	require.NoError(t, activeStore.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		Database:      db,
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+	previousStore := runnerlogs.Current()
+	runnerlogs.SetCurrent(activeStore)
+	t.Cleanup(func() {
+		require.NoError(t, activeStore.Delete(context.Background(), task.ID))
+		runnerlogs.SetCurrent(previousStore)
+	})
 
 	registrationToken, err := MintRegistrationToken(
 		signer,

@@ -70,6 +70,7 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}).Error)
+	require.NoError(t, activeStore.Initialize(t.Context(), task.ID))
 	_, err = activeStore.Append(t.Context(), task.ID, 0, []byte("first\n"))
 	require.NoError(t, err)
 	_, err = activeStore.Append(t.Context(), task.ID, 1, []byte("second\n"))
