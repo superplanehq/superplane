@@ -136,6 +136,9 @@ export function PlanningSettingsPopup({
           showAutomationNote={false}
           showCancel={false}
           showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
+          defaultRefinementPrompt={agent.defaultRefinementPrompt}
+          defaultRefinementPromptFailed={agent.defaultRefinementPromptFailed}
+          onRetryDefaultRefinementPrompt={agent.onRetryDefaultRefinementPrompt}
         />
       ) : (
         <PlanningGeneralTab

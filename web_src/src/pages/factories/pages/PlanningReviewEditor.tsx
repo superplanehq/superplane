@@ -38,6 +38,9 @@ export type PlanningReviewAgentSlot = {
   factoryKey?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   showVisualEvidenceSetting?: boolean;
+  defaultRefinementPrompt?: string;
+  defaultRefinementPromptFailed?: boolean;
+  onRetryDefaultRefinementPrompt?: () => void;
 };
 
 /** Agent editor body. The column menu popup and the automation view Agent tab share this. */
@@ -53,6 +56,9 @@ export function PlanningReviewEditor({
   showAutomationNote = true,
   showCancel = true,
   showVisualEvidenceSetting = false,
+  defaultRefinementPrompt,
+  defaultRefinementPromptFailed = false,
+  onRetryDefaultRefinementPrompt,
 }: {
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -65,6 +71,9 @@ export function PlanningReviewEditor({
   showAutomationNote?: boolean;
   showCancel?: boolean;
   showVisualEvidenceSetting?: boolean;
+  defaultRefinementPrompt?: string;
+  defaultRefinementPromptFailed?: boolean;
+  onRetryDefaultRefinementPrompt?: () => void;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
@@ -103,6 +112,9 @@ export function PlanningReviewEditor({
             factoryId={factoryId}
             factoryKey={factoryKey}
             showVisualEvidenceSetting={showVisualEvidenceSetting}
+            defaultRefinementPrompt={defaultRefinementPrompt}
+            defaultRefinementPromptFailed={defaultRefinementPromptFailed}
+            onRetryDefaultRefinementPrompt={onRetryDefaultRefinementPrompt}
           />
         </PopupBody>
       )}
