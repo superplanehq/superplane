@@ -163,21 +163,18 @@ export function factoryNodeStatusStripClass(status: FactoryNodeStatus): string {
   }
 }
 
-/** Compact duration: `7s`, `1m 16s`, `9m so far`. */
-export function formatFactoryNodeDuration(ms: number, options?: { soFar?: boolean }): string {
+/** Compact duration: `7s`, `1m 16s`, `9m`. */
+export function formatFactoryNodeDuration(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSec / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
   const seconds = totalSec % 60;
 
-  let text: string;
   if (hours > 0) {
-    text = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  } else if (minutes > 0) {
-    text = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-  } else {
-    text = `${seconds}s`;
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
-
-  return options?.soFar ? `${text} so far` : text;
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
 }

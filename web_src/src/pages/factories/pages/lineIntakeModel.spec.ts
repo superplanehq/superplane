@@ -276,7 +276,7 @@ describe("lineIntakeModel", () => {
 
     expect(fixture.phases.map((phase) => [phase.id, phase.status, phase.duration])).toEqual([
       ["ingest", "passed", "2s"],
-      ["analyze", "running", "3m 12s so far"],
+      ["analyze", "running", "3m 12s"],
       ["plan", "pending", "—"],
       ["score", "pending", "—"],
     ]);

@@ -394,7 +394,7 @@ const OWNER = {
 const ANALYSIS_PHASE_DURATION = {
   ingest: "2s",
   analyze: "3m 45s",
-  analyzeRunning: "3m 12s so far",
+  analyzeRunning: "3m 12s",
   plan: "18s",
   score: "7s",
 } as const;
