@@ -548,7 +548,22 @@ func intakeAnalysisCloneCommand() string {
 		"fi",
 		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
 		"rm -rf repo",
-		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+		cloneRepositoryCommand(),
+	}, "\n")
+}
+
+func cloneRepositoryCommand() string {
+	return strings.Join([]string{
+		`branch="${BASE:-main}"`,
+		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
+		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
+		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
+		`elif [ -z "$heads" ]; then`,
+		`  git clone "${REPO_URL}" repo`,
+		`else`,
+		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
+		`  exit 1`,
+		`fi`,
 	}, "\n")
 }
 
