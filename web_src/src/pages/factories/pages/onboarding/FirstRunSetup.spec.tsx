@@ -164,7 +164,7 @@ describe("FirstRunSetup GitHub catalog", () => {
       await user.click(screen.getByTestId("first-run-connect-github"));
 
       expect(assign).toHaveBeenCalledWith(
-        "/auth/github?intent=connect&redirect=%2Forg-1%2Fworkspaces%2FPAY%2Fsetup%3Fstep%3Drepo",
+        "/auth/github?intent=connect&redirect=%2Forg-1%2Fworkspaces%2FPAY%2Fsetup%3Fstep%3Drepo%26githubConnected%3D1",
       );
     } finally {
       window.location.assign = previousAssign;
@@ -189,15 +189,54 @@ describe("FirstRunSetup GitHub catalog", () => {
 
       await user.click(screen.getByTestId("first-run-connect-github"));
       expect(assign).toHaveBeenCalled();
-      expect(readOnboardingGitHubConnect("factory-1")).toBe(true);
+      expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(false);
     } finally {
       window.location.assign = previousAssign;
     }
   });
 
+  it("saves the GitHub connection when GitHub returns after a successful connection", async () => {
+    github.data.identity = { userId: "9", login: "octocat" };
+
+    renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo&githubConnected=1");
+
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    await waitFor(() => expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(true));
+  });
+
+  it("does not use a GitHub connection that another person saved in this browser", () => {
+    writeOnboardingGitHubConnect("account-2", "factory-1");
+    github.data.identity = { userId: "9", login: "octocat" };
+
+    renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
+
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+  });
+
+  it("stays on repository selection when the user clears a saved repository", async () => {
+    github.data.identity = { userId: "9", login: "octocat" };
+    github.data.repositories = [
+      { repositoryId: "77", installationId: "101", fullName: "acme/api", defaultBranch: "main" },
+      { repositoryId: "88", installationId: "202", fullName: "octo/web", defaultBranch: "main" },
+    ];
+    const path = "/org-1/workspaces/PAY/setup?step=repo";
+    const model = pageModel();
+    const view = renderSetup({ ...model, setup: { ...model.setup, selectedRepo: "acme/api" } }, path);
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+
+    view.rerender(
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={{ ...model, setup: { ...model.setup, selectedRepo: null } }} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
   it("skips installation when cached accessible repositories exist", async () => {
     const user = userEvent.setup();
-    writeOnboardingGitHubConnect("factory-1");
+    writeOnboardingGitHubConnect("account-1", "factory-1");
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.repositories = [
       { repositoryId: "77", installationId: "101", fullName: "acme/api", defaultBranch: "main" },
@@ -218,7 +257,7 @@ describe("FirstRunSetup GitHub catalog", () => {
   });
 
   it("opens repository selection while repositories synchronize", async () => {
-    writeOnboardingGitHubConnect("factory-1");
+    writeOnboardingGitHubConnect("account-1", "factory-1");
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.synchronizing = true;
 
@@ -269,7 +308,7 @@ describe("FirstRunSetup GitHub catalog", () => {
     });
 
     it("resumes at repository selection after a GitHub setup callback", async () => {
-      writeOnboardingGitHubConnect("factory-1");
+      writeOnboardingGitHubConnect("account-1", "factory-1");
       github.data.identity = { userId: "9", login: "octocat" };
 
       renderSetup(pageModel(), setupPath);
@@ -279,7 +318,7 @@ describe("FirstRunSetup GitHub catalog", () => {
 
     it("goes back to the connect screen from repository selection and stays there", async () => {
       const user = userEvent.setup();
-      writeOnboardingGitHubConnect("factory-1");
+      writeOnboardingGitHubConnect("account-1", "factory-1");
       github.data.identity = { userId: "9", login: "octocat" };
 
       renderSetup(pageModel(), setupPath);

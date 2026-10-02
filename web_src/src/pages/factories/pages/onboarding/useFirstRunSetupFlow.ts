@@ -1,5 +1,6 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useAccount } from "@/contexts/useAccount";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { getApiErrorMessage } from "@/lib/errors";
 import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
@@ -23,7 +24,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
-import { useOnboardingGitHubConnect } from "./onboardingGitHubConnect";
+import { githubConnectReturnPath, useOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -263,9 +264,8 @@ function useFirstRunCommands(args: {
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: ReturnType<typeof useFirstRunBlockingAction>;
   jiraAvailable: boolean;
-  confirmGitHubConnect: () => void;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable, confirmGitHubConnect } = args;
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
   const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
@@ -290,8 +290,7 @@ function useFirstRunCommands(args: {
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
-      const returnPath = onboardingStepPath(`${location.pathname}${location.search}`, "repo");
-      confirmGitHubConnect();
+      const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
       window.location.assign(linkedAccountConnectHref("github", returnPath));
       return true;
     });
@@ -391,9 +390,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
-  const [githubConnectConfirmed, confirmGitHubConnect] = useOnboardingGitHubConnect(factoryId);
-  // A saved repository means the user connected GitHub for this workspace before.
-  const githubReady = Boolean(connection.identity) && (githubConnectConfirmed || Boolean(model.setup.selectedRepo));
+  const { account } = useAccount();
+  const githubConnected = useOnboardingGitHubConnect({
+    accountId: account?.id ?? "",
+    factoryId,
+    connectedBefore: Boolean(model.setup.selectedRepo),
+  });
+  const githubReady = Boolean(connection.identity) && githubConnected;
   const jiraFeature = useExperimentalFeature(organizationId);
   const jiraFeatureLoading = jiraFeature.isLoading;
   const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
@@ -411,7 +414,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     navigation,
     blocking,
     jiraAvailable,
-    confirmGitHubConnect,
   });
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   // A saved Jira choice is not valid when the organization does not have the

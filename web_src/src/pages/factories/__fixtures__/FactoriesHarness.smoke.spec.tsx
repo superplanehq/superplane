@@ -5,7 +5,6 @@ import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { factoryRouteSegment, factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
-import { writeOnboardingGitHubConnect } from "../pages/onboarding/onboardingGitHubConnect";
 import { FIRST_RUN_COPY } from "../pages/onboarding/first-run/firstRunCopy";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
@@ -295,10 +294,9 @@ describe("FactoriesHarness workspace setup", () => {
   }, 15000);
 
   it("skips installation when initial onboarding already has repository access", async () => {
-    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?githubConnected=1`}
         factoriesFixture={factoriesFixtureWithSetupAnswers({ initial: true })}
         onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
         orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
@@ -311,10 +309,9 @@ describe("FactoriesHarness workspace setup", () => {
 
   it("opens the repository list when the VCS step already has repository access", async () => {
     const user = userEvent.setup();
-    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs&githubConnected=1`}
         factoriesFixture={factoriesFixtureWithGithubAccess()}
         onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
         orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
@@ -329,10 +326,9 @@ describe("FactoriesHarness workspace setup", () => {
 
   it("restores the saved connection's repositories on a direct repo-step load", async () => {
     const user = userEvent.setup();
-    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo&githubConnected=1`}
         factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.vcs)}
         onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
         orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
