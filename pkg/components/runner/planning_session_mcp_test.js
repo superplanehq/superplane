@@ -27,12 +27,20 @@ test("analysis protocol omits a disabled score tool", () => {
   const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
   assert.match(clarityOnly, /propose_clarity/);
   assert.doesNotMatch(clarityOnly, /propose_confidence/);
-  assert.match(clarityOnly, /Publish a Clarity score every turn/);
+  assert.match(clarityOnly, /Publish a Clarity score when this turn updates the plan, the score would change, or the user asks to update that score/);
+  assert.match(clarityOnly, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(clarityOnly, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(clarityOnly, /Confidence summary/);
+  assert.doesNotMatch(clarityOnly, / {2,}/);
 
   const confidenceOnly = analysisProtocol({ SUPERPLANE_PLANNING_CLARITY: "false" });
   assert.match(confidenceOnly, /propose_confidence/);
   assert.doesNotMatch(confidenceOnly, /propose_clarity/);
-  assert.match(confidenceOnly, /Publish a Confidence score every turn/);
+  assert.match(confidenceOnly, /Publish a Confidence score when this turn updates the plan, the score would change, or the user asks to update that score/);
+  assert.match(confidenceOnly, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(confidenceOnly, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(confidenceOnly, /Clarity summary/);
+  assert.doesNotMatch(confidenceOnly, / {2,}/);
 
   const neither = analysisProtocol({
     SUPERPLANE_PLANNING_CLARITY: "false",
@@ -41,6 +49,11 @@ test("analysis protocol omits a disabled score tool", () => {
   assert.doesNotMatch(neither, /propose_clarity/);
   assert.doesNotMatch(neither, /propose_confidence/);
   assert.match(neither, /Do not publish Clarity or Confidence scores/);
+  assert.match(neither, /ask to update the plan or the scores, or confirm a decision/);
+  assert.doesNotMatch(neither, /a score would change/);
+  assert.doesNotMatch(neither, /required score is 5/);
+  assert.doesNotMatch(neither, /Clarity summary/);
+  assert.doesNotMatch(neither, / {2,}/);
 });
 
 test("planningTools omits disabled score tools", () => {
@@ -92,7 +105,12 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.doesNotMatch(pack, /Never create a task the user did not confirm/);
   assert.doesNotMatch(pack, /narrow the specification to the part that stays/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
+  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
+  assert.match(pack, /Do not call the spec tool or a score tool/);
+  assert.match(pack, /Do not add that sentence on a turn that already updates the plan/);
   assert.match(pack, /Do not name files/);
+  assert.match(pack, /name one only when that name is the direct answer/);
+  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
   assert.match(pack, /Answer the questions in this session/);
   assert.match(pack, /Do not describe agent fit/);
   assert.match(pack, /Do not write a test or an acceptance check/);
@@ -145,7 +163,17 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /Blast radius/);
   assert.match(pack, /Skip Risks only when Clarity is 5 and Confidence is 4 or higher/);
   assert.doesNotMatch(pack, /how suitable the work is for an agent/);
-  assert.match(pack, /2 to 4 short sentences/);
+  assert.match(pack, /## Answer turn/);
+  assert.match(pack, /## Plan turn/);
+  assert.match(pack, /which file, type, test, command, or API owns a behavior, name it/);
+  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
+  assert.match(pack, /do not rewrite the plan/);
+  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
+  assert.match(pack, /Do not use a survey to answer a question/);
+  assert.match(pack, /leave the plan unchanged/);
+  assert.doesNotMatch(pack, /five steps/);
+  assert.doesNotMatch(pack, /2 to 4 short sentences/);
+  assert.doesNotMatch(pack, /Every turn follows/);
   assert.match(pack, /Keep each option under 12 words/);
   assert.match(pack, /If Clarity is 1 or 2/);
   assert.match(pack, /do not have enough Clarity to write a plan/);
@@ -357,11 +385,19 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.deepEqual(spec.inputSchema.required, ["body"]);
   assert.match(spec.description, /Do not leave a written plan unpublished/);
   assert.match(clarity.description, /how well the task is defined/);
-  assert.match(clarity.description, /every turn/);
+  assert.match(clarity.description, /when this turn updates the plan, the score would change, or the user asks to update this score/);
+  assert.match(clarity.description, /When every required score is 5/);
+  assert.match(clarity.description, /Do not call it on a question turn/);
+  assert.match(clarity.description, /An unchanged score stays on the card/);
+  assert.doesNotMatch(clarity.description, /every turn/);
   assert.match(clarity.description, /without propose_spec/);
   assert.match(clarity.inputSchema.properties.summary.description, /Follow the task prompt/);
   assert.match(confidence.description, /how likely a coding agent completes this task in one run/);
-  assert.match(confidence.description, /every turn/);
+  assert.match(confidence.description, /when this turn updates the plan, the score would change, or the user asks to update this score/);
+  assert.match(confidence.description, /When every required score is 5/);
+  assert.match(confidence.description, /Do not call it on a question turn/);
+  assert.match(confidence.description, /An unchanged score stays on the card/);
+  assert.doesNotMatch(confidence.description, /every turn/);
   assert.match(confidence.description, /without propose_spec/);
   assert.deepEqual(confidence.inputSchema.required, ["score", "summary"]);
   assert.match(survey.description, /short everyday options/);
