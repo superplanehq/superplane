@@ -432,7 +432,8 @@ describe("notesForLiveStream", () => {
       sections: [waitForMessageSection()],
       error: null,
       isStreaming: false,
-      nodeStatus: "passed",
+      nodeStatus: "cancelled",
+      analysisStatus: "passed",
     });
 
     expect(notes?.[0]).toEqual(
@@ -444,25 +445,27 @@ describe("notesForLiveStream", () => {
     );
   });
 
-  it("marks a failed wait canceled when the analysis run is canceled", () => {
-    const notes = notesForLiveStream({
-      nodeId: "agent",
-      sections: [waitForMessageSection()],
-      error: null,
-      isStreaming: false,
-      nodeStatus: "cancelled",
-    });
-
-    expect(notes?.[0]?.status).toBe("cancelled");
-  });
-
-  it("keeps a failed wait failed when the analysis run failed", () => {
+  it("marks a failed wait canceled when the analysis outcome is canceled", () => {
     const notes = notesForLiveStream({
       nodeId: "agent",
       sections: [waitForMessageSection()],
       error: null,
       isStreaming: false,
       nodeStatus: "failed",
+      analysisStatus: "cancelled",
+    });
+
+    expect(notes?.[0]?.status).toBe("cancelled");
+  });
+
+  it("keeps a failed wait failed when an explicit stop leaves the analysis failed", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [waitForMessageSection()],
+      error: null,
+      isStreaming: false,
+      nodeStatus: "cancelled",
+      analysisStatus: "failed",
     });
 
     expect(notes?.[0]?.status).toBe("failed");
@@ -475,6 +478,7 @@ describe("notesForLiveStream", () => {
       error: null,
       isStreaming: false,
       nodeStatus: "passed",
+      analysisStatus: "passed",
     });
 
     expect(notes?.[0]).toEqual(

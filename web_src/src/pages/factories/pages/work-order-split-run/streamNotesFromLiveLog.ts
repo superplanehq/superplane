@@ -38,7 +38,7 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
 export function notesFromLiveLogSections(
   nodeId: string,
   sections: CommandSection[],
-  runStatus?: SplitRunPhaseStatus,
+  analysisStatus?: SplitRunPhaseStatus,
 ): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -52,7 +52,7 @@ export function notesFromLiveLogSections(
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section, runStatus));
+    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section, analysisStatus));
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
@@ -64,7 +64,7 @@ function noteFromCommandSection(
   stepId: string,
   orderKey: number | undefined,
   section: CommandSection,
-  runStatus?: SplitRunPhaseStatus,
+  analysisStatus?: SplitRunPhaseStatus,
 ): SplitRunStreamLine {
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
@@ -79,7 +79,7 @@ function noteFromCommandSection(
     note: true,
     componentType: section.kind,
     componentName: name || preview,
-    status: streamStatus(commandSectionStatus(section, runStatus)),
+    status: streamStatus(commandSectionStatus(section, analysisStatus)),
     detail: detail || undefined,
     commandScript: bashScript || undefined,
     commandStdout: bashScript ? output || undefined : undefined,
@@ -391,9 +391,10 @@ export function notesForLiveStream(input: {
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
-    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.nodeStatus);
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.analysisStatus);
     if (notes.length > 0) {
       return notes;
     }
@@ -442,18 +443,18 @@ function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatu
   };
 }
 
-function commandSectionStatus(section: CommandSection, runStatus?: SplitRunPhaseStatus): string {
-  if (isCanceledAnalysisWait(section, runStatus)) {
+function commandSectionStatus(section: CommandSection, analysisStatus?: SplitRunPhaseStatus): string {
+  if (isCanceledAnalysisWait(section, analysisStatus)) {
     return "cancelled";
   }
   return section.status;
 }
 
-function isCanceledAnalysisWait(section: CommandSection, runStatus?: SplitRunPhaseStatus): boolean {
+function isCanceledAnalysisWait(section: CommandSection, analysisStatus?: SplitRunPhaseStatus): boolean {
   return (
     section.status === "failed" &&
     section.text.trim() === ANALYSIS_WAIT_COMMAND &&
-    (runStatus === "passed" || runStatus === "cancelled")
+    (analysisStatus === "passed" || analysisStatus === "cancelled")
   );
 }
 
