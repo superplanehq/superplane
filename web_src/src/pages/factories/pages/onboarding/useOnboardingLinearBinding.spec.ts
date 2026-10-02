@@ -76,4 +76,19 @@ describe("useOnboardingLinearBinding", () => {
 
     expect(result.current.linearProjectIds).toEqual(["project-gone"]);
   });
+
+  it("keeps a saved project when Linear cannot return the list", () => {
+    writeOnboardingLinearProjects("factory-1", "linear-1", ["project-gone"]);
+    linearResources.isError = true;
+    linearResources.data = [];
+
+    const { result } = renderHook(() =>
+      useOnboardingLinearBinding("org-1", "factory-1", { id: "linear-1", ready: true }),
+    );
+
+    expect(result.current.linearProjectIds).toEqual(["project-gone"]);
+    expect(localStorage.getItem("superplane:onboarding-linear-projects:factory-1:linear-1")).toBe(
+      JSON.stringify(["project-gone"]),
+    );
+  });
 });

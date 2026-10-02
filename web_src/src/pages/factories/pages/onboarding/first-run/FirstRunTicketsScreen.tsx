@@ -87,11 +87,12 @@ function ticketScanAllowed(args: {
   linearConnected: boolean;
   linearProjectIds: string[];
   linearProjectsLoading: boolean;
+  linearProjectsError: boolean;
 }): boolean {
   const jiraSelectionBlocked = Boolean(args.jiraChoiceBlock) || (args.ticketSource === "jira" && !args.jiraAvailable);
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
-  if (args.ticketSource === "linear" && args.linearProjectsLoading) return false;
+  if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
     !jiraSelectionBlocked &&
     !linearSelectionBlocked &&
@@ -165,6 +166,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     linearConnected,
     linearProjectIds,
     linearProjectsLoading,
+    linearProjectsError,
   });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
 

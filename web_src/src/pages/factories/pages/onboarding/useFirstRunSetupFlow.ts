@@ -212,6 +212,7 @@ function selectedIssuesChoice(
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
   if (issuesChoice === "jira" && !jiraAvailable) return null;
   if (issuesChoice === "linear" && !linearAvailable) return null;
+  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({

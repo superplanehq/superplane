@@ -249,6 +249,22 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
+  it("keeps scan stopped when Linear projects fail to load", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="linear"
+        linearAvailable
+        linearConnected
+        linearProjectsError
+        linearProjectIds={["project-gone"]}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+  });
+
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {
     const user = userEvent.setup();
     const onSelectJiraProject = vi.fn();
