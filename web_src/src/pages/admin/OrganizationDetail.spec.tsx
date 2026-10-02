@@ -248,7 +248,7 @@ describe("OrganizationDetail", () => {
     await user.click(screen.getByRole("tab", { name: "Credits" }));
 
     expect(await screen.findByText("Hosted credit")).toBeVisible();
-    expect(await screen.findByTestId("admin-org-credit-amount")).toBeVisible();
+    expect(await screen.findByTestId("admin-org-credit-topup-target")).toBeVisible();
     expect(screen.queryByText("Factories")).not.toBeInTheDocument();
   });
 
@@ -258,18 +258,18 @@ describe("OrganizationDetail", () => {
 
     await user.click(screen.getByRole("tab", { name: "Credits" }));
 
-    const amount = await screen.findByTestId("admin-org-credit-amount");
+    const amount = await screen.findByTestId("admin-org-credit-topup-target");
     await user.clear(amount);
     await user.type(amount, "12.50");
 
     await user.click(screen.getByRole("tab", { name: "Users" }));
     expect(await screen.findByText("Ada Lovelace")).toBeVisible();
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "inactive");
-    expect(screen.getByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+    expect(screen.getByTestId("admin-org-credit-topup-target")).toHaveValue("12.50");
 
     await user.click(screen.getByRole("tab", { name: "Credits" }));
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "active");
-    expect(await screen.findByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+    expect(await screen.findByTestId("admin-org-credit-topup-target")).toHaveValue("12.50");
   });
 
   it("retries overview load after an error", async () => {
