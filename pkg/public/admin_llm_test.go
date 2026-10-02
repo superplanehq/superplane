@@ -237,6 +237,86 @@ func TestAdminLLMSettings(t *testing.T) {
 	})
 }
 
+func TestAdminOrganizationCreditBalances(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	creditPath := "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit"
+	balancesPath := creditPath + "/balances"
+	setBalance := func(authCookie string, body map[string]any) *httptest.ResponseRecorder {
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		return execRequest(server, requestParams{
+			method:      "PUT",
+			path:        balancesPath,
+			authCookie:  authCookie,
+			body:        encoded,
+			contentType: "application/json",
+		})
+	}
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-credit-balance@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := setBalance(regularToken, map[string]any{"bucket": "grant", "target_cents": 100})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: regularToken})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("admin sets trial balance and sees the adjustment in history", func(t *testing.T) {
+		response := execRequest(server, requestParams{method: "GET", path: creditPath, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, credit.WelcomeRemainingCents)
+		assert.NotNil(t, credit.WelcomeCreditExpiresAt)
+
+		response = setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             1000,
+			"expected_remaining_cents": credit.WelcomeRemainingCents,
+			"note":                     "support",
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, int64(1000), credit.WelcomeRemainingCents)
+		assert.Equal(t, int64(1000), credit.RemainingCreditCents)
+
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var history struct {
+			Grants []map[string]any `json:"grants"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &history))
+		require.Len(t, history.Grants, 2)
+		latest := history.Grants[0]
+		assert.Equal(t, models.LLMCreditGrantKindTrialAdjustment, latest["kind"])
+		assert.Equal(t, "-4000", latest["amountCents"])
+		assert.Equal(t, "support", latest["note"])
+		assert.NotEmpty(t, latest["actorName"])
+	})
+
+	t.Run("stale expected balance returns 409", func(t *testing.T) {
+		response := setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             2000,
+			"expected_remaining_cents": 5000,
+		})
+		assert.Equal(t, http.StatusConflict, response.Code)
+		assert.Contains(t, response.Body.String(), "The balance changed")
+	})
+
+	t.Run("negative target and unknown credit type return 400", func(t *testing.T) {
+		response := setBalance(token, map[string]any{"bucket": "grant", "target_cents": -100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		response = setBalance(token, map[string]any{"bucket": "included", "target_cents": 100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+}
+
 func TestAdminOrganizationBillingPlan(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"

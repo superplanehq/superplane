@@ -71,19 +71,48 @@ type hostedLLMModelResponse struct {
 }
 
 type organizationLLMCreditResponse struct {
-	RemainingCreditCents int64 `json:"remaining_credit_cents"`
-	GrantTotalCents      int64 `json:"grant_total_cents"`
-	SuperplaneGrantCents int64 `json:"superplane_grant_cents"`
-	PurchasedCreditCents int64 `json:"purchased_credit_cents"`
-	HostedBilledCents    int64 `json:"hosted_billed_cents"`
-	MarkupBPS            int   `json:"markup_bps"`
-	MarkupOverrideBPS    *int  `json:"markup_override_bps"`
-	Warning              bool  `json:"warning"`
+	RemainingCreditCents    int64   `json:"remaining_credit_cents"`
+	GrantTotalCents         int64   `json:"grant_total_cents"`
+	SuperplaneGrantCents    int64   `json:"superplane_grant_cents"`
+	PurchasedCreditCents    int64   `json:"purchased_credit_cents"`
+	HostedBilledCents       int64   `json:"hosted_billed_cents"`
+	WelcomeRemainingCents   int64   `json:"welcome_remaining_cents"`
+	IncludedRemainingCents  int64   `json:"included_remaining_cents"`
+	PurchasedRemainingCents int64   `json:"purchased_remaining_cents"`
+	AdminRemainingCents     int64   `json:"admin_remaining_cents"`
+	WelcomeCreditExpiresAt  *string `json:"welcome_credit_expires_at"`
+	MarkupBPS               int     `json:"markup_bps"`
+	MarkupOverrideBPS       *int    `json:"markup_override_bps"`
+	Warning                 bool    `json:"warning"`
 }
 
 type addOrganizationLLMCreditRequest struct {
 	AmountCents int64  `json:"amount_cents"`
 	Note        string `json:"note"`
+}
+
+type setOrganizationCreditBalanceRequest struct {
+	Bucket                 string `json:"bucket"`
+	TargetCents            int64  `json:"target_cents"`
+	ExpectedRemainingCents int64  `json:"expected_remaining_cents"`
+	Note                   string `json:"note"`
+}
+
+// organizationCreditGrantResponse matches the OrganizationCreditGrant JSON
+// shape from the organization API so the UI renders both with one table.
+type organizationCreditGrantResponse struct {
+	ID           string  `json:"id"`
+	Kind         string  `json:"kind"`
+	AmountCents  int64   `json:"amountCents,string"`
+	Note         string  `json:"note"`
+	ActorName    string  `json:"actorName,omitempty"`
+	PolarOrderID string  `json:"polarOrderId,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	ExpiresAt    *string `json:"expiresAt,omitempty"`
+}
+
+type listOrganizationCreditGrantsResponse struct {
+	Grants []organizationCreditGrantResponse `json:"grants"`
 }
 
 type organizationLLMMarkupRequest struct {
@@ -369,6 +398,107 @@ func (s *Server) adminAddOrganizationLLMCredit(w http.ResponseWriter, r *http.Re
 	respondJSON(w, response)
 }
 
+func (s *Server) adminListOrganizationCreditGrants(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+
+	db := database.DB(r.Context())
+	grants, err := models.ListOrganizationLLMCreditGrants(db, orgID)
+	if err != nil {
+		log.Errorf("admin: failed to list organization credit grants: %v", err)
+		http.Error(w, "Failed to load credit history", http.StatusInternalServerError)
+		return
+	}
+	actorNames, err := models.CreditGrantActorNames(db, grants)
+	if err != nil {
+		log.Errorf("admin: failed to load credit grant actors: %v", err)
+		http.Error(w, "Failed to load credit history", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]organizationCreditGrantResponse, 0, len(grants))
+	for _, grant := range grants {
+		out = append(out, serializeAdminCreditGrant(grant, actorNames))
+	}
+	respondJSON(w, listOrganizationCreditGrantsResponse{Grants: out})
+}
+
+func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return
+	}
+
+	var req setOrganizationCreditBalanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	account, _ := middleware.GetAccountFromContext(r.Context())
+	var actor *uuid.UUID
+	if account != nil {
+		actor = &account.ID
+	}
+
+	db := database.DB(r.Context())
+	_, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: orgID,
+		Bucket:         req.Bucket,
+		TargetMicros:   req.TargetCents * models.MicrosPerCent,
+		ExpectedMicros: req.ExpectedRemainingCents * models.MicrosPerCent,
+		Note:           req.Note,
+		ActorAccountID: actor,
+	})
+	if err != nil {
+		writeCreditBalanceError(w, err)
+		return
+	}
+
+	response, err := describeOrganizationLLMCreditJSON(db, orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization LLM credit: %v", err)
+		http.Error(w, "Failed to load organization credit", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, response)
+}
+
+func writeCreditBalanceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, models.ErrCreditBalanceChanged):
+		http.Error(w, "The balance changed. Reload and try again.", http.StatusConflict)
+	case errors.Is(err, models.ErrCreditBalanceBucket),
+		errors.Is(err, models.ErrCreditBalanceNegative):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, models.ErrTrialCreditNotActive):
+		http.Error(w, "This organization has no active trial credit.", http.StatusBadRequest)
+	default:
+		log.Errorf("admin: failed to set organization credit balance: %v", err)
+		http.Error(w, "Failed to set credit balance", http.StatusInternalServerError)
+	}
+}
+
+func serializeAdminCreditGrant(grant models.OrganizationLLMCreditGrant, actorNames map[uuid.UUID]string) organizationCreditGrantResponse {
+	item := organizationCreditGrantResponse{
+		ID:          grant.ID.String(),
+		Kind:        grant.Kind,
+		AmountCents: models.SignedMicrosToCents(grant.AmountMicros),
+		Note:        grant.Note,
+		CreatedAt:   grant.CreatedAt.UTC().Format(time.RFC3339),
+		ExpiresAt:   formatOptionalTime(grant.ExpiresAt),
+	}
+	if grant.ActorAccountID != nil {
+		item.ActorName = actorNames[*grant.ActorAccountID]
+	}
+	if grant.PolarOrderID != nil {
+		item.PolarOrderID = *grant.PolarOrderID
+	}
+	return item
+}
+
 func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
@@ -528,14 +658,19 @@ func describeOrganizationLLMCreditJSON(tx *gorm.DB, orgID uuid.UUID) (organizati
 		override = orgSettings.MarkupBPS
 	}
 	return organizationLLMCreditResponse{
-		RemainingCreditCents: pricebook.MicrosToCents(summary.RemainingMicros),
-		GrantTotalCents:      pricebook.MicrosToCents(summary.GrantMicros),
-		SuperplaneGrantCents: pricebook.MicrosToCents(summary.SuperPlaneGrantMicros),
-		PurchasedCreditCents: pricebook.MicrosToCents(summary.PurchasedCreditMicros),
-		HostedBilledCents:    pricebook.MicrosToCents(summary.BilledMicros),
-		MarkupBPS:            summary.MarkupBPS,
-		MarkupOverrideBPS:    override,
-		Warning:              summary.Warning,
+		RemainingCreditCents:    pricebook.MicrosToCents(summary.RemainingMicros),
+		GrantTotalCents:         pricebook.MicrosToCents(summary.GrantMicros),
+		SuperplaneGrantCents:    pricebook.MicrosToCents(summary.SuperPlaneGrantMicros),
+		PurchasedCreditCents:    pricebook.MicrosToCents(summary.PurchasedCreditMicros),
+		HostedBilledCents:       pricebook.MicrosToCents(summary.BilledMicros),
+		WelcomeRemainingCents:   pricebook.MicrosToCents(summary.WelcomeRemainingMicros),
+		IncludedRemainingCents:  pricebook.MicrosToCents(summary.IncludedRemainingMicros),
+		PurchasedRemainingCents: pricebook.MicrosToCents(summary.PurchasedRemainingMicros),
+		AdminRemainingCents:     pricebook.MicrosToCents(summary.AdminRemainingMicros),
+		WelcomeCreditExpiresAt:  formatOptionalTime(summary.WelcomeCreditExpiresAt),
+		MarkupBPS:               summary.MarkupBPS,
+		MarkupOverrideBPS:       override,
+		Warning:                 summary.Warning,
 	}, nil
 }
 
