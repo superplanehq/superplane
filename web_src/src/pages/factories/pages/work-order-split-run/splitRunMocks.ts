@@ -1719,7 +1719,7 @@ function endedAtForExecution(execution: FactoriesWorkOrderExecution, status: Spl
   if (status === "running" || status === "pending") {
     return undefined;
   }
-  const value = execution.run?.finishedAt || execution.updatedAt;
+  const value = execution.finishedAt || execution.updatedAt;
   return Date.parse(value ?? "") ? value : undefined;
 }
 

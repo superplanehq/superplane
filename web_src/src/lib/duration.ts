@@ -119,28 +119,63 @@ export function formatCompactDuration(durationMs: number): string {
     return "< 1s";
   }
   if (durationMs >= MS_PER_WEEK) {
-    return formatTwoUnits(durationMs, MS_PER_WEEK, "w", MS_PER_DAY, "d", 7);
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_WEEK,
+      majorUnit: "w",
+      minorMs: MS_PER_DAY,
+      minorUnit: "d",
+      minorPerMajor: 7,
+    });
   }
   if (durationMs >= MS_PER_DAY) {
-    return formatTwoUnits(durationMs, MS_PER_DAY, "d", MS_PER_HOUR, "h", 24);
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_DAY,
+      majorUnit: "d",
+      minorMs: MS_PER_HOUR,
+      minorUnit: "h",
+      minorPerMajor: 24,
+    });
   }
   if (durationMs >= MS_PER_HOUR) {
-    return formatTwoUnits(durationMs, MS_PER_HOUR, "h", MS_PER_MINUTE, "m", 60);
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_HOUR,
+      majorUnit: "h",
+      minorMs: MS_PER_MINUTE,
+      minorUnit: "m",
+      minorPerMajor: 60,
+    });
   }
   if (durationMs >= MS_PER_MINUTE) {
-    return formatTwoUnits(durationMs, MS_PER_MINUTE, "m", MS_PER_SECOND, "s", 60);
+    return formatTwoUnits({
+      durationMs,
+      majorMs: MS_PER_MINUTE,
+      majorUnit: "m",
+      minorMs: MS_PER_SECOND,
+      minorUnit: "s",
+      minorPerMajor: 60,
+    });
   }
   return `${Math.round(durationMs / MS_PER_SECOND)}s`;
 }
 
-function formatTwoUnits(
-  durationMs: number,
-  majorMs: number,
-  majorUnit: string,
-  minorMs: number,
-  minorUnit: string,
-  minorPerMajor: number,
-): string {
+function formatTwoUnits({
+  durationMs,
+  majorMs,
+  majorUnit,
+  minorMs,
+  minorUnit,
+  minorPerMajor,
+}: {
+  durationMs: number;
+  majorMs: number;
+  majorUnit: string;
+  minorMs: number;
+  minorUnit: string;
+  minorPerMajor: number;
+}): string {
   let major = Math.floor(durationMs / majorMs);
   let minor = Math.round((durationMs % majorMs) / minorMs);
   if (minor >= minorPerMajor) {
