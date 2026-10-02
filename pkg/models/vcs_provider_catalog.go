@@ -111,10 +111,18 @@ func (VCSProviderInstallationReconcileJob) TableName() string {
 	return "vcs_provider_installation_reconcile_jobs"
 }
 
+// VCSProviderInstallationRequesterWindow caps how long an organization waits
+// on the sync of an installation that it requested.
+const VCSProviderInstallationRequesterWindow = 30 * time.Minute
+
+// VCSProviderInstallationReconcileRequester links an installation to the
+// organization that installed or updated it. The row outlives the reconcile
+// job, so the organization sees the collaborator sync of that installation.
 type VCSProviderInstallationReconcileRequester struct {
 	Provider       string    `gorm:"primaryKey"`
 	InstallationID int64     `gorm:"primaryKey"`
 	OrganizationID uuid.UUID `gorm:"primaryKey"`
+	CreatedAt      time.Time
 }
 
 func (VCSProviderInstallationReconcileRequester) TableName() string {
@@ -375,6 +383,12 @@ func VCSProviderCatalogSynchronizing(
 				AND collaborator.repository_id = repository.repository_id
 			WHERE repository.provider = ?
 				AND collaborator.provider_user_id = ?
+			UNION
+			SELECT requester.provider, requester.installation_id
+			FROM vcs_provider_installation_reconcile_requesters AS requester
+			WHERE requester.provider = ?
+				AND requester.organization_id = ?
+				AND requester.created_at > ?
 		)
 		SELECT EXISTS (
 			SELECT 1
@@ -389,24 +403,18 @@ func VCSProviderCatalogSynchronizing(
 			UNION ALL
 			SELECT 1
 			FROM vcs_provider_installation_reconcile_jobs AS job
+			JOIN relevant_installations AS relevant
+				ON relevant.provider = job.provider
+				AND relevant.installation_id = job.installation_id
 			WHERE job.provider = ?
-				AND (
-					EXISTS (
-						SELECT 1
-						FROM relevant_installations AS relevant
-						WHERE relevant.provider = job.provider
-							AND relevant.installation_id = job.installation_id
-					)
-					OR EXISTS (
-						SELECT 1
-						FROM vcs_provider_installation_reconcile_requesters AS requester
-						WHERE requester.provider = job.provider
-							AND requester.installation_id = job.installation_id
-							AND requester.organization_id = ?
-					)
-				)
 		)
-	`, provider, providerUserID, provider, providerUserID, provider, provider, organizationID).Scan(&synchronizing).Error
+	`,
+		provider, providerUserID,
+		provider, providerUserID,
+		provider, organizationID, time.Now().Add(-VCSProviderInstallationRequesterWindow),
+		provider,
+		provider,
+	).Scan(&synchronizing).Error
 	return synchronizing, err
 }
 
@@ -464,9 +472,20 @@ func EnqueueVCSProviderInstallationReconciliation(
 			Provider:       provider,
 			InstallationID: installationID,
 			OrganizationID: organizationID,
+			CreatedAt:      updatedAt,
 		}
-		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&requester).Error
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "provider"}, {Name: "installation_id"}, {Name: "organization_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"created_at"}),
+		}).Create(&requester).Error
 	})
+}
+
+func DeleteStaleVCSProviderInstallationRequesters(tx *gorm.DB, provider string, before time.Time) error {
+	return tx.
+		Where("provider = ? AND created_at < ?", provider, before).
+		Delete(&VCSProviderInstallationReconcileRequester{}).
+		Error
 }
 
 func ClaimVCSProviderInstallationReconciliation(
@@ -773,6 +792,12 @@ func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID in
 		Find(&requests).
 		Error
 	return requests, err
+}
+
+func HasVCSProviderInstallRequests(tx *gorm.DB, provider string) (bool, error) {
+	var count int64
+	err := tx.Model(&VCSProviderInstallRequest{}).Where("provider = ?", provider).Limit(1).Count(&count).Error
+	return count > 0, err
 }
 
 func DeleteVCSProviderInstallRequestsForAccount(

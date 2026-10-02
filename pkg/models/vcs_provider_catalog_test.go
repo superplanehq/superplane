@@ -429,6 +429,66 @@ func TestVCSProviderCatalogSynchronizingIncludesRequestedOrganizationJobs(t *tes
 	assert.False(t, synchronizing)
 }
 
+// After an organization installs the App on a new GitHub organization, the
+// install job finishes in about a second. The collaborator sync of its
+// repositories runs much longer, and the user is not a collaborator yet.
+func TestVCSProviderCatalogSynchronizingFollowsRequestedInstallationAfterItsJob(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	organizationID := uuid.New()
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, organizationID, now.Add(-time.Second)))
+	job, err := ClaimVCSProviderInstallationReconciliation(db, ProviderGitHub, now, now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityInteractive))
+	require.NoError(t, CompleteVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, *job.LockedAt))
+
+	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.True(t, synchronizing)
+
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, uuid.New())
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
+
+	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).
+		Where("installation_id = ?", 101).
+		Update("created_at", now.Add(-VCSProviderInstallationRequesterWindow-time.Minute)).Error)
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
+}
+
+func TestDeleteStaleVCSProviderInstallationRequesters(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	staleOrganizationID := uuid.New()
+	freshOrganizationID := uuid.New()
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, staleOrganizationID, now))
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, freshOrganizationID, now))
+	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).
+		Where("organization_id = ?", staleOrganizationID).
+		Update("created_at", now.Add(-2*time.Hour)).Error)
+
+	require.NoError(t, DeleteStaleVCSProviderInstallationRequesters(db, ProviderGitHub, now.Add(-time.Hour)))
+
+	var requesters []VCSProviderInstallationReconcileRequester
+	require.NoError(t, db.Find(&requesters).Error)
+	require.Len(t, requesters, 1)
+	assert.Equal(t, freshOrganizationID, requesters[0].OrganizationID)
+}
+
 func TestVCSProviderCatalogSynchronizingIncludesRelevantInstallationJobs(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
@@ -486,7 +546,7 @@ func TestVCSProviderInstallationReconciliationJobClaim(t *testing.T) {
 	))
 	var requesterCount int64
 	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).Count(&requesterCount).Error)
-	assert.Zero(t, requesterCount)
+	assert.Equal(t, int64(1), requesterCount)
 }
 
 func TestVCSProviderReconciliationJobClaim(t *testing.T) {

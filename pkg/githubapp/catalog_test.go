@@ -144,6 +144,54 @@ func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
 	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, job.Priority)
 }
 
+func TestCatalogReconcileInstallRequestsRemovesCancelledRequests(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	cancelledAccountID := int64(301)
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountID:    &cancelledAccountID,
+		AccountLogin: "cancelled",
+		RequesterID:  9,
+		RequestedAt:  time.Now().Add(-time.Hour),
+	}}))
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installation-requests", r.URL.Path)
+		_, _ = w.Write([]byte(`[{"id":44,"account":{"id":2,"login":"acme"},"requester":{"id":9,"login":"member"}}]`))
+	})
+
+	catalog := &Catalog{db: db, appClient: client, now: time.Now}
+	require.NoError(t, catalog.ReconcileInstallRequests(t.Context()))
+
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, 9)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "acme", requests[0].AccountLogin)
+}
+
+func TestCatalogReconcileSavesRequestsWhenInstallationsFail(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app/installation-requests":
+			_, _ = w.Write([]byte(`[{"id":44,"account":{"id":2,"login":"acme"},"requester":{"id":9,"login":"member"}}]`))
+		default:
+			http.Error(w, "temporary GitHub error", http.StatusInternalServerError)
+		}
+	})
+
+	catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+	err := catalog.Reconcile(t.Context(), models.VCSProviderRepositorySyncPriorityInteractive)
+	assert.ErrorContains(t, err, "list GitHub App installations")
+
+	requests, listErr := models.ListVCSProviderInstallRequests(database.Conn(), models.ProviderGitHub, 9)
+	require.NoError(t, listErr)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "acme", requests[0].AccountLogin)
+}
+
 func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
 	registry := support.Setup(t)
 	t.Cleanup(registry.Close)

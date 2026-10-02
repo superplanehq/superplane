@@ -42,6 +42,14 @@ var enqueueGitHubAppInstallationReconciliation = func(
 	)
 }
 
+var refreshGitHubAppInstallRequests = func(ctx context.Context) error {
+	catalog, err := appcatalog.NewCatalog(database.DB(ctx), config.LoadGitHubHostedAppConfig())
+	if err != nil {
+		return err
+	}
+	return catalog.ReconcileInstallRequests(ctx)
+}
+
 var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID int64) (bool, error) {
 	db := database.DB(ctx)
 	installation, err := models.FindVCSProviderInstallation(db, models.ProviderGitHub, installationID)
@@ -69,11 +77,7 @@ var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID i
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if query.Get("setup_action") == "request" {
-		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
-			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/", http.StatusFound)
+		s.handleGitHubAppInstallRequest(w, r)
 		return
 	}
 	installationID, err := strconv.ParseInt(strings.TrimSpace(query.Get("installation_id")), 10, 64)
@@ -111,6 +115,24 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
 }
+
+// The user returns to the wizard right after this redirect, so the request
+// list is read now. The queued reconciliation is only the fallback.
+func (s *Server) handleGitHubAppInstallRequest(w http.ResponseWriter, r *http.Request) {
+	err := refreshGitHubAppInstallRequests(r.Context())
+	if err == nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	log.WithError(err).Warn("failed to refresh GitHub App installation requests")
+	if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
+		http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func githubAppSetupOrganizationID(state string) uuid.UUID {
 	cfg := config.LoadGitHubHostedAppConfig()
 	organizationID, err := common.VerifyHostedAppInstallState(cfg.WebhookSecret, state)

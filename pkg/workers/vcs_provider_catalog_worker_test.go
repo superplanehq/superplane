@@ -25,6 +25,14 @@ type recordingVCSProviderCatalog struct {
 	started             chan int64
 	installationError   error
 	reconcilePriorities []models.VCSProviderRepositorySyncPriority
+	requestRefreshes    int
+}
+
+func (c *recordingVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.requestRefreshes++
+	return nil
 }
 
 func (c *recordingVCSProviderCatalog) ReconcileInstallation(
@@ -95,6 +103,25 @@ func TestVCSProviderCatalogWorkerPrioritizesRequestedReconciliation(t *testing.T
 	assert.Equal(t, []models.VCSProviderRepositorySyncPriority{
 		models.VCSProviderRepositorySyncPriorityInteractive,
 	}, catalog.priorities())
+}
+
+func TestVCSProviderCatalogWorkerRefreshesInstallRequestsOnlyWhileOnePending(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	catalog := &recordingVCSProviderCatalog{}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+
+	worker.refreshPendingInstallRequests(t.Context())
+	assert.Zero(t, catalog.requestRefreshes)
+
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(database.Conn(), models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountLogin: "acme",
+		RequesterID:  9,
+		RequestedAt:  time.Now(),
+	}}))
+	worker.refreshPendingInstallRequests(t.Context())
+	assert.Equal(t, 1, catalog.requestRefreshes)
 }
 
 func TestVCSProviderCatalogWorkerReconcilesRequestedInstallation(t *testing.T) {
@@ -258,6 +285,10 @@ func (c *progressivelyVisibleVCSProviderCatalog) Reconcile(
 	return nil
 }
 
+func (c *progressivelyVisibleVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
+	return nil
+}
+
 func (c *progressivelyVisibleVCSProviderCatalog) ReconcileInstallation(
 	context.Context,
 	int64,
@@ -351,6 +382,10 @@ func (c *blockingReconcileVCSProviderCatalog) ReconcileInstallation(
 	_ models.VCSProviderRepositorySyncPriority,
 ) error {
 	c.installationReconciled <- installationID
+	return nil
+}
+
+func (c *blockingReconcileVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
 	return nil
 }
 

@@ -13,17 +13,20 @@ import (
 )
 
 const (
-	vcsProviderReconcileInterval             = 5 * time.Minute
-	vcsProviderJobPollInterval               = time.Second
-	vcsProviderClaimTimeout                  = 5 * time.Minute
-	vcsProviderJobBatchSize                  = 8
-	vcsProviderInstallationJobConcurrency    = 4
-	vcsProviderInstallationMaxAttempts       = 10
-	vcsProviderInstallationRetryMaximumDelay = 30 * time.Second
+	vcsProviderReconcileInterval              = 5 * time.Minute
+	vcsProviderInstallRequestRefreshInterval  = 15 * time.Second
+	vcsProviderInstallationRequesterRetention = time.Hour
+	vcsProviderJobPollInterval                = time.Second
+	vcsProviderClaimTimeout                   = 5 * time.Minute
+	vcsProviderJobBatchSize                   = 8
+	vcsProviderInstallationJobConcurrency     = 4
+	vcsProviderInstallationMaxAttempts        = 10
+	vcsProviderInstallationRetryMaximumDelay  = 30 * time.Second
 )
 
 type vcsProviderCatalog interface {
 	Reconcile(context.Context, models.VCSProviderRepositorySyncPriority) error
+	ReconcileInstallRequests(context.Context) error
 	ReconcileInstallation(context.Context, int64, models.VCSProviderRepositorySyncPriority) error
 	SyncRepositoryCollaborators(context.Context, int64) error
 }
@@ -53,7 +56,7 @@ func NewVCSProviderCatalogWorker(provider string, catalog vcsProviderCatalog) *V
 
 func (w *VCSProviderCatalogWorker) Start(ctx context.Context) {
 	var loops sync.WaitGroup
-	loops.Add(2)
+	loops.Add(3)
 	go func() {
 		defer loops.Done()
 		w.startReconciliation(ctx)
@@ -62,9 +65,43 @@ func (w *VCSProviderCatalogWorker) Start(ctx context.Context) {
 		defer loops.Done()
 		w.startInstallationReconciliation(ctx)
 	}()
+	go func() {
+		defer loops.Done()
+		w.startInstallRequestRefresh(ctx)
+	}()
 
 	w.startRepositorySynchronization(ctx)
 	loops.Wait()
+}
+
+// GitHub sends no webhook when a member cancels an approval request, so the
+// worker reads the request list again while any request is pending.
+func (w *VCSProviderCatalogWorker) startInstallRequestRefresh(ctx context.Context) {
+	ticker := time.NewTicker(vcsProviderInstallRequestRefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.refreshPendingInstallRequests(ctx)
+		}
+	}
+}
+
+func (w *VCSProviderCatalogWorker) refreshPendingInstallRequests(ctx context.Context) {
+	pending, err := models.HasVCSProviderInstallRequests(database.Conn(), w.provider)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to check pending VCS installation requests")
+		return
+	}
+	if !pending {
+		return
+	}
+	if err := w.catalog.ReconcileInstallRequests(ctx); err != nil {
+		w.logger.WithError(err).Error("failed to refresh pending VCS installation requests")
+	}
 }
 
 func (w *VCSProviderCatalogWorker) startInstallationReconciliation(ctx context.Context) {
@@ -154,6 +191,14 @@ func (w *VCSProviderCatalogWorker) processReconcileJob(ctx context.Context) {
 func (w *VCSProviderCatalogWorker) reconcile(ctx context.Context) {
 	if err := w.catalog.Reconcile(ctx, models.VCSProviderRepositorySyncPriorityBackground); err != nil {
 		w.logger.WithError(err).Error("failed to reconcile the VCS provider catalog")
+	}
+	w.deleteStaleInstallationRequesters()
+}
+
+func (w *VCSProviderCatalogWorker) deleteStaleInstallationRequesters() {
+	before := time.Now().Add(-vcsProviderInstallationRequesterRetention)
+	if err := models.DeleteStaleVCSProviderInstallationRequesters(database.Conn(), w.provider, before); err != nil {
+		w.logger.WithError(err).Error("failed to delete stale VCS installation requesters")
 	}
 }
 

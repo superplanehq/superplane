@@ -195,6 +195,7 @@ func TruncateTables() error {
 	return Conn().Exec(`
 		truncate table
 			vcs_provider_installation_reconcile_requesters,
+			vcs_provider_install_requests,
 			vcs_provider_installation_reconcile_jobs,
 			vcs_provider_reconcile_jobs,
 			vcs_provider_installations,

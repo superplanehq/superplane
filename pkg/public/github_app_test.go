@@ -2,6 +2,7 @@ package public
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,6 +24,7 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 	previousReconciliation := enqueueGitHubAppReconciliation
 	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
 	previousHasInstallationRequest := hasGitHubAppInstallationRequest
+	previousRefreshInstallRequests := refreshGitHubAppInstallRequests
 	organizationID := uuid.New()
 	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", organizationID)
 	require.NoError(t, err)
@@ -47,10 +49,17 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 	hasGitHubAppInstallationRequest = func(_ context.Context, _ int64) (bool, error) {
 		return installationRequested, nil
 	}
+	installRequestRefreshes := 0
+	var installRequestRefreshError error
+	refreshGitHubAppInstallRequests = func(context.Context) error {
+		installRequestRefreshes++
+		return installRequestRefreshError
+	}
 	t.Cleanup(func() {
 		enqueueGitHubAppReconciliation = previousReconciliation
 		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
 		hasGitHubAppInstallationRequest = previousHasInstallationRequest
+		refreshGitHubAppInstallRequests = previousRefreshInstallRequests
 	})
 
 	t.Run("direct installation returns to the app", func(t *testing.T) {
@@ -115,7 +124,23 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 		assert.Zero(t, reconciliationCount)
 	})
 
-	t.Run("approval request returns to the app without an installation id", func(t *testing.T) {
+	t.Run("approval request saves the request before it returns to the app", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?setup_action=request",
+			nil,
+		))
+
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assert.Equal(t, 1, installRequestRefreshes)
+		assert.Zero(t, reconciliationCount)
+	})
+
+	t.Run("approval request queues reconciliation when GitHub does not answer", func(t *testing.T) {
+		installRequestRefreshError = errors.New("GitHub is unavailable")
+		t.Cleanup(func() { installRequestRefreshError = nil })
 		recorder := httptest.NewRecorder()
 		(&Server{}).HandleGitHubAppSetup(recorder, httptest.NewRequest(
 			http.MethodGet,
