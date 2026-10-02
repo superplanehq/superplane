@@ -2203,11 +2203,10 @@ func TestValidateConsoleContent_RejectsBoardWithDuplicateLaneValues(t *testing.T
 	assert.Contains(t, err.Error(), "render.lanes[1].value must be unique")
 }
 
-func TestValidateConsoleContent_RejectsBoardWithUnknownLaneColor(t *testing.T) {
+func TestValidateConsoleContent_IgnoresLegacyBoardLaneColor(t *testing.T) {
 	panel := boardPanel(map[string]any{"lanes": []any{map[string]any{"value": "Todo", "color": "fuchsia"}}})
 	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "render.lanes[0].color must be one of")
+	require.NoError(t, err)
 }
 
 func TestValidateConsoleContent_RejectsBoardWithoutCard(t *testing.T) {

@@ -289,7 +289,10 @@ function MarkdownPanelView({
         />
         {body.trim() ? (
           <div
-            className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}
+            className={cn(
+              "min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-3 pb-3 pt-1.5",
+              CONSOLE_PANEL_BODY_SURFACE,
+            )}
             onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="console-markdown-view"
           >

@@ -42,12 +42,12 @@ export function MarkdownSection({
           aria-expanded={open}
           aria-controls={panelId}
           className={cn(
-            "flex w-full min-w-0 items-center gap-2 px-2.5 text-left",
+            "flex w-full min-w-0 items-center gap-1 px-2.5 text-left",
             isRoot ? "min-h-9" : "min-h-8 rounded-md hover:bg-slate-100/70 dark:hover:bg-gray-800/60",
           )}
           onClick={() => setOpen((current) => !current)}
         >
-          <span className="flex size-5 shrink-0 items-center justify-center">
+          <span className="flex size-4 shrink-0 items-center justify-center">
             <ChevronRight
               className={cn(
                 "size-3.5 text-slate-500 transition-transform duration-200 dark:text-gray-400",
@@ -56,11 +56,11 @@ export function MarkdownSection({
               aria-hidden
             />
           </span>
-          <span className="flex size-5 shrink-0 items-center justify-center">
+          <span className="flex size-4 shrink-0 items-center justify-center">
             <Icon className={cn("size-3.5", preset.iconClassName)} aria-hidden />
           </span>
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-            <span className="truncate text-[13px] font-semibold text-slate-900 dark:text-gray-100">{title}</span>
+            <span className="truncate text-[13px] font-medium text-slate-900 dark:text-gray-100">{title}</span>
             {childSectionCount > 0 ? (
               <span
                 className="shrink-0 text-[12px] font-normal tabular-nums text-slate-500 dark:text-gray-400"

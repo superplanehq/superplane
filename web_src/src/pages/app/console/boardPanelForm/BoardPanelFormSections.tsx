@@ -13,18 +13,14 @@ import { ActionRow } from "../TablePanelFormActionRow";
 import { ColumnRow, FilterRow } from "../TablePanelFormRows";
 import type { RowActionPayloadDrafts } from "../tablePanelForm/useRowActionPayloadDrafts";
 import {
-  WIDGET_BOARD_LANE_COLORS,
   WIDGET_SORT_ORDERS,
   type WidgetBoardLane,
-  type WidgetBoardLaneColor,
   type WidgetRowAction,
   type WidgetSortOrder,
   type WidgetTableColumn,
   type WidgetTableFilter,
 } from "../widget/types";
 import type { BoardPanelFormActions } from "./useBoardPanelFormActions";
-
-const NEUTRAL_LANE_COLOR: WidgetBoardLaneColor = "neutral";
 
 /** Title + groupBy + otherLane toggle. */
 export function BoardHeaderFields({
@@ -122,33 +118,18 @@ function BoardLaneRow({
     <div className="flex gap-2 rounded-lg bg-slate-100 p-2 dark:bg-gray-800" data-testid="board-lane-row">
       <div className="grid min-w-0 flex-1 grid-cols-12 items-center gap-2">
         <Input
-          className="col-span-5 h-8"
+          className="col-span-6 h-8"
           value={lane.value}
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder="Value (e.g. Done)"
           data-testid="board-lane-value"
         />
         <Input
-          className="col-span-4 h-8"
+          className="col-span-6 h-8"
           value={lane.label ?? ""}
           onChange={(e) => onChange({ label: e.target.value || undefined })}
           placeholder="Header label (optional)"
         />
-        <Select
-          value={lane.color ?? NEUTRAL_LANE_COLOR}
-          onValueChange={(v) => onChange({ color: v as WidgetBoardLaneColor })}
-        >
-          <SelectTrigger className="col-span-3 h-8" data-testid="board-lane-color">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {WIDGET_BOARD_LANE_COLORS.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
       <div className="flex shrink-0 items-start justify-end">
         <Button
