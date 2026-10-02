@@ -403,6 +403,32 @@ describe("console automation grouping", () => {
     expect(risk?.latest.checks.map((check) => check.name)).toEqual(["Blast radius", "Diff size"]);
   });
 
+  it("puts factory PR Closure in Done, not Verify", () => {
+    const ids = columnStageIds(
+      splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        demoArtifacts: false,
+        prFeedbackRuns: [
+          {
+            canvasId: "app-pr-closure",
+            handlerName: "PR Closure",
+            title: "Pull request merged",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-closure",
+              canvasId: "app-pr-closure",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T13:00:00Z",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(ids.done).toContain("pr-feedback-run-closure");
+    expect(ids.verify).not.toContain("pr-feedback-run-closure");
+  });
+
   it("puts a Done-column app run in Done", () => {
     const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
       demoArtifacts: false,
