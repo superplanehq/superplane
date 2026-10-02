@@ -1,0 +1,20 @@
+{
+  "superplaneUrl": "http://app:8000",
+  "installationAdminToken": "",
+  "reconcileIntervalSeconds": 2,
+  "requestTimeoutSeconds": 60,
+  "fleets": [
+    {
+      "id": "e1-large-amd64",
+      "provider": "docker",
+      "maxCapacity": 1,
+      "docker": {
+        "image": "superplane-runner-local:dev",
+        "architecture": "amd64",
+        "runnerApiUrl": "http://app:8000",
+        "network": "superplane_default",
+        "extraHosts": ["host.docker.internal:host-gateway"]
+      }
+    }
+  ]
+}

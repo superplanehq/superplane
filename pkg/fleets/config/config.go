@@ -1,0 +1,235 @@
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+)
+
+const (
+	defaultReconcileIntervalSeconds = 15
+	defaultRequestTimeoutSeconds    = 90
+	defaultInstanceType             = "t3.micro"
+	defaultVolumeSizeGB             = 30
+
+	ProviderAWS    = "aws"
+	ProviderDocker = "docker"
+)
+
+type Config struct {
+	SuperPlaneURL            string  `json:"superplaneUrl"`
+	InstallationAdminToken   string  `json:"installationAdminToken"`
+	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
+	AWSRegion                string  `json:"awsRegion"`
+	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
+	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
+	Fleets                   []Fleet `json:"fleets"`
+}
+
+type Fleet struct {
+	ID           string `json:"id"`
+	WarmCapacity int    `json:"warmCapacity"`
+	MaxCapacity  int    `json:"maxCapacity"`
+	Provider     string `json:"provider"`
+	AWS          AWS    `json:"aws"`
+	Docker       Docker `json:"docker"`
+}
+
+type AWS struct {
+	AMI                  string   `json:"ami"`
+	InstanceType         string   `json:"instanceType"`
+	Architecture         string   `json:"architecture"`
+	SubnetIDs            []string `json:"subnetIds"`
+	SecurityGroupIDs     []string `json:"securityGroupIds"`
+	IAMInstanceProfile   string   `json:"iamInstanceProfile"`
+	KeyName              string   `json:"keyName"`
+	VolumeSizeGB         int32    `json:"volumeSizeGb"`
+	VolumeIOPS           int32    `json:"volumeIops"`
+	VolumeThroughputMBps int32    `json:"volumeThroughputMbps"`
+}
+
+type Docker struct {
+	Image        string   `json:"image"`
+	Architecture string   `json:"architecture"`
+	RunnerAPIURL string   `json:"runnerApiUrl"`
+	Network      string   `json:"network"`
+	Volumes      []string `json:"volumes"`
+	ExtraHosts   []string `json:"extraHosts"`
+}
+
+func Load(path string) (*Config, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("config path is required")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open config: %w", err)
+	}
+	defer file.Close()
+
+	var config Config
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
+		return nil, fmt.Errorf("decode config: %w", err)
+	}
+	if token := strings.TrimSpace(os.Getenv("INSTALLATION_ADMIN_TOKEN")); token != "" {
+		config.InstallationAdminToken = token
+	}
+	config.applyDefaults()
+	if err := config.validate(); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func (c *Config) ReconcileInterval() time.Duration {
+	return time.Duration(c.ReconcileIntervalSeconds) * time.Second
+}
+
+func (c *Config) RequestTimeout() time.Duration {
+	return time.Duration(c.RequestTimeoutSeconds) * time.Second
+}
+
+func (c *Config) applyDefaults() {
+	c.RunnerReleaseBaseURL = strings.TrimRight(
+		strings.TrimSpace(c.RunnerReleaseBaseURL),
+		"/",
+	)
+	if c.ReconcileIntervalSeconds == 0 {
+		c.ReconcileIntervalSeconds = defaultReconcileIntervalSeconds
+	}
+	if c.RequestTimeoutSeconds == 0 {
+		c.RequestTimeoutSeconds = defaultRequestTimeoutSeconds
+	}
+	for index := range c.Fleets {
+		fleet := &c.Fleets[index]
+		fleet.Provider = strings.ToLower(strings.TrimSpace(fleet.Provider))
+		if fleet.Provider == "" {
+			fleet.Provider = ProviderAWS
+		}
+		if strings.TrimSpace(fleet.AWS.InstanceType) == "" {
+			fleet.AWS.InstanceType = defaultInstanceType
+		}
+		if fleet.AWS.VolumeSizeGB == 0 {
+			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
+		}
+		fleet.ID = strings.TrimSpace(fleet.ID)
+		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
+		fleet.AWS.SubnetIDs = nonEmpty(fleet.AWS.SubnetIDs)
+		fleet.AWS.SecurityGroupIDs = nonEmpty(fleet.AWS.SecurityGroupIDs)
+		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
+		fleet.Docker.Architecture = strings.ToLower(
+			strings.TrimSpace(fleet.Docker.Architecture),
+		)
+		fleet.Docker.RunnerAPIURL = strings.TrimRight(
+			strings.TrimSpace(fleet.Docker.RunnerAPIURL),
+			"/",
+		)
+		fleet.Docker.Network = strings.TrimSpace(fleet.Docker.Network)
+		fleet.Docker.Volumes = nonEmpty(fleet.Docker.Volumes)
+		fleet.Docker.ExtraHosts = nonEmpty(fleet.Docker.ExtraHosts)
+	}
+}
+
+func (c *Config) validate() error {
+	switch {
+	case strings.TrimSpace(c.SuperPlaneURL) == "":
+		return fmt.Errorf("superplaneUrl is required")
+	case strings.TrimSpace(c.InstallationAdminToken) == "":
+		return fmt.Errorf("installationAdminToken is required")
+	case c.ReconcileIntervalSeconds < 1:
+		return fmt.Errorf("reconcileIntervalSeconds must be positive")
+	case c.RequestTimeoutSeconds < 1:
+		return fmt.Errorf("requestTimeoutSeconds must be positive")
+	case len(c.Fleets) == 0:
+		return fmt.Errorf("fleets must contain at least one fleet")
+	}
+	if c.hasProvider(ProviderAWS) {
+		switch {
+		case c.RunnerReleaseBaseURL == "":
+			return fmt.Errorf("runnerReleaseBaseUrl is required")
+		case strings.Contains(
+			strings.ToLower(c.RunnerReleaseBaseURL),
+			"latest",
+		):
+			return fmt.Errorf("runnerReleaseBaseUrl must not use latest")
+		case strings.TrimSpace(c.AWSRegion) == "":
+			return fmt.Errorf("awsRegion is required")
+		}
+	}
+
+	seen := make(map[string]struct{}, len(c.Fleets))
+	for index, fleet := range c.Fleets {
+		prefix := fmt.Sprintf("fleets[%d]", index)
+		switch {
+		case fleet.ID == "":
+			return fmt.Errorf("%s.id is required", prefix)
+		case fleet.WarmCapacity < 0:
+			return fmt.Errorf("%s.warmCapacity must not be negative", prefix)
+		case fleet.MaxCapacity < 0:
+			return fmt.Errorf("%s.maxCapacity must not be negative", prefix)
+		case fleet.MaxCapacity > 0 && fleet.WarmCapacity > fleet.MaxCapacity:
+			return fmt.Errorf(
+				"%s.warmCapacity must not exceed maxCapacity",
+				prefix,
+			)
+		case fleet.Provider != ProviderAWS &&
+			fleet.Provider != ProviderDocker:
+			return fmt.Errorf("%s.provider is invalid", prefix)
+		case fleet.Provider == ProviderDocker &&
+			fleet.Docker.Image == "":
+			return fmt.Errorf("%s.docker.image is required", prefix)
+		case fleet.Provider == ProviderDocker &&
+			fleet.Docker.Architecture != "amd64" &&
+			fleet.Docker.Architecture != "arm64":
+			return fmt.Errorf(
+				"%s.docker.architecture must be amd64 or arm64",
+				prefix,
+			)
+		case fleet.Provider == ProviderDocker:
+			break
+		case strings.TrimSpace(fleet.AWS.AMI) == "":
+			return fmt.Errorf("%s.aws.ami is required", prefix)
+		case fleet.AWS.Architecture != "amd64" && fleet.AWS.Architecture != "arm64":
+			return fmt.Errorf("%s.aws.architecture must be amd64 or arm64", prefix)
+		case len(fleet.AWS.SubnetIDs) == 0:
+			return fmt.Errorf("%s.aws.subnetIds must not be empty", prefix)
+		case len(fleet.AWS.SecurityGroupIDs) == 0:
+			return fmt.Errorf("%s.aws.securityGroupIds must not be empty", prefix)
+		case fleet.AWS.VolumeSizeGB < 1:
+			return fmt.Errorf("%s.aws.volumeSizeGb must be positive", prefix)
+		case fleet.AWS.VolumeIOPS < 0:
+			return fmt.Errorf("%s.aws.volumeIops must not be negative", prefix)
+		case fleet.AWS.VolumeThroughputMBps < 0:
+			return fmt.Errorf("%s.aws.volumeThroughputMbps must not be negative", prefix)
+		}
+		if _, exists := seen[fleet.ID]; exists {
+			return fmt.Errorf("fleet ID %q is duplicated", fleet.ID)
+		}
+		seen[fleet.ID] = struct{}{}
+	}
+	return nil
+}
+
+func (c *Config) hasProvider(provider string) bool {
+	for _, fleet := range c.Fleets {
+		if fleet.Provider == provider {
+			return true
+		}
+	}
+	return false
+}
+
+func nonEmpty(values []string) []string {
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			cleaned = append(cleaned, value)
+		}
+	}
+	return cleaned
+}

@@ -164,6 +164,98 @@ describe("consumeLiveLogNdjsonLine", () => {
   });
 });
 
+describe("LiveLogStream integrated polling", () => {
+  it("preserves the opaque cursor and stops at the archived state", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            backend: "integrated",
+            stream_url: "/runner-logs",
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response('{"type":"line","text":"first"}\n', {
+          status: 200,
+          headers: {
+            "X-SuperPlane-Log-Cursor": "cursor-1",
+            "X-SuperPlane-Log-State": "active",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response('{"type":"line","text":"second"}\n', {
+          status: 200,
+          headers: {
+            "X-SuperPlane-Log-Cursor": "cursor-2",
+            "X-SuperPlane-Log-State": "archived",
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const onLogLine = vi.fn();
+      const final = new LiveLogStream("organization-1", "canvas-1", "execution-1", 0).pump(handlers({ onLogLine }));
+
+      expect(await final).toBe(true);
+      expect(fetchMock.mock.calls[2]?.[0]).toBe("/runner-logs?after=cursor-1");
+      expect(onLogLine).toHaveBeenNthCalledWith(1, "first");
+      expect(onLogLine).toHaveBeenNthCalledWith(2, "second");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("clears a stale cursor before loading the final object", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ backend: "integrated", stream_url: "/runner-logs" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response('{"type":"line","text":"active"}\n', {
+          status: 200,
+          headers: {
+            "X-SuperPlane-Log-Cursor": "cursor-1",
+            "X-SuperPlane-Log-State": "active",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 409,
+          headers: { "X-SuperPlane-Log-Reset": "true" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response('{"type":"line","text":"final"}\n', {
+          status: 200,
+          headers: {
+            "X-SuperPlane-Log-Cursor": "cursor-2",
+            "X-SuperPlane-Log-State": "archived",
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const onReset = vi.fn();
+      const final = await new LiveLogStream("organization-1", "canvas-1", "execution-1", 0).pump(handlers({ onReset }));
+
+      expect(final).toBe(true);
+      expect(onReset).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[2]?.[0]).toBe("/runner-logs?after=cursor-1");
+      expect(fetchMock.mock.calls[3]?.[0]).toBe("/runner-logs");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("LiveLogStream session errors", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
