@@ -92,6 +92,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
+    customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,

@@ -7,12 +7,15 @@ describe("byokProviderProductName", () => {
     expect(byokProviderProductName("anthropic")).toBe("Claude");
     expect(byokProviderProductName("openai")).toBe("OpenAI");
     expect(byokProviderProductName("openrouter")).toBe("OpenRouter");
+    expect(byokProviderProductName("custom")).toBe("Custom provider");
   });
 });
 
 describe("providerKeyHeading", () => {
   it("names the key the models come from", () => {
     expect(providerKeyHeading("openrouter")).toBe("Your OpenRouter key");
+    expect(providerKeyHeading("custom")).toBe("Your custom provider");
     expect(providerKeyIntegrationLink("anthropic")).toBe("Open Claude integration");
+    expect(providerKeyIntegrationLink("custom")).toBe("Open integration");
   });
 });

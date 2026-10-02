@@ -19,13 +19,13 @@ type llmModelListScope struct {
 	FactoryID      *uuid.UUID
 }
 
-func parseLLMModelListScope(tx *gorm.DB, orgID, provider, factoryID, internalMessage string) (llmModelListScope, error) {
+func parseLLMModelListScope(tx *gorm.DB, orgID, provider, factoryID, internalMessage string, normalize func(string) (string, error)) (llmModelListScope, error) {
 	organization, err := models.FindOrganizationByIDOrSlug(tx, orgID)
 	if err != nil {
 		return llmModelListScope{}, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 	organizationID := organization.ID
-	normalized, err := models.NormalizeHostedLLMProvider(provider)
+	normalized, err := normalize(provider)
 	if err != nil {
 		return llmModelListScope{}, grpcerrors.InvalidArgument(err, err.Error())
 	}
@@ -54,7 +54,7 @@ func ListHostedLLMModels(
 	req *pb.ListHostedLLMModelsRequest,
 ) (*pb.ListHostedLLMModelsResponse, error) {
 	tx := database.DB(ctx)
-	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list hosted models")
+	scope, err := parseLLMModelListScope(tx, orgID, req.GetProvider(), req.GetFactoryId(), "failed to list hosted models", models.NormalizeHostedLLMProvider)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,7 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
 function renderAgentStep(args?: {
   connected?: IntegrationId[];
   spend?: { remainingCreditCents: string; grantTotalCents: string };
+  showCustomProvider?: boolean;
   onRequestConnect?: (id: IntegrationId) => void;
 }) {
   Object.assign(spendState, args?.spend ?? { remainingCreditCents: "4124", grantTotalCents: "5000" });
@@ -31,7 +32,14 @@ function renderAgentStep(args?: {
       remainingCreditCents: 0,
       simulateDiscovery: false,
     });
-    return <AgentStep organizationId={FACTORIES_ORGANIZATION_ID} setup={setup} onRequestConnect={onRequestConnect} />;
+    return (
+      <AgentStep
+        organizationId={FACTORIES_ORGANIZATION_ID}
+        setup={setup}
+        showCustomProvider={args?.showCustomProvider}
+        onRequestConnect={onRequestConnect}
+      />
+    );
   }
 
   return {
@@ -92,5 +100,24 @@ describe("AgentStep", () => {
     await user.click(screen.getByRole("button", { name: "Connect OpenAI" }));
 
     expect(onRequestConnect).toHaveBeenCalledWith("openai");
+  });
+
+  it("hides the custom provider unless the organization can use one", () => {
+    renderAgentStep({ spend: { remainingCreditCents: "0", grantTotalCents: "0" } });
+
+    expect(screen.queryByRole("button", { name: "Connect Custom provider" })).not.toBeInTheDocument();
+  });
+
+  it("connects a custom provider when the organization can use one", async () => {
+    const user = userEvent.setup();
+    const { onRequestConnect } = renderAgentStep({
+      spend: { remainingCreditCents: "0", grantTotalCents: "0" },
+      showCustomProvider: true,
+    });
+
+    expect(screen.getByText("Set a provider URL, token, and API type.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Connect Custom provider" }));
+
+    expect(onRequestConnect).toHaveBeenCalledWith("customLlm");
   });
 });

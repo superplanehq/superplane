@@ -15,6 +15,7 @@ import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrgan
 const saveModels = vi.fn();
 const switchSource = vi.fn();
 let canUpdate = true;
+let enabledFeatures: string[] = [];
 let hostedModels: Array<{ key: string; label: string }> = [];
 
 type BYOKQuery = {
@@ -33,6 +34,15 @@ const byokByProvider: Record<string, BYOKQuery> = {};
 
 vi.mock("@/hooks/usePageTitle", () => ({
   usePageTitle: vi.fn(),
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledFeatures.includes(featureId),
+    enabledExperimentalFeatures: enabledFeatures,
+    isLoading: false,
+    organizationReady: true,
+  }),
 }));
 
 vi.mock("@/hooks/useLLMModelAllowlists", () => ({
@@ -110,6 +120,7 @@ function renderPage(agentHarness?: FactoryOnboardingAgentHarness) {
 describe("FactorySettingsOrganizationLLMModelsPage", () => {
   beforeEach(() => {
     canUpdate = true;
+    enabledFeatures = [];
     hostedModels = [{ key: "hosted::anthropic::claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" }];
     saveModels.mockReset();
     saveModels.mockResolvedValue({});
@@ -211,6 +222,28 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     });
   });
 
+  it("selects all models from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    setConnected("openrouter", ["model-a", "model-b"], ["model-a"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    const bulkToggle = screen.getByTestId("model-allowlist-bulk-toggle");
+    expect(bulkToggle).toHaveTextContent("Select all");
+    await user.click(bulkToggle);
+    await user.click(screen.getByRole("button", { name: "Save models" }));
+    expect(saveModels).toHaveBeenCalledWith({ provider: "openrouter", allowedModels: ["model-a", "model-b"] });
+  });
+
+  it("deselects all models from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    setConnected("openrouter", ["model-a", "model-b"], ["model-a", "model-b"]);
+    renderPage("AGENT_HARNESS_CLAUDE_CODE");
+
+    await user.click(screen.getByTestId("model-allowlist-bulk-toggle"));
+    await user.click(screen.getByRole("button", { name: "Save models" }));
+    expect(saveModels).toHaveBeenCalledWith({ provider: "openrouter", allowedModels: [] });
+  });
+
   it("disables changes when the user cannot update", () => {
     canUpdate = false;
     setConnected("openrouter", ["anthropic/claude-sonnet-4-6"]);
@@ -272,5 +305,34 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(screen.queryByTestId("llm-models-switch-api-key")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Switch to SuperPlane" }));
     expect(switchSource).toHaveBeenCalledWith({ source: "hosted", apiKey: undefined });
+  });
+
+  it("hides the custom provider until both BYOK flags are on", () => {
+    enabledFeatures = ["organization_byok"];
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    expect(screen.queryByTestId("llm-models-connect-custom")).not.toBeInTheDocument();
+  });
+
+  it("saves a custom provider URL, token, and API type", async () => {
+    const user = userEvent.setup();
+    enabledFeatures = ["organization_byok", "organization_byok_custom_provider"];
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    await user.click(within(screen.getByTestId("llm-models-connect-custom")).getByRole("button", { name: "Connect" }));
+    await user.click(screen.getByRole("button", { name: "Switch to Custom provider" }));
+    await user.type(screen.getByTestId("llm-models-custom-url"), "https://models.example/v1");
+    await user.type(screen.getByTestId("llm-models-custom-token"), "secret-token");
+    await user.click(screen.getByTestId("llm-models-custom-api-type"));
+    await user.click(screen.getByRole("option", { name: "OpenAI-compatible" }));
+    await user.click(screen.getByRole("button", { name: "Save and switch" }));
+
+    expect(switchSource).toHaveBeenCalledWith({
+      source: "custom",
+      apiKey: "secret-token",
+      baseUrl: "https://models.example/v1",
+      apiType: "openai-compatible",
+    });
+    expect(screen.queryByText(/opencode go/i)).not.toBeInTheDocument();
   });
 });

@@ -1161,20 +1161,6 @@
   );
 }
 
-/* Selected Task / Automations pill. Same violet / amber pair as the first-run sphere. */
-[data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
-  border-color: rgb(91 51 173 / 28%);
-  background: color-mix(in oklab, #f3ecff 82%, transparent);
-  color: #4c2a94;
-  box-shadow: none;
-}
-
-.dark [data-slot="tabs-trigger"].sp-popup-view-tab[data-state="active"] {
-  border-color: rgb(246 168 33 / 34%);
-  background: color-mix(in oklab, #f6a821 10%, transparent);
-  color: #f6a821;
-}
-
 .sp-survey-page {
   animation: sp-survey-page 220ms ease-out both;
 }

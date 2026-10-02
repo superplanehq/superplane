@@ -30,34 +30,38 @@ function analysisProtocol(env = process.env) {
   if (clarity && !confidence) {
     text = text
       .replace(
-        "Publish a Clarity score and a Confidence score every turn.",
-        "Publish a Clarity score every turn.",
+        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
+        "Publish a Clarity score when this turn updates the plan, the score would change, or the user asks to update that score. When every required score is 5, publish each required score on that plan turn.",
       )
       .replace(
-        "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
-        "Call propose_clarity every turn with a 1 through 5 score and a short summary. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Each summary is one chip, not the plan.",
+        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
+        "Call propose_clarity when this turn updates the plan, the score would change, or the user asks to update that score. Do not call it on a question turn. When every required score is 5, call that score tool on that plan turn, even if the score did not change. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
       )
       .replace("the spec and the scores", "the spec and the Clarity score");
   } else if (!clarity && confidence) {
     text = text
       .replace(
-        "Publish a Clarity score and a Confidence score every turn.",
-        "Publish a Confidence score every turn.",
+        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
+        "Publish a Confidence score when this turn updates the plan, the score would change, or the user asks to update that score. When every required score is 5, publish each required score on that plan turn.",
       )
       .replace(
-        "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
-        "Call propose_confidence every turn with a 1 through 5 score and a short summary. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.",
+        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
+        "Call propose_confidence when this turn updates the plan, the score would change, or the user asks to update that score. Do not call it on a question turn. When every required score is 5, call that score tool on that plan turn, even if the score did not change. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
       )
       .replace("the spec and the scores", "the spec and the Confidence score");
   } else {
     text = text
       .replace(
-        "Publish a Clarity score and a Confidence score every turn.",
+        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
         "Do not publish Clarity or Confidence scores.",
       )
       .replace(
-        "Call propose_clarity every turn with a 1 through 5 score and a short summary. Call propose_confidence every turn with a 1 through 5 score and a short summary. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan.\n\n",
-        "",
+        "Answer, then update the plan and publish any score that changed. If the user asks to update only a score, publish that score and do not rewrite the plan. When every required score is 5, publish each required score on that plan turn.",
+        "Answer, then update the plan.",
+      )
+      .replace(
+        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.\n\n",
+        "On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.\n\n",
       )
       .replace("the spec and the scores", "the spec");
   }
