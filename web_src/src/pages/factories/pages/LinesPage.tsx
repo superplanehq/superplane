@@ -1245,6 +1245,8 @@ function LineBoardSplitRunPopup({
     <>
       <MergeConfidenceCanvasListeners
         organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={peekOrderId}
         canvasIds={mergeConfidence.canvasIds}
         taskKey={mergeConfidence.taskKey}
         pullRequests={peekPullRequests}

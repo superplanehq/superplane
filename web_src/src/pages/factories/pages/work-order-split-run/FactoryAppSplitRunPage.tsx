@@ -22,6 +22,8 @@ export function FactoryAppSplitRunPage() {
     <>
       <MergeConfidenceCanvasListeners
         organizationId={model.organizationId}
+        factoryId={model.factoryId}
+        orderId={model.mergeConfidenceOrderId}
         canvasIds={model.mergeConfidenceCanvasIds}
         pullRequests={model.mergeConfidencePullRequests}
         taskKey={model.mergeConfidenceTaskKey}

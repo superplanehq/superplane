@@ -7,15 +7,23 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
-import { mergeConfidenceDescribedRunKey, mergeConfidenceRunsKey } from "./useMergeConfidenceRuns";
+import {
+  mergeConfidenceDescribedRunKey,
+  mergeConfidenceRunsKey,
+  mergeConfidenceScoredRunRefsPrefix,
+} from "./useMergeConfidenceRuns";
 
 export function MergeConfidenceCanvasListeners({
   organizationId,
+  factoryId,
+  orderId,
   canvasIds,
   taskKey,
   pullRequests,
 }: {
   organizationId: string;
+  factoryId: string;
+  orderId: string;
   canvasIds: string[];
   taskKey: string;
   pullRequests: FactoriesFactoryPullRequest[];
@@ -24,6 +32,8 @@ export function MergeConfidenceCanvasListeners({
     <MergeConfidenceCanvasListener
       key={canvasId}
       organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={orderId}
       canvasId={canvasId}
       taskKey={taskKey}
       pullRequests={pullRequests}
@@ -33,11 +43,15 @@ export function MergeConfidenceCanvasListeners({
 
 function MergeConfidenceCanvasListener({
   organizationId,
+  factoryId,
+  orderId,
   canvasId,
   taskKey,
   pullRequests,
 }: {
   organizationId: string;
+  factoryId: string;
+  orderId: string;
   canvasId: string;
   taskKey: string;
   pullRequests: FactoriesFactoryPullRequest[];
@@ -66,7 +80,10 @@ function MergeConfidenceCanvasListener({
     void queryClient.invalidateQueries({
       queryKey: ["merge-confidence-described-run", organizationId, canvasId],
     });
-  }, [canvasId, organizationId, queryClient, queryKey]);
+    void queryClient.invalidateQueries({
+      queryKey: mergeConfidenceScoredRunRefsPrefix(organizationId, factoryId, orderId),
+    });
+  }, [canvasId, factoryId, orderId, organizationId, queryClient, queryKey]);
 
   useCanvasWebsocket({
     canvasId,

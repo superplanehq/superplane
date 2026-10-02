@@ -37,13 +37,17 @@ export function mergeConfidenceDescribedRunKey(organizationId: string, canvasId:
   return ["merge-confidence-described-run", organizationId, canvasId, runId] as const;
 }
 
+export function mergeConfidenceScoredRunRefsPrefix(organizationId: string, factoryId: string, orderId: string) {
+  return ["merge-confidence-scored-run-refs", organizationId, factoryId, orderId] as const;
+}
+
 function mergeConfidenceScoredRunRefsKey(
   organizationId: string,
   factoryId: string,
   orderId: string,
   canvasIds: string,
 ) {
-  return ["merge-confidence-scored-run-refs", organizationId, factoryId, orderId, canvasIds] as const;
+  return [...mergeConfidenceScoredRunRefsPrefix(organizationId, factoryId, orderId), canvasIds] as const;
 }
 
 /**
