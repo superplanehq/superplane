@@ -1,4 +1,4 @@
-import { Frame, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
+import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import {
   Timeline,
   TimelineContent,
@@ -18,15 +18,15 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile
 
 import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { SplitRunSource } from "../splitRunSource";
-import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
-import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
+import { IntakeTimelineEvent } from "./consoleIntake";
 import { StepOutputCounts } from "./consoleOutputChips";
 import { runMetaLine } from "./consoleCardText";
 import {
   allStages,
   automationsFromStages,
+  isConsoleCreationStage,
   outcomeSummary,
   stagesByConsoleColumn,
   stagesFromFixture,
@@ -53,7 +53,7 @@ type AutomationsConsoleVariantProps = {
   factoryKey?: string;
   orderNumber?: string;
   lineId?: string;
-  /** Task description markdown shown above the timeline. */
+  /** Task description markdown shown in the Intake event. */
   taskDescription?: string;
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
@@ -79,6 +79,8 @@ export function AutomationsConsoleVariant({
   organizationId,
   factoryId,
   orderId,
+  factoryKey,
+  orderNumber,
   taskDescription,
   canEditDescription = false,
   descriptionBusy = false,
@@ -103,60 +105,34 @@ export function AutomationsConsoleVariant({
   const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
   const liveRun = liveRunTarget(fixture);
   const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
+  const showIntake = Boolean(source) || Boolean(taskDescription?.trim()) || canEditDescription;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="redesign-console-variant">
-      <section className="flex min-w-0 flex-col gap-4">
-        <TimelineTaskDescription
-          description={taskDescription}
-          canEdit={canEditDescription}
-          busy={descriptionBusy}
-          onSave={onDescriptionSave}
-          source={source}
-          files={files}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          orderId={orderId}
-        />
-        <Timeline value={reachedColumnCount(markers)} className="pl-1">
-          {columns.map((column, index) => (
-            <TimelineItem key={column.id} step={index + 1} data-testid={`redesign-console-column-${column.id}`}>
-              <TimelineHeader className="flex items-center gap-2">
-                <TimelineSeparator />
-                <ColumnStatusIndicator marker={markers[index]} columnId={column.id} />
-                <TimelineTitle className="font-semibold">{column.title}</TimelineTitle>
-                {column.automations.length > 0 ? (
-                  <Badge variant="secondary" className="h-5 min-w-5 px-1.5">
-                    {column.automations.length}
-                  </Badge>
-                ) : null}
-              </TimelineHeader>
-              <TimelineContent className="mt-2 flex flex-col gap-3 text-foreground">
-                {column.automations.length === 0 ? (
-                  <span className={META_TEXT_CLASSNAME}>{index + 1 < currentColumn ? "Skipped" : "Not started"}</span>
-                ) : (
-                  column.automations.map((automation) => (
-                    <ConsoleAutomationCard
-                      key={automation.id}
-                      automation={automation}
-                      phase={fixture.phases.find((phase) => phase.id === automation.latest.id)}
-                      phases={fixture.phases}
-                      organizationId={organizationId}
-                      source={source}
-                      expandIdle={expandIdleCards && index + 1 === currentColumn}
-                      anyLive={anyLive}
-                      canStopRun={canStopRun}
-                      actionBusy={actionBusy}
-                      onStopRun={onStopRun}
-                      onRerunStep={onRerunStep}
-                    />
-                  ))
-                )}
-              </TimelineContent>
-            </TimelineItem>
-          ))}
-        </Timeline>
-      </section>
+      <ConsoleTimeline
+        fixture={fixture}
+        columns={columns}
+        markers={markers}
+        currentColumn={currentColumn}
+        anyLive={anyLive}
+        expandIdleCards={expandIdleCards}
+        showIntake={showIntake}
+        source={source}
+        taskDescription={taskDescription}
+        canEditDescription={canEditDescription}
+        descriptionBusy={descriptionBusy}
+        onDescriptionSave={onDescriptionSave}
+        files={files}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        orderId={orderId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        canStopRun={canStopRun}
+        actionBusy={actionBusy}
+        onStopRun={onStopRun}
+        onRerunStep={onRerunStep}
+      />
       <ConsoleSummaryPanel
         fixture={fixture}
         outcome={outcome}
@@ -187,17 +163,178 @@ interface ConsoleColumn {
 
 /**
  * Task stages sit in the column named after them. A column app uses the
- * column it is installed on. The creation stage sits in Backlog even
- * when no automation ran. Pull request activity sits in Verify, except
- * a closer run or an app installed on another column.
+ * column it is installed on. The create-task stage is omitted; the Intake
+ * event shows it. Pull request activity sits in Verify, except a closer
+ * run or an app installed on another column.
  */
 function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
   const byColumn = stagesByConsoleColumn(groups, closerAppId);
   return CONSOLE_COLUMNS.map((column) => ({
     id: column.id,
     title: column.title,
-    automations: automationsFromStages(byColumn[column.id]),
+    automations: automationsFromStages(byColumn[column.id].filter((stage) => !isConsoleCreationStage(stage))),
   }));
+}
+
+function ConsoleTimeline({
+  fixture,
+  columns,
+  markers,
+  currentColumn,
+  anyLive,
+  expandIdleCards,
+  showIntake,
+  source,
+  taskDescription,
+  canEditDescription,
+  descriptionBusy,
+  onDescriptionSave,
+  files,
+  organizationId,
+  factoryId,
+  orderId,
+  factoryKey,
+  orderNumber,
+  canStopRun,
+  actionBusy,
+  onStopRun,
+  onRerunStep,
+}: {
+  fixture: SplitRunFixture;
+  columns: ConsoleColumn[];
+  markers: ColumnMarker[];
+  currentColumn: number;
+  anyLive: boolean;
+  expandIdleCards: boolean;
+  showIntake: boolean;
+  source?: SplitRunSource;
+  taskDescription?: string;
+  canEditDescription: boolean;
+  descriptionBusy: boolean;
+  onDescriptionSave?: (next: string) => void | Promise<void>;
+  files?: FilesFile[];
+  organizationId?: string;
+  factoryId?: string;
+  orderId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  canStopRun: boolean;
+  actionBusy: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  onRerunStep?: (phase: SplitRunPhase) => void;
+}) {
+  const offset = showIntake ? 1 : 0;
+  return (
+    <section className="flex min-w-0 flex-col gap-4">
+      <Timeline value={reachedColumnCount(markers) + offset} className="pl-1">
+        {showIntake ? (
+          <IntakeTimelineEvent
+            source={source}
+            description={taskDescription}
+            canEdit={canEditDescription}
+            busy={descriptionBusy}
+            onSave={onDescriptionSave}
+            files={files}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
+          />
+        ) : null}
+        {columns.map((column, index) => (
+          <ColumnTimelineItem
+            key={column.id}
+            column={column}
+            index={index}
+            step={index + 1 + offset}
+            marker={markers[index]}
+            currentColumn={currentColumn}
+            fixture={fixture}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+            expandIdle={expandIdleCards && index + 1 === currentColumn}
+            anyLive={anyLive}
+            canStopRun={canStopRun}
+            actionBusy={actionBusy}
+            onStopRun={onStopRun}
+            onRerunStep={onRerunStep}
+          />
+        ))}
+      </Timeline>
+    </section>
+  );
+}
+
+function ColumnTimelineItem({
+  column,
+  index,
+  step,
+  marker,
+  currentColumn,
+  fixture,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  expandIdle,
+  anyLive,
+  canStopRun,
+  actionBusy,
+  onStopRun,
+  onRerunStep,
+}: {
+  column: ConsoleColumn;
+  index: number;
+  step: number;
+  marker: ColumnMarker;
+  currentColumn: number;
+  fixture: SplitRunFixture;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  expandIdle: boolean;
+  anyLive: boolean;
+  canStopRun: boolean;
+  actionBusy: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  onRerunStep?: (phase: SplitRunPhase) => void;
+}) {
+  return (
+    <TimelineItem step={step} data-testid={`redesign-console-column-${column.id}`}>
+      <TimelineHeader className="flex items-center gap-2">
+        <TimelineSeparator />
+        <ColumnStatusIndicator marker={marker} columnId={column.id} />
+        <TimelineTitle className="font-semibold">{column.title}</TimelineTitle>
+        {column.automations.length > 0 ? (
+          <Badge variant="secondary" className="h-5 min-w-5 px-1.5">
+            {column.automations.length}
+          </Badge>
+        ) : null}
+      </TimelineHeader>
+      <TimelineContent className="mt-2 flex flex-col gap-3 text-foreground">
+        {column.automations.length === 0 ? (
+          <span className={META_TEXT_CLASSNAME}>{index + 1 < currentColumn ? "Skipped" : "Not started"}</span>
+        ) : (
+          column.automations.map((automation) => (
+            <ConsoleAutomationCard
+              key={automation.id}
+              automation={automation}
+              phase={fixture.phases.find((entry) => entry.id === automation.latest.id)}
+              phases={fixture.phases}
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
+              expandIdle={expandIdle}
+              anyLive={anyLive}
+              canStopRun={canStopRun}
+              actionBusy={actionBusy}
+              onStopRun={onStopRun}
+              onRerunStep={onRerunStep}
+            />
+          ))
+        )}
+      </TimelineContent>
+    </TimelineItem>
+  );
 }
 
 /** Timeline steps to fill: through the last column that has a run. */
@@ -282,75 +419,13 @@ function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; col
   );
 }
 
-/** Preview height so the timeline stays on screen. Show more reveals the rest. */
-const TASK_DESCRIPTION_PREVIEW_PX = 160;
-
-function TimelineTaskDescription({
-  description,
-  canEdit,
-  busy,
-  onSave,
-  source,
-  files,
-  organizationId,
-  factoryId,
-  orderId,
-}: {
-  description?: string;
-  canEdit: boolean;
-  busy: boolean;
-  onSave?: (next: string) => void | Promise<void>;
-  source?: SplitRunSource;
-  files?: FilesFile[];
-  organizationId?: string;
-  factoryId?: string;
-  orderId?: string;
-}) {
-  const hasBody = Boolean(description?.trim()) || canEdit;
-  if (!hasBody && !source) {
-    return null;
-  }
-  return (
-    <Frame
-      variant="default"
-      spacing="sm"
-      stacked
-      className="[--frame-radius:var(--radius-lg)]"
-      data-testid="redesign-console-task-description"
-    >
-      <FrameHeader className="flex flex-row items-center justify-between gap-2">
-        {source ? (
-          <WorkOrderSplitRunSource compact source={source} />
-        ) : (
-          <FrameTitle className="text-[13px] font-medium">Task</FrameTitle>
-        )}
-      </FrameHeader>
-      {hasBody ? (
-        <FramePanel>
-          <WorkOrderSplitRunDescription
-            description={description ?? ""}
-            canEdit={canEdit}
-            busy={busy}
-            previewHeight={TASK_DESCRIPTION_PREVIEW_PX}
-            fadeClassName="from-card via-card/90"
-            onSave={onSave}
-            files={files}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            orderId={orderId}
-          />
-        </FramePanel>
-      ) : null}
-    </Frame>
-  );
-}
-
 function ConsoleAutomationCard({
   automation,
   phase,
   phases,
   organizationId,
-  source,
+  factoryKey,
+  orderNumber,
   expandIdle,
   anyLive,
   canStopRun,
@@ -362,8 +437,8 @@ function ConsoleAutomationCard({
   phase?: SplitRunPhase;
   phases: SplitRunPhase[];
   organizationId?: string;
-  /** Where the task came from. The Backlog creation card shows it. */
-  source?: SplitRunSource;
+  factoryKey?: string;
+  orderNumber?: string;
   /** True for the current-column card on a draft that has not started a run. */
   expandIdle: boolean;
   /** True when any automation on this task is running or waiting. */
@@ -433,7 +508,8 @@ function ConsoleAutomationCard({
               phase={shownPhase}
               phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
               organizationId={organizationId}
-              source={source}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
               onStop={stopRun}
               onRetry={rerunStep}
               actionBusy={actionBusy}
