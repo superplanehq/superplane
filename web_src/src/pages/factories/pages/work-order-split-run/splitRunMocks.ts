@@ -59,6 +59,7 @@ import {
   hasActiveBacklogAnalysisRun,
   type BacklogAnalysisRun,
 } from "../../lib/backlogAnalysis";
+import type { MergeConfidenceLogRun } from "../../lib/mergeConfidenceRuns";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { closureCardDescription } from "./closureCardText";
 import {
@@ -414,6 +415,8 @@ export type SplitRunFixtureOptions = {
   closer?: SplitRunFooterCloser;
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Merge confidence canvas runs for this task. One phase per score. */
+  mergeConfidenceRuns?: MergeConfidenceLogRun[];
   /**
    * Factory apps on board columns. A related run becomes a console card
    * in that column, under the app name.
@@ -736,6 +739,7 @@ function phasesForOrder(
     })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? [], columnApps),
+    ...phasesForMergeConfidenceRuns(options?.mergeConfidenceRuns ?? [], columnApps),
   ];
   return [
     ...knownPhases,
@@ -925,6 +929,71 @@ function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[], columnApps: SplitRunC
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
     .map((entry) => prFeedbackRunToPhase(entry, columnApps));
+}
+
+function phasesForMergeConfidenceRuns(
+  runs: MergeConfidenceLogRun[],
+  columnApps: SplitRunColumnApp[] = [],
+): SplitRunPhase[] {
+  const seen = new Set<string>();
+  return [...runs]
+    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
+    .flatMap((entry) => {
+      const runId = entry.run.id ?? "";
+      if (seen.has(runId)) {
+        return [];
+      }
+      seen.add(runId);
+      return [mergeConfidenceRunToPhase(entry, columnApps)];
+    });
+}
+
+function mergeConfidenceRunToPhase(entry: MergeConfidenceLogRun, columnApps: SplitRunColumnApp[]): SplitRunPhase {
+  const status = statusForCanvasRun(entry.run);
+  const componentName =
+    columnAppForCanvas(columnApps, entry.canvasId)?.name?.trim() || entry.canvasName.trim() || "Merge confidence";
+  const columnKey = consoleColumnForAppKey(columnAppForCanvas(columnApps, entry.canvasId)?.columnKey) ?? "verify";
+  const updatedAt = entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt;
+  const duration = durationForExecution({ createdAt: entry.run.createdAt, updatedAt }, status);
+  const line: SplitRunStreamLine = {
+    id: entry.run.id ?? componentName,
+    at: clockLabel(entry.run.createdAt),
+    componentName,
+    status,
+    duration,
+    durationRunning: status === "running",
+    kind: "action",
+    componentType: componentName,
+    action: prFeedbackStreamAction(status),
+    iconSlug: "box",
+  };
+  return {
+    id: `merge-confidence-${entry.run.id}`,
+    name: phaseNameForColumn(columnKey),
+    status,
+    duration,
+    durationRunning: status === "running",
+    startedAt: entry.run.createdAt,
+    endedAt: status === "running" ? undefined : updatedAt,
+    componentName,
+    artifacts: [],
+    stream: [line],
+    canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+    appId: entry.canvasId,
+    runId: entry.run.id,
+    costCents: metricText(entry.run.costCents),
+    totalTokens: metricText(entry.run.totalTokens),
+    model: joinRunnerModels(entry.run.models ?? []) || undefined,
+    columnKey,
+  };
+}
+
+function metricText(value: string | number | undefined): string | undefined {
+  if (value == null || value === "") {
+    return undefined;
+  }
+  return String(value);
 }
 
 function phasesForColumnAppChecks(
