@@ -18,6 +18,54 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestPostgresDialectorPrefersSimpleProtocol(t *testing.T) {
+	dialector := postgresDialector("postgres://user:pass@db.example:5432/appdb?sslmode=disable")
+	pgDialector, ok := dialector.(*postgresdrv.Dialector)
+	require.True(t, ok)
+	require.NotNil(t, pgDialector.Config)
+	require.True(t, pgDialector.PreferSimpleProtocol)
+}
+
+func TestReadSucceedsAfterIntegerColumnBecomesBigint(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	preparedStatementDSN := withQueryExecMode(t, postgresDSNFromEnv(), "cache_statement")
+	db, err := gorm.Open(postgresDialector(preparedStatementDSN), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	t.Cleanup(func() {
+		require.NoError(t, sqlDB.Close())
+	})
+
+	ctx := context.Background()
+	conn, err := sqlDB.Conn(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, conn.Close())
+	})
+
+	_, err = conn.ExecContext(ctx, `CREATE TEMPORARY TABLE column_type_change (id integer PRIMARY KEY, amount integer)`)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, `INSERT INTO column_type_change (id, amount) VALUES (1, 7)`)
+	require.NoError(t, err)
+
+	const query = `SELECT amount FROM column_type_change WHERE id = $1`
+	var amount int64
+	require.NoError(t, conn.QueryRowContext(ctx, query, 1).Scan(&amount))
+	require.Equal(t, int64(7), amount)
+
+	_, err = conn.ExecContext(ctx, `ALTER TABLE column_type_change ALTER COLUMN amount TYPE bigint`)
+	require.NoError(t, err)
+
+	require.NoError(t, conn.QueryRowContext(ctx, query, 1).Scan(&amount))
+	require.Equal(t, int64(7), amount)
+}
+
 func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
 	dsn := buildPostgresDSN(DSNConfig{
 		Host:            "db.example",
