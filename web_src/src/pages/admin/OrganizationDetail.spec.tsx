@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
@@ -84,6 +84,25 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+          return jsonResponse({
+            items: [
+              {
+                id: "integration-1",
+                app_name: "sentry",
+                installation_name: "acme-sentry",
+                state: "error",
+                state_description: "Sentry is not sending issue events.",
+                details: { installation_uuid: "install-uuid-1", external_organization: "acme-sentry-org" },
+                created_at: "2024-01-15T12:00:00Z",
+                updated_at: "2024-02-20T12:00:00Z",
+              },
+            ],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          });
+        }
         if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
           return jsonResponse({
             features: [{ id: "factories", label: "Factories", description: "Software factories", released: false }],
@@ -128,6 +147,7 @@ describe("OrganizationDetail", () => {
       "Overview",
       "Users",
       "Automations",
+      "Connections",
       "Features",
       "Credits",
     ]);
@@ -201,6 +221,81 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByPlaceholderText("Search automations...")).toBeInTheDocument();
     expect(await screen.findByText("Deploy pipeline")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+  });
+
+  it("shows connection status and details after a tab click", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
+
+    const panel = screen.getByRole("tabpanel", { name: "Connections" });
+    expect(await within(panel).findByText("acme-sentry")).toBeInTheDocument();
+    expect(within(panel).getByText("error")).toBeInTheDocument();
+    expect(within(panel).getByText("Sentry is not sending issue events.")).toBeInTheDocument();
+    expect(within(panel).getByText("install-uuid-1")).toBeInTheDocument();
+    expect(within(panel).getByText("acme-sentry-org")).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Search connections..."), "acme");
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/admin/api/organizations/${ORG_ID}/integrations?`),
+        expect.objectContaining({ credentials: "include" }),
+      );
+      const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+      expect(urls.some((url) => url.includes("search=acme") && url.includes("limit=50"))).toBe(true);
+    });
+  });
+
+  it("loads the next page of connections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({
+          id: ORG_ID,
+          name: "Acme",
+          slug: "acme",
+          description: "Builds widgets",
+          canvas_count: 2,
+          task_count: 4,
+          done_task_count: 6,
+          member_count: 3,
+          created_at: "2024-01-15T12:00:00Z",
+          updated_at: "2024-02-20T12:00:00Z",
+        });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+        const offset = new URL(url, "http://localhost").searchParams.get("offset");
+        return jsonResponse({
+          items: [
+            {
+              id: offset === "50" ? "integration-2" : "integration-1",
+              app_name: "sentry",
+              installation_name: offset === "50" ? "second-sentry" : "acme-sentry",
+              state: "ready",
+              state_description: "",
+              details: {},
+              created_at: "2024-01-15T12:00:00Z",
+              updated_at: "2024-02-20T12:00:00Z",
+            },
+          ],
+          total: 51,
+          limit: 50,
+          offset: Number(offset ?? 0),
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("second-sentry")).toBeInTheDocument();
+    expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {
