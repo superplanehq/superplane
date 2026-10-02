@@ -13,6 +13,12 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 /** A screen that lists intakes or repository providers for a company. */
 export type IntakeSurface = "addIntake" | "onboardingTickets" | "onboardingRepository";
 
+export const INTAKE_SURFACE_ORDER: readonly IntakeSurface[] = [
+  "addIntake",
+  "onboardingTickets",
+  "onboardingRepository",
+];
+
 export interface IntakePresentation {
   key: string;
   name: string;

@@ -16,6 +16,7 @@ import { showErrorToast } from "@/lib/toast";
 import { IntakeAccessCard } from "./IntakeAccessCard";
 import type { AdminIntakeEntry } from "./intakeCatalogModel";
 import { DeleteDialog, DetailCard, EntryMenu, MetadataRail, RenameDialog, StatusNoteEditor } from "./IntakeDetailParts";
+import { IntakePreviewCard } from "./IntakePreviewCard";
 import { IntakeIcon, IntakeStatusPill } from "./IntakeStatusPill";
 import { MaturityStepper } from "./MaturityStepper";
 
@@ -95,6 +96,12 @@ function IntakeDetail({ entry }: { entry: AdminIntakeEntry }) {
               onAddOrganization={(organizationId) => addOrganization.mutate(organizationId, { onError })}
               onRemoveOrganization={(organizationId) => removeOrganization.mutate(organizationId, { onError })}
             />
+          </DetailCard>
+          <DetailCard
+            title="What companies see"
+            description="Pick a company to see this intake as that company sees it in the factory."
+          >
+            <IntakePreviewCard entry={entry} />
           </DetailCard>
         </div>
         <MetadataRail entry={entry} disabled={update.isPending} onChangeCategory={(category) => patch({ category })} />

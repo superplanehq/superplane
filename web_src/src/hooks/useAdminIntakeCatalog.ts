@@ -66,14 +66,15 @@ export function useAdminIntakeCatalog() {
   });
 }
 
+/** Pass an empty organization id to preview a company without access. */
 export function useAdminIntakePreview(key: string, organizationId: string) {
   return useQuery({
     queryKey: adminIntakeCatalogKeys.preview(key, organizationId),
-    queryFn: () =>
-      requestJSON<AdminIntakePreview>(
-        `${entryPath(key)}/preview?${new URLSearchParams({ organization_id: organizationId })}`,
-      ),
-    enabled: Boolean(key && organizationId),
+    queryFn: () => {
+      const params = organizationId ? `?${new URLSearchParams({ organization_id: organizationId })}` : "";
+      return requestJSON<AdminIntakePreview>(`${entryPath(key)}/preview${params}`);
+    },
+    enabled: Boolean(key),
   });
 }
 

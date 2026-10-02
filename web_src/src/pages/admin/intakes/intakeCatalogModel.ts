@@ -83,6 +83,18 @@ export const ONLY_BETA_FOR_ALL_REASON = "Only a Beta intake can be open to all c
 export const NOT_IMPLEMENTED_REASON = "The code for this intake does not exist yet. The status stays Planned.";
 export const NO_COMPANIES_EMPTY = "No companies can use this intake. Add a company to start.";
 
+/** Why a surface does not show the intake to the selected company. */
+export function previewNotShownReason(surface: IntakeSurface, listed: boolean, status: string): string {
+  const label = INTAKE_SURFACE_LABELS[surface];
+  if (!listed) {
+    return `Not shown in ${label}. The code does not support this intake here.`;
+  }
+  if (status === "deprecated") {
+    return `Not shown in ${label}. Companies cannot create new Deprecated intakes.`;
+  }
+  return `Not shown in ${label}. Only the companies that you add can see an Internal intake.`;
+}
+
 export function isIntakeStatus(value: string): value is IntakeStatus {
   return (INTAKE_STATUSES as readonly string[]).includes(value);
 }
