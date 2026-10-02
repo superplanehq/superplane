@@ -85,7 +85,7 @@ git push origin feat/add-new-feature
 2. You should see a banner suggesting to create a pull request from your recently pushed branch
 3. Click "Compare & pull request"
 4. Fill in the PR title following the [title format rules](#title-format-rules)
-5. Add a detailed description (see [Pull Request Description](#pull-request-description))
+5. Add a description with a Summary and a Test plan (see [Pull Request Description](#pull-request-description))
 6. Submit the pull request
 
 ## Title Format Rules
@@ -129,15 +129,28 @@ You can optionally add more detail about the breaking behavior in the PR descrip
 
 ## Pull Request Description
 
-A good PR description helps reviewers understand your changes quickly. Include:
+Use this shape so reviewers can scan the change. The in-repo agent guide
+([AGENTS.md](../../AGENTS.md) and
+[.agents/skills/commit-and-pr-messages/SKILL.md](../../.agents/skills/commit-and-pr-messages/SKILL.md))
+uses the same sections.
 
-### Required Information
+```markdown
+## Summary
 
-- **What changed**: A clear summary of what the PR does
-- **Why**: The motivation or problem being solved
-- **How**: Brief explanation of the approach taken (if not obvious from the code)
-- **Related issues**: Link to any related GitHub issues using `Closes #123` or `Fixes #456`
-- **Breaking changes**: If applicable, clearly document any breaking changes
+<2-4 short sentences or bullets: the problem and why this change exists.
+Focus on motivation and user or system impact.>
+
+## Test plan
+
+- [ ] <Imperative check a reviewer can run>
+- [ ] <Edge cases or regressions worth checking>
+```
+
+Also include when they apply:
+
+- Related issues: `Closes #123` or `Fixes #456`
+- A brief note on approach when it is not obvious from the diff
+- Breaking changes, with migration steps for users
 
 ## Review Process
 
