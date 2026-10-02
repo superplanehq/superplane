@@ -3,6 +3,7 @@ import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
 import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import type { MergeConfidenceLogRun } from "../../lib/mergeConfidenceRuns";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } from "./splitRunCanvases";
 import {
@@ -44,6 +45,7 @@ export function resolveSplitRunOrder(
 export type FixtureForSplitRunPageOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   analysisRuns?: BacklogAnalysisRun[];
+  mergeConfidenceRuns?: MergeConfidenceLogRun[];
   columnApps?: SplitRunColumnApp[];
   artifacts?: FactoriesWorkOrderArtifact[];
   /** True while the Backlog automation still scores this draft, including the
@@ -68,6 +70,7 @@ export function fixtureForSplitRunPage(
     demoArtifacts: false,
     prFeedbackRuns: options?.prFeedbackRuns,
     analysisRuns: options?.analysisRuns,
+    mergeConfidenceRuns: options?.mergeConfidenceRuns,
     columnApps: options?.columnApps,
     artifacts: options?.artifacts,
     isAnalyzing: options?.isAnalyzing,
