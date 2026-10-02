@@ -17,6 +17,7 @@ export { DatadogIntakeSetupPage } from "./DatadogIntakeSetupPage";
 export { DependabotIntakeSetupPage } from "./DependabotIntakeSetupPage";
 export { GitHubIntakeSetupPage } from "./GitHubIntakeSetupPage";
 export { JiraIntakeSetupPage } from "./JiraIntakeSetupPage";
+export { LinearIntakeSetupPage } from "./LinearIntakeSetupPage";
 export { ProductiveIntakeSetupPage } from "./ProductiveIntakeSetupPage";
 export { PlanningSetupPage } from "./PlanningSetupPage";
 export { RiskScoreSetupPage } from "./RiskScoreSetupPage";

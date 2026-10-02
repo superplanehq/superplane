@@ -157,6 +157,17 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       "{{ root().data.title }}",
 		createDescription: "{{ root().data.description }}",
 	},
+	models.FactoryIntakeSourceLinearIssues: {
+		name:             "Linear issues",
+		description:      "Create a work order when a Linear issue is added to a selected project.",
+		triggerComponent: "linear.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"actions": []any{"create", "update"},
+		},
+		createTitle:       `{{ root().data.data.identifier }}: {{ root().data.data.title }}`,
+		createDescription: `{{ root().data.data.description }}`,
+	},
 }
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
@@ -443,6 +454,15 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	if request.Source == models.FactoryIntakeSourceProductiveTasks {
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
+	if request.Source == models.FactoryIntakeSourceLinearIssues {
+		projects := request.Settings.LinearProjectIDs
+		if len(projects) == 0 {
+			projects = configurationStrings(configuration["projects"])
+		}
+		configuration["projects"] = configurationAnyStrings(projects)
+		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
+		configuration["actions"] = []any{"create", "update"}
+	}
 
 	return configuration
 }
@@ -472,6 +492,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceDatadog {
 		return defaultDatadogIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return defaultLinearIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

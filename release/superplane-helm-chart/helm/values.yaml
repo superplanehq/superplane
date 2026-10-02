@@ -109,6 +109,19 @@ polar:
   apiVersion: ""
 
 #
+# SuperPlane Linear OAuth application.
+# When enabled, Connect authorizes this public app.
+# On the Linear application, set the callback URL to
+# {BASE_URL}/api/v1/linear/oauth/callback.
+# Request the read, write, and admin scopes.
+#
+linear:
+  secretName: ""
+  enabled: false
+  clientId: ""
+  clientSecret: ""
+
+#
 # Secret used to sign JWT session tokens
 #
 jwt:

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
@@ -15,9 +16,10 @@ import (
 type OnIssue struct{}
 
 type OnIssueConfiguration struct {
-	Team    string                    `json:"team" mapstructure:"team"`
-	Actions []string                  `json:"actions" mapstructure:"actions"`
-	Labels  []configuration.Predicate `json:"labels" mapstructure:"labels"`
+	Team     string                    `json:"team" mapstructure:"team"`
+	Projects []string                  `json:"projects" mapstructure:"projects"`
+	Actions  []string                  `json:"actions" mapstructure:"actions"`
+	Labels   []configuration.Predicate `json:"labels" mapstructure:"labels"`
 }
 
 func (i *OnIssue) Name() string {
@@ -43,7 +45,8 @@ func (i *OnIssue) Documentation() string {
 
 ## Configuration
 
-- **Team** (required): Linear team to monitor
+- **Team**: Linear team to monitor. Required when no projects are selected.
+- **Projects** (optional): Only issues in these projects. When set, the team can stay empty and SuperPlane listens on every team those projects belong to, including private teams.
 - **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
 - **Labels** (optional): Only trigger for issues carrying specific labels
 
@@ -73,12 +76,32 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Name:        "team",
 			Label:       "Team",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The Linear team to monitor",
+			Required:    false,
+			Description: "The Linear team to monitor. Required when no projects are selected.",
 			Placeholder: "Select a team",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeTeam,
+				},
+			},
+		},
+		{
+			Name:        "projects",
+			Label:       "Projects",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Only issues in these projects. Leave empty to listen to the whole team.",
+			Placeholder: "All projects",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  ResourceTypeProject,
+					Multi: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "team",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "team"},
+						},
+					},
 				},
 			},
 		},
@@ -119,16 +142,21 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Team == "" {
-		return fmt.Errorf("team is required")
-	}
-
 	//
 	// The shared multi-select validation accepts an empty list for a required
 	// field, so reject it here rather than saving a trigger that can never match.
 	//
 	if len(config.Actions) == 0 {
 		return fmt.Errorf("at least one action is required")
+	}
+
+	projects := normalizeIDs(config.Projects)
+	if len(projects) > 0 {
+		return i.setupProjectWebhooks(ctx, projects)
+	}
+
+	if config.Team == "" {
+		return fmt.Errorf("team is required")
 	}
 
 	team, err := requireTeam(ctx.Integration, config.Team)
@@ -142,6 +170,27 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
+		ResourceType: IssueResourceType,
+	})
+}
+
+func (i *OnIssue) setupProjectWebhooks(ctx core.TriggerContext, projects []string) error {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	teamIDs, err := client.ProjectTeamIDs(projects)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.Metadata.Set(NodeMetadata{}); err != nil {
+		return err
+	}
+
+	return ctx.Integration.RequestWebhook(WebhookConfiguration{
+		TeamIDs:      teamIDs,
 		ResourceType: IssueResourceType,
 	})
 }
@@ -191,6 +240,10 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusOK, nil, nil
 	}
 
+	if !issueMatchesProjectScope(data, normalizeIDs(config.Projects)) {
+		return http.StatusOK, nil, nil
+	}
+
 	if len(config.Labels) > 0 && !i.hasWhitelistedLabel(ctx.Logger, data, config.Labels) {
 		return http.StatusOK, nil, nil
 	}
@@ -204,6 +257,49 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// issueMatchesProjectScope keeps issues in the selected projects. An empty
+// project list keeps the team-wide behavior, including completed issues.
+// An update creates a task only when the issue moves into a selected
+// project. Completed and canceled issues never match a project scope.
+func issueMatchesProjectScope(data map[string]any, projects []string) bool {
+	if len(projects) == 0 {
+		return true
+	}
+	if closedLinearIssue(data) {
+		return false
+	}
+
+	issue, _ := data["data"].(map[string]any)
+	projectID, _ := issue["projectId"].(string)
+	projectID = strings.TrimSpace(projectID)
+	if !slices.Contains(projects, projectID) {
+		return false
+	}
+
+	action, _ := data["action"].(string)
+	if action != "update" {
+		return true
+	}
+
+	updatedFrom, ok := data["updatedFrom"].(map[string]any)
+	if !ok {
+		return false
+	}
+	previous, exists := updatedFrom["projectId"]
+	if !exists {
+		return false
+	}
+	previousID, _ := previous.(string)
+	return previousID != projectID
+}
+
+func closedLinearIssue(data map[string]any) bool {
+	issue, _ := data["data"].(map[string]any)
+	state, _ := issue["state"].(map[string]any)
+	stateType, _ := state["type"].(string)
+	return stateType == "completed" || stateType == "canceled"
 }
 
 func (i *OnIssue) whitelistedAction(logger *log.Entry, data map[string]any, allowedActions []string) bool {
