@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/lint/gocoverage"
 )
 
 const (
@@ -154,10 +156,7 @@ func readCoverageProfile(profilePath string, ignoredPackagePrefixes []string) (c
 		return coverageStats{}, fmt.Errorf("coverage profile %s is empty", profilePath)
 	}
 
-	totalStatements := 0
-	totalCoveredStatements := 0
-	packageStats := map[string]packageTotals{}
-
+	parsedBlocks := make([]gocoverage.Block, 0, len(lines))
 	for index, line := range lines {
 		if index == 0 {
 			if !strings.HasPrefix(line, "mode:") {
@@ -182,22 +181,40 @@ func readCoverageProfile(profilePath string, ignoredPackagePrefixes []string) (c
 			return coverageStats{}, fmt.Errorf("invalid execution count in line %q: %w", line, err)
 		}
 
-		filePath := strings.SplitN(fileWithRange, ":", 2)[0]
-		packagePath := toPackagePath(filePath)
+		filePath, startLine, endLine, ok := gocoverage.ParseBlockLocation(fileWithRange)
+		if !ok {
+			return coverageStats{}, fmt.Errorf("unexpected coverage location: %s", fileWithRange)
+		}
 
-		if shouldIgnorePackage(packagePath, ignoredPackagePrefixes) {
+		if shouldIgnorePackage(toPackagePath(filePath), ignoredPackagePrefixes) {
 			continue
 		}
 
-		totalStatements += statementCount
-		if executionCount > 0 {
-			totalCoveredStatements += statementCount
+		parsedBlocks = append(parsedBlocks, gocoverage.Block{
+			File:       filePath,
+			StartLine:  startLine,
+			EndLine:    endLine,
+			Statements: statementCount,
+			Covered:    executionCount > 0,
+		})
+	}
+
+	normalized := gocoverage.NormalizeBlocks(parsedBlocks)
+
+	totalStatements := 0
+	totalCoveredStatements := 0
+	packageStats := map[string]packageTotals{}
+	for _, block := range normalized {
+		packagePath := toPackagePath(block.File)
+		totalStatements += block.Statements
+		if block.Covered {
+			totalCoveredStatements += block.Statements
 		}
 
 		t := packageStats[packagePath]
-		t.totalStatements += statementCount
-		if executionCount > 0 {
-			t.coveredStatements += statementCount
+		t.totalStatements += block.Statements
+		if block.Covered {
+			t.coveredStatements += block.Statements
 		}
 		packageStats[packagePath] = t
 	}

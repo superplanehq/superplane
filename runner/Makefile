@@ -21,7 +21,7 @@ test-integration:
 	docker run --rm --network "$$net" \
 	  -v "$$(pwd):/src" -w /src \
 	  -e TEST_DATABASE_URL="$(LOCAL_BROKER_DATABASE_URL)" \
-	  golang:1.25 \
+	  golang:1.27 \
 	  go test ./task-broker/... ./runner/... ./shared/... -count=1 -p 1
 
 LOCAL_BROKER_LISTEN ?= :8081
@@ -109,7 +109,7 @@ task-broker:
 	  -e DATABASE_URL="$(LOCAL_BROKER_DATABASE_URL)" \
 	  -e LISTEN_ADDR=":$$port" \
 	  -e AUTH_TOKEN="$(LOCAL_STACK_AUTH_TOKEN)" \
-	  golang:1.25 \
+	  golang:1.27 \
 	  go run ./task-broker/cmd/task-broker
 
 # After task-broker is listening; registers LOCAL_FLEET_ID on the broker.
