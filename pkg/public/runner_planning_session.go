@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -26,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -584,52 +584,57 @@ func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *mod
 
 func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
 	switch {
-	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid),
+		errors.Is(err, models.ErrFactoryWorkOrderCheckInvalid):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
 		errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, "planning session not found", http.StatusNotFound)
+	case errors.Is(err, models.ErrFactoryWorkOrderNotFound):
+		http.Error(w, "factory work order not found", http.StatusNotFound)
+	case errors.Is(err, models.ErrFactoryNotFound):
+		http.Error(w, "factory not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		http.Error(w, "planning session has no draft", http.StatusConflict)
 	case isPlanningRequestCanceled(r, err):
 		log.WithError(err).WithField("route", resolveCriticalHTTPRoute(r)).Info("runner planning session client disconnected")
 		w.WriteHeader(statusClientClosedRequest)
 	default:
 		log.WithError(err).Error("runner planning session failed")
-		captureRunnerPlanningErrorToSentry(r, session, err)
-		http.Error(w, "Lookup failed", http.StatusInternalServerError)
+		noteRunnerPlanningServerError(r, session, err)
+		http.Error(w, "Planning session failed", http.StatusInternalServerError)
 	}
 }
 
-func captureRunnerPlanningErrorToSentry(r *http.Request, session *models.FactoryPlanningSession, err error) {
-	hub := sentry.CurrentHub()
-	if hub == nil || hub.Client() == nil {
+func noteRunnerPlanningServerError(r *http.Request, session *models.FactoryPlanningSession, err error) {
+	if r == nil || err == nil {
 		return
 	}
-	hub.WithScope(func(scope *sentry.Scope) {
-		applyRunnerPlanningErrorTags(scope, r, session, err)
-		hub.CaptureException(err)
-	})
+	middleware.SetServerError(r.Context(), err, runnerPlanningServerErrorTags(r, session, err))
 }
 
-func applyRunnerPlanningErrorTags(scope *sentry.Scope, r *http.Request, session *models.FactoryPlanningSession, err error) {
+func runnerPlanningServerErrorTags(r *http.Request, session *models.FactoryPlanningSession, err error) map[string]string {
+	tags := map[string]string{}
 	if r != nil {
 		if route := resolveCriticalHTTPRoute(r); route != "" {
-			scope.SetTag("route", route)
+			tags["route"] = route
 		}
 	}
 	if session != nil {
 		if session.ID != uuid.Nil {
-			scope.SetTag("planning_session_id", session.ID.String())
+			tags["planning_session_id"] = session.ID.String()
 		}
 		if session.DraftWorkOrderID != nil && *session.DraftWorkOrderID != uuid.Nil {
-			scope.SetTag("draft_work_order_id", session.DraftWorkOrderID.String())
+			tags["draft_work_order_id"] = session.DraftWorkOrderID.String()
 		}
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code != "" {
-		scope.SetTag("postgres_error_code", pgErr.Code)
+		tags["postgres_error_code"] = pgErr.Code
 	}
+	return tags
 }
 
 func clampPlanningHoldSeconds(raw string) int {

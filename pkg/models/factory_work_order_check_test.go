@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models/factory"
-	"gorm.io/datatypes"
 )
 
 func TestFactoryWorkOrder_ReportCheck_Validation(t *testing.T) {
@@ -216,7 +215,7 @@ func TestAppendRecentCheckScore_CapsAndSeedsHistory(t *testing.T) {
 	for i := range long {
 		long[i] = float64(i)
 	}
-	capped := appendRecentCheckScore(datatypes.NewJSONSlice(long), 0, 99)
+	capped := appendRecentCheckScore(recentCheckScores(long), 0, 99)
 	require.Len(t, []float64(capped), MaxFactoryWorkOrderCheckRecentScores)
 	assert.Equal(t, float64(1), capped[0])
 	assert.Equal(t, float64(99), capped[MaxFactoryWorkOrderCheckRecentScores-1])
@@ -272,4 +271,47 @@ func TestFactoryWorkOrder_ListChecks_OrdersByFirstReport(t *testing.T) {
 	assert.Equal(t, "risk-review", checks[0].Key)
 	assert.Equal(t, "code-coverage", checks[1].Key)
 	assert.Equal(t, "confidence", checks[2].Key)
+}
+
+func TestFactoryWorkOrder_ReportCheck_ReadsNullScoreHistory(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	db := database.DB(t.Context())
+	_, userID, factoryModel := setupFactoryWithUser(t, "check-null-history")
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	first, err := order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      "confidence",
+		Name:     "Confidence score",
+		Score:    2,
+		MaxScore: 5,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Exec(
+		"UPDATE factory_work_order_checks SET recent_scores = NULL WHERE id = ?",
+		first.ID,
+	).Error)
+
+	listed, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.Empty(t, []float64(listed[0].RecentScores))
+
+	grouped, err := ListChecksForWorkOrders(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	require.Len(t, grouped[order.ID], 1)
+
+	second, err := order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      "confidence",
+		Name:     "Confidence score",
+		Score:    4,
+		MaxScore: 5,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	require.NotNil(t, second.PreviousScore)
+	assert.Equal(t, 2.0, *second.PreviousScore)
+	assert.Equal(t, []float64{2, 4}, []float64(second.RecentScores))
 }

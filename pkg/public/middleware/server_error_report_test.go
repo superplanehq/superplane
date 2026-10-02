@@ -212,6 +212,41 @@ func TestLoggingMiddleware_StoresStatusMessageWhenCauseRepeatsSafeMessage(t *tes
 	assert.Empty(t, events[0].Exception)
 }
 
+func TestLoggingMiddleware_StoresHandlerServerErrorCause(t *testing.T) {
+	const (
+		path      = "/api/v1/runner/planning-sessions/confidence"
+		causeText = "scan recent_scores: sql: Scan error"
+		safeBody  = "Planning session failed\n"
+	)
+
+	transport := bindCaptureTransport(t)
+	logger, _ := newJSONLogger()
+	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		SetServerError(r.Context(), errors.New(causeText), map[string]string{
+			"route":               path,
+			"planning_session_id": "session-1",
+		})
+		http.Error(w, "Planning session failed", http.StatusInternalServerError)
+	}))
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, nil))
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Equal(t, safeBody, recorder.Body.String())
+	assert.NotContains(t, recorder.Body.String(), causeText)
+
+	events := transport.Events()
+	require.Len(t, events, 1)
+	event := events[0]
+	assert.Empty(t, event.Message)
+	assert.Equal(t, []string{causeText}, exceptionValues(event))
+	assert.NotContains(t, event.Message, statusReport(http.StatusInternalServerError, path))
+	assert.Equal(t, "500", event.Tags["status"])
+	assert.Equal(t, path, event.Tags["route"])
+	assert.Equal(t, "session-1", event.Tags["planning_session_id"])
+}
+
 func TestLoggingMiddleware_DoesNotStoreClientError(t *testing.T) {
 	transport := bindCaptureTransport(t)
 	logger, _ := newJSONLogger()
