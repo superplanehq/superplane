@@ -5,10 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { isUrl } from "@/lib/utils";
-import { Check, Pencil, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Check, ExternalLink, Pencil, X } from "lucide-react";
 import { DescriptionTooltip } from "./DescriptionTooltip";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
+
+const GITHUB_APP_INSTALLATION_URL_PROPERTY = "appInstallationURL";
 
 export interface PropertiesTabProps {
   integrationProperties: IntegrationProperty[];
@@ -19,6 +22,34 @@ export interface PropertiesTabProps {
   settingsMutationBusy: boolean;
   saveProperty: (propertyName: string, value: string) => Promise<void>;
   isSavingProperty: (propertyName: string | undefined) => boolean;
+}
+
+function GitHubRepositoryAccessHelp({ integrationProperties }: { integrationProperties: IntegrationProperty[] }) {
+  const installationURL =
+    integrationProperties.find((property) => property.name === GITHUB_APP_INSTALLATION_URL_PROPERTY)?.value?.trim() ??
+    "";
+
+  if (!isUrl(installationURL)) {
+    return null;
+  }
+
+  return (
+    <Alert>
+      <AlertTitle>Can't find a repository?</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          The GitHub App only lists repositories it can access. Update its repository access in GitHub, then return
+          here.
+        </p>
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <a href={installationURL} target="_blank" rel="noopener noreferrer">
+            Manage repository access
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
 }
 
 type PropertyReadonlyDisplayProps = {
@@ -259,6 +290,7 @@ export function PropertiesTab({
 
   return (
     <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
+      <GitHubRepositoryAccessHelp integrationProperties={integrationProperties} />
       {integrationProperties.map((property) => (
         <IntegrationPropertyRow
           key={property.name}
