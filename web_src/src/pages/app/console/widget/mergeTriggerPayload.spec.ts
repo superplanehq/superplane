@@ -51,4 +51,35 @@ describe("mergeTriggerPayload", () => {
     // empty string (the literal prefix in this template is also empty).
     expect(out).toEqual({ amount: "" });
   });
+
+  it("uses row.payload when payloadTemplates is omitted", () => {
+    const row = {
+      id: "run-2",
+      status: "failed",
+      payload: { repo: "superplane", pr_number: 42 },
+    };
+    const params = mergeTriggerParameters(START_NODE, "run", "deploy", row);
+    expect(params).toEqual({
+      template: "deploy",
+      repo: "superplane",
+      pr_number: 42,
+    });
+  });
+
+  it("uses row data without internal metadata when row.payload is not an object and payloadTemplates is omitted", () => {
+    const row = {
+      id: "mem-3",
+      namespace: "environments",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      service: "worker",
+      version: "v2.1",
+    };
+    const params = mergeTriggerParameters(START_NODE, "run", "deploy", row);
+    expect(params).toEqual({
+      template: "deploy",
+      service: "worker",
+      version: "v2.1",
+    });
+  });
 });

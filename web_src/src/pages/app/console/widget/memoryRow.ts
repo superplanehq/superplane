@@ -35,11 +35,19 @@ export function flattenMemoryEntries(
   for (const entry of filtered) {
     const value = getValueAtPath(entry.values, fieldPath);
     if (Array.isArray(value)) {
-      for (const item of value) {
+      for (let i = 0; i < value.length; i++) {
+        const item = value[i];
         if (item && typeof item === "object") {
-          out.push({ id: entry.id, namespace: entry.namespace, ...(item as Record<string, unknown>) });
+          const itemRecord = item as Record<string, unknown>;
+          const itemId =
+            typeof itemRecord.id === "string" && itemRecord.id.length > 0
+              ? itemRecord.id
+              : typeof itemRecord.id === "number" || typeof itemRecord.id === "bigint"
+                ? String(itemRecord.id)
+                : `${entry.id}:${i}`;
+          out.push({ id: itemId, namespace: entry.namespace, ...itemRecord });
         } else if (item !== undefined) {
-          out.push({ id: entry.id, namespace: entry.namespace, value: item });
+          out.push({ id: `${entry.id}:${i}`, namespace: entry.namespace, value: item });
         }
       }
     } else if (value !== undefined) {
