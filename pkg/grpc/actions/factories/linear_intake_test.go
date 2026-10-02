@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func Test__intakeFilterExpressionFor_Linear(t *testing.T) {
@@ -58,7 +59,9 @@ func Test__applyIntakeSettingsToGraph__LinearRequiresAProject(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, nodes, 1)
-	assert.Equal(t, []string{"project-1", "project-2"}, nodes[0].Configuration["projects"])
+	assert.Equal(t, []any{"project-1", "project-2"}, nodes[0].Configuration["projects"])
+	_, err = structpb.NewStruct(nodes[0].Configuration)
+	require.NoError(t, err)
 }
 
 func Test__withLinearSeedLabels(t *testing.T) {

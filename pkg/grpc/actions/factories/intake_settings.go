@@ -884,6 +884,16 @@ func metadataBool(value any, fallback bool) bool {
 	return fallback
 }
 
+// configurationAnyStrings stores a string list in node configuration.
+// protobuf structs reject []string, so a Go string slice fails canvas creation.
+func configurationAnyStrings(values []string) []any {
+	items := make([]any, 0, len(values))
+	for _, value := range values {
+		items = append(items, value)
+	}
+	return items
+}
+
 func configurationStrings(value any) []string {
 	switch values := value.(type) {
 	case []string:

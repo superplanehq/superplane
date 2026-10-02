@@ -1,0 +1,11 @@
+{{- if and .Values.linear.enabled (eq .Values.linear.secretName "") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.linear.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  SUPERPLANE_LINEAR_OAUTH_CLIENT_ID: {{ .Values.linear.clientId | required ".Values.linear.clientId is required." | b64enc }}
+  SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET: {{ .Values.linear.clientSecret | required ".Values.linear.clientSecret is required." | b64enc }}
+{{- end }}

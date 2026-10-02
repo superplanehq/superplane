@@ -316,7 +316,7 @@ func applyIntakeSettingsToGraph(
 				configuration["alertTransitions"] = intakeDatadogAlertTransitions(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceLinearIssues:
-				configuration["projects"] = updated.LinearProjectIDs
+				configuration["projects"] = configurationAnyStrings(updated.LinearProjectIDs)
 				configuration["labels"] = linearLabelPredicates(updated.LinearLabels)
 				configuration["actions"] = []any{"create", "update"}
 				nodes[i].Configuration = configuration

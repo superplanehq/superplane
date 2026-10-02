@@ -55,6 +55,10 @@ spec:
             - secretRef:
                 name: {{ include "secrets.polar.name" . }}
             {{- end }}
+            {{- if .Values.linear.enabled }}
+            - secretRef:
+                name: {{ include "secrets.linear.name" . }}
+            {{- end }}
           env:
             - name: START_CONSUMERS
               value: "yes"

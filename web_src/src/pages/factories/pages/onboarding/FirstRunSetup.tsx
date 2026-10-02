@@ -213,6 +213,9 @@ function TicketsScreenHost({
       jiraAvailable={flow.jiraAvailable}
       jiraFeatureLoading={flow.jiraFeatureLoading}
       jiraChoiceBlock={flow.jiraChoiceBlock}
+      linearAvailable={flow.linearAvailable}
+      linearFeatureLoading={flow.linearFeatureLoading}
+      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -222,10 +225,18 @@ function TicketsScreenHost({
       jiraProjectsLoading={model.jiraProjectsLoading}
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
+      linearConnected={model.setup.connected.has("linear")}
+      linearProjects={model.linearProjects}
+      linearProjectsLoading={model.linearProjectsLoading}
+      linearProjectsError={model.linearProjectsError}
+      linearProjectIds={model.linearProjectIds}
       onSelectTicketSource={flow.selectTicketSource}
       onConnectJira={() => void flow.connectJira()}
       onSelectJiraProject={model.setJiraProjectId}
       onRetryJiraProjects={model.retryJiraProjects}
+      onConnectLinear={() => void flow.connectLinear()}
+      onToggleLinearProject={model.toggleLinearProject}
+      onRetryLinearProjects={model.retryLinearProjects}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );

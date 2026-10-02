@@ -10,6 +10,7 @@ import (
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func Test__BuildIntakeCanvas(t *testing.T) {
@@ -48,7 +49,9 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		require.NoError(t, err)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
-		assert.Equal(t, []string{"project-1", "project-2"}, trigger.Configuration["projects"])
+		assert.Equal(t, []any{"project-1", "project-2"}, trigger.Configuration["projects"])
+		_, err = structpb.NewStruct(trigger.Configuration)
+		require.NoError(t, err)
 		assert.Equal(t, []any{"create", "update"}, trigger.Configuration["actions"])
 		assert.Equal(t, "integration-1", trigger.Integration.ID)
 

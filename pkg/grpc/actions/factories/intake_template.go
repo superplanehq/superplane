@@ -459,7 +459,7 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 		if len(projects) == 0 {
 			projects = configurationStrings(configuration["projects"])
 		}
-		configuration["projects"] = projects
+		configuration["projects"] = configurationAnyStrings(projects)
 		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
 		configuration["actions"] = []any{"create", "update"}
 	}
