@@ -473,7 +473,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(header).queryByRole("button", { name: /agent run/ })).not.toBeInTheDocument();
   });
 
-  it("shows agent run, artifact, and check counts as badges on the card", () => {
+  it("shows the agent run count as a badge on the card", () => {
     renderSplitRun();
 
     const implement = screen
@@ -482,8 +482,9 @@ describe("WorkOrderSplitRunPopup", () => {
     const header = within(implement).getByTestId(/^redesign-console-card-header-/);
 
     expect(within(header).getByText("1 agent run")).toBeInTheDocument();
-    expect(within(header).getByText(/\d+ artifacts?/)).toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: /agent run|artifact|check/ })).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ artifacts?/)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/\d+ checks?/)).not.toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: /agent run/ })).not.toBeInTheDocument();
     expect(within(header).queryByRole("button", { name: "Full log" })).not.toBeInTheDocument();
   });
 
