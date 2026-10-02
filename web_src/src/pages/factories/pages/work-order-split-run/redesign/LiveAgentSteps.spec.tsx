@@ -24,6 +24,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [RUNNING_RUNNER],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream());
@@ -135,6 +136,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
         RUNNING_RUNNER,
@@ -214,6 +216,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     const stage = {
@@ -247,6 +250,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(
@@ -346,6 +350,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
         RUNNING_RUNNER,
@@ -388,6 +393,62 @@ describe("LiveAgentSteps", () => {
 
     expect(await screen.findByText("Something went wrong while fetching logs.")).toBeInTheDocument();
     expect(screen.queryByRole("status", { name: "Waiting for logs" })).not.toBeInTheDocument();
+  });
+
+  it("keeps live runner activity when another node failed", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [
+        {
+          id: "broken-node",
+          nodeId: "broken-node",
+          at: "09:00:01",
+          componentName: "Broken node",
+          status: "failed",
+          action: "failed",
+          kind: "action",
+          detail: "unknown name asdad",
+        },
+        RUNNING_RUNNER,
+      ],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(
+      idleStream({
+        sections: [
+          {
+            index: 1,
+            text: "Implementation",
+            kind: "prompt",
+            preview: "",
+            lines: [],
+            events: [],
+            activities: [LIVE_ACTIVITY],
+            status: "running",
+            duration_ms: null,
+            started_at: 1,
+            collapsed: false,
+          },
+        ],
+        activityState: { activities: [LIVE_ACTIVITY], seenEventIds: new Set() },
+      }),
+    );
+
+    render(
+      <LiveAgentSteps
+        stage={{ ...implementStage(), agentSteps: [] }}
+        phase={implementPhase()}
+        organizationId="org-1"
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Broken node")).toBeInTheDocument();
+    expect(screen.getByTestId("redesign-live-activity-implement")).toBeInTheDocument();
+    expect(screen.getByText("Inspecting the retry path.")).toBeInTheDocument();
   });
 
   it("keeps Starting agent when the live stream has not reported a waiting note", () => {

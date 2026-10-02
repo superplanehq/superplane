@@ -29,6 +29,11 @@ export type SplitRunIntakeKind =
   | "datadog"
   | "slack";
 
+export type SplitRunAddedBy =
+  | { kind: "intake"; name: string }
+  | { kind: "manual" }
+  | { kind: "imported"; personName: string };
+
 export type SplitRunSource =
   | {
       kind: "intake";
@@ -36,6 +41,7 @@ export type SplitRunSource =
       iconSrc: string;
       iconAlt: string;
       ticket?: { label: string; href: string };
+      addedBy?: SplitRunAddedBy;
     }
   | {
       kind: "mcp";
@@ -47,7 +53,18 @@ export type SplitRunSource =
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
+      addedBy?: SplitRunAddedBy;
     };
+
+export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
+  if (source.addedBy) {
+    return source.addedBy;
+  }
+  if (source.kind === "manual") {
+    return { kind: "manual" };
+  }
+  return { kind: "intake", name: source.name };
+}
 
 export function isMonochromeSourceLogo(iconAlt: string): boolean {
   return iconAlt === "GitHub" || iconAlt === "SuperPlane";
@@ -113,21 +130,24 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
 export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSource {
   const originHref = order.origin?.url?.trim();
   if (originHref) {
-    return intakeSourceFromHref(
+    const source = intakeSourceFromHref(
       originHref,
       intakeKindFromHref(originHref),
       order.origin?.label?.trim() || sourceTicketLabel(originHref),
     );
+    return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
   }
 
   const candidate = reviewCandidateForWorkOrderId(order.id);
   if (candidate?.issue.url) {
-    return intakeSourceFromHref(candidate.issue.url);
+    const source = intakeSourceFromHref(candidate.issue.url);
+    return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
   }
 
   const automation = order.createdBy?.automation;
   if (automation) {
-    return intakeSourceFromKind(intakeKindForAutomation(automation));
+    const source = intakeSourceFromKind(intakeKindForAutomation(automation));
+    return { ...source, addedBy: { kind: "intake", name: source.name } };
   }
 
   const mcpName = order.mcpClient?.name?.trim();
@@ -144,7 +164,19 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
     kind: "manual",
     person: sourcePerson(order, resolveUser),
     detail: CREATED_MANUALLY,
+    addedBy: { kind: "manual" },
   };
+}
+
+function addedByForIntakeOrder(order: FactoriesWorkOrder, intakeName: string): SplitRunAddedBy {
+  if (order.createdBy?.automation) {
+    return { kind: "intake", name: intakeName };
+  }
+  const personName = order.createdBy?.user?.name?.trim();
+  if (personName) {
+    return { kind: "imported", personName };
+  }
+  return { kind: "intake", name: intakeName };
 }
 
 export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, source?: SplitRunSource): boolean {
@@ -157,11 +189,13 @@ export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, sou
   return extractArtifactUrl(toArtifactDataRecord(artifact.data)) === source.ticket.href;
 }
 
+type SplitRunIntakeSource = Extract<SplitRunSource, { kind: "intake" }>;
+
 function intakeSourceFromHref(
   href: string,
   intakeKind = intakeKindFromHref(href),
   label = sourceTicketLabel(href),
-): SplitRunSource {
+): SplitRunIntakeSource {
   return {
     kind: "intake",
     ...INTAKE_PRESENTATION[intakeKind],
@@ -184,7 +218,7 @@ function intakeKindFromLabel(label: string): SplitRunIntakeKind {
   return INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind ?? "github-issues";
 }
 
-function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunSource {
+function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {
   return {
     kind: "intake",
     ...INTAKE_PRESENTATION[intakeKind],

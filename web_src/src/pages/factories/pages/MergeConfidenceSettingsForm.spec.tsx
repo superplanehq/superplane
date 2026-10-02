@@ -36,16 +36,19 @@ function draft(): PlanningReviewDraft {
 }
 
 describe("MergeConfidenceSettingsForm", () => {
+  it("does not show the risk category list", () => {
+    render(<MergeConfidenceSettingsForm draft={draft()} onSave={vi.fn()} />);
+
+    expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
+  });
+
   it("turns a check off and saves that choice in the prompt", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(<MergeConfidenceSettingsForm draft={draft()} onSave={onSave} />);
 
-    expect(screen.getByTestId("risk-score-setup-categories")).toBeInTheDocument();
-
     await user.click(screen.getByRole("switch", { name: "Drift from Specification" }));
     await user.click(screen.getByRole("switch", { name: "Blast radius" }));
-    expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("merge-confidence-settings-save"));
 

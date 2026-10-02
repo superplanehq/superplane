@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc/status"
@@ -14,16 +15,20 @@ type serverErrorReportKey struct{}
 // serverErrorReport is filled by the gateway after LoggingMiddleware attaches it.
 // The pointer stays on the request context so the access log can read a later write.
 type serverErrorReport struct {
-	cause    error
-	source   error
-	reported bool
+	cause           error
+	source          error
+	reported        bool
+	tags            map[string]string
+	omitRequestBody bool
 }
 
 // NotedServerError is a server-error cause kept for the error tracker and the access log.
 // Source is the original handler error, when one was present.
 type NotedServerError struct {
-	Cause  error
-	Source error
+	Cause           error
+	Source          error
+	Tags            map[string]string
+	OmitRequestBody bool
 }
 
 // WithServerErrorReport attaches an empty holder to the request.
@@ -43,7 +48,30 @@ func NotedServerErrorFrom(ctx context.Context) (NotedServerError, bool) {
 		return NotedServerError{}, false
 	}
 
-	return NotedServerError{Cause: report.cause, Source: report.source}, true
+	return NotedServerError{
+		Cause:           report.cause,
+		Source:          report.source,
+		Tags:            report.tags,
+		OmitRequestBody: report.omitRequestBody,
+	}, true
+}
+
+// SetHTTPHandlerServerError records a raw handler error for Sentry when the
+// response status is already known (non-gateway handlers such as webhooks).
+func SetHTTPHandlerServerError(ctx context.Context, err error, tags map[string]string) {
+	if err == nil {
+		return
+	}
+
+	report := serverErrorReportFrom(ctx)
+	if report == nil {
+		return
+	}
+
+	report.cause = err
+	report.source = err
+	report.tags = copyServerErrorTags(tags)
+	report.omitRequestBody = true
 }
 
 // ServerErrorAlreadyReported reports whether a panic was already sent to the error tracker.
@@ -126,4 +154,24 @@ func serverErrorReportFrom(ctx context.Context) *serverErrorReport {
 
 	report, _ := ctx.Value(serverErrorReportKey{}).(*serverErrorReport)
 	return report
+}
+
+func copyServerErrorTags(tags map[string]string) map[string]string {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	copied := make(map[string]string, len(tags))
+	for key, value := range tags {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		copied[key] = value
+	}
+	if len(copied) == 0 {
+		return nil
+	}
+	return copied
 }

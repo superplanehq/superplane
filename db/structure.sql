@@ -480,7 +480,7 @@ CREATE TABLE public.factory_llm_model_allowlists (
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
-    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
 );
 
 
@@ -1064,7 +1064,7 @@ CREATE TABLE public.organization_byok_model_allowlists (
     provider text NOT NULL,
     allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text, 'custom'::text])))
 );
 
 
@@ -5108,7 +5108,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261001215733	f
+20261002133436	f
 \.
 
 

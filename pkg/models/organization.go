@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -62,8 +63,14 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
+	search = strings.TrimSpace(search)
 	if search != "" {
-		query = query.Where("organizations.name ILIKE ?", "%"+search+"%")
+		pattern := "%" + search + "%"
+		query = query.Where(
+			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+			pattern,
+			pattern,
+		)
 	}
 
 	var total int64
@@ -435,6 +442,24 @@ func DisableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featu
 			"updated_at":                    &now,
 		}).
 		Error
+}
+
+// OrganizationHasExperimentalFeatures reports whether every feature is active
+// for the organization. Released features count as active.
+func OrganizationHasExperimentalFeatures(tx *gorm.DB, orgID uuid.UUID, featureIDs ...string) (bool, error) {
+	if tx == nil {
+		return false, fmt.Errorf("transaction is required")
+	}
+	organization, err := FindOrganizationByIDInTransaction(tx, orgID.String())
+	if err != nil {
+		return false, err
+	}
+	for _, featureID := range featureIDs {
+		if !organization.HasExperimentalFeature(featureID) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // HasExperimentalFeature reports whether the given feature id is active for

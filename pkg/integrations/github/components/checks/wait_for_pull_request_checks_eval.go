@@ -143,8 +143,9 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 
 func evaluatePullRequestChecks(checks []PullRequestCheck, selectedNames []string, timedOut bool) waitChecksEvaluation {
 	selected := selectedChecks(checks, selectedNames)
-	failed := failedChecks(selected)
 	missing := missingSelectedNames(checks, selectedNames)
+	selected = append(selected, pendingSelectedChecks(missing)...)
+	failed := failedChecks(selected)
 	fingerprint := checkFingerprint(checks)
 
 	evaluation := waitChecksEvaluation{
@@ -221,6 +222,20 @@ func missingSelectedNames(checks []PullRequestCheck, selectedNames []string) []s
 		}
 	}
 	return missing
+}
+
+func pendingSelectedChecks(missing []string) []PullRequestCheck {
+	if len(missing) == 0 {
+		return nil
+	}
+	pending := make([]PullRequestCheck, 0, len(missing))
+	for _, name := range missing {
+		pending = append(pending, PullRequestCheck{
+			Name:   name,
+			Status: checkStatusPending,
+		})
+	}
+	return pending
 }
 
 func failedChecks(checks []PullRequestCheck) []PullRequestCheck {

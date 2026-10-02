@@ -123,6 +123,10 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed}, []string{"DCO", "build"}, false)
 		assert.Equal(t, waitChecksOutcomePending, evaluation.Outcome)
 		assert.Equal(t, []string{"build"}, evaluation.MissingSelected)
+		require.Len(t, evaluation.SelectedChecks, 2)
+		assert.Equal(t, "DCO", evaluation.SelectedChecks[0].Name)
+		assert.Equal(t, "build", evaluation.SelectedChecks[1].Name)
+		assert.Equal(t, checkStatusPending, evaluation.SelectedChecks[1].Status)
 	})
 
 	t.Run("timeout wins over pending selected names", func(t *testing.T) {

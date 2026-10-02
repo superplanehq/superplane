@@ -9,6 +9,7 @@ import (
 	"gorm.io/datatypes"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -109,6 +110,47 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	found, err = models.FindSelectableLLMModel(db, r.Organization.ID, &factory.ID, "hosted::anthropic::claude-sonnet-4-6")
 	require.NoError(t, err)
 	assert.Equal(t, "hosted::anthropic::claude-sonnet-4-6", found.Key)
+}
+
+func Test__ListSelectableLLMModels__HidesCustomModelsWithoutFlags(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderCustom, datatypes.JSONSlice[string]{
+		"kimi-k3",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = database.Conn().Where("organization_id = ? AND provider = ?", r.Organization.ID, models.UsageProviderCustom).
+			Delete(&models.OrganizationBYOKModelAllowlist{})
+	})
+
+	const customKey = "byok::custom::kimi-k3"
+
+	listed, err := models.ListSelectableLLMModels(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, selectableKeys(listed), customKey)
+	_, err = models.FindSelectableLLMModel(db, r.Organization.ID, nil, customKey)
+	assert.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	listed, err = models.ListSelectableLLMModels(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, selectableKeys(listed), customKey)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	listed, err = models.ListSelectableLLMModels(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.Contains(t, selectableKeys(listed), customKey)
+	found, err := models.FindSelectableLLMModel(db, r.Organization.ID, nil, customKey)
+	require.NoError(t, err)
+	assert.Equal(t, "kimi-k3", found.Model.ID)
+
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOKCustomProvider))
+	listed, err = models.ListSelectableLLMModels(db, r.Organization.ID, nil)
+	require.NoError(t, err)
+	assert.NotContains(t, selectableKeys(listed), customKey)
+	_, err = models.FindSelectableLLMModel(db, r.Organization.ID, nil, customKey)
+	assert.ErrorIs(t, err, models.ErrSelectableLLMModelNotAllowed)
 }
 
 func Test__SelectableLLMRunnerComponent(t *testing.T) {
