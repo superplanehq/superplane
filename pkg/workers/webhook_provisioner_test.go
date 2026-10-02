@@ -41,6 +41,7 @@ func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 		Secret:     []byte("secret"),
 		RetryCount: 0,
 		MaxRetries: 3,
+		LastError:  "previous setup error",
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
@@ -51,6 +52,7 @@ func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateReady, updatedWebhook.State)
 	assert.Equal(t, 0, updatedWebhook.RetryCount)
+	assert.Empty(t, updatedWebhook.LastError)
 }
 
 func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
@@ -95,6 +97,7 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStatePending, updatedWebhook.State)
 	assert.Equal(t, 1, updatedWebhook.RetryCount)
+	assert.Equal(t, "oops", updatedWebhook.LastError)
 }
 
 func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
@@ -138,6 +141,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
 	assert.Equal(t, 3, updatedWebhook.RetryCount)
+	assert.Equal(t, "oops", updatedWebhook.LastError)
 }
 
 func Test__WebhookProvisioner_PersistsIntegrationMetadataWrittenBySetup(t *testing.T) {
@@ -394,10 +398,11 @@ func Test__WebhookProvisioner_MarkFailed(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err := webhook.MarkFailed(database.Conn())
+	err := webhook.MarkFailed(database.Conn(), "registration rejected")
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
+	assert.Equal(t, "registration rejected", updatedWebhook.LastError)
 }

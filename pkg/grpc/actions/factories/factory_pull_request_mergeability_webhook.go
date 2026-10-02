@@ -20,6 +20,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -355,22 +356,23 @@ func ensureGitHubFactoryMergeabilityWebhook(
 		return nil
 	}
 
-	webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
-	if err != nil {
-		return fmt.Errorf("list factory mergeability webhooks: %w", err)
-	}
-	for i := range webhooks {
-		hook := &webhooks[i]
-		if !isFactoryMergeabilityWebhook(hook.Configuration.Data()) {
-			continue
+	return tx.Transaction(func(tx *gorm.DB) error {
+		var locked models.Integration
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", integration.ID).
+			First(&locked).Error; err != nil {
+			return fmt.Errorf("lock integration for factory mergeability webhook: %w", err)
 		}
-		if factoryMergeabilityWebhookRepository(hook.Configuration.Data()) != repository {
-			continue
-		}
-		return updateFactoryMergeabilityWebhook(tx, hook)
-	}
 
-	return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
+		hook, err := findFactoryMergeabilityWebhook(tx, integration.ID, repository)
+		if err != nil {
+			return err
+		}
+		if hook != nil {
+			return nil
+		}
+		return createFactoryMergeabilityWebhook(ctx, tx, encryptor, integration.ID, repository)
+	})
 }
 
 func factoryMergeabilityWebhookConfiguration(repository string) map[string]any {
@@ -406,16 +408,133 @@ func factoryMergeabilityWebhookRepository(configuration any) string {
 	return strings.TrimSpace(repository)
 }
 
-func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook) error {
-	if hook.State != models.WebhookStateFailed {
-		return nil
+func matchesFactoryMergeabilityWebhook(hook *models.Webhook, repository string) bool {
+	if hook == nil || !isFactoryMergeabilityWebhook(hook.Configuration.Data()) {
+		return false
+	}
+	return factoryMergeabilityWebhookRepository(hook.Configuration.Data()) == strings.TrimSpace(repository)
+}
+
+func findFactoryMergeabilityWebhook(tx *gorm.DB, integrationID uuid.UUID, repository string) (*models.Webhook, error) {
+	repository = strings.TrimSpace(repository)
+	if integrationID == uuid.Nil || repository == "" {
+		return nil, nil
 	}
 
-	return tx.Model(hook).Updates(map[string]any{
-		"state":       models.WebhookStatePending,
-		"retry_count": 0,
-		"updated_at":  time.Now(),
-	}).Error
+	webhooks, err := models.ListIntegrationWebhooks(tx, integrationID)
+	if err != nil {
+		return nil, fmt.Errorf("list factory mergeability webhooks: %w", err)
+	}
+	for i := range webhooks {
+		hook := &webhooks[i]
+		if matchesFactoryMergeabilityWebhook(hook, repository) {
+			return hook, nil
+		}
+	}
+	return nil, nil
+}
+
+var errFactoryMergeabilityWebhookNotCreated = errors.New("factory mergeability webhook was not created")
+
+func loadFactoryMergeabilityWebhook(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*models.Webhook, error) {
+	hook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil || hook != nil || pullRequest == nil {
+		return hook, err
+	}
+	if !factoryMergeabilityWebhookExpected(db, factory, pullRequest.Repository) {
+		return nil, nil
+	}
+
+	ensureErr := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository)
+	if ensureErr != nil {
+		log.WithError(ensureErr).Warnf(
+			"factory mergeability: failed to ensure webhook for %s",
+			pullRequest.Repository,
+		)
+	}
+	hook, err = findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil {
+		return nil, err
+	}
+	if hook == nil && ensureErr != nil {
+		return nil, errFactoryMergeabilityWebhookNotCreated
+	}
+	return hook, nil
+}
+
+func findFactoryMergeabilityWebhookForPullRequest(
+	tx *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*models.Webhook, error) {
+	if factory == nil || pullRequest == nil || pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+		return nil, nil
+	}
+
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
+	if integrationID == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, nil
+	}
+	return findFactoryMergeabilityWebhook(tx, id, pullRequest.Repository)
+}
+
+const (
+	githubWebhookHookLimit       = "cannot have more than 20 hooks"
+	webhookSetupHookLimitMessage = "SuperPlane could not register a webhook on this repository. GitHub allows 20 pull request webhooks, and this repository already has 20. Remove an unused webhook, then try again."
+	webhookSetupFallbackMessage  = "SuperPlane could not register a webhook on this repository. Try again."
+)
+
+func factoryWebhookSetupMessage(stored string) string {
+	if strings.Contains(stored, githubWebhookHookLimit) {
+		return webhookSetupHookLimitMessage
+	}
+	return webhookSetupFallbackMessage
+}
+
+func webhookSetupInProgress(hook *models.Webhook, creationExpected bool) bool {
+	if hook == nil {
+		return creationExpected
+	}
+	return hook.State == models.WebhookStatePending || hook.State == models.WebhookStateProvisioning
+}
+
+func factoryMergeabilityWebhookExpected(tx *gorm.DB, factory *models.Factory, repository string) bool {
+	if factory == nil {
+		return false
+	}
+	repository = strings.TrimSpace(repository)
+	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
+	if repository == "" || integrationID == "" {
+		return false
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return false
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return false
+	}
+	return integration.State == models.IntegrationStateReady && integration.AppName == "github"
+}
+
+func failedFactoryMergeabilityResult(pullRequest *models.FactoryPullRequest, hook *models.Webhook) *factoryPullRequestMergeability {
+	result := &factoryPullRequestMergeability{PullRequest: pullRequest}
+	message := webhookSetupFallbackMessage
+	if hook != nil {
+		message = factoryWebhookSetupMessage(hook.LastError)
+	}
+	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, message)
 }
 
 func createFactoryMergeabilityWebhook(

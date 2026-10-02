@@ -191,6 +191,11 @@ func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.Me
 	return actions.MergeFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) RetryFactoryPullRequestWebhook(ctx context.Context, req *pb.RetryFactoryPullRequestWebhookRequest) (*pb.RetryFactoryPullRequestWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RetryFactoryPullRequestWebhook(ctx, organizationID, req)
+}
+
 func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)

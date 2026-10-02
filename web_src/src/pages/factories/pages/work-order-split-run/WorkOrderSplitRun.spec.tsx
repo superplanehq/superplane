@@ -51,6 +51,7 @@ vi.mock("@/lib/toast", () => ({
 vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
   useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
+  useRetryFactoryPullRequestWebhook: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const useLiveLogStreamMock = vi.fn();
