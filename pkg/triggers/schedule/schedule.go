@@ -762,9 +762,21 @@ func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now t
 	}
 
 	nowInTZ := now
-	nextTriggerMonths := interval
-	nextTrigger := nowInTZ.AddDate(0, nextTriggerMonths, 0)
-	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), dayOfMonth, hour, minute, 0, 0, nextTrigger.Location())
+	// Advance the month arithmetically instead of via AddDate, which keeps the
+	// current day while adding months and normalizes overflow forward (Jan 31
+	// + 1 month = Feb 31 = Mar 3), landing the trigger one month late whenever
+	// a tick happens on day 29-31.
+	monthIndex := int(nowInTZ.Month()) - 1 + interval
+	targetYear := nowInTZ.Year() + monthIndex/12
+	targetMonth := time.Month(monthIndex%12 + 1)
+	// Clamp dayOfMonth to the target month's length so 29-31 means "last day"
+	// in shorter months instead of rolling into the following month.
+	lastDay := time.Date(targetYear, targetMonth+1, 0, 0, 0, 0, 0, nowInTZ.Location()).Day()
+	day := dayOfMonth
+	if day > lastDay {
+		day = lastDay
+	}
+	nextTrigger := time.Date(targetYear, targetMonth, day, hour, minute, 0, 0, nowInTZ.Location())
 
 	utcResult := nextTrigger.UTC()
 	return &utcResult, nil
