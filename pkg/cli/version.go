@@ -46,11 +46,25 @@ func init() {
 }
 
 // StartUpdateCheck begins an async check for a newer CLI version.
-// It is a no-op for dev builds.
-func StartUpdateCheck() {
+// It is a no-op for dev builds, and for a check that already ran in the last
+// updateCheckInterval. The arguments give the configuration file that holds the
+// time of the last check.
+func StartUpdateCheck(args []string) {
 	if isDevBuild() {
 		return
 	}
+
+	path := configFilePath(args)
+	if !updateCheckDue(path) {
+		return
+	}
+
+	// Record the check before the request, not after. A check that fails or
+	// times out must also count, or a network problem gives one HTTP call for
+	// every command, which is the cost this interval removes. A write that
+	// fails is not fatal, because the update notice matters more than the
+	// interval.
+	_ = recordUpdateCheck(path)
 
 	ch := make(chan *updateInfo, 1)
 	updateCheckResult = ch
