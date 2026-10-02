@@ -20,6 +20,8 @@ import { type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseStatus } fr
 import type { SplitRunSource } from "../splitRunSource";
 import { AutomationCardBody } from "./AutomationCardBody";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
+import { timingsForConsoleColumns, type ColumnTiming } from "./columnTiming";
+import { ColumnTimingMeta } from "./consoleColumnTiming";
 import { IntakeTimelineEvent } from "./consoleIntake";
 import { StepOutputCounts } from "./consoleOutputChips";
 import { runMetaLine } from "./consoleCardText";
@@ -31,6 +33,7 @@ import {
   stagesByConsoleColumn,
   stagesFromFixture,
   type ConsoleAutomation,
+  type ConsoleColumnId,
 } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 import { StageStatusGlyph } from "./redesignShared";
@@ -156,7 +159,7 @@ const CONSOLE_COLUMNS = [
 ] as const;
 
 interface ConsoleColumn {
-  id: string;
+  id: ConsoleColumnId;
   title: string;
   automations: ConsoleAutomation[];
 }
@@ -224,6 +227,7 @@ function ConsoleTimeline({
   onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   const offset = showIntake ? 1 : 0;
+  const timings = timingsForConsoleColumns(fixture);
   return (
     <section className="flex min-w-0 flex-col gap-4">
       <Timeline value={reachedColumnCount(markers) + offset} className="pl-1">
@@ -238,6 +242,7 @@ function ConsoleTimeline({
             organizationId={organizationId}
             factoryId={factoryId}
             orderId={orderId}
+            timing={timings.intake}
           />
         ) : null}
         {columns.map((column, index) => (
@@ -248,6 +253,7 @@ function ConsoleTimeline({
             step={index + 1 + offset}
             marker={markers[index]}
             currentColumn={currentColumn}
+            timing={timings[column.id]}
             fixture={fixture}
             organizationId={organizationId}
             factoryKey={factoryKey}
@@ -271,6 +277,7 @@ function ColumnTimelineItem({
   step,
   marker,
   currentColumn,
+  timing,
   fixture,
   organizationId,
   factoryKey,
@@ -287,6 +294,7 @@ function ColumnTimelineItem({
   step: number;
   marker: ColumnMarker;
   currentColumn: number;
+  timing?: ColumnTiming;
   fixture: SplitRunFixture;
   organizationId?: string;
   factoryKey?: string;
@@ -299,8 +307,8 @@ function ColumnTimelineItem({
   onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   return (
-    <TimelineItem step={step} data-testid={`redesign-console-column-${column.id}`}>
-      <TimelineHeader className="flex items-center gap-2">
+    <TimelineItem step={step} className="group/column" data-testid={`redesign-console-column-${column.id}`}>
+      <TimelineHeader className="flex w-full items-center gap-2">
         <TimelineSeparator />
         <ColumnStatusIndicator marker={marker} columnId={column.id} />
         <TimelineTitle className="font-semibold">{column.title}</TimelineTitle>
@@ -309,6 +317,7 @@ function ColumnTimelineItem({
             {column.automations.length}
           </Badge>
         ) : null}
+        <ColumnTimingMeta columnId={column.id} timing={timing} />
       </TimelineHeader>
       <TimelineContent className="mt-2 flex flex-col gap-3 text-foreground">
         {column.automations.length === 0 ? (
