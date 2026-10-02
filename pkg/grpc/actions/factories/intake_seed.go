@@ -114,6 +114,8 @@ func seedIntake(
 		return seedDependabotAlerts(ctx, deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceDatadog:
 		return seedDatadogIssues(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceLinearIssues:
+		return seedLinearIssues(deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.

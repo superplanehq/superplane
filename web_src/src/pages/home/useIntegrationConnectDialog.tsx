@@ -9,7 +9,12 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { peekIntegrationSetupReturnPreferredIntegration } from "@/lib/integrationSetupReturn";
-import { offersPrivateGitHubAppSetup, usesHostedJiraOAuth, usesPrivateGitHubAppWizard } from "@/lib/integrations";
+import {
+  offersPrivateGitHubAppSetup,
+  usesHostedJiraOAuth,
+  usesHostedLinearOAuth,
+  usesPrivateGitHubAppWizard,
+} from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
 import { startDirectJiraConnect } from "@/lib/startDirectJiraConnect";
 import { showErrorToast } from "@/lib/toast";
@@ -23,6 +28,7 @@ import {
 } from "./homeIntegrationStatus";
 import { resolveIntegrationHomeHref, useCreateDialogProps } from "./integrationConnectDialogState";
 import { useHomeIntegrationConnectActions } from "./useHomeIntegrationConnectActions";
+import { useHostedLinearConnect } from "./useHostedLinearConnect";
 import { useInstallIntegrationSelections, useRefetchOnWindowFocus } from "./useInstallIntegrationSelections";
 
 export function selectReadyIntegrationInstance(
@@ -142,7 +148,7 @@ export function useIntegrationConnectDialog({
       setConfigureIntegrationId,
     });
 
-  const connectHostedJira = useHostedJiraConnect({
+  const hostedConnect = useHostedIssueConnect({
     organizationId,
     returnTo,
     connected,
@@ -188,7 +194,10 @@ export function useIntegrationConnectDialog({
       return true;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
-      return connectHostedJira();
+      return hostedConnect.jira();
+    }
+    if (integrationName === "linear" && isHostedLinear(availableIntegrations)) {
+      return hostedConnect.linear();
     }
     openConnectDialog(integrationName);
     return false;
@@ -200,7 +209,11 @@ export function useIntegrationConnectDialog({
       return;
     }
     if (integrationName === "jira" && isHostedJira(availableIntegrations)) {
-      void connectHostedJira(true);
+      void hostedConnect.jira(true);
+      return;
+    }
+    if (integrationName === "linear" && isHostedLinear(availableIntegrations)) {
+      void hostedConnect.linear(true);
       return;
     }
     openCreateIntegrationModal(integrationName);
@@ -280,6 +293,27 @@ function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefini
 
 function isHostedJira(availableIntegrations: IntegrationsIntegrationDefinition[]) {
   return usesHostedJiraOAuth(availableIntegrations.find((item) => item.name === "jira"));
+}
+
+function isHostedLinear(availableIntegrations: IntegrationsIntegrationDefinition[]) {
+  return usesHostedLinearOAuth(availableIntegrations.find((item) => item.name === "linear"));
+}
+
+function useHostedIssueConnect(args: {
+  organizationId: string;
+  returnTo?: string;
+  connected: OrganizationsIntegration[];
+  existingIntegrationNames: Set<string>;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  return {
+    jira: useHostedJiraConnect(args),
+    linear: useHostedLinearConnect(args),
+  };
 }
 
 export function useHostedJiraConnect({
