@@ -416,15 +416,16 @@ func isBoardDoneStage(name, columnKey string, appID uuid.UUID) bool {
 	return strings.Contains(strings.ToLower(appID.String()), "pr-closure")
 }
 
-func isRunnableHandOffStage(stage handOffStage) bool {
-	return !stage.IsDone && !stage.IsClosure
-}
-
 func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
+	board := make([]handOffStage, 0, len(stages))
 	runnable := make([]handOffStage, 0, len(stages))
 	matches := make([]handOffStage, 0, len(stages))
 	for _, stage := range stages {
-		if !isRunnableHandOffStage(stage) {
+		if stage.IsDone {
+			continue
+		}
+		board = append(board, stage)
+		if stage.IsClosure {
 			continue
 		}
 		runnable = append(runnable, stage)
@@ -432,7 +433,7 @@ func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
 			matches = append(matches, stage)
 		}
 	}
-	if len(runnable) == 1 && (len(stages) == 1 || runnable[0].IsImplementation) {
+	if len(board) == 1 && len(runnable) == 1 {
 		return runnable[0].Index, nil
 	}
 	if len(matches) == 1 {

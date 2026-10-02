@@ -80,6 +80,35 @@ func Test__HandOffWorkOrder__ImplementWritesSpecAndStartsImplementation(t *testi
 	assert.EqualValues(t, 1, implRuns)
 }
 
+func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedHandOffFactory(t, r, db)
+	customApp, customEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "custom", "start-custom")
+	doneApp, doneEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "done", "start-done")
+	require.NoError(t, doneApp.StampFactoryAppTemplate(db, doneEntry, "pr-closure", 1))
+	renameCanvas(t, db, doneApp, "Done")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: customApp.ID, Entrypoint: customEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: doneApp.ID, Entrypoint: doneEntry},
+	})
+	require.NoError(t, err)
+
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship custom implement",
+		Plan:      "# Retry refunds",
+		Column:    HandOffColumnImplement,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetLineDispatches(), 1)
+	require.Len(t, result.Order.GetLineDispatches()[0].GetStepExecutions(), 1)
+	assert.Equal(t, int32(0), result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetStepIndex())
+	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetState())
+}
+
 func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
