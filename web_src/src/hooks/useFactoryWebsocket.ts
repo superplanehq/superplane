@@ -150,6 +150,10 @@ function isMissingWorkOrderError(error: unknown): boolean {
   return isNotFoundError(error) || (error instanceof Error && /404|not found/i.test(error.message));
 }
 
+function isExpiredSessionError(error: unknown): boolean {
+  return error instanceof Error && error.message === "Unauthorized";
+}
+
 function dropMissingWorkOrder(
   queryClient: WorkOrderQueryClient,
   organizationId: string,
@@ -246,6 +250,9 @@ export function useFactoryWebsocket(organizationId: string, factoryId: string, e
       refreshVersion.current.set(orderId, version);
       const isCurrent = () => refreshVersion.current.get(orderId) === version;
       void refreshUpdatedWorkOrder(queryClient, organizationId, factoryId, orderId, isCurrent).catch((error) => {
+        if (isExpiredSessionError(error)) {
+          return;
+        }
         if (!isMissingWorkOrderError(error)) {
           console.warn("factory ws: failed to refresh work order", error);
           return;
