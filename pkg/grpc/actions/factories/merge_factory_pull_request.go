@@ -42,8 +42,15 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(errFactoryPullRequestMergeDisabled, "failed to merge factory pull request")
 	}
 
-	hook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	hook, err := loadFactoryMergeabilityWebhook(ctx, db, deps, factory, pullRequest)
 	if err != nil {
+		if errors.Is(err, errFactoryMergeabilityWebhookNotCreated) {
+			blocked := failedFactoryMergeabilityResult(pullRequest, nil)
+			return nil, factoryErrorToStatus(
+				errors.Join(errFactoryPullRequestNotMergeable, errors.New(blocked.Message)),
+				"failed to merge factory pull request",
+			)
+		}
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 	if hook != nil && hook.State == models.WebhookStateFailed {

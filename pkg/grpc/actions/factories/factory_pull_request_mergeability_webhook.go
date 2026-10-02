@@ -434,6 +434,40 @@ func findFactoryMergeabilityWebhook(tx *gorm.DB, integrationID uuid.UUID, reposi
 	return nil, nil
 }
 
+var errFactoryMergeabilityWebhookNotCreated = errors.New("factory mergeability webhook was not created")
+
+func loadFactoryMergeabilityWebhook(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (*models.Webhook, error) {
+	hook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil || hook != nil || pullRequest == nil {
+		return hook, err
+	}
+	if !factoryMergeabilityWebhookExpected(db, factory, pullRequest.Repository) {
+		return nil, nil
+	}
+
+	ensureErr := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository)
+	if ensureErr != nil {
+		log.WithError(ensureErr).Warnf(
+			"factory mergeability: failed to ensure webhook for %s",
+			pullRequest.Repository,
+		)
+	}
+	hook, err = findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	if err != nil {
+		return nil, err
+	}
+	if hook == nil && ensureErr != nil {
+		return nil, errFactoryMergeabilityWebhookNotCreated
+	}
+	return hook, nil
+}
+
 func findFactoryMergeabilityWebhookForPullRequest(
 	tx *gorm.DB,
 	factory *models.Factory,

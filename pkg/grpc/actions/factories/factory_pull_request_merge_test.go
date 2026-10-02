@@ -28,6 +28,16 @@ import (
 	"gorm.io/gorm"
 )
 
+type failingEncryptor struct{}
+
+func (failingEncryptor) Encrypt(context.Context, []byte, []byte) ([]byte, error) {
+	return nil, errors.New("encrypt failed")
+}
+
+func (failingEncryptor) Decrypt(context.Context, []byte, []byte) ([]byte, error) {
+	return nil, errors.New("decrypt failed")
+}
+
 type fakeFactoryGitHub struct {
 	pullRequest   *github.PullRequest
 	combined      *github.CombinedStatus
@@ -1358,6 +1368,47 @@ func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
 		assert.Empty(t, webhooks)
 	})
 
+	t.Run("shows a setup failure when webhook creation fails before a row exists", func(t *testing.T) {
+		useMergeableGitHub(t)
+		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      true,
+			HeadSHA:        headSHA,
+			AllowedMethods: "SQUASH",
+		}))
+
+		resp, err := DescribeFactoryPullRequestMergeability(ctx, IntakeDependencies{Encryptor: failingEncryptor{}}, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.GetMergeability())
+		assert.False(t, resp.GetMergeability().GetCanMerge())
+		assert.False(t, resp.GetMergeability().GetWebhookSetupPending())
+		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, resp.GetMergeability().GetBlockedReason())
+		assert.Equal(t, webhookSetupFallbackProductMessage, resp.GetMergeability().GetMessage())
+		assert.NotContains(t, resp.GetMergeability().GetMessage(), "encrypt failed")
+
+		webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+		require.NoError(t, err)
+		assert.Empty(t, webhooks)
+
+		recovered, err := DescribeFactoryPullRequestMergeability(ctx, IntakeDependencies{Encryptor: r.Encryptor}, orgID, &pb.DescribeFactoryPullRequestMergeabilityRequest{
+			FactoryId: factory.ID.String(),
+			PrId:      pr.GetId(),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, recovered.GetMergeability())
+		assert.True(t, recovered.GetMergeability().GetWebhookSetupPending())
+		assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, recovered.GetMergeability().GetBlockedReason())
+		webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+		require.NoError(t, err)
+		require.Len(t, webhooks, 1)
+		assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	})
+
 	t.Run("starts setup when the webhook row does not exist yet", func(t *testing.T) {
 		useMergeableGitHub(t)
 		require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
@@ -1501,6 +1552,24 @@ func TestMergeFactoryPullRequestRefusesFailedWebhook(t *testing.T) {
 	open, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: stored.ID})
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryPullRequestStateOpen, open.State)
+
+	require.NoError(t, db.Delete(&webhook).Error)
+	_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{Encryptor: failingEncryptor{}}, orgID, &pb.MergeFactoryPullRequestRequest{
+		FactoryId:       factory.ID.String(),
+		PrId:            pr.GetId(),
+		MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+		ExpectedHeadSha: headSHA,
+	})
+	require.Error(t, err)
+	code, message, ok = grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Equal(t, webhookSetupFallbackProductMessage, message)
+	assert.NotContains(t, message, "encrypt failed")
+	assert.Equal(t, 0, api.mergeCalls)
+	webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	assert.Empty(t, webhooks)
 }
 
 func TestRetryFactoryPullRequestWebhook(t *testing.T) {

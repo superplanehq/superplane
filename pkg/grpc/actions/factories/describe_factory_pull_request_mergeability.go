@@ -40,21 +40,14 @@ func DescribeFactoryPullRequestMergeability(
 	}
 	repository = pullRequest.Repository
 
-	hook, err := findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
+	hook, err := loadFactoryMergeabilityWebhook(ctx, db, deps, factory, pullRequest)
 	if err != nil {
+		if errors.Is(err, errFactoryMergeabilityWebhookNotCreated) {
+			return &pb.DescribeFactoryPullRequestMergeabilityResponse{
+				Mergeability: failedFactoryMergeabilityResult(pullRequest, nil).proto(),
+			}, nil
+		}
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
-	}
-	if hook == nil && factoryMergeabilityWebhookExpected(db, factory, pullRequest.Repository) {
-		if ensureErr := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); ensureErr != nil {
-			log.WithError(ensureErr).Warnf(
-				"factory mergeability: failed to ensure webhook for %s",
-				pullRequest.Repository,
-			)
-		}
-		hook, err = findFactoryMergeabilityWebhookForPullRequest(db, factory, pullRequest)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
-		}
 	}
 	if hook != nil && hook.State == models.WebhookStateFailed {
 		return &pb.DescribeFactoryPullRequestMergeabilityResponse{
