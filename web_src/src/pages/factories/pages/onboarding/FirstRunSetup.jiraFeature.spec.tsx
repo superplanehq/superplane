@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -15,12 +15,16 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true, isLoading: false }));
 
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (id: string) => id === FEATURE_FACTORY_JIRA_INTAKE && feature.jiraIntake,
-    isLoading: feature.isLoading,
-    organizationReady: feature.organizationReady,
-  }),
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => {
+    if (feature.isLoading) {
+      return intakeCatalogAvailability(null);
+    }
+    if (!feature.organizationReady) {
+      return { ...intakeCatalogAvailability(null), loading: false, error: true };
+    }
+    return intakeCatalogAvailability(seededIntakeCatalog(feature.jiraIntake ? ["jira-issues"] : []));
+  },
 }));
 
 vi.mock("../../layout/factoriesLayoutContext", () => ({

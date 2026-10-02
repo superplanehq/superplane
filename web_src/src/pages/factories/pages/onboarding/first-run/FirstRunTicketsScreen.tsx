@@ -1,4 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
+import { isIntakeSelectable, type IntakeSurfaceEntry, type IntakeSurfaceState } from "@/lib/intakeCatalog";
+import { findIntakePresentation } from "@/lib/intakePresentation";
 
 import { JiraProjectStep } from "../../JiraIntakeSetupSteps";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
@@ -16,12 +18,14 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false and the lookup is done. */
-  jiraAvailable?: boolean;
-  /** True while the feature lookup has not finished. The row does not show Coming soon. */
-  jiraFeatureLoading?: boolean;
+  /** State of each intake for the organization. Undefined until the intake catalog loads. */
+  intakeState?: (key: string) => IntakeSurfaceState | undefined;
+  /** True while the intake catalog loads. Rows do not show Coming soon. */
+  intakesLoading?: boolean;
+  /** Ticket intakes in display order. Null until the intake catalog loads. */
+  ticketIntakes?: IntakeSurfaceEntry[] | null;
   /**
-   * A saved Jira choice cannot continue until the feature lookup confirms Jira.
+   * A saved Jira choice cannot continue until the intake catalog confirms Jira.
    * The notice explains the block.
    */
   jiraChoiceBlock?: FirstRunJiraChoiceBlock | null;
@@ -61,8 +65,9 @@ export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
   sphere,
-  jiraAvailable = false,
-  jiraFeatureLoading = false,
+  intakeState = noIntakeState,
+  intakesLoading = false,
+  ticketIntakes,
   jiraChoiceBlock = null,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
   continuePending = false,
@@ -80,6 +85,7 @@ export function FirstRunTicketsScreen({
   onRetryJiraProjects,
 }: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
+  const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
   const jiraSelectionBlocked = Boolean(jiraChoiceBlock) || (ticketSource === "jira" && !jiraAvailable);
   const canAnalyze = !jiraSelectionBlocked && canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
@@ -94,31 +100,20 @@ export function FirstRunTicketsScreen({
       <div className="mt-8 space-y-4">
         <FirstRunPanel>
           <div className="space-y-3">
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="github" />}
-              title={copy.githubIssues}
-              detail={copy.githubIssuesHelper}
-              selected={ticketSource === "github-issues"}
-              disabled={saving}
-              onSelect={() => onSelectTicketSource("github-issues")}
-            />
-            <FirstRunJiraTicketRow
-              jiraAvailable={jiraAvailable}
-              jiraFeatureLoading={jiraFeatureLoading}
-              ticketSource={ticketSource}
-              saving={saving}
-              jiraConnected={jiraConnected}
-              onSelectTicketSource={onSelectTicketSource}
-              onConnectJira={onConnectJira}
-            />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="linear" />}
-              title={copy.linear}
-              detail={copy.linearHelper}
-              soon
-              disabled={saving}
-              onSelect={() => undefined}
-            />
+            {ticketRows(ticketIntakes).map(({ key, entry }) => (
+              <FirstRunTicketRow
+                key={key}
+                intakeKey={key}
+                entry={entry}
+                state={intakeState(key)}
+                intakesLoading={intakesLoading}
+                ticketSource={ticketSource}
+                saving={saving}
+                jiraConnected={jiraConnected}
+                onSelectTicketSource={onSelectTicketSource}
+                onConnectJira={onConnectJira}
+              />
+            ))}
           </div>
           <FirstRunJiraProjectFields
             jiraAvailable={jiraAvailable}
@@ -170,25 +165,116 @@ function jiraChoiceNoticeCopy(block: FirstRunJiraChoiceBlock | null): string | n
   return null;
 }
 
-function FirstRunJiraTicketRow({
-  jiraAvailable,
-  jiraFeatureLoading,
-  ticketSource,
-  saving,
-  jiraConnected,
-  onSelectTicketSource,
-  onConnectJira,
-}: {
-  jiraAvailable: boolean;
-  jiraFeatureLoading: boolean;
+const DEFAULT_TICKET_ROWS = ["github-issues", "jira-issues", "linear-issues"];
+
+function noIntakeState(): IntakeSurfaceState | undefined {
+  return undefined;
+}
+
+function ticketRows(ticketIntakes: IntakeSurfaceEntry[] | null | undefined) {
+  if (!ticketIntakes) {
+    return DEFAULT_TICKET_ROWS.map((key) => ({ key, entry: undefined }));
+  }
+  return ticketIntakes.map((entry) => ({ key: entry.key, entry }));
+}
+
+type FirstRunTicketRowProps = {
+  intakeKey: string;
+  entry?: IntakeSurfaceEntry;
+  state: IntakeSurfaceState | undefined;
+  intakesLoading: boolean;
   ticketSource: FirstRunTicketSource | null;
   saving: boolean;
   jiraConnected: boolean;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onConnectJira?: () => void;
+};
+
+/** Exported for the admin preview, which renders the row read-only. */
+export function FirstRunTicketRow(props: FirstRunTicketRowProps) {
+  const copy = FIRST_RUN_COPY.tickets;
+  const { intakeKey, state, saving, ticketSource } = props;
+  const meta = state === "beta" ? copy.beta : undefined;
+
+  if (intakeKey === "github-issues") {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="github" />}
+        title={copy.githubIssues}
+        detail={copy.githubIssuesHelper}
+        meta={meta}
+        selected={ticketSource === "github-issues"}
+        soon={state === "soon"}
+        disabled={saving}
+        onSelect={() => props.onSelectTicketSource("github-issues")}
+      />
+    );
+  }
+  if (intakeKey === "jira-issues") {
+    return <FirstRunJiraTicketRow {...props} meta={meta} />;
+  }
+  return <FirstRunSoonTicketRow intakeKey={intakeKey} entry={props.entry} saving={saving} />;
+}
+
+function FirstRunSoonTicketRow({
+  intakeKey,
+  entry,
+  saving,
+}: {
+  intakeKey: string;
+  entry?: IntakeSurfaceEntry;
+  saving: boolean;
 }) {
   const copy = FIRST_RUN_COPY.tickets;
-  if (jiraFeatureLoading) {
+  if (intakeKey === "linear-issues") {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="linear" />}
+        title={copy.linear}
+        detail={copy.linearHelper}
+        soon
+        disabled={saving}
+        onSelect={() => undefined}
+      />
+    );
+  }
+  const name = entry?.name ?? findIntakePresentation(intakeKey)?.name ?? intakeKey;
+  const iconSrc = entry?.iconSrc ?? findIntakePresentation(intakeKey)?.iconSrc;
+  return (
+    <ConnectOptionRow
+      icon={<TicketIntakeGlyph name={name} iconSrc={iconSrc} />}
+      title={name}
+      detail={copy.intakeSoonHelper}
+      soon
+      disabled={saving}
+      onSelect={() => undefined}
+    />
+  );
+}
+
+function TicketIntakeGlyph({ name, iconSrc }: { name: string; iconSrc?: string }) {
+  if (iconSrc) {
+    return <img src={iconSrc} alt="" className="size-5" />;
+  }
+  return (
+    <span className="flex size-5 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+function FirstRunJiraTicketRow({
+  state,
+  intakesLoading,
+  ticketSource,
+  saving,
+  jiraConnected,
+  meta,
+  onSelectTicketSource,
+  onConnectJira,
+}: FirstRunTicketRowProps & { meta?: string }) {
+  const copy = FIRST_RUN_COPY.tickets;
+  if (state === undefined && intakesLoading) {
     return (
       <ConnectOptionRow
         icon={<IntegrationChoiceIcon name="jira" />}
@@ -199,7 +285,7 @@ function FirstRunJiraTicketRow({
       />
     );
   }
-  if (!jiraAvailable) {
+  if (!isIntakeSelectable(state)) {
     return (
       <ConnectOptionRow
         icon={<IntegrationChoiceIcon name="jira" />}
@@ -216,6 +302,7 @@ function FirstRunJiraTicketRow({
       icon={<IntegrationChoiceIcon name="jira" />}
       title={copy.jira}
       detail={copy.jiraHelper}
+      meta={meta}
       selected={ticketSource === "jira"}
       connectLabel={copy.jira}
       connected={jiraConnected}

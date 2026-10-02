@@ -28,6 +28,8 @@ async function fetchIntakeCatalog(organizationId: string): Promise<IntakeCatalog
 
 export interface IntakeCatalogAvailability {
   catalog: IntakeCatalogItem[];
+  /** True after the catalog loaded for the organization. */
+  loaded: boolean;
   loading: boolean;
   error: boolean;
   /** State for one key. Undefined while the catalog loads. */
@@ -58,6 +60,7 @@ export function useIntakeCatalogAvailability(organizationId: string): IntakeCata
 
   return {
     catalog,
+    loaded,
     loading: query.isLoading,
     error: query.isError,
     stateOf,

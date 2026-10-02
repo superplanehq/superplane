@@ -1,8 +1,8 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
+import { isIntakeSelectable } from "@/lib/intakeCatalog";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -331,7 +331,7 @@ export function shouldClearSavedJiraChoice(args: {
 
 export type SavedJiraChoiceBlock = "loading" | "lookup-failed";
 
-/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
+/** A saved Jira choice cannot continue until the intake catalog confirms Jira. */
 export function savedJiraChoiceBlock(args: {
   issuesChoice: IssuesChoiceId | null;
   featureLoading: boolean;
@@ -349,9 +349,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
-  const jiraFeature = useExperimentalFeature(organizationId);
-  const jiraFeatureLoading = jiraFeature.isLoading;
-  const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
+  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
+  const jiraFeatureLoading = intakeCatalog.loading;
+  const jiraAvailable = isIntakeSelectable(intakeCatalog.stateOf("jira-issues"));
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -361,17 +361,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const navigation = useFirstRunNavigation(model, agentGate, connection);
   const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
-  // A saved Jira choice is not valid when the organization does not have the
-  // Jira intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
-  // replace the saved choice with the GitHub Issues default.
+  // A saved Jira choice is not valid when the intake catalog does not let the
+  // organization use Jira. Clear it only after the catalog loads and confirms
+  // that. A failed lookup has no catalog data and must not replace the saved
+  // choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
   const jiraChoiceArgs = {
     issuesChoice,
     featureLoading: jiraFeatureLoading,
     jiraAvailable,
-    organizationReady: jiraFeature.organizationReady,
+    organizationReady: intakeCatalog.loaded,
   };
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
   const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
@@ -391,7 +391,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
-    jiraFeatureLoading,
+    intakeState: intakeCatalog.stateOf,
+    intakesLoading: jiraFeatureLoading,
+    ticketIntakes: intakeCatalog.loaded ? intakeCatalog.entriesFor("onboardingTickets") : null,
     jiraChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],

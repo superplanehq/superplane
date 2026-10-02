@@ -46,10 +46,11 @@ export function seededIntakeCatalog(
 /** The value that `useIntakeCatalogAvailability` returns for a loaded catalog. */
 export function intakeCatalogAvailability(catalog: readonly IntakeCatalogItem[] | null): IntakeCatalogAvailability {
   if (!catalog) {
-    return { catalog: [], loading: true, error: false, stateOf: () => undefined, entriesFor: () => [] };
+    return { catalog: [], loaded: false, loading: true, error: false, stateOf: () => undefined, entriesFor: () => [] };
   }
   return {
     catalog: [...catalog],
+    loaded: true,
     loading: false,
     error: false,
     stateOf: (key) => intakeSurfaceState(catalog.find((item) => item.key === key)),
