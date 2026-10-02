@@ -53,11 +53,14 @@ export function AnalysisPopupHeader({
   fullPage,
   toggleFullPage,
   onArchive,
+  onDuplicate,
+  duplicateBusy = false,
   footerBusy,
   reviewActions,
   showOwnerRow,
   planningSpend,
   views,
+  canDuplicate = false,
 }: {
   edits: AnalysisHeaderEdits;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
@@ -70,6 +73,8 @@ export function AnalysisPopupHeader({
   fullPage: boolean;
   toggleFullPage: () => void;
   onArchive?: () => void;
+  onDuplicate?: () => void | Promise<void>;
+  duplicateBusy?: boolean;
   footerBusy: boolean;
   reviewActions: ReactNode;
   /** The unified view moves owner and spend into the summary panel. */
@@ -80,6 +85,7 @@ export function AnalysisPopupHeader({
     savedCostCents: number;
   };
   views: ReactNode;
+  canDuplicate?: boolean;
 }) {
   return (
     <PopupHeader
@@ -90,15 +96,18 @@ export function AnalysisPopupHeader({
       titleBusy={edits.titleBusy}
       onTitleSave={(next) => void edits.saveTitle(next)}
       expanded={fullPage}
-      onToggleExpanded={toggleFullPage}
-      actions={
-        <PopupHeaderActions
-          copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-          onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
-          archiveBusy={footerBusy}
-          taskActions={reviewActions}
-        />
-      }
+       onToggleExpanded={toggleFullPage}
+       actions={
+         <PopupHeaderActions
+           copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+           onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
+           archiveBusy={footerBusy}
+           onDuplicate={onDuplicate}
+           duplicateBusy={duplicateBusy}
+           canDuplicate={canDuplicate}
+           taskActions={reviewActions}
+         />
+       }
       accessory={views}
     >
       {planningSpend ? (

@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,23 @@ export function PopupHeaderActions({
   copyUrl,
   onArchive,
   archiveBusy = false,
+  onDuplicate,
+  duplicateBusy = false,
+  canDuplicate = false,
   taskActions,
 }: {
   copyUrl?: string;
   onArchive?: () => void | Promise<void>;
   archiveBusy?: boolean;
+  onDuplicate?: () => void | Promise<void>;
+  duplicateBusy?: boolean;
+  canDuplicate?: boolean;
   taskActions?: ReactNode;
 }) {
   return (
     <>
       {taskActions}
+      {onDuplicate && canDuplicate ? <PopupDuplicateButton onDuplicate={onDuplicate} busy={duplicateBusy} /> : null}
       {onArchive ? <PopupArchiveButton onArchive={onArchive} busy={archiveBusy} /> : null}
       <CopyLinkButton
         url={copyUrl}
@@ -54,6 +61,30 @@ function PopupArchiveButton({ onArchive, busy }: { onArchive: () => void | Promi
         </span>
       </TooltipTrigger>
       <TooltipContent side="bottom">Archive</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PopupDuplicateButton({ onDuplicate, busy }: { onDuplicate: () => void | Promise<void>; busy: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void onDuplicate()}
+            disabled={busy}
+            className={HEADER_ICON_BUTTON}
+            aria-label="Duplicate"
+            data-testid="popup-work-order-duplicate-button"
+          >
+            <Copy className="h-4 w-4" aria-hidden />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Duplicate</TooltipContent>
     </Tooltip>
   );
 }
