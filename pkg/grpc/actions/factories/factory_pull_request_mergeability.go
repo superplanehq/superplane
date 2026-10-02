@@ -40,14 +40,15 @@ const (
 )
 
 type factoryPullRequestMergeability struct {
-	CanMerge       bool
-	BlockedReason  pb.FactoryPullRequestMergeability_BlockedReason
-	Message        string
-	AllowedMethods []pb.FactoryPullRequestMergeability_MergeMethod
-	HeadSHA        string
-	PullRequest    *models.FactoryPullRequest
-	Client         factoryGitHubAPI
-	canRetry       bool
+	CanMerge            bool
+	BlockedReason       pb.FactoryPullRequestMergeability_BlockedReason
+	Message             string
+	AllowedMethods      []pb.FactoryPullRequestMergeability_MergeMethod
+	HeadSHA             string
+	PullRequest         *models.FactoryPullRequest
+	Client              factoryGitHubAPI
+	WebhookSetupPending bool
+	canRetry            bool
 }
 
 func loadFactoryPullRequestForMerge(
@@ -602,10 +603,11 @@ func (m *factoryPullRequestMergeability) proto() *pb.FactoryPullRequestMergeabil
 		return &pb.FactoryPullRequestMergeability{}
 	}
 	return &pb.FactoryPullRequestMergeability{
-		CanMerge:       m.CanMerge,
-		BlockedReason:  m.BlockedReason,
-		Message:        m.Message,
-		AllowedMethods: m.AllowedMethods,
-		HeadSha:        m.HeadSHA,
+		CanMerge:            m.CanMerge,
+		BlockedReason:       m.BlockedReason,
+		Message:             m.Message,
+		AllowedMethods:      m.AllowedMethods,
+		HeadSha:             m.HeadSHA,
+		WebhookSetupPending: m.WebhookSetupPending,
 	}
 }

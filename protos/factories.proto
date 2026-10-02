@@ -1668,6 +1668,7 @@ message FactoryPullRequestMergeability {
   string message = 3;
   repeated MergeMethod allowed_methods = 4;
   string head_sha = 5;
+  bool webhook_setup_pending = 6;
 }
 
 message DescribeFactoryPullRequestMergeabilityRequest {

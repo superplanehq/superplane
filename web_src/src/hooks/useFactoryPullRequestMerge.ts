@@ -10,6 +10,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { factoryQueryKeys } from "./useFactoryData";
 import { invalidateFactoryWorkOrderQueries } from "./useFactoryWebsocket";
 
+export const factoryPullRequestWebhookSetupPollMs = 2_000;
+
+export function factoryPullRequestMergeabilityPollInterval(
+  mergeability: { webhookSetupPending?: boolean } | undefined,
+): number | false {
+  if (mergeability?.webhookSetupPending) {
+    return factoryPullRequestWebhookSetupPollMs;
+  }
+  return false;
+}
+
 export function factoryPullRequestMergeabilityKey(organizationId: string, factoryId: string, pullRequestId: string) {
   return factoryQueryKeys.pullRequestMergeability(organizationId, factoryId, pullRequestId);
 }
@@ -32,6 +43,7 @@ export function useFactoryPullRequestMergeability(
       return response.data?.mergeability ?? {};
     },
     enabled: Boolean(organizationId && factoryId && pullRequestId) && (options?.enabled ?? true),
+    refetchInterval: (current) => factoryPullRequestMergeabilityPollInterval(current.state.data),
   });
 }
 

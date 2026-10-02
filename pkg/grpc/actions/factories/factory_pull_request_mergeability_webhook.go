@@ -458,6 +458,13 @@ func factoryWebhookSetupMessage(stored string) string {
 	return webhookSetupFallbackMessage
 }
 
+func webhookSetupInProgress(hook *models.Webhook) bool {
+	if hook == nil {
+		return false
+	}
+	return hook.State == models.WebhookStatePending || hook.State == models.WebhookStateProvisioning
+}
+
 func failedFactoryMergeabilityResult(pullRequest *models.FactoryPullRequest, hook *models.Webhook) *factoryPullRequestMergeability {
 	result := &factoryPullRequestMergeability{PullRequest: pullRequest}
 	message := webhookSetupFallbackMessage

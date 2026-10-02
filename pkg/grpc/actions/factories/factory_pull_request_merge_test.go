@@ -1295,6 +1295,7 @@ func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
 
 		got := describe(t)
 		assert.False(t, got.GetCanMerge())
+		assert.False(t, got.GetWebhookSetupPending())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
 		assert.Equal(t, webhookSetupHookLimitProductMessage, got.GetMessage())
 		assert.NotContains(t, got.GetMessage(), "cannot have more than 20 hooks")
@@ -1318,6 +1319,7 @@ func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
 
 		got := describe(t)
 		assert.False(t, got.GetCanMerge())
+		assert.False(t, got.GetWebhookSetupPending())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
 		assert.Equal(t, webhookSetupFallbackProductMessage, got.GetMessage())
 		assert.NotContains(t, got.GetMessage(), "boom")
@@ -1330,9 +1332,123 @@ func TestDescribeFactoryPullRequestMergeabilityWebhookFailure(t *testing.T) {
 
 		got := describe(t)
 		assert.True(t, got.GetCanMerge())
+		assert.False(t, got.GetWebhookSetupPending())
 		assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
 		assert.NotContains(t, got.GetMessage(), "could not register a webhook")
 	})
+
+	t.Run("reports setup still in progress without blocking a cached merge result", func(t *testing.T) {
+		useMergeableGitHub(t)
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      true,
+			HeadSHA:        headSHA,
+			AllowedMethods: "SQUASH",
+		}))
+
+		for _, state := range []string{models.WebhookStatePending, models.WebhookStateProvisioning} {
+			t.Run(state, func(t *testing.T) {
+				require.NoError(t, db.Where("app_installation_id = ?", integration.ID).Delete(&models.Webhook{}).Error)
+				createWebhook(t, state, "", 0)
+
+				got := describe(t)
+				assert.True(t, got.GetCanMerge())
+				assert.True(t, got.GetWebhookSetupPending())
+				assert.NotEqual(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_WEBHOOK_FAILED, got.GetBlockedReason())
+			})
+		}
+	})
+}
+
+func TestMergeFactoryPullRequestRefusesFailedWebhook(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	created, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
+		FactoryId:   factory.ID.String(),
+		WorkOrderId: order.ID.String(),
+		Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
+		Repository:  "acme/app",
+		Number:      42,
+		Url:         "https://github.com/acme/app/pull/42",
+		Title:       "Ready",
+		State:       pb.FactoryPullRequest_STATE_OPEN,
+	})
+	require.NoError(t, err)
+	pr := created.GetPullRequest()
+
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	vcsID := integration.ID.String()
+	appRepo := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSIntegrationID: &vcsID,
+		AppRepository:    &appRepo,
+	}))
+
+	const headSHA = "abc123def456"
+	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, pr.GetId())})
+	require.NoError(t, err)
+	require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+		Mergeable:      true,
+		HeadSHA:        headSHA,
+		AllowedMethods: "SQUASH",
+	}))
+	now := time.Now()
+	webhook := models.Webhook{
+		ID:                uuid.New(),
+		State:             models.WebhookStateFailed,
+		Secret:            []byte("secret"),
+		Configuration:     datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration("acme/app"))),
+		AppInstallationID: &integration.ID,
+		RetryCount:        3,
+		MaxRetries:        3,
+		LastError:         `The "pull_request" event cannot have more than 20 hooks.`,
+		CreatedAt:         &now,
+	}
+	require.NoError(t, db.Create(&webhook).Error)
+
+	api := &fakeFactoryGitHub{
+		pullRequest: mergeableGitHubPullRequest(headSHA),
+		combined:    &github.CombinedStatus{State: github.Ptr("success")},
+		checkRuns:   &github.ListCheckRunsResults{},
+		repository:  allMethodsRepository(),
+	}
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
+		return api, nil
+	}
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+
+	_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.MergeFactoryPullRequestRequest{
+		FactoryId:       factory.ID.String(),
+		PrId:            pr.GetId(),
+		MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
+		ExpectedHeadSha: headSHA,
+	})
+	require.Error(t, err)
+	code, message, ok := grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Equal(t, webhookSetupHookLimitProductMessage, message)
+	assert.NotContains(t, message, "cannot have more than 20 hooks")
+	assert.Equal(t, 0, api.mergeCalls)
+
+	reloaded, err := models.FindWebhookInTransaction(db, webhook.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.WebhookStateFailed, reloaded.State)
+	open, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: stored.ID})
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryPullRequestStateOpen, open.State)
 }
 
 func TestRetryFactoryPullRequestWebhook(t *testing.T) {
