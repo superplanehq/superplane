@@ -207,6 +207,41 @@ describe("AutomationsConsoleVariant card collapse", () => {
     expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
   });
 
+  it("collapses Backlog when it finishes while Implement is still running", () => {
+    const overlapping = {
+      ...SPLIT_RUN_RUNNING,
+      phases: [
+        ...SPLIT_RUN_RUNNING.phases,
+        {
+          id: "analysis-1",
+          name: "Analysis",
+          status: "running" as const,
+          duration: "30s",
+          startedAt: TWO_HOURS_AGO,
+          componentName: "Backlog",
+          appId: "app-refund-backlog-analyzer",
+          artifacts: [],
+          stream: [],
+          canvasSteps: [],
+        },
+      ],
+    };
+    const { rerenderConsole } = renderConsole(overlapping);
+
+    expect(cardState("Backlog")).toHaveAttribute("data-state", "open");
+    expect(cardState("Implementation")).toHaveAttribute("data-state", "open");
+
+    rerenderConsole({
+      ...overlapping,
+      phases: overlapping.phases.map((phase) =>
+        phase.id === "analysis-1" ? { ...phase, status: "passed" as const } : phase,
+      ),
+    });
+
+    expect(cardState("Backlog")).toHaveAttribute("data-state", "closed");
+    expect(cardState("Implementation")).toHaveAttribute("data-state", "open");
+  });
+
   it("collapses the last card after every automation finishes", () => {
     const { rerenderConsole } = renderConsole(SPLIT_RUN_RUNNING);
     expect(cardState("Implementation")).toHaveAttribute("data-state", "open");
