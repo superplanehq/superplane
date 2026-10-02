@@ -22,7 +22,11 @@ export function useDefaultRefinementPrompt(input: {
           body: {},
         }),
       );
-      return refinementPromptFromAutomationDefaults(response.data?.canvasYaml ?? "");
+      const prompt = refinementPromptFromAutomationDefaults(response.data?.canvasYaml ?? "");
+      if (!prompt) {
+        throw new Error("default refinement prompt is missing");
+      }
+      return prompt;
     },
   });
 
