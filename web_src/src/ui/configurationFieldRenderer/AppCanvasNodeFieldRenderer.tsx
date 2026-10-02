@@ -38,6 +38,10 @@ export function AppCanvasNodeFieldRenderer({
     error,
   } = useCanvas(organizationId, appCanvasId ?? "", {
     enabled: Boolean(appCanvasId),
+    // The canvas detail cache may contain the current edit-session draft.
+    // Treat it as authoritative until the surrounding workflow invalidates it;
+    // a mount-time refetch would replace draft nodes with the live canvas.
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
   const options: AutoCompleteOption[] = useMemo(() => {
