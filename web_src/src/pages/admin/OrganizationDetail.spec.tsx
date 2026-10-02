@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { createElement, type ReactNode } from "react";
@@ -432,6 +432,72 @@ describe("OrganizationDetail", () => {
     });
     expect(screen.getByText("acme-sentry")).toBeInTheDocument();
     expect(screen.queryByText("This organization has no connections.")).not.toBeInTheDocument();
+  });
+
+  it("keeps a newer search when an older empty page finishes reading", async () => {
+    const user = userEvent.setup();
+    let releaseEmptyPage = () => {};
+    const connection = (name: string, id: string) => ({
+      id,
+      app_name: "sentry",
+      installation_name: name,
+      state: "ready",
+      state_description: "",
+      details: {},
+      created_at: "2024-01-15T12:00:00Z",
+      updated_at: "2024-02-20T12:00:00Z",
+    });
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({
+          id: ORG_ID,
+          name: "Acme",
+          slug: "acme",
+          description: "Builds widgets",
+          canvas_count: 0,
+          task_count: 0,
+          done_task_count: 0,
+          member_count: 0,
+          created_at: "2024-01-15T12:00:00Z",
+          updated_at: "2024-02-20T12:00:00Z",
+        });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/integrations`)) {
+        const parsed = new URL(url, "http://localhost");
+        if (parsed.searchParams.get("offset") === "50") {
+          const response = new Response(null, { status: 200 });
+          response.json = () =>
+            new Promise((resolve) => {
+              releaseEmptyPage = () => resolve({ items: [], total: 50, limit: 50, offset: 50 });
+            });
+          return response;
+        }
+        if (parsed.searchParams.get("search") === "found") {
+          return jsonResponse({ items: [connection("found-sentry", "integration-3")], total: 1, limit: 50, offset: 0 });
+        }
+        return jsonResponse({ items: [connection("acme-sentry", "integration-1")], total: 51, limit: 50, offset: 0 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Loading...")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "Search connections" }), "found");
+    expect(await screen.findByText("found-sentry")).toBeInTheDocument();
+
+    await act(async () => {
+      releaseEmptyPage();
+    });
+
+    expect(screen.getByText("found-sentry")).toBeInTheDocument();
+    expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {

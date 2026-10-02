@@ -52,6 +52,11 @@ function earlierPageOffset(total: number, offset: number, rowCount: number) {
   return lastOffset;
 }
 
+function integrationPage(body: AdminIntegrationsResponse, offset: number) {
+  const rows = body.items ?? [];
+  return { rows, total: body.total, retryOffset: earlierPageOffset(body.total, offset, rows.length) };
+}
+
 const STATE_CLASSES: Record<string, string> = {
   ready: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300",
   pending: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
@@ -74,6 +79,12 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
         setError(true);
         setLoading(false);
       };
+      const showPage = (rows: AdminIntegration[], nextTotal: number) => {
+        setItems(rows);
+        setTotal(nextTotal);
+        setError(false);
+        setLoading(false);
+      };
       setLoading(true);
       setError(false);
       try {
@@ -86,17 +97,16 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
           return;
         }
         const body = (await response.json()) as AdminIntegrationsResponse;
-        const rows = body.items ?? [];
-        const retryOffset = earlierPageOffset(body.total, nextOffset, rows.length);
-        if (retryOffset !== null) {
-          setOffset(retryOffset);
-          void fetchIntegrations(nextSearch, retryOffset);
+        if (id !== requestId.current) {
           return;
         }
-        setItems(rows);
-        setTotal(body.total);
-        setError(false);
-        setLoading(false);
+        const page = integrationPage(body, nextOffset);
+        if (page.retryOffset !== null) {
+          setOffset(page.retryOffset);
+          void fetchIntegrations(nextSearch, page.retryOffset);
+          return;
+        }
+        showPage(page.rows, page.total);
       } catch {
         if (id !== requestId.current) {
           return;
