@@ -52,6 +52,30 @@ describe("notesForLiveStream analysis wait", () => {
     expect(notes?.[0]?.status).toBe("cancelled");
   });
 
+  it("keeps a failed wait failed when a saved result makes the analysis look passed", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [
+        commandSection({
+          text: "Wait for the next message",
+          lines: ["request rejected"],
+        }),
+      ],
+      error: null,
+      isStreaming: false,
+      nodeStatus: "failed",
+      analysisStatus: "passed",
+    });
+
+    expect(notes?.[0]).toEqual(
+      expect.objectContaining({
+        componentName: "Wait for the next message",
+        detail: "Wait for the next user message\n\nrequest rejected",
+        status: "failed",
+      }),
+    );
+  });
+
   it("keeps a failed wait failed when an explicit stop leaves the analysis failed", () => {
     const notes = notesForLiveStream({
       nodeId: "agent",
