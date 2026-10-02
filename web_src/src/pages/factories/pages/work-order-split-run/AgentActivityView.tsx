@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { agentToolDisplayText, isCommandTool } from "@/lib/agentToolLabels";
-import { normalizeTerminalOutput } from "@/lib/shellScript";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronRight } from "lucide-react";
@@ -235,36 +234,21 @@ function ToolLine({
 }) {
   const command = isCommandTool(tool);
   const line = command ? (
-    <CommandLine tool={tool} expandable={expandableCommands} />
+    <CommandLine tool={tool} expandable={expandableCommands} showOutput={tone === "log"} />
   ) : (
     <ToolLabel tool={tool} tone={tone} />
   );
-  if (tone !== "log") return line;
-  if (command && failedTool(tool)) {
+  if (tone !== "log" || command) {
     return line;
   }
-  const output = command ? normalizeTerminalOutput(tool.output) : tool.output.trim();
+  const output = tool.output.trim();
   if (!output) {
     return line;
   }
   return (
     <div>
       {line}
-      <ToolOutput command={command} text={output} />
-    </div>
-  );
-}
-
-function ToolOutput({ command, text }: { command: boolean; text: string }) {
-  if (!command) {
-    return (
-      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{text}</pre>
-    );
-  }
-  return (
-    <div className="mt-1 px-1">
-      <p className="text-[11px] leading-4 text-muted-foreground">Output</p>
-      <pre className={cn(COMMAND_CLASSNAME, "mt-0.5 max-h-32 overflow-auto text-muted-foreground")}>{text}</pre>
+      <pre className={cn(COMMAND_CLASSNAME, "mt-1 max-h-32 overflow-auto px-1 text-muted-foreground")}>{output}</pre>
     </div>
   );
 }
