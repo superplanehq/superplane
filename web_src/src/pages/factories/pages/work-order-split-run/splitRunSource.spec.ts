@@ -184,6 +184,21 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  it("names the MCP client when the task has an MCP source", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        mcpClient: { id: "superplane-local", name: "Cursor" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Cursor",
+        iconAlt: "SuperPlane",
+      }),
+    );
+  });
+
   it("resolves the source person's avatar from the org members list when one is available", () => {
     const resolveUser = (userId: string | undefined, name?: string) =>
       userId
@@ -230,6 +245,8 @@ describe("splitRunSourceForOrder", () => {
           expect(source.ticket.href, order.id).toMatch(/^https?:/);
           expect(source.ticket.label, order.id).toBeTruthy();
         }
+      } else if (source.kind === "mcp") {
+        expect(source.name, order.id).toBeTruthy();
       } else {
         expect(source.person.name, order.id).toBeTruthy();
         expect(source.detail, order.id).toBe("Created manually");
