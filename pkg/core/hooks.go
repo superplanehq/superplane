@@ -37,6 +37,7 @@ type ActionHookContext struct {
 	Factory        FactoryContext
 	Usage          UsageRecorder
 	HostedLLM      HostedLLMContext
+	RunnerTasks    RunnerTaskContext
 }
 
 /*

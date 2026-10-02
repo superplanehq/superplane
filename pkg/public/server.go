@@ -46,6 +46,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -88,6 +89,7 @@ type Server struct {
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
+	adminRouter           *mux.Router
 	BasePath              string
 	BaseURL               string
 	WebhooksBaseURL       string
@@ -370,6 +372,27 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	adminGatewayMux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
+		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			pattern, ok := runtime.HTTPPathPattern(ctx)
+			if ok {
+				setOtelMetricRoute(ctx, pattern)
+			}
+			return nil
+		}),
+		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
+	)
+	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
+		return err
+	}
+	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
+	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -388,6 +411,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-logs",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerTaskLogs)),
+	).Methods(http.MethodGet)
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
@@ -739,7 +766,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
@@ -781,6 +808,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/unblock", s.unblockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}", s.adminDeleteAccount).Methods("DELETE")
+	s.adminRouter = adminRoute
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {

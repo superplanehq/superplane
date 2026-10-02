@@ -74,7 +74,7 @@ Example:
 4. bash — ` + "`git push`" + `
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
 - **Model**: Select a model from Organization LLM Models.
@@ -94,7 +94,7 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 
 func (c *RunClaudeCode) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "Anthropic API Key",
 			IntegrationName:  "claude",
@@ -152,9 +152,9 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
@@ -186,12 +186,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		Labels:         runner.OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := broker.CreateTask(params)
+	taskID, err := client.CreateTask(params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
