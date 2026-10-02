@@ -306,6 +306,7 @@ function ColumnTimelineItem({
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
+  const emptyCopy = emptyColumnCopy(column.id, index, currentColumn, fixture);
   return (
     <TimelineItem step={step} className="group/column" data-testid={`redesign-console-column-${column.id}`}>
       <TimelineHeader className="flex w-full items-center gap-2">
@@ -321,7 +322,9 @@ function ColumnTimelineItem({
       </TimelineHeader>
       <TimelineContent className="mt-2 flex flex-col gap-3 text-foreground">
         {column.automations.length === 0 ? (
-          <span className={META_TEXT_CLASSNAME}>{index + 1 < currentColumn ? "Skipped" : "Not started"}</span>
+          emptyCopy ? (
+            <span className={META_TEXT_CLASSNAME}>{emptyCopy}</span>
+          ) : null
         ) : (
           column.automations.map((automation) => (
             <ConsoleAutomationCard
@@ -344,6 +347,19 @@ function ColumnTimelineItem({
       </TimelineContent>
     </TimelineItem>
   );
+}
+
+/** Empty Backlog after Intake is not skipped; the creation stage already ran. */
+function emptyColumnCopy(
+  columnId: ConsoleColumnId,
+  index: number,
+  currentColumn: number,
+  fixture: SplitRunFixture,
+): string | undefined {
+  if (columnId === "backlog" && fixture.phases.some((phase) => isConsoleCreationStage(phase))) {
+    return undefined;
+  }
+  return index + 1 < currentColumn ? "Skipped" : "Not started";
 }
 
 /** Timeline steps to fill: through the last column that has a run. */

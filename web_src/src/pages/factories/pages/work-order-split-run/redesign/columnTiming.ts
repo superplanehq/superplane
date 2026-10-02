@@ -1,5 +1,4 @@
-import type { SplitRunFixture, SplitRunPhase } from "../splitRunMocks";
-import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
+import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "../splitRunMocks";
 import { consoleColumnIdForStage, isConsoleCreationStage, type ConsoleColumnId } from "./automationsViewModel";
 
 export type ColumnTimingId = "intake" | ConsoleColumnId;
@@ -39,7 +38,8 @@ export function timingsForConsoleColumns(
     if (column !== "done") {
       const next = NEXT_COLUMN[column];
       const nextEntered = next ? enteredMs[next] : undefined;
-      const durationMs = Math.max(0, (nextEntered ?? nowMs) - entered);
+      const end = nextEntered ?? dwellEndMs(column, fixture, nowMs);
+      const durationMs = Math.max(0, end - entered);
       if (durationMs > 0) {
         timing.durationMs = durationMs;
       }
@@ -115,18 +115,25 @@ function endedMsForColumn(phases: SplitRunPhase[], column: ConsoleColumnId): num
   return times.length ? Math.max(...times) : undefined;
 }
 
+function dwellEndMs(column: ConsoleColumnId, fixture: SplitRunFixture, nowMs: number): number {
+  if (isOpenLineStatus(fixture.lineStatus)) {
+    return nowMs;
+  }
+  return endedMsForColumn(fixture.phases, column) ?? latestEndedMs(fixture.phases) ?? nowMs;
+}
+
+function isOpenLineStatus(status: SplitRunPhaseStatus): boolean {
+  return status === "running" || status === "waiting" || status === "pending";
+}
+
+function latestEndedMs(phases: SplitRunPhase[]): number | undefined {
+  const times = phases.map((phase) => parseTime(phase.endedAt)).filter((value): value is number => value != null);
+  return times.length ? Math.max(...times) : undefined;
+}
+
 function timingColumnForPhase(phase: SplitRunPhase): ConsoleColumnId {
   if (isConsoleCreationStage(phase)) {
     return "backlog";
-  }
-  if (phase.columnKey) {
-    return phase.columnKey;
-  }
-  if (phase.stepIndex === 1) {
-    return "verify";
-  }
-  if (phase.stepIndex != null && phase.stepIndex >= 2) {
-    return phase.id === SPLIT_RUN_CLOSURE_PHASE_ID || phase.name === "Done" ? "done" : "verify";
   }
   return consoleColumnIdForStage({ id: phase.id, name: phase.name, columnKey: phase.columnKey });
 }
