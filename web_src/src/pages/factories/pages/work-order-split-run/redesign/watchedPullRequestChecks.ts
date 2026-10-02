@@ -17,18 +17,53 @@ export type WatchedPullRequestCheck = {
 type CanvasNodeRef = {
   id?: string;
   component?: string;
+  configuration?: unknown;
 };
 
-export function waitForPullRequestChecksNodeId(nodes: CanvasNodeRef[] | undefined): string | undefined {
-  return nodes?.find((node) => node.component === WAIT_FOR_PULL_REQUEST_CHECKS_COMPONENT && node.id)?.id;
+export function waitForPullRequestChecksNode(
+  nodes: CanvasNodeRef[] | undefined,
+): { id: string; checkNames: string[] } | undefined {
+  const node = nodes?.find((item) => item.component === WAIT_FOR_PULL_REQUEST_CHECKS_COMPONENT && item.id);
+  if (!node?.id) {
+    return undefined;
+  }
+  return { id: node.id, checkNames: configuredCheckNames(node.configuration) };
 }
 
-export function watchedPullRequestChecksFromExecutions(executions: unknown, nodeId: string): WatchedPullRequestCheck[] {
+function configuredCheckNames(configuration: unknown): string[] {
+  if (!isRecord(configuration) || !Array.isArray(configuration.checkNames)) {
+    return [];
+  }
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const value of configuration.checkNames) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const name = value.trim();
+    if (!name) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+export function watchedPullRequestChecksFromExecutions(
+  executions: unknown,
+  nodeId: string,
+  configuredNames: string[] = [],
+): WatchedPullRequestCheck[] {
   const execution = latestExecutionForNode(executions, nodeId);
   if (!execution) {
     return [];
   }
-  return selectedChecksForExecution(execution);
+  return selectedChecksForExecution(execution, configuredNames);
 }
 
 export function watchedCheckStatus(status: string, conclusion: string): WatchedCheckStatus {
@@ -45,15 +80,22 @@ export function watchedCheckStatus(status: string, conclusion: string): WatchedC
   return "Passed";
 }
 
-function selectedChecksForExecution(execution: Record<string, unknown>): WatchedPullRequestCheck[] {
+function selectedChecksForExecution(
+  execution: Record<string, unknown>,
+  configuredNames: string[],
+): WatchedPullRequestCheck[] {
   const fromMetadata = selectedChecksList(execution.metadata);
-  if (fromMetadata) {
+  if (fromMetadata && fromMetadata.length > 0) {
     return fromMetadata;
   }
   if (execution.state !== "STATE_FINISHED") {
-    return [];
+    return pendingConfiguredChecks(configuredNames);
   }
   return selectedChecksFromOutputs(execution.outputs) ?? [];
+}
+
+function pendingConfiguredChecks(names: string[]): WatchedPullRequestCheck[] {
+  return names.map((name) => ({ name, status: "Pending" as const }));
 }
 
 function selectedChecksFromOutputs(outputs: unknown): WatchedPullRequestCheck[] | undefined {
