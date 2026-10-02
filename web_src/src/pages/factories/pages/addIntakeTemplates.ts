@@ -7,7 +7,6 @@ import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -47,7 +46,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Dependabot alerts",
     description: "Creates tasks from Dependabot alerts.",
     iconSrc: dependabotIcon,
-    featureId: FEATURE_FACTORY_DEPENDABOT_INTAKE,
   },
   {
     id: "jira-issues",
