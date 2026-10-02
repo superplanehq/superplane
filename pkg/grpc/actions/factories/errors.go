@@ -18,6 +18,7 @@ import (
 const (
 	intakeConnectFirstMessage      = "Connect this intake first."
 	intakeCouldNotLoadItemsMessage = "SuperPlane could not load items from this intake."
+	linearIssueFilesMessage        = "SuperPlane could not store the Linear files. Try the import again."
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
@@ -201,6 +202,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, errLinearIssueFiles):
+		return grpcerrors.FailedPrecondition(err, linearIssueFilesMessage)
 	case errors.Is(err, datadog.ErrErrorTrackingForbidden):
 		return grpcerrors.FailedPrecondition(err, datadog.ErrorTrackingForbiddenMessage)
 	case errors.Is(err, models.ErrFileNotFound):

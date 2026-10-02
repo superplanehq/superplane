@@ -22,6 +22,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
 			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
+			models.FactoryIntakeSourceLinearIssues:       "linear.onIssue",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -30,6 +31,30 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			assert.Equal(t, expected, trigger.Component)
 			assert.Equal(t, yaml.NodeTypeTrigger, trigger.Type)
 		}
+	})
+
+	t.Run("a Linear intake listens to the selected projects", func(t *testing.T) {
+		settings := defaultLinearIntakeSettings()
+		settings.LinearProjectIDs = []string{"project-1", "project-2"}
+		settings.LinearLabels = []string{"bug"}
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:   models.FactoryIntakeSourceLinearIssues,
+			Settings: settings,
+			Binding: &intakeBinding{
+				Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "Acme Linear"},
+				Configuration: map[string]any{"projects": []string{"project-1", "project-2"}},
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []string{"project-1", "project-2"}, trigger.Configuration["projects"])
+		assert.Equal(t, []any{"create", "update"}, trigger.Configuration["actions"])
+		assert.Equal(t, "integration-1", trigger.Integration.ID)
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Contains(t, filter.Configuration["expression"], `"project-1"`)
+		assert.Contains(t, filter.Configuration["expression"], `"bug"`)
 	})
 
 	t.Run("a GitHub issue flows from the trigger through the filter to the work order", func(t *testing.T) {
@@ -226,7 +251,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 
 	t.Run("an unknown source has no graph", func(t *testing.T) {
-		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "linear-issues"})
+		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "notion"})
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
 	})
 

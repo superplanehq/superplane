@@ -32,17 +32,20 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-SuperPlane connects to Linear with OAuth.
+SuperPlane connects to Linear with OAuth. A workspace admin must authorize the connection, because the triggers register webhooks. That person must also be a member of each private team you want to listen to.
 
-1. Click the **Connect** button with client id and secret empty to start the setup wizard.
+The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues, comments, attachments, and reactions. Admin lets SuperPlane register webhooks.
 
-The connection requests the **read**, **write** and **admin** scopes. Write covers creating and editing
-issues, comments, attachments and reactions; admin is needed because the triggers register webhooks,
-which Linear restricts to workspace admins.
+1. Open Linear, then **Settings**, then **Administration**, then **API**.
+2. Under **OAuth applications**, click **Create new**.
+3. Set the callback URL to the address SuperPlane shows, then create the application.
+4. Copy the **Client ID** into the **Client ID** field.
+5. Copy the **Client Secret** into the **Client Secret** field.
+6. Click **Save**. SuperPlane opens Linear so a workspace admin can authorize the connection.
 
-Components act as the user who authorizes the connection, so that user needs access to the teams you
-automate. Linear also lets only a comment's own author edit it, so **Update Issue Comment** can only
-change comments that this same connection posted.
+You can also leave both fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL filled in. Copy the **Client ID** and **Client Secret** from the credentials page into the fields above, then click **Save** again.
+
+Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
 
 <a id="on-issue"></a>
 
@@ -60,7 +63,8 @@ The On Issue trigger starts a workflow execution when issue events occur in a Li
 
 ### Configuration
 
-- **Team** (required): Linear team to monitor
+- **Team**: Linear team to monitor. Required when no projects are selected.
+- **Projects** (optional): Only issues in these projects. When set, the team can stay empty and SuperPlane listens on every team those projects belong to, including private teams.
 - **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
 - **Labels** (optional): Only trigger for issues carrying specific labels
 
@@ -131,6 +135,9 @@ the **admin** scope, so the Linear connection must be authorized by a **workspac
     },
     "organizationId": "dc844923-f9a4-40a3-825c-dea7747e57d6",
     "type": "Issue",
+    "updatedFrom": {
+      "projectId": null
+    },
     "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry",
     "webhookId": "000042e3-d123-4980-b49f-8e140eef9329",
     "webhookTimestamp": 1774553375841
