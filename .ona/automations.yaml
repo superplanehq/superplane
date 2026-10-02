@@ -1,0 +1,34 @@
+services:
+  superplane:
+    name: SuperPlane
+    triggeredBy:
+      - manual
+      - postEnvironmentStart
+    commands:
+      start: |
+        make dev.up
+        make dev.server
+        gitpod environment port open 8000 --dont-wait --admission creator_only --name superplane
+        make dev.logs
+      ready: curl -sf http://localhost:8000/health
+
+tasks:
+  install-dependencies:
+    name: Install dependencies
+    triggeredBy:
+      - manual
+      - postDevcontainerStart
+      - prebuild
+    command: |
+      make dev.up
+      make dev.setup
+
+  build:
+    name: Build
+    triggeredBy:
+      - manual
+    dependsOn:
+      - install-dependencies
+    command: |
+      make check.build.app
+      make check.build.ui
