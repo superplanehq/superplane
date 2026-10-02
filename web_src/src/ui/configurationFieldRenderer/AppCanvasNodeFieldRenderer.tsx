@@ -2,10 +2,11 @@ import { useEffect, useMemo } from "react";
 import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCompleteSelect";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ConfigurationField } from "@/api-client";
-import { useCanvas } from "@/hooks/useCanvasData";
+import { canvasKeys, useCanvas } from "@/hooks/useCanvasData";
+import { useQuery } from "@tanstack/react-query";
+import { fetchStagedCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
 import { toTestId } from "@/lib/testID";
 import { filterAppCanvasNodes, resolveAppCanvasId } from "./appCanvasNodeField";
-
 interface AppCanvasNodeFieldRendererProps {
   field: ConfigurationField;
   value: string | undefined;
@@ -24,13 +25,14 @@ export function AppCanvasNodeFieldRenderer({
   readOnly = false,
 }: AppCanvasNodeFieldRendererProps) {
   const typeOptions = field.typeOptions?.appCanvasNode;
-  const appCanvasId = useMemo(() => {
-    if (!typeOptions) {
-      return undefined;
-    }
 
-    return resolveAppCanvasId(typeOptions.parameters, allValues);
-  }, [allValues, typeOptions]);
+const appCanvasId = useMemo(() => {
+  if (!typeOptions) {
+    return undefined;
+  }
+
+  return resolveAppCanvasId(typeOptions.parameters, allValues);
+}, [allValues, typeOptions]);
 
   const {
     data: canvas,
@@ -39,22 +41,43 @@ export function AppCanvasNodeFieldRenderer({
   } = useCanvas(organizationId, appCanvasId ?? "", {
     enabled: Boolean(appCanvasId),
   });
+const { data: stagedCanvas } = useQuery({
+  queryKey: canvasKeys.stagedCanvasSpec(appCanvasId ?? ""),
+  queryFn: async () => {
+    if (!appCanvasId || !canvas) {
+      return null;
+    }
+
+    return fetchStagedCanvasVersionWithSpec(
+      appCanvasId,
+      canvas
+    );
+  },
+  enabled: Boolean(appCanvasId && canvas),
+});
 
   const options: AutoCompleteOption[] = useMemo(() => {
     if (!typeOptions) {
       return [];
     }
 
-    const matchingNodes = filterAppCanvasNodes(canvas?.spec?.nodes, typeOptions.nodeTypes, typeOptions.componentTypes);
+    const nodes =
+  stagedCanvas?.spec?.nodes ??
+  canvas?.spec?.nodes ??
+  [];
 
+const matchingNodes = filterAppCanvasNodes(
+  nodes,
+  typeOptions.nodeTypes,
+  typeOptions.componentTypes
+);
     return matchingNodes
       .map((node) => ({
         value: node.id!,
         label: node.name?.trim() || node.id!,
       }))
       .sort((left, right) => left.label.localeCompare(right.label));
-  }, [canvas?.spec?.nodes, typeOptions]);
-
+  }, [canvas?.spec?.nodes, stagedCanvas?.spec?.nodes, typeOptions]);
   const selectedValue = useMemo(() => {
     if (!value) {
       return "";
