@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_DEPENDABOT_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -371,7 +370,7 @@ describe("lineIntakeModel", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
@@ -381,12 +380,9 @@ describe("lineIntakeModel", () => {
 
   it("keeps Jira, Productive.io, and Datadog live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [
-        FEATURE_FACTORY_DATADOG_INTAKE,
-        FEATURE_FACTORY_DEPENDABOT_INTAKE,
-        FEATURE_FACTORY_JIRA_INTAKE,
-        FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-      ].includes(featureId),
+      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(
+        featureId,
+      ),
     );
 
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();

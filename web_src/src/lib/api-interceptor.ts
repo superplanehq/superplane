@@ -1,12 +1,27 @@
 import { ACCOUNT_BLOCKED_MESSAGE } from "@/lib/account-blocked";
 import { isPublicFactoryLinePath } from "@/lib/publicFactoryLinePath";
+import { client } from "@/api-client/client.gen";
 
 const ACCOUNT_SESSION_PATHS = new Set(["/account", "/organizations"]);
 const PUBLIC_LINE_GUEST_PROBES = new Set(["/organizations", "/account/experimental-features"]);
 
 let interceptorFetch: typeof globalThis.fetch | undefined;
+let clientErrorInterceptorInstalled = false;
 
 export const setupApiInterceptor = (): void => {
+  if (!clientErrorInterceptorInstalled) {
+    client.interceptors.error.use((error, response) => {
+      if (error instanceof Error) {
+        return error;
+      }
+
+      const fields = typeof error === "object" && error !== null ? error : {};
+      const message = "message" in fields && typeof fields.message === "string" ? fields.message : String(error);
+      return Object.assign(new Error(message), fields, { status: response?.status });
+    });
+    clientErrorInterceptorInstalled = true;
+  }
+
   if (globalThis.fetch === interceptorFetch) {
     return;
   }

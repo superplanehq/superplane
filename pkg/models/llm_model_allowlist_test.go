@@ -125,4 +125,8 @@ func Test__BYOKIntegrationAppName(t *testing.T) {
 	name, err := models.BYOKIntegrationAppName(models.UsageProviderAnthropic)
 	require.NoError(t, err)
 	assert.Equal(t, "claude", name)
+
+	name, err = models.BYOKIntegrationAppName(models.UsageProviderCustom)
+	require.NoError(t, err)
+	assert.Equal(t, models.CustomLLMAppName, name)
 }

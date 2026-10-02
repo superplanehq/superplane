@@ -505,6 +505,19 @@ func layoutWide(in Input) wideModel {
 	return out
 }
 
+const (
+	chartLayoutWidth  = 800
+	chartDisplayWidth = 1012
+)
+
+func (wideModel) LayoutWidth() int { return chartLayoutWidth }
+
+func (wideModel) DisplayWidth() int { return chartDisplayWidth }
+
+func (m wideModel) DisplayHeight() int {
+	return int(math.Round(float64(m.Height) * chartDisplayWidth / chartLayoutWidth))
+}
+
 func wideTitle(in Input, m metrics) string {
 	if m.showShare {
 		return fmt.Sprintf("SuperPlane %d%% of merged PRs vs previous %d days", m.share, in.PeriodDays)
@@ -770,7 +783,7 @@ const largeSVG = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 const wideSVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" id="{{.RootID}}" width="100%" height="{{.Height}}" viewBox="0 0 800 {{.Height}}" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" id="{{.RootID}}" width="{{.DisplayWidth}}" height="{{.DisplayHeight}}" viewBox="0 0 {{.LayoutWidth}} {{.Height}}" role="img">
   <title>{{.Title}}</title>
   <style>
     #{{.RootID}} text       { font-family: ` + fontFamily + `; }

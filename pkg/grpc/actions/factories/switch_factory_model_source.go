@@ -15,8 +15,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/customllm"
+	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
@@ -31,6 +34,7 @@ const (
 	modelSourceAnthropic  = "anthropic"
 	modelSourceOpenAI     = "openai"
 	modelSourceOpenRouter = "openrouter"
+	modelSourceCustom     = "custom"
 )
 
 type workspaceAgentRewrite struct {
@@ -79,6 +83,21 @@ func workspaceAgentRewriteFor(source, integrationName string, modelIDs []string)
 			Harness:         models.FactoryOnboardingAgentHarnessClaudeCode,
 			Provider:        models.UsageProviderOpenRouter,
 		}, nil
+	case modelSourceCustom:
+		model, planning := agentModelsForSource(modelSourceCustom, modelIDs)
+		if model == "" {
+			return workspaceAgentRewrite{}, grpcerrors.FailedPrecondition(nil, "The provider did not return any models. Check the URL, token, and API type.")
+		}
+		// runnerOpenRouter starts the OpenCode CLI. The custom provider block
+		// replaces the OpenRouter provider in that OpenCode config.
+		return workspaceAgentRewrite{
+			Component:       "runnerOpenRouter",
+			Model:           model,
+			PlanningModel:   planning,
+			IntegrationName: integrationName,
+			Harness:         models.FactoryOnboardingAgentHarnessClaudeCode,
+			Provider:        models.UsageProviderCustom,
+		}, nil
 	default:
 		return workspaceAgentRewrite{}, grpcerrors.InvalidArgument(nil, "unsupported model source")
 	}
@@ -108,9 +127,15 @@ func rewriteWorkspaceAgentNode(node *models.Node, rewrite workspaceAgentRewrite)
 		delete(node.Configuration, "credentials")
 		delete(node.Configuration, "model")
 		delete(node.Configuration, "maxTurns")
+		delete(node.Configuration, "llmProvider")
 		return true
 	}
 
+	if rewrite.Provider == models.UsageProviderCustom {
+		node.Configuration["llmProvider"] = models.UsageProviderCustom
+	} else {
+		delete(node.Configuration, "llmProvider")
+	}
 	node.Configuration["credentials"] = map[string]any{
 		"source": "integration",
 		"integration": map[string]any{
@@ -259,10 +284,15 @@ func ensureWorkspaceProviderIntegration(
 	orgID uuid.UUID,
 	provider string,
 	apiKey string,
+	baseURL string,
+	apiType string,
 ) (*models.Integration, error) {
 	existing, err := models.FindReadyBYOKIntegration(tx, orgID, provider)
 	if err != nil {
 		return nil, err
+	}
+	if provider == modelSourceCustom {
+		return ensureCustomProviderIntegration(ctx, tx, encryptor, orgID, existing, apiKey, baseURL, apiType)
 	}
 	if existing != nil {
 		return existing, nil
@@ -304,6 +334,132 @@ func ensureWorkspaceProviderIntegration(
 	return integration, nil
 }
 
+func ensureCustomProviderIntegration(
+	ctx context.Context,
+	tx *gorm.DB,
+	encryptor crypto.Encryptor,
+	orgID uuid.UUID,
+	existing *models.Integration,
+	apiKey string,
+	baseURL string,
+	apiType string,
+) (*models.Integration, error) {
+	enabled, err := models.OrganizationHasExperimentalFeatures(
+		tx,
+		orgID,
+		features.FeatureOrganizationBYOK,
+		features.FeatureOrganizationBYOKCustomProvider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, grpcerrors.PermissionDenied(nil, "Custom provider is not enabled for this organization.")
+	}
+
+	key := strings.TrimSpace(apiKey)
+	url := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	parsedType := strings.TrimSpace(apiType)
+	if existing != nil && key == "" && url == "" && parsedType == "" {
+		return existing, nil
+	}
+	if url == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "Enter a public http or https URL.")
+	}
+	if err := llm.ValidateBaseURL(url); err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "Enter a public http or https URL.")
+	}
+	normalizedType, err := customllm.NormalizeAPIType(parsedType)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, err.Error())
+	}
+	if existing == nil && key == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "API token is required.")
+	}
+
+	if existing != nil {
+		return updateCustomProviderIntegration(ctx, tx, encryptor, existing, key, url, normalizedType)
+	}
+
+	appName, err := models.BYOKIntegrationAppName(modelSourceCustom)
+	if err != nil {
+		return nil, err
+	}
+	installationName, err := nextInstallationName(tx, orgID, appName)
+	if err != nil {
+		return nil, err
+	}
+	integrationID := uuid.New()
+	encrypted, err := encryptAPIKey(ctx, encryptor, integrationID, key)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	integration := &models.Integration{
+		ID:               integrationID,
+		OrganizationID:   orgID,
+		AppName:          appName,
+		InstallationName: installationName,
+		State:            models.IntegrationStateReady,
+		Configuration: datatypes.NewJSONType(map[string]any{
+			"apiKey":  encrypted,
+			"baseURL": url,
+			"apiType": normalizedType,
+		}),
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+	if err := tx.Create(integration).Error; err != nil {
+		return nil, err
+	}
+	return integration, nil
+}
+
+func updateCustomProviderIntegration(
+	ctx context.Context,
+	tx *gorm.DB,
+	encryptor crypto.Encryptor,
+	existing *models.Integration,
+	apiKey string,
+	baseURL string,
+	apiType string,
+) (*models.Integration, error) {
+	data := existing.Configuration.Data()
+	if data == nil {
+		data = map[string]any{}
+	}
+	// A saved token is bound to the previous host. Sending it to a new URL
+	// would disclose the credential. Require a replacement token first.
+	if customProviderURLChanged(data, baseURL) && strings.TrimSpace(apiKey) == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "Enter a new API token when you change the provider URL.")
+	}
+	if apiKey != "" {
+		encrypted, err := encryptAPIKey(ctx, encryptor, existing.ID, apiKey)
+		if err != nil {
+			return nil, err
+		}
+		data["apiKey"] = encrypted
+	}
+	data["baseURL"] = baseURL
+	data["apiType"] = apiType
+	now := time.Now()
+	existing.Configuration = datatypes.NewJSONType(data)
+	existing.UpdatedAt = &now
+	if err := tx.Save(existing).Error; err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func customProviderURLChanged(data map[string]any, baseURL string) bool {
+	previous, _ := data["baseURL"].(string)
+	return normalizeCustomProviderURL(previous) != normalizeCustomProviderURL(baseURL)
+}
+
+func normalizeCustomProviderURL(value string) string {
+	return strings.TrimRight(strings.TrimSpace(value), "/")
+}
+
 func encryptAPIKey(ctx context.Context, encryptor crypto.Encryptor, integrationID uuid.UUID, apiKey string) (string, error) {
 	if encryptor == nil {
 		return "", fmt.Errorf("encryptor is required")
@@ -337,11 +493,13 @@ func switchFactoryModelSource(
 	factory *models.Factory,
 	source string,
 	apiKey string,
+	baseURL string,
+	apiType string,
 ) ([]uuid.UUID, string, error) {
 	var integration *models.Integration
 	if strings.TrimSpace(source) != modelSourceHosted {
 		provider := strings.TrimSpace(source)
-		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey)
+		saved, err := ensureWorkspaceProviderIntegration(ctx, tx, reg.Encryptor, factory.OrganizationID, provider, apiKey, baseURL, apiType)
 		if err != nil {
 			return nil, "", err
 		}
@@ -355,10 +513,14 @@ func switchFactoryModelSource(
 		integrationName = integration.InstallationName
 		integrationID = integration.ID.String()
 		ids, err := organizations.ListConnectedBYOKModelIDs(tx, reg, integration)
-		if err != nil && !providerModelListUsesDefaults(err) {
+		if strings.TrimSpace(source) == modelSourceCustom {
+			if err != nil {
+				return nil, "", err
+			}
+			modelIDs = ids
+		} else if err != nil && !providerModelListUsesDefaults(err) {
 			return nil, "", err
-		}
-		if err != nil {
+		} else if err != nil {
 			log.WithError(err).Warn("model list unavailable; switch uses default agent models")
 		} else {
 			modelIDs = ids
@@ -420,6 +582,8 @@ func SwitchFactoryModelSourceInTransaction(
 	factoryID string,
 	source string,
 	apiKey string,
+	baseURL string,
+	apiType string,
 ) ([]uuid.UUID, string, error) {
 	if reg == nil {
 		return nil, "", fmt.Errorf("integration registry is required")
@@ -438,7 +602,7 @@ func SwitchFactoryModelSourceInTransaction(
 			return err
 		}
 		var savedID string
-		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey)
+		changed, savedID, err = switchFactoryModelSource(ctx, tx, reg, factory, source, apiKey, baseURL, apiType)
 		integrationID = savedID
 		return err
 	})

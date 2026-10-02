@@ -13,9 +13,6 @@ export const FEATURE_FACTORY_JIRA_INTAKE = "factory_jira_intake";
 /** Organization experimental feature: manual "Add intake" entry for Productive.io in the Backlog column menu. */
 export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 
-/** Organization experimental feature: Dependabot alert intake from the Backlog column menu. */
-export const FEATURE_FACTORY_DEPENDABOT_INTAKE = "factory_dependabot_intake";
-
 /** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
@@ -27,6 +24,9 @@ export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 
 /** Organization experimental feature: organization LLM Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
+
+/** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
+export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
 /** Organization experimental feature: blank custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";

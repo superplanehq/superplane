@@ -197,8 +197,15 @@ func captureHTTPError(r *http.Request, status int) {
 
 	noted, hasCause := grpc.NotedServerErrorFrom(r.Context())
 	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetRequest(r)
+		request := r
+		if noted.OmitRequestBody {
+			request = requestWithoutBody(r)
+		}
+		scope.SetRequest(request)
 		scope.SetTag("status", strconv.Itoa(status))
+		for key, value := range noted.Tags {
+			scope.SetTag(key, value)
+		}
 		if !hasCause {
 			hub.CaptureMessage(fmt.Sprintf("HTTP %d %s", status, r.URL.Path))
 			return
@@ -207,6 +214,21 @@ func captureHTTPError(r *http.Request, status int) {
 		setHandlerMessage(scope, noted.Source)
 		hub.CaptureException(noted.Cause)
 	})
+}
+
+func requestWithoutBody(r *http.Request) *http.Request {
+	if r == nil {
+		return nil
+	}
+
+	clone := r.Clone(r.Context())
+	clone.Body = http.NoBody
+	clone.GetBody = nil
+	clone.ContentLength = 0
+	clone.Form = nil
+	clone.PostForm = nil
+	clone.MultipartForm = nil
+	return clone
 }
 
 func setHandlerMessage(scope *sentry.Scope, source error) {

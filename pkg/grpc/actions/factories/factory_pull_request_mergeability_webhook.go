@@ -241,16 +241,24 @@ func storedFactoryPullRequestMergeability(pullRequest *models.FactoryPullRequest
 	}
 }
 
+type githubWebhookUser struct {
+	Login   string `json:"login"`
+	HTMLURL string `json:"html_url"`
+	Name    string `json:"name"`
+}
+
 type githubMergeabilityWebhookPayload struct {
 	Action     string `json:"action"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
+	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
-		Number   int64  `json:"number"`
-		Merged   bool   `json:"merged"`
-		MergedAt string `json:"merged_at"`
-		ClosedAt string `json:"closed_at"`
+		Number   int64              `json:"number"`
+		Merged   bool               `json:"merged"`
+		MergedAt string             `json:"merged_at"`
+		ClosedAt string             `json:"closed_at"`
+		MergedBy *githubWebhookUser `json:"merged_by"`
 		Head     struct {
 			SHA string `json:"sha"`
 		} `json:"head"`

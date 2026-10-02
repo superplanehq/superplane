@@ -91,7 +91,7 @@ func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node model
 		return hostedSelectableLineRunnerModels(tx, orgID, factoryID, storedRunnerModel(node.Configuration))
 	}
 
-	provider, ok := runnerComponentProvider(node.ComponentName())
+	provider, ok := runnerNodeProvider(node)
 	if !ok {
 		return nil, nil
 	}
@@ -141,6 +141,13 @@ func concreteLineRunnerModels(ids []string) []string {
 		out = append(out, resolved)
 	}
 	return out
+}
+
+func runnerNodeProvider(node models.Node) (string, bool) {
+	if provider, _ := node.Configuration["llmProvider"].(string); strings.TrimSpace(provider) == models.UsageProviderCustom {
+		return models.UsageProviderCustom, true
+	}
+	return runnerComponentProvider(node.ComponentName())
 }
 
 func runnerComponentProvider(component string) (string, bool) {

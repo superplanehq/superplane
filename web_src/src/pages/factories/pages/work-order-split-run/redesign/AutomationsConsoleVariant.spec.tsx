@@ -9,10 +9,12 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
+import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { LiveHeaderSpendProvider, useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import { buildSplitRunFooter } from "../splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks";
+import { CREATED_MANUALLY } from "../splitRunSource";
 import { AutomationsConsoleVariant } from "./AutomationsConsoleVariant";
 
 type ConsoleProps = Parameters<typeof AutomationsConsoleVariant>[0];
@@ -46,6 +48,9 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Running");
     expect(screen.getByTestId("redesign-console-column-marker-verify")).toHaveAttribute("data-status", "pending");
     expect(screen.getByTestId("redesign-console-column-marker-done")).toHaveAttribute("data-status", "pending");
+    expect(
+      within(screen.getByTestId("redesign-console-column-backlog")).queryByText("Skipped"),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
     expect(screen.getByTestId("redesign-console-column-verify").getAttribute("data-completed")).toBeNull();
   });
@@ -190,34 +195,6 @@ describe("AutomationsConsoleVariant timeline markers", () => {
   });
 });
 
-function cardState(name: string) {
-  return screen.getByRole("button", { name: `Toggle ${name} details` }).closest("[data-state]");
-}
-
-describe("AutomationsConsoleVariant card collapse", () => {
-  it("keeps a running card open and collapses finished cards", () => {
-    renderConsole(SPLIT_RUN_RUNNING);
-
-    expect(cardState("Implementation")).toHaveAttribute("data-state", "open");
-    expect(cardState("Ingest")).toHaveAttribute("data-state", "closed");
-  });
-
-  it("collapses the last card after every automation finishes", () => {
-    const { rerenderConsole } = renderConsole(SPLIT_RUN_RUNNING);
-    expect(cardState("Implementation")).toHaveAttribute("data-state", "open");
-
-    rerenderConsole({
-      ...SPLIT_RUN_RUNNING,
-      lineStatus: "passed",
-      footerTone: "done",
-      phases: SPLIT_RUN_RUNNING.phases.map((phase) => ({ ...phase, status: "passed" })),
-    });
-
-    expect(cardState("Implementation")).toHaveAttribute("data-state", "closed");
-    expect(cardState("Ingest")).toHaveAttribute("data-state", "closed");
-  });
-});
-
 describe("AutomationsConsoleVariant summary strip", () => {
   it("shows the live note with Stop while a run is active", () => {
     const onStopRun = vi.fn();
@@ -315,18 +292,38 @@ describe("AutomationsConsoleVariant summary strip", () => {
   });
 });
 
-describe("AutomationsConsoleVariant task description", () => {
-  it("keeps the source and hides the empty sentence when edit is not allowed", () => {
+describe("AutomationsConsoleVariant intake", () => {
+  it("shows Intake with the source icon and the task description", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
+
+    const intake = screen.getByTestId("redesign-console-column-intake");
+    expect(within(intake).getByText("Intake")).toBeInTheDocument();
+    expect(within(intake).getByTestId("redesign-console-column-marker-intake")).toHaveTextContent("GitHub");
+    const description = within(intake).getByTestId("redesign-console-task-description");
+    expect(description).toHaveTextContent("Users see duplicate refund entries.");
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
+      "Intake GitHub issues",
+    );
+    expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
+    expect(
+      intake.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps Intake and hides the empty sentence when edit is not allowed", () => {
     renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "   ", canEditDescription: false });
 
     const description = screen.getByTestId("redesign-console-task-description");
-    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
     expect(screen.queryByText("No description yet.")).not.toBeInTheDocument();
   });
 
-  it("hides the task frame when there is no source and edit is not allowed", () => {
+  it("hides Intake when there is no source and edit is not allowed", () => {
     renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "   ", canEditDescription: false, source: undefined });
 
+    expect(screen.queryByTestId("redesign-console-column-intake")).not.toBeInTheDocument();
     expect(screen.queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
   });
 
@@ -336,19 +333,75 @@ describe("AutomationsConsoleVariant task description", () => {
     const description = screen.getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("No description yet.");
     expect(within(description).getByTestId("split-run-description-edit")).toBeInTheDocument();
-    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
     expect(
-      description.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
+      screen
+        .getByTestId("redesign-console-column-intake")
+        .compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeGreaterThan(0);
   });
 
-  it("shows the source above a written description", () => {
-    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
+  it("shows who added a manual task in the Intake description", () => {
+    renderConsole(SPLIT_RUN_RUNNING, {
+      source: { kind: "manual", person: SPLIT_RUN_RUNNING.owner, detail: CREATED_MANUALLY },
+      taskDescription: "Users see duplicate refund entries.",
+    });
 
     const description = screen.getByTestId("redesign-console-task-description");
-    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
-    expect(description).toHaveTextContent("Users see duplicate refund entries.");
+    expect(within(description).getByTestId("split-run-source")).toHaveTextContent(SPLIT_RUN_RUNNING.owner.name);
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(CREATED_MANUALLY);
+    expect(within(description).queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
+  });
+
+  it("shows who imported a task in the Intake description", () => {
+    const imported = splitRunFixtureForWorkOrder({
+      ...OPEN_WORK_ORDER,
+      createdBy: { user: { id: SPLIT_RUN_RUNNING.owner.id, name: SPLIT_RUN_RUNNING.owner.name } },
+      origin: { url: "https://github.com/acme/payments/issues/12", label: "acme/payments#12" },
+    });
+    renderConsole(imported, { taskDescription: "Users see duplicate refund entries." });
+
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments#12");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
+      `Imported by ${SPLIT_RUN_RUNNING.owner.name}`,
+    );
+  });
+});
+
+describe("AutomationsConsoleVariant column timing", () => {
+  const arrived = formatWorkOrderDateTime(new Date(TWO_HOURS_AGO));
+
+  it("stamps Intake without dwell and shows backlog arrival plus time spent", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
+
+    const intake = screen.getByTestId("redesign-console-column-timing-intake");
+    expect(intake).toHaveTextContent(`Arrived ${arrived}`);
+    expect(intake).not.toHaveTextContent("Spent");
+
+    const backlog = screen.getByTestId("redesign-console-column-timing-backlog");
+    expect(backlog).toHaveTextContent(`Arrived ${arrived}`);
+    expect(backlog).toHaveTextContent("Spent 1h");
+
+    expect(screen.queryByTestId("redesign-console-column-timing-verify")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("redesign-console-column-timing-done")).not.toBeInTheDocument();
+  });
+
+  it("shows Verify arrival and time so far while the task waits in that column", () => {
+    const entered = "2026-09-30T12:00:00.000Z";
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "waiting",
+      currentStepIndex: 0,
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, status: "passed" as const, endedAt: entered } : phase,
+      ),
+    });
+
+    const verify = screen.getByTestId("redesign-console-column-timing-verify");
+    expect(verify).toHaveTextContent(`Arrived ${formatWorkOrderDateTime(new Date(entered))}`);
+    expect(verify).toHaveTextContent("Spent");
   });
 });
 

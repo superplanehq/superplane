@@ -959,10 +959,14 @@ message UpdateFactoryOnboardingResponse {
 
 message SwitchFactoryModelSourceRequest {
   string id = 1;
-  // hosted, anthropic, openai, or openrouter.
+  // hosted, anthropic, openai, openrouter, or custom.
   string source = 2;
   // Provider API key. Required when this organization has no ready integration for the source.
   string api_key = 3;
+  // Provider base URL. Required when the source is a new custom provider.
+  string base_url = 4;
+  // API type for a custom provider: anthropic, openai, or openai-compatible.
+  string api_type = 5;
 }
 
 message SwitchFactoryModelSourceResponse {

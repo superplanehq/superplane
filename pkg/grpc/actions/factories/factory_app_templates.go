@@ -108,6 +108,7 @@ type factoryTemplateAgent struct {
 	planningModel             string
 	credentialSource          string
 	credentialIntegrationName string
+	llmProvider               string
 }
 
 func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
@@ -131,6 +132,7 @@ func factoryTemplateAgentFromIntake(agent *intakeAgent) *factoryTemplateAgent {
 		model:                     agent.model(),
 		credentialSource:          "integration",
 		credentialIntegrationName: name,
+		llmProvider:               agent.LLMProvider,
 	}
 }
 
@@ -300,6 +302,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		delete(node.Configuration, "credentials")
 		delete(node.Configuration, "model")
 		delete(node.Configuration, "maxTurns")
+		delete(node.Configuration, "llmProvider")
 		return
 	}
 	node.Component = agent.component
@@ -312,6 +315,11 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		model = agent.planningModel
 	}
 	node.Configuration["model"] = models.ConcreteClaudeModelID(model, nil)
+	if agent.llmProvider == models.UsageProviderCustom {
+		node.Configuration["llmProvider"] = models.UsageProviderCustom
+	} else {
+		delete(node.Configuration, "llmProvider")
+	}
 }
 
 func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
@@ -363,6 +371,10 @@ func factoryTemplateInputFromRequest(req *pb.MaterializeFactoryAppTemplateReques
 			planningModel:             req.Agent.GetPlanningModel(),
 			credentialSource:          req.Agent.GetCredentialSource(),
 			credentialIntegrationName: req.Agent.GetCredentialIntegrationName(),
+		}
+		custom := integrations[models.CustomLLMAppName]
+		if agent.component == "runnerOpenRouter" && custom.name != "" && custom.name == agent.credentialIntegrationName {
+			agent.llmProvider = models.UsageProviderCustom
 		}
 	}
 	return factoryTemplateInput{
@@ -539,6 +551,9 @@ func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
 			return nil
 		}
 		agent := &factoryTemplateAgent{component: name, model: model}
+		if provider, _ := node.Configuration["llmProvider"].(string); provider == models.UsageProviderCustom {
+			agent.llmProvider = provider
+		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
 		agent.credentialSource, _ = credentials["source"].(string)
 		if integration, ok := credentials["integration"].(map[string]any); ok {
@@ -685,11 +700,15 @@ func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 			continue
 		}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
-		return &intakeAgent{
+		agent := &intakeAgent{
 			Component:   node.ComponentName(),
 			Credentials: maps.Clone(credentials),
 			Model:       configString(node.Configuration, "model"),
 		}
+		if provider, _ := node.Configuration["llmProvider"].(string); provider == models.UsageProviderCustom {
+			agent.LLMProvider = provider
+		}
+		return agent
 	}
 	return nil
 }
