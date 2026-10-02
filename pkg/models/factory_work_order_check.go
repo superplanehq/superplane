@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,7 +63,7 @@ type FactoryWorkOrderCheck struct {
 	PreviousScore  *float64
 	// RecentScores holds the latest report scores, oldest first and
 	// ending with Score, capped at MaxFactoryWorkOrderCheckRecentScores.
-	RecentScores datatypes.JSONSlice[float64]
+	RecentScores recentCheckScores
 	Summary      string
 	Analysis     string
 	Automation   datatypes.JSON
@@ -242,7 +244,7 @@ func (o *FactoryWorkOrder) reportCheck(
 				MaxScore:       normalized.MaxScore,
 				Format:         normalized.Format,
 				Level:          normalized.Level,
-				RecentScores:   datatypes.NewJSONSlice([]float64{normalized.Score}),
+				RecentScores:   recentCheckScores{normalized.Score},
 				Summary:        normalized.Summary,
 				Analysis:       normalized.Analysis,
 				Automation:     automationJSON,
@@ -372,10 +374,10 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 // slice; seed it with the score they held so the history does not start
 // mid-stream.
 func appendRecentCheckScore(
-	history datatypes.JSONSlice[float64],
+	history recentCheckScores,
 	previousScore float64,
 	score float64,
-) datatypes.JSONSlice[float64] {
+) recentCheckScores {
 	scores := []float64(history)
 	if len(scores) == 0 {
 		scores = []float64{previousScore}
@@ -386,7 +388,49 @@ func appendRecentCheckScore(
 		scores = scores[overflow:]
 	}
 
-	return datatypes.NewJSONSlice(scores)
+	return recentCheckScores(scores)
+}
+
+// recentCheckScores scans a jsonb score history. A NULL column is an
+// empty history so a row written before the column had a default can
+// still be read and re-reported.
+type recentCheckScores []float64
+
+func (recentCheckScores) GormDataType() string {
+	return "json"
+}
+
+func (s recentCheckScores) Value() (driver.Value, error) {
+	return s.jsonSlice().Value()
+}
+
+func (s *recentCheckScores) Scan(value any) error {
+	if value == nil {
+		*s = recentCheckScores{}
+		return nil
+	}
+
+	var decoded datatypes.JSONSlice[float64]
+	if err := decoded.Scan(value); err != nil {
+		return err
+	}
+	if decoded == nil {
+		*s = recentCheckScores{}
+		return nil
+	}
+	*s = recentCheckScores(decoded)
+	return nil
+}
+
+func (s recentCheckScores) GormValue(ctx context.Context, db *gorm.DB) clause.Expr {
+	return s.jsonSlice().GormValue(ctx, db)
+}
+
+func (s recentCheckScores) jsonSlice() datatypes.JSONSlice[float64] {
+	if s == nil {
+		return datatypes.JSONSlice[float64]{}
+	}
+	return datatypes.JSONSlice[float64](s)
 }
 
 func isFiniteCheckNumber(value float64) bool {
