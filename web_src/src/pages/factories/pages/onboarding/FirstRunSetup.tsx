@@ -52,6 +52,7 @@ const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
 // The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
+  choose: "connect",
   tickets: "choose",
   agent: "tickets",
 };
@@ -179,9 +180,6 @@ function AgentScreen({
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  if (target === "choose") {
-    return () => flow.goToScreen(flow.identityConnected ? "welcome" : "connect");
-  }
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
@@ -321,6 +319,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
         onSelectRepository={setup.selectRepo}
+        onClearRepository={setup.clearRepository}
         onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
         onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
         onGrantAccess={() => void flow.grantGitHubAccess()}

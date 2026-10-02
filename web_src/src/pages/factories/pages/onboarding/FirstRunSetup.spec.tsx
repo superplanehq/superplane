@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
+import { readOnboardingGitHubConnect, writeOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -120,9 +121,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
+function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=vcs") {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=vcs"]}>
+    <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
@@ -143,6 +144,7 @@ describe("FirstRunSetup GitHub catalog", () => {
     github.error = null;
     github.calls = [];
     showErrorToast.mockReset();
+    localStorage.clear();
   });
 
   it("shows Connect GitHub when identity is missing", () => {
@@ -169,7 +171,33 @@ describe("FirstRunSetup GitHub catalog", () => {
     }
   });
 
+  it("asks the user to connect GitHub when the identity only comes from sign-in", async () => {
+    const user = userEvent.setup();
+    const previousAssign = window.location.assign.bind(window.location);
+    const assign = vi.fn();
+    window.location.assign = assign;
+    github.data.identity = { userId: "9", login: "octocat" };
+    github.data.repositories = [
+      { repositoryId: "77", installationId: "101", fullName: "acme/api", defaultBranch: "main" },
+    ];
+
+    try {
+      renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
+
+      expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId("first-run-connect-github"));
+      expect(assign).toHaveBeenCalled();
+      expect(readOnboardingGitHubConnect("factory-1")).toBe(true);
+    } finally {
+      window.location.assign = previousAssign;
+    }
+  });
+
   it("skips installation when cached accessible repositories exist", async () => {
+    const user = userEvent.setup();
+    writeOnboardingGitHubConnect("factory-1");
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.repositories = [
       { repositoryId: "77", installationId: "101", fullName: "acme/api", defaultBranch: "main" },
@@ -181,12 +209,16 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
       "You are signed in to GitHub as octocat.",
     );
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.useOrganization("example") })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.useOrganization("acme") }));
     expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /example\/web/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /example\/web/ })).not.toBeInTheDocument();
     expect(startInstallation).not.toHaveBeenCalled();
   });
 
   it("opens repository selection while repositories synchronize", async () => {
+    writeOnboardingGitHubConnect("factory-1");
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.synchronizing = true;
 
@@ -217,6 +249,51 @@ describe("FirstRunSetup GitHub catalog", () => {
         expect.objectContaining({ repositoryId: "77", fullName: "acme/api" }),
       ),
     );
+  });
+
+  describe("without a requested step", () => {
+    const setupPath = "/org-1/workspaces/PAY/setup";
+
+    it("opens the welcome screen before GitHub is connected", () => {
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    });
+
+    it("opens the welcome screen when the GitHub identity only comes from sign-in", () => {
+      github.data.identity = { userId: "9", login: "octocat" };
+
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    });
+
+    it("resumes at repository selection after a GitHub setup callback", async () => {
+      writeOnboardingGitHubConnect("factory-1");
+      github.data.identity = { userId: "9", login: "octocat" };
+
+      renderSetup(pageModel(), setupPath);
+
+      expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    });
+
+    it("goes back to the connect screen from repository selection and stays there", async () => {
+      const user = userEvent.setup();
+      writeOnboardingGitHubConnect("factory-1");
+      github.data.identity = { userId: "9", login: "octocat" };
+
+      renderSetup(pageModel(), setupPath);
+      await user.click(await screen.findByTestId("first-run-back"));
+
+      await waitFor(() => expect(screen.getByTestId("first-run-connect")).toBeInTheDocument());
+      expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId("first-run-back"));
+      expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("first-run-get-started"));
+      expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    });
   });
 
   it("stops GitHub onboarding polling once the running workspace step is shown", () => {

@@ -23,6 +23,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
+import { useOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -51,10 +52,36 @@ const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
   agent: "agent",
 };
 
-function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen {
+/** Null means no step was requested, so the flow resumes from saved progress. */
+function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | null {
   const requestedStep = searchParams.get("step");
   if (isWizardStepId(requestedStep)) return SCREEN_FOR_STEP[requestedStep];
-  return "welcome";
+  return null;
+}
+
+// GitHub setup callbacks return without a step. Saved progress or a confirmed
+// GitHub connection must not send the user back to the welcome screen.
+function resumeFirstRunScreen(args: {
+  savedStep: WizardStepId;
+  githubPending: boolean;
+  githubReady: boolean;
+}): FirstRunScreen {
+  if (args.savedStep !== "vcs") return SCREEN_FOR_STEP[args.savedStep];
+  if (args.githubPending) return "connect";
+  return args.githubReady ? "choose" : "welcome";
+}
+
+// A GitHub identity from sign-in is not enough. The repository screen opens
+// only after the user connects GitHub for this workspace.
+function screenWithGitHubConnection(
+  screen: FirstRunScreen,
+  github: { pending: boolean; identity: boolean; ready: boolean; stayOnConnect: boolean },
+): FirstRunScreen {
+  if (github.pending || screen === "welcome") return screen;
+  if (!github.identity) return "connect";
+  if (screen === "connect" && github.ready && !github.stayOnConnect) return "choose";
+  if (screen === "choose" && !github.ready) return "connect";
+  return screen;
 }
 
 function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
@@ -121,9 +148,10 @@ function useGitHubConnectionState(organizationId: string, options?: { poll?: boo
     identity: onboarding.data?.identity,
     identities: onboarding.data?.identities ?? [],
     repositories,
-    pendingOrganizations: (onboarding.data?.pendingRequests ?? [])
-      .map((request) => request.accountLogin?.trim())
-      .filter((organization): organization is string => Boolean(organization)),
+    // An empty login still means a pending request; the screen shows generic copy for it.
+    pendingOrganizations: [
+      ...new Set((onboarding.data?.pendingRequests ?? []).map((request) => request.accountLogin?.trim() ?? "")),
+    ],
     synchronizing: Boolean(onboarding.data?.synchronizing),
     appConfigured: Boolean(onboarding.data?.providerConfigured),
     initialScreen: initialFirstRunScreen(searchParams),
@@ -145,15 +173,32 @@ function useFirstRunNavigation(
   model: OnboardingPageModel,
   agentGate: OnboardingAgentGate,
   connection: ReturnType<typeof useGitHubConnectionState>,
+  githubReady: boolean,
 ) {
-  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(connection.initialScreen);
+  const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(connection.initialScreen);
+  // Back from repository selection must not forward to it again.
+  const [stayOnConnect, setStayOnConnect] = useState(false);
   const openStep = useRef(model.openSection);
+  const openedScreen =
+    requestedScreen ??
+    resumeFirstRunScreen({
+      savedStep: model.openSection,
+      githubPending: connection.onboarding.isPending,
+      githubReady,
+    });
 
   useEffect(() => {
     if (model.openSection === openStep.current) return;
     openStep.current = model.openSection;
-    setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
+    setRequestedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
+
+  const availableScreen = screenWithGitHubConnection(openedScreen, {
+    pending: connection.onboarding.isPending,
+    identity: Boolean(connection.identity),
+    ready: githubReady,
+    stayOnConnect,
+  });
 
   const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
@@ -161,14 +206,9 @@ function useFirstRunNavigation(
       openStep.current = step;
       model.setOpenSection(step);
     }
-    setOpenedScreen(next);
+    setStayOnConnect(next === "connect" && availableScreen === "choose");
+    setRequestedScreen(next);
   };
-
-  let availableScreen = openedScreen;
-  if (!connection.onboarding.isPending && openedScreen !== "welcome") {
-    if (!connection.identity) availableScreen = "connect";
-    else if (openedScreen === "connect") availableScreen = "choose";
-  }
 
   return {
     screen: screenWithoutIncompleteJira(
@@ -223,8 +263,9 @@ function useFirstRunCommands(args: {
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: ReturnType<typeof useFirstRunBlockingAction>;
   jiraAvailable: boolean;
+  confirmGitHubConnect: () => void;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable, confirmGitHubConnect } = args;
   const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
@@ -250,6 +291,7 @@ function useFirstRunCommands(args: {
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
       const returnPath = onboardingStepPath(`${location.pathname}${location.search}`, "repo");
+      confirmGitHubConnect();
       window.location.assign(linkedAccountConnectHref("github", returnPath));
       return true;
     });
@@ -345,10 +387,13 @@ export function savedJiraChoiceBlock(args: {
 }
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { organizationId } = useFactoriesLayout();
+  const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
+  const [githubConnectConfirmed, confirmGitHubConnect] = useOnboardingGitHubConnect(factoryId);
+  // A saved repository means the user connected GitHub for this workspace before.
+  const githubReady = Boolean(connection.identity) && (githubConnectConfirmed || Boolean(model.setup.selectedRepo));
   const jiraFeature = useExperimentalFeature(organizationId);
   const jiraFeatureLoading = jiraFeature.isLoading;
   const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
@@ -358,8 +403,16 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection);
-  const commands = useFirstRunCommands({ model, agentGate, connection, navigation, blocking, jiraAvailable });
+  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady);
+  const commands = useFirstRunCommands({
+    model,
+    agentGate,
+    connection,
+    navigation,
+    blocking,
+    jiraAvailable,
+    confirmGitHubConnect,
+  });
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms
@@ -396,7 +449,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
-    identityConnected: Boolean(connection.identity),
     githubLogin: connection.identity?.login ?? "",
     githubUserId: connection.identity?.userId ?? "",
     githubIdentities: connection.identities,

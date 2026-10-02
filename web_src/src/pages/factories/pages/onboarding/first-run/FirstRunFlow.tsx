@@ -85,6 +85,7 @@ export function FirstRunFlow({
         githubIdentities={[{ userId: "1", login: "octocat" }]}
         chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
+        onClearRepository={() => setSelectedRepository(null)}
         onSelectGitHubIdentity={() => undefined}
         onConnectAnotherGitHubAccount={() => undefined}
         onGrantAccess={() => undefined}

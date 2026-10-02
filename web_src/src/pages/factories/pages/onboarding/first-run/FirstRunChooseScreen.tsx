@@ -1,7 +1,6 @@
 import type { MeVcsProviderIdentity } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { Clock, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
+import { FirstRunOrganizationStep } from "./FirstRunOrganizationStep";
+import {
+  findOrganization,
+  ownerOfRepository,
+  repositoriesInOrganization,
+  repositoryBelongsTo,
+  repositoryOrganizations,
+} from "./githubOrganizations";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
@@ -38,6 +46,7 @@ export function FirstRunChooseScreen({
   chrome,
   sphere,
   onSelectRepository,
+  onClearRepository,
   onSelectGitHubIdentity,
   onConnectAnotherGitHubAccount,
   onGrantAccess,
@@ -59,17 +68,26 @@ export function FirstRunChooseScreen({
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onSelectRepository: (repository: string) => void;
+  onClearRepository?: () => void;
   onSelectGitHubIdentity?: (userId: string) => void;
   onConnectAnotherGitHubAccount?: () => void;
   onGrantAccess: () => void;
   onContinue: () => void;
 }) {
   const busy = Boolean(loading || saving || grantingAccess || switchingGitHubAccount);
+  const organizationChoice = useOrganizationChoice(repositories, selectedRepository, onClearRepository);
+  const organization = loading ? null : organizationChoice.organization;
+  // In the repository step, Back returns to the organization step of this screen.
+  const screenChrome = organization && chrome ? { ...chrome, onBack: organizationChoice.clear } : chrome;
+  const syncStatus = synchronizing ? <RepositorySyncStatus /> : undefined;
+  const grantAccessDisabled = busy || !appConfigured;
 
   return (
-    <FirstRunShell testId="first-run-choose" chrome={chrome} busy={busy} contentSpacing="compact" sphere={sphere}>
-      <FirstRunHeading headline={copy.headline}>
-        <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
+    <FirstRunShell testId="first-run-choose" chrome={screenChrome} busy={busy} contentSpacing="compact" sphere={sphere}>
+      <FirstRunHeading headline={organization ? copy.headline : copy.organizationHeadline}>
+        <p className="text-[13px] text-muted-foreground">
+          {organization ? copy.repositoryHelper : copy.organizationHelper}
+        </p>
         {githubLogin ? (
           <SignedInAsLine
             login={githubLogin}
@@ -83,23 +101,68 @@ export function FirstRunChooseScreen({
       </FirstRunHeading>
 
       <div className="mt-8 space-y-4">
-        <FirstRunGithubStepper current="repository" action={synchronizing ? <RepositorySyncStatus /> : undefined}>
-          <RepositoryStepBody
-            repositories={repositories}
-            selectedRepository={selectedRepository}
-            loading={loading}
-            busy={busy}
-            grantingAccess={grantingAccess}
-            pendingOrganizations={pendingOrganizations}
-            appConfigured={appConfigured}
-            onSelectRepository={onSelectRepository}
-            onGrantAccess={onGrantAccess}
-          />
-          <ChooseContinue selectedRepository={selectedRepository} saving={saving} busy={busy} onContinue={onContinue} />
-        </FirstRunGithubStepper>
+        {organization ? (
+          <FirstRunGithubStepper current="repository" organizationName={organization} action={syncStatus}>
+            <RepositoryStepBody
+              repositories={repositoriesInOrganization(repositories, organization)}
+              selectedRepository={selectedRepository}
+              busy={busy}
+              grantAccessDisabled={grantAccessDisabled}
+              grantingAccess={grantingAccess}
+              onSelectRepository={onSelectRepository}
+              onGrantAccess={onGrantAccess}
+            />
+            <ChooseContinue
+              selectedRepository={selectedRepository}
+              saving={saving}
+              busy={busy}
+              onContinue={onContinue}
+            />
+          </FirstRunGithubStepper>
+        ) : (
+          <FirstRunGithubStepper current="organization" action={syncStatus}>
+            {loading ? (
+              <RepositoryListLoading />
+            ) : (
+              <FirstRunOrganizationStep
+                organizations={organizationChoice.organizations}
+                pendingOrganizations={pendingOrganizations}
+                synchronizing={synchronizing}
+                disabled={busy}
+                grantAccessDisabled={grantAccessDisabled}
+                grantingAccess={grantingAccess}
+                onSelectOrganization={organizationChoice.choose}
+                onGrantAccess={onGrantAccess}
+              />
+            )}
+          </FirstRunGithubStepper>
+        )}
       </div>
     </FirstRunShell>
   );
+}
+
+/**
+ * The organization is only a filter for the repository list. A saved
+ * repository opens its owner. An organization that leaves the list, for
+ * example after an account switch, returns the user to the organization step.
+ */
+function useOrganizationChoice(
+  repositories: string[],
+  selectedRepository: string | null,
+  onClearRepository?: () => void,
+) {
+  const organizations = useMemo(() => repositoryOrganizations(repositories), [repositories]);
+  const [chosen, setChosen] = useState<string | null>(() => ownerOfRepository(selectedRepository));
+  return {
+    organizations,
+    organization: findOrganization(organizations, chosen),
+    choose: (next: string) => {
+      if (selectedRepository && !repositoryBelongsTo(selectedRepository, next)) onClearRepository?.();
+      setChosen(next);
+    },
+    clear: () => setChosen(null),
+  };
 }
 
 function SignedInAsLine({
@@ -195,50 +258,45 @@ function GitHubAccountMenu({
 function RepositoryStepBody({
   repositories,
   selectedRepository,
-  loading,
   busy,
+  grantAccessDisabled,
   grantingAccess,
-  pendingOrganizations,
-  appConfigured,
   onSelectRepository,
   onGrantAccess,
 }: {
   repositories: string[];
   selectedRepository: string | null;
-  loading?: boolean;
   busy: boolean;
+  grantAccessDisabled: boolean;
   grantingAccess: boolean;
-  pendingOrganizations: string[];
-  appConfigured: boolean;
   onSelectRepository: (repository: string) => void;
   onGrantAccess: () => void;
 }) {
   return (
     <>
-      {loading ? (
-        <RepositoryListLoading />
-      ) : (
-        <RepositoryPicker
-          host="github"
-          repos={repositories}
-          selectedRepo={selectedRepository}
-          disabled={busy}
-          listClassName="max-h-48"
-          onSelect={onSelectRepository}
-        />
-      )}
-      {pendingOrganizations.length > 0 ? <PendingApprovalRows organizations={pendingOrganizations} /> : null}
-      <p className="mt-3 text-[13px] text-muted-foreground">
-        {copy.missingRepository}{" "}
-        <button
+      <RepositoryPicker
+        host="github"
+        repos={repositories}
+        selectedRepo={selectedRepository}
+        disabled={busy}
+        listClassName="max-h-48"
+        onSelect={onSelectRepository}
+      />
+      <div className="flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
+        <span>{copy.missingRepository}</span>
+        <LoadingButton
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onGrantAccess}
-          disabled={busy || !appConfigured}
-          className="font-medium text-foreground underline underline-offset-2 hover:no-underline disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={grantAccessDisabled}
+          loading={grantingAccess}
+          loadingText={copy.openingGitHub}
+          data-testid="first-run-grant-access"
         >
-          {grantingAccess ? copy.openingGitHub : copy.grantAccess}
-        </button>
-      </p>
+          {copy.grantAccess}
+        </LoadingButton>
+      </div>
     </>
   );
 }
@@ -255,30 +313,6 @@ function RepositorySyncStatus() {
         {copy.synchronizing}
       </span>
     </span>
-  );
-}
-
-function PendingApprovalRows({ organizations }: { organizations: string[] }) {
-  return (
-    <div className="space-y-2 text-left" data-testid="first-run-github-install-requested">
-      {organizations.map((organization) => (
-        <Tooltip key={organization}>
-          <TooltipTrigger asChild>
-            <div
-              className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]"
-              data-testid="first-run-github-waiting-row"
-            >
-              <span className="min-w-0 truncate font-medium">{copy.installRequested(organization)}</span>
-              <Clock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-md space-y-1 text-left text-pretty">
-            <p>{copy.installRequestedBody(organization)}</p>
-            <p>{copy.installRequestedNext}</p>
-          </TooltipContent>
-        </Tooltip>
-      ))}
-    </div>
   );
 }
 

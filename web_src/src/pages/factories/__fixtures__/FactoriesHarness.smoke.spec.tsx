@@ -1,10 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 
 import { factoryRouteSegment, factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
+import { writeOnboardingGitHubConnect } from "../pages/onboarding/onboardingGitHubConnect";
+import { FIRST_RUN_COPY } from "../pages/onboarding/first-run/firstRunCopy";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
@@ -239,6 +241,10 @@ describe("FactoriesHarness workspace setup", () => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("mounts the same setup page as the app, without workspace chrome", async () => {
     render(
       <FactoriesHarness
@@ -271,7 +277,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
   }, 15000);
 
-  it("skips installation when initial onboarding already has repository access", async () => {
+  it("asks the user to connect GitHub when the identity only comes from sign-in", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -284,11 +290,28 @@ describe("FactoriesHarness workspace setup", () => {
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
 
+    expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("skips installation when initial onboarding already has repository access", async () => {
+    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers({ initial: true })}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
     expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   }, 15000);
 
   it("opens the repository list when the VCS step already has repository access", async () => {
+    const user = userEvent.setup();
+    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=vcs`}
@@ -298,10 +321,15 @@ describe("FactoriesHarness workspace setup", () => {
       />,
     );
 
+    await user.click(
+      await screen.findByRole("button", { name: FIRST_RUN_COPY.choose.useOrganization("acme") }, { timeout: 8000 }),
+    );
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 
   it("restores the saved connection's repositories on a direct repo-step load", async () => {
+    const user = userEvent.setup();
+    writeOnboardingGitHubConnect(PRIMARY_FACTORY_ID);
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo`}
@@ -312,6 +340,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("button", { name: FIRST_RUN_COPY.choose.useOrganization("acme") }, { timeout: 8000 }),
+    );
     expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
   }, 15000);
 

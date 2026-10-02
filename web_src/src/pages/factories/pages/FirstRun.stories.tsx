@@ -5,6 +5,7 @@ import { firstRunStoryChrome } from "./onboarding/first-run/firstRunMocks";
 import { analysisSphereFor } from "./onboarding/first-run/firstRunSphereFor";
 import { FirstRunAnalysisScreen } from "./onboarding/first-run/FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./onboarding/first-run/FirstRunBoardExit";
+import { FirstRunChooseScreen } from "./onboarding/first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./onboarding/first-run/FirstRunConnectScreen";
 import { FirstRunFlow } from "./onboarding/first-run/FirstRunFlow";
 import type { FirstRunAnalysisProgress } from "./onboarding/first-run/firstRunAnalysisProgress";
@@ -75,8 +76,54 @@ export const ConnectInstallRequested: Story = {
 };
 
 export const Choose: Story = {
-  name: "3 Choose repository",
+  name: "3a Choose organization",
   render: () => <FirstRunFlow firstName="Ada" initialScreen="choose" />,
+};
+
+export const ChooseNoRepositories: Story = {
+  name: "3b Choose organization (no repositories)",
+  render: () => (
+    <FirstRunChooseScreen
+      repositories={[]}
+      selectedRepository={null}
+      githubLogin="octocat"
+      chrome={firstRunStoryChrome(2)}
+      onSelectRepository={() => undefined}
+      onGrantAccess={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
+};
+
+export const ChooseWaitingForApproval: Story = {
+  name: "3c Choose organization (waiting for approval)",
+  render: () => (
+    <FirstRunChooseScreen
+      repositories={["octocat/dotfiles"]}
+      selectedRepository={null}
+      githubLogin="octocat"
+      pendingOrganizations={["acme"]}
+      chrome={firstRunStoryChrome(2)}
+      onSelectRepository={() => undefined}
+      onGrantAccess={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
+};
+
+export const ChooseRepository: Story = {
+  name: "3d Choose repository (filtered)",
+  render: () => (
+    <FirstRunChooseScreen
+      repositories={["acme/api", "acme/web", "octocat/dotfiles"]}
+      selectedRepository="acme/api"
+      githubLogin="octocat"
+      chrome={firstRunStoryChrome(2)}
+      onSelectRepository={() => undefined}
+      onGrantAccess={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
 };
 
 export const Tickets: Story = {
