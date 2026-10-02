@@ -356,12 +356,21 @@ export function agentStepsFromNotes(notes: SplitRunStreamLine[]): AgentStep[] {
   return groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
 }
 
-/** A canceled or failed stage no longer has a step in progress. */
+/** A canceled stage stops an open step. A failed stage does not mark a running command failed. */
 export function settleStoppedSteps(steps: AgentStep[], status?: SplitRunPhaseStatus): AgentStep[] {
   if (status !== "cancelled" && status !== "failed") {
     return steps;
   }
-  return steps.map((step) => (step.status === "running" ? { ...step, status } : step));
+  return steps.map((step) => {
+    if (step.status !== "running" || keepsCommandStatus(step, status)) {
+      return step;
+    }
+    return { ...step, status };
+  });
+}
+
+function keepsCommandStatus(step: AgentStep, status: SplitRunPhaseStatus): boolean {
+  return status === "failed" && step.type === "bash";
 }
 
 function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
