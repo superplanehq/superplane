@@ -32,7 +32,7 @@ your machine. Everything runs in containers managed by Make and Docker.
 
 Before you begin, make sure you have the following:
 
-- You are running MacOS or Linux
+- You are running MacOS, Linux, or Windows with WSL2
 - [Make](https://www.gnu.org/software/make/)
 - [Docker](https://www.docker.com/)
 
