@@ -1003,9 +1003,10 @@ function phaseForColumnAppCheck(
   const name = phaseNameForColumn(columnKey);
   const componentName = columnAppCheckName(app, first, name);
   const latest = checks[checks.length - 1] ?? first;
-  const span = canvasRunSpanForCheck(ref.runId, pullRequests, checks);
-  const status: SplitRunPhaseStatus = "passed";
-  const duration = durationForExecution(span, status);
+  const run = canvasRunForCheck(ref.runId, pullRequests);
+  const status = run ? statusForCanvasRun(run) : "passed";
+  const span = run ? { createdAt: run.createdAt, updatedAt: run.finishedAt ?? run.updatedAt } : {};
+  const duration = span.createdAt ? durationForExecution(span, status) : "";
   const line: SplitRunStreamLine = {
     id: ref.runId,
     at: clockLabel(span.createdAt ?? latest.updatedAt),
@@ -1014,7 +1015,7 @@ function phaseForColumnAppCheck(
     duration,
     kind: "action",
     componentType: componentName,
-    action: "passed",
+    action: prFeedbackStreamAction(status),
     iconSlug: "box",
   };
   return {
@@ -1022,8 +1023,9 @@ function phaseForColumnAppCheck(
     name,
     status,
     duration,
+    durationRunning: status === "running",
     startedAt: span.createdAt ?? first.updatedAt,
-    endedAt: span.updatedAt,
+    endedAt: status === "running" ? undefined : span.updatedAt,
     componentName,
     artifacts: artifactsForCanvasRun(artifacts, ref.runId),
     checks: presentWorkOrderChecks(checks),
@@ -1035,22 +1037,18 @@ function phaseForColumnAppCheck(
   };
 }
 
-function canvasRunSpanForCheck(
-  runId: string,
-  pullRequests: FactoriesFactoryPullRequest[] | undefined,
-  checks: FactoriesWorkOrderCheck[],
-): { createdAt?: string; updatedAt?: string } {
+function canvasRunForCheck(runId: string, pullRequests: FactoriesFactoryPullRequest[] | undefined) {
   for (const pullRequest of pullRequests ?? []) {
     const linked = (pullRequest.runs ?? []).find((entry) => entry.run?.id === runId)?.run;
+    if (linked) {
+      return linked;
+    }
     const activity = (pullRequest.activities ?? []).find((entry) => entry.run?.id === runId)?.run;
-    const run = linked ?? activity;
-    if (run) {
-      return { createdAt: run.createdAt, updatedAt: run.finishedAt ?? run.updatedAt };
+    if (activity) {
+      return activity;
     }
   }
-  const first = checks[0]?.updatedAt;
-  const last = checks[checks.length - 1]?.updatedAt;
-  return { createdAt: first, updatedAt: last };
+  return undefined;
 }
 
 function columnAppCheckRef(check: FactoriesWorkOrderCheck): { appId: string; runId: string } | undefined {

@@ -2235,6 +2235,86 @@ describe("line board work-order examples", () => {
     expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("4m");
   });
 
+  it("does not use check update times as a column-app duration", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-merge-risk",
+          key: "merge-risk",
+          name: "Blast radius",
+          score: 4,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-merge", appName: "Merge confidence" },
+          runId: "run-merge",
+          updatedAt: "2026-08-26T11:10:00Z",
+        },
+        {
+          id: "check-merge-diff",
+          key: "merge-diff",
+          name: "Diff size",
+          score: 1,
+          maxScore: 5,
+          level: "LEVEL_POSITIVE",
+          automation: { appId: "app-merge", appName: "Merge confidence" },
+          runId: "run-merge",
+          updatedAt: "2026-08-26T11:04:00Z",
+        },
+      ],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("keeps a column-app check card live while the canvas run continues", () => {
+    const createdAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const updatedAt = new Date(Date.now() - 59 * 60 * 1000).toISOString();
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_STARTED",
+                  createdAt,
+                  updatedAt,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-merge",
+            key: "merge-confidence",
+            name: "Merge confidence",
+            score: 4,
+            maxScore: 5,
+            level: "LEVEL_POSITIVE",
+            automation: { appId: "app-merge", appName: "Merge confidence" },
+            runId: "run-merge",
+            updatedAt,
+          },
+        ],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      },
+    );
+    const phase = fixture.phases.find((entry) => entry.id === "column-app-run-merge");
+
+    expect(phase).toMatchObject({ status: "running", durationRunning: true });
+    expect(phase?.duration).not.toBe("1m");
+  });
+
   it("uses the canvas run span for PR feedback phase duration", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
