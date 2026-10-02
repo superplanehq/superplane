@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
+import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { LiveHeaderSpendProvider, useReportLiveHeaderSpend } from "../liveHeaderSpendContext";
 import { buildSplitRunFooter } from "../splitRunFooter";
@@ -391,6 +392,41 @@ describe("AutomationsConsoleVariant intake", () => {
     expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
       `Imported by ${SPLIT_RUN_RUNNING.owner.name}`,
     );
+  });
+});
+
+describe("AutomationsConsoleVariant column timing", () => {
+  const arrived = formatWorkOrderDateTime(new Date(TWO_HOURS_AGO));
+
+  it("stamps Intake without dwell and shows backlog arrival plus time spent", () => {
+    renderConsole(SPLIT_RUN_RUNNING, { taskDescription: "Users see duplicate refund entries." });
+
+    const intake = screen.getByTestId("redesign-console-column-timing-intake");
+    expect(intake).toHaveTextContent(`Arrived ${arrived}`);
+    expect(intake).not.toHaveTextContent("Spent");
+
+    const backlog = screen.getByTestId("redesign-console-column-timing-backlog");
+    expect(backlog).toHaveTextContent(`Arrived ${arrived}`);
+    expect(backlog).toHaveTextContent("Spent 1h");
+
+    expect(screen.queryByTestId("redesign-console-column-timing-verify")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("redesign-console-column-timing-done")).not.toBeInTheDocument();
+  });
+
+  it("shows Verify arrival and time so far while the task waits in that column", () => {
+    const entered = "2026-09-30T12:00:00.000Z";
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      lineStatus: "waiting",
+      currentStepIndex: 0,
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, status: "passed" as const, endedAt: entered } : phase,
+      ),
+    });
+
+    const verify = screen.getByTestId("redesign-console-column-timing-verify");
+    expect(verify).toHaveTextContent(`Arrived ${formatWorkOrderDateTime(new Date(entered))}`);
+    expect(verify).toHaveTextContent("Spent");
   });
 });
 

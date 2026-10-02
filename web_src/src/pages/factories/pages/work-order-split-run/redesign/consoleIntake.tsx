@@ -23,6 +23,8 @@ import {
 } from "../splitRunSource";
 import { WorkOrderSplitRunDescription } from "../WorkOrderSplitRunDescription";
 import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
+import type { ColumnTiming } from "./columnTiming";
+import { ColumnTimingMeta } from "./consoleColumnTiming";
 
 function intakeSourceIcon(source?: SplitRunSource): { src: string; alt: string } {
   if (source?.kind === "intake") {
@@ -49,6 +51,7 @@ export function IntakeTimelineEvent({
   organizationId,
   factoryId,
   orderId,
+  timing,
 }: {
   source?: SplitRunSource;
   description?: string;
@@ -59,11 +62,12 @@ export function IntakeTimelineEvent({
   organizationId?: string;
   factoryId?: string;
   orderId?: string;
+  timing?: ColumnTiming;
 }) {
   const icon = intakeSourceIcon(source);
   return (
-    <TimelineItem step={1} data-testid="redesign-console-column-intake">
-      <TimelineHeader className="flex items-center gap-2">
+    <TimelineItem step={1} className="group/column" data-testid="redesign-console-column-intake">
+      <TimelineHeader className="flex w-full items-center gap-2">
         <TimelineSeparator />
         <TimelineIndicator
           aria-hidden={false}
@@ -74,6 +78,7 @@ export function IntakeTimelineEvent({
           <span className="sr-only">{icon.alt}</span>
         </TimelineIndicator>
         <TimelineTitle className="font-semibold">Intake</TimelineTitle>
+        <ColumnTimingMeta columnId="intake" timing={timing} />
       </TimelineHeader>
       <TimelineContent className="mt-2 text-foreground">
         <IntakeTaskDescription
