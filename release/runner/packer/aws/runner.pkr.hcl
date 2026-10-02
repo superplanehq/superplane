@@ -44,7 +44,7 @@ variable "instance_type" {
 variable "claude_code_version" {
   type        = string
   description = "Claude Code version installed in the AMIs."
-  default     = "2.1.212"
+  default     = "2.1.282"
 }
 
 variable "opencode_version" {
