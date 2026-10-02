@@ -74,6 +74,27 @@ func TestOpenDedicatedSQLDB_ConfiguresDedicatedPool(t *testing.T) {
 	require.NoError(t, db.Ping())
 }
 
+func TestDbPoolSize(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  int
+	}{
+		{"unset", "", 5},
+		{"valid", "10", 10},
+		{"zero", "0", 5},
+		{"negative", "-1", 5},
+		{"not_a_number", "abc", 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DB_POOL_SIZE", tt.value)
+			require.Equal(t, tt.want, dbPoolSize())
+		})
+	}
+}
+
 func TestIsTestDatabaseName(t *testing.T) {
 	require.True(t, isTestDatabaseName("superplane_test"))
 	require.False(t, isTestDatabaseName("superplane_dev"))
