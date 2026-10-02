@@ -4,6 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronRight } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { getWorkOrderRunHref } from "../../../lib/workOrderExecutions";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage } from "./automationsViewModel";
 import { LiveAgentSteps } from "./LiveAgentSteps";
@@ -24,12 +25,16 @@ export function AgentRunsPage({
   phases,
   automationName,
   organizationId,
+  factoryKey,
+  orderNumber,
   usagePhaseId,
 }: {
   runs: AutomationStage[];
   phases: SplitRunPhase[];
   automationName: string;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   /** Only this run reports into the card usage chart. */
   usagePhaseId?: string;
 }) {
@@ -41,6 +46,8 @@ export function AgentRunsPage({
         phase={phases.find((phase) => phase.id === single.id)}
         automationName={automationName}
         organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
         reportUsage={!usagePhaseId || single.id === usagePhaseId}
       />
     );
@@ -53,6 +60,8 @@ export function AgentRunsPage({
           run={run}
           phase={phases.find((phase) => phase.id === run.id)}
           organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
           defaultOpen={index === runs.length - 1}
           reportUsage={!usagePhaseId || run.id === usagePhaseId}
         />
@@ -67,12 +76,16 @@ function SingleRun({
   phase,
   automationName,
   organizationId,
+  factoryKey,
+  orderNumber,
   reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   automationName: string;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
@@ -94,6 +107,7 @@ function SingleRun({
         organizationId={organizationId}
         emptyNote="No steps for this run."
         reportUsage={reportUsage}
+        runHref={runHrefFor(organizationId, factoryKey, phase, orderNumber)}
       />
     </div>
   );
@@ -103,12 +117,16 @@ function AgentRunRow({
   run,
   phase,
   organizationId,
+  factoryKey,
+  orderNumber,
   defaultOpen,
   reportUsage,
 }: {
   run: AutomationStage;
   phase?: SplitRunPhase;
   organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
   defaultOpen: boolean;
   reportUsage: boolean;
 }) {
@@ -147,6 +165,7 @@ function AgentRunRow({
           organizationId={organizationId}
           emptyNote="No steps for this run."
           reportUsage={reportUsage}
+          runHref={runHrefFor(organizationId, factoryKey, phase, orderNumber)}
         />
       </CollapsibleContent>
     </Collapsible>
@@ -209,4 +228,16 @@ function RunDescription({ description }: { description?: string }) {
 /** Markdown links reduced to their text, for aria labels. */
 function plainRunTitle(name: string): string {
   return name.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim() || "run";
+}
+
+function runHrefFor(
+  organizationId: string | undefined,
+  factoryKey: string | undefined,
+  phase: SplitRunPhase | undefined,
+  orderNumber: string | undefined,
+): string | null {
+  if (!organizationId || !factoryKey) {
+    return null;
+  }
+  return getWorkOrderRunHref(organizationId, factoryKey, phase?.appId, phase?.runId, { orderNumber });
 }

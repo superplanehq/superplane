@@ -17,8 +17,6 @@ import { PhaseAgentUsageProvider } from "../phaseAgentUsageContext";
 import { PhaseUsageSpendButton } from "../PhaseUsageChartButton";
 import { useSpecificModelIds } from "../specificModelIds";
 import type { SplitRunPhase } from "../splitRunMocks";
-import type { SplitRunSource } from "../splitRunSource";
-import { WorkOrderSplitRunSource } from "../WorkOrderSplitRunSource";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
 import { AgentRunsPage } from "./consoleAgentRuns";
 import { ArtifactsPage } from "./consoleArtifactRows";
@@ -44,7 +42,8 @@ export function AutomationCardBody({
   automation,
   phase,
   organizationId,
-  source,
+  factoryKey,
+  orderNumber,
   onStop,
   onRetry,
   actionBusy,
@@ -54,8 +53,8 @@ export function AutomationCardBody({
   phase?: SplitRunPhase;
   phases?: SplitRunPhase[];
   organizationId?: string;
-  /** Where the task came from. The Backlog creation card shows it. */
-  source?: SplitRunSource;
+  factoryKey?: string;
+  orderNumber?: string;
   onStop?: () => void;
   onRetry?: () => void;
   actionBusy: boolean;
@@ -77,13 +76,14 @@ export function AutomationCardBody({
               phases={phases ?? (phase ? [phase] : [])}
               automationName={automation.name}
               organizationId={organizationId}
+              factoryKey={factoryKey}
+              orderNumber={orderNumber}
               usagePhaseId={latest.id}
             />
           </div>
         ) : null}
         {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
         {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
-        <CreationSource stageId={latest.id} source={source} />
         <CardRunFooter stage={latest} phase={phase} actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
       </div>
     </PhaseAgentUsageProvider>
@@ -119,18 +119,6 @@ function CardPageTabs({
         ))}
       </TabsList>
     </Tabs>
-  );
-}
-
-function CreationSource({ stageId, source }: { stageId: string; source?: SplitRunSource }) {
-  if (stageId !== "backlog" || !source) {
-    return null;
-  }
-  return (
-    <div data-testid="redesign-console-card-source">
-      <span className="text-[12px] font-medium text-muted-foreground">Source</span>
-      <WorkOrderSplitRunSource source={source} />
-    </div>
   );
 }
 
