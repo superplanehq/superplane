@@ -414,6 +414,20 @@ service Factories {
     };
   }
 
+  rpc RetryFactoryPullRequestWebhook(
+    RetryFactoryPullRequestWebhookRequest
+  ) returns (RetryFactoryPullRequestWebhookResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/webhook-retry"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retry factory pull request webhook";
+      description: "Retries a failed factory mergeability webhook for the pull request repository";
+      tags: "Factory";
+    };
+  }
+
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -1639,6 +1653,7 @@ message FactoryPullRequestMergeability {
     BLOCKED_REASON_CONFLICTING = 5;
     BLOCKED_REASON_MISSING_INTEGRATION = 6;
     BLOCKED_REASON_UNAVAILABLE = 7;
+    BLOCKED_REASON_WEBHOOK_FAILED = 8;
   }
 
   enum MergeMethod {
@@ -1674,6 +1689,13 @@ message MergeFactoryPullRequestRequest {
 message MergeFactoryPullRequestResponse {
   FactoryPullRequest pull_request = 1;
 }
+
+message RetryFactoryPullRequestWebhookRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message RetryFactoryPullRequestWebhookResponse {}
 
 message FactoryIntakeItem {
   string id = 1;

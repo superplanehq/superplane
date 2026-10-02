@@ -1540,7 +1540,8 @@ CREATE TABLE public.webhooks (
     deleted_at timestamp without time zone,
     retry_count integer DEFAULT 0 NOT NULL,
     max_retries integer DEFAULT 3 NOT NULL,
-    app_installation_id uuid
+    app_installation_id uuid,
+    last_error text DEFAULT ''::text NOT NULL
 );
 
 
@@ -5146,7 +5147,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261002172239	f
+20261002211145	f
 \.
 
 
