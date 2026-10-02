@@ -1,10 +1,13 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { Plug, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import AdminPagination from "./AdminPagination";
 
 export type AdminIntegration = {
@@ -149,7 +152,17 @@ export function OrgIntegrationsTable({ orgId }: { orgId: string }) {
           />
         </div>
       </div>
-      <OrgIntegrationsBody isLoading={loading} isError={error} items={items} hasSearch={search !== ""} />
+      <OrgIntegrationsBody
+        isLoading={loading}
+        isError={error}
+        items={items}
+        hasSearch={search !== ""}
+        orgId={orgId}
+        onClearSearch={() => {
+          setSearch("");
+          setLoading(true);
+        }}
+      />
       {!loading && items.length > 0 ? (
         <AdminPagination
           offset={offset}
@@ -170,11 +183,15 @@ function OrgIntegrationsBody({
   isError,
   items,
   hasSearch,
+  orgId,
+  onClearSearch,
 }: {
   isLoading: boolean;
   isError: boolean;
   items: AdminIntegration[];
   hasSearch: boolean;
+  orgId: string;
+  onClearSearch: () => void;
 }) {
   if (isLoading) {
     return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading...</Text>;
@@ -183,11 +200,7 @@ function OrgIntegrationsBody({
     return <Text className="text-sm text-red-600 dark:text-red-400">{LOAD_ERROR}</Text>;
   }
   if (items.length === 0) {
-    return (
-      <Text className="text-sm text-gray-500 dark:text-gray-400">
-        {hasSearch ? "No connections match your search." : "This organization has no connections."}
-      </Text>
-    );
+    return <OrgIntegrationsEmpty hasSearch={hasSearch} orgId={orgId} onClearSearch={onClearSearch} />;
   }
 
   return (
@@ -239,6 +252,40 @@ function OrgIntegrationsBody({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function OrgIntegrationsEmpty({
+  hasSearch,
+  orgId,
+  onClearSearch,
+}: {
+  hasSearch: boolean;
+  orgId: string;
+  onClearSearch: () => void;
+}) {
+  if (hasSearch) {
+    return (
+      <div className="space-y-2">
+        <Text className="text-sm text-gray-500 dark:text-gray-400">No connections match this search.</Text>
+        <Text className="text-sm text-gray-500 dark:text-gray-400">Try a different name, or clear the search.</Text>
+        <Button type="button" variant="outline" size="sm" onClick={onClearSearch}>
+          Clear search
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Text className="text-sm text-gray-500 dark:text-gray-400">This organization has no connections.</Text>
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        Members add connections on the organization integrations page.
+      </Text>
+      <Button variant="outline" size="sm" asChild>
+        <Link to={organizationIntegrationsPath(orgId)}>Open integrations</Link>
+      </Button>
     </div>
   );
 }

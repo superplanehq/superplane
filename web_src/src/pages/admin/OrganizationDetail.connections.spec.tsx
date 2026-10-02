@@ -267,4 +267,56 @@ describe("OrganizationDetail connections", () => {
     expect(screen.getByText("found-sentry")).toBeInTheDocument();
     expect(screen.queryByText("acme-sentry")).not.toBeInTheDocument();
   });
+
+  it("clears a search that matches no connections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input) === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organization());
+      }
+      const integrations = integrationsUrl(input);
+      if (integrations) {
+        if (integrations.searchParams.get("search")) {
+          return jsonResponse(page([], 0, 0));
+        }
+        return jsonResponse(page([connection("acme-sentry", "integration-1")], 1, 0));
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "Search connections" }), "none");
+    expect(await screen.findByText("No connections match this search.")).toBeInTheDocument();
+    expect(screen.getByText("Try a different name, or clear the search.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(await screen.findByText("acme-sentry")).toBeInTheDocument();
+    expect(screen.queryByText("No connections match this search.")).not.toBeInTheDocument();
+  });
+
+  it("explains how to add connections when the organization has none", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input) === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organization());
+      }
+      if (integrationsUrl(input)) {
+        return jsonResponse(page([], 0, 0));
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "Connections" }));
+
+    expect(await screen.findByText("This organization has no connections.")).toBeInTheDocument();
+    expect(screen.getByText("Members add connections on the organization integrations page.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open integrations" })).toHaveAttribute(
+      "href",
+      "/org-1/organization/integrations",
+    );
+  });
 });
