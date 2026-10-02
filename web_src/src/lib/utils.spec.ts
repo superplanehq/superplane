@@ -44,6 +44,28 @@ describe("utils", () => {
     expect(calcRelativeTimeFromDiff(172_800_000)).toBe("2d");
   });
 
+  it("never renders a negative duration when the browser clock is behind the server", () => {
+    // `Date.now() - receivedAt` goes negative on clock skew; every unit branch
+    // tests `> 0`, so this used to fall through to raw seconds ("-3s", "-3600s").
+    expect(calcRelativeTimeFromDiff(-3_000)).toBe("0s");
+    expect(calcRelativeTimeFromDiff(-120_000)).toBe("0s");
+    expect(calcRelativeTimeFromDiff(-3_600_000)).toBe("0s");
+  });
+
+  it("falls back to 0s for non-finite diffs", () => {
+    // e.g. an unparseable timestamp yielding NaN, which rendered "NaNs".
+    expect(calcRelativeTimeFromDiff(Number.NaN)).toBe("0s");
+    expect(calcRelativeTimeFromDiff(Number.POSITIVE_INFINITY)).toBe("0s");
+  });
+
+  it("keeps the unit boundaries intact", () => {
+    expect(calcRelativeTimeFromDiff(0)).toBe("0s");
+    expect(calcRelativeTimeFromDiff(999)).toBe("0s");
+    expect(calcRelativeTimeFromDiff(60_000)).toBe("1m");
+    expect(calcRelativeTimeFromDiff(59_999)).toBe("59s");
+    expect(calcRelativeTimeFromDiff(86_400_000)).toBe("1d");
+  });
+
   it("formats timestamps using toLocaleTimeString", () => {
     const toLocaleTimeStringSpy = vi.spyOn(Date.prototype, "toLocaleTimeString").mockReturnValue("14:30");
 

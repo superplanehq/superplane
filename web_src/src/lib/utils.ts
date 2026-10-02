@@ -7,7 +7,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const calcRelativeTimeFromDiff = (diff: number) => {
-  const seconds = Math.floor(diff / 1000);
+  // `diff` is normally `Date.now() - <server timestamp>`, so a server clock that
+  // runs ahead of the browser makes it negative. Every unit branch below tests
+  // `> 0`, so a negative diff skipped all of them and fell through to raw
+  // seconds: a running component rendered "-3s", or "-3600s" for a larger skew,
+  // ticking once a second. An elapsed duration can never be negative — clamp it
+  // (and guard NaN/Infinity from an unparseable date) so callers can render the
+  // result verbatim.
+  const safeDiff = Number.isFinite(diff) && diff > 0 ? diff : 0;
+  const seconds = Math.floor(safeDiff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
