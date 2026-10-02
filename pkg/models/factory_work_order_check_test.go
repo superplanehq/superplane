@@ -276,11 +276,12 @@ func TestFactoryWorkOrder_ListChecks_OrdersByFirstReport(t *testing.T) {
 func TestFactoryWorkOrder_ReportCheck_ReadsNullScoreHistory(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
+	db := database.DB(t.Context())
 	_, userID, factoryModel := setupFactoryWithUser(t, "check-null-history")
-	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Check target", "", &userID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Check target", "", &userID, nil, nil)
 	require.NoError(t, err)
 
-	first, err := order.ReportCheck(database.Conn(), FactoryWorkOrderCheckParams{
+	first, err := order.ReportCheck(db, FactoryWorkOrderCheckParams{
 		Key:      "confidence",
 		Name:     "Confidence score",
 		Score:    2,
@@ -288,21 +289,21 @@ func TestFactoryWorkOrder_ReportCheck_ReadsNullScoreHistory(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, database.Conn().Exec(
+	require.NoError(t, db.Exec(
 		"UPDATE factory_work_order_checks SET recent_scores = NULL WHERE id = ?",
 		first.ID,
 	).Error)
 
-	listed, err := order.ListChecks(database.Conn())
+	listed, err := order.ListChecks(db)
 	require.NoError(t, err)
 	require.Len(t, listed, 1)
 	assert.Empty(t, []float64(listed[0].RecentScores))
 
-	grouped, err := ListChecksForWorkOrders(database.Conn(), []uuid.UUID{order.ID})
+	grouped, err := ListChecksForWorkOrders(db, []uuid.UUID{order.ID})
 	require.NoError(t, err)
 	require.Len(t, grouped[order.ID], 1)
 
-	second, err := order.ReportCheck(database.Conn(), FactoryWorkOrderCheckParams{
+	second, err := order.ReportCheck(db, FactoryWorkOrderCheckParams{
 		Key:      "confidence",
 		Name:     "Confidence score",
 		Score:    4,
