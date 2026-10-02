@@ -36,6 +36,12 @@ function draft(): PlanningReviewDraft {
 }
 
 describe("MergeConfidenceSettingsForm", () => {
+  it("does not show the risk category list", () => {
+    render(<MergeConfidenceSettingsForm draft={draft()} onSave={vi.fn()} />);
+
+    expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
+  });
+
   it("turns a check off and saves that choice in the prompt", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
