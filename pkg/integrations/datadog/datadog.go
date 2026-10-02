@@ -417,12 +417,7 @@ func (d *Datadog) ListResources(resourceType string, ctx core.ListResourcesConte
 		return environmentResources(names), nil
 	}
 
-	names, err := client.ListServices()
-	if err != nil {
-		return nil, err
-	}
-
-	return serviceResources(names), nil
+	return client.listServiceResources()
 }
 
 func (d *Datadog) Hooks() []core.Hook {

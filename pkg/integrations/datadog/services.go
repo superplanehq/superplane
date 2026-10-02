@@ -25,15 +25,36 @@ const (
 	serviceAggregateMaxPages = 10
 )
 
+const (
+	ResourceTypeListNotice          = "list-notice"
+	ListNoticeIssueSearchFailed     = "issue-search-failed"
+	listNoticeIssueSearchFailedName = "The open-issue search failed. Services found only on open issues are missing."
+)
+
 // ListServices returns service names seen in spans or logs in the last 30
 // days, plus services on open Error Tracking issues. The three reads run
 // together under one time limit. A refused or failed telemetry query is
 // skipped. A refused issue search is skipped when another source succeeds.
 // Any other issue search failure keeps telemetry names when one exists, so
-// a temporary error does not hide those services. Services that exist only
-// on open issues are then missing. The list fails when that search fails
-// and no telemetry name is available.
+// a temporary error does not hide those services. That result includes
+// ListNoticeIssueSearchFailed so the missing names are not silent. The list
+// fails when that search fails and no telemetry name is available.
 func (c *Client) ListServices() ([]string, error) {
+	resources, err := c.listServiceResources()
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		if resource.Type != ResourceTypeService {
+			continue
+		}
+		names = append(names, resource.ID)
+	}
+	return names, nil
+}
+
+func (c *Client) listServiceResources() ([]core.IntegrationResource, error) {
 	restoreDeadline := c.applyServiceListDeadline()
 	defer restoreDeadline()
 
@@ -68,7 +89,8 @@ func (c *Client) ListServices() ([]string, error) {
 	if spanErr != nil && logErr != nil && issueErr != nil {
 		return nil, serviceListError(issueErr, spanErr, logErr)
 	}
-	if issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden) {
+	issueSearchFailed := issueErr != nil && !errors.Is(issueErr, ErrErrorTrackingForbidden)
+	if issueSearchFailed {
 		log.WithError(issueErr).Warn("datadog service list omitted open-issue services")
 	}
 
@@ -82,7 +104,15 @@ func (c *Client) ListServices() ([]string, error) {
 	if issueErr == nil {
 		names = append(names, serviceNamesFromIssues(issues)...)
 	}
-	return uniqueSortedNames(names), nil
+	resources := serviceResources(uniqueSortedNames(names))
+	if issueSearchFailed {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeListNotice,
+			ID:   ListNoticeIssueSearchFailed,
+			Name: listNoticeIssueSearchFailedName,
+		})
+	}
+	return resources, nil
 }
 
 func (c *Client) applyServiceListDeadline() func() {

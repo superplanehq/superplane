@@ -111,6 +111,9 @@ func serializeAgentIntegrationResources(resources []*organizationpb.IntegrationR
 		if resource == nil {
 			continue
 		}
+		if resource.GetType() == "list-notice" {
+			continue
+		}
 		result = append(result, integrationResourceResult{
 			Type: resource.GetType(),
 			ID:   resource.GetId(),

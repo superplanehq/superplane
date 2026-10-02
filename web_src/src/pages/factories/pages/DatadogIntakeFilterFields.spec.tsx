@@ -93,7 +93,10 @@ describe("DatadogIntakeFilterFields", () => {
     expect(screen.queryByTestId("datadog-environment-new")).not.toBeInTheDocument();
     expect(screen.getByTestId("datadog-environment-prod")).toBeInTheDocument();
     expect(screen.getByText(DATADOG_INTAKE_SETTINGS_COPY.environmentsHelper)).toBeInTheDocument();
-    expect(screen.getByText(DATADOG_INTAKE_SETUP_COPY.serviceListIncomplete)).toBeInTheDocument();
+    expect(screen.queryByText(DATADOG_INTAKE_SETUP_COPY.serviceListIssueSearchFailed)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(DATADOG_INTAKE_SETUP_COPY.serviceListIssueSearchFailedNoNameField),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
   });
 

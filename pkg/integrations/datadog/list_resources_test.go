@@ -108,6 +108,7 @@ func Test__Datadog__ListResources(t *testing.T) {
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
 		assert.Equal(t, []string{"checkout"}, resourceIDs(resources))
+		assert.Empty(t, listNoticeID(resources))
 	})
 
 	t.Run("keeps telemetry services when the issue search fails", func(t *testing.T) {
@@ -119,7 +120,16 @@ func Test__Datadog__ListResources(t *testing.T) {
 
 		resources, err := (&Datadog{}).ListResources(ResourceTypeService, datadogListContext(httpContext))
 		require.NoError(t, err)
-		assert.Equal(t, []string{"billing", "checkout"}, resourceIDs(resources))
+		assert.Equal(t, []string{"billing", "checkout"}, serviceResourceIDs(resources))
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeService, ID: "billing", Name: "billing"},
+			{Type: ResourceTypeService, ID: "checkout", Name: "checkout"},
+			{
+				Type: ResourceTypeListNotice,
+				ID:   ListNoticeIssueSearchFailed,
+				Name: listNoticeIssueSearchFailedName,
+			},
+		}, resources)
 	})
 
 	t.Run("fails the list when the issue search fails and telemetry has no names", func(t *testing.T) {
@@ -364,9 +374,10 @@ func TestListServicesKeepsTelemetryNamesWhenTheIssueSearchMissesTheDeadline(t *t
 	}
 	client.SetRequestDeadline(time.Now().Add(50 * time.Millisecond))
 
-	names, err := client.ListServices()
+	resources, err := client.listServiceResources()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"from-logs", "from-spans"}, names)
+	assert.Equal(t, []string{"from-logs", "from-spans"}, serviceResourceIDs(resources))
+	assert.Equal(t, ListNoticeIssueSearchFailed, listNoticeID(resources))
 	select {
 	case <-gate.started:
 	default:
@@ -523,11 +534,27 @@ func issueSearchBody(services ...string) string {
 }
 
 func resourceIDs(resources []core.IntegrationResource) []string {
+	return serviceResourceIDs(resources)
+}
+
+func serviceResourceIDs(resources []core.IntegrationResource) []string {
 	ids := make([]string, 0, len(resources))
 	for _, resource := range resources {
+		if resource.Type != ResourceTypeService {
+			continue
+		}
 		ids = append(ids, resource.ID)
 	}
 	return ids
+}
+
+func listNoticeID(resources []core.IntegrationResource) string {
+	for _, resource := range resources {
+		if resource.Type == ResourceTypeListNotice {
+			return resource.ID
+		}
+	}
+	return ""
 }
 
 func aggregateQuery(t *testing.T, request *http.Request) string {

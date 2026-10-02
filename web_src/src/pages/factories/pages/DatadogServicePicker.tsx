@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { hasIssueSearchFailedNotice, withoutIntegrationListNotices } from "@/lib/integrationListNotice";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
@@ -16,7 +17,7 @@ export function DatadogServicePicker({
   onRetry,
   showNameField = true,
 }: {
-  services: Array<{ id?: string; name?: string }>;
+  services: Array<{ id?: string; name?: string; type?: string }>;
   serviceName: string;
   loading: boolean;
   error: boolean;
@@ -24,7 +25,11 @@ export function DatadogServicePicker({
   onRetry: () => void;
   showNameField?: boolean;
 }) {
-  const options = useMemo(() => servicesWithCurrent(services, serviceName), [services, serviceName]);
+  const issueSearchFailed = hasIssueSearchFailedNotice(services);
+  const options = useMemo(
+    () => servicesWithCurrent(withoutIntegrationListNotices(services), serviceName),
+    [services, serviceName],
+  );
   const filtered = useMemo(() => {
     if (!showNameField) return options;
     const term = serviceName.trim().toLowerCase();
@@ -62,8 +67,8 @@ export function DatadogServicePicker({
           </Button>
         </div>
       ) : null}
-      {!loading && !error ? (
-        <p className="workspace-body-text text-muted-foreground">{DATADOG_INTAKE_SETUP_COPY.serviceListIncomplete}</p>
+      {!loading && !error && issueSearchFailed ? (
+        <IssueSearchFailedNotice showNameField={showNameField} onRetry={onRetry} />
       ) : null}
       {!loading && !error && options.length === 0 ? (
         <p className="workspace-body-text text-muted-foreground">{DATADOG_INTAKE_SETUP_COPY.wizardServicesEmpty}</p>
@@ -105,6 +110,21 @@ export function DatadogServicePicker({
           )}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function IssueSearchFailedNotice({ showNameField, onRetry }: { showNameField: boolean; onRetry: () => void }) {
+  return (
+    <div className="space-y-3">
+      <p className="workspace-body-text text-muted-foreground">
+        {showNameField
+          ? DATADOG_INTAKE_SETUP_COPY.serviceListIssueSearchFailed
+          : DATADOG_INTAKE_SETUP_COPY.serviceListIssueSearchFailedNoNameField}
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        {DATADOG_INTAKE_SETUP_COPY.wizardRetry}
+      </Button>
     </div>
   );
 }
