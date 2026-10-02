@@ -103,7 +103,7 @@ func (t *OnErrorTrackingAlert) Configuration() []configuration.Field {
 			Label:       "Service",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only trigger for Error Tracking alerts of this service",
+			Description: "Only trigger for Error Tracking alerts of this service. The list includes up to 10,000 services from the last 30 days. Type a name if it is missing.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeService,
