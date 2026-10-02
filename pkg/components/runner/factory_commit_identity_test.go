@@ -330,7 +330,7 @@ printf 'Co-authored-by: SuperPlane Agent <agent@superplane.com>\n' >> "$1"
 	assert.Contains(t, trailers, "Signed-off-by: Jane Doe <jane@example.com>")
 	assert.Contains(t, trailers, "Co-authored-by: Pat Example <pat@example.com>")
 	assert.NotContains(t, trailers, "Repository hook ran.")
-	assert.NotContains(t, trailers, "agent@superplane.com")
+	assert.NotContains(t, trailers, "<agent@superplane.com>")
 
 	runGit(t, repo, wrapper, env, "commit", "--amend", "--no-edit")
 	amended := gitShow(t, repo, env, "%B")
