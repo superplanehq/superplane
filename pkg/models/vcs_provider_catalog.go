@@ -974,16 +974,9 @@ func enqueueVCSProviderRepositorySync(
 		Columns: []clause.Column{{Name: "provider"}, {Name: "repository_id"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"run_at": repositorySyncRunAtExpression(schedule, runAt),
-			"priority": gorm.Expr(
-				`CASE
-					WHEN vcs_provider_repository_sync_jobs.locked_at IS NOT NULL
-						AND vcs_provider_repository_sync_jobs.updated_at <= vcs_provider_repository_sync_jobs.locked_at
-						THEN ?
-					ELSE GREATEST(vcs_provider_repository_sync_jobs.priority, ?)
-				END`,
-				priority,
-				priority,
-			),
+			// A running interactive sync keeps its priority, so onboarding
+			// still counts it as requested work until it ends.
+			"priority":   gorm.Expr("GREATEST(vcs_provider_repository_sync_jobs.priority, ?)", priority),
 			"last_error": "",
 			"updated_at": gorm.Expr(
 				"GREATEST(?, COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', ?))",

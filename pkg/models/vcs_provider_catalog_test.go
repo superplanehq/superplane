@@ -317,6 +317,39 @@ func TestVCSProviderRepositorySyncReenqueueKeepsUrgency(t *testing.T) {
 	assert.WithinDuration(t, now, job.RunAt, time.Millisecond)
 }
 
+func TestVCSProviderRepositorySyncReenqueueDuringRunKeepsUrgency(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(-time.Second),
+		VCSProviderRepositorySyncPriorityInteractive,
+	))
+	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now,
+		VCSProviderRepositorySyncPriorityBackground,
+	))
+
+	var running VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&running, "provider = ? AND repository_id = ?", ProviderGitHub, 201).Error)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, running.Priority)
+}
+
 func TestVCSProviderRepositorySyncDelayedRefreshMovesUnlockedJobLater(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
