@@ -171,6 +171,11 @@ export function isConsoleTaskStage(stage: Pick<AutomationStage, "id" | "appId">)
   return Boolean(stage.appId) || stage.id === "backlog" || stage.id === SPLIT_RUN_CLOSURE_PHASE_ID;
 }
 
+/** The synthetic create-task stage. The console Intake event shows it. */
+export function isConsoleCreationStage(stage: Pick<AutomationStage, "id">): boolean {
+  return stage.id === "backlog";
+}
+
 export function allStages(groups: AutomationStageGroups): AutomationStage[] {
   return [...groups.taskStages, ...groups.pullRequestGroups.flatMap((group) => group.stages)];
 }
@@ -329,6 +334,7 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
     duration: line.duration,
     summary: "",
     toolCount: 0,
+    output: line.detail?.trim() || undefined,
     events: [],
     iconSlug: line.iconSlug,
   };

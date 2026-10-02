@@ -902,27 +902,23 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
-  it("shows the original task above the timeline before the Backlog card opens", async () => {
-    const user = userEvent.setup();
+  it("shows Intake with the original task before Backlog", () => {
     renderSplitRun();
 
-    const description = screen.getByTestId("redesign-console-task-description");
+    const intake = screen.getByTestId("redesign-console-column-intake");
+    expect(within(intake).getByText("Intake")).toBeInTheDocument();
+    expect(within(intake).getByTestId("redesign-console-column-marker-intake")).toHaveTextContent("GitHub");
+    const description = within(intake).getByTestId("redesign-console-task-description");
     expect(description).toHaveTextContent("Users see duplicate refund entries");
-    expect(within(description).getByTestId("split-run-source")).toBeInTheDocument();
-    const backlog = screen.getByTestId("redesign-console-column-backlog");
-    expect(description.compareDocumentPosition(backlog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0);
-
-    const header = within(backlog).getAllByTestId(/^redesign-console-card-header-/)[0];
-    const card = header.closest("[data-testid^='redesign-console-automation-']") as HTMLElement;
-    expect(within(card).queryByText("1 artifact")).not.toBeInTheDocument();
-    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
-
-    await user.click(within(header).getByRole("button", { name: "Toggle Ingest details" }));
-
-    expect(within(card).queryByRole("button", { name: "description.md" })).not.toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: "Download description.md" })).not.toBeInTheDocument();
-    expect(within(card).queryByTestId("redesign-console-task-description")).not.toBeInTheDocument();
-    expect(within(card).getByTestId("redesign-console-card-source")).toBeInTheDocument();
+    expect(within(description).getByTestId("split-run-source-ticket")).toHaveTextContent("acme/payments-service#103");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent(
+      "Intake GitHub issues",
+    );
+    expect(
+      intake.compareDocumentPosition(screen.getByTestId("redesign-console-column-backlog")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Toggle Ingest details" })).not.toBeInTheDocument();
     const summary = screen.getByTestId("redesign-console-summary");
     expect(within(summary).getByRole("button", { name: "description.md" })).toBeInTheDocument();
     expect(within(summary).getByText("Source")).toBeInTheDocument();
@@ -1704,7 +1700,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("redesign-console-variant")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-chat")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-session")).not.toBeInTheDocument();
-    expect(screen.getByTestId("redesign-console-task-description")).toHaveTextContent("emoji reactions");
+    const description = screen.getByTestId("redesign-console-task-description");
+    expect(description).toHaveTextContent("emoji reactions");
+    expect(within(description).getByTestId("split-run-source")).toHaveTextContent("Leonardo DiCaprio");
+    expect(within(description).getByTestId("redesign-console-intake-added-by")).toHaveTextContent("Created manually");
     expect(screen.getByTestId("split-run-description-edit")).toBeInTheDocument();
     const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
     expect(note).toHaveTextContent("This task is ready to start");
