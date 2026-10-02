@@ -24,6 +24,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [RUNNING_RUNNER],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(idleStream());
@@ -135,6 +136,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
         RUNNING_RUNNER,
@@ -214,6 +216,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     const stage = {
@@ -247,6 +250,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
     });
     vi.mocked(useLiveLogStream).mockReturnValue(
@@ -346,6 +350,7 @@ describe("LiveAgentSteps", () => {
       isError: false,
       isLoading: false,
       canvas: undefined,
+      rootEventId: undefined,
       stream: [
         { ...RUNNING_RUNNER, id: "other-runner", executionId: "exec-other", nodeId: "node-other", status: "passed" },
         RUNNING_RUNNER,
