@@ -1,0 +1,39 @@
+# Fleet Manager
+
+This process reconciles SuperPlane runner demand with configured infrastructure
+providers. A fleet can use AWS or Docker. Fleet Manager only uses the
+installation admin HTTP API. Set `FLEET_MANAGER_CONFIG_FILE` to the JSON
+configuration path. The default is
+`/etc/superplane/fleet-manager.json`.
+
+Use a personal API token that belongs to an installation administrator. The
+Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
+their short-lived registration token.
+
+The local Compose service waits for owner setup and manages a development
+token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
+
+AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
+from this layout:
+
+```text
+<runnerReleaseBaseUrl>/<version>/runner-linux-amd64.tar.gz
+<runnerReleaseBaseUrl>/<version>/runner-linux-arm64.tar.gz
+<runnerReleaseBaseUrl>/<version>/checksums.txt
+```
+
+Each archive contains the runner binary and `install.sh`. Fleet Manager reads
+the selected archive checksum from `checksums.txt`. AWS bootstrap downloads
+the archive, verifies its SHA-256, extracts it, and runs the bundled installer.
+
+Docker fleets use a configured runner image instead of a release artifact.
+The local development configuration uses the tool-rich
+`superplane-runner-local:dev` image.
+
+Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
+next queued task. The target capacity is the number of queued tasks plus
+`warmCapacity`. Set `warmCapacity` to the number of idle runners that the
+fleet must keep when no tasks are queued. Set `maxCapacity` to limit the total
+number of pending, idle, and busy runners. A value of `0`, or no value, permits
+unlimited capacity. Set `warmCapacity` and `maxCapacity` to the same positive
+value for a fixed-size fleet.

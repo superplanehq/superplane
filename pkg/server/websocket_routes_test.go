@@ -46,3 +46,25 @@ func TestShouldRegisterGRPCGateway(t *testing.T) {
 		}
 	})
 }
+
+func TestGetRunnerAPIBaseURL(t *testing.T) {
+	t.Run("uses configured runner API URL", func(t *testing.T) {
+		t.Setenv("RUNNER_API_BASE_URL", "https://runner.example")
+
+		got := getRunnerAPIBaseURL("https://app.example")
+
+		if got != "https://runner.example" {
+			t.Fatalf("getRunnerAPIBaseURL() = %q, want %q", got, "https://runner.example")
+		}
+	})
+
+	t.Run("falls back to application base URL", func(t *testing.T) {
+		t.Setenv("RUNNER_API_BASE_URL", "")
+
+		got := getRunnerAPIBaseURL("https://app.example")
+
+		if got != "https://app.example" {
+			t.Fatalf("getRunnerAPIBaseURL() = %q, want %q", got, "https://app.example")
+		}
+	})
+}

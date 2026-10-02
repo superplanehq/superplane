@@ -475,6 +475,7 @@ function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
     "secret",
     "run-parameters",
     "hosted-model",
+    "runner-fleet",
   ];
 
   return (
