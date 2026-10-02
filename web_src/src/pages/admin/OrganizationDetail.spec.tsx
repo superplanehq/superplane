@@ -84,6 +84,22 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
+        if (url === `/admin/api/organizations/${ORG_ID}/integrations`) {
+          return jsonResponse({
+            items: [
+              {
+                id: "integration-1",
+                app_name: "sentry",
+                installation_name: "acme-sentry",
+                state: "error",
+                state_description: "Sentry is not sending issue events.",
+                details: { installation_uuid: "install-uuid-1", external_organization: "acme-sentry-org" },
+                created_at: "2024-01-15T12:00:00Z",
+                updated_at: "2024-02-20T12:00:00Z",
+              },
+            ],
+          });
+        }
         if (url === `/admin/api/organizations/${ORG_ID}/experimental-features`) {
           return jsonResponse({
             features: [{ id: "factories", label: "Factories", description: "Software factories", released: false }],
@@ -128,6 +144,7 @@ describe("OrganizationDetail", () => {
       "Overview",
       "Users",
       "Automations",
+      "Connections",
       "Features",
       "Credits",
     ]);
@@ -201,6 +218,21 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByPlaceholderText("Search automations...")).toBeInTheDocument();
     expect(await screen.findByText("Deploy pipeline")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+  });
+
+  it("shows connection status and details after a tab click", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
+
+    const panel = screen.getByRole("tabpanel", { name: "Connections" });
+    expect(await within(panel).findByText("acme-sentry")).toBeInTheDocument();
+    expect(within(panel).getByText("error")).toBeInTheDocument();
+    expect(within(panel).getByText("Sentry is not sending issue events.")).toBeInTheDocument();
+    expect(within(panel).getByText("install-uuid-1")).toBeInTheDocument();
+    expect(within(panel).getByText("acme-sentry-org")).toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {
