@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ConfigurationField } from "@/api-client";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { useComponent } from "@/hooks/useComponentData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
@@ -15,7 +16,7 @@ import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 import { HEADER_MCP_RESOURCE } from "../__fixtures__/agentResourceFixtures";
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import { PlanningReviewForm } from "./PlanningReviewForm";
-import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
+import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft, type PlanningReviewStep } from "./planningReviewMockup";
 
 const useCanvasMock = vi.hoisted(() =>
   vi.fn((): { data: { metadata?: { factoryId?: string } } | undefined; isPending: boolean } => ({
@@ -121,19 +122,27 @@ function renderForm(
     showVisualEvidenceSetting?: boolean;
     factoryId?: string;
     factoryKey?: string;
+    defaultRefinementPrompt?: string;
+    defaultRefinementPromptFailed?: boolean;
+    onRetryDefaultRefinementPrompt?: () => void;
   } = {},
 ) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
-        <PlanningReviewForm
-          draft={draft}
-          onChange={props.onChange ?? vi.fn()}
-          organizationId="org-1"
-          factoryId={props.factoryId}
-          factoryKey={props.factoryKey}
-          showVisualEvidenceSetting={props.showVisualEvidenceSetting}
-        />
+        <ThemeProvider>
+          <PlanningReviewForm
+            draft={draft}
+            onChange={props.onChange ?? vi.fn()}
+            organizationId="org-1"
+            factoryId={props.factoryId}
+            factoryKey={props.factoryKey}
+            showVisualEvidenceSetting={props.showVisualEvidenceSetting}
+            defaultRefinementPrompt={props.defaultRefinementPrompt}
+            defaultRefinementPromptFailed={props.defaultRefinementPromptFailed}
+            onRetryDefaultRefinementPrompt={props.onRetryDefaultRefinementPrompt}
+          />
+        </ThemeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -380,5 +389,123 @@ describe("PlanningReviewForm model options", () => {
         ],
       }),
     );
+  });
+});
+
+const FACTORY_DEFAULT_PROMPT = "Plan the task.\n\nTask:\n{{ root().data.workOrder }}";
+
+function draftWithSteps(steps: PlanningReviewStep[]): PlanningReviewDraft {
+  return {
+    ...PLANNING_REVIEW_DRAFT,
+    components: [
+      {
+        ...PLANNING_REVIEW_DRAFT.components[0],
+        configuration: {
+          ...PLANNING_REVIEW_DRAFT.components[0].configuration,
+          steps,
+        },
+      },
+    ],
+  };
+}
+
+function refinementSteps(prompt: string): PlanningReviewStep[] {
+  return [
+    { name: "Notes", type: "prompt", prompt: "Keep this note.", workingDirectory: "notes" },
+    { name: "Clone repository", type: "bash", command: "git clone", workingDirectory: "repo" },
+    { name: "Refine Task", type: "prompt", prompt, workingDirectory: "repo" },
+  ];
+}
+
+describe("PlanningReviewForm default refinement prompt", () => {
+  beforeAll(() => {
+    Element.prototype.hasPointerCapture ??= () => false;
+    Element.prototype.setPointerCapture ??= () => {};
+    Element.prototype.releasePointerCapture ??= () => {};
+    Element.prototype.scrollIntoView ??= () => {};
+  });
+
+  beforeEach(() => {
+    vi.mocked(useComponent).mockReturnValue({ data: undefined } as ReturnType<typeof useComponent>);
+    vi.mocked(useExperimentalFeature).mockReturnValue({
+      has: () => false,
+      enabledExperimentalFeatures: [],
+      isLoading: false,
+      organizationReady: true,
+    });
+    vi.mocked(useFactoryAgentResources).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useFactoryAgentResources>);
+  });
+
+  it("restores only the Refine Task prompt when a default is provided and the prompt differs", async () => {
+    const user = userEvent.setup();
+    const steps = refinementSteps("Changed prompt.");
+    const draft = draftWithSteps(steps);
+    const onChange = vi.fn();
+
+    const withoutDefault = renderForm(draft, { onChange });
+    await user.click(screen.getByTestId("planning-review-step-toggle-2"));
+    expect(screen.queryByRole("button", { name: "Restore default prompt" })).not.toBeInTheDocument();
+    withoutDefault.unmount();
+
+    renderForm(draft, { onChange, defaultRefinementPrompt: FACTORY_DEFAULT_PROMPT });
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
+    expect(screen.queryByRole("button", { name: "Restore default prompt" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("planning-review-step-toggle-2"));
+    await user.click(screen.getByRole("button", { name: "Restore default prompt" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as PlanningReviewDraft;
+    expect(next.components[0].configuration.steps).toEqual([
+      steps[0],
+      steps[1],
+      { ...steps[2], prompt: FACTORY_DEFAULT_PROMPT },
+    ]);
+    expect(next.components[0].configuration.model).toBe(draft.components[0].configuration.model);
+    expect(next.components[0].concurrency).toEqual(draft.components[0].concurrency);
+  });
+
+  it("hides the restore action when the prompt already matches the default", async () => {
+    const user = userEvent.setup();
+    renderForm(draftWithSteps(refinementSteps(FACTORY_DEFAULT_PROMPT)), {
+      defaultRefinementPrompt: FACTORY_DEFAULT_PROMPT,
+    });
+
+    await user.click(screen.getByTestId("planning-review-step-toggle-2"));
+
+    expect(screen.queryByRole("button", { name: "Restore default prompt" })).not.toBeInTheDocument();
+  });
+
+  it("restores the first prompt step when no step is named Refine Task", async () => {
+    const user = userEvent.setup();
+    const steps: PlanningReviewStep[] = [
+      { name: "Draft plan", type: "prompt", prompt: "Changed prompt.", workingDirectory: "repo" },
+      { name: "Commit", type: "bash", command: "git commit", workingDirectory: "repo" },
+    ];
+    const onChange = vi.fn();
+    renderForm(draftWithSteps(steps), { onChange, defaultRefinementPrompt: FACTORY_DEFAULT_PROMPT });
+
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
+    await user.click(screen.getByRole("button", { name: "Restore default prompt" }));
+
+    const next = onChange.mock.calls[0][0] as PlanningReviewDraft;
+    expect(next.components[0].configuration.steps).toEqual([{ ...steps[0], prompt: FACTORY_DEFAULT_PROMPT }, steps[1]]);
+  });
+
+  it("shows a retry control when the default prompt did not load", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    renderForm(draftWithSteps(refinementSteps("Changed prompt.")), {
+      defaultRefinementPromptFailed: true,
+      onRetryDefaultRefinementPrompt: onRetry,
+    });
+
+    expect(screen.getByText("The default prompt did not load. Try again.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("planning-review-add-step")).toBeEnabled();
   });
 });

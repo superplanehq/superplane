@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useListFieldDragReorder } from "@/ui/configurationFieldRenderer/useListFieldDragReorder";
 
+import { REFINE_TASK_STEP_NAME } from "../lib/refinementPromptFromAutomationDefaults";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 
@@ -19,9 +20,15 @@ const KIND_LABEL: Record<PlanningReviewStepKind, string> = { bash: "Bash", promp
 export function PlanningReviewStepList({
   steps,
   onChange,
+  defaultRefinementPrompt,
+  defaultRefinementPromptFailed = false,
+  onRetryDefaultRefinementPrompt,
 }: {
   steps: PlanningReviewStep[];
   onChange: (steps: PlanningReviewStep[]) => void;
+  defaultRefinementPrompt?: string;
+  defaultRefinementPromptFailed?: boolean;
+  onRetryDefaultRefinementPrompt?: () => void;
 }) {
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [openStep, setOpenStep] = useState("");
@@ -34,6 +41,8 @@ export function PlanningReviewStepList({
     rowRefs,
   });
 
+  const renderedSteps = renderedItems as PlanningReviewStep[];
+  const restoreStepIndex = defaultPromptRestoreStepIndex(renderedSteps);
   const update = (index: number, next: PlanningReviewStep) =>
     onChange(steps.map((step, position) => (position === index ? next : step)));
 
@@ -60,18 +69,21 @@ export function PlanningReviewStepList({
           Add step
         </Button>
       </header>
+      {defaultRefinementPromptFailed ? <DefaultPromptLoadError onRetry={onRetryDefaultRefinementPrompt} /> : null}
       {steps.length === 0 ? (
         <p className="px-5 py-10 text-center text-sm text-muted-foreground" data-testid="planning-review-steps-empty">
           This agent has no steps yet. Add a step to tell the runner what to do.
         </p>
       ) : (
         <ol className="divide-y divide-border">
-          {(renderedItems as PlanningReviewStep[]).map((step, index) => (
+          {renderedSteps.map((step, index) => (
             <li key={index}>
               <StepRow
                 step={step}
                 position={index}
                 canReorder={steps.length > 1}
+                defaultRefinementPrompt={defaultRefinementPrompt}
+                isDefaultPromptTarget={restoreStepIndex === index}
                 isOpen={openStep === String(index)}
                 onToggle={() => setOpenStep((current) => (current === String(index) ? "" : String(index)))}
                 rowRef={(element) => {
@@ -99,6 +111,8 @@ function StepRow({
   onDragStart,
   onChange,
   onRemove,
+  defaultRefinementPrompt,
+  isDefaultPromptTarget,
 }: {
   step: PlanningReviewStep;
   position: number;
@@ -109,10 +123,17 @@ function StepRow({
   onDragStart: (event: React.MouseEvent) => void;
   onChange: (step: PlanningReviewStep) => void;
   onRemove: () => void;
+  defaultRefinementPrompt?: string;
+  isDefaultPromptTarget: boolean;
 }) {
   const kind = step.type;
   const label = step.name || `Step ${position + 1}`;
   const bodyId = `planning-review-step-body-wrapper-${position}`;
+  const showRestoreDefaultPrompt = canRestoreDefaultPrompt(step, {
+    isOpen,
+    isDefaultPromptTarget,
+    defaultRefinementPrompt,
+  });
 
   return (
     <div
@@ -165,14 +186,27 @@ function StepRow({
         <StepDragHandle label={label} canReorder={canReorder} onDragStart={onDragStart} />
       </div>
       {isOpen ? (
-        <div id={bodyId} className="px-3 pb-3">
-          <PlanningReviewStepBody
-            kind={kind}
-            value={(kind === "prompt" ? step.prompt : step.command) ?? ""}
-            onChange={(next) => onChange(kind === "prompt" ? { ...step, prompt: next } : { ...step, command: next })}
-            label={`${KIND_LABEL[kind]} for ${label}`}
-            testId={`planning-review-step-body-${position}`}
-          />
+        <div id={bodyId} className="flex flex-col items-start gap-2 px-3 pb-3">
+          <div className="w-full">
+            <PlanningReviewStepBody
+              kind={kind}
+              value={(kind === "prompt" ? step.prompt : step.command) ?? ""}
+              onChange={(next) => onChange(kind === "prompt" ? { ...step, prompt: next } : { ...step, command: next })}
+              label={`${KIND_LABEL[kind]} for ${label}`}
+              testId={`planning-review-step-body-${position}`}
+            />
+          </div>
+          {showRestoreDefaultPrompt && defaultRefinementPrompt ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onChange({ ...step, prompt: defaultRefinementPrompt })}
+              data-testid="planning-review-restore-default-prompt"
+            >
+              Restore default prompt
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -262,4 +296,49 @@ function StepKindMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function DefaultPromptLoadError({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <div
+      className="flex items-center gap-3 border-b border-border px-5 py-3"
+      data-testid="planning-review-default-prompt-error"
+    >
+      <p className="min-w-0 flex-1 text-sm text-destructive">The default prompt did not load. Try again.</p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onRetry}
+        data-testid="planning-review-default-prompt-retry"
+      >
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function defaultPromptRestoreStepIndex(steps: PlanningReviewStep[]): number | undefined {
+  const named = steps.findIndex((step) => step.type === "prompt" && step.name === REFINE_TASK_STEP_NAME);
+  if (named >= 0) {
+    return named;
+  }
+  const firstPrompt = steps.findIndex((step) => step.type === "prompt");
+  if (firstPrompt < 0) {
+    return undefined;
+  }
+  return firstPrompt;
+}
+
+function canRestoreDefaultPrompt(
+  step: PlanningReviewStep,
+  options: { isOpen: boolean; isDefaultPromptTarget: boolean; defaultRefinementPrompt?: string },
+): boolean {
+  if (!options.isOpen || !options.isDefaultPromptTarget || step.type !== "prompt") {
+    return false;
+  }
+  if (!options.defaultRefinementPrompt) {
+    return false;
+  }
+  return step.prompt !== options.defaultRefinementPrompt;
 }
