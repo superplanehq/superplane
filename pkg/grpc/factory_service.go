@@ -126,6 +126,11 @@ func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFac
 	return actions.ListFactoryIntakes(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryIntakeCatalog(ctx context.Context, req *pb.ListFactoryIntakeCatalogRequest) (*pb.ListFactoryIntakeCatalogResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryIntakeCatalog(ctx, organizationID, req)
+}
+
 func (s *FactoryService) CreateFactoryIntake(ctx context.Context, req *pb.CreateFactoryIntakeRequest) (*pb.CreateFactoryIntakeResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactoryIntake(ctx, s.intakeDeps, organizationID, req)

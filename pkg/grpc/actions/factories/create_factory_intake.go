@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -76,6 +77,14 @@ func CreateFactoryIntake(
 	}
 
 	db := database.DB(ctx)
+	available, err := models.IsIntakeAvailableForOrganization(db, source, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+	if !available {
+		return nil, grpcerrors.FailedPrecondition(nil, "this intake is not available for the organization")
+	}
+
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
