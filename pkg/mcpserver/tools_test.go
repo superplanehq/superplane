@@ -118,6 +118,36 @@ func TestCreateTaskReturnsNewTask(t *testing.T) {
 	require.NotEmpty(t, payload["id"])
 }
 
+func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Hand Off", "", "HND")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	_, err = factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+
+	claims := toolClaims(r, factoryModel.ID)
+	claims.ClientID = LocalClientID
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, claims, "hand_off_task", map[string]any{
+		"title":  "Ship MCP hand-off",
+		"plan":   "# Implement the MCP hand-off.",
+		"column": "implement",
+	})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, result)
+	assert.Equal(t, "open", payload["state"])
+	assert.Equal(t, "implement", payload["column"])
+	require.NotEmpty(t, payload["id"])
+	require.NotEmpty(t, payload["key"])
+}
+
 func TestCallToolRejectsWithoutMCPServerFlag(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))

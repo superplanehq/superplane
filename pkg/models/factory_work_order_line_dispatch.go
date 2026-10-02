@@ -121,6 +121,71 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 	return dispatch, result, nil
 }
 
+// RecordPassedStageWithoutRun records a finished line traversal whose
+// step at stepIndex passed, without a canvas run. Earlier steps stay
+// empty. The board treats this as waiting in Verify.
+func (l *FactoryLine) RecordPassedStageWithoutRun(
+	tx *gorm.DB,
+	order *FactoryWorkOrder,
+	stepIndex int,
+) (*FactoryWorkOrderLineDispatch, *FactoryWorkOrderExecution, error) {
+	if l == nil || order == nil {
+		return nil, nil, ErrFactoryLineNotFound
+	}
+	if len(l.Steps) == 0 {
+		return nil, nil, ErrFactoryLineHasNoSteps
+	}
+	if stepIndex < 0 || stepIndex >= len(l.Steps) {
+		return nil, nil, ErrFactoryLineStepOutOfRange
+	}
+
+	step := l.Steps[stepIndex]
+	canvas, err := FindCanvasInTransaction(tx, l.OrganizationID, step.AppID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	now := time.Now()
+	dispatch := &FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         l.ID,
+		LineName:       l.Name,
+		Steps:          l.Steps,
+		State:          FactoryWorkOrderLineDispatchStateFinished,
+		Result:         CanvasRunResultPassed,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		FinishedAt:     &now,
+	}
+	if err := tx.Clauses(clause.Returning{}).Create(dispatch).Error; err != nil {
+		return nil, nil, err
+	}
+
+	execution := &FactoryWorkOrderExecution{
+		ID:             uuid.New(),
+		OrganizationID: l.OrganizationID,
+		FactoryID:      l.FactoryID,
+		WorkOrderID:    order.ID,
+		LineID:         l.ID,
+		LineDispatchID: dispatch.ID,
+		StepIndex:      stepIndex,
+		StepName:       canvas.Name,
+		Status:         FactoryWorkOrderExecutionStatusFinished,
+		Result:         CanvasRunResultPassed,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		FinishedAt:     &now,
+	}
+	if err := tx.Clauses(clause.Returning{}).Create(execution).Error; err != nil {
+		return nil, nil, err
+	}
+
+	return dispatch, execution, nil
+}
+
 // EnqueueOrStartStep starts the step at stepIndex when it has a free slot,
 // or queues the dispatch for admission when the step is at its
 // maxParallelism. The step's queue is FIFO: when other dispatches already
