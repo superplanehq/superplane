@@ -9,6 +9,7 @@ export type WatchedCheckStatus = "Pending" | "Failed" | "Passed";
 export type WatchedPullRequestCheck = {
   name: string;
   status: WatchedCheckStatus;
+  description?: string;
   detailsUrl?: string;
   summary?: string;
 };
@@ -103,12 +104,14 @@ function watchedCheckFromValue(value: unknown): WatchedPullRequestCheck[] {
   if (!name) {
     return [];
   }
+  const description = typeof value.description === "string" ? value.description.trim() : "";
   const detailsUrl = typeof value.detailsUrl === "string" ? value.detailsUrl.trim() : "";
   const summary = typeof value.summary === "string" ? value.summary.trim() : "";
   return [
     {
       name,
       status: watchedCheckStatus(stringField(value.status), stringField(value.conclusion)),
+      ...(description ? { description } : {}),
       ...(detailsUrl ? { detailsUrl } : {}),
       ...(summary ? { summary } : {}),
     },

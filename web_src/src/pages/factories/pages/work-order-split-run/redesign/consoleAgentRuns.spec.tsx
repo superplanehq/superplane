@@ -295,7 +295,13 @@ describe("AgentRunsPage pull request checks", () => {
         state: "STATE_FINISHED",
         metadata: {
           selectedChecks: [
-            { name: "build", status: "completed", conclusion: "success", detailsUrl: "https://example.com/build" },
+            {
+              name: "build",
+              description: "CI",
+              status: "completed",
+              conclusion: "success",
+              detailsUrl: "https://example.com/build",
+            },
             { name: "lint", status: "completed", conclusion: "success" },
           ],
         },
@@ -307,9 +313,9 @@ describe("AgentRunsPage pull request checks", () => {
     );
 
     expect(screen.getByText(/Checks passed on/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["buildPassed", "lintPassed"]);
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["build: CIPassed", "lintPassed"]);
+    expect(screen.getByRole("link", { name: "build: CI" })).toHaveAttribute("href", "https://example.com/build");
     expect(screen.queryByTestId("redesign-run-description")).not.toBeInTheDocument();
-    expect(screen.queryByText("build: CI")).not.toBeInTheDocument();
   });
 
   it("shows a failed check summary on the row and hides the markdown list", () => {
@@ -325,6 +331,7 @@ describe("AgentRunsPage pull request checks", () => {
                 selectedChecks: [
                   {
                     name: "build",
+                    description: "CI",
                     status: "completed",
                     conclusion: "failure",
                     detailsUrl: "https://example.com/build",
@@ -348,12 +355,46 @@ describe("AgentRunsPage pull request checks", () => {
 
     expect(screen.getByText(/Fixing failed checks on/)).toBeInTheDocument();
     expect(screen.getByText("The build failed on Semaphore 2.0.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "build: CI" })).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual([
-      "buildThe build failed on Semaphore 2.0.Failed",
+      "build: CIThe build failed on Semaphore 2.0.Failed",
     ]);
     expect(screen.queryByText("Failed checks")).not.toBeInTheDocument();
-    expect(screen.queryByText("build: CI")).not.toBeInTheDocument();
     expect(screen.queryByText("unwatched")).not.toBeInTheDocument();
+  });
+
+  it("shows an unlinked check title once and hides the markdown list", () => {
+    mockExecutions([
+      {
+        nodeId: WAIT_NODE_ID,
+        state: "STATE_FINISHED",
+        metadata: {
+          selectedChecks: [{ name: "build", description: "CI", status: "completed", conclusion: "success" }],
+        },
+      },
+    ]);
+
+    renderChecksCard(checksRun(`Checks passed on [3fc0c4c](${COMMIT_URL})`, "· build: CI"));
+
+    expect(screen.getAllByText("build: CI")).toHaveLength(1);
+    expect(screen.queryByTestId("redesign-run-description")).not.toBeInTheDocument();
+  });
+
+  it("keeps the markdown list when the snapshot has no output title", () => {
+    mockExecutions([
+      {
+        nodeId: WAIT_NODE_ID,
+        state: "STATE_FINISHED",
+        metadata: {
+          selectedChecks: [{ name: "build", status: "completed", conclusion: "success" }],
+        },
+      },
+    ]);
+
+    renderChecksCard(checksRun(`Checks passed on [3fc0c4c](${COMMIT_URL})`, "· build: CI"));
+
+    expect(screen.getByRole("listitem")).toHaveTextContent("buildPassed");
+    expect(screen.getByTestId("redesign-run-description")).toHaveTextContent("build: CI");
   });
 
   it("keeps the failure explanation when the snapshot has no summary", () => {

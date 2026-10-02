@@ -239,12 +239,8 @@ function checksDescriptionIsRedundant(description: string | undefined, checks: W
   if (!isChecksMarkdownDescription(description) || checks.length === 0) {
     return false;
   }
-  const explanations = checkExplanations(description);
-  if (explanations.length === 0) {
-    return true;
-  }
-  const shown = new Set(checks.flatMap((check) => (check.summary ? [check.summary] : [])));
-  return explanations.every((explanation) => shown.has(explanation));
+  const rendered = new Set(checks.map(watchedCheckMarkdownLine));
+  return checksMarkdownLines(description).every((line) => rendered.has(line));
 }
 
 function isChecksMarkdownDescription(description: string | undefined): boolean {
@@ -263,36 +259,28 @@ function checksMarkdownLines(description: string | undefined): string[] {
   return lines[0] === "Failed checks" ? lines.slice(1) : lines;
 }
 
-function checkExplanations(description: string | undefined): string[] {
-  return checksMarkdownLines(description).flatMap(lineExplanation);
-}
-
-function lineExplanation(line: string): string[] {
-  const item = line.startsWith("· ") ? line.slice(2) : line;
-  const linked = item.match(/^\[[^\]]*\]\([^)]*\)(?::\s*(\S.*))?$/);
-  if (linked) {
-    const summary = linked[1]?.trim();
-    return summary ? [summary] : [];
-  }
-  const parts = item.split(": ");
-  if (parts.length < 2) {
-    return [];
-  }
-  const summary = parts[parts.length - 1]?.trim();
-  return summary ? [summary] : [];
-}
-
 function CheckName({ check }: { check: WatchedPullRequestCheck }) {
   const href = safeExternalUrl(check.detailsUrl);
-  const className = "block min-w-0 truncate text-[12.5px] font-medium text-foreground";
+  const label = watchedCheckLabel(check);
+  const className = "block min-w-0 break-words text-[12.5px] font-medium text-foreground";
   if (!href) {
-    return <span className={className}>{check.name}</span>;
+    return <span className={className}>{label}</span>;
   }
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className={cn(className, RUN_LINK)}>
-      {check.name}
+      {label}
     </a>
   );
+}
+
+function watchedCheckLabel(check: WatchedPullRequestCheck): string {
+  return check.description ? `${check.name}: ${check.description}` : check.name;
+}
+
+function watchedCheckMarkdownLine(check: WatchedPullRequestCheck): string {
+  const label = watchedCheckLabel(check);
+  const item = check.detailsUrl ? `[${label}](${check.detailsUrl})` : label;
+  return check.summary ? `· ${item}: ${check.summary}` : `· ${item}`;
 }
 
 /** Review comments stay at five lines until the person asks for the rest. */
