@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import {
   mergeConfidenceCanvases,
   mergeConfidenceRunsForPullRequests,
+  mergeMergeConfidenceRunSnapshots,
   pullRequestIdentityFromRootEvent,
 } from "./mergeConfidenceRuns";
 
@@ -86,5 +87,41 @@ describe("mergeConfidenceRunsForPullRequests", () => {
     expect(
       pullRequestIdentityFromRootEvent(scoreRun({ id: "run-raw", number: 7, repository: "acme/app", wrapped: false })),
     ).toMatchObject({ number: "7", repository: "acme/app" });
+  });
+});
+
+describe("mergeMergeConfidenceRunSnapshots", () => {
+  it("drops a cached run that the new snapshot omits", () => {
+    const kept = scoreRun({ id: "run-kept", number: 12, repository: "acme/app" });
+    const dropped = scoreRun({ id: "run-dropped", number: 4, repository: "acme/other" });
+
+    const merged = mergeMergeConfidenceRunSnapshots([kept, dropped], [kept], new Set(["run-kept", "run-dropped"]));
+
+    expect(merged.map((run) => run.id)).toEqual(["run-kept"]);
+  });
+
+  it("keeps a live run that arrives during the fetch", () => {
+    const snapshot = scoreRun({ id: "run-snapshot", number: 12, repository: "acme/app" });
+    const live = scoreRun({ id: "run-live", number: 8, repository: "acme/other", createdAt: "2026-08-26T12:00:00Z" });
+
+    const merged = mergeMergeConfidenceRunSnapshots([snapshot, live], [snapshot], new Set(["run-snapshot"]));
+
+    expect(merged.map((run) => run.id)).toEqual(["run-snapshot", "run-live"]);
+  });
+
+  it("keeps a newer live state when the snapshot is older", () => {
+    const stale = scoreRun({ id: "run-1", number: 12, repository: "acme/app" });
+    stale.state = "STATE_STARTED";
+    stale.updatedAt = "2026-08-26T11:00:00Z";
+    const live = {
+      ...stale,
+      state: "STATE_FINISHED" as const,
+      result: "RESULT_PASSED" as const,
+      updatedAt: "2026-08-26T11:01:00Z",
+    };
+
+    const merged = mergeMergeConfidenceRunSnapshots([live], [stale], new Set(["run-1"]));
+
+    expect(merged[0]).toMatchObject({ state: "STATE_FINISHED", result: "RESULT_PASSED" });
   });
 });

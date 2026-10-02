@@ -127,13 +127,25 @@ export function upsertMergeConfidenceCanvasRun(
   return next;
 }
 
-/** Keep live events that arrived while an older REST snapshot was loading. */
+/**
+ * Apply a REST snapshot. Keep a live run that arrived during the fetch.
+ * Drop a cached run that the snapshot no longer includes.
+ */
 export function mergeMergeConfidenceRunSnapshots(
   current: CanvasesCanvasRun[] | undefined,
   incoming: CanvasesCanvasRun[],
+  idsAtFetchStart?: ReadonlySet<string>,
 ): CanvasesCanvasRun[] {
+  const incomingIds = new Set(incoming.flatMap((run) => (run.id ? [run.id] : [])));
   let merged = incoming;
   for (const run of current ?? []) {
+    if (!run.id) {
+      continue;
+    }
+    const arrivedDuringFetch = idsAtFetchStart !== undefined && !idsAtFetchStart.has(run.id);
+    if (!incomingIds.has(run.id) && !arrivedDuringFetch) {
+      continue;
+    }
     merged = upsertMergeConfidenceCanvasRun(merged, run);
   }
   return merged;
