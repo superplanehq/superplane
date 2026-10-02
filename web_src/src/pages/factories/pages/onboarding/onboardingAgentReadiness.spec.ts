@@ -33,6 +33,7 @@ describe("isAgentStepReady", () => {
     expect(isAgentStepReady(connected("claude"), 0)).toBe(true);
     expect(isAgentStepReady(connected("openai"), 0)).toBe(true);
     expect(isAgentStepReady(connected("openrouter"), 0)).toBe(true);
+    expect(isAgentStepReady(connected("customLlm"), 0)).toBe(true);
   });
 
   it("is not ready when credit is empty and no provider is connected", () => {
@@ -42,6 +43,35 @@ describe("isAgentStepReady", () => {
 });
 
 describe("resolveOnboardingAgent", () => {
+  it("plans a custom provider with the first model id", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: ["zeta-model", "alpha-model"],
+      }),
+    ).toEqual({
+      providerId: "customLlm",
+      component: "runnerOpenRouter",
+      credentialsSource: "integration",
+      integrationName: "customLlm",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "alpha-model",
+      planningModel: "alpha-model",
+      llmProvider: "custom",
+    });
+  });
+
+  it("does not invent an OpenRouter model when the custom provider returns none", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: [],
+      }),
+    ).toBeUndefined();
+  });
+
   it("uses a connected OpenRouter integration and an allowlisted model", () => {
     expect(
       resolveOnboardingAgent({

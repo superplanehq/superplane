@@ -167,6 +167,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization LLM Models settings page",
             },
             {
+              id: "organization_byok_custom_provider",
+              label: "Organization BYOK Custom Provider",
+              description: "Add a custom model provider with a URL, token, and API type",
+            },
+            {
               id: "workspace_mcp",
               label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",

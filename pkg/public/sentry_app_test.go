@@ -196,6 +196,40 @@ func TestHandleSentryAppWebhook_listenerCannotStartRun(t *testing.T) {
 	})
 }
 
+func TestHandleSentryAppWebhook_unclaimedInstallWithoutCodeLogsSentryOrganization(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
+	r := support.Setup(t)
+	server, err := NewServer(
+		r.Encryptor, r.Registry, jwt.NewSigner("test-client-secret"), support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	body := []byte(`{
+		"action": "created",
+		"installation": {"uuid": "unclaimed-install"},
+		"data": {"installation": {
+			"status": "installed",
+			"uuid": "unclaimed-install",
+			"organization": {"slug": "acme-sentry", "id": 127789}
+		}}
+	}`)
+	rec := httptest.NewRecorder()
+	logs := captureSentryWebhookLogs(t)
+
+	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "installation"))
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	failed := sentryWebhookLogLine(t, logs.String(), "failed to store unclaimed Sentry app install")
+	assert.Equal(t, "unclaimed-install", failed["installation_uuid"])
+	assert.Equal(t, "acme-sentry", failed["sentry_organization_slug"])
+	assert.Equal(t, "127789", failed["sentry_organization_id"])
+	assert.Equal(t, "installation grant code is required", failed["error"])
+}
+
 func createSentryIssueListener(t *testing.T, r *support.ResourceRegistry, integration *models.Integration) *models.Canvas {
 	t.Helper()
 

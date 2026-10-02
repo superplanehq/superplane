@@ -55,6 +55,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show the organization LLM Models settings page", f.Description)
 	})
 
+	t.Run("known id returns organization byok custom provider feature", func(t *testing.T) {
+		f, ok := Get(FeatureOrganizationBYOKCustomProvider)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureOrganizationBYOKCustomProvider, f.ID)
+		assert.Equal(t, "Organization BYOK Custom Provider", f.Label)
+		assert.Equal(t, "Add a custom model provider with a URL, token, and API type", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns custom automations feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryCustomAutomations)
 		assert.True(t, ok)
@@ -145,6 +154,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
+	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
