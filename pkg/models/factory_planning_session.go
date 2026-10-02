@@ -457,6 +457,20 @@ func (s *FactoryPlanningSession) IsAnalysisSession() bool {
 	return s.Kind == PlanningSessionKindWorkOrderAnalysis
 }
 
+// IsWaiting reports that the agent stopped and is waiting for the user.
+func (s *FactoryPlanningSession) IsWaiting() bool {
+	return s.isOpen() && s.WaitState == PlanningWaitPending
+}
+
+// IsWorking reports that the agent is still starting or running this session.
+func (s *FactoryPlanningSession) IsWorking() bool {
+	return s.isOpen() && s.WaitState != PlanningWaitPending
+}
+
+func (s *FactoryPlanningSession) isOpen() bool {
+	return s != nil && s.State != PlanningSessionStateEnded
+}
+
 func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
 	if !s.IsAnalysisSession() {
 		return false

@@ -115,7 +115,28 @@ describe("LineBoardOrderCard", () => {
     });
 
     expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
+  });
+
+  it("keeps the working indicator while analysis still runs with saved scores and a question", () => {
+    renderCard({
+      ...draft,
+      planningSession: {
+        id: "ps-1",
+        state: "running",
+        executionId: "exec-1",
+        survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST"] }] },
+      },
+      checkScores: [
+        { key: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+        { key: "confidence", name: "Confidence score", score: 4, maxScore: 5 },
+      ],
+    });
+
+    expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-agent-question-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-1")).not.toBeInTheDocument();
   });
 
   it("shows an agent question from the planning session summary", () => {
@@ -129,10 +150,29 @@ describe("LineBoardOrderCard", () => {
         executionId: "exec-1",
         survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST"] }] },
       },
+      checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
     });
 
     expect(screen.getByTestId("work-order-card-agent-question-wo-1")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4/5");
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
+  });
+
+  it("shows saved scores after analysis ends without a wait", () => {
+    renderCard({
+      ...draft,
+      planningSession: {
+        id: "ps-1",
+        state: "ended",
+        executionId: "exec-1",
+        survey: { id: "survey-1", questions: [{ prompt: "Which API?", options: ["REST"] }] },
+      },
+      checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
+    });
+
+    expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-agent-question-wo-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4/5");
   });
 });
