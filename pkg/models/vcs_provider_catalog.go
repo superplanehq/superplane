@@ -392,7 +392,8 @@ func VCSProviderCatalogSynchronizing(
 				AND collaborator.repository_id = repository.repository_id
 			WHERE repository.provider = ?
 				AND collaborator.provider_user_id = ?
-			UNION
+		),
+		requested_installations AS (
 			SELECT requester.provider, requester.installation_id
 			FROM vcs_provider_installation_reconcile_requesters AS requester
 			WHERE requester.provider = ?
@@ -410,8 +411,23 @@ func VCSProviderCatalogSynchronizing(
 			WHERE job.provider = ?
 			UNION ALL
 			SELECT 1
+			FROM vcs_provider_repository_sync_jobs AS job
+			JOIN vcs_provider_repositories AS repository
+				ON repository.provider = job.provider
+				AND repository.repository_id = job.repository_id
+			JOIN requested_installations AS requested
+				ON requested.provider = repository.provider
+				AND requested.installation_id = repository.installation_id
+			WHERE job.provider = ?
+				AND job.priority >= ?
+			UNION ALL
+			SELECT 1
 			FROM vcs_provider_installation_reconcile_jobs AS job
-			JOIN relevant_installations AS relevant
+			JOIN (
+				SELECT provider, installation_id FROM relevant_installations
+				UNION
+				SELECT provider, installation_id FROM requested_installations
+			) AS relevant
 				ON relevant.provider = job.provider
 				AND relevant.installation_id = job.installation_id
 			WHERE job.provider = ?
@@ -421,6 +437,7 @@ func VCSProviderCatalogSynchronizing(
 		provider, providerUserID,
 		provider, organizationID,
 		provider,
+		provider, VCSProviderRepositorySyncPriorityInteractive,
 		provider,
 	).Scan(&synchronizing).Error
 	return synchronizing, err
@@ -490,7 +507,8 @@ func EnqueueVCSProviderInstallationReconciliation(
 }
 
 // DeleteFinishedVCSProviderInstallationRequesters deletes requester rows whose
-// installation has no reconcile job and no repository sync job left.
+// installation has no reconcile job and no interactive repository sync job
+// left. Background syncs are routine and do not belong to the request.
 // createdBefore keeps new rows while the reconcile job enqueues their syncs.
 func DeleteFinishedVCSProviderInstallationRequesters(tx *gorm.DB, provider string, createdBefore time.Time) error {
 	return tx.
@@ -509,7 +527,8 @@ func DeleteFinishedVCSProviderInstallationRequesters(tx *gorm.DB, provider strin
 				AND repository.repository_id = job.repository_id
 			WHERE repository.provider = vcs_provider_installation_reconcile_requesters.provider
 				AND repository.installation_id = vcs_provider_installation_reconcile_requesters.installation_id
-		)`).
+				AND job.priority >= ?
+		)`, VCSProviderRepositorySyncPriorityInteractive).
 		Delete(&VCSProviderInstallationReconcileRequester{}).
 		Error
 }

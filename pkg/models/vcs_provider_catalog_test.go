@@ -467,6 +467,12 @@ func TestVCSProviderCatalogSynchronizingFollowsRequestedInstallationAfterItsJob(
 	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
 	require.NoError(t, err)
 	assert.True(t, synchronizing)
+
+	require.NoError(t, db.Where("repository_id = ?", 201).Delete(&VCSProviderRepositorySyncJob{}).Error)
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityBackground))
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
 }
 
 func TestDeleteFinishedVCSProviderInstallationRequesters(t *testing.T) {
@@ -484,15 +490,21 @@ func TestDeleteFinishedVCSProviderInstallationRequesters(t *testing.T) {
 		require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, installationID, organizationID, now))
 	}
 	require.NoError(t, db.Where("provider = ?", ProviderGitHub).Delete(&VCSProviderInstallationReconcileJob{}).Error)
-	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
-		Provider:       ProviderGitHub,
-		InstallationID: 102,
-		AccountLogin:   "acme",
-		AccountType:    "Organization",
+	for installationID, login := range map[int64]string{101: "done", 102: "acme"} {
+		require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+			Provider:       ProviderGitHub,
+			InstallationID: installationID,
+			AccountLogin:   login,
+			AccountType:    "Organization",
+		}))
+	}
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "done/api"},
 	}))
 	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 102, []VCSProviderRepository{
 		{RepositoryID: 202, FullName: "acme/api"},
 	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityBackground))
 	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 202, now, VCSProviderRepositorySyncPriorityInteractive))
 	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).
 		Where("installation_id IN ?", []int64{101, 102}).
