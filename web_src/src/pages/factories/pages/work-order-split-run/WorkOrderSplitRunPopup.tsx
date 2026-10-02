@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactory } from "@/hooks/useFactoryData";
 import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
-import { FEATURE_FACTORY_TASK_CONSOLE } from "@/lib/experimentalFeatures";
 
 import { analysisFirstResultDelivered, hasAnalysisPlan, hasAnalysisScore } from "../../lib/analysisOutcome";
 import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
@@ -22,11 +20,7 @@ import {
   isTaskResultFooter,
   SPLIT_RUN_ANALYZING_NOTE,
 } from "./splitRunFooter";
-import {
-  defaultSplitRunPopupTab,
-  refinePopupShowsAutomations,
-  SPLIT_RUN_POPUP_DIALOG_CLASSNAME,
-} from "./splitRunPopupModel";
+import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -133,20 +127,17 @@ function AnalysisWorkOrderPopup({
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
-  const taskConsole = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_TASK_CONSOLE);
-  const [tab, setTab] = useState(() => defaultSplitRunPopupTab(fixture));
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const draftStart = draftStartAction(
     fixture.footer.kind,
     onDispatch,
-    taskConsole ? () => {} : () => setTab("log"),
     draftModel,
     factoryPlanningEnabled(factory) ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
   const { sourceOnly, viewFixture } = analysisPopupView(fixture, factory);
-  const unified = taskConsole && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
+  const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
     factory,
     organizationId,
@@ -185,20 +176,14 @@ function AnalysisWorkOrderPopup({
   const reviewActions = showPullRequestReview ? analysisPopupReview({ ...reviewArgs, actionsOnly: true }) : undefined;
   const panelReview = unified ? analysisPopupReview({ ...reviewArgs, compact: "stacked" }) : undefined;
   const stripAnalysis = draftChrome.stripAnalysis;
-  const descriptionReview = taskConsole
-    ? !unified && !showSidebarNote
-      ? review
-      : undefined
-    : showsDescriptionReview(sourceOnly, showSidebarNote, tab)
-      ? review
-      : undefined;
+  const descriptionReview = !unified && !showSidebarNote ? review : undefined;
 
   return (
     <PopupShell
       testId="work-order-split-run"
       fixed={fixed}
       fullPage={fullPage}
-      className={analysisPopupClassName(fullPage, unified, !taskConsole && sourceOnly)}
+      className={analysisPopupClassName(fullPage, unified, sourceOnly)}
       onDismiss={onClose}
     >
       <LiveHeaderSpendProvider>
@@ -212,9 +197,6 @@ function AnalysisWorkOrderPopup({
           orderId={orderId}
           orderNumber={orderNumber}
           lineId={lineId}
-          classic={!taskConsole}
-          tab={tab}
-          onTabChange={setTab}
           canUpdate={canUpdate}
           footerActions={footerActions}
           resultFooter={descriptionReview}
@@ -244,7 +226,6 @@ function AnalysisWorkOrderPopup({
             />
           )}
         />
-        {taskConsole ? null : analysisShellReview(sourceOnly, showSidebarNote, tab, review)}
       </LiveHeaderSpendProvider>
     </PopupShell>
   );
@@ -422,22 +403,9 @@ function analysisReviewCompact(
   return showSidebarNote || (footerKind === "draft" && !sourceOnly);
 }
 
-/** In the classic tabs, the review renders inside the description tab only. */
-function showsDescriptionReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string) {
-  return !sourceOnly && !showSidebarNote && tab === "description";
-}
-
-/** In the classic tabs, the review renders below the tabs when the description tab does not carry it. */
-function analysisShellReview(sourceOnly: boolean, showSidebarNote: boolean, tab: string, review: ReactNode) {
-  if (sourceOnly || (!showSidebarNote && tab !== "description")) {
-    return review;
-  }
-  return null;
-}
-
-/** The unified view is wide; the Planning draft and the classic source-only view keep the refine widths. */
-function analysisPopupClassName(fullPage: boolean, unified: boolean, classicSourceOnly: boolean) {
-  if (fullPage || classicSourceOnly) {
+/** The console is wide. A Planning draft and a source-only draft keep the refine widths. */
+function analysisPopupClassName(fullPage: boolean, unified: boolean, sourceOnly: boolean) {
+  if (fullPage || sourceOnly) {
     return undefined;
   }
   if (unified) {

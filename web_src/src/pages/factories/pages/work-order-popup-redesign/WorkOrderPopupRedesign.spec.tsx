@@ -221,7 +221,9 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("link", { name: /feature\/rf-103/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("redesign-console-column-implement")).toBeInTheDocument();
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
@@ -269,7 +271,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Create plan")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("redesign-console-column-implement")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     expect(
@@ -302,10 +304,10 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
-    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
+    expect(await within(dialog).findByTestId("redesign-console-column-verify")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
-    expect(within(dialog).getByText("Verify")).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Verify" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
@@ -334,9 +336,9 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
-    expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
-    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("redesign-console-variant")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
   }, 20000);
 
