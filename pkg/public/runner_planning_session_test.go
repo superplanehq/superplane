@@ -33,6 +33,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -99,6 +100,48 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	}
 	assert.Equal(t, 5.0, scores[models.PlanningClarityCheckKey])
 	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
+}
+
+func TestRunnerPlanningSessionConfidenceRepublishesMissingScoreHistory(t *testing.T) {
+	r := support.Setup(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+
+	post := func(score int, summary string) *httptest.ResponseRecorder {
+		t.Helper()
+		body := fmt.Sprintf(`{"score":%d,"summary":%q}`, score, summary)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(body)))
+		req.Header.Set("Authorization", "Bearer "+token)
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	first := post(2, "The change needs a test.")
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	assert.JSONEq(t, `{"status":"shown"}`, first.Body.String())
+
+	require.NoError(t, db.Exec(
+		"UPDATE factory_work_order_checks SET recent_scores = NULL WHERE work_order_id = ? AND key = ?",
+		order.ID,
+		models.PlanningConfidenceCheckKey,
+	).Error)
+
+	second := post(4, "The plan is ready.")
+	require.Equal(t, http.StatusOK, second.Code, second.Body.String())
+	assert.JSONEq(t, `{"status":"shown"}`, second.Body.String())
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, models.PlanningConfidenceCheckKey, checks[0].Key)
+	assert.Equal(t, 4.0, checks[0].Score)
+	require.NotNil(t, checks[0].PreviousScore)
+	assert.Equal(t, 2.0, *checks[0].PreviousScore)
+	assert.Equal(t, []float64{2, 4}, []float64(checks[0].RecentScores))
 }
 
 func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
@@ -180,39 +223,39 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			body:    "planning session has ended\n",
 		},
 		{
-			name:        "no draft stays 500",
-			err:         models.ErrFactoryPlanningSessionNoDraft,
-			session:     session,
-			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
-			wantCapture: true,
-			wantTags: map[string]string{
-				"route":               "/api/v1/runner/planning-sessions/clarity",
-				"planning_session_id": sessionID.String(),
-				"draft_work_order_id": draftID.String(),
-			},
-			wantMessage: models.ErrFactoryPlanningSessionNoDraft.Error(),
+			name:    "no draft",
+			err:     models.ErrFactoryPlanningSessionNoDraft,
+			session: session,
+			status:  http.StatusConflict,
+			body:    "planning session has no draft\n",
 		},
 		{
-			name:        "rejected check stays 500",
-			err:         fmt.Errorf("%w: key is required", models.ErrFactoryWorkOrderCheckInvalid),
-			session:     session,
-			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
-			wantCapture: true,
-			wantTags: map[string]string{
-				"route":               "/api/v1/runner/planning-sessions/clarity",
-				"planning_session_id": sessionID.String(),
-				"draft_work_order_id": draftID.String(),
-			},
-			wantMessage: models.ErrFactoryWorkOrderCheckInvalid.Error(),
+			name:    "rejected check",
+			err:     fmt.Errorf("%w: key is required", models.ErrFactoryWorkOrderCheckInvalid),
+			session: session,
+			status:  http.StatusBadRequest,
+			body:    fmt.Errorf("%w: key is required", models.ErrFactoryWorkOrderCheckInvalid).Error() + "\n",
+		},
+		{
+			name:    "missing work order",
+			err:     models.ErrFactoryWorkOrderNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    "factory work order not found\n",
+		},
+		{
+			name:    "missing factory",
+			err:     models.ErrFactoryNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    "factory not found\n",
 		},
 		{
 			name:        "wrapped postgres error includes code",
 			err:         deadlock,
 			session:     session,
 			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
+			body:        "Planning session failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
 				"route":               "/api/v1/runner/planning-sessions/clarity",
@@ -226,7 +269,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			name:        "nil session omits session tags",
 			err:         errors.New("lookup timeout"),
 			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
+			body:        "Planning session failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
 				"route": "/api/v1/runner/planning-sessions/clarity",
@@ -253,7 +296,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			err:         fmt.Errorf("lookup: %w", context.Canceled),
 			session:     session,
 			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
+			body:        "Planning session failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
 				"route":               "/api/v1/runner/planning-sessions/clarity",
@@ -267,7 +310,7 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			err:         fmt.Errorf("lookup: %w", context.DeadlineExceeded),
 			session:     session,
 			status:      http.StatusInternalServerError,
-			body:        "Lookup failed\n",
+			body:        "Planning session failed\n",
 			wantCapture: true,
 			wantTags: map[string]string{
 				"route":               "/api/v1/runner/planning-sessions/clarity",
@@ -298,9 +341,14 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 			rec := httptest.NewRecorder()
-			writeRunnerPlanningError(rec, req, tt.session, tt.err)
+			servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+				writeRunnerPlanningError(w, r, tt.session, tt.err)
+			})
 			require.Equal(t, tt.status, rec.Code)
 			assert.Equal(t, tt.body, rec.Body.String())
+			if tt.wantMessage != "" {
+				assert.NotContains(t, rec.Body.String(), tt.wantMessage)
+			}
 
 			errorLogs := 0
 			for _, entry := range hook.AllEntries() {
@@ -321,6 +369,9 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			}
 
 			event := requireCapturedException(t, events)
+			require.Len(t, events, 1)
+			assert.NotContains(t, event.Message, "HTTP 500")
+			assert.Empty(t, event.Message)
 			for key, value := range tt.wantTags {
 				assert.Equal(t, value, event.Tags[key], "tag %s", key)
 			}
@@ -388,11 +439,17 @@ func TestWritePlanningWaitError(t *testing.T) {
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
 
-		writePlanningWaitError(rec, req, session, lookupCanceled)
+		servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+			writePlanningWaitError(w, r, session, lookupCanceled)
+		})
 
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
-		assert.Equal(t, "Lookup failed\n", rec.Body.String())
-		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, "Planning session failed\n", rec.Body.String())
+		assert.NotContains(t, rec.Body.String(), lookupCanceled.Error())
+		events := transport.Events()
+		require.Len(t, events, 1)
+		event := requireCapturedException(t, events)
+		assert.Empty(t, event.Message)
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
 	})
 
@@ -470,11 +527,17 @@ func TestWritePlanningWaitError(t *testing.T) {
 			Err: syscall.ECONNRESET,
 		})
 
-		writePlanningWaitError(rec, req, session, blobReset)
+		servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+			writePlanningWaitError(w, r, session, blobReset)
+		})
 
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
-		assert.Equal(t, "Lookup failed\n", rec.Body.String())
-		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, "Planning session failed\n", rec.Body.String())
+		assert.NotContains(t, rec.Body.String(), blobReset.Error())
+		events := transport.Events()
+		require.Len(t, events, 1)
+		event := requireCapturedException(t, events)
+		assert.Empty(t, event.Message)
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
 	})
 
@@ -485,12 +548,19 @@ func TestWritePlanningWaitError(t *testing.T) {
 		rec := httptest.NewRecorder()
 		deadlock := fmt.Errorf("lookup: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"})
 
-		writePlanningWaitError(rec, req, session, deadlock)
+		servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+			writePlanningWaitError(w, r, session, deadlock)
+		})
 
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
-		assert.Equal(t, "Lookup failed\n", rec.Body.String())
-		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, "Planning session failed\n", rec.Body.String())
+		assert.NotContains(t, rec.Body.String(), "deadlock detected")
+		events := transport.Events()
+		require.Len(t, events, 1)
+		event := requireCapturedException(t, events)
+		assert.Empty(t, event.Message)
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
+		assert.Equal(t, "40P01", event.Tags["postgres_error_code"])
 	})
 
 	t.Run("generic lookup error with live request stays 500", func(t *testing.T) {
@@ -499,11 +569,18 @@ func TestWritePlanningWaitError(t *testing.T) {
 		req.Pattern = "/api/v1/runner/planning-sessions/wait"
 		rec := httptest.NewRecorder()
 
-		writePlanningWaitError(rec, req, session, errors.New("lookup failed"))
+		cause := errors.New("lookup failed")
+		servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+			writePlanningWaitError(w, r, session, cause)
+		})
 
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
-		assert.Equal(t, "Lookup failed\n", rec.Body.String())
-		event := requireCapturedException(t, transport.Events())
+		assert.Equal(t, "Planning session failed\n", rec.Body.String())
+		assert.NotContains(t, rec.Body.String(), cause.Error())
+		events := transport.Events()
+		require.Len(t, events, 1)
+		event := requireCapturedException(t, events)
+		assert.Empty(t, event.Message)
 		assert.Equal(t, sessionID.String(), event.Tags["planning_session_id"])
 	})
 }
@@ -513,6 +590,7 @@ func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
 	activityID := uuid.New()
 	path := "/api/v1/runner/planning-sessions/activities/" + activityID.String()
 	router := mux.NewRouter()
+	router.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 	router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", func(w http.ResponseWriter, r *http.Request) {
 		writeRunnerPlanningError(w, r, nil, errors.New("lookup timeout"))
 	}).Methods(http.MethodPut)
@@ -522,7 +600,10 @@ func TestWriteRunnerPlanningErrorUsesMatchedRouteTemplate(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
-	event := requireCapturedException(t, transport.Events())
+	events := transport.Events()
+	require.Len(t, events, 1)
+	event := requireCapturedException(t, events)
+	assert.Empty(t, event.Message)
 	assert.Equal(t, "/api/v1/runner/planning-sessions/activities/{activity_id}", event.Tags["route"])
 }
 
@@ -531,14 +612,19 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 	activityID := uuid.New()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/runner/planning-sessions/activities/"+activityID.String(), nil)
 	rec := httptest.NewRecorder()
-	writeRunnerPlanningError(rec, req, nil, errors.New("lookup timeout"))
+	servePlanningHandler(rec, req, func(w http.ResponseWriter, r *http.Request) {
+		writeRunnerPlanningError(w, r, nil, errors.New("lookup timeout"))
+	})
 
-	event := requireCapturedException(t, transport.Events())
+	events := transport.Events()
+	require.Len(t, events, 1)
+	event := requireCapturedException(t, events)
+	assert.Empty(t, event.Message)
 	_, present := event.Tags["route"]
 	assert.False(t, present)
 }
 
-func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
+func TestRunnerPlanningSessionClarityWithoutDraftReturnsConflict(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
@@ -556,15 +642,9 @@ func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
-	assert.Equal(t, "Lookup failed\n", rec.Body.String())
-
-	event := requireCapturedException(t, transport.Events())
-	assert.Equal(t, "/api/v1/runner/planning-sessions/clarity", event.Tags["route"])
-	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
-	_, hasDraft := event.Tags["draft_work_order_id"]
-	assert.False(t, hasDraft)
-	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Equal(t, "planning session has no draft\n", rec.Body.String())
+	assert.Empty(t, transport.Events())
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
@@ -1429,6 +1509,10 @@ func requireResolvedMessageWait(t *testing.T, db *gorm.DB, session *models.Facto
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Add refund retries.", uuid.Nil))
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+}
+
+func servePlanningHandler(rec *httptest.ResponseRecorder, req *http.Request, handler http.HandlerFunc) {
+	middleware.LoggingMiddleware(log.StandardLogger())(handler).ServeHTTP(rec, req)
 }
 
 func bindTestSentryHub(t *testing.T) *memorySentryTransport {
