@@ -34,9 +34,7 @@ const PUBLIC_BADGE_COPY = {
   linkPrivateHelper: "The workspace is private. Make it public in the Visibility section above.",
   periodLabel: "Time frame",
   sizeLabel: "Size",
-  markdownLabel: "Markdown",
-  markdownHelper: "Paste this snippet into a README.",
-  copy: "Copy Markdown",
+  snippetHelper: "Paste this snippet into a README.",
   previewAlt: "Public badge preview",
   saveError: "SuperPlane could not update the public badge.",
   permission: "You don't have permission to update workspaces.",
@@ -49,6 +47,29 @@ const BADGE_SIZES = [
 ] as const;
 
 type BadgeSize = (typeof BADGE_SIZES)[number]["value"];
+
+type SnippetFormat = "markdown" | "html";
+
+const SNIPPET_COPY: Record<SnippetFormat, { label: string; copy: string }> = {
+  markdown: { label: "Markdown", copy: "Copy Markdown" },
+  html: { label: "HTML", copy: "Copy HTML" },
+};
+
+function snippetFormat(size: BadgeSize): SnippetFormat {
+  return size === "wide" ? "html" : "markdown";
+}
+
+const BADGE_IMAGE_ALT = "PRs via SuperPlane";
+
+function badgeSnippet(size: BadgeSize, imageURL: string, linkURL: string): string {
+  if (!imageURL) {
+    return "";
+  }
+  if (size === "wide") {
+    return `<a href="${linkURL}"><img src="${imageURL}" alt="${BADGE_IMAGE_ALT}" width="100%"></a>`;
+  }
+  return `[![${BADGE_IMAGE_ALT}](${imageURL})](${linkURL})`;
+}
 
 type PublicBadgeUpdate = {
   publicBadgeEnabled?: boolean;
@@ -162,7 +183,7 @@ function usePublicBadgeState(
     customized: changed.length > 0,
     linkToBoard,
     canLinkToBoard: Boolean(publicBoardPath),
-    markdown: imageURL ? `[![PRs via SuperPlane](${imageURL})](${linkURL})` : "",
+    markdown: badgeSnippet(size, imageURL, linkURL),
     previewURL: imageURL ? `${imageURL}&v=${previewNonce}` : "",
     setPeriod,
     setSize,
@@ -247,6 +268,7 @@ function PublicBadgeDetails({
       />
       <BadgeMarkdown
         markdown={badge.markdown}
+        format={snippetFormat(badge.size)}
         locked={locked}
         canUpdate={canUpdate}
         permissionsLoading={permissionsLoading}
@@ -331,11 +353,13 @@ function BadgePreview({ previewURL }: { previewURL: string }) {
 
 function BadgeMarkdown({
   markdown,
+  format,
   locked,
   canUpdate,
   permissionsLoading,
 }: {
   markdown: string;
+  format: SnippetFormat;
   locked: boolean;
   canUpdate: boolean;
   permissionsLoading: boolean;
@@ -343,9 +367,10 @@ function BadgeMarkdown({
   if (!markdown) {
     return null;
   }
+  const copy = SNIPPET_COPY[format];
   return (
     <div className="space-y-2">
-      <Label htmlFor="factory-settings-public-badge-markdown">{PUBLIC_BADGE_COPY.markdownLabel}</Label>
+      <Label htmlFor="factory-settings-public-badge-markdown">{copy.label}</Label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           id="factory-settings-public-badge-markdown"
@@ -362,11 +387,11 @@ function BadgeMarkdown({
             data-testid="factory-settings-public-badge-copy"
             onClick={() => void navigator.clipboard.writeText(markdown)}
           >
-            {PUBLIC_BADGE_COPY.copy}
+            {copy.copy}
           </Button>
         </PermissionTooltip>
       </div>
-      <p className="text-[12px] text-muted-foreground">{PUBLIC_BADGE_COPY.markdownHelper}</p>
+      <p className="text-[12px] text-muted-foreground">{PUBLIC_BADGE_COPY.snippetHelper}</p>
     </div>
   );
 }

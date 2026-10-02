@@ -123,7 +123,8 @@ describe("FactorySettingsGeneralPage", () => {
     const cost = screen.getByRole("switch", { name: "Show cost per merged PR" });
     expect(cost).not.toBeChecked();
 
-    const snippet = screen.getByTestId("factory-settings-public-badge-markdown");
+    const snippet = screen.getByLabelText("Markdown");
+    expect(screen.getByRole("button", { name: "Copy Markdown" })).toBeInTheDocument();
     expect(snippet).toHaveValue(
       `[![PRs via SuperPlane](${window.location.origin}/api/v1/public/badges/badge-token.svg?period=30&size=small)](${window.location.origin})`,
     );
@@ -136,8 +137,14 @@ describe("FactorySettingsGeneralPage", () => {
 
     await user.click(screen.getByTestId("factory-settings-public-badge-size"));
     await user.click(screen.getByRole("option", { name: "Full width" }));
+    expect(screen.getByLabelText("HTML")).toBe(snippet);
+    expect(screen.getByRole("button", { name: "Copy HTML" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy Markdown" })).not.toBeInTheDocument();
     const afterSize = (snippet as HTMLInputElement).value;
-    expect(afterSize).toContain("period=14&size=wide");
+    const wideURL = `${window.location.origin}/api/v1/public/badges/badge-token.svg?period=14&size=wide`;
+    expect(afterSize).toBe(
+      `<a href="${window.location.origin}"><img src="${wideURL}" alt="PRs via SuperPlane" width="100%"></a>`,
+    );
 
     await user.click(cost);
     expect(mutateAsync).toHaveBeenCalledWith({ publicBadgeShowCost: true });
