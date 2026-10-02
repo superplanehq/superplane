@@ -31,7 +31,7 @@ export function useDefaultRefinementPrompt(input: {
   });
 
   return {
-    prompt: query.data || undefined,
+    prompt: query.isError ? undefined : query.data,
     failed: query.isError,
     retry: () => {
       void query.refetch();

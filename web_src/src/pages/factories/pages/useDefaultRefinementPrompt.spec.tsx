@@ -87,6 +87,19 @@ describe("useDefaultRefinementPrompt", () => {
     expect(result.current.failed).toBe(false);
   });
 
+  it("does not keep a previous prompt after a later response omits it", async () => {
+    materializeDefaults
+      .mockResolvedValueOnce({ data: { canvasYaml: yamlWithPrompt(PROMPT) } })
+      .mockResolvedValueOnce({ data: { canvasYaml: yamlWithoutPrompt() } });
+
+    const { result } = renderPromptHook();
+
+    await waitFor(() => expect(result.current.prompt).toBe(PROMPT));
+    result.current.retry();
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.prompt).toBeUndefined();
+  });
+
   it("retries a missing prompt load", async () => {
     materializeDefaults
       .mockResolvedValueOnce({ data: { canvasYaml: yamlWithoutPrompt() } })
