@@ -28,6 +28,9 @@ export function PlanningReviewForm({
   factoryId,
   factoryKey,
   showVisualEvidenceSetting = false,
+  defaultRefinementPrompt,
+  defaultRefinementPromptFailed = false,
+  onRetryDefaultRefinementPrompt,
 }: {
   draft: PlanningReviewDraft;
   onChange: (next: PlanningReviewDraft) => void;
@@ -35,6 +38,9 @@ export function PlanningReviewForm({
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting?: boolean;
+  defaultRefinementPrompt?: string;
+  defaultRefinementPromptFailed?: boolean;
+  onRetryDefaultRefinementPrompt?: () => void;
 }) {
   const updateComponent = (id: string, next: PlanningReviewComponent) => {
     onChange({
@@ -53,6 +59,9 @@ export function PlanningReviewForm({
           factoryId={factoryId}
           factoryKey={factoryKey}
           showVisualEvidenceSetting={showVisualEvidenceSetting}
+          defaultRefinementPrompt={defaultRefinementPrompt}
+          defaultRefinementPromptFailed={defaultRefinementPromptFailed}
+          onRetryDefaultRefinementPrompt={onRetryDefaultRefinementPrompt}
           onChange={(next) => updateComponent(component.id, next)}
         />
       ))}
@@ -66,6 +75,9 @@ function AgentPanel({
   factoryId,
   factoryKey,
   showVisualEvidenceSetting,
+  defaultRefinementPrompt,
+  defaultRefinementPromptFailed,
+  onRetryDefaultRefinementPrompt,
   onChange,
 }: {
   component: PlanningReviewComponent;
@@ -73,6 +85,9 @@ function AgentPanel({
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting: boolean;
+  defaultRefinementPrompt?: string;
+  defaultRefinementPromptFailed: boolean;
+  onRetryDefaultRefinementPrompt?: () => void;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
   const componentRef = useRef(component);
@@ -175,6 +190,9 @@ function AgentPanel({
       <PlanningReviewStepList
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
+        defaultRefinementPrompt={defaultRefinementPrompt}
+        defaultRefinementPromptFailed={defaultRefinementPromptFailed}
+        onRetryDefaultRefinementPrompt={onRetryDefaultRefinementPrompt}
       />
       <PlanningReviewResourcesCard
         organizationId={organizationId}
