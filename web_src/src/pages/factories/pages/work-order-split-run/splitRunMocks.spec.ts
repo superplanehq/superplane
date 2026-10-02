@@ -2249,7 +2249,6 @@ describe("line board work-order examples", () => {
   });
 
   it("says the Completed card is resolved because the person merged the pull request", () => {
-    const actor = { id: "user-1", name: "Alex", initials: "A" };
     const fixture = splitRunFixtureForWorkOrder(
       {
         ...LINE_BOARD_DONE_RECEIPTS_ORDER,
@@ -2262,7 +2261,7 @@ describe("line board work-order examples", () => {
           },
         ],
       },
-      { closer: { actor, actorHref: "https://github.com/alex" } },
+      { closer: { automationName: "Alex", automationHref: "https://github.com/alex" } },
     );
 
     expect(fixture.phases.find((phase) => phase.id === "done-closure")?.description).toBe(

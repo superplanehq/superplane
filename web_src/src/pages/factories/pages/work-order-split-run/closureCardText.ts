@@ -17,11 +17,11 @@ export function closureCardDescription(
   pullRequests: FactoriesFactoryPullRequest[] = [],
 ): string | undefined {
   const pullRequest = latestMergedPullRequest(pullRequests);
-  const person = closerPerson(closer);
   if (status === "completed" && pullRequest) {
     const request = pullRequestMarkdown(pullRequest);
-    if (person) {
-      return `Resolved because ${personMarkdown(person)} merged ${request}.`;
+    const merger = closerMerger(closer);
+    if (merger) {
+      return `Resolved because ${personMarkdown(merger)} merged ${request}.`;
     }
     return `Resolved because ${request} is merged.`;
   }
@@ -36,22 +36,17 @@ function latestMergedPullRequest(pullRequests: FactoriesFactoryPullRequest[]): F
   return [...merged].sort((left, right) => Date.parse(right.mergedAt ?? "") - Date.parse(left.mergedAt ?? ""))[0];
 }
 
-function closerPerson(closer?: SplitRunFooterCloser): { name: string; href?: string } | undefined {
-  const actorName = closer?.actor?.name?.trim();
-  if (actorName) {
-    return { name: actorName, ...(closer.actorHref ? { href: closer.actorHref } : {}) };
-  }
-  const automationName = closer?.automationName?.trim();
-  if (!automationName) {
+/**
+ * Only a GitHub merger stored on the close event. A SuperPlane closer
+ * completed the task; that is not proof they merged the pull request.
+ */
+function closerMerger(closer?: SplitRunFooterCloser): { name: string; href?: string } | undefined {
+  const name = closer?.automationName?.trim();
+  const href = closer?.automationHref;
+  if (!name || !href) {
     return undefined;
   }
-  if (closer.automationHref) {
-    return { name: automationName, href: closer.automationHref };
-  }
-  if (/\s/.test(automationName)) {
-    return undefined;
-  }
-  return { name: automationName };
+  return { name, href };
 }
 
 function pullRequestMarkdown(pullRequest: FactoriesFactoryPullRequest): string {

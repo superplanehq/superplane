@@ -14,9 +14,9 @@ const MERGED: FactoriesFactoryPullRequest = {
 const ALEX = { id: "user-1", name: "Alex Rivera", initials: "AR" };
 
 describe("closureCardDescription", () => {
-  it("names the person who merged the pull request and links both", () => {
-    expect(closureCardDescription("completed", { actor: ALEX, actorHref: "https://github.com/alex" }, [MERGED])).toBe(
-      "Resolved because [Alex Rivera](https://github.com/alex) merged [#8044 feat: Show watched checks on the task card](https://github.com/superplanehq/superplane/pull/8044).",
+  it("does not credit a SuperPlane closer with the merge", () => {
+    expect(closureCardDescription("completed", { actor: ALEX }, [MERGED])).toBe(
+      "Resolved because [#8044 feat: Show watched checks on the task card](https://github.com/superplanehq/superplane/pull/8044) is merged.",
     );
   });
 
