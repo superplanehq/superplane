@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -140,42 +139,8 @@ func ImagePayloadFromGetResponse(body []byte) (map[string]any, error) {
 // WaitForGlobalOperation polls a global (project-scoped) operation until it is
 // DONE, mirroring WaitForZoneOperation for global resources like images.
 func WaitForGlobalOperation(ctx context.Context, client Client, project, operationName string) error {
-	path := fmt.Sprintf("projects/%s/global/operations/%s", project, operationName)
-	deadline := time.Now().Add(defaultOperationWaitTimeout)
-	ticker := time.NewTicker(operationPollInterval)
-	defer ticker.Stop()
-	for {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for operation %s", operationName)
-		}
-		body, err := client.Get(ctx, path)
-		if err != nil {
-			return err
-		}
-		var op zoneOperationResp
-		if err := json.Unmarshal(body, &op); err != nil {
-			return fmt.Errorf("parse operation response: %w", err)
-		}
-		switch op.Status {
-		case opStatusDone:
-			if op.Error != nil && len(op.Error.Errors) > 0 {
-				msg := op.Error.Errors[0].Message
-				if msg == "" {
-					msg = op.Error.Errors[0].Code
-				}
-				return fmt.Errorf("operation failed: %s", msg)
-			}
-			return nil
-		case opStatusPending, opStatusRunning:
-		default:
-			return fmt.Errorf("unexpected operation status: %s", op.Status)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-	}
+	return waitForComputeOperation(ctx, client,
+		fmt.Sprintf("projects/%s/global/operations/%s", project, operationName), operationName)
 }
 
 // operationNameFromResponse extracts the operation name from a global operation

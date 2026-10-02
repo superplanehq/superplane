@@ -3,9 +3,9 @@ package artifactregistry
 import (
 	"context"
 	"fmt"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -22,25 +22,13 @@ type Client interface {
 	ProjectID() string
 }
 
-var (
-	clientFactoryMu sync.RWMutex
-	clientFactory   func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error)
-)
-
-func SetClientFactory(fn func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error)) {
-	clientFactoryMu.Lock()
-	defer clientFactoryMu.Unlock()
-	clientFactory = fn
+// newClient is a package variable so tests can inject fake clients.
+var newClient = func(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
+	return gcpcommon.NewClient(httpCtx, integration)
 }
 
 func getClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (Client, error) {
-	clientFactoryMu.RLock()
-	fn := clientFactory
-	clientFactoryMu.RUnlock()
-	if fn == nil {
-		panic("gcp artifactregistry: SetClientFactory was not called by the gcp integration")
-	}
-	return fn(httpCtx, integration)
+	return newClient(httpCtx, integration)
 }
 
 func listLocationsURL(projectID string) string {

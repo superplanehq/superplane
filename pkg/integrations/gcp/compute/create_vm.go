@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -25,25 +25,13 @@ type Client interface {
 	ProjectID() string
 }
 
-var (
-	clientFactoryMu sync.RWMutex
-	clientFactory   func(ctx core.ExecutionContext) (Client, error)
-)
-
-func SetClientFactory(fn func(ctx core.ExecutionContext) (Client, error)) {
-	clientFactoryMu.Lock()
-	defer clientFactoryMu.Unlock()
-	clientFactory = fn
+// newClient is a package variable so tests can inject fake clients.
+var newClient = func(ctx core.ExecutionContext) (Client, error) {
+	return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 }
 
 func getClient(ctx core.ExecutionContext) (Client, error) {
-	clientFactoryMu.RLock()
-	fn := clientFactory
-	clientFactoryMu.RUnlock()
-	if fn == nil {
-		panic("gcp compute: SetClientFactory was not called by the gcp integration")
-	}
-	return fn(ctx)
+	return newClient(ctx)
 }
 
 type ProvisioningModel string
@@ -1158,7 +1146,13 @@ type zoneOperationResp struct {
 }
 
 func WaitForZoneOperation(ctx context.Context, client Client, project, zone, operationName string) error {
-	path := fmt.Sprintf("projects/%s/zones/%s/operations/%s", project, zone, operationName)
+	return waitForComputeOperation(ctx, client,
+		fmt.Sprintf("projects/%s/zones/%s/operations/%s", project, zone, operationName), operationName)
+}
+
+// waitForComputeOperation polls a Compute Engine operation resource until it
+// reaches DONE or the timeout elapses.
+func waitForComputeOperation(ctx context.Context, client Client, path, operationName string) error {
 	deadline := time.Now().Add(defaultOperationWaitTimeout)
 	ticker := time.NewTicker(operationPollInterval)
 	defer ticker.Stop()
