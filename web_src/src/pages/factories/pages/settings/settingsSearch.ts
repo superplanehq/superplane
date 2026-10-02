@@ -160,6 +160,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "claude",
     "openai",
     "your keys",
+    "custom provider",
     "select models",
   ]),
 

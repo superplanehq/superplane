@@ -45,6 +45,10 @@ const FeatureWorkspaceModels = "workspace_models"
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
 
+// FeatureOrganizationBYOKCustomProvider gates a custom model provider on the
+// organization LLM Models page. It requires FeatureOrganizationBYOK as well.
+const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
+
 // FeatureFactoryCustomAutomations gates blank custom automations on Verify,
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
@@ -87,6 +91,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
+	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},

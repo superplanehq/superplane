@@ -39,6 +39,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/cloudsmith"
 	_ "github.com/superplanehq/superplane/pkg/integrations/coolify"
 	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
+	_ "github.com/superplanehq/superplane/pkg/integrations/customllm"
 	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
 	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"

@@ -37,6 +37,7 @@ func TestCatalogModelID(t *testing.T) {
 	assert.Equal(t, "x-ai/grok-4.6", CatalogModelID("x-ai/grok-4.6"))
 	assert.Equal(t, "anthropic/claude-sonnet-4-6", CatalogModelID("openrouter/openrouter/anthropic/claude-sonnet-4-6"))
 	assert.Equal(t, "claude-sonnet-4-6", CatalogModelID("claude-sonnet-4-6"))
+	assert.Equal(t, "kimi-k3", CatalogModelID("custom/kimi-k3"))
 	assert.Equal(t, "openrouter/free", CatalogModelID("openrouter/free"))
 	assert.Equal(t, "openrouter/free", CatalogModelID("openrouter/openrouter/free"))
 }
