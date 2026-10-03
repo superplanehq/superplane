@@ -35,6 +35,16 @@ describe("useGitHubInstallReturn", () => {
     expect(again.result.current).toBe(false);
   });
 
+  it("checks only once for each trip to GitHub", () => {
+    markGitHubInstallStarted(scope, ["installation:101"]);
+    const first = renderHook(() => useGitHubInstallReturn(scope, ["installation:101"], vi.fn()));
+    expect(first.result.current).toBe(true);
+
+    const later = renderHook(() => useGitHubInstallReturn(scope, ["installation:101"], vi.fn()));
+
+    expect(later.result.current).toBe(false);
+  });
+
   it("does not check for another person or workspace", () => {
     markGitHubInstallStarted(scope, []);
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 
 const STORAGE_PREFIX = "superplane:github-install-started";
 const MARKER_MAX_AGE_MS = 10 * 60_000;
-const CHECK_DURATION_MS = 15_000;
+const CHECK_DURATION_MS = 6_000;
 const CHECK_POLL_INTERVAL_MS = 1_000;
 
 interface InstallMarker {
@@ -70,9 +70,9 @@ function startCheck(scope: GitHubInstallScope): InstallCheck | null {
 
 /**
  * GitHub does not tell SuperPlane when a member sends an install request, so
- * the request shows only after the next catalog read. A tab that opens or
- * comes back after the user went to GitHub checks often for a short time and
- * reports that it is checking until new access arrives.
+ * the request shows only after the next catalog read. The first time a tab
+ * opens or comes back after the user went to GitHub, it checks often for a
+ * short time and reports that it is checking until new access arrives.
  */
 export function useGitHubInstallReturn(
   scope: GitHubInstallScope,
@@ -93,12 +93,15 @@ export function useGitHubInstallReturn(
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [accountId, factoryId]);
 
+  useEffect(() => {
+    if (check) clearGitHubInstallStarted({ accountId, factoryId });
+  }, [check, accountId, factoryId]);
+
   const arrived = Boolean(check && keys?.some((key) => !check.knownKeys.includes(key)));
 
   useEffect(() => {
     if (!check) return;
     if (arrived) {
-      clearGitHubInstallStarted({ accountId, factoryId });
       setCheck(null);
       return;
     }
