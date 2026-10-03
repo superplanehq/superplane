@@ -24,7 +24,13 @@ import {
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
-import { githubAccessKeys, markGitHubInstallStarted, useGitHubInstallReturn } from "./githubInstallReturn";
+import {
+  clearGitHubInstallStarted,
+  githubAccessKeys,
+  markGitHubInstallStarted,
+  useGitHubInstallReturn,
+  type GitHubInstallScope,
+} from "./githubInstallReturn";
 import { githubConnectReturnPath, useOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -265,8 +271,9 @@ function useFirstRunCommands(args: {
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: ReturnType<typeof useFirstRunBlockingAction>;
   jiraAvailable: boolean;
+  installScope: GitHubInstallScope;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable } = args;
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable, installScope } = args;
   const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
@@ -302,12 +309,13 @@ function useFirstRunCommands(args: {
     });
   const grantGitHubAccess = () =>
     blocking.run("opening-github", async () => {
-      markGitHubInstallStarted(githubAccessKeys(connection.onboarding.data) ?? []);
+      markGitHubInstallStarted(installScope, githubAccessKeys(connection.onboarding.data) ?? []);
       const popup = openGitHubWindow();
       try {
         const url = await connection.onboarding.startInstallation.mutateAsync();
         navigateGitHubWindow(popup, url);
       } catch (error) {
+        clearGitHubInstallStarted(installScope);
         popup?.close();
         throw error;
       }
@@ -393,13 +401,16 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const blocking = useFirstRunBlockingAction();
   const connection = useGitHubConnectionState(organizationId, setupFinished ? { poll: false } : undefined);
   const { account } = useAccount();
+  const accountId = account?.id ?? "";
   const githubConnected = useOnboardingGitHubConnect({
-    accountId: account?.id ?? "",
+    accountId,
     factoryId,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
   const githubReady = Boolean(connection.identity) && githubConnected;
+  const installScope = { accountId, factoryId };
   const checkingGitHub = useGitHubInstallReturn(
+    installScope,
     githubAccessKeys(connection.onboarding.data),
     connection.onboarding.refetch,
   );
@@ -420,6 +431,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     navigation,
     blocking,
     jiraAvailable,
+    installScope,
   });
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   // A saved Jira choice is not valid when the organization does not have the
