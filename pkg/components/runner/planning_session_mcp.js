@@ -309,7 +309,7 @@ const TOOLS = [
   {
     name: "propose_clarity",
     description:
-      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this when this turn updates the plan, the score would change, or the user asks to update this score. Do not call it on a question turn. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card otherwise. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this on each plan turn, including the first message and a turn that also asks a question. Do not call it on an answer turn. Call it before survey. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -328,7 +328,7 @@ const TOOLS = [
   {
     name: "propose_confidence",
     description:
-      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this when this turn updates the plan, the score would change, or the user asks to update this score. Do not call it on a question turn. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card otherwise. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
+      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this on each plan turn, including the first message and a turn that also asks a question. Do not call it on an answer turn. Call it before survey. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -347,7 +347,7 @@ const TOOLS = [
   {
     name: "survey",
     description:
-      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. Then stop and wait. Do not ask the same question in chat.",
+      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. On a plan turn, call the required score tools before this call. Call propose_spec first when you write a plan. Then stop and wait. Do not ask the same question in chat.",
     inputSchema: {
       type: "object",
       properties: {
