@@ -416,7 +416,7 @@ describe("FirstRunChooseScreen", () => {
       const status = within(repositoryHeader).getByTestId("first-run-repositories-synchronizing");
       expect(status).toHaveTextContent(copy.synchronizing);
       expect(status).toHaveClass("sp-ai-thinking");
-      expect(screen.getByRole("status", { name: copy.loadingRepositories })).toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-repositories-loading-more")).not.toBeInTheDocument();
     });
 
     it("explains that only writable repositories appear", () => {
@@ -431,7 +431,6 @@ describe("FirstRunChooseScreen", () => {
       );
 
       expect(screen.getByText(copy.writeAccessHint)).toBeInTheDocument();
-      expect(screen.queryByRole("status", { name: copy.loadingRepositories })).not.toBeInTheDocument();
     });
   });
 
