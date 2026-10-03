@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/admincli/display"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -152,8 +153,8 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 				runner.GetState(),
 				valueOrDash(runner.GetRunnerVersion()),
 				runner.GetEphemeral(),
-				formatTime(runner.CreatedAt),
-				formatTime(runner.LastSeenAt),
+				formatRelativeTime(runner.CreatedAt),
+				formatRelativeTime(runner.LastSeenAt),
 			); err != nil {
 				return err
 			}
@@ -254,11 +255,11 @@ func renderRunner(ctx core.CommandContext, runner *openapi_client.RunnersRunner)
 			runner.GetState(),
 			valueOrDash(runner.GetRunnerVersion()),
 			runner.GetEphemeral(),
-			formatTime(runner.RegisteredAt),
-			formatTime(runner.LastSeenAt),
-			formatTime(runner.CreatedAt),
-			formatTime(runner.UpdatedAt),
-			formatTime(runner.TerminatedAt),
+			formatRelativeTime(runner.RegisteredAt),
+			formatRelativeTime(runner.LastSeenAt),
+			formatRelativeTime(runner.CreatedAt),
+			formatRelativeTime(runner.UpdatedAt),
+			formatRelativeTime(runner.TerminatedAt),
 			valueOrDash(strings.TrimSpace(runner.GetTerminationReason())),
 		)
 		return err
@@ -270,6 +271,10 @@ func valueOrDash(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func formatRelativeTime(value *time.Time) string {
+	return display.FormatRelativeTime(value, time.Now())
 }
 
 func formatTime(value *time.Time) string {
