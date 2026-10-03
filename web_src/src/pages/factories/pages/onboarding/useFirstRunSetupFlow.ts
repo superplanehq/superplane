@@ -24,6 +24,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
+import { githubAccessKeys, markGitHubInstallStarted, useGitHubInstallReturn } from "./githubInstallReturn";
 import { githubConnectReturnPath, useOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useGitHubOnboarding } from "./useGitHubOnboarding";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -301,6 +302,7 @@ function useFirstRunCommands(args: {
     });
   const grantGitHubAccess = () =>
     blocking.run("opening-github", async () => {
+      markGitHubInstallStarted(githubAccessKeys(connection.onboarding.data) ?? []);
       const popup = openGitHubWindow();
       try {
         const url = await connection.onboarding.startInstallation.mutateAsync();
@@ -397,6 +399,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
   const githubReady = Boolean(connection.identity) && githubConnected;
+  const checkingGitHub = useGitHubInstallReturn(
+    githubAccessKeys(connection.onboarding.data),
+    connection.onboarding.refetch,
+  );
   const jiraFeature = useExperimentalFeature(organizationId);
   const jiraFeatureLoading = jiraFeature.isLoading;
   const jiraAvailable = !jiraFeatureLoading && jiraFeature.has(FEATURE_FACTORY_JIRA_INTAKE);
@@ -455,7 +461,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     githubUserId: connection.identity?.userId ?? "",
     githubIdentities: connection.identities,
     pendingOrganizations: connection.pendingOrganizations,
-    synchronizing: connection.synchronizing,
+    synchronizing: connection.synchronizing || checkingGitHub,
     appConfigured: connection.appConfigured,
     connectError: connection.onboarding.error
       ? githubOnboardingMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
