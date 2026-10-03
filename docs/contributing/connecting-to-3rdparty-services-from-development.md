@@ -120,6 +120,12 @@ above if you still need to expose `localhost:8000`.
    - Commit statuses: Read and write
    - Deployments: Read and write
    - Organization administration: Read-only
+   - Members (organization): Read-only
+
+   Without the Members permission, GitHub hides private organization
+   members from the repository collaborators list. Organization owners and
+   members with team or base-permission access then do not see the
+   repositories in SuperPlane.
 
    Subscribe the app to the **Member** event. SuperPlane uses this event to
    refresh cached push access after repository membership changes.

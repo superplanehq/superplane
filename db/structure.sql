@@ -1496,6 +1496,17 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: vcs_provider_install_request_refreshes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.vcs_provider_install_request_refreshes (
+    provider text NOT NULL,
+    refresh_until timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: vcs_provider_install_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1535,7 +1546,8 @@ CREATE TABLE public.vcs_provider_installation_reconcile_jobs (
 CREATE TABLE public.vcs_provider_installation_reconcile_requesters (
     provider text NOT NULL,
     installation_id bigint NOT NULL,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2712,6 +2724,14 @@ ALTER TABLE ONLY public.user_notification_settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: vcs_provider_install_request_refreshes vcs_provider_install_request_refreshes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.vcs_provider_install_request_refreshes
+    ADD CONSTRAINT vcs_provider_install_request_refreshes_pkey PRIMARY KEY (provider);
 
 
 --
@@ -5098,14 +5118,6 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: vcs_provider_installation_reconcile_requesters vcs_provider_installation_reconcile_requesters_job_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.vcs_provider_installation_reconcile_requesters
-    ADD CONSTRAINT vcs_provider_installation_reconcile_requesters_job_fkey FOREIGN KEY (provider, installation_id) REFERENCES public.vcs_provider_installation_reconcile_jobs(provider, installation_id) ON DELETE CASCADE;
-
-
---
 -- Name: vcs_provider_integration_bindings vcs_provider_integration_bindings_installation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5465,7 +5477,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261002195100	f
+20261003031939	f
 \.
 
 
