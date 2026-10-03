@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState, type ComponentProps } from "react";
 
 import { FIRST_RUN_COPY } from "./onboarding/first-run/firstRunCopy";
 import { firstRunStoryChrome } from "./onboarding/first-run/firstRunMocks";
@@ -20,6 +21,31 @@ function AnalysisState({ progress, failed = false }: { progress: FirstRunAnalysi
       chrome={firstRunStoryChrome(4)}
       sphere={analysisSphereFor("acme/payments-service", progress.total)}
       onGoToBoard={() => undefined}
+    />
+  );
+}
+
+type ChooseStateProps = Pick<
+  ComponentProps<typeof FirstRunChooseScreen>,
+  "repositories" | "pendingOrganizations" | "synchronizing"
+> & { initialRepository?: string };
+
+/** Choose screen in one state. Choosing a repository updates the screen. */
+function ChooseState({ initialRepository, ...props }: ChooseStateProps) {
+  const [selectedRepository, setSelectedRepository] = useState<string | null>(initialRepository ?? null);
+  return (
+    <FirstRunChooseScreen
+      {...props}
+      selectedRepository={selectedRepository}
+      githubLogin="octocat"
+      chrome={firstRunStoryChrome(2)}
+      onSelectRepository={(repository) => {
+        console.log("select repository", repository);
+        setSelectedRepository(repository);
+      }}
+      onClearRepository={() => setSelectedRepository(null)}
+      onGrantAccess={() => console.log("install GitHub App")}
+      onContinue={() => console.log("continue with", selectedRepository)}
     />
   );
 }
@@ -82,63 +108,23 @@ export const Choose: Story = {
 
 export const ChooseNoRepositories: Story = {
   name: "3b Choose organization (no repositories)",
-  render: () => (
-    <FirstRunChooseScreen
-      repositories={[]}
-      selectedRepository={null}
-      githubLogin="octocat"
-      chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onGrantAccess={() => undefined}
-      onContinue={() => undefined}
-    />
-  ),
+  render: () => <ChooseState repositories={[]} />,
 };
 
 export const ChooseWaitingForApproval: Story = {
   name: "3c Choose organization (waiting for approval)",
-  render: () => (
-    <FirstRunChooseScreen
-      repositories={["octocat/dotfiles"]}
-      selectedRepository={null}
-      githubLogin="octocat"
-      pendingOrganizations={["acme"]}
-      chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onGrantAccess={() => undefined}
-      onContinue={() => undefined}
-    />
-  ),
+  render: () => <ChooseState repositories={["octocat/dotfiles"]} pendingOrganizations={["acme"]} />,
 };
 
 export const ChooseLoadingAfterInstall: Story = {
   name: "3e Choose organization (loading after install)",
-  render: () => (
-    <FirstRunChooseScreen
-      repositories={["octocat/dotfiles"]}
-      selectedRepository={null}
-      githubLogin="octocat"
-      synchronizing
-      chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onGrantAccess={() => undefined}
-      onContinue={() => undefined}
-    />
-  ),
+  render: () => <ChooseState repositories={["octocat/dotfiles"]} synchronizing />,
 };
 
 export const ChooseRepository: Story = {
   name: "3d Choose repository (filtered)",
   render: () => (
-    <FirstRunChooseScreen
-      repositories={["acme/api", "acme/web", "octocat/dotfiles"]}
-      selectedRepository="acme/api"
-      githubLogin="octocat"
-      chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onGrantAccess={() => undefined}
-      onContinue={() => undefined}
-    />
+    <ChooseState repositories={["acme/api", "acme/web", "octocat/dotfiles"]} initialRepository="acme/api" />
   ),
 };
 
