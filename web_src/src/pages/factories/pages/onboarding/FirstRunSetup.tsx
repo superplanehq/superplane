@@ -25,6 +25,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
+import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
@@ -250,6 +251,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
+  useGitHubInstallationChecks(organizationId, flow.screen === "choose" && !destination);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 

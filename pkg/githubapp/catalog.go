@@ -117,10 +117,38 @@ func (c *Catalog) ReconcileInstallation(
 	priority models.VCSProviderRepositorySyncPriority,
 ) error {
 	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
+	if installationNotFound(err) {
+		return models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installationID)
+	}
 	if err != nil {
 		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
 	}
 	return c.reconcileInstallation(ctx, installation, priority)
+}
+
+// VerifyInstallation reads one installation from GitHub without its
+// repositories. GitHub does not always send a webhook when an App is
+// uninstalled, so an installation that GitHub no longer has is deleted here.
+func (c *Catalog) VerifyInstallation(ctx context.Context, installationID int64) error {
+	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
+	if installationNotFound(err) {
+		return models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installationID)
+	}
+	if err != nil {
+		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
+	}
+	model := installationModel(installation)
+	if err := models.UpsertVCSProviderInstallation(c.db, &model); err != nil {
+		return fmt.Errorf("save GitHub App installation %d: %w", installationID, err)
+	}
+	return nil
+}
+
+func installationNotFound(err error) bool {
+	var responseErr *gh.ErrorResponse
+	return errors.As(err, &responseErr) &&
+		responseErr.Response != nil &&
+		responseErr.Response.StatusCode == http.StatusNotFound
 }
 
 func (c *Catalog) HasInstallationRequest(ctx context.Context, installationID int64) (bool, error) {

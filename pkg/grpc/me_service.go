@@ -2,20 +2,28 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/me"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+const vcsProviderInstallationCheckInterval = 10 * time.Second
+
 type MeService struct {
-	authService authorization.Authorization
+	authService        authorization.Authorization
+	installationChecks *me.VCSProviderInstallationChecks
 }
 
 func NewMeService(authService authorization.Authorization) *MeService {
 	return &MeService{
-		authService: authService,
+		authService:        authService,
+		installationChecks: me.NewVCSProviderInstallationChecks(vcsProviderInstallationCheckInterval),
 	}
 }
 
@@ -73,4 +81,18 @@ func (s *MeService) ConfigureVCSProviderInstallation(ctx context.Context, req *p
 
 func (s *MeService) RefreshVCSProviderOnboarding(ctx context.Context, req *pb.RefreshVCSProviderOnboardingRequest) (*pb.RefreshVCSProviderOnboardingResponse, error) {
 	return me.RefreshVCSProviderOnboarding(ctx, req.GetProvider(), req.RepositoryId)
+}
+
+func (s *MeService) VerifyVCSProviderInstallations(ctx context.Context, req *pb.VerifyVCSProviderInstallationsRequest) (*pb.VerifyVCSProviderInstallationsResponse, error) {
+	return me.VerifyVCSProviderInstallations(ctx, req.GetProvider(), s.installationChecks, githubInstallationVerifier{})
+}
+
+type githubInstallationVerifier struct{}
+
+func (githubInstallationVerifier) VerifyInstallation(ctx context.Context, installationID int64) error {
+	catalog, err := githubapp.NewCatalog(database.DB(ctx), config.LoadGitHubHostedAppConfig())
+	if err != nil {
+		return err
+	}
+	return catalog.VerifyInstallation(ctx, installationID)
 }
