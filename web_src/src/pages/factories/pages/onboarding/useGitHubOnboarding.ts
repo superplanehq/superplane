@@ -4,15 +4,19 @@ import {
   meRefreshVcsProviderOnboarding,
   meSelectVcsProviderOnboardingIdentity,
   meStartVcsProviderInstallation,
+  meVerifyVcsProviderInstallations,
   type MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const githubOnboardingKey = (organizationId: string) => ["me", organizationId, "github-onboarding"] as const;
+const githubInstallationChecksKey = (organizationId: string) =>
+  ["me", organizationId, "github-installation-checks"] as const;
 const githubProvider = "github";
 const githubOnboardingPollIntervalMs = 3_000;
 const githubOnboardingSyncPollIntervalMs = 1_000;
+const githubInstallationCheckIntervalMs = 10_000;
 
 type GitHubOnboardingPollingState = Pick<MeDescribeVcsProviderOnboardingResponse, "identity" | "synchronizing">;
 
@@ -90,4 +94,27 @@ export function useGitHubOnboarding(organizationId: string, options: { poll?: bo
     configureInstallation,
     refresh,
   };
+}
+
+/**
+ * GitHub does not always send a webhook when an App is uninstalled. While the
+ * organization or repository choice is open, the server checks the visible
+ * installations with GitHub, so an uninstalled organization leaves the list.
+ */
+export function useGitHubInstallationChecks(organizationId: string, enabled: boolean) {
+  const queryClient = useQueryClient();
+  useQuery({
+    queryKey: githubInstallationChecksKey(organizationId),
+    queryFn: async () => {
+      await meVerifyVcsProviderInstallations(
+        withOrganizationHeader({ organizationId, path: { provider: githubProvider }, body: {} }),
+      );
+      await queryClient.invalidateQueries({ queryKey: githubOnboardingKey(organizationId) });
+      return null;
+    },
+    enabled: enabled && Boolean(organizationId),
+    refetchInterval: githubInstallationCheckIntervalMs,
+    retry: false,
+    gcTime: 0,
+  });
 }

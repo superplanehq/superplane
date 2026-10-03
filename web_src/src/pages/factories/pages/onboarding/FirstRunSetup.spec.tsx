@@ -26,6 +26,7 @@ const github = vi.hoisted(() => ({
   },
   error: null as unknown,
   calls: [] as Array<{ organizationId: string; options?: { poll?: boolean } }>,
+  installationChecks: [] as boolean[],
 }));
 
 const showErrorToast = vi.hoisted(() => vi.fn());
@@ -47,6 +48,9 @@ vi.mock("./useGitHubOnboarding", () => ({
       configureInstallation: { mutateAsync: configureInstallation },
       selectIdentity: { mutateAsync: vi.fn() },
     };
+  },
+  useGitHubInstallationChecks: (_organizationId: string, enabled: boolean) => {
+    github.installationChecks.push(enabled);
   },
 }));
 
@@ -150,6 +154,7 @@ describe("FirstRunSetup GitHub catalog", () => {
     github.data.synchronizing = false;
     github.error = null;
     github.calls = [];
+    github.installationChecks = [];
     showErrorToast.mockReset();
     localStorage.clear();
   });
@@ -232,6 +237,18 @@ describe("FirstRunSetup GitHub catalog", () => {
 
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
     await waitFor(() => expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(true));
+  });
+
+  it("checks GitHub installations only while the organization and repository choice is open", async () => {
+    renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    expect(github.installationChecks.every((enabled) => !enabled)).toBe(true);
+
+    github.data.identity = { userId: "9", login: "octocat" };
+    renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo&githubConnected=1");
+
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+    expect(github.installationChecks.at(-1)).toBe(true);
   });
 
   it("does not use a GitHub connection that another person saved in this browser", () => {
