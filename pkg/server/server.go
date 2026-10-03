@@ -315,9 +315,13 @@ func startWorkers(
 		if err != nil {
 			panic(fmt.Sprintf("failed to load installation ID: %v", err))
 		}
+		activeStore := runnerlogs.Current()
+		if activeStore == nil {
+			panic("runner task log compactor requires RUNNER_ACTIVE_LOG_FS_PATH")
+		}
 		w := workers.NewRunnerTaskLogCompactor(
 			blob.Current(),
-			runnerlogs.Current(),
+			activeStore,
 			installationID,
 			5*time.Second,
 			time.Minute,
@@ -875,9 +879,7 @@ func newBlobProvider() (blob.Provider, error) {
 }
 
 func newRunnerActiveLogStore() (runnerlogs.Store, error) {
-	if os.Getenv("START_RUNNER_API") != "yes" &&
-		os.Getenv("START_RUNNER_LOG_COMPACTOR") != "yes" &&
-		os.Getenv("START_RUNNER_CLEANUP_WORKER") != "yes" {
+	if strings.TrimSpace(os.Getenv("RUNNER_ACTIVE_LOG_FS_PATH")) == "" {
 		return nil, nil
 	}
 

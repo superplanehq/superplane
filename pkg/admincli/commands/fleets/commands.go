@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/admincli/display"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -286,8 +287,8 @@ func renderFleet(stdout io.Writer, fleet *openapi_client.RunnersFleet) error {
 		formatMemory(spec.GetMemoryMb()),
 		formatDisk(spec.GetDiskGb()),
 		valueOrDash(strings.Join(spec.GetCapabilities(), ", ")),
-		formatTime(fleet.CreatedAt),
-		formatTime(fleet.UpdatedAt),
+		display.FormatRelativeTime(fleet.CreatedAt, time.Now()),
+		display.FormatRelativeTime(fleet.UpdatedAt, time.Now()),
 	)
 	return err
 }
@@ -318,11 +319,4 @@ func formatDisk(value int32) string {
 		return "-"
 	}
 	return fmt.Sprintf("%d GB", value)
-}
-
-func formatTime(value *time.Time) string {
-	if value == nil {
-		return "-"
-	}
-	return value.UTC().Format(time.RFC3339)
 }
