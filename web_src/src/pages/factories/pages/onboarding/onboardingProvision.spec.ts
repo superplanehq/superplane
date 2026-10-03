@@ -409,6 +409,28 @@ describe("provisionOnboardingIntake", () => {
     });
   });
 
+  it("creates a Linear intake when the ticket source is Linear", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-linear" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
+
+    const intake = await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "linear",
+      linear: { integrationId: "linear-1", projectIds: ["project-1", "project-2"] },
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_LINEAR_ISSUES",
+      integrationId: "linear-1",
+      resourceId: "project-1,project-2",
+      settings: { linearProjectIds: ["project-1", "project-2"] },
+    });
+    expect(intake?.id).toBe("intake-linear");
+  });
+
   it("removes a leftover Jira intake when the retry selects GitHub", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-jira", source: JIRA_INTAKE_SOURCE }]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-github" } as FactoriesFactoryIntake);

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +73,55 @@ func TestUseRealProviderAuthInDevelopment(t *testing.T) {
 		)
 
 		assert.False(t, useRealProviderAuthInDevelopment(request))
+	})
+}
+
+func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
+	handler, r := setupAuthHandler(t, false)
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "client-id",
+			Secret:      "client-secret",
+			CallbackURL: "https://app.example/auth/github/callback",
+		},
+	})
+
+	authorizeQuery := func(t *testing.T, target string, withSession bool) url.Values {
+		request := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, target, nil),
+			map[string]string{"provider": models.ProviderGitHub},
+		)
+		if withSession {
+			token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
+				"sub":             r.Account.ID.String(),
+				sessionStartClaim: strconv.FormatInt(time.Now().Unix(), 10),
+			})
+			require.NoError(t, err)
+			request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		}
+		recorder := httptest.NewRecorder()
+
+		handler.handleAuth(recorder, request)
+
+		require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+		location, err := url.Parse(recorder.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, "github.com", location.Host)
+		return location.Query()
+	}
+
+	t.Run("asks GitHub to show the account picker when connecting an account", func(t *testing.T) {
+		query := authorizeQuery(t, "/auth/github?intent=connect&redirect=/onboarding", true)
+
+		assert.Equal(t, "select_account", query.Get("prompt"))
+		assert.Equal(t, "user:email", query.Get("scope"))
+		assert.NotEmpty(t, query.Get("state"))
+	})
+
+	t.Run("keeps sign-in on the active GitHub account", func(t *testing.T) {
+		query := authorizeQuery(t, "/auth/github", false)
+
+		assert.Empty(t, query.Get("prompt"))
 	})
 }
 

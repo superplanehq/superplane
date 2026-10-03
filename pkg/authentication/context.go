@@ -9,6 +9,14 @@ import (
 
 const TokenScopesMetadataKey = "x-token-scopes"
 
+func SetAccountIDInMetadata(ctx context.Context, accountID string) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-account-id", accountID))
+}
+
+func GetAccountIDFromMetadata(ctx context.Context) (string, bool) {
+	return getFirstMetadataValue(ctx, "x-account-id")
+}
+
 func SetUserIdInMetadata(ctx context.Context, userId string) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", userId))
 }

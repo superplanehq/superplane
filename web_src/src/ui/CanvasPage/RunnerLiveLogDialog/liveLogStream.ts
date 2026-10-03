@@ -43,13 +43,20 @@ export type LiveLogRecordEnvelope = {
 };
 
 type LiveLogSessionResponse = {
+  backend?: "legacy" | "integrated";
   stream_url?: string;
   token?: string;
   expires_at?: string;
 };
 
+const INTEGRATED_POLL_INTERVAL_MS = 2000;
+const LOG_CURSOR_HEADER = "X-SuperPlane-Log-Cursor";
+const LOG_STATE_HEADER = "X-SuperPlane-Log-State";
+const LOG_RESET_HEADER = "X-SuperPlane-Log-Reset";
+
 export type LiveLogStreamHandlers = {
   onOpen?: () => void;
+  onReset?: () => void;
   onRecord?: (record: AgentActivityRecord) => void;
   onLogLine: (text: string, commandIndex?: number) => void;
   onStreamError: (message: string) => void;
@@ -88,19 +95,39 @@ async function fetchRunnerLiveLogSession(
   return (await res.json()) as LiveLogSessionResponse;
 }
 
-async function fetchRunnerLiveLogResponse(url: string, token: string, signal: AbortSignal): Promise<Response> {
-  const res = await fetch(url, {
-    method: "GET",
-    credentials: "omit",
-    signal,
-    headers: {
-      Accept: "application/x-ndjson",
-      Authorization: `Bearer ${token}`,
-      "Accept-Encoding": "identity",
-    },
-  });
-
-  if (!res.ok) {
+async function fetchRunnerLiveLogResponse(
+  session: RequiredLiveLogSession,
+  organizationId: string,
+  signal: AbortSignal,
+  cursor?: string,
+): Promise<Response> {
+  const streamUrl =
+    session.backend === "integrated" && cursor !== undefined
+      ? `${session.streamUrl}${session.streamUrl.includes("?") ? "&" : "?"}after=${encodeURIComponent(cursor)}`
+      : session.streamUrl;
+  const init =
+    session.backend === "integrated"
+      ? withOrganizationHeader({
+          organizationId,
+          method: "GET",
+          credentials: "include" as const,
+          signal,
+          headers: { Accept: "application/x-ndjson" },
+        })
+      : {
+          method: "GET",
+          credentials: "omit" as const,
+          signal,
+          headers: {
+            Accept: "application/x-ndjson",
+            Authorization: `Bearer ${session.token}`,
+            "Accept-Encoding": "identity",
+          },
+        };
+  const res = await fetch(streamUrl, init);
+  const isIntegratedReset =
+    session.backend === "integrated" && res.status === 409 && res.headers.get(LOG_RESET_HEADER) === "true";
+  if (!res.ok && !isIntegratedReset) {
     throw liveLogRequestErrorFromResponse(res, await res.text());
   }
 
@@ -322,40 +349,116 @@ async function pumpReaderNdjson(
   }
 }
 
-function requireLiveLogSession(session: LiveLogSessionResponse): { streamUrl: string; token: string } {
+type RequiredLiveLogSession = {
+  backend: "legacy" | "integrated";
+  streamUrl: string;
+  token?: string;
+};
+
+function requireLiveLogSession(session: LiveLogSessionResponse): RequiredLiveLogSession {
   const streamUrl = session.stream_url?.trim();
   const token = session.token?.trim();
-  if (!streamUrl || !token) {
+  const backend = session.backend === "integrated" ? "integrated" : "legacy";
+  if (!streamUrl || (backend === "legacy" && !token)) {
     throw new Error("Live log session response is incomplete");
   }
-  return { streamUrl, token };
+  return { backend, streamUrl, token };
 }
 
 /**
- * Fetches a short-lived task-broker stream session from SuperPlane, then consumes NDJSON live logs
- * directly from the task broker until the stream ends or aborts.
+ * Resolves the execution's log backend through SuperPlane, then consumes its
+ * NDJSON stream until the stream ends or aborts.
  */
 export class LiveLogStream {
   private readonly organizationId: string;
   private readonly sessionUrl: string;
   private readonly abortController: AbortController;
+  private readonly pollIntervalMs: number;
 
-  constructor(organizationId: string, canvasId: string, executionId: string) {
+  constructor(
+    organizationId: string,
+    canvasId: string,
+    executionId: string,
+    pollIntervalMs = INTEGRATED_POLL_INTERVAL_MS,
+  ) {
     this.organizationId = organizationId;
     this.sessionUrl = `/api/v1/canvases/${encodeURIComponent(canvasId)}/node-executions/${encodeURIComponent(executionId)}/runner-live-logs/session`;
     this.abortController = new AbortController();
+    this.pollIntervalMs = pollIntervalMs;
   }
 
   stop() {
     this.abortController.abort();
   }
 
-  async pump(handlers: LiveLogStreamHandlers): Promise<void> {
+  async pump(handlers: LiveLogStreamHandlers): Promise<boolean> {
     const session = await fetchRunnerLiveLogSession(this.sessionUrl, this.organizationId, this.abortController.signal);
-    const { streamUrl, token } = requireLiveLogSession(session);
-    const res = await fetchRunnerLiveLogResponse(streamUrl, token, this.abortController.signal);
+    const required = requireLiveLogSession(session);
+    if (required.backend === "integrated") {
+      return this.pollIntegrated(required, handlers);
+    }
+
+    const res = await fetchRunnerLiveLogResponse(required, this.organizationId, this.abortController.signal);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+    }
     const reader = requireBodyReader(res);
     handlers.onOpen?.();
     await pumpReaderNdjson(reader, handlers);
+    return false;
   }
+
+  private async pollIntegrated(session: RequiredLiveLogSession, handlers: LiveLogStreamHandlers): Promise<boolean> {
+    let cursor: string | undefined;
+    let opened = false;
+
+    while (!this.abortController.signal.aborted) {
+      const res = await fetchRunnerLiveLogResponse(session, this.organizationId, this.abortController.signal, cursor);
+      if (res.status === 409 && res.headers.get(LOG_RESET_HEADER) === "true") {
+        handlers.onReset?.();
+        cursor = undefined;
+        continue;
+      }
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+      }
+      if (!opened) {
+        handlers.onOpen?.();
+        opened = true;
+      }
+      if (res.body) {
+        await pumpReaderNdjson(requireBodyReader(res), handlers);
+      }
+
+      const nextCursor = res.headers.get(LOG_CURSOR_HEADER);
+      if (nextCursor !== null) {
+        cursor = nextCursor;
+      }
+      if (res.headers.get(LOG_STATE_HEADER) === "archived") {
+        return true;
+      }
+      await waitForPoll(this.pollIntervalMs, this.abortController.signal);
+    }
+    return false;
+  }
+}
+
+async function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      window.clearTimeout(timeout);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timeout = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }

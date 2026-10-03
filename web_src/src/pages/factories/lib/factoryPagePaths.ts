@@ -382,6 +382,31 @@ export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
 }
 
+/** Connection created in this Linear OAuth round trip. The Linear callback appends it. */
+export const LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM = "linearIntegrationId";
+
+/** Dedicated setup page for Linear issue intake. */
+export function factoryLinearIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  options?: { integrationId?: string },
+) {
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/linear`;
+  const integrationId = options?.integrationId?.trim();
+  if (!integrationId) {
+    return path;
+  }
+  const params = new URLSearchParams();
+  params.set(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
+}
+
+export function linearIntakeIntegrationIdFromSearch(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
+}
+
 /** Dedicated setup page for Dependabot alert intake. */
 export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;

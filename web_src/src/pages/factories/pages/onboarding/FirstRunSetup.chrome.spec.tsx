@@ -119,6 +119,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsLoading: false,
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
+    linearIntegrationId: "",
+    linearProjectIds: [],
+    toggleLinearProject: vi.fn(),
+    linearProjects: [],
+    linearProjectsLoading: false,
+    linearProjectsError: false,
+    retryLinearProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -154,6 +161,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
+    localStorage.clear();
   });
 
   it("shows the workspace switch when another workspace exists", () => {
@@ -243,6 +251,7 @@ describe("FirstRunSetup chrome", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
   });
 

@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -21,12 +22,14 @@ func testGRPCServices(
 	t.Helper()
 
 	services, err := grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:         "http://localhost",
-		WebhooksBaseURL: "http://localhost",
-		Encryptor:       encryptor,
-		AuthService:     authService,
-		Registry:        registry,
-		OIDCProvider:    oidcProvider,
+		BaseURL:          "http://localhost",
+		WebhooksBaseURL:  "http://localhost",
+		RunnerAPIBaseURL: "http://localhost",
+		Encryptor:        encryptor,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		JWTSigner:        jwt.NewSigner("test-runner-registration-secret"),
 	})
 	require.NoError(t, err)
 	return services

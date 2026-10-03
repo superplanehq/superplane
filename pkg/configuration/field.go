@@ -39,6 +39,7 @@ const (
 	FieldTypeAppCanvasNode       = "app-canvas-node"
 	FieldTypeRunParameters       = "run-parameters"
 	FieldTypeHostedModel         = "hosted-model"
+	FieldTypeRunnerFleet         = "runner-fleet"
 )
 
 // HostedModelAllProviders lists every SuperPlane-hosted allowlist in one picker.
