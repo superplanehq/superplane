@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const https = require("https");
+const { pipeline } = require("stream/promises");
 
 const PLATFORM_MAP = {
   "darwin-x64": "darwin-amd64",
@@ -31,37 +32,47 @@ function resolveTarget() {
   return target;
 }
 
-function download(url, dest) {
+function get(url) {
   return new Promise((resolve, reject) => {
-    function attempt(currentUrl, redirectsLeft) {
-      const req = https.get(currentUrl, (res) => {
-        if (
-          res.statusCode >= 300 &&
-          res.statusCode < 400 &&
-          res.headers.location
-        ) {
-          res.resume();
-          if (redirectsLeft <= 0) {
-            reject(new Error("too many redirects"));
-            return;
-          }
-          attempt(res.headers.location, redirectsLeft - 1);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          reject(new Error(`HTTP ${res.statusCode} fetching ${currentUrl}`));
-          return;
-        }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on("finish", () => file.close((err) => (err ? reject(err) : resolve())));
-        file.on("error", reject);
-      });
-      req.on("error", reject);
-    }
-    attempt(url, 5);
+    const req = https.get(url, resolve);
+    req.on("error", reject);
   });
+}
+
+async function download(url, dest) {
+  let currentUrl = url;
+
+  for (let redirectsLeft = 5; ; redirectsLeft--) {
+    const res = await get(currentUrl);
+
+    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      res.resume();
+      if (redirectsLeft <= 0) {
+        throw new Error("too many redirects");
+      }
+      currentUrl = new URL(res.headers.location, currentUrl).toString();
+      continue;
+    }
+
+    if (res.statusCode !== 200) {
+      res.resume();
+      throw new Error(`HTTP ${res.statusCode} fetching ${currentUrl}`);
+    }
+
+    // pipeline propagates a mid-stream response error to the file stream and
+    // rejects. res.pipe() does not, which let a truncated download look like a
+    // successful install.
+    await pipeline(res, fs.createWriteStream(dest));
+
+    const expected = Number.parseInt(res.headers["content-length"], 10);
+    if (Number.isFinite(expected) && fs.statSync(dest).size !== expected) {
+      throw new Error(
+        `incomplete download: expected ${expected} bytes, got ${fs.statSync(dest).size}`
+      );
+    }
+
+    return;
+  }
 }
 
 async function main() {
@@ -76,10 +87,14 @@ async function main() {
   console.log(`@superplane/cli: downloading ${target} binary for v${version}`);
   console.log(`  ${url}`);
 
+  const tmpPath = `${binPath}.download-${process.pid}`;
+
   try {
-    await download(url, binPath);
-    fs.chmodSync(binPath, 0o755);
+    await download(url, tmpPath);
+    fs.chmodSync(tmpPath, 0o755);
+    fs.renameSync(tmpPath, binPath);
   } catch (err) {
+    fs.rmSync(tmpPath, { force: true });
     console.error("@superplane/cli: failed to download binary.");
     console.error(`  ${err.message}`);
     process.exit(1);
