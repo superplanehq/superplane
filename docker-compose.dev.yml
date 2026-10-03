@@ -252,7 +252,7 @@ services:
       dockerfile: cmd/fleetmanager/Dockerfile
       target: local
     environment:
-      FLEET_MANAGER_CONFIG_FILE: /etc/superplane/fleet-manager.json
+      FLEET_MANAGER_CONFIG_FILE: /etc/superplane/fleet-manager.yaml
       INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
       DB_HOST: db
       DB_PORT: 5432
@@ -261,7 +261,7 @@ services:
       DB_PASSWORD: the-cake-is-a-lie
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/fleet-manager.local.json:/etc/superplane/fleet-manager.json:ro
+      - ./config/fleet-manager.local.yaml:/etc/superplane/fleet-manager.yaml:ro
     depends_on:
       app:
         condition: service_started
