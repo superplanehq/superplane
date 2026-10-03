@@ -301,6 +301,61 @@ func TestCatalogHasInstallationRequestLoadsMissingInstallation(t *testing.T) {
 	assert.True(t, requested)
 }
 
+func TestCatalogVerifyInstallation(t *testing.T) {
+	saveInstallation := func(t *testing.T) {
+		require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+			Provider:       models.ProviderGitHub,
+			InstallationID: 101,
+			AccountLogin:   "acme",
+		}))
+	}
+	removedInstallation := func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installations/101", r.URL.Path)
+		http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+	}
+
+	t.Run("deletes an installation that GitHub no longer has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, removedInstallation)
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.VerifyInstallation(t.Context(), 101))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("keeps an installation that GitHub still has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"id":101,"account":{"id":301,"login":"acme"}}`))
+		})
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.VerifyInstallation(t.Context(), 101))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.NoError(t, err)
+	})
+
+	t.Run("an installation job deletes an installation that GitHub no longer has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, removedInstallation)
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.ReconcileInstallation(t.Context(), 101, models.VCSProviderRepositorySyncPriorityInteractive))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+}
+
 func guideClient(t *testing.T, handler http.HandlerFunc) (*gh.Client, *int) {
 	t.Helper()
 	requests := 0
