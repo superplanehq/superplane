@@ -81,6 +81,7 @@ vi.mock("./useGitHubOnboarding", () => ({
     startInstallation: { mutateAsync: vi.fn() },
     configureInstallation: { mutateAsync: vi.fn() },
   }),
+  useGitHubInstallationChecks: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
