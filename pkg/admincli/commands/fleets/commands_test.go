@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,39 @@ func TestDescribeFleetGetsCapacityWithoutLongPolling(t *testing.T) {
 		"/admin/api/installation/fleets/aws-large-amd64/capacity",
 	}, paths)
 	assert.Contains(t, stdout.String(), `"runnableTasks": "2"`)
+}
+
+func TestDescribeFleetTextUsesRelativeTimes(t *testing.T) {
+	now := time.Now().UTC()
+	created := now.Add(-2 * time.Hour).Truncate(time.Second)
+	updated := now.Add(-72 * time.Hour).Truncate(time.Second)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/admin/api/installation/fleets/aws-large-amd64":
+			_, _ = fmt.Fprintf(
+				w,
+				`{"fleet":{"id":"aws-large-amd64","createdAt":%q,"updatedAt":%q}}`,
+				created.Format(time.RFC3339),
+				updated.Format(time.RFC3339),
+			)
+		case "/admin/api/installation/fleets/aws-large-amd64/capacity":
+			_, _ = fmt.Fprint(w, `{"runnableTasks":"2","generation":"3"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	err := (&describeCommand{FleetID: "aws-large-amd64"}).Execute(ctx)
+
+	require.NoError(t, err)
+	output := stdout.String()
+	assert.Contains(t, output, "Created: 2h ago\n")
+	assert.Contains(t, output, "Updated: 3d ago\n")
+	assert.NotContains(t, output, created.Format(time.RFC3339))
+	assert.NotContains(t, output, updated.Format(time.RFC3339))
 }
 
 func TestDescribeYAMLCanBeEditedAndUsedForUpdate(t *testing.T) {
