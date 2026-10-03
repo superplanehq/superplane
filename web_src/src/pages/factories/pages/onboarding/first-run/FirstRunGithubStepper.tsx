@@ -6,12 +6,15 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 
 const copy = FIRST_RUN_COPY.connect;
 
-export type FirstRunGithubStep = "connect" | "repository";
+export type FirstRunGithubStep = "connect" | "organization" | "repository";
 
-const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "repository"];
+const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "organization", "repository"];
 
-function stepLabel(step: FirstRunGithubStep): string {
+function stepLabel(step: FirstRunGithubStep, done: boolean, organizationName?: string): string {
   if (step === "connect") return copy.connectGitHub;
+  if (step === "organization") {
+    return done && organizationName ? copy.stepOrganizationDone(organizationName) : copy.stepOrganization;
+  }
   return copy.stepRepository;
 }
 
@@ -41,10 +44,13 @@ function StepBadge({ number, done }: { number: number; done: boolean }) {
  */
 export function FirstRunGithubStepper({
   current,
+  organizationName,
   action,
   children,
 }: {
   current: FirstRunGithubStep;
+  /** Names the finished organization row, e.g. "Organization: acme". */
+  organizationName?: string;
   /** Control on the active step header, e.g. the Connect button. */
   action?: ReactNode;
   children?: ReactNode;
@@ -70,7 +76,7 @@ export function FirstRunGithubStepper({
             >
               <span className="flex items-center gap-2.5">
                 <StepBadge number={index + 1} done={done} />
-                {stepLabel(step)}
+                {stepLabel(step, done, organizationName)}
               </span>
               {active ? action : null}
             </div>

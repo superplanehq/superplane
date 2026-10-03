@@ -25,6 +25,14 @@ type recordingVCSProviderCatalog struct {
 	started             chan int64
 	installationError   error
 	reconcilePriorities []models.VCSProviderRepositorySyncPriority
+	requestRefreshes    int
+}
+
+func (c *recordingVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.requestRefreshes++
+	return nil
 }
 
 func (c *recordingVCSProviderCatalog) ReconcileInstallation(
@@ -95,6 +103,53 @@ func TestVCSProviderCatalogWorkerPrioritizesRequestedReconciliation(t *testing.T
 	assert.Equal(t, []models.VCSProviderRepositorySyncPriority{
 		models.VCSProviderRepositorySyncPriorityInteractive,
 	}, catalog.priorities())
+}
+
+func TestVCSProviderCatalogWorkerRefreshesInstallRequestsOnlyWhileOnePending(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	catalog := &recordingVCSProviderCatalog{}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+
+	now := time.Now()
+
+	worker.refreshInstallRequests(t.Context(), now)
+	assert.Zero(t, catalog.requestRefreshes)
+
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(database.Conn(), models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountLogin: "acme",
+		RequesterID:  9,
+		RequestedAt:  now,
+	}}))
+	worker.refreshInstallRequests(t.Context(), now)
+	assert.Equal(t, 1, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestPollInterval))
+	assert.Equal(t, 1, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestRefreshInterval))
+	assert.Equal(t, 2, catalog.requestRefreshes)
+}
+
+func TestVCSProviderCatalogWorkerRefreshesInstallRequestsOnEveryPollWhileRequested(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	catalog := &recordingVCSProviderCatalog{}
+	worker := newTestVCSProviderCatalogWorker(catalog)
+	now := time.Now()
+	require.NoError(t, models.RequestVCSProviderInstallRequestRefresh(
+		database.Conn(),
+		models.ProviderGitHub,
+		now.Add(time.Minute),
+	))
+
+	worker.refreshInstallRequests(t.Context(), now)
+	worker.refreshInstallRequests(t.Context(), now.Add(vcsProviderInstallRequestPollInterval))
+	assert.Equal(t, 2, catalog.requestRefreshes)
+
+	worker.refreshInstallRequests(t.Context(), now.Add(2*time.Minute))
+	assert.Equal(t, 2, catalog.requestRefreshes)
 }
 
 func TestVCSProviderCatalogWorkerReconcilesRequestedInstallation(t *testing.T) {
@@ -258,6 +313,10 @@ func (c *progressivelyVisibleVCSProviderCatalog) Reconcile(
 	return nil
 }
 
+func (c *progressivelyVisibleVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
+	return nil
+}
+
 func (c *progressivelyVisibleVCSProviderCatalog) ReconcileInstallation(
 	context.Context,
 	int64,
@@ -351,6 +410,10 @@ func (c *blockingReconcileVCSProviderCatalog) ReconcileInstallation(
 	_ models.VCSProviderRepositorySyncPriority,
 ) error {
 	c.installationReconciled <- installationID
+	return nil
+}
+
+func (c *blockingReconcileVCSProviderCatalog) ReconcileInstallRequests(context.Context) error {
 	return nil
 }
 
