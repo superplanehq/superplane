@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAdminIntakeCatalog } from "@/hooks/useAdminIntakeCatalog";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { INTAKE_CATEGORIES, INTAKE_STATUSES, type IntakeCategory, type IntakeStatus } from "@/lib/intakeCatalog";
+import { INTAKE_CATEGORIES, type IntakeCategory } from "@/lib/intakeCatalog";
 
 import { CreateIntakeDialog } from "./CreateIntakeDialog";
 import {
@@ -16,26 +16,23 @@ import {
   intakeCategoryLabel,
   type AdminIntakeEntry,
 } from "./intakeCatalogModel";
-import { CategoryRail, StageStrip, SurfaceIcons } from "./IntakeListParts";
+import { CategoryRail, StatusGuide, SurfaceIcons } from "./IntakeListParts";
 import { IntakeIcon, IntakeStatusPill } from "./IntakeStatusPill";
 
 export function IntakesListPage() {
   usePageTitle(["Intakes", "Installation Admin"]);
   const navigate = useNavigate();
   const { data: entries = [], isLoading, isError } = useAdminIntakeCatalog();
-  const [status, setStatus] = useState<IntakeStatus | null>(null);
   const [category, setCategory] = useState<IntakeCategory | null>(null);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const statusCounts = useMemo(() => countBy(entries, INTAKE_STATUSES, (entry) => entry.status), [entries]);
   const categoryCounts = useMemo(() => countBy(entries, INTAKE_CATEGORIES, (entry) => entry.category), [entries]);
   const visible = useMemo(
-    () => filterIntakeEntries(entries, { status, category, search }),
-    [entries, status, category, search],
+    () => filterIntakeEntries(entries, { status: null, category, search }),
+    [entries, category, search],
   );
   const clearFilters = () => {
-    setStatus(null);
     setCategory(null);
     setSearch("");
   };
@@ -45,7 +42,10 @@ export function IntakesListPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-gray-100">Intakes</h1>
-          <p className="text-sm text-slate-500 dark:text-gray-400">Control the maturity and access of each intake.</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-sm text-slate-500 dark:text-gray-400">Control the maturity and access of each intake.</p>
+            <StatusGuide />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -64,8 +64,6 @@ export function IntakesListPage() {
           </Button>
         </div>
       </div>
-
-      <StageStrip counts={statusCounts} selected={status} onSelect={setStatus} />
 
       <div className="grid grid-cols-[13rem_1fr] gap-6">
         <CategoryRail counts={categoryCounts} total={entries.length} selected={category} onSelect={setCategory} />

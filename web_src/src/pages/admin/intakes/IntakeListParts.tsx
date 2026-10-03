@@ -1,7 +1,7 @@
 import { GitBranch, Info, LayoutGrid, Ticket, type LucideIcon } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { INTAKE_CATEGORIES, INTAKE_STATUSES, type IntakeCategory, type IntakeStatus } from "@/lib/intakeCatalog";
+import { INTAKE_CATEGORIES, INTAKE_STATUSES, type IntakeCategory } from "@/lib/intakeCatalog";
 import { intakeSurfaces, type IntakeSurface } from "@/lib/intakePresentation";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -9,59 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { INTAKE_CATEGORY_LABELS, INTAKE_STATUS_INFO, INTAKE_SURFACE_LABELS } from "./intakeCatalogModel";
 import { IntakeStatusPill } from "./IntakeStatusPill";
 
-interface StageStripProps {
-  counts: Record<IntakeStatus, number>;
-  selected: IntakeStatus | null;
-  onSelect: (status: IntakeStatus | null) => void;
-}
-
-export function StageStrip({ counts, selected, onSelect }: StageStripProps) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div
-        role="group"
-        aria-label="Filter by status"
-        className="flex flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-      >
-        {INTAKE_STATUSES.map((status) => {
-          const info = INTAKE_STATUS_INFO[status];
-          const active = selected === status;
-          return (
-            <Tooltip key={status}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onSelect(active ? null : status)}
-                  className={cn(
-                    "flex min-w-0 flex-1 flex-col items-start gap-1 border-r border-slate-200 px-4 py-3 text-left transition-colors last:border-r-0 dark:border-gray-700",
-                    active ? "bg-slate-50 dark:bg-gray-800" : "hover:bg-slate-50 dark:hover:bg-gray-800/60",
-                  )}
-                >
-                  <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-gray-400">
-                    <span className={cn("size-2 rounded-full", info.dotClassName)} aria-hidden />
-                    {info.label}
-                  </span>
-                  <span className="text-xl font-semibold text-slate-900 tabular-nums dark:text-gray-100">
-                    {counts[status]}
-                  </span>
-                  <span
-                    className={cn("h-0.5 w-full rounded-full", active ? info.dotClassName : "bg-transparent")}
-                    aria-hidden
-                  />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-64">{info.summary}</TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
-      <StatusGuide />
-    </div>
-  );
-}
-
-function StatusGuide() {
+export function StatusGuide() {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -73,7 +21,7 @@ function StatusGuide() {
           About statuses
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[34rem] p-0">
+      <PopoverContent align="start" className="w-[34rem] p-0">
         <div className="border-b border-slate-200 px-4 py-3 dark:border-gray-700">
           <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">Statuses</p>
           <p className="text-xs text-slate-500 dark:text-gray-400">
