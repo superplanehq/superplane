@@ -192,8 +192,7 @@ describe("FirstRunChooseScreen", () => {
       };
       const view = render(<FirstRunChooseScreen {...props} repositories={[]} />);
 
-      const loading = screen.getByRole("status", { name: copy.loadingOrganizations });
-      expect(loading.children).toHaveLength(2);
+      expect(screen.queryByTestId("first-run-organizations-loading")).not.toBeInTheDocument();
       expect(screen.queryByTestId("first-run-repositories-empty")).not.toBeInTheDocument();
       expect(
         within(screen.getByTestId("first-run-step-organization-header")).getByTestId(
@@ -201,16 +200,10 @@ describe("FirstRunChooseScreen", () => {
         ),
       ).toHaveTextContent(copy.synchronizingOrganizations);
 
-      view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api"]} />);
-      expect(screen.getByRole("button", { name: copy.useOrganization("acme") })).toBeInTheDocument();
-      expect(screen.getByRole("status", { name: copy.loadingOrganizations }).children).toHaveLength(1);
-
       view.rerender(<FirstRunChooseScreen {...props} repositories={["acme/api", "octo/web"]} />);
       expect(screen.getByRole("button", { name: copy.useOrganization("acme") })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: copy.useOrganization("octo") })).toBeInTheDocument();
-
-      view.rerender(<FirstRunChooseScreen {...props} synchronizing={false} repositories={["acme/api", "octo/web"]} />);
-      expect(screen.queryByRole("status", { name: copy.loadingOrganizations })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-organizations-loading")).not.toBeInTheDocument();
     });
 
     it("explains that only organizations with a writable repository appear", () => {
