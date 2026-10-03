@@ -14,7 +14,7 @@ import (
 
 const (
 	vcsProviderReconcileInterval             = 5 * time.Minute
-	vcsProviderInstallRequestPollInterval    = 5 * time.Second
+	vcsProviderInstallRequestPollInterval    = 2 * time.Second
 	vcsProviderInstallRequestRefreshInterval = 15 * time.Second
 	vcsProviderInstallationRequesterGrace    = 5 * time.Minute
 	vcsProviderJobPollInterval               = time.Second

@@ -95,10 +95,7 @@ function OrganizationEmptyState({
   onGrantAccess: () => void;
 }) {
   return (
-    <div
-      className="space-y-4 rounded-lg border border-dashed border-border px-4 py-5"
-      data-testid="first-run-repositories-empty"
-    >
+    <div className="space-y-4 py-5" data-testid="first-run-repositories-empty">
       <div className="space-y-1 text-[13px]">
         <p className="font-medium text-foreground">{copy.emptyTitle}</p>
         <p className="text-muted-foreground">{copy.emptyBody}</p>
@@ -106,7 +103,6 @@ function OrganizationEmptyState({
       <LoadingButton
         type="button"
         className="w-full"
-        variant={hasPendingApprovals ? "outline" : "default"}
         onClick={onGrantAccess}
         disabled={disabled}
         loading={grantingAccess}
