@@ -22,7 +22,7 @@ import (
 
 const (
 	configPathEnvironment = "FLEET_MANAGER_CONFIG_FILE"
-	defaultConfigPath     = "/etc/superplane/fleet-manager.json"
+	defaultConfigPath     = "/etc/superplane/fleet-manager.yaml"
 )
 
 func main() {

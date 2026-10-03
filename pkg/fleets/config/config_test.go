@@ -71,6 +71,36 @@ func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
 	}
 }
 
+func TestLoadYAML(t *testing.T) {
+	body := `
+superplaneUrl: http://app:8000
+installationAdminToken: personal-token
+fleets:
+  - id: e1-large-amd64
+    provider: docker
+    docker:
+      image: runner:dev
+      architecture: amd64
+      runnerApiUrl: http://app:8000
+      network: superplane_default
+`
+
+	for _, extension := range []string{".yml", ".yaml"} {
+		t.Run(extension, func(t *testing.T) {
+			config, err := Load(writeConfigWithExtension(t, body, extension))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if config.Fleets[0].Provider != ProviderDocker {
+				t.Fatalf("provider = %q", config.Fleets[0].Provider)
+			}
+			if config.Fleets[0].Docker.Image != "runner:dev" {
+				t.Fatalf("image = %q", config.Fleets[0].Docker.Image)
+			}
+		})
+	}
+}
+
 func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	_, err := Load(writeConfig(t, `{
@@ -126,7 +156,12 @@ func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "fleet-manager.json")
+	return writeConfigWithExtension(t, body, ".json")
+}
+
+func writeConfigWithExtension(t *testing.T, body, extension string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "fleet-manager"+extension)
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
