@@ -3,6 +3,7 @@ package me
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,12 +15,40 @@ import (
 )
 
 type recordingInstallationVerifier struct {
-	verified []int64
+	mu            sync.Mutex
+	verified      []int64
+	errors        []error
+	cancelRequest context.CancelFunc
 }
 
-func (v *recordingInstallationVerifier) VerifyInstallation(_ context.Context, installationID int64) error {
+func (v *recordingInstallationVerifier) VerifyInstallation(ctx context.Context, installationID int64) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.cancelRequest != nil {
+		v.cancelRequest()
+	}
 	v.verified = append(v.verified, installationID)
+	v.errors = append(v.errors, ctx.Err())
 	return nil
+}
+
+func TestVerifyVCSProviderInstallationsFinishesChecksAfterThePageCancelsTheRequest(t *testing.T) {
+	r := support.Setup(t)
+	setVCSProviderGitHubAppEnvironment(t)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "101", "octocat", "", ""),
+	))
+	saveInstallationWithRepositories(t, 301, []int64{401}, 101)
+	ctx, cancel := context.WithCancel(notificationSettingsContext(r.User.String(), r.Organization.ID.String()))
+	defer cancel()
+	verifier := &recordingInstallationVerifier{cancelRequest: cancel}
+
+	_, err := VerifyVCSProviderInstallations(ctx, models.ProviderGitHub, NewVCSProviderInstallationChecks(time.Minute), verifier)
+	require.NoError(t, err)
+
+	assert.Equal(t, []int64{301}, verifier.verified)
+	assert.Equal(t, []error{nil}, verifier.errors)
 }
 
 func TestVerifyVCSProviderInstallationsChecksVisibleInstallationsOncePerInterval(t *testing.T) {

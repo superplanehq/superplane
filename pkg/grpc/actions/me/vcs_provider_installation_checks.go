@@ -10,6 +10,12 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
+	"golang.org/x/sync/errgroup"
+)
+
+const (
+	vcsProviderInstallationCheckConcurrency = 4
+	vcsProviderInstallationCheckTimeout     = 15 * time.Second
 )
 
 type VCSProviderInstallationVerifier interface {
@@ -23,6 +29,7 @@ type VCSProviderInstallationChecks struct {
 	interval  time.Duration
 	mu        sync.Mutex
 	checkedAt map[int64]time.Time
+	prunedAt  time.Time
 }
 
 func NewVCSProviderInstallationChecks(interval time.Duration) *VCSProviderInstallationChecks {
@@ -34,20 +41,28 @@ func NewVCSProviderInstallationChecks(interval time.Duration) *VCSProviderInstal
 func (c *VCSProviderInstallationChecks) due(installationIDs []int64, now time.Time) []int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for installationID, checkedAt := range c.checkedAt {
-		if now.Sub(checkedAt) >= c.interval {
-			delete(c.checkedAt, installationID)
-		}
-	}
+	c.pruneExpired(now)
 	due := make([]int64, 0, len(installationIDs))
 	for _, installationID := range installationIDs {
-		if _, checked := c.checkedAt[installationID]; checked {
+		if checkedAt, checked := c.checkedAt[installationID]; checked && now.Sub(checkedAt) < c.interval {
 			continue
 		}
 		c.checkedAt[installationID] = now
 		due = append(due, installationID)
 	}
 	return due
+}
+
+func (c *VCSProviderInstallationChecks) pruneExpired(now time.Time) {
+	if now.Sub(c.prunedAt) < c.interval {
+		return
+	}
+	c.prunedAt = now
+	for installationID, checkedAt := range c.checkedAt {
+		if now.Sub(checkedAt) >= c.interval {
+			delete(c.checkedAt, installationID)
+		}
+	}
 }
 
 // VerifyVCSProviderInstallations checks that the installations the user can
@@ -86,12 +101,26 @@ func VerifyVCSProviderInstallations(
 		installationIDs = append(installationIDs, repository.InstallationID)
 	}
 
-	for _, installationID := range checks.due(installationIDs, time.Now()) {
-		if err := verifier.VerifyInstallation(ctx, installationID); err != nil {
-			log.WithError(err).
-				WithField("installation_id", installationID).
-				Warn("failed to verify VCS provider installation")
-		}
-	}
+	verifyInstallations(ctx, verifier, checks.due(installationIDs, time.Now()))
 	return &pb.VerifyVCSProviderInstallationsResponse{}, nil
+}
+
+// The installations are already recorded as checked, so the checks must
+// finish even when the page closes the request early.
+func verifyInstallations(ctx context.Context, verifier VCSProviderInstallationVerifier, installationIDs []int64) {
+	checkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), vcsProviderInstallationCheckTimeout)
+	defer cancel()
+	var checks errgroup.Group
+	checks.SetLimit(vcsProviderInstallationCheckConcurrency)
+	for _, installationID := range installationIDs {
+		checks.Go(func() error {
+			if err := verifier.VerifyInstallation(checkCtx, installationID); err != nil {
+				log.WithError(err).
+					WithField("installation_id", installationID).
+					Warn("failed to verify VCS provider installation")
+			}
+			return nil
+		})
+	}
+	_ = checks.Wait()
 }
