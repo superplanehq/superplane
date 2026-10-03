@@ -4,8 +4,6 @@ import { Clock } from "lucide-react";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
-import { FirstRunSkeletonRows } from "./FirstRunSkeletonRows";
-
 const copy = FIRST_RUN_COPY.choose;
 
 /**
@@ -69,13 +67,6 @@ export function FirstRunOrganizationStep({
               {copy.useOrganization(organization)}
             </Button>
           ))}
-          {synchronizing ? (
-            <FirstRunSkeletonRows
-              count={empty ? 2 : 1}
-              label={copy.loadingOrganizations}
-              testId="first-run-organizations-loading"
-            />
-          ) : null}
           {missingAccess}
         </div>
       )}

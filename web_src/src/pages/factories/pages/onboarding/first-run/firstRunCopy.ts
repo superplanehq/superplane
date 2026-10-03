@@ -39,7 +39,6 @@ export const FIRST_RUN_COPY = {
     useOrganization: (organization: string) => `Use ${organization}`,
     missingOrganization: "Do not see your GitHub account or organization?",
     organizationWriteAccessHint: "You need write access to at least one repository in an organization.",
-    loadingOrganizations: "Loading organizations from GitHub",
     synchronizingOrganizations: "Organizations appear as GitHub verifies access…",
     headline: "Choose your first repository",
     switchAccount: "Switch account",
