@@ -18,7 +18,6 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
 import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
 import { FirstRunOrganizationStep } from "./FirstRunOrganizationStep";
-import { FirstRunSkeletonRows } from "./FirstRunSkeletonRows";
 import {
   findOrganization,
   ownerOfRepository,
@@ -110,7 +109,6 @@ export function FirstRunChooseScreen({
               repositories={repositoriesInOrganization(repositories, organization)}
               selectedRepository={selectedRepository}
               busy={busy}
-              synchronizing={synchronizing}
               grantAccessDisabled={grantAccessDisabled}
               grantingAccess={grantingAccess}
               onSelectRepository={onSelectRepository}
@@ -263,7 +261,6 @@ function RepositoryStepBody({
   repositories,
   selectedRepository,
   busy,
-  synchronizing,
   grantAccessDisabled,
   grantingAccess,
   onSelectRepository,
@@ -272,7 +269,6 @@ function RepositoryStepBody({
   repositories: string[];
   selectedRepository: string | null;
   busy: boolean;
-  synchronizing: boolean;
   grantAccessDisabled: boolean;
   grantingAccess: boolean;
   onSelectRepository: (repository: string) => void;
@@ -288,9 +284,6 @@ function RepositoryStepBody({
         listClassName="max-h-48"
         onSelect={onSelectRepository}
       />
-      {synchronizing ? (
-        <FirstRunSkeletonRows count={1} label={copy.loadingRepositories} testId="first-run-repositories-loading-more" />
-      ) : null}
       <FirstRunMissingAccessLine
         hint={copy.writeAccessHint}
         question={copy.missingRepository}
