@@ -15,6 +15,7 @@ import (
 	pwssh "golang.org/x/crypto/ssh"
 	"gorm.io/datatypes"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -101,6 +102,7 @@ func (s *sshLineEndingsSteps) createPasswordSecret() {
 	require.NoError(s.t, err)
 
 	_, err = models.CreateSecret(
+		uuid.New(),
 		sshLineEndingSecretName,
 		secrets.ProviderLocal,
 		s.session.Account.ID.String(),
