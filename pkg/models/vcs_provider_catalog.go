@@ -829,10 +829,29 @@ func ReplaceVCSProviderInstallRequests(tx *gorm.DB, provider string, requests []
 	})
 }
 
+// GitHub keeps an approved request in its list for a short time after the
+// installation exists. The row stays, so the setup callback can still tell
+// that an admin approved it, but the account no longer waits for approval.
+const vcsProviderInstallRequestNotInstalled = `NOT EXISTS (
+	SELECT 1
+	FROM vcs_provider_installations AS installation
+	WHERE installation.provider = vcs_provider_install_requests.provider
+		AND (
+			installation.account_id = vcs_provider_install_requests.account_id
+			OR (
+				vcs_provider_install_requests.account_id IS NULL
+				AND LOWER(installation.account_login) = LOWER(vcs_provider_install_requests.account_login)
+			)
+		)
+)`
+
+// ListVCSProviderInstallRequests lists the requests that still wait for
+// approval.
 func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID int64) ([]VCSProviderInstallRequest, error) {
 	var requests []VCSProviderInstallRequest
 	err := tx.
 		Where("provider = ? AND requester_id = ?", provider, requesterID).
+		Where(vcsProviderInstallRequestNotInstalled).
 		Order("requested_at ASC").
 		Find(&requests).
 		Error
@@ -841,7 +860,12 @@ func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID in
 
 func HasVCSProviderInstallRequests(tx *gorm.DB, provider string) (bool, error) {
 	var count int64
-	err := tx.Model(&VCSProviderInstallRequest{}).Where("provider = ?", provider).Limit(1).Count(&count).Error
+	err := tx.Model(&VCSProviderInstallRequest{}).
+		Where("provider = ?", provider).
+		Where(vcsProviderInstallRequestNotInstalled).
+		Limit(1).
+		Count(&count).
+		Error
 	return count > 0, err
 }
 
