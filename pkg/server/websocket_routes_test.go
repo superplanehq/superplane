@@ -1,6 +1,10 @@
 package server
 
-import "testing"
+import (
+	"testing"
+
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+)
 
 func TestShouldRegisterWebSocketRoutes(t *testing.T) {
 	tests := []struct {
@@ -67,4 +71,35 @@ func TestGetRunnerAPIBaseURL(t *testing.T) {
 			t.Fatalf("getRunnerAPIBaseURL() = %q, want %q", got, "https://app.example")
 		}
 	})
+}
+
+func TestNewRunnerActiveLogStoreUsesConfiguredPath(t *testing.T) {
+	t.Setenv("RUNNER_ACTIVE_LOG_FS_PATH", t.TempDir())
+	t.Setenv("START_RUNNER_API", "")
+	t.Setenv("START_RUNNER_LOG_COMPACTOR", "")
+	t.Setenv("START_RUNNER_CLEANUP_WORKER", "")
+
+	store, err := newRunnerActiveLogStore()
+	if err != nil {
+		t.Fatalf("newRunnerActiveLogStore() error = %v", err)
+	}
+	if store == nil {
+		t.Fatal("newRunnerActiveLogStore() = nil, want configured store")
+	}
+	if store.Name() != runnerlogs.StoreFS {
+		t.Fatalf("newRunnerActiveLogStore().Name() = %q, want %q", store.Name(), runnerlogs.StoreFS)
+	}
+}
+
+func TestNewRunnerActiveLogStoreDoesNotRequirePathForCleanupWorker(t *testing.T) {
+	t.Setenv("RUNNER_ACTIVE_LOG_FS_PATH", "")
+	t.Setenv("START_RUNNER_CLEANUP_WORKER", "yes")
+
+	store, err := newRunnerActiveLogStore()
+	if err != nil {
+		t.Fatalf("newRunnerActiveLogStore() error = %v", err)
+	}
+	if store != nil {
+		t.Fatalf("newRunnerActiveLogStore() = %T, want nil", store)
+	}
 }
