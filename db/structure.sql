@@ -876,6 +876,8 @@ CREATE TABLE public.factory_work_orders (
     repository text,
     default_branch text,
     auto_start_line_id uuid,
+    mcp_client_id text,
+    mcp_client_name text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -976,6 +978,29 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
+-- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.linear_webhook_receipts (
+    id uuid NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    integration_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    webhook_id uuid NOT NULL,
+    event_type text DEFAULT ''::text NOT NULL,
+    action text DEFAULT ''::text NOT NULL,
+    issue_identifier text DEFAULT ''::text NOT NULL,
+    issue_id text DEFAULT ''::text NOT NULL,
+    team_key text DEFAULT ''::text NOT NULL,
+    workspace_key text DEFAULT ''::text NOT NULL,
+    http_status integer NOT NULL,
+    outcome text NOT NULL,
+    subscription_count integer DEFAULT 0 NOT NULL,
+    task_ids text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1161,6 +1186,128 @@ CREATE TABLE public.role_metadata (
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: runner_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_credentials (
+    runner_id uuid NOT NULL,
+    access_token_hash text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone
+);
+
+
+--
+-- Name: runner_fleets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_fleets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    scope_type character varying(32) NOT NULL,
+    scope_id uuid,
+    slug text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    runner_version text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT runner_fleets_runner_version_check CHECK ((runner_version <> ''::text)),
+    CONSTRAINT runner_fleets_scope_check CHECK (((((scope_type)::text = 'installation'::text) AND (scope_id IS NULL)) OR (((scope_type)::text = 'organization'::text) AND (scope_id IS NOT NULL)))),
+    CONSTRAINT runner_fleets_scope_type_check CHECK (((scope_type)::text = ANY ((ARRAY['installation'::character varying, 'organization'::character varying])::text[]))),
+    CONSTRAINT runner_fleets_slug_check CHECK ((slug <> ''::text)),
+    CONSTRAINT runner_fleets_spec_check CHECK ((jsonb_typeof(spec) = 'object'::text))
+);
+
+
+--
+-- Name: runner_registrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_registrations (
+    jti uuid NOT NULL,
+    runner_id uuid NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: runner_task_log_lifecycles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_task_log_lifecycles (
+    task_id uuid NOT NULL,
+    active_store text NOT NULL,
+    state character varying(32) DEFAULT 'active'::character varying NOT NULL,
+    final_object_key text,
+    final_cursor text,
+    truncated boolean DEFAULT false NOT NULL,
+    cleanup_after timestamp with time zone,
+    processing_until timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT runner_task_log_lifecycles_active_store_check CHECK ((active_store <> ''::text)),
+    CONSTRAINT runner_task_log_lifecycles_state_check CHECK (((state)::text = ANY ((ARRAY['active'::character varying, 'archivable'::character varying, 'archiving'::character varying, 'archived'::character varying])::text[])))
+);
+
+
+--
+-- Name: runner_tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_tasks (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    fleet_id uuid NOT NULL,
+    runner_id uuid,
+    backend character varying(32) NOT NULL,
+    state character varying(32) DEFAULT 'queued'::character varying NOT NULL,
+    payload_ciphertext bytea NOT NULL,
+    result jsonb,
+    exit_code integer,
+    error_message text,
+    completion_hash text,
+    cancel_requested_at timestamp with time zone,
+    queued_at timestamp with time zone DEFAULT now() NOT NULL,
+    reserved_at timestamp with time zone,
+    started_at timestamp with time zone,
+    finished_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT runner_tasks_backend_check CHECK (((backend)::text = ANY ((ARRAY['legacy'::character varying, 'integrated'::character varying])::text[]))),
+    CONSTRAINT runner_tasks_state_check CHECK (((state)::text = ANY ((ARRAY['queued'::character varying, 'reserved'::character varying, 'running'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'canceled'::character varying, 'lost'::character varying])::text[])))
+);
+
+
+--
+-- Name: runners; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runners (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    fleet_id uuid NOT NULL,
+    state character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    runner_version text NOT NULL,
+    ephemeral boolean DEFAULT false NOT NULL,
+    creation_idempotency_key text,
+    creation_request_hash text,
+    registered_at timestamp with time zone,
+    last_seen_at timestamp with time zone,
+    current_connection_id uuid,
+    termination_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    terminated_at timestamp with time zone,
+    CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
+    CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
+    CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
 );
 
 
@@ -2284,6 +2431,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: linear_webhook_receipts linear_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.linear_webhook_receipts
+    ADD CONSTRAINT linear_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mcp_oauth_clients mcp_oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2385,6 +2540,62 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.role_metadata
     ADD CONSTRAINT role_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_credentials runner_credentials_access_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credentials
+    ADD CONSTRAINT runner_credentials_access_token_hash_key UNIQUE (access_token_hash);
+
+
+--
+-- Name: runner_credentials runner_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credentials
+    ADD CONSTRAINT runner_credentials_pkey PRIMARY KEY (runner_id);
+
+
+--
+-- Name: runner_fleets runner_fleets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_fleets
+    ADD CONSTRAINT runner_fleets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_registrations runner_registrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_registrations
+    ADD CONSTRAINT runner_registrations_pkey PRIMARY KEY (jti);
+
+
+--
+-- Name: runner_task_log_lifecycles runner_task_log_lifecycles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_log_lifecycles
+    ADD CONSTRAINT runner_task_log_lifecycles_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: runner_tasks runner_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runners runners_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runners
+    ADD CONSTRAINT runners_pkey PRIMARY KEY (id);
 
 
 --
@@ -3395,6 +3606,13 @@ CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (gro
 
 
 --
+-- Name: idx_linear_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_received_at ON public.linear_webhook_receipts USING btree (received_at DESC);
+
+
+--
 -- Name: idx_node_requests_state_run_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3812,6 +4030,83 @@ CREATE INDEX index_organizations_on_created_by_account_id ON public.organization
 --
 
 CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: runner_fleets_scope_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_fleets_scope_idx ON public.runner_fleets USING btree (scope_type, scope_id) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: runner_fleets_scope_slug_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_fleets_scope_slug_key ON public.runner_fleets USING btree (scope_type, COALESCE(scope_id, '00000000-0000-0000-0000-000000000000'::uuid), slug) WHERE (deleted_at IS NULL);
+
+
+--
+-- Name: runner_registrations_active_runner_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_registrations_active_runner_key ON public.runner_registrations USING btree (runner_id) WHERE ((consumed_at IS NULL) AND (revoked_at IS NULL));
+
+
+--
+-- Name: runner_registrations_expiry_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_registrations_expiry_idx ON public.runner_registrations USING btree (expires_at) WHERE ((consumed_at IS NULL) AND (revoked_at IS NULL));
+
+
+--
+-- Name: runner_task_log_lifecycles_archiving_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_task_log_lifecycles_archiving_idx ON public.runner_task_log_lifecycles USING btree (state, updated_at) WHERE ((state)::text = ANY ((ARRAY['archivable'::character varying, 'archiving'::character varying, 'archived'::character varying])::text[]));
+
+
+--
+-- Name: runner_tasks_fleet_state_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_fleet_state_idx ON public.runner_tasks USING btree (fleet_id, state, queued_at);
+
+
+--
+-- Name: runner_tasks_organization_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_organization_idx ON public.runner_tasks USING btree (organization_id, created_at);
+
+
+--
+-- Name: runner_tasks_runner_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_tasks_runner_id_key ON public.runner_tasks USING btree (runner_id) WHERE ((runner_id IS NOT NULL) AND ((state)::text = ANY ((ARRAY['reserved'::character varying, 'running'::character varying])::text[])));
+
+
+--
+-- Name: runners_creation_idempotency_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runners_creation_idempotency_key ON public.runners USING btree (creation_idempotency_key) WHERE (creation_idempotency_key IS NOT NULL);
+
+
+--
+-- Name: runners_fleet_state_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runners_fleet_state_idx ON public.runners USING btree (fleet_id, state);
+
+
+--
+-- Name: runners_last_seen_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runners_last_seen_idx ON public.runners USING btree (last_seen_at) WHERE ((state)::text = ANY ((ARRAY['idle'::character varying, 'busy'::character varying])::text[]));
 
 
 --
@@ -4660,6 +4955,70 @@ ALTER TABLE ONLY public.organization_invite_links
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_created_by_account_id_fkey FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: runner_credentials runner_credentials_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_credentials
+    ADD CONSTRAINT runner_credentials_runner_id_fkey FOREIGN KEY (runner_id) REFERENCES public.runners(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_fleets runner_fleets_scope_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_fleets
+    ADD CONSTRAINT runner_fleets_scope_id_fkey FOREIGN KEY (scope_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: runner_registrations runner_registrations_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_registrations
+    ADD CONSTRAINT runner_registrations_runner_id_fkey FOREIGN KEY (runner_id) REFERENCES public.runners(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_task_log_lifecycles runner_task_log_lifecycles_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_task_log_lifecycles
+    ADD CONSTRAINT runner_task_log_lifecycles_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.runner_tasks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_tasks runner_tasks_fleet_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_fleet_id_fkey FOREIGN KEY (fleet_id) REFERENCES public.runner_fleets(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: runner_tasks runner_tasks_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: runner_tasks runner_tasks_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_runner_id_fkey FOREIGN KEY (runner_id) REFERENCES public.runners(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: runners runners_fleet_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runners
+    ADD CONSTRAINT runners_fleet_id_fkey FOREIGN KEY (fleet_id) REFERENCES public.runner_fleets(id) ON DELETE RESTRICT;
 
 
 --

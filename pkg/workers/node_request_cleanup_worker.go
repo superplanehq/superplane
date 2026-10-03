@@ -62,6 +62,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 
 	w.deleteExpiredSentryWebhookReceipts()
 	w.deleteExpiredDatadogWebhookReceipts()
+	w.deleteExpiredLinearWebhookReceipts()
 
 	startedAt := time.Now()
 	olderThan := startedAt.AddDate(0, 0, -w.retentionDays)
@@ -104,6 +105,23 @@ func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {
 		"deleted":    deleted,
 		"older_than": cutoff.Format(time.RFC3339),
 	}).Info("Deleted expired Sentry webhook receipts")
+}
+
+func (w *NodeRequestCleanupWorker) deleteExpiredLinearWebhookReceipts() {
+	cutoff := time.Now().UTC().Add(-models.LinearWebhookReceiptRetention)
+	deleted, err := models.DeleteExpiredLinearWebhookReceipts(database.Conn(), cutoff, webhookReceiptCleanupBatch)
+	if err != nil {
+		w.logger.Errorf("Error cleaning Linear webhook receipts: %v", err)
+		return
+	}
+	if deleted == 0 {
+		return
+	}
+
+	w.logger.WithFields(log.Fields{
+		"deleted":    deleted,
+		"older_than": cutoff.Format(time.RFC3339),
+	}).Info("Deleted expired Linear webhook receipts")
 }
 
 func (w *NodeRequestCleanupWorker) deleteExpiredDatadogWebhookReceipts() {

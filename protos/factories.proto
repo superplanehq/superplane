@@ -1211,6 +1211,7 @@ message FactoryIntake {
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
+    SOURCE_LINEAR_ISSUES = 8;
   }
 
   enum InitialImportStatus {
@@ -1302,6 +1303,12 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
+    // Projects that still create a task. Required for a Linear intake.
+    // Linear issue intakes only.
+    repeated string linear_project_ids = 21;
+    // Label names that still create a task. Empty means every label.
+    // Linear issue intakes only.
+    repeated string linear_labels = 22;
   }
 
   string id = 1;
@@ -1825,6 +1832,9 @@ message WorkOrder {
   // Set after an auto-start attempt that did not start the task.
   // Empty before the attempt, and empty again after a successful start.
   string auto_start_line_id = 25;
+  // MCP client that created this task through a hand-off. Empty for
+  // tasks that did not come from an MCP client.
+  WorkOrderMcpClient mcp_client = 26;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -1854,6 +1864,9 @@ message WorkOrderSummary {
   PlanningSessionSummary planning_session = 19;
   // Pull requests tracked on this task.
   repeated FactoryPullRequest pull_requests = 20;
+  // MCP client that created this task through a hand-off. Empty for
+  // tasks that did not come from an MCP client.
+  WorkOrderMcpClient mcp_client = 21;
 }
 
 // WorkOrderCheckScore is the board-card view of a check.
@@ -1868,6 +1881,12 @@ message WorkOrderCheckScore {
 message WorkOrderOrigin {
   string url = 1;
   string label = 2;
+}
+
+// MCP OAuth client that handed a task to Implement or Verify.
+message WorkOrderMcpClient {
+  string id = 1;
+  string name = 2;
 }
 
 // WorkOrderStatusNote announces what a waiting work order is blocked on

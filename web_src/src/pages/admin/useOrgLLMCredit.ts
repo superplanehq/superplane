@@ -22,6 +22,54 @@ export type OrganizationBillingPlan = {
   current_period_end: string | null;
 };
 
+const TRIAL_LENGTH_DAYS = 14;
+
+export function utcCalendarDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+export function prefilledTrialEndDate(trialEndsAt: string | null, now = new Date()): string {
+  if (trialEndsAt) {
+    const parsed = new Date(trialEndsAt);
+    if (!Number.isNaN(parsed.getTime()) && parsed.getTime() > now.getTime()) {
+      return utcCalendarDate(parsed);
+    }
+  }
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  day.setUTCDate(day.getUTCDate() + TRIAL_LENGTH_DAYS);
+  return utcCalendarDate(day);
+}
+
+export function utcTrialEndTimestamp(calendarDate: string): string {
+  return `${calendarDate}T23:59:59Z`;
+}
+
+export function isFutureUtcTrialEnd(calendarDate: string, now = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
+    return false;
+  }
+  const end = new Date(utcTrialEndTimestamp(calendarDate));
+  return !Number.isNaN(end.getTime()) && end.getTime() > now.getTime();
+}
+
+function billingPlanRequest(plan: string, trialEndsOn: string): { plan: string; trial_ends_at?: string } {
+  if (plan !== "trial") {
+    return { plan };
+  }
+  return { plan, trial_ends_at: utcTrialEndTimestamp(trialEndsOn) };
+}
+
+export function formatUtcTrialEnd(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return utcCalendarDate(parsed);
+}
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   const text = await response.text();
   if (text.trim() === "") {
@@ -38,12 +86,15 @@ async function fetchOrganizationBillingPlan(orgId: string): Promise<Organization
   return (await response.json()) as OrganizationBillingPlan;
 }
 
-async function putOrganizationBillingPlan(orgId: string, plan: string): Promise<OrganizationBillingPlan> {
+async function putOrganizationBillingPlan(
+  orgId: string,
+  body: { plan: string; trial_ends_at?: string },
+): Promise<OrganizationBillingPlan> {
   const response = await fetch(`/admin/api/organizations/${orgId}/billing-plan`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Failed to set billing plan"));
@@ -77,6 +128,7 @@ export function useOrgLLMCredit(orgId: string) {
   const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [planValue, setPlanValue] = useState("trial");
+  const [trialEndsOn, setTrialEndsOn] = useState("");
   const [loading, setLoading] = useState(true);
   const [grantDollars, setGrantDollars] = useState("");
   const [note, setNote] = useState("");
@@ -93,6 +145,7 @@ export function useOrgLLMCredit(orgId: string) {
   const applyPlan = useCallback((nextPlan: OrganizationBillingPlan) => {
     setPlan(nextPlan);
     setPlanValue(nextPlan.plan || "none");
+    setTrialEndsOn(prefilledTrialEndDate(nextPlan.trial_ends_at));
   }, []);
 
   const loadCredit = useCallback(async () => {
@@ -160,9 +213,12 @@ export function useOrgLLMCredit(orgId: string) {
   };
 
   const savePlan = async () => {
+    if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
+      return;
+    }
     setSavingPlan(true);
     try {
-      applyPlan(await putOrganizationBillingPlan(orgId, planValue));
+      applyPlan(await putOrganizationBillingPlan(orgId, billingPlanRequest(planValue, trialEndsOn)));
       showSuccessToast("Billing plan updated");
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
@@ -176,6 +232,9 @@ export function useOrgLLMCredit(orgId: string) {
     plan,
     planValue,
     setPlanValue,
+    trialEndsOn,
+    setTrialEndsOn,
+    trialEndInvalid: planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn),
     loading,
     grantDollars,
     setGrantDollars,
