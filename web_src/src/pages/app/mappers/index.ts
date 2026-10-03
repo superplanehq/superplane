@@ -23,6 +23,7 @@ import { updateMemoryMapper } from "./updateMemory";
 import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
+import { waitForEndpointMapper, WAIT_FOR_ENDPOINT_STATE_REGISTRY } from "./waitForEndpoint";
 import { graphqlMapper, GRAPHQL_STATE_REGISTRY } from "./graphql";
 import {
   componentMappers as semaphoreComponentMappers,
@@ -313,6 +314,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   if: ifMapper,
   loop: loopMapper,
   http: httpMapper,
+  waitForEndpoint: waitForEndpointMapper,
   graphql: graphqlMapper,
   ssh: sshMapper,
   runner: runnerMapper,
@@ -489,6 +491,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
+  waitForEndpoint: WAIT_FOR_ENDPOINT_STATE_REGISTRY,
   graphql: GRAPHQL_STATE_REGISTRY,
   ssh: SSH_STATE_REGISTRY,
   runner: RUNNER_STATE_REGISTRY,
