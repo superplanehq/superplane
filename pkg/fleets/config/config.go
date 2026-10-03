@@ -1,11 +1,16 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -71,9 +76,7 @@ func Load(path string) (*Config, error) {
 	defer file.Close()
 
 	var config Config
-	decoder := json.NewDecoder(file)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&config); err != nil {
+	if err := decode(file, filepath.Ext(path), &config); err != nil {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 	if token := strings.TrimSpace(os.Getenv("INSTALLATION_ADMIN_TOKEN")); token != "" {
@@ -84,6 +87,34 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	return &config, nil
+}
+
+func decode(reader io.Reader, extension string, config *Config) error {
+	switch strings.ToLower(extension) {
+	case ".json":
+		return decodeJSON(reader, config)
+	case ".yml", ".yaml":
+		var document any
+		if err := yaml.NewDecoder(reader).Decode(&document); err != nil {
+			return err
+		}
+		raw, err := json.Marshal(document)
+		if err != nil {
+			return err
+		}
+		return decodeJSON(bytes.NewReader(raw), config)
+	default:
+		return fmt.Errorf(
+			"unsupported file extension %q; use .json, .yml, or .yaml",
+			extension,
+		)
+	}
+}
+
+func decodeJSON(reader io.Reader, config *Config) error {
+	decoder := json.NewDecoder(reader)
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(config)
 }
 
 func (c *Config) ReconcileInterval() time.Duration {

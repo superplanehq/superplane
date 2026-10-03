@@ -2,9 +2,10 @@
 
 This process reconciles SuperPlane runner demand with configured infrastructure
 providers. A fleet can use AWS or Docker. Fleet Manager only uses the
-installation admin HTTP API. Set `FLEET_MANAGER_CONFIG_FILE` to the JSON
-configuration path. The default is
-`/etc/superplane/fleet-manager.json`.
+installation admin HTTP API. Set `FLEET_MANAGER_CONFIG_FILE` to the
+configuration path. Fleet Manager accepts JSON files with a `.json` extension.
+It accepts YAML files with a `.yml` or `.yaml` extension. The default is
+`/etc/superplane/fleet-manager.yaml`.
 
 Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
