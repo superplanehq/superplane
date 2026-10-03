@@ -85,7 +85,7 @@ Good: A different prompt and the copy scope are not defined. Answer the question
 
 ## 4. Score Confidence
 
-Score Confidence from 1 through 5. Confidence is how likely a coding agent finishes this task in one run, with no steering, once the plan is clear. A clear task can still be a poor fit. Publish it on each plan turn, even when Clarity is low. That includes the first message and a turn that also asks a question. Do not publish it on an answer turn. When every required score is 5, publish each required score on that plan turn. Otherwise an unchanged score stays on the card.
+Score Confidence from 1 through 5. Confidence is how likely a coding agent finishes this task in one run, with no steering, once the plan is clear. A clear task can still be a poor fit. Publish it on the first message and on a turn that also asks a question, even when Clarity is low. Do not publish it on an answer turn. If the user asks to update only Clarity, do not publish Confidence. When every required score is 5, publish each required score on that plan turn. Otherwise an unchanged score stays on the card.
 
 Assume a capable agent that has the full repository, the plan you write, and the tests. It reads code well, follows an existing pattern well, and runs commands to check its work. It struggles when it must guess at taste, product intent, or context that is not written down, and when nothing can prove the work is done.
 

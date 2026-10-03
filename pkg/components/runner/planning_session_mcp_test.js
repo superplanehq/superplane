@@ -27,7 +27,8 @@ test("analysis protocol omits a disabled score tool", () => {
   const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
   assert.match(clarityOnly, /propose_clarity/);
   assert.doesNotMatch(clarityOnly, /propose_confidence/);
-  assert.match(clarityOnly, /Publish a Clarity score on each plan turn, including a turn that also asks a question/);
+  assert.match(clarityOnly, /Publish a Clarity score on the first message/);
+  assert.doesNotMatch(clarityOnly, /only one score/);
   assert.match(clarityOnly, /The first message is a plan turn/);
   assert.match(clarityOnly, /If no score is published yet, this turn is a plan turn/);
   assert.doesNotMatch(clarityOnly, /question turn/);
@@ -39,7 +40,8 @@ test("analysis protocol omits a disabled score tool", () => {
   const confidenceOnly = analysisProtocol({ SUPERPLANE_PLANNING_CLARITY: "false" });
   assert.match(confidenceOnly, /propose_confidence/);
   assert.doesNotMatch(confidenceOnly, /propose_clarity/);
-  assert.match(confidenceOnly, /Publish a Confidence score on each plan turn, including a turn that also asks a question/);
+  assert.match(confidenceOnly, /Publish a Confidence score on the first message/);
+  assert.doesNotMatch(confidenceOnly, /only one score/);
   assert.match(confidenceOnly, /An unclear draft is still a plan turn/);
   assert.doesNotMatch(confidenceOnly, /question turn/);
   assert.match(confidenceOnly, /When every required score is 5, publish each required score on that plan turn/);
@@ -120,6 +122,8 @@ test("analysis protocol covers publish tools and hides chat dumps", () => {
   assert.match(pack, /An unclear draft is still a plan turn/);
   assert.match(pack, /publish each required score first/);
   assert.match(pack, /Do not call them on an answer turn/);
+  assert.match(pack, /If the user asks to update only one score, call that score tool only/);
+  assert.doesNotMatch(pack, /on each plan turn/);
   assert.doesNotMatch(pack, /question turn/);
   assert.match(pack, /Do not add that sentence on a turn that already updates the plan/);
   assert.match(pack, /Do not name files/);
@@ -183,6 +187,7 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.match(pack, /The first message is not an answer turn/);
   assert.match(pack, /An unclear draft is still a plan turn/);
   assert.match(pack, /Publish Clarity on the first plan turn, even when you ask a question/);
+  assert.match(pack, /If the user asks to update only Clarity, do not publish Confidence/);
   assert.doesNotMatch(pack, /when the user has not asked a question/);
   assert.doesNotMatch(pack, /question turn/);
   assert.match(pack, /which file, type, test, command, or API owns a behavior, name it/);
@@ -405,7 +410,8 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.deepEqual(spec.inputSchema.required, ["body"]);
   assert.match(spec.description, /Do not leave a written plan unpublished/);
   assert.match(clarity.description, /how well the task is defined/);
-  assert.match(clarity.description, /on each plan turn, including the first message and a turn that also asks a question/);
+  assert.match(clarity.description, /on the first message and on a plan turn that also asks a question/);
+  assert.match(clarity.description, /If the user asks to update only the other score, do not call this tool/);
   assert.match(clarity.description, /When every required score is 5/);
   assert.match(clarity.description, /Do not call it on an answer turn/);
   assert.match(clarity.description, /Call it before survey/);
@@ -415,7 +421,8 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.match(clarity.description, /without propose_spec/);
   assert.match(clarity.inputSchema.properties.summary.description, /Follow the task prompt/);
   assert.match(confidence.description, /how likely a coding agent completes this task in one run/);
-  assert.match(confidence.description, /on each plan turn, including the first message and a turn that also asks a question/);
+  assert.match(confidence.description, /on the first message and on a plan turn that also asks a question/);
+  assert.match(confidence.description, /If the user asks to update only the other score, do not call this tool/);
   assert.match(confidence.description, /When every required score is 5/);
   assert.match(confidence.description, /Do not call it on an answer turn/);
   assert.match(confidence.description, /Call it before survey/);
