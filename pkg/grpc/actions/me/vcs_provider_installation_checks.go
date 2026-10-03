@@ -28,29 +28,44 @@ type VCSProviderInstallationVerifier interface {
 type VCSProviderInstallationChecks struct {
 	interval  time.Duration
 	mu        sync.Mutex
+	running   map[int64]struct{}
 	checkedAt map[int64]time.Time
 	prunedAt  time.Time
 }
 
 func NewVCSProviderInstallationChecks(interval time.Duration) *VCSProviderInstallationChecks {
-	return &VCSProviderInstallationChecks{interval: interval, checkedAt: map[int64]time.Time{}}
+	return &VCSProviderInstallationChecks{
+		interval:  interval,
+		running:   map[int64]struct{}{},
+		checkedAt: map[int64]time.Time{},
+	}
 }
 
-// due returns the installations that were not checked in the interval and
-// records them as checked at now.
-func (c *VCSProviderInstallationChecks) due(installationIDs []int64, now time.Time) []int64 {
+// start returns the installations that have no running check and no check
+// that finished in the interval, and records their checks as running.
+func (c *VCSProviderInstallationChecks) start(installationIDs []int64, now time.Time) []int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.pruneExpired(now)
-	due := make([]int64, 0, len(installationIDs))
+	started := make([]int64, 0, len(installationIDs))
 	for _, installationID := range installationIDs {
+		if _, running := c.running[installationID]; running {
+			continue
+		}
 		if checkedAt, checked := c.checkedAt[installationID]; checked && now.Sub(checkedAt) < c.interval {
 			continue
 		}
-		c.checkedAt[installationID] = now
-		due = append(due, installationID)
+		c.running[installationID] = struct{}{}
+		started = append(started, installationID)
 	}
-	return due
+	return started
+}
+
+func (c *VCSProviderInstallationChecks) finish(installationID int64, now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.running, installationID)
+	c.checkedAt[installationID] = now
 }
 
 func (c *VCSProviderInstallationChecks) pruneExpired(now time.Time) {
@@ -101,19 +116,25 @@ func VerifyVCSProviderInstallations(
 		installationIDs = append(installationIDs, repository.InstallationID)
 	}
 
-	verifyInstallations(ctx, verifier, checks.due(installationIDs, time.Now()))
+	verifyInstallations(ctx, verifier, checks, checks.start(installationIDs, time.Now()))
 	return &pb.VerifyVCSProviderInstallationsResponse{}, nil
 }
 
-// The installations are already recorded as checked, so the checks must
+// The installations are already recorded as running, so the checks must
 // finish even when the page closes the request early.
-func verifyInstallations(ctx context.Context, verifier VCSProviderInstallationVerifier, installationIDs []int64) {
+func verifyInstallations(
+	ctx context.Context,
+	verifier VCSProviderInstallationVerifier,
+	checks *VCSProviderInstallationChecks,
+	installationIDs []int64,
+) {
 	checkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), vcsProviderInstallationCheckTimeout)
 	defer cancel()
-	var checks errgroup.Group
-	checks.SetLimit(vcsProviderInstallationCheckConcurrency)
+	var group errgroup.Group
+	group.SetLimit(vcsProviderInstallationCheckConcurrency)
 	for _, installationID := range installationIDs {
-		checks.Go(func() error {
+		group.Go(func() error {
+			defer func() { checks.finish(installationID, time.Now()) }()
 			if err := verifier.VerifyInstallation(checkCtx, installationID); err != nil {
 				log.WithError(err).
 					WithField("installation_id", installationID).
@@ -122,5 +143,5 @@ func verifyInstallations(ctx context.Context, verifier VCSProviderInstallationVe
 			return nil
 		})
 	}
-	_ = checks.Wait()
+	_ = group.Wait()
 }

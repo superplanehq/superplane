@@ -106,7 +106,19 @@ func TestVCSProviderInstallationChecksAllowAnotherCheckAfterTheInterval(t *testi
 	checks := NewVCSProviderInstallationChecks(10 * time.Second)
 	now := time.Now()
 
-	assert.Equal(t, []int64{301}, checks.due([]int64{301}, now))
-	assert.Empty(t, checks.due([]int64{301}, now.Add(9*time.Second)))
-	assert.Equal(t, []int64{301}, checks.due([]int64{301}, now.Add(10*time.Second)))
+	assert.Equal(t, []int64{301}, checks.start([]int64{301}, now))
+	checks.finish(301, now.Add(time.Second))
+	assert.Empty(t, checks.start([]int64{301}, now.Add(10*time.Second)))
+	assert.Equal(t, []int64{301}, checks.start([]int64{301}, now.Add(11*time.Second)))
+}
+
+func TestVCSProviderInstallationChecksDoNotOverlapASlowCheck(t *testing.T) {
+	checks := NewVCSProviderInstallationChecks(10 * time.Second)
+	now := time.Now()
+
+	assert.Equal(t, []int64{301}, checks.start([]int64{301}, now))
+	assert.Empty(t, checks.start([]int64{301}, now.Add(20*time.Second)))
+
+	checks.finish(301, now.Add(20*time.Second))
+	assert.Equal(t, []int64{301}, checks.start([]int64{301}, now.Add(30*time.Second)))
 }
