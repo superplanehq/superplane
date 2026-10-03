@@ -48,7 +48,6 @@ export const FIRST_RUN_COPY = {
     searchPlaceholder: "Search repositories",
     missingRepository: "Do not see your repository?",
     writeAccessHint: "You need write access to a repository to see it here.",
-    loadingRepositories: "Loading more repositories from GitHub",
     grantAccess: "Grant access on GitHub",
     emptyTitle: "SuperPlane cannot see your repositories yet",
     emptyBody:
