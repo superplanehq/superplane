@@ -358,17 +358,18 @@ func planningScoreLevel(score float64) string {
 func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
 	const startCue = "When every required score is 5, publish each required score on that plan turn. "
+	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
 	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
 	if err != nil {
-		return "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
+		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
 	}
 	switch {
 	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
-		return "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
+		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
 	case factoryModel.PlanningClarity:
-		return "Publish the specification only when this turn updates the plan. Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
+		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
 	case factoryModel.PlanningConfidence:
-		return "Publish the specification only when this turn updates the plan. Publish the Confidence score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
+		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Confidence score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
 	default:
 		return "Publish the specification only when this turn updates the plan. " + updateCue
 	}
