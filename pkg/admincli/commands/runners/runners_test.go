@@ -105,7 +105,7 @@ func TestDescribeRunnerUsesFleetAndRunnerIDs(t *testing.T) {
 }
 
 func TestDescribeRunnerJSONKeepsAbsoluteTimestamp(t *testing.T) {
-	created := time.Date(2026, 10, 2, 19, 0, 0, 0, time.UTC)
+	created := time.Now().UTC().Truncate(time.Second)
 	stamp := created.Format(time.RFC3339)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodGet, r.Method)
