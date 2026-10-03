@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -166,6 +166,29 @@ describe("FirstRunSetup GitHub catalog", () => {
       expect(assign).toHaveBeenCalledWith(
         "/auth/github?intent=connect&redirect=%2Forg-1%2Fworkspaces%2FPAY%2Fsetup%3Fstep%3Drepo%26githubConnected%3D1",
       );
+    } finally {
+      window.location.assign = previousAssign;
+    }
+  });
+
+  it("enables Connect GitHub again when the browser restores the page from its cache", async () => {
+    const user = userEvent.setup();
+    const previousAssign = window.location.assign.bind(window.location);
+    window.location.assign = vi.fn();
+
+    try {
+      renderSetup(pageModel());
+      await user.click(screen.getByTestId("first-run-connect-github"));
+      expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.openingGitHub);
+
+      const restored = new Event("pageshow");
+      Object.defineProperty(restored, "persisted", { value: true });
+      act(() => {
+        window.dispatchEvent(restored);
+      });
+
+      expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent("Connect GitHub");
+      expect(screen.getByTestId("first-run-connect-github")).toBeEnabled();
     } finally {
       window.location.assign = previousAssign;
     }

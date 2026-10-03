@@ -120,6 +120,15 @@ function useFirstRunBlockingAction() {
     lock.current = false;
     setAction(null);
   }, []);
+  // A page restored from the back-forward cache still holds the action of
+  // the navigation that left it, for example "Opening GitHub…".
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) finish();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [finish]);
   const run = useCallback(
     async (next: FirstRunBlockingAction, operation: () => Promise<void>) => {
       if (!begin(next)) return;
