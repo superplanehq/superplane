@@ -387,6 +387,7 @@ func TestAdminPolarWebhookServerErrorCapturesPolarCause(t *testing.T) {
 		wantStatus   int
 		wantBody     string
 		captureCause bool
+		wantCauses   []string
 	}{
 		{
 			name:         "list failure keeps the response and records the polar body",
@@ -396,6 +397,7 @@ func TestAdminPolarWebhookServerErrorCapturesPolarCause(t *testing.T) {
 			wantStatus:   http.StatusBadGateway,
 			wantBody:     "Failed to load Polar webhook deliveries",
 			captureCause: true,
+			wantCauses:   []string{polarBody},
 		},
 		{
 			name:         "endpoint list failure records the polar body",
@@ -405,6 +407,47 @@ func TestAdminPolarWebhookServerErrorCapturesPolarCause(t *testing.T) {
 			wantStatus:   http.StatusBadGateway,
 			wantBody:     "Failed to load Polar webhook endpoints",
 			captureCause: true,
+			wantCauses:   []string{polarBody},
+		},
+		{
+			name:         "redelivery failure records the polar body",
+			method:       http.MethodPost,
+			path:         "/admin/api/polar/webhooks/evt_1/redeliver",
+			status:       http.StatusInternalServerError,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Failed to redeliver Polar webhook event",
+			captureCause: true,
+			wantCauses:   []string{polarBody},
+		},
+		{
+			name:         "token rejection records the polar error",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks",
+			status:       http.StatusUnauthorized,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.",
+			captureCause: true,
+			wantCauses:   []string{"polar unauthorized", polarBody},
+		},
+		{
+			name:         "unsupported api version records the polar error",
+			method:       http.MethodPost,
+			path:         "/admin/api/polar/webhooks/evt_1/redeliver",
+			status:       http.StatusNotFound,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar does not support API version " + polar.APIVersion() + ". Upgrade the pinned Polar API version.",
+			captureCause: true,
+			wantCauses:   []string{"polar api version is not supported", polar.APIVersion()},
+		},
+		{
+			name:         "rate limit records the polar error",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks/endpoints",
+			status:       http.StatusTooManyRequests,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar rate-limited the request. Try again later.",
+			captureCause: true,
+			wantCauses:   []string{"polar rate limited"},
 		},
 		{
 			name:         "missing event does not create an error tracker event",
@@ -452,7 +495,10 @@ func TestAdminPolarWebhookServerErrorCapturesPolarCause(t *testing.T) {
 			require.Len(t, events, 1)
 			event := events[0]
 			assert.Empty(t, event.Message)
-			assert.Contains(t, capturedExceptionText(event), polarBody)
+			exception := capturedExceptionText(event)
+			for _, cause := range testCase.wantCauses {
+				assert.Contains(t, exception, cause)
+			}
 			assert.Equal(t, strconv.Itoa(http.StatusBadGateway), event.Tags["status"])
 
 			encoded, err := json.Marshal(event)
