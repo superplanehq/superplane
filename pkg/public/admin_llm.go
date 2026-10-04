@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -129,7 +130,8 @@ type organizationBillingPlanResponse struct {
 }
 
 type organizationBillingPlanRequest struct {
-	Plan string `json:"plan"`
+	Plan        string  `json:"plan"`
+	TrialEndsAt *string `json:"trial_ends_at"`
 }
 
 func (s *Server) adminGetInstallationLLMSettings(w http.ResponseWriter, r *http.Request) {
@@ -443,12 +445,23 @@ func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *htt
 		actor = &account.ID
 	}
 
+	targetMicros, err := creditCentsToMicros(req.TargetCents)
+	if err != nil {
+		writeCreditBalanceError(w, err)
+		return
+	}
+	expectedMicros, err := creditCentsToMicros(req.ExpectedRemainingCents)
+	if err != nil {
+		writeCreditBalanceError(w, err)
+		return
+	}
+
 	db := database.DB(r.Context())
-	_, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+	_, err = models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
 		OrganizationID: orgID,
 		Bucket:         req.Bucket,
-		TargetMicros:   req.TargetCents * models.MicrosPerCent,
-		ExpectedMicros: req.ExpectedRemainingCents * models.MicrosPerCent,
+		TargetMicros:   targetMicros,
+		ExpectedMicros: expectedMicros,
 		Note:           req.Note,
 		ActorAccountID: actor,
 	})
@@ -466,12 +479,25 @@ func (s *Server) adminSetOrganizationCreditBalance(w http.ResponseWriter, r *htt
 	respondJSON(w, response)
 }
 
+var errCreditCentsOutOfRange = errors.New("credit balance is out of range")
+
+func creditCentsToMicros(cents int64) (int64, error) {
+	if cents < 0 {
+		return 0, models.ErrCreditBalanceNegative
+	}
+	if cents > math.MaxInt64/models.MicrosPerCent {
+		return 0, errCreditCentsOutOfRange
+	}
+	return cents * models.MicrosPerCent, nil
+}
+
 func writeCreditBalanceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, models.ErrCreditBalanceChanged):
 		http.Error(w, "The balance changed. Reload and try again.", http.StatusConflict)
 	case errors.Is(err, models.ErrCreditBalanceBucket),
-		errors.Is(err, models.ErrCreditBalanceNegative):
+		errors.Is(err, models.ErrCreditBalanceNegative),
+		errors.Is(err, errCreditCentsOutOfRange):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, models.ErrTrialCreditNotActive):
 		http.Error(w, "This organization has no active trial credit.", http.StatusBadRequest)
@@ -558,7 +584,14 @@ func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 		log.WithError(err).WithField("organization_id", orgID.String()).Warn("failed to sync Polar subscription")
 	}
 
-	_, err := models.SetAdminOrganizationPlan(database.Conn(), orgID, strings.TrimSpace(req.Plan))
+	planName := strings.TrimSpace(req.Plan)
+	trialEndsAt, err := trialEndForAdminPlan(planName, req.TrialEndsAt)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = models.SetAdminOrganizationPlan(database.Conn(), orgID, planName, trialEndsAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -586,6 +619,24 @@ func describeOrganizationBillingPlanJSON(tx *gorm.DB, orgID uuid.UUID) (organiza
 		TrialEndsAt:             formatOptionalTime(plan.TrialEndsAt),
 		CurrentPeriodEnd:        formatOptionalTime(plan.CurrentPeriodEnd),
 	}, nil
+}
+
+func trialEndForAdminPlan(planName string, raw *string) (*time.Time, error) {
+	if planName != models.BillingPlanTrial {
+		return nil, nil
+	}
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil, errors.New("trial end date is required")
+	}
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*raw))
+	if err != nil {
+		return nil, errors.New("trial end date is required")
+	}
+	if !parsed.After(time.Now()) {
+		return nil, errors.New("choose a future date")
+	}
+	end := parsed.UTC()
+	return &end, nil
 }
 
 func formatOptionalTime(value *time.Time) *string {

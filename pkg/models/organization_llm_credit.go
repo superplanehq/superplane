@@ -168,6 +168,12 @@ func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt tim
 		Update("welcome_credit_granted_at", grantedAt).Error
 }
 
+func SetWelcomeGrantExpiresAt(tx *gorm.DB, orgID uuid.UUID, endsAt time.Time) error {
+	return tx.Model(&OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
+		Update("expires_at", endsAt.UTC()).Error
+}
+
 func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, note string, actorAccountID *uuid.UUID) (*OrganizationLLMCreditGrant, error) {
 	if amountMicros <= 0 {
 		return nil, ErrCreditGrantNotPositive

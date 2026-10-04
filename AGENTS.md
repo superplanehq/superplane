@@ -31,12 +31,7 @@ them as tracked changes. Do not commit them. Do not hand-edit them. Edit
 
 A clean clone does not contain these files until `make dev.setup` or
 `make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
-runs `make dev.setup`, which includes `pb.gen`. App blocks skip `/runner/**`.
-Runner tests and publish pipelines run when `/runner` changes. Create
-deployment target `runner-prod` on the SuperPlane Semaphore project and
-attach `GHCR_TOKEN` plus the AWS keys used for S3, ECS, and AMI jobs.
-Auto-promote those pipelines only from `main`. Do not put runner jobs on
-`production`.
+runs `make dev.setup`, which includes `pb.gen`.
 
 ### Do not rediscover the build system
 
@@ -71,9 +66,11 @@ approvals, and an operational UI.
 - `scripts/` — codegen, DB, and CI helper scripts.
 - `test/` — backend and end-to-end tests.
 - `docs/` — Markdown documentation (see `docs/contributing/`).
-- `runner/` — task-broker, runner worker, and fleet-manager. Own Go module
-  (`github.com/superplane/runner`). Local start uses the root `make` targets.
-  Image publish and deploy stay on runner Semaphore pipelines.
+- `cmd/runner`, `cmd/fleetmanager`, `pkg/runners`, and `pkg/fleets` — the
+  integrated runner and Fleet Manager. Local development uses this stack.
+- Legacy runner source and release automation live in
+  [superplanehq/runner](https://github.com/superplanehq/runner). App-side
+  legacy broker routing remains here during the hosted rollout.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -90,23 +87,21 @@ or Node installed on the host, only Docker.
 Run these three steps once, in order:
 
 1. `make dev.up` — builds the app and runner images and starts dependency
-   containers (app shell, db, rabbitmq). The first run builds the
-   images (~3-5 min); later runs reuse them. After you change
-   `runner/runner/Dockerfile.local`, run `make dev.up` again. If a sibling
-   `../runner` Compose project still holds port `8091`, stop it first.
+   containers (app shell, db, rabbitmq). The first run builds the images
+   (~3-5 min); later runs reuse them. After you change
+   `release/runner/Dockerfile`, run `make dev.up` again.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
-   codegen, creates + migrates `superplane_dev`, creates database `broker`
-   on that Postgres, starts task-broker so GORM migrates it, and registers
-   local fleets. Re-run when
-   protos, Go modules, or frontend deps change. By
+   codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
+   modules, or frontend deps change. By
    default only `superplane_dev` is migrated; use
    `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need
    `superplane_test` (E2E; backend CI sets this via the environment).
 3. `make dev.server` — starts the API (Go hot-reload via `air`), the Vite
-   dev server, and 10 runner workers. UI at http://localhost:8000; health
-   check at http://localhost:8000/health. Task broker at
-   http://127.0.0.1:8091. Use `N=1 make dev.server` to scale workers. Use
-   `make dev.server.fg` for foreground logs.
+   dev server, and the Docker Fleet Manager. UI at http://localhost:8000;
+   health check at http://localhost:8000/health. `make dev.setup` creates or
+   updates the local `e1-large-amd64` fleet. Fleet Manager waits for owner
+   setup and creates its local development token. Use `make dev.server.fg` for
+   foreground logs.
 
 Factory workspace onboarding needs a public SuperPlane GitHub App on a
 stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
@@ -115,9 +110,9 @@ Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
 for a personal token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
-`make dev.up`, `make dev.setup`, and `make dev.server` start the local
-task-broker and runner workers. Set `TASK_BROKER_*` in `.env` only for a
-remote broker (see `.env.example`).
+`make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
+runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
+testing legacy or remote broker routing (see `.env.example`).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
 `jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
@@ -154,10 +149,8 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
-  After editing `runner/` Go code: `make format.runner`, then
-  `$(MAKE) -C runner test`. Do not run `go build ./...` — `scripts/` has more
-  than one `main` package. Use `make check.build.app`. App `gofmt` excludes
-  `runner/`.
+ Do not run `go build ./...` — `scripts/` has more than one `main` package.
+ Use `make check.build.app`.
 - After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
   `make check.build.ui`. Run `make check.lint.ui` locally before you open a
   pull request. CI fails when the ESLint budget grows.

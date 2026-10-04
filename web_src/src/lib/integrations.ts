@@ -21,6 +21,10 @@ export function usesHostedJiraOAuth(definition?: IntegrationsIntegrationDefiniti
   return definition?.name === "jira" && definition.hostedAppInstall === true;
 }
 
+export function usesHostedLinearOAuth(definition?: IntegrationsIntegrationDefinition): boolean {
+  return definition?.name === "linear" && definition.hostedAppInstall === true;
+}
+
 const HOSTED_JIRA_CREDENTIAL_FIELDS = ["clientId", "clientSecret"];
 
 /** Hide Client ID and Client Secret when SuperPlane holds the Jira OAuth app. */

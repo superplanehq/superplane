@@ -89,7 +89,16 @@ spec:
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
 
-              git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo
+              branch="${BASE:-main}"
+              heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
+              if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
+                git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
+              elif [ -z "$heads" ]; then
+                git clone "${REPO_URL}" repo
+              else
+                echo "Remote branch ${branch} not found. The repository has other branches." >&2
+                exit 1
+              fi
               cd repo
 
               git config user.email "superplaneagent@superplane.com"
@@ -252,11 +261,38 @@ spec:
               exit 0
               HOOK
               chmod +x .git/hooks/prepare-commit-msg
+
+              use_existing_branch() {
+                echo "Another run created ${branch}. Using that branch." >&2
+                git fetch origin "${branch}"
+                git checkout -B "${branch}" "origin/${branch}"
+              }
+
+              if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+                remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                if [ -n "$remote_head" ]; then
+                  use_existing_branch
+                else
+                  echo "Remote has no branches. Creating ${branch}." >&2
+                  git checkout -B "${branch}"
+                  git commit --allow-empty -s -m "chore: Initialize repository"
+                  if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+                    remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                    if [ -z "$remote_head" ]; then
+                      echo "Failed to create ${branch}." >&2
+                      exit 1
+                    fi
+                    use_existing_branch
+                  fi
+                fi
+              fi
           - name: Implementation
             type: prompt
             workingDirectory: repo
             prompt: |-
               You are implementing a SuperPlane task. The repository is cloned in the current working directory on {{ task().default_branch }}.
+
+              If the repository had no commits, the clone step already pushed an initial commit on {{ task().default_branch }}. Do not change that commit.
 
               Repository: {{ task().repository }}
               Task title: {{ task().title }}

@@ -31,7 +31,7 @@ ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends bash ca-certificates make unzip && \
+  apt-get install -y --no-install-recommends bash ca-certificates git make unzip && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 

@@ -13,7 +13,9 @@ import { Wallet } from "lucide-react";
 
 import {
   creditRemainingCents,
+  formatUtcTrialEnd,
   useOrgLLMCredit,
+  utcCalendarDate,
   type CreditBalanceBucket,
   type CreditBalanceInputs,
   type OrganizationLLMCredit,
@@ -28,6 +30,10 @@ export const ADMIN_SET_BALANCE_HELP_COPY =
   "Enter the new remaining balance. SuperPlane adds the difference to the credit history as an adjustment.";
 export const ADMIN_NO_ACTIVE_TRIAL_COPY = "This organization has no active trial credit.";
 export const ADMIN_INCLUDED_USAGE_COPY = "The Business subscription sets this value.";
+export const ADMIN_TRIAL_ENDS_LABEL = "Trial ends";
+export const ADMIN_TRIAL_ENDS_HELP = "Trial credit stays usable until this date. Dates use UTC.";
+export const ADMIN_TRIAL_ENDS_ERROR = "Choose a future date.";
+export const ADMIN_CREDIT_HISTORY_ERROR_COPY = "SuperPlane could not load the credit history.";
 
 const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; action: string }> = [
   { bucket: "trial", label: "Trial credit", action: "Set trial credit" },
@@ -54,6 +60,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
           planKnown={credit.plan != null}
+          savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
         />
       ) : null}
     </div>
@@ -65,10 +72,17 @@ function OrgBillingPlanField(args: {
   planKnown: boolean;
   planValue: string;
   setPlanValue: (value: string) => void;
+  savedTrialEndsAt: string | null;
+  trialEndsOn: string;
+  setTrialEndsOn: (value: string) => void;
+  trialEndInvalid: boolean;
   savingPlan: boolean;
   savePlan: () => void;
 }) {
   const planLocked = !args.planKnown || args.polarManaged;
+  const showTrialEndField = args.planKnown && !args.polarManaged && args.planValue === "trial";
+  const savedTrialEnd = formatUtcTrialEnd(args.savedTrialEndsAt);
+  const showTrialEnd = args.planKnown && !args.polarManaged && (showTrialEndField || savedTrialEnd != null);
   return (
     <div className="mb-4 max-w-sm">
       <Label className="mb-2 block text-left">Billing plan</Label>
@@ -85,6 +99,34 @@ function OrgBillingPlanField(args: {
       <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         {billingPlanHelp(args.planKnown, args.polarManaged)}
       </Text>
+      {showTrialEnd ? (
+        <div className="mt-3">
+          <Label className="mb-2 block text-left" htmlFor="admin-org-trial-ends-input">
+            {ADMIN_TRIAL_ENDS_LABEL}
+          </Label>
+          {showTrialEndField ? (
+            <>
+              <Input
+                id="admin-org-trial-ends-input"
+                type="date"
+                data-testid="admin-org-trial-ends-input"
+                value={args.trialEndsOn}
+                min={utcCalendarDate(new Date())}
+                aria-invalid={args.trialEndInvalid}
+                onChange={(event) => args.setTrialEndsOn(event.target.value)}
+              />
+              <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{ADMIN_TRIAL_ENDS_HELP}</Text>
+              {args.trialEndInvalid ? (
+                <Text className="mt-1 text-xs text-red-600 dark:text-red-400">{ADMIN_TRIAL_ENDS_ERROR}</Text>
+              ) : null}
+            </>
+          ) : (
+            <Text data-testid="admin-org-trial-ends" className="text-sm text-gray-900 dark:text-gray-100">
+              {savedTrialEnd}
+            </Text>
+          )}
+        </div>
+      ) : null}
       {planLocked ? null : (
         <Button
           type="button"
@@ -124,6 +166,12 @@ function OrgHostedCreditCard(args: {
   planValue: string;
   setPlanValue: (value: string) => void;
   savingBalance: CreditBalanceBucket | null;
+  savedTrialEndsAt: string | null;
+  trialEndsOn: string;
+  setTrialEndsOn: (value: string) => void;
+  trialEndInvalid: boolean;
+  grantsLoadFailed: boolean;
+  reloadGrants: () => void;
   savingMarkup: boolean;
   savingPlan: boolean;
   saveBalance: (bucket: CreditBalanceBucket) => void;
@@ -139,6 +187,10 @@ function OrgHostedCreditCard(args: {
         planKnown={args.planKnown}
         planValue={args.planValue}
         setPlanValue={args.setPlanValue}
+        savedTrialEndsAt={args.savedTrialEndsAt}
+        trialEndsOn={args.trialEndsOn}
+        setTrialEndsOn={args.setTrialEndsOn}
+        trialEndInvalid={args.trialEndInvalid}
         savingPlan={args.savingPlan}
         savePlan={args.savePlan}
       />
@@ -183,7 +235,7 @@ function OrgHostedCreditCard(args: {
         savingMarkup={args.savingMarkup}
         saveMarkup={args.saveMarkup}
       />
-      <CreditHistory grants={args.grants} />
+      <CreditHistory grants={args.grants} loadFailed={args.grantsLoadFailed} onRetry={() => void args.reloadGrants()} />
     </div>
   );
 }
@@ -268,17 +320,32 @@ function MarkupOverrideField(args: {
   );
 }
 
-function CreditHistory({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
+function CreditHistory({
+  grants,
+  loadFailed,
+  onRetry,
+}: {
+  grants: OrganizationsOrganizationCreditGrant[];
+  loadFailed: boolean;
+  onRetry: () => void;
+}) {
   return (
     <div className="mt-6" data-testid="admin-org-credit-history">
       <Heading level={3} className="text-gray-800 text-sm dark:text-gray-100">
         Credit history
       </Heading>
-      {grants.length === 0 ? (
+      {loadFailed ? (
+        <>
+          <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">{ADMIN_CREDIT_HISTORY_ERROR_COPY}</Text>
+          <Button type="button" className="mt-3" variant="outline" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        </>
+      ) : null}
+      {!loadFailed && grants.length === 0 ? (
         <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">No credit grants yet.</Text>
-      ) : (
-        <CreditGrantTable grants={grants} />
-      )}
+      ) : null}
+      {!loadFailed && grants.length > 0 ? <CreditGrantTable grants={grants} /> : null}
     </div>
   );
 }

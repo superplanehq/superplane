@@ -49,6 +49,9 @@ func (s *Store) Put(ctx context.Context, key string, r io.Reader, opts blob.PutO
 	if strings.TrimSpace(opts.ContentType) != "" {
 		writer.ContentType = opts.ContentType
 	}
+	if strings.TrimSpace(opts.ContentEncoding) != "" {
+		writer.ContentEncoding = opts.ContentEncoding
+	}
 	if _, err := io.Copy(writer, r); err != nil {
 		_ = writer.Close()
 		return fmt.Errorf("write GCS object: %w", err)
@@ -90,8 +93,9 @@ func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) 
 		return nil, fmt.Errorf("head GCS object: %w", err)
 	}
 	return &blob.ObjectInfo{
-		Size:        attrs.Size,
-		ContentType: attrs.ContentType,
+		Size:            attrs.Size,
+		ContentType:     attrs.ContentType,
+		ContentEncoding: attrs.ContentEncoding,
 	}, nil
 }
 

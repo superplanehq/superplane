@@ -46,6 +46,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -88,6 +89,7 @@ type Server struct {
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
+	adminRouter           *mux.Router
 	BasePath              string
 	BaseURL               string
 	WebhooksBaseURL       string
@@ -370,6 +372,27 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	adminGatewayMux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
+		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			pattern, ok := runtime.HTTPPathPattern(ctx)
+			if ok {
+				setOtelMetricRoute(ctx, pattern)
+			}
+			return nil
+		}),
+		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
+	)
+	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
+		return err
+	}
+	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
+	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -388,6 +411,10 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-logs",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerTaskLogs)),
+	).Methods(http.MethodGet)
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
@@ -718,6 +745,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/oauth/callback", s.HandleLinearOAuthCallback).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -738,7 +766,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
@@ -767,6 +795,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/datadog/webhooks", s.adminListDatadogWebhooks).Methods("GET")
+	adminRoute.HandleFunc("/linear/webhooks", s.adminListLinearWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
@@ -781,6 +810,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/unblock", s.unblockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}", s.adminDeleteAccount).Methods("DELETE")
+	s.adminRouter = adminRoute
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -1842,8 +1872,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
+	track := s.openLinearWebhookReceipt(r.Context(), webhook, r.Header, body)
 	if err != nil {
 		if _, ok := err.(*http.MaxBytesError); ok {
+			track.complete(r.Context(), http.StatusRequestEntityTooLarge, 0)
 			http.Error(
 				w,
 				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
@@ -1853,12 +1885,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		track.complete(r.Context(), http.StatusBadRequest, 0)
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
 	if err != nil {
+		track.complete(r.Context(), http.StatusNotFound, 0)
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
@@ -1867,6 +1901,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	mergeabilityWebhook := factoryactions.IsFactoryMergeabilityWebhook(webhook)
 	if len(nodes) == 0 {
 		if !mergeabilityWebhook || !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+			track.complete(r.Context(), http.StatusNotFound, 0)
 			http.Error(w, "webhook not found", http.StatusNotFound)
 			return
 		}
@@ -1877,10 +1912,13 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			r.Header,
 			body,
 		); err != nil {
+			track.complete(r.Context(), code, 0)
 			http.Error(w, "invalid signature", code)
 			return
 		}
 	}
+
+	requestCtx := withLinearWebhookTrack(r.Context(), track)
 
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
@@ -1895,8 +1933,9 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, organizationID, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
+		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
+			track.complete(requestCtx, code, len(nodes))
 			s.replyWebhookError(w, r, webhook, node, code, err, organizationID)
 			return
 		}
@@ -1927,6 +1966,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
+	track.complete(requestCtx, http.StatusOK, len(nodes))
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1974,6 +2014,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
+	events := core.EventContext(contexts.NewEventContext(tx, &node, nil, onNewEvents))
+	if track := linearWebhookTrackFrom(ctx); track != nil {
+		events = &linearReceiptEvents{inner: events, track: track}
+	}
+
 	code, response, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
@@ -1985,7 +2030,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        webhookNodeLogger(node, integration),
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),
+		Events:        events,
 		Integration:   integrationCtx,
 	})
 	return code, response, integrationOrganizationID(integration), err

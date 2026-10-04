@@ -144,6 +144,82 @@ func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
 	assert.Equal(t, models.VCSProviderRepositorySyncPriorityInteractive, job.Priority)
 }
 
+func TestCatalogReconcileInstallRequestsRemovesCancelledRequests(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	cancelledAccountID := int64(301)
+	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
+		RequestID:    401,
+		AccountID:    &cancelledAccountID,
+		AccountLogin: "cancelled",
+		RequesterID:  9,
+		RequestedAt:  time.Now().Add(-time.Hour),
+	}}))
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installation-requests", r.URL.Path)
+		_, _ = w.Write([]byte(`[{"id":44,"account":{"id":2,"login":"acme"},"requester":{"id":9,"login":"member"}}]`))
+	})
+
+	catalog := &Catalog{db: db, appClient: client, now: time.Now}
+	require.NoError(t, catalog.ReconcileInstallRequests(t.Context()))
+
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, 9)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "acme", requests[0].AccountLogin)
+}
+
+func TestCatalogReconcileInstallRequestsSkipsApprovedRequests(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	db := database.Conn()
+	approvedAccountID := int64(2)
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountID:      &approvedAccountID,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"id":44,"account":{"id":2,"login":"acme"},"requester":{"id":9,"login":"member"}},
+			{"id":45,"account":{"id":3,"login":"octo"},"requester":{"id":9,"login":"member"}}
+		]`))
+	})
+
+	catalog := &Catalog{db: db, appClient: client, now: time.Now}
+	require.NoError(t, catalog.ReconcileInstallRequests(t.Context()))
+
+	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, 9)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "octo", requests[0].AccountLogin)
+}
+
+func TestCatalogReconcileSavesRequestsWhenInstallationsFail(t *testing.T) {
+	registry := support.Setup(t)
+	t.Cleanup(registry.Close)
+	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/app/installation-requests":
+			_, _ = w.Write([]byte(`[{"id":44,"account":{"id":2,"login":"acme"},"requester":{"id":9,"login":"member"}}]`))
+		default:
+			http.Error(w, "temporary GitHub error", http.StatusInternalServerError)
+		}
+	})
+
+	catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+	err := catalog.Reconcile(t.Context(), models.VCSProviderRepositorySyncPriorityInteractive)
+	assert.ErrorContains(t, err, "list GitHub App installations")
+
+	requests, listErr := models.ListVCSProviderInstallRequests(database.Conn(), models.ProviderGitHub, 9)
+	require.NoError(t, listErr)
+	require.Len(t, requests, 1)
+	assert.Equal(t, "acme", requests[0].AccountLogin)
+}
+
 func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
 	registry := support.Setup(t)
 	t.Cleanup(registry.Close)
@@ -197,9 +273,9 @@ func TestCatalogHasInstallationRequestUsesStoredInstallationWithoutRemovingReque
 	requested, err := catalog.HasInstallationRequest(t.Context(), 101)
 	require.NoError(t, err)
 	assert.True(t, requested)
-	requests, err := models.ListVCSProviderInstallRequests(db, models.ProviderGitHub, 501)
-	require.NoError(t, err)
-	assert.Len(t, requests, 1)
+	var storedRequests int64
+	require.NoError(t, db.Model(&models.VCSProviderInstallRequest{}).Where("request_id = ?", 401).Count(&storedRequests).Error)
+	assert.Equal(t, int64(1), storedRequests)
 }
 
 func TestCatalogHasInstallationRequestLoadsMissingInstallation(t *testing.T) {
@@ -223,6 +299,61 @@ func TestCatalogHasInstallationRequestLoadsMissingInstallation(t *testing.T) {
 	requested, err := catalog.HasInstallationRequest(t.Context(), 101)
 	require.NoError(t, err)
 	assert.True(t, requested)
+}
+
+func TestCatalogVerifyInstallation(t *testing.T) {
+	saveInstallation := func(t *testing.T) {
+		require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+			Provider:       models.ProviderGitHub,
+			InstallationID: 101,
+			AccountLogin:   "acme",
+		}))
+	}
+	removedInstallation := func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/app/installations/101", r.URL.Path)
+		http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+	}
+
+	t.Run("deletes an installation that GitHub no longer has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, removedInstallation)
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.VerifyInstallation(t.Context(), 101))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("keeps an installation that GitHub still has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"id":101,"account":{"id":301,"login":"acme"}}`))
+		})
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.VerifyInstallation(t.Context(), 101))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.NoError(t, err)
+	})
+
+	t.Run("an installation job deletes an installation that GitHub no longer has", func(t *testing.T) {
+		registry := support.Setup(t)
+		t.Cleanup(registry.Close)
+		saveInstallation(t)
+		client, _ := guideClient(t, removedInstallation)
+
+		catalog := &Catalog{db: database.Conn(), appClient: client, now: time.Now}
+		require.NoError(t, catalog.ReconcileInstallation(t.Context(), 101, models.VCSProviderRepositorySyncPriorityInteractive))
+
+		_, err := models.FindVCSProviderInstallation(database.Conn(), models.ProviderGitHub, 101)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
 }
 
 func guideClient(t *testing.T, handler http.HandlerFunc) (*gh.Client, *int) {
