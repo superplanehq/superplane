@@ -28,6 +28,7 @@ const FIXED_HEADLINES: Record<
 > = {
   "pr-discussion": "Addresses pull request comments",
   "pr-checks": "Fixes failing status checks",
+  "pr-conflicts": "Fixes merge conflicts",
   "pr-closure": "Closes tasks when pull requests merge",
   "risk-score": "Scores merge confidence",
 };

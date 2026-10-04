@@ -114,6 +114,9 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		}
 		settings.RunnerIntegrationNames = runnerExtraIntegrationNames(findIntakeNode(spec.Nodes, graph.RunnerNodeID))
 	}
+	if graph.isConflicts() {
+		settings.RunnerIntegrationNames = runnerExtraIntegrationNames(findIntakeNode(spec.Nodes, graph.RunnerNodeID))
+	}
 
 	return settings.normalized()
 }
@@ -167,6 +170,9 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			MaximumAttempts:      &maximumAttempts,
 			RunnerIntegrationIds: settings.RunnerIntegrationIDs,
 		},
+		Conflicts: &pb.FactoryPRFeedbackHandler_ConflictSettings{
+			MaximumAttempts: &maximumAttempts,
+		},
 	}
 }
 
@@ -180,6 +186,13 @@ func validatePRFeedbackSettingsForSource(
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 		if requested != nil && requested.GetChecks() != nil && len(requested.GetChecks().GetRunnerIntegrationIds()) > 0 {
 			return invalidArgument("discussion handlers do not accept runner integrations")
+		}
+		return nil
+	}
+
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
+		if settings.MaximumAttempts < prFeedbackMaximumAttemptsMin || settings.MaximumAttempts > prFeedbackMaximumAttemptsMax {
+			return invalidArgument("maximum attempts must be between 1 and 10")
 		}
 		return nil
 	}
@@ -261,6 +274,9 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 			updated.MaximumAttempts = int(requested.GetChecks().GetMaximumAttempts())
 		}
 		updated.RunnerIntegrationIDs = requested.GetChecks().GetRunnerIntegrationIds()
+	}
+	if requested.GetConflicts() != nil && requested.GetConflicts().MaximumAttempts != nil {
+		updated.MaximumAttempts = int(requested.GetConflicts().GetMaximumAttempts())
 	}
 	return updated.normalized()
 }

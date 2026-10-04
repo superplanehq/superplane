@@ -12,6 +12,7 @@ type prFeedbackGraph struct {
 	ReviewTriggerNodeID      string
 	ReplyTriggerNodeID       string
 	PullRequestTriggerNodeID string
+	ConflictTriggerNodeID    string
 	FindNodeID               string
 	ActivityNodeID           string
 	WaitChecksNodeID         string
@@ -34,7 +35,14 @@ func (g prFeedbackGraph) isChecks() bool {
 	return g.PullRequestTriggerNodeID != ""
 }
 
+func (g prFeedbackGraph) isConflicts() bool {
+	return g.ConflictTriggerNodeID != ""
+}
+
 func (g prFeedbackGraph) triggerNodeIDs() []string {
+	if g.isConflicts() {
+		return []string{g.ConflictTriggerNodeID}
+	}
 	if g.isChecks() {
 		return []string{g.PullRequestTriggerNodeID}
 	}
@@ -42,6 +50,9 @@ func (g prFeedbackGraph) triggerNodeIDs() []string {
 }
 
 func (g prFeedbackGraph) Healthy(spec models.LiveCanvasSpec) bool {
+	if g.isConflicts() {
+		return g.healthyConflicts(spec)
+	}
 	if g.isChecks() {
 		return g.healthyChecks(spec)
 	}
@@ -132,6 +143,48 @@ func resolvePRFeedbackDiscussionFlow(
 	return resolvedPRFeedbackDiscussionFlow{}, false
 }
 
+func (g prFeedbackGraph) healthyConflicts(spec models.LiveCanvasSpec) bool {
+	if g.ConflictTriggerNodeID == "" || g.FindNodeID == "" || g.ActivityNodeID == "" {
+		return false
+	}
+	if g.StartRepairNodeID == "" || g.RunnerNodeID == "" || g.PauseFixesNodeID == "" {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.ConflictTriggerNodeID, g.FindNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.FindNodeID, g.ActivityNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.ActivityNodeID, g.StartRepairNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.StartRepairNodeID, g.RunnerNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.StartRepairNodeID, g.PauseFixesNodeID) {
+		return false
+	}
+
+	activity := findIntakeNode(spec.Nodes, g.ActivityNodeID)
+	if activity == nil || activity.ComponentName() != prFeedbackActivityComponent {
+		return false
+	}
+	start := findIntakeNode(spec.Nodes, g.StartRepairNodeID)
+	if start == nil || start.ComponentName() != prFeedbackUpdateActivityComponent {
+		return false
+	}
+	runner := findIntakeNode(spec.Nodes, g.RunnerNodeID)
+	if runner == nil || !slices.Contains(intakeAnalysisComponents, runner.ComponentName()) {
+		return false
+	}
+	if strings.TrimSpace(prFeedbackNodeString(findIntakeNode(spec.Nodes, g.ConflictTriggerNodeID), "repository")) == "" {
+		return false
+	}
+
+	return true
+}
+
 func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
 	if g.PullRequestTriggerNodeID == "" || g.FindNodeID == "" || g.ActivityNodeID == "" {
 		return false
@@ -199,6 +252,9 @@ func resolvePRFeedbackGraph(spec models.LiveCanvasSpec) prFeedbackGraph {
 		}),
 		PullRequestTriggerNodeID: resolveIntakeNode(nodes, prFeedbackPullRequestTriggerNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == "github.onPullRequest"
+		}),
+		ConflictTriggerNodeID: resolveIntakeNode(nodes, prFeedbackConflictTriggerNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == "onPullRequestConflict"
 		}),
 		FindNodeID: resolveIntakeNode(nodes, prFeedbackFindNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackFindComponent

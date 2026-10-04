@@ -47,7 +47,7 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 	if !cached {
-		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, immediateFactoryMergeabilityRefreshOptions())
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 		}
@@ -125,11 +125,11 @@ func MergeFactoryPullRequest(
 			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
 		}
 		if isGitHubHeadMovedError(err) {
-			_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+			_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, immediateFactoryMergeabilityRefreshOptions())
 			return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 		}
 		message := errFactoryPullRequestNotMergeable.Error()
-		if synced, syncErr := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest); syncErr == nil {
+		if synced, syncErr := syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, immediateFactoryMergeabilityRefreshOptions()); syncErr == nil {
 			if !synced.CanMerge && synced.Message != "" {
 				message = synced.Message
 			} else if synced.CanMerge {

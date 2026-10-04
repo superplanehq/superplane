@@ -14,7 +14,7 @@ import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
 export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
-export type PRFeedbackSourceId = "discussion" | "checks";
+export type PRFeedbackSourceId = "discussion" | "checks" | "conflicts";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
   return value === "general" || value === "agent" || value === "automation";
@@ -53,6 +53,15 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
     iconAlt: "GitHub",
     defaultName: "Fix pull request checks",
   },
+  {
+    id: "conflicts",
+    name: "Merge conflicts",
+    description: "Start an agent when a pull request has merge conflicts.",
+    listenTitle: "Listening for merge conflicts",
+    iconSrc: githubIcon,
+    iconAlt: "GitHub",
+    defaultName: "Fix merge conflicts",
+  },
 ];
 
 export function availablePRFeedbackSources(): PRFeedbackSource[] {
@@ -68,11 +77,23 @@ export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource |
 }
 
 export function prFeedbackSourceId(source?: FactoriesFactoryPrFeedbackHandlerSource): PRFeedbackSourceId {
-  return source === "SOURCE_PULL_REQUEST_CHECKS" ? "checks" : "discussion";
+  if (source === "SOURCE_PULL_REQUEST_CHECKS") {
+    return "checks";
+  }
+  if (source === "SOURCE_PULL_REQUEST_CONFLICTS") {
+    return "conflicts";
+  }
+  return "discussion";
 }
 
 export function apiPRFeedbackSource(sourceId: PRFeedbackSourceId): FactoriesFactoryPrFeedbackHandlerSource {
-  return sourceId === "checks" ? "SOURCE_PULL_REQUEST_CHECKS" : "SOURCE_PULL_REQUEST_DISCUSSION";
+  if (sourceId === "checks") {
+    return "SOURCE_PULL_REQUEST_CHECKS";
+  }
+  if (sourceId === "conflicts") {
+    return "SOURCE_PULL_REQUEST_CONFLICTS";
+  }
+  return "SOURCE_PULL_REQUEST_DISCUSSION";
 }
 
 export function takenPRFeedbackSourceIds(
@@ -116,9 +137,15 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
     ignoreBots: discussion?.ignoreBots !== false,
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
-    maximumAttempts: checks?.maximumAttempts ?? 3,
+    maximumAttempts: handlerDraftMaximumAttempts(handler, source),
     runnerIntegrationIds: checks?.runnerIntegrationIds ?? [],
   };
+}
+
+function handlerDraftMaximumAttempts(handler: FactoriesFactoryPrFeedbackHandler, source: PRFeedbackSourceId): number {
+  const attempts =
+    source === "conflicts" ? handler.settings?.conflicts?.maximumAttempts : handler.settings?.checks?.maximumAttempts;
+  return attempts ?? 3;
 }
 
 function handlerDraftName(name: string | undefined, source: PRFeedbackSourceId): string {
@@ -138,7 +165,8 @@ function handlerDraftMention(mention: string | undefined): string {
 }
 
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {
-  const sourceId = source === "discussion" || source === "checks" ? source : prFeedbackSourceId(source);
+  const sourceId =
+    source === "discussion" || source === "checks" || source === "conflicts" ? source : prFeedbackSourceId(source);
   return prFeedbackSourceById(sourceId)?.listenTitle ?? "Listening to pull request comments";
 }
 
@@ -226,10 +254,19 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
   if (next.source === "checks") {
     return next.checkNames.length > 0 && isPRFeedbackMaximumAttemptsValid(next.maximumAttempts);
   }
+  if (next.source === "conflicts") {
+    return isPRFeedbackMaximumAttemptsValid(next.maximumAttempts);
+  }
   return next.mention.length === 0 || next.mention.startsWith("@");
 }
 
 export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): FactoriesFactoryPrFeedbackHandlerSettings {
+  if (draft.source === "conflicts") {
+    return {
+      subject: { repository: draft.repository },
+      conflicts: { maximumAttempts: draft.maximumAttempts },
+    };
+  }
   if (draft.source === "checks") {
     return {
       subject: { repository: draft.repository },

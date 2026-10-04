@@ -53,6 +53,9 @@ describe("hasFactoryAppDefaults", () => {
 
   it("recognizes generated PR feedback checks canvases", () => {
     expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pull-request" }, { id: "wait-pr-checks" }]))).toBe(true);
+    expect(
+      hasFactoryAppDefaults(canvasWith([{ id: "on-pull-request-conflict" }, { id: "resolve-merge-conflict" }])),
+    ).toBe(true);
   });
 
   it("rejects custom canvases", () => {

@@ -19,6 +19,7 @@ import { canvasAppIds, type CanvasAppFixture } from "@/pages/app/__fixtures__/ha
 import {
   AutomationsPage,
   ChecksPRFeedbackSetupPage,
+  ConflictsPRFeedbackSetupPage,
   CreateWorkOrderComposeRedirect,
   DatadogIntakeSetupPage,
   DependabotIntakeSetupPage,
@@ -325,6 +326,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
                 <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+                <Route path=":lineId/setup/conflicts" element={<ConflictsPRFeedbackSetupPage />} />
                 <Route
                   path=":lineId/setup/risk-score"
                   element={

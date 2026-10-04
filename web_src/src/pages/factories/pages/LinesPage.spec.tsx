@@ -1046,6 +1046,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-conflicts")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
@@ -1071,6 +1072,7 @@ describe("LinesPage board extras", () => {
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+        { id: "handler-conflicts", source: "SOURCE_PULL_REQUEST_CONFLICTS", healthy: true },
       ],
       isPending: false,
     });

@@ -12,6 +12,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -27,6 +28,7 @@ var (
 	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
 	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
 	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
+	errFactoryPullRequestMergeabilityUnknown     = errors.New("merge status is still unknown")
 )
 
 const (
@@ -39,15 +41,25 @@ const (
 	mergeBlockedUnavailable        = "Merge status is unavailable right now."
 )
 
+type factoryMergeabilityRefreshOptions struct {
+	ExpectedBase   string
+	PersistUnknown bool
+}
+
 type factoryPullRequestMergeability struct {
-	CanMerge       bool
-	BlockedReason  pb.FactoryPullRequestMergeability_BlockedReason
-	Message        string
-	AllowedMethods []pb.FactoryPullRequestMergeability_MergeMethod
-	HeadSHA        string
-	PullRequest    *models.FactoryPullRequest
-	Client         factoryGitHubAPI
-	canRetry       bool
+	CanMerge             bool
+	BlockedReason        pb.FactoryPullRequestMergeability_BlockedReason
+	Message              string
+	AllowedMethods       []pb.FactoryPullRequestMergeability_MergeMethod
+	HeadSHA              string
+	HeadRef              string
+	HeadRepository       string
+	BaseRef              string
+	PullRequest          *models.FactoryPullRequest
+	Client               factoryGitHubAPI
+	canRetry             bool
+	Skip                 bool
+	AwaitingMergeability bool
 }
 
 func loadFactoryPullRequestForMerge(
@@ -85,6 +97,7 @@ func evaluateFactoryPullRequestMergeability(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
+	opts factoryMergeabilityRefreshOptions,
 ) (*factoryPullRequestMergeability, error) {
 	result := &factoryPullRequestMergeability{PullRequest: pullRequest}
 
@@ -113,6 +126,13 @@ func evaluateFactoryPullRequestMergeability(
 		return nil, errFactoryPullRequestMissing
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
+	result.HeadRef = githubPR.GetHead().GetRef()
+	result.HeadRepository = githubPR.GetHead().GetRepo().GetFullName()
+	result.BaseRef = githubPR.GetBase().GetRef()
+	if opts.ExpectedBase != "" && !strings.EqualFold(result.BaseRef, opts.ExpectedBase) {
+		result.Skip = true
+		return result, nil
+	}
 
 	if githubPR.GetDraft() || strings.EqualFold(githubPR.GetMergeableState(), "draft") {
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_DRAFT, mergeBlockedDraft), nil
@@ -121,6 +141,7 @@ func evaluateFactoryPullRequestMergeability(
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING, mergeBlockedConflicting), nil
 	}
 	if strings.EqualFold(githubPR.GetMergeableState(), "unknown") || githubPR.Mergeable == nil {
+		result.AwaitingMergeability = true
 		return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED, mergeBlockedChecksUnfinished), nil
 	}
 
@@ -248,15 +269,31 @@ func syncFactoryPullRequestMergeability(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
+	opts factoryMergeabilityRefreshOptions,
 ) (*factoryPullRequestMergeability, error) {
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, opts)
 	if err != nil {
 		return nil, err
+	}
+	if result.Skip {
+		return result, nil
+	}
+	if result.AwaitingMergeability && !opts.PersistUnknown {
+		return nil, errFactoryPullRequestMergeabilityUnknown
 	}
 	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
 		return nil, err
 	}
+	if result.BlockedReason == pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING {
+		if startErr := startFactoryPullRequestConflictRepair(ctx, db, factory, pullRequest, result); startErr != nil {
+			log.WithError(startErr).Warnf("factory mergeability: failed to start conflict repair for pull request %s", pullRequest.ID)
+		}
+	}
 	return result, nil
+}
+
+func immediateFactoryMergeabilityRefreshOptions() factoryMergeabilityRefreshOptions {
+	return factoryMergeabilityRefreshOptions{PersistUnknown: true}
 }
 
 func mergeabilityFromCache(
