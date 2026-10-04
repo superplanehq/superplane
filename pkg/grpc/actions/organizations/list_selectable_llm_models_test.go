@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -21,9 +22,11 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	t.Cleanup(func() {
-		_ = database.Conn().Where("provider <> ?", "").Delete(&models.HostedLLMProvider{})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 	})
+	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
 
 	resp, err := ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
@@ -34,6 +37,10 @@ func Test__ListSelectableLLMModels(t *testing.T) {
 		Enabled:       true,
 		APIKey:        []byte("encrypted"),
 		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
+		"claude-sonnet-4-6",
 	})
 	require.NoError(t, err)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{
@@ -69,7 +76,9 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 	db := database.Conn()
 	t.Cleanup(func() {
 		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationBYOKModelAllowlist{})
+		_ = database.Conn().Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
 	})
+	saveEmptyHostedModelSelections(t, db, r.Organization.ID)
 
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "openai", support.RandomName("openai"), map[string]any{})
 	require.NoError(t, err)
@@ -93,4 +102,12 @@ func Test__ListSelectableLLMModels__EnablesConnectedKeyModelsByDefault(t *testin
 	resp, err = ListSelectableLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListSelectableLLMModelsRequest{})
 	require.NoError(t, err)
 	assert.Empty(t, resp.Models)
+}
+
+func saveEmptyHostedModelSelections(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+	t.Helper()
+	for _, provider := range models.KnownHostedLLMProviders() {
+		_, err := models.UpsertOrganizationHostedModelAllowlist(db, orgID, provider, datatypes.JSONSlice[string]{})
+		require.NoError(t, err)
+	}
 }
