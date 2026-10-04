@@ -204,7 +204,7 @@ Each event has type `pullRequest.conflictDetected`. The payload uses the same pu
   "pull_request": {
     "number": 12,
     "html_url": "https://github.com/acme/app/pull/12",
-    "head": { "sha": "abc123", "ref": "feature" },
+    "head": { "sha": "abc123", "ref": "feature", "repo": { "full_name": "acme/app" } },
     "base": { "ref": "main" }
   }
 }
@@ -221,6 +221,9 @@ Each event has type `pullRequest.conflictDetected`. The payload uses the same pu
       },
       "head": {
         "ref": "feature",
+        "repo": {
+          "full_name": "acme/app"
+        },
         "sha": "abc123def456"
       },
       "html_url": "https://github.com/acme/app/pull/12",

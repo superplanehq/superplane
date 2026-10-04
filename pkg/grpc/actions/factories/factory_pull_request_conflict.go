@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
+
+var errConflictRepairNotEmitted = errors.New("conflict repair did not emit an event")
 
 func startFactoryPullRequestConflictRepair(
 	ctx context.Context,
@@ -48,20 +51,31 @@ func startFactoryPullRequestConflictRepair(
 		return nil
 	}
 
-	claimed, err := models.ClaimFactoryPullRequestConflictHead(db, handler.ID, pullRequest.ID, headSHA)
+	var emitted []models.CanvasEvent
+	err = db.Transaction(func(tx *gorm.DB) error {
+		claimed, claimErr := models.ClaimFactoryPullRequestConflictHead(tx, handler.ID, pullRequest.ID, headSHA)
+		if claimErr != nil {
+			return claimErr
+		}
+		if !claimed {
+			return nil
+		}
+		if emitErr := emitPullRequestConflict(tx, handler, pullRequest, result, &emitted); emitErr != nil {
+			return emitErr
+		}
+		if len(emitted) == 0 {
+			return errConflictRepairNotEmitted
+		}
+		return nil
+	})
+	if errors.Is(err, errConflictRepairNotEmitted) {
+		log.Warnf("factory mergeability: conflict repair did not emit an event for pull request %s", pullRequest.ID)
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	if !claimed {
-		return nil
-	}
-
-	if err := emitPullRequestConflict(db, handler, pullRequest, result); err != nil {
-		if releaseErr := models.ReleaseFactoryPullRequestConflictHead(db, handler.ID, pullRequest.ID, headSHA); releaseErr != nil {
-			log.WithError(releaseErr).Warnf("factory mergeability: failed to release conflict claim for pull request %s", pullRequest.ID)
-		}
-		return err
-	}
+	publishConflictEvents(emitted)
 	return nil
 }
 
@@ -70,6 +84,7 @@ func emitPullRequestConflict(
 	handler *models.FactoryPRFeedbackHandler,
 	pullRequest *models.FactoryPullRequest,
 	result *factoryPullRequestMergeability,
+	emitted *[]models.CanvasEvent,
 ) error {
 	node, err := conflictTriggerNode(db, handler.CanvasID)
 	if err != nil {
@@ -79,20 +94,18 @@ func emitPullRequestConflict(
 		return fmt.Errorf("conflict trigger is missing on canvas %s", handler.CanvasID)
 	}
 
-	var emitted []models.CanvasEvent
 	events := contexts.NewEventContext(db, node, nil, func(created []models.CanvasEvent) {
-		emitted = append(emitted, created...)
+		*emitted = append(*emitted, created...)
 	})
-	if err := events.Emit(factory.OnPullRequestConflictPayloadType, pullRequestConflictPayload(pullRequest, result)); err != nil {
-		return err
-	}
+	return events.Emit(factory.OnPullRequestConflictPayloadType, pullRequestConflictPayload(pullRequest, result))
+}
 
+func publishConflictEvents(emitted []models.CanvasEvent) {
 	for i := range emitted {
 		if err := messages.PublishCanvasEventCreatedMessage(&emitted[i]); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to publish conflict event %s", emitted[i].ID)
 		}
 	}
-	return nil
 }
 
 func conflictTriggerNode(db *gorm.DB, canvasID uuid.UUID) (*models.CanvasNode, error) {
@@ -131,6 +144,9 @@ func pullRequestConflictPayload(pullRequest *models.FactoryPullRequest, result *
 			"head": map[string]any{
 				"sha": result.HeadSHA,
 				"ref": result.HeadRef,
+				"repo": map[string]any{
+					"full_name": result.HeadRepository,
+				},
 			},
 			"base": map[string]any{
 				"ref": result.BaseRef,

@@ -50,7 +50,7 @@ Each event has type ` + "`pullRequest.conflictDetected`" + `. The payload uses t
   "pull_request": {
     "number": 12,
     "html_url": "https://github.com/acme/app/pull/12",
-    "head": { "sha": "abc123", "ref": "feature" },
+    "head": { "sha": "abc123", "ref": "feature", "repo": { "full_name": "acme/app" } },
     "base": { "ref": "main" }
   }
 }
@@ -81,6 +81,9 @@ func (t *OnPullRequestConflict) ExampleData() map[string]any {
 				"head": map[string]any{
 					"sha": "abc123def456",
 					"ref": "feature",
+					"repo": map[string]any{
+						"full_name": "acme/app",
+					},
 				},
 				"base": map[string]any{
 					"ref": "main",

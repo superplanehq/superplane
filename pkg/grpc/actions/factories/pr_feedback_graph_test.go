@@ -471,6 +471,7 @@ func Test__BuildConflictsPRFeedbackCanvas(t *testing.T) {
 		runner := findSpecNode(t, canvas, prFeedbackConflictRunnerNodeID)
 		assert.Contains(t, runnerEnv(t, runner, "BASE_REF"), "pull_request.base.ref")
 		assert.Contains(t, runnerEnv(t, runner, "PR_REVISION"), "pull_request.head.sha")
+		assert.Contains(t, runnerEnv(t, runner, "HEAD_REPO"), "pull_request.head.repo.full_name")
 
 		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
 		assert.Contains(t, checkout, `git clone --filter=blob:none "https://github.com/${REPO}.git" repo`)
@@ -488,7 +489,11 @@ func Test__BuildConflictsPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
 		assert.Contains(t, push, "Stop without pushing.")
 		assert.Contains(t, push, `git commit -s -m "fix: resolve merge conflict on PR #${PR_NUMBER}"`)
+		assert.Contains(t, push, `if [ "${LOCAL_HEAD}" = "${REMOTE_HEAD}" ]`)
+		assert.Contains(t, push, `git push "https://github.com/${HEAD_REPOSITORY}.git" "HEAD:refs/heads/${PR_HEAD}"`)
+		assert.NotContains(t, push, "git push origin HEAD")
 		assert.NotContains(t, push, "--force")
+		assert.Contains(t, prompt, "Do not push.")
 		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
 	})
 }

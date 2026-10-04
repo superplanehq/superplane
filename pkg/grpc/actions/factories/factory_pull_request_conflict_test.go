@@ -88,6 +88,89 @@ func TestRefreshFactoryPullRequestMergeabilityPollsUnknownMergeability(t *testin
 	assert.False(t, stored.Mergeable)
 }
 
+func TestPushRefreshSchedulesUnknownMergeability(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	_, unknownPullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 11)
+	_, conflictingPullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 12)
+	integration := readyGitHubIntegration(t, db, r)
+
+	previousPoll := startFactoryMergeabilityUnknownPoll
+	var scheduled []uuid.UUID
+	startFactoryMergeabilityUnknownPoll = func(_ context.Context, _ IntakeDependencies, _, _, pullRequestID uuid.UUID) {
+		scheduled = append(scheduled, pullRequestID)
+	}
+	t.Cleanup(func() { startFactoryMergeabilityUnknownPoll = previousPoll })
+
+	previousDelays := factoryMergeabilityUnknownDelays
+	factoryMergeabilityUnknownDelays = []time.Duration{time.Hour}
+	t.Cleanup(func() { factoryMergeabilityUnknownDelays = previousDelays })
+
+	stubFactoryGitHub(t, &pullRequestByNumberGitHub{
+		byNumber: map[int]*github.PullRequest{
+			11: unknownGitHubPullRequest("abc123def456", "feature", "main"),
+			12: conflictingGitHubPullRequest("def456abc123", "other", "main"),
+		},
+	})
+	silenceFactoryWorkOrderUpdates(t)
+
+	RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+		t.Context(),
+		IntakeDependencies{},
+		&models.Webhook{AppInstallationID: &integration.ID},
+		"push",
+		[]byte(`{"ref":"refs/heads/main","repository":{"full_name":"acme/app"}}`),
+	)
+
+	assert.Equal(t, []uuid.UUID{unknownPullRequest.ID}, scheduled)
+	stored := reloadFactoryPullRequest(t, db, conflictingPullRequest)
+	assert.Equal(t, "CONFLICTING", stored.MergeBlockedReason)
+	unknownStored := reloadFactoryPullRequest(t, db, unknownPullRequest)
+	assert.Empty(t, unknownStored.MergeBlockedReason)
+}
+
+func TestConflictRepairDoesNotKeepClaimWithoutEvent(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 41)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{
+			NodeID: "start",
+			Name:   "Start",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+		}},
+		nil,
+	)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	_, err := factory.CreatePRFeedbackHandler(
+		db,
+		canvas.ID,
+		models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+		models.FactoryPRFeedbackHandlerSourcePullRequestConflicts,
+	)
+	require.NoError(t, err)
+
+	stubFactoryGitHub(t, &fakeFactoryGitHub{
+		pullRequest: conflictingGitHubPullRequest("abc123def456", "feature", "main"),
+	})
+	silenceFactoryWorkOrderUpdates(t)
+
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
+
+	var claims int64
+	require.NoError(t, db.Model(&models.FactoryPRConflictClaim{}).
+		Where("pull_request_id = ?", pullRequest.ID).
+		Count(&claims).Error)
+	assert.Equal(t, int64(0), claims)
+	assert.Equal(t, int64(0), countCanvasEvents(t, db, canvas.ID, "on-pull-request-conflict"))
+}
+
 func TestStartFactoryPullRequestConflictRepairEmitsOneEventPerHead(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

@@ -53,6 +53,7 @@ type factoryPullRequestMergeability struct {
 	AllowedMethods       []pb.FactoryPullRequestMergeability_MergeMethod
 	HeadSHA              string
 	HeadRef              string
+	HeadRepository       string
 	BaseRef              string
 	PullRequest          *models.FactoryPullRequest
 	Client               factoryGitHubAPI
@@ -126,6 +127,7 @@ func evaluateFactoryPullRequestMergeability(
 	}
 	result.HeadSHA = githubPR.GetHead().GetSHA()
 	result.HeadRef = githubPR.GetHead().GetRef()
+	result.HeadRepository = githubPR.GetHead().GetRepo().GetFullName()
 	result.BaseRef = githubPR.GetBase().GetRef()
 	if opts.ExpectedBase != "" && !strings.EqualFold(result.BaseRef, opts.ExpectedBase) {
 		result.Skip = true

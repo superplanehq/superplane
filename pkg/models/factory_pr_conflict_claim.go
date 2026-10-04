@@ -43,15 +43,3 @@ WHERE factory_pr_conflict_claims.head_sha <> EXCLUDED.head_sha
 	}
 	return result.RowsAffected == 1, nil
 }
-
-// ReleaseFactoryPullRequestConflictHead drops a claim that did not emit an event.
-func ReleaseFactoryPullRequestConflictHead(tx *gorm.DB, handlerID, pullRequestID uuid.UUID, headSHA string) error {
-	headSHA = strings.TrimSpace(headSHA)
-	if handlerID == uuid.Nil || pullRequestID == uuid.Nil || headSHA == "" {
-		return nil
-	}
-	return tx.Exec(`
-DELETE FROM factory_pr_conflict_claims
-WHERE handler_id = ? AND pull_request_id = ? AND head_sha = ?
-`, handlerID, pullRequestID, headSHA).Error
-}
