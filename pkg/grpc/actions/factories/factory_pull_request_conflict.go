@@ -50,6 +50,9 @@ func startFactoryPullRequestConflictRepair(
 	if reached {
 		return nil
 	}
+	if !conflictRepairCanPublish(pullRequest.Repository, result.HeadRepository) {
+		return nil
+	}
 
 	var emitted []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -98,6 +101,14 @@ func emitPullRequestConflict(
 		*emitted = append(*emitted, created...)
 	})
 	return events.Emit(factory.OnPullRequestConflictPayloadType, pullRequestConflictPayload(pullRequest, result))
+}
+
+func conflictRepairCanPublish(baseRepository, headRepository string) bool {
+	headRepository = strings.TrimSpace(headRepository)
+	if headRepository == "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(baseRepository), headRepository)
 }
 
 func publishConflictEvents(emitted []models.CanvasEvent) {

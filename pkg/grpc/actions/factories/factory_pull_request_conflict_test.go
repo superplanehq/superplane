@@ -171,6 +171,34 @@ func TestConflictRepairDoesNotKeepClaimWithoutEvent(t *testing.T) {
 	assert.Equal(t, int64(0), countCanvasEvents(t, db, canvas.ID, "on-pull-request-conflict"))
 }
 
+func TestConflictRepairSkipsForkPullRequest(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 51)
+	canvas := conflictTriggerCanvas(t, r, factory.ID)
+	_, err := factory.CreatePRFeedbackHandler(
+		db,
+		canvas.ID,
+		models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+		models.FactoryPRFeedbackHandlerSourcePullRequestConflicts,
+	)
+	require.NoError(t, err)
+
+	pull := conflictingGitHubPullRequest("abc123def456", "feature", "main")
+	pull.Head.Repo = &github.Repository{FullName: github.Ptr("contributor/app")}
+	stubFactoryGitHub(t, &fakeFactoryGitHub{pullRequest: pull})
+	silenceFactoryWorkOrderUpdates(t)
+
+	require.NoError(t, refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest))
+
+	assert.Equal(t, int64(0), countCanvasEvents(t, db, canvas.ID, "on-pull-request-conflict"))
+	var claims int64
+	require.NoError(t, db.Model(&models.FactoryPRConflictClaim{}).
+		Where("pull_request_id = ?", pullRequest.ID).
+		Count(&claims).Error)
+	assert.Equal(t, int64(0), claims)
+}
+
 func TestStartFactoryPullRequestConflictRepairEmitsOneEventPerHead(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
@@ -262,8 +290,12 @@ func conflictingGitHubPullRequest(sha, headRef, baseRef string) *github.PullRequ
 		Mergeable:      github.Ptr(false),
 		MergeableState: github.Ptr("dirty"),
 		Draft:          github.Ptr(false),
-		Head:           &github.PullRequestBranch{SHA: github.Ptr(sha), Ref: github.Ptr(headRef)},
-		Base:           &github.PullRequestBranch{Ref: github.Ptr(baseRef)},
+		Head: &github.PullRequestBranch{
+			SHA:  github.Ptr(sha),
+			Ref:  github.Ptr(headRef),
+			Repo: &github.Repository{FullName: github.Ptr("acme/app")},
+		},
+		Base: &github.PullRequestBranch{Ref: github.Ptr(baseRef)},
 	}
 }
 
