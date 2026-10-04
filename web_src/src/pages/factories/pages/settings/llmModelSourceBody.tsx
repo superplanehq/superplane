@@ -208,6 +208,7 @@ function HostedModelAllowlist({ organizationId, canUpdate }: { organizationId: s
   const modelIds = candidates.map((model) => model.key ?? "").filter(Boolean);
   const savedIds = (hosted.data?.selected ?? []).map((model) => model.key ?? "").filter((id) => modelIds.includes(id));
   const selected = (draft ?? savedIds).filter((id) => modelIds.includes(id));
+  const allSelected = modelIds.length > 0 && modelIds.every((id) => selected.includes(id));
   const changed = selected.length !== savedIds.length || selected.some((id) => !savedIds.includes(id));
   const modelLabels = Object.fromEntries(
     candidates.map((model) => {
@@ -242,9 +243,11 @@ function HostedModelAllowlist({ organizationId, canUpdate }: { organizationId: s
         query={search}
         onQueryChange={setSearch}
         onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
+        onBulkToggle={() => setDraft(allSelected ? [] : [...modelIds])}
         disabled={!canUpdate || update.isPending}
         searchLabel="Search SuperPlane models"
         showCount
+        showBulkToggle
       />
       <PermissionTooltip allowed={canUpdate} message={COPY.noPermission}>
         <Button type="button" onClick={() => void save()} disabled={!canUpdate || update.isPending || !changed}>

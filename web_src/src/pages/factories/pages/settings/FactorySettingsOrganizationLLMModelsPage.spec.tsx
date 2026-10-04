@@ -204,6 +204,22 @@ describe("FactorySettingsOrganizationLLMModelsPage", () => {
     expect(checkbox).not.toBeChecked();
   });
 
+  it("selects and deselects every SuperPlane model from the bulk toggle", async () => {
+    const user = userEvent.setup();
+    hostedModels.push({ key: "hosted::openrouter::openai/gpt-5", label: "openai/gpt-5", provider: "openrouter" });
+    renderPage("AGENT_HARNESS_SUPERPLANE");
+
+    const hosted = screen.getByTestId("llm-models-hosted");
+    const bulkToggle = within(hosted).getByRole("button", { name: "Select all" });
+    await user.click(bulkToggle);
+    await user.click(within(hosted).getByRole("button", { name: "Save models" }));
+    expect(saveHostedModels).toHaveBeenCalledWith(hostedModels.map((model) => model.key));
+
+    await user.click(within(hosted).getByRole("button", { name: "Deselect all" }));
+    await user.click(within(hosted).getByRole("button", { name: "Save models" }));
+    expect(saveHostedModels).toHaveBeenLastCalledWith([]);
+  });
+
   it("keeps newly available hosted candidates unchecked and saves their keys", async () => {
     const user = userEvent.setup();
     hostedModels.push({ key: "hosted::openrouter::openai/gpt-5", label: "openai/gpt-5", provider: "openrouter" });
