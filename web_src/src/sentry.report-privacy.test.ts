@@ -1,3 +1,4 @@
+import type { Event } from "@sentry/react";
 import { describe, expect, it } from "bun:test";
 
 interface SentryWindow extends Window {
@@ -38,7 +39,7 @@ describe("sentry report privacy", () => {
       expect(collected.cookies).toBe(false);
       expect(collected.httpBodies).toEqual([]);
 
-      const captured: Sentry.Event[] = [];
+      const captured: Event[] = [];
       const probe = Sentry.init({
         dsn: "https://public@o0.ingest.sentry.io/0",
         sendClientReports: false,
