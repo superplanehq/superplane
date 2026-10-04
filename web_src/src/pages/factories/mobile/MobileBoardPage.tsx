@@ -263,7 +263,7 @@ function MobileLineBoard(props: {
   const model = useMobileBoardModel(props);
   const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
   const { view: colorView, setView: setColorView } = useLineBoardColumnColorViewPreference();
-  const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment);
+  const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment, { compact: true });
   const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
   const configuredIntakes = useMemo(
     () => intakeSourcesFromFactoryIntakes(model.factoryIntakes),

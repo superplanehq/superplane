@@ -81,7 +81,7 @@ export function MobileBoardHeader({
     <header className="shrink-0 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)]">
       <div className="flex h-12 items-center gap-1" data-testid="mobile-board-header">
         <MobileLineSwitcher lines={lines} lineId={lineId} onSelect={onSelectLine} />
-        <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]">{creditKicker}</div>
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden">{creditKicker}</div>
         <div className="flex shrink-0 items-center gap-0.5">
           <FilterMenu
             state={state}
