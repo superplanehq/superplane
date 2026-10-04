@@ -1,4 +1,4 @@
-import type { FactoriesFactoryPrFeedbackHandler } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesFactoryPrFeedbackHandler } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { MoreHorizontal, Radio, Search, X } from "lucide-react";
-import type { KeyboardEvent, ReactNode, RefObject } from "react";
+import { Check, MoreHorizontal, Radio, Search, X } from "lucide-react";
+import { useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
@@ -22,9 +22,11 @@ import { LineBoardViewMenu } from "../pages/LineBoardViewMenu";
 import type { ConfiguredLineIntakeSource } from "../pages/lineIntakeModel";
 import { lineIntakeListenTitle } from "../pages/lineIntakeModel";
 import { prFeedbackListenTitle } from "../pages/prFeedbackSettingsModel";
+import { humanizeLineName } from "../lib/humanizeLineName";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "../workOrders/header/menuStyles";
+import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import { MOBILE_BOARD_COPY } from "./mobileCopy";
 
 /**
@@ -45,6 +47,13 @@ export function MobileBoardHeader({
   prFeedbackHandlers,
   onOpenIntake,
   onOpenPRFeedback,
+  lines,
+  lineId,
+  onSelectLine,
+  organizationId,
+  factoryId,
+  factoryKey,
+  canManageClosedStatus,
 }: {
   state: WorkOrderListState;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -58,10 +67,20 @@ export function MobileBoardHeader({
   prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
   onOpenIntake: (intake: ConfiguredLineIntakeSource) => void;
   onOpenPRFeedback: (handlerId: string) => void;
+  lines: FactoriesFactoryLine[];
+  lineId: string;
+  onSelectLine: (lineId: string) => void;
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  canManageClosedStatus: boolean;
 }) {
+  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
+
   return (
     <header className="shrink-0 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)]">
       <div className="flex h-12 items-center gap-1" data-testid="mobile-board-header">
+        <MobileLineSwitcher lines={lines} lineId={lineId} onSelect={onSelectLine} />
         <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]">{creditKicker}</div>
         <div className="flex shrink-0 items-center gap-0.5">
           <FilterMenu
@@ -69,6 +88,7 @@ export function MobileBoardHeader({
             sourceOptions={sourceOptions}
             assigneeOptions={assigneeOptions}
             showPullRequestMerge={showPullRequestMerge}
+            onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
           />
           <Button
             type="button"
@@ -102,7 +122,71 @@ export function MobileBoardHeader({
           />
         </div>
       ) : null}
+      {closedStatusDialogOpen ? (
+        <WorkOrderClosedStatusDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={lineId}
+          canManage={canManageClosedStatus}
+          onOpenChange={(open) => {
+            if (!open) {
+              setClosedStatusDialogOpen(false);
+            }
+          }}
+        />
+      ) : null}
     </header>
+  );
+}
+
+/** Chooses a line when the workspace has more than one. */
+function MobileLineSwitcher({
+  lines,
+  lineId,
+  onSelect,
+}: {
+  lines: FactoriesFactoryLine[];
+  lineId: string;
+  onSelect: (lineId: string) => void;
+}) {
+  const choices = lines.filter((line): line is FactoriesFactoryLine & { id: string } => Boolean(line.id));
+  if (choices.length < 2) {
+    return null;
+  }
+  const current = choices.find((line) => line.id === lineId) ?? choices[0];
+  const name = humanizeLineName(current.name);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 max-w-[42%] shrink px-2 text-[13px] font-medium"
+          aria-label={`${MOBILE_BOARD_COPY.switchLine}: ${name}`}
+          data-testid="mobile-board-line-switcher"
+        >
+          <span className="truncate">{name}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>{MOBILE_BOARD_COPY.lines}</DropdownMenuLabel>
+        {choices.map((line) => (
+          <DropdownMenuItem
+            key={line.id}
+            className={MENU_ITEM_CLASSNAME}
+            data-testid={`mobile-board-line-${line.id}`}
+            onSelect={() => onSelect(line.id)}
+          >
+            <span className="min-w-0 flex-1 truncate">{humanizeLineName(line.name)}</span>
+            {line.id === lineId ? <Check className="size-3.5 shrink-0" aria-hidden /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

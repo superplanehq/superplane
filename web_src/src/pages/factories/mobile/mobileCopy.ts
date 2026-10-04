@@ -13,6 +13,9 @@ export const MOBILE_BOARD_COPY = {
   needsRepair: "Needs repair",
   searchPlaceholder: "Search tasks",
   closeSearch: "Close search",
+  switchLine: "Switch line",
+  lines: "Lines",
+  loadMore: "Load more",
 } as const;
 
 export const MOBILE_TASK_COPY = {

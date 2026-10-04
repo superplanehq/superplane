@@ -6,6 +6,7 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -32,6 +33,7 @@ import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnCol
 import {
   factoryHomePath,
   factoryIntakePath,
+  factoryLineDetailPath,
   factoryPRFeedbackPath,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -62,6 +64,8 @@ import { PhaseGlyph } from "../pages/linePhaseGlyph";
 import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { MobileBoardHeader } from "./MobileBoardHeader";
+import { MobileBoardSettings } from "./MobileBoardSettings";
+import { MOBILE_BOARD_COPY } from "./mobileCopy";
 import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
 
 type ColumnPaging = { hasMore: boolean; isLoading: boolean; onLoadMore: () => void };
@@ -252,16 +256,33 @@ function MobileLineBoard(props: {
   currentUserId?: string;
   onOpenWorkOrder: (order: FactoriesWorkOrderSummary) => void;
 }) {
-  const { organizationId, routeSegment, line, lineId, onOpenWorkOrder } = props;
+  const { organizationId, factoryId, routeSegment, line, lineId, onOpenWorkOrder } = props;
   const navigate = useNavigate();
+  const { factory } = useFactoriesLayout();
+  const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
   const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
   const { view: colorView, setView: setColorView } = useLineBoardColumnColorViewPreference();
   const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment);
   const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
+  const configuredIntakes = useMemo(
+    () => intakeSourcesFromFactoryIntakes(model.factoryIntakes),
+    [model.factoryIntakes],
+  );
+  const canConfigureFactory = canAct("factories", "update");
+  const lines = factory?.lines ?? [];
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
+      <MobileBoardSettings
+        organizationId={organizationId}
+        factoryId={factoryId}
+        routeSegment={routeSegment}
+        lineId={lineId}
+        intakes={configuredIntakes}
+        canUpdate={canConfigureFactory}
+        onboarding={factory?.onboarding}
+      />
       <MobileBoardHeader
         state={model.listState}
         searchRef={searchRef}
@@ -271,12 +292,23 @@ function MobileLineBoard(props: {
         showPullRequestMerge={model.showPullRequestMerge}
         colorView={colorView}
         onColorViewChange={setColorView}
-        intakes={intakeSourcesFromFactoryIntakes(model.factoryIntakes)}
+        intakes={configuredIntakes}
         prFeedbackHandlers={model.prFeedbackHandlers}
         onOpenIntake={(intake) => navigate(factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId))}
         onOpenPRFeedback={(handlerId) =>
           navigate(factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handlerId))
         }
+        lines={lines}
+        lineId={lineId}
+        onSelectLine={(nextLineId) => {
+          if (nextLineId !== lineId) {
+            navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
+          }
+        }}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={routeSegment}
+        canManageClosedStatus={canConfigureFactory}
       />
       <MobileColumnCarousel
         columns={model.columns}
@@ -432,12 +464,13 @@ function MobileColumn({
   renderCard: (order: FactoriesWorkOrder) => ReactNode;
 }) {
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll(paging);
-  const showEmpty = !cardsPending && column.cards.length === 0;
+  const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
 
   return (
     <section
       aria-label={column.title}
       aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
       data-testid={`mobile-board-column-${column.key}`}
       className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
     >
@@ -457,6 +490,19 @@ function MobileColumn({
           ))}
         </LineBoardColumnCardList>
       )}
+      {paging.hasMore ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2 w-full shrink-0"
+          disabled={paging.isLoading}
+          onClick={() => paging.onLoadMore()}
+          data-testid={`mobile-board-load-more-${column.key}`}
+        >
+          {MOBILE_BOARD_COPY.loadMore}
+        </Button>
+      ) : null}
     </section>
   );
 }

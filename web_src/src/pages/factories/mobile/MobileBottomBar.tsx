@@ -2,7 +2,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { cn } from "@/lib/utils";
 import { Gauge, LayoutGrid, Plus, Settings } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { SidebarUserMenu } from "../layout/SidebarUserMenu";
@@ -11,6 +11,7 @@ import {
   factorySettingsWorkspaceGeneralPath,
   factoryVelocityPath,
   firstFactoryLineId,
+  workOrderBoardLineIdFromSearch,
 } from "../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { MOBILE_BOTTOM_BAR_COPY } from "./mobileCopy";
@@ -20,6 +21,43 @@ const TAB_CLASSNAME =
 
 function isActivePath(pathname: string, target: string): boolean {
   return pathname === target || pathname.startsWith(`${target}/`);
+}
+
+function lineIdFromPathname(pathname: string): string | undefined {
+  const match = /\/lines\/([^/]+)/.exec(pathname);
+  const lineId = match?.[1];
+  if (!lineId || lineId === "new") {
+    return undefined;
+  }
+  return decodeURIComponent(lineId);
+}
+
+function knownLineId(
+  factory: { lines?: Array<{ id?: string }> | null } | null | undefined,
+  lineId: string | null | undefined,
+): string | undefined {
+  if (!lineId || !factory?.lines?.some((line) => line.id === lineId)) {
+    return undefined;
+  }
+  return lineId;
+}
+
+/**
+ * Line the Board tab should open. Prefer the line in the current URL, then
+ * the last line this shell showed, then the first line in the workspace.
+ */
+function useBoardLineId(factory: { lines?: Array<{ id?: string }> | null } | null | undefined): string | undefined {
+  const { pathname, search } = useLocation();
+  const routeLineId = knownLineId(factory, lineIdFromPathname(pathname) ?? workOrderBoardLineIdFromSearch(search));
+  const [rememberedLineId, setRememberedLineId] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (routeLineId) {
+      setRememberedLineId(routeLineId);
+    }
+  }, [routeLineId]);
+
+  return routeLineId ?? knownLineId(factory, rememberedLineId) ?? firstFactoryLineId(factory);
 }
 
 /**
@@ -32,7 +70,8 @@ export function MobileBottomBar({ canCreateWorkOrder }: { canCreateWorkOrder: bo
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId);
 
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
+  const boardLineId = useBoardLineId(factory);
+  const boardHref = factoryHomePath(organizationId, routeSegment, boardLineId);
   const velocityHref = factoryVelocityPath(organizationId, routeSegment);
   const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, routeSegment);
   const boardActive = pathname.includes("/lines/") || pathname.includes("/task/");

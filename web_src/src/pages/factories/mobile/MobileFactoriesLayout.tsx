@@ -1,8 +1,9 @@
 import type { FactoriesFactory } from "@/api-client";
+import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router";
 
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
@@ -16,6 +17,7 @@ import {
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
 import { firstFactoryLineId } from "../lib/factoryPagePaths";
+import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { MobileBottomBar } from "./MobileBottomBar";
 
@@ -90,11 +92,27 @@ function MobileFactoryShell({
   children?: ReactNode;
 }) {
   useFactoriesThemeClass();
+  const { account } = useAccount();
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId) ?? null;
   const routeSegment = factoryRouteSegment(factory) || factoryKey;
   const canCreateWorkOrder = canAct("work_orders", "create");
+
+  useEffect(() => {
+    if (account?.id && factory?.id) {
+      recordLastVisitedFactory(account.id, organizationId, factory.id);
+    }
+  }, [account?.id, organizationId, factory?.id]);
+
+  // A stale last-visited pointer would send the index back here after the
+  // error state's "Back to workspaces" link. Clear it when this workspace
+  // cannot be loaded.
+  useEffect(() => {
+    if (account?.id && factoryError) {
+      clearLastVisitedFactory(account.id, organizationId, factoryId);
+    }
+  }, [account?.id, factoryError, factoryId, organizationId]);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(organizationId, routeSegment, canCreateWorkOrder, firstFactoryLineId(factory));
   useFactoryWebsocket(organizationId, factoryId);
