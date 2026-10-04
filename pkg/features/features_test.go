@@ -125,6 +125,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns mobile board feature", func(t *testing.T) {
+		f, ok := Get(FeatureMobileFactoryBoard)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureMobileFactoryBoard, f.ID)
+		assert.Equal(t, "Mobile Board", f.Label)
+		assert.Equal(t, "Show the mobile workspace shell on phone-width screens", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -171,6 +180,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureMobileFactoryBoard))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
