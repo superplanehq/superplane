@@ -119,3 +119,78 @@ func Test__AllocateHostedCreditSpendAdminLast(t *testing.T) {
 	assert.Equal(t, int64(0), spent.PurchasedRemainingMicros)
 	assert.Equal(t, CentsToMicros(1000), spent.AdminRemainingMicros)
 }
+
+func Test__AllocateHostedCreditSpendPositiveAdjustmentAddsToItsType(t *testing.T) {
+	now := time.Now()
+	welcomeEnd := now.Add(14 * 24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(5000), ExpiresAt: &welcomeEnd, CreatedAt: now.Add(-time.Hour)},
+		{Kind: LLMCreditGrantKindTrialAdjustment, AmountMicros: CentsToMicros(1000), ExpiresAt: &welcomeEnd, CreatedAt: now},
+		{Kind: LLMCreditGrantKindTopupAdjustment, AmountMicros: CentsToMicros(2000), CreatedAt: now},
+		{Kind: LLMCreditGrantKindAdminAdjustment, AmountMicros: CentsToMicros(3000), CreatedAt: now},
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(5500), map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(500), spend.WelcomeRemainingMicros)
+	assert.Equal(t, CentsToMicros(2000), spend.PurchasedRemainingMicros)
+	assert.Equal(t, CentsToMicros(3000), spend.AdminRemainingMicros)
+	assert.Equal(t, CentsToMicros(2000), spend.PurchasedCreditMicros)
+	assert.Equal(t, CentsToMicros(9000), spend.SuperPlaneGrantMicros)
+}
+
+func Test__AllocateHostedCreditSpendNegativeAdjustmentLowersRemaining(t *testing.T) {
+	now := time.Now()
+	welcomeEnd := now.Add(14 * 24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(5000), ExpiresAt: &welcomeEnd, CreatedAt: now.Add(-time.Hour)},
+		{Kind: LLMCreditGrantKindTrialAdjustment, AmountMicros: -CentsToMicros(2000), CreatedAt: now},
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(2000), map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(1000), spend.WelcomeRemainingMicros)
+	assert.Equal(t, CentsToMicros(1000), spend.RemainingMicros)
+	assert.Equal(t, CentsToMicros(3000), spend.SuperPlaneGrantMicros)
+}
+
+func Test__AllocateHostedCreditSpendSpillsPastLoweredType(t *testing.T) {
+	now := time.Now()
+	welcomeEnd := now.Add(14 * 24 * time.Hour)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindWelcome, AmountMicros: CentsToMicros(5000), ExpiresAt: &welcomeEnd, CreatedAt: now.Add(-time.Hour)},
+		{Kind: LLMCreditGrantKindTrialAdjustment, AmountMicros: -CentsToMicros(4000), CreatedAt: now},
+		{Kind: LLMCreditGrantKindAdmin, AmountMicros: CentsToMicros(5000), CreatedAt: now.Add(-time.Hour)},
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(3000), map[int64]int64{}, now)
+	assert.Equal(t, int64(0), spend.WelcomeRemainingMicros)
+	assert.Equal(t, CentsToMicros(3000), spend.AdminRemainingMicros)
+	assert.Equal(t, CentsToMicros(3000), spend.RemainingMicros)
+}
+
+func Test__AllocateHostedCreditSpendNegativeAdjustmentLowersLastSpentGrantFirst(t *testing.T) {
+	now := time.Now()
+	created := now.Add(-time.Hour)
+	soonEnd := now.AddDate(0, 1, 0)
+	laterEnd := now.AddDate(0, 12, 0)
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindTopup, AmountMicros: CentsToMicros(10000), ExpiresAt: &soonEnd, CreatedAt: created},
+		{Kind: LLMCreditGrantKindTopup, AmountMicros: CentsToMicros(10000), ExpiresAt: &laterEnd, CreatedAt: created},
+		{Kind: LLMCreditGrantKindTopupAdjustment, AmountMicros: -CentsToMicros(13000), CreatedAt: now},
+	}
+
+	spend := allocateHostedCreditSpend(grants, CentsToMicros(5000), map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(2000), spend.PurchasedRemainingMicros)
+	assert.Equal(t, CentsToMicros(7000), spend.PurchasedCreditMicros)
+}
+
+func Test__AllocateHostedCreditSpendNegativeAdjustmentSkipsLaterGrants(t *testing.T) {
+	now := time.Now()
+	grants := []OrganizationLLMCreditGrant{
+		{Kind: LLMCreditGrantKindAdmin, AmountMicros: CentsToMicros(5000), CreatedAt: now.Add(-2 * time.Hour)},
+		{Kind: LLMCreditGrantKindAdminAdjustment, AmountMicros: -CentsToMicros(5000), CreatedAt: now.Add(-time.Hour)},
+		{Kind: LLMCreditGrantKindAdmin, AmountMicros: CentsToMicros(2000), CreatedAt: now},
+	}
+
+	spend := allocateHostedCreditSpend(grants, 0, map[int64]int64{}, now)
+	assert.Equal(t, CentsToMicros(2000), spend.AdminRemainingMicros)
+}
