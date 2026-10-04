@@ -135,6 +135,36 @@ func startWorkers(
 ) {
 	log.Println("Starting Workers")
 
+	if os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
+		log.Println("Starting Runner Task Log Compactor")
+		installationID, err := models.GetInstallationID(database.Conn())
+		if err != nil {
+			panic(fmt.Sprintf("failed to load installation ID: %v", err))
+		}
+		activeStore := runnerlogs.Current()
+		if activeStore == nil {
+			panic("runner task log compactor requires RUNNER_ACTIVE_LOG_FS_PATH")
+		}
+		w := workers.NewRunnerTaskLogCompactor(
+			blob.Current(),
+			activeStore,
+			installationID,
+			5*time.Second,
+			time.Minute,
+		)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Runner Cleanup Worker")
+		w := workers.NewRunnerCleanupWorker(5 * time.Second)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_REGULAR_WORKERS") == "no" {
+		return
+	}
+
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
 		panic(err)
@@ -306,32 +336,6 @@ func startWorkers(
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" {
 		log.Println("Starting Event Retention Worker")
 		w := workers.NewEventRetentionWorker()
-		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
-		log.Println("Starting Runner Task Log Compactor")
-		installationID, err := models.GetInstallationID(database.Conn())
-		if err != nil {
-			panic(fmt.Sprintf("failed to load installation ID: %v", err))
-		}
-		activeStore := runnerlogs.Current()
-		if activeStore == nil {
-			panic("runner task log compactor requires RUNNER_ACTIVE_LOG_FS_PATH")
-		}
-		w := workers.NewRunnerTaskLogCompactor(
-			blob.Current(),
-			activeStore,
-			installationID,
-			5*time.Second,
-			time.Minute,
-		)
-		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
-		log.Println("Starting Runner Cleanup Worker")
-		w := workers.NewRunnerCleanupWorker(5 * time.Second)
 		go w.Start(context.Background())
 	}
 
