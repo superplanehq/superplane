@@ -1149,8 +1149,8 @@ CREATE TABLE public.organization_llm_credit_grants (
     polar_order_id text,
     polar_refund_id text,
     expires_at timestamp with time zone,
-    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'topup_refund'::text) AND (amount_micros > 0)))),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text])))
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'topup_refund'::text) AND (amount_micros < 0)) OR ((kind = ANY (ARRAY['trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])) AND (amount_micros <> 0)) OR ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text])) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'included'::text, 'topup'::text, 'topup_refund'::text, 'trial_adjustment'::text, 'topup_adjustment'::text, 'admin_adjustment'::text])))
 );
 
 

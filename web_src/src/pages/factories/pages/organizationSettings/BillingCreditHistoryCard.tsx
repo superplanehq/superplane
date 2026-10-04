@@ -17,7 +17,7 @@ export function BillingCreditHistoryCard({ grants }: { grants: OrganizationsOrga
   );
 }
 
-function CreditGrantTable({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
+export function CreditGrantTable({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
   return (
     <table className="mt-1 w-full text-left text-[13px]">
       <thead>

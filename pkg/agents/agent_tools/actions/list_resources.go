@@ -14,6 +14,7 @@ const (
 	listResourcesActionName = "list_resources"
 	defaultResourceLimit    = 100
 	maxResourceLimit        = 200
+	listNoticeResourceType  = "list-notice"
 )
 
 type listResourcesAction struct {
@@ -51,14 +52,14 @@ func (a listResourcesAction) Execute(ctx context.Context, session agents.AgentSe
 	}
 
 	limit := resourceLimit(input.Limit)
-	resources, truncated := serializeAgentIntegrationResources(response.GetResources(), limit)
+	resources, count, truncated := serializeAgentIntegrationResources(response.GetResources(), limit)
 
 	return resourcesResult{
 		Action:        listResourcesActionName,
 		CanvasID:      session.CanvasID,
 		IntegrationID: integrationID,
 		ResourceType:  resourceType,
-		Count:         len(response.GetResources()),
+		Count:         count,
 		Truncated:     truncated,
 		Resources:     resources,
 	}, nil
@@ -96,26 +97,32 @@ func resourceLimit(input uint32) int {
 	return int(input)
 }
 
-func serializeAgentIntegrationResources(resources []*organizationpb.IntegrationResourceRef, limit int) ([]integrationResourceResult, bool) {
+func serializeAgentIntegrationResources(resources []*organizationpb.IntegrationResourceRef, limit int) ([]integrationResourceResult, int, bool) {
 	if limit < 0 {
 		limit = 0
 	}
 
-	truncated := len(resources) > limit
-	if truncated {
-		resources = resources[:limit]
-	}
-
-	result := make([]integrationResourceResult, 0, len(resources))
+	selectable := make([]*organizationpb.IntegrationResourceRef, 0, len(resources))
 	for _, resource := range resources {
-		if resource == nil {
+		if resource == nil || resource.GetType() == listNoticeResourceType {
 			continue
 		}
+		selectable = append(selectable, resource)
+	}
+
+	count := len(selectable)
+	truncated := count > limit
+	if truncated {
+		selectable = selectable[:limit]
+	}
+
+	result := make([]integrationResourceResult, 0, len(selectable))
+	for _, resource := range selectable {
 		result = append(result, integrationResourceResult{
 			Type: resource.GetType(),
 			ID:   resource.GetId(),
 			Name: resource.GetName(),
 		})
 	}
-	return result, truncated
+	return result, count, truncated
 }
