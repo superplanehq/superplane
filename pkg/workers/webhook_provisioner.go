@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -48,6 +49,9 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 		w.logger.Errorf("Error resetting stuck provisioning webhooks: %v", err)
 	} else if count > 0 {
 		w.logger.Infof("Reset %d stuck provisioning webhook(s) back to pending", count)
+	}
+	if err := factoryactions.ScheduleReadyFactoryMergeabilityWebhookUpgrades(database.DB(ctx)); err != nil {
+		w.logger.Errorf("Error scheduling factory mergeability webhook upgrades: %v", err)
 	}
 
 	ticker := time.NewTicker(1 * time.Second)

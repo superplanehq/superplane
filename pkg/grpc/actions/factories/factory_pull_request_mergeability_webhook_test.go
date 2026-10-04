@@ -142,6 +142,53 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	assert.Equal(t, map[string]struct{}{"acme/app": {}, "acme/other": {}}, repositories)
 }
 
+func TestScheduleReadyFactoryMergeabilityWebhookUpgrades(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
+
+	webhooks, err := models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	require.NoError(t, db.Model(&models.Webhook{}).Where("id = ?", webhooks[0].ID).Updates(map[string]any{
+		"state": models.WebhookStateReady,
+		"configuration": datatypes.NewJSONType(any(map[string]any{
+			"eventTypes":                  []any{"pull_request", "check_run", "check_suite", "status"},
+			"repository":                  "acme/app",
+			factoryMergeabilityWebhookKey: true,
+		})),
+	}).Error)
+
+	require.NoError(t, ScheduleReadyFactoryMergeabilityWebhookUpgrades(db))
+
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	assert.True(t, factoryMergeabilityWebhookHasEvent(webhooks[0].Configuration.Data(), "push"))
+
+	require.NoError(t, db.Model(&webhooks[0]).Updates(map[string]any{
+		"state":         models.WebhookStateReady,
+		"configuration": datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration("acme/app"))),
+		"retry_count":   0,
+		"updated_at":    time.Now(),
+	}).Error)
+	require.NoError(t, ScheduleReadyFactoryMergeabilityWebhookUpgrades(db))
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	assert.Equal(t, models.WebhookStateReady, webhooks[0].State)
+}
+
 func TestVerifyGitHubFactoryMergeabilitySignature(t *testing.T) {
 	r := support.Setup(t)
 	webhookID := uuid.New()

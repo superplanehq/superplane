@@ -119,6 +119,8 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 
 var publishFactoryWorkOrderUpdated = messages.PublishFactoryWorkOrderUpdated
 
+var startFactoryMergeabilityUnknownPoll = ScheduleFactoryPullRequestMergeabilityRefresh
+
 func ScheduleFactoryPullRequestMergeabilityRefresh(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -218,10 +220,29 @@ func refreshOpenFactoryPullRequestsOnBase(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		if err := pollFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, baseRef); err != nil {
+		if err := refreshOpenFactoryPullRequestOnBase(ctx, db, deps, factory, pullRequest, baseRef); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		}
 	}
+}
+
+func refreshOpenFactoryPullRequestOnBase(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+	baseRef string,
+) error {
+	err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest, factoryMergeabilityRefreshOptions{
+		ExpectedBase:   baseRef,
+		PersistUnknown: false,
+	})
+	if errors.Is(err, errFactoryPullRequestMergeabilityUnknown) {
+		startFactoryMergeabilityUnknownPoll(ctx, deps, pullRequest.OrganizationID, pullRequest.FactoryID, pullRequest.ID)
+		return nil
+	}
+	return err
 }
 
 func refreshFactoryPullRequestMergeabilityWithRetry(
@@ -506,6 +527,27 @@ func factoryMergeabilityWebhookRepository(configuration any) string {
 	}
 	repository, _ := config["repository"].(string)
 	return strings.TrimSpace(repository)
+}
+
+func ScheduleReadyFactoryMergeabilityWebhookUpgrades(tx *gorm.DB) error {
+	if tx == nil {
+		return nil
+	}
+
+	var hooks []models.Webhook
+	err := tx.
+		Where("state = ?", models.WebhookStateReady).
+		Where("configuration ->> ? = ?", factoryMergeabilityWebhookKey, "true").
+		Find(&hooks).Error
+	if err != nil {
+		return fmt.Errorf("list factory mergeability webhooks: %w", err)
+	}
+	for i := range hooks {
+		if err := updateFactoryMergeabilityWebhook(tx, &hooks[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook) error {
