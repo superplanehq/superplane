@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -335,6 +335,9 @@ check.test.ui: ensure.bun
 
 check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
+
+check.test.ui.browser:
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_backlog_create_tabs.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"

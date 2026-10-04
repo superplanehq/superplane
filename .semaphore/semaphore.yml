@@ -127,6 +127,7 @@ blocks:
           commands:
             - make check.tool.configs
             - make check.build.storybook
+            - make check.test.ui.browser
 
         - name: Unit Tests
           parallelism: 2
