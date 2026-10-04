@@ -1,0 +1,462 @@
+import type {
+  FactoriesFactoryIntake,
+  FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderSummary,
+} from "@/api-client";
+import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { usePermissions } from "@/contexts/usePermissions";
+import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import {
+  useFactoryAutomations,
+  useFactoryBoardWorkOrders,
+  type FactoryBoardColumnPage,
+  type FactoryBoardWorkOrdersOptions,
+} from "@/hooks/useFactoryData";
+import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
+import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
+import { cn } from "@/lib/utils";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Navigate, useNavigate, useParams } from "react-router";
+
+import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
+import {
+  factoryHomePath,
+  factoryIntakePath,
+  factoryPRFeedbackPath,
+  firstFactoryLineId,
+  workOrderDetailPath,
+} from "../lib/factoryPagePaths";
+import { humanizeLineName } from "../lib/humanizeLineName";
+import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
+import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
+import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
+import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
+import {
+  buildAssigneeFilterOptions,
+  buildSourceFilterOptions,
+  type WorkOrderFilterOption,
+} from "../lib/workOrderFilterOptions";
+import {
+  applyWorkOrderFilters,
+  applyWorkOrderScope,
+  applyWorkOrderSearch,
+  buildWorkOrderListEntries,
+  UNASSIGNED_FILTER_VALUE,
+} from "../lib/workOrderListModel";
+import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
+import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
+import { LineBoardColumnCardList, LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
+import { lineBoardColumnLaneProps, normalizeColumnColors } from "../pages/lineBoardColumnColors";
+import { intakeSourcesFromFactoryIntakes } from "../pages/lineIntakeModel";
+import { PhaseGlyph } from "../pages/linePhaseGlyph";
+import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
+import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { MobileBoardHeader } from "./MobileBoardHeader";
+import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
+
+type ColumnPaging = { hasMore: boolean; isLoading: boolean; onLoadMore: () => void };
+
+function boardQueryOptions(
+  state: WorkOrderListState,
+  lineId: string,
+  currentUserId?: string,
+): FactoryBoardWorkOrdersOptions {
+  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+  const mine = state.scope === "my";
+  return {
+    userId: ownerIds.length === 1 ? ownerIds[0] : mine ? currentUserId : undefined,
+    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
+    requireUser: mine && ownerIds.length !== 1,
+    done: { lineId, results: boardDoneResultsForStatuses(state.filters.statuses) },
+  };
+}
+
+/** Phone line board: one column in view, swipe sideways to change column. */
+export function MobileBoardPage() {
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
+  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
+  const navigate = useNavigate();
+  const { canAct, currentUserId } = usePermissions();
+  const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
+  const selectedLine = lines.find((line) => line.id === routeLineId) ?? null;
+
+  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
+
+  if (!selectedLine?.id) {
+    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
+  }
+
+  return (
+    <MobileLineBoard
+      organizationId={organizationId}
+      factoryId={factoryId}
+      routeSegment={routeSegment}
+      line={selectedLine}
+      lineId={selectedLine.id}
+      canUpdateWorkOrders={canAct("work_orders", "update")}
+      currentUserId={currentUserId}
+      onOpenWorkOrder={(order) => {
+        const number = canonicalWorkOrderNumber(order);
+        if (number) {
+          navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id));
+        }
+      }}
+    />
+  );
+}
+
+type MobileBoardModel = {
+  listState: WorkOrderListState;
+  showPullRequestMerge: boolean;
+  columns: MobileBoardColumn[];
+  cardsPending: boolean;
+  paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
+  sourceOptions: WorkOrderFilterOption[];
+  assigneeOptions: WorkOrderFilterOption[];
+  factoryIntakes: FactoriesFactoryIntake[];
+  prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
+  workOrderCardContext: WorkOrderCardContext;
+  analyzingOrderIds: Set<string>;
+  creditFailureLabels: ReadonlyMap<string, string>;
+};
+
+function columnPaging(page: FactoryBoardColumnPage, isPlaceholderData: boolean): ColumnPaging {
+  return {
+    hasMore: !isPlaceholderData && page.hasNextPage,
+    isLoading: page.isFetchingNextPage,
+    onLoadMore: page.fetchNextPage,
+  };
+}
+
+/** Loads the board data and applies scope, filters, and search to the visible columns. */
+function useMobileBoardModel({
+  organizationId,
+  factoryId,
+  routeSegment,
+  line,
+  lineId,
+  canUpdateWorkOrders,
+  currentUserId,
+}: {
+  organizationId: string;
+  factoryId: string;
+  routeSegment: string;
+  line: FactoriesFactoryLine;
+  lineId: string;
+  canUpdateWorkOrders: boolean;
+  currentUserId?: string;
+}): MobileBoardModel {
+  const { factory } = useFactoriesLayout();
+  const listState = useWorkOrderListState(factoryId);
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
+
+  const { workOrders, isPlaceholderData, backlog, open, done } = useFactoryBoardWorkOrders(
+    organizationId,
+    factoryId,
+    boardQueryOptions(listState, lineId, currentUserId),
+  );
+  const { data: apps = [] } = useFactoryAutomations(organizationId, factoryId);
+  const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
+  const { data: prFeedbackHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
+  const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const pullRequests = useMemo(() => pullRequestsFromWorkOrders(workOrders), [workOrders]);
+  const attention = usePRFeedbackWorkOrderAttention(pullRequests, prFeedbackHandlers);
+
+  const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [factory, workOrders]);
+  const visibleWorkOrders = useMemo(() => {
+    const visibleIds = new Set(
+      applyWorkOrderSearch(
+        applyWorkOrderFilters(
+          applyWorkOrderScope(entries, listState.scope === "my" ? "my" : "all", currentUserId),
+          { ...listState.filters, lineIds: [] },
+          { showPullRequestMerge },
+        ),
+        listState.search,
+      ).map((entry) => entry.id),
+    );
+    return uniqueWorkOrdersById(workOrders.filter((order) => order.id && visibleIds.has(order.id)));
+  }, [currentUserId, entries, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders]);
+
+  const columns = useMemo(
+    () => buildMobileBoardColumns(line, visibleWorkOrders, apps),
+    [apps, line, visibleWorkOrders],
+  );
+  const sourceOptions = useMemo(() => buildSourceFilterOptions(factoryIntakes, entries), [entries, factoryIntakes]);
+  const assigneeOptions = useMemo(
+    () =>
+      buildAssigneeFilterOptions(
+        entries,
+        orgUsers.flatMap((user) => {
+          const display = getOrgUserDisplayFromUser(user);
+          return display ? [{ id: display.id, name: display.name }] : [];
+        }),
+      ),
+    [entries, orgUsers],
+  );
+  const creditFailureLabels = useMemo(
+    () => backlogAnalysisCreditLabels(backlogAnalysis.runsByWorkOrder),
+    [backlogAnalysis.runsByWorkOrder],
+  );
+
+  return {
+    listState,
+    showPullRequestMerge,
+    columns,
+    cardsPending: Boolean(isPlaceholderData),
+    paging: {
+      backlog: columnPaging(backlog, Boolean(isPlaceholderData)),
+      open: columnPaging(open, Boolean(isPlaceholderData)),
+      done: columnPaging(done, Boolean(isPlaceholderData)),
+    },
+    sourceOptions,
+    assigneeOptions,
+    factoryIntakes,
+    prFeedbackHandlers,
+    workOrderCardContext: {
+      organizationId,
+      factoryId,
+      factoryKey: routeSegment,
+      factoryLines: factory?.lines ?? [],
+      preferredLineName: line.name,
+      canDispatch: canUpdateWorkOrders,
+      canAssign: canUpdateWorkOrders,
+      pullRequests,
+      ...attention,
+      ...cardActions,
+    },
+    analyzingOrderIds: backlogAnalysis.analyzingOrderIds,
+    creditFailureLabels,
+  };
+}
+
+function MobileLineBoard(props: {
+  organizationId: string;
+  factoryId: string;
+  routeSegment: string;
+  line: FactoriesFactoryLine;
+  lineId: string;
+  canUpdateWorkOrders: boolean;
+  currentUserId?: string;
+  onOpenWorkOrder: (order: FactoriesWorkOrderSummary) => void;
+}) {
+  const { organizationId, routeSegment, line, lineId, onOpenWorkOrder } = props;
+  const navigate = useNavigate();
+  const model = useMobileBoardModel(props);
+  const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
+  const { view: colorView, setView: setColorView } = useLineBoardColumnColorViewPreference();
+  const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment);
+  const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
+      <MobileBoardHeader
+        state={model.listState}
+        searchRef={searchRef}
+        creditKicker={headerKicker}
+        sourceOptions={model.sourceOptions}
+        assigneeOptions={model.assigneeOptions}
+        showPullRequestMerge={model.showPullRequestMerge}
+        colorView={colorView}
+        onColorViewChange={setColorView}
+        intakes={intakeSourcesFromFactoryIntakes(model.factoryIntakes)}
+        prFeedbackHandlers={model.prFeedbackHandlers}
+        onOpenIntake={(intake) => navigate(factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId))}
+        onOpenPRFeedback={(handlerId) =>
+          navigate(factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handlerId))
+        }
+      />
+      <MobileColumnCarousel
+        columns={model.columns}
+        cardsPending={model.cardsPending}
+        laneClassName={(column) =>
+          lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
+        }
+        paging={model.paging}
+        renderCard={(column, order) => (
+          <LineBoardWorkOrderCard
+            order={order}
+            workOrderCardContext={model.workOrderCardContext}
+            onOpen={() => onOpenWorkOrder(order)}
+            isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
+            creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
+          />
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * Horizontal snap carousel. Each column fills the screen width and scrolls
+ * on its own. Tabs above mirror the swipe position and jump on tap.
+ */
+function MobileColumnCarousel({
+  columns,
+  cardsPending,
+  laneClassName,
+  paging,
+  renderCard,
+}: {
+  columns: MobileBoardColumn[];
+  cardsPending: boolean;
+  laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
+  paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
+  renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const syncActiveFromScroll = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+    setActiveIndex(activeColumnIndex(track.scrollLeft, track.clientWidth, columns.length));
+  }, [columns.length]);
+
+  const scrollToColumn = useCallback((index: number) => {
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+    track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
+    setActiveIndex(index);
+  }, []);
+
+  useEffect(() => {
+    if (activeIndex > columns.length - 1) {
+      setActiveIndex(Math.max(columns.length - 1, 0));
+    }
+  }, [activeIndex, columns.length]);
+
+  return (
+    <>
+      <MobileColumnTabs columns={columns} activeIndex={activeIndex} onSelect={scrollToColumn} />
+      <div
+        ref={trackRef}
+        onScroll={syncActiveFromScroll}
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+        data-testid="mobile-board-track"
+      >
+        {columns.map((column, index) => (
+          <MobileColumn
+            key={column.key}
+            column={column}
+            hidden={index !== activeIndex}
+            cardsPending={cardsPending}
+            lane={laneClassName(column)}
+            paging={paging[column.paging]}
+            renderCard={(order) => renderCard(column, order)}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function MobileColumnTabs({
+  columns,
+  activeIndex,
+  onSelect,
+}: {
+  columns: MobileBoardColumn[];
+  activeIndex: number;
+  onSelect: (index: number) => void;
+}) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  useEffect(() => {
+    tabRefs.current[activeIndex]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [activeIndex]);
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Board columns"
+      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 [scrollbar-width:none]"
+      data-testid="mobile-board-tabs"
+    >
+      {columns.map((column, index) => {
+        const active = index === activeIndex;
+        return (
+          <button
+            key={column.key}
+            ref={(element) => {
+              tabRefs.current[index] = element;
+            }}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(index)}
+            data-testid={`mobile-board-tab-${column.key}`}
+            className={cn(
+              "flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
+              active ? "border-foreground text-foreground" : "border-transparent text-muted-foreground",
+            )}
+          >
+            {column.glyph ? <PhaseGlyph kind={column.glyph} className="size-3" /> : null}
+            <span className="truncate">{column.title}</span>
+            <span className="tabular-nums text-[12px] text-muted-foreground">{column.cards.length}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MobileColumn({
+  column,
+  hidden,
+  cardsPending,
+  lane,
+  paging,
+  renderCard,
+}: {
+  column: MobileBoardColumn;
+  hidden: boolean;
+  cardsPending: boolean;
+  lane: { className?: string; surfaceClassName?: string };
+  paging: ColumnPaging;
+  renderCard: (order: FactoriesWorkOrder) => ReactNode;
+}) {
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll(paging);
+  const showEmpty = !cardsPending && column.cards.length === 0;
+
+  return (
+    <section
+      aria-label={column.title}
+      aria-hidden={hidden || undefined}
+      data-testid={`mobile-board-column-${column.key}`}
+      className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
+    >
+      {showEmpty ? (
+        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-[13px] text-muted-foreground">
+          {column.emptyDescription}
+        </p>
+      ) : (
+        <LineBoardColumnCardList
+          pending={cardsPending}
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 [scrollbar-width:none]"
+          testId={`mobile-board-column-scroll-${column.key}`}
+          onScroll={loadMoreIfNeeded}
+        >
+          {column.cards.map((card) => (
+            <li key={card.key}>{renderCard(card.order)}</li>
+          ))}
+        </LineBoardColumnCardList>
+      )}
+    </section>
+  );
+}
