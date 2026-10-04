@@ -1,6 +1,6 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Input, InputGroup } from "@/components/Input/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Search } from "lucide-react";
 import { useMemo } from "react";
 
@@ -40,14 +40,12 @@ export function ModelAllowlistEditor({
 
   return (
     <div className="space-y-3">
-      <InputGroup className="relative">
-        <Search
-          size={14}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
+      <InputGroup>
+        <InputGroupAddon>
+          <Search className="size-3.5" />
+        </InputGroupAddon>
+        <InputGroupInput
           type="search"
-          className="pl-9"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search models..."
