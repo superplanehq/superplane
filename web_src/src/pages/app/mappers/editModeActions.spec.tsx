@@ -99,6 +99,17 @@ function makeTriggerContext(overrides?: Partial<TriggerRendererContext>): Trigge
   };
 }
 
+function makeDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("workflow v2 edit-mode action affordances", () => {
   it("hides start trigger run buttons in edit mode", () => {
     const props = startTriggerRenderer.getTriggerProps({
@@ -241,7 +252,7 @@ describe("workflow v2 edit-mode action affordances", () => {
     );
   });
 
-  it("invokes manual run directly when templates have no parameters", () => {
+  it("invokes manual run directly when templates have no parameters", async () => {
     const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
     const openModal = vi.fn();
     const props = startTriggerRenderer.getTriggerProps({
@@ -257,9 +268,54 @@ describe("workflow v2 edit-mode action affordances", () => {
     expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
       template: "Example",
     });
+    await waitFor(() => expect(screen.getByTestId("start-template-run")).toBeEnabled());
   });
 
-  it("invokes manual run directly when template parameters array is empty", () => {
+  it("shows progress and prevents duplicate direct runs", async () => {
+    const request = makeDeferred<void>();
+    const invokeNodeTriggerHook = vi.fn(() => request.promise);
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext(),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal: vi.fn() },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    const runButton = screen.getByTestId("start-template-run");
+
+    fireEvent.click(runButton);
+
+    expect(runButton).toBeDisabled();
+    expect(runButton).toHaveTextContent("Running...");
+    fireEvent.click(runButton);
+    expect(invokeNodeTriggerHook).toHaveBeenCalledTimes(1);
+
+    request.resolve();
+
+    await waitFor(() => expect(runButton).toBeEnabled());
+    expect(runButton).toHaveTextContent("Run");
+  });
+
+  it("restores the direct run button after a failed request", async () => {
+    const request = makeDeferred<void>();
+    const invokeNodeTriggerHook = vi.fn(() => request.promise);
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext(),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal: vi.fn() },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    const runButton = screen.getByTestId("start-template-run");
+
+    fireEvent.click(runButton);
+    request.reject(new Error("request failed"));
+
+    await waitFor(() => expect(runButton).toBeEnabled());
+    expect(runButton).toHaveTextContent("Run");
+  });
+
+  it("invokes manual run directly when template parameters array is empty", async () => {
     const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
     const openModal = vi.fn();
     const props = startTriggerRenderer.getTriggerProps({
@@ -291,6 +347,7 @@ describe("workflow v2 edit-mode action affordances", () => {
     expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
       template: "Example",
     });
+    await waitFor(() => expect(screen.getByTestId("start-template-run")).toBeEnabled());
   });
 
   it("disables approval actions in edit mode", () => {
