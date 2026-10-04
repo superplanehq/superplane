@@ -81,6 +81,11 @@ const FeatureFactoryRiskScore = "factory_risk_score"
 // against one workspace. Without it, POST /mcp returns 404.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
+// FeatureMobileFactoryBoard gates the mobile-first workspace shell: a
+// one-column-at-a-time line board with a bottom action bar and a full-screen
+// task view on phone-width screens. Desktop screens keep the standard shell.
+const FeatureMobileFactoryBoard = "mobile_factory_board"
+
 func released() *bool {
 	v := true
 	return &v
@@ -104,6 +109,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
+	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
 }
 
 func All() []Feature {
