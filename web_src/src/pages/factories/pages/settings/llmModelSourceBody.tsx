@@ -1,11 +1,16 @@
-import { ArrowUpRight, Check, KeyRound } from "lucide-react";
+import { ArrowUpRight, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
 import superplaneLogo from "@/assets/superplane.svg";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { useUpdateBYOKLLMModels, type useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
+import {
+  useOrganizationHostedLLMModels,
+  useUpdateBYOKLLMModels,
+  useUpdateOrganizationHostedLLMModels,
+  type useBYOKLLMModels,
+} from "@/hooks/useLLMModelAllowlists";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -32,9 +37,6 @@ const BYOK_INTEGRATION_NAMES: Record<string, string> = {
 export function ModelSourceBody({
   source,
   switchedNotice,
-  hostedModels,
-  hostedLoading,
-  hostedError,
   providers,
   currentProvider,
   organizationId,
@@ -46,9 +48,6 @@ export function ModelSourceBody({
 }: {
   source: WorkspaceModelSource;
   switchedNotice: string | null;
-  hostedModels: Array<{ key: string; label: string }>;
-  hostedLoading: boolean;
-  hostedError: boolean;
   providers: LLMModelsSwitchProvider[];
   currentProvider: LLMModelsSwitchProvider | null;
   organizationId: string;
@@ -63,12 +62,13 @@ export function ModelSourceBody({
       {switchedNotice}
     </p>
   ) : null;
+  const hostedModels = <HostedModelAllowlist organizationId={organizationId} canUpdate={canUpdate} />;
 
   if (source === "hosted") {
     return (
       <div className="space-y-5">
         {notice}
-        <HostedModelList models={hostedModels} isLoading={hostedLoading} isError={hostedError} />
+        {hostedModels}
         <ProviderChoices providers={providers} onChoose={onChoose} disabled={!canUpdate} />
       </div>
     );
@@ -89,6 +89,7 @@ export function ModelSourceBody({
       ) : (
         <NoProviderNotice integrationsHref={integrationsHref} />
       )}
+      <div className="border-t border-border pt-4">{hostedModels}</div>
       <ChangeModelSource current={currentProvider} providers={providers} onChoose={onChoose} disabled={!canUpdate} />
     </div>
   );
@@ -198,30 +199,58 @@ function StatusText({ children }: { children: string }) {
   return <p className="text-[13px] text-muted-foreground">{children}</p>;
 }
 
-function HostedModelList({
-  models,
-  isLoading,
-  isError,
-}: {
-  models: Array<{ key: string; label: string }>;
-  isLoading: boolean;
-  isError: boolean;
-}) {
-  if (isLoading) return <StatusText>{COPY.loading}</StatusText>;
-  if (isError) return <StatusText>{COPY.listError}</StatusText>;
-  if (models.length === 0) return <StatusText>{COPY.hostedModelsEmpty}</StatusText>;
+function HostedModelAllowlist({ organizationId, canUpdate }: { organizationId: string; canUpdate: boolean }) {
+  const hosted = useOrganizationHostedLLMModels(organizationId);
+  const update = useUpdateOrganizationHostedLLMModels(organizationId);
+  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const candidates = hosted.data?.candidates ?? [];
+  const modelIds = candidates.map((model) => model.key ?? "").filter(Boolean);
+  const savedIds = (hosted.data?.selected ?? []).map((model) => model.key ?? "").filter((id) => modelIds.includes(id));
+  const selected = (draft ?? savedIds).filter((id) => modelIds.includes(id));
+  const changed = selected.length !== savedIds.length || selected.some((id) => !savedIds.includes(id));
+  const modelLabels = Object.fromEntries(
+    candidates.map((model) => {
+      const label = model.label ?? "";
+      const duplicate = candidates.some((other) => other.key !== model.key && other.label === label);
+      const providerName = model.provider === "anthropic" ? "Anthropic" : byokProviderProductName(model.provider ?? "");
+      return [model.key ?? "", duplicate ? `${label} (${providerName})` : label];
+    }),
+  );
+
+  const save = async () => {
+    try {
+      await update.mutateAsync(selected);
+      setDraft(null);
+      showSuccessToast(COPY.saveSuccess);
+    } catch (saveError) {
+      showErrorToast(getApiErrorMessage(saveError, COPY.saveError));
+    }
+  };
+
+  if (hosted.isLoading) return <StatusText>{COPY.loading}</StatusText>;
+  if (hosted.isError) return <StatusText>Unable to list SuperPlane models.</StatusText>;
+  if (modelIds.length === 0) return <StatusText>{COPY.hostedModelsEmpty}</StatusText>;
 
   return (
     <div className="space-y-3" data-testid="llm-models-hosted">
       <p className="text-xs text-muted-foreground">{COPY.hostedModelsHelper}</p>
-      <ul className="max-h-56 space-y-2 overflow-auto">
-        {models.map((model) => (
-          <li key={model.key} className="flex items-center gap-2 text-[13px]">
-            <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="font-mono text-xs">{model.label}</span>
-          </li>
-        ))}
-      </ul>
+      <ModelAllowlistEditor
+        modelIds={modelIds}
+        modelLabels={modelLabels}
+        selected={selected}
+        query={search}
+        onQueryChange={setSearch}
+        onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
+        disabled={!canUpdate || update.isPending}
+        searchLabel="Search SuperPlane models"
+        showCount
+      />
+      <PermissionTooltip allowed={canUpdate} message={COPY.noPermission}>
+        <Button type="button" onClick={() => void save()} disabled={!canUpdate || update.isPending || !changed}>
+          {update.isPending ? COPY.saving : COPY.save}
+        </Button>
+      </PermissionTooltip>
     </div>
   );
 }
