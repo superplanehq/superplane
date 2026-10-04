@@ -271,6 +271,27 @@ describe("BacklogCreatePopover", () => {
     expect(sentryList.scrollTop).toBe(0);
   });
 
+  it("scrolls extra source tabs inside the menu", async () => {
+    const user = userEvent.setup();
+    const longSources: BacklogIntakeSource[] = [
+      { intakeId: "intake-linear", name: "Linear issues", iconAlt: "Linear", tabLabel: "Linear" },
+      { intakeId: "intake-dependabot", name: "Dependabot alerts", iconAlt: "Dependabot", tabLabel: "Dependabot" },
+      { intakeId: "intake-datadog", name: "Datadog errors", iconAlt: "Datadog", tabLabel: "Datadog" },
+      { intakeId: "intake-sentry", name: "Sentry exceptions", iconAlt: "Sentry", tabLabel: "Sentry" },
+    ];
+
+    render(popover({ sources: longSources, focusedIntakeId: "intake-linear" }));
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    const tabs = screen.getByTestId("lines-backlog-create-tabs");
+    expect(tabs.className).toContain("max-w-full");
+    expect(tabs.className).toContain("overflow-x-auto");
+    expect(screen.getByTestId("lines-backlog-create-menu")).toHaveClass("w-96");
+    for (const source of longSources) {
+      expect(screen.getByTestId(`lines-backlog-create-tab-${source.intakeId}`)).toHaveTextContent(source.tabLabel);
+    }
+  });
+
   it("keeps a single intake as a search row without tabs", async () => {
     const user = userEvent.setup();
 
