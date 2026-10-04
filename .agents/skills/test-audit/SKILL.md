@@ -88,7 +88,8 @@ run parallel discovery lanes when available:
 
 - Go application and entrypoints (`pkg/`, `cmd/`);
 - UI (`web_src/`);
-- runner (`runner/`);
+- integrated runner and Fleet Manager (`pkg/runners`, `pkg/fleets`,
+  `cmd/runner`, `cmd/fleetmanager`);
 - end-to-end tests and helper scripts (`test/`, `scripts/`);
 - a cross-cutting pattern sweep.
 
@@ -145,13 +146,12 @@ the smallest owner suite that covers the change.
 1. Run the smallest owner and sibling tests:
    - Go: `make test PKG_TEST_PACKAGES=...`
    - UI: `make check.test.ui FILES=...` (paths relative to `web_src/`)
-   - runner: `$(MAKE) -C runner test`
    - end-to-end: `E2E_TEST_PACKAGES=... make test.e2e` (or
      `make test.e2e.single FILE=... LINE=...`)
 2. For removed source greps or plan assertions, run the Make target or
    executable script that owns the real contract.
-3. Run targeted formatting (`make format.go`, `make format.js`, or
-   `make format.runner`), then `git diff --check`.
+3. Run targeted formatting (`make format.go` or `make format.js`), then
+   `git diff --check`.
 4. Run the matching lint and build checks from
    [pre-pipeline-review](../pre-pipeline-review/SKILL.md).
 5. Inspect `git diff --numstat`; report production and tooling separately from

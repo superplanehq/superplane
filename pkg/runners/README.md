@@ -1,7 +1,7 @@
 # SuperPlane runner
 
-This package contains the runner implementation in the root Go module. It does
-not import code from the legacy `runner/` module.
+This package contains the integrated runner implementation in the root Go
+module.
 
 The runner:
 

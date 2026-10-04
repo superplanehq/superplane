@@ -31,12 +31,7 @@ them as tracked changes. Do not commit them. Do not hand-edit them. Edit
 
 A clean clone does not contain these files until `make dev.setup` or
 `make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
-runs `make dev.setup`, which includes `pb.gen`. App blocks skip `/runner/**`.
-Runner tests and publish pipelines run when `/runner` changes. Create
-deployment target `runner-prod` on the SuperPlane Semaphore project and
-attach `GHCR_TOKEN` plus the AWS keys used for S3, ECS, and AMI jobs.
-Auto-promote those pipelines only from `main`. Do not put runner jobs on
-`production`.
+runs `make dev.setup`, which includes `pb.gen`.
 
 ### Do not rediscover the build system
 
@@ -73,10 +68,9 @@ approvals, and an operational UI.
 - `docs/` — Markdown documentation (see `docs/contributing/`).
 - `cmd/runner`, `cmd/fleetmanager`, `pkg/runners`, and `pkg/fleets` — the
   integrated runner and Fleet Manager. Local development uses this stack.
-- `runner/` — the legacy task-broker, runner worker, and fleet-manager. It has
-  its own Go module (`github.com/superplane/runner`). Preserve it until the
-  runner migration is complete. Image publish and deploy stay on the existing
-  runner Semaphore pipelines.
+- Legacy runner source and release automation live in
+  [superplanehq/runner](https://github.com/superplanehq/runner). App-side
+  legacy broker routing remains here during the hosted rollout.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -155,10 +149,8 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
-  After editing `runner/` Go code: `make format.runner`, then
-  `$(MAKE) -C runner test`. Do not run `go build ./...` — `scripts/` has more
-  than one `main` package. Use `make check.build.app`. App `gofmt` excludes
-  `runner/`.
+ Do not run `go build ./...` — `scripts/` has more than one `main` package.
+ Use `make check.build.app`.
 - After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
   `make check.build.ui`. Run `make check.lint.ui` locally before you open a
   pull request. CI fails when the ESLint budget grows.
