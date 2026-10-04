@@ -1092,6 +1092,19 @@ CREATE TABLE public.organization_byok_model_allowlists (
 
 
 --
+-- Name: organization_hosted_model_allowlists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_hosted_model_allowlists (
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_hosted_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2476,6 +2489,14 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 ALTER TABLE ONLY public.organization_byok_model_allowlists
     ADD CONSTRAINT organization_byok_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
+
+
+--
+-- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_hosted_model_allowlists
+    ADD CONSTRAINT organization_hosted_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
 
 
 --
@@ -4931,6 +4952,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT fk_workflow_runs_workflow_node FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id);
+
+
+--
+-- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_hosted_model_allowlists
+    ADD CONSTRAINT organization_hosted_model_allowlists_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
