@@ -27,6 +27,13 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
       ...(creatorName ? { creatorName } : {}),
     };
   }
+  if (source.kind === "mcp") {
+    return {
+      name: source.name,
+      iconSrc: source.iconSrc,
+      iconAlt: source.iconAlt,
+    };
+  }
   if (source.kind !== "intake") {
     return null;
   }
@@ -40,11 +47,15 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
 
 /** Sentinel source filter value that matches tasks created by a person. */
 export const MANUAL_FILTER_VALUE = "manual";
+export const MCP_SOURCE_FILTER_PREFIX = "mcp:";
 
 export function workOrderListSource(order: FactoriesWorkOrder): { id: string; label: string } {
   const source = splitRunSourceForOrder(order);
   if (source.kind === "manual") {
     return { id: MANUAL_FILTER_VALUE, label: CREATED_MANUALLY };
+  }
+  if (source.kind === "mcp") {
+    return { id: `${MCP_SOURCE_FILTER_PREFIX}${source.name}`, label: source.name };
   }
   const intakeKind = intakeKindForPresentationName(source.name);
   return {

@@ -73,6 +73,18 @@ func (VCSProviderInstallRequest) TableName() string {
 	return "vcs_provider_install_requests"
 }
 
+// VCSProviderInstallRequestRefresh asks the catalog worker to read the
+// provider's install request list often until RefreshUntil.
+type VCSProviderInstallRequestRefresh struct {
+	Provider     string `gorm:"primaryKey"`
+	RefreshUntil time.Time
+	UpdatedAt    time.Time
+}
+
+func (VCSProviderInstallRequestRefresh) TableName() string {
+	return "vcs_provider_install_request_refreshes"
+}
+
 type VCSProviderRepositorySyncPriority int16
 
 const (
@@ -111,10 +123,15 @@ func (VCSProviderInstallationReconcileJob) TableName() string {
 	return "vcs_provider_installation_reconcile_jobs"
 }
 
+// VCSProviderInstallationReconcileRequester links an installation to the
+// organization that installed or updated it. The row outlives the reconcile
+// job until the collaborator sync of that installation finishes, so the
+// organization sees that sync.
 type VCSProviderInstallationReconcileRequester struct {
 	Provider       string    `gorm:"primaryKey"`
 	InstallationID int64     `gorm:"primaryKey"`
 	OrganizationID uuid.UUID `gorm:"primaryKey"`
+	CreatedAt      time.Time
 }
 
 func (VCSProviderInstallationReconcileRequester) TableName() string {
@@ -375,6 +392,12 @@ func VCSProviderCatalogSynchronizing(
 				AND collaborator.repository_id = repository.repository_id
 			WHERE repository.provider = ?
 				AND collaborator.provider_user_id = ?
+		),
+		requested_installations AS (
+			SELECT requester.provider, requester.installation_id
+			FROM vcs_provider_installation_reconcile_requesters AS requester
+			WHERE requester.provider = ?
+				AND requester.organization_id = ?
 		)
 		SELECT EXISTS (
 			SELECT 1
@@ -388,25 +411,35 @@ func VCSProviderCatalogSynchronizing(
 			WHERE job.provider = ?
 			UNION ALL
 			SELECT 1
-			FROM vcs_provider_installation_reconcile_jobs AS job
+			FROM vcs_provider_repository_sync_jobs AS job
+			JOIN vcs_provider_repositories AS repository
+				ON repository.provider = job.provider
+				AND repository.repository_id = job.repository_id
+			JOIN requested_installations AS requested
+				ON requested.provider = repository.provider
+				AND requested.installation_id = repository.installation_id
 			WHERE job.provider = ?
-				AND (
-					EXISTS (
-						SELECT 1
-						FROM relevant_installations AS relevant
-						WHERE relevant.provider = job.provider
-							AND relevant.installation_id = job.installation_id
-					)
-					OR EXISTS (
-						SELECT 1
-						FROM vcs_provider_installation_reconcile_requesters AS requester
-						WHERE requester.provider = job.provider
-							AND requester.installation_id = job.installation_id
-							AND requester.organization_id = ?
-					)
-				)
+				AND job.priority >= ?
+			UNION ALL
+			SELECT 1
+			FROM vcs_provider_installation_reconcile_jobs AS job
+			JOIN (
+				SELECT provider, installation_id FROM relevant_installations
+				UNION
+				SELECT provider, installation_id FROM requested_installations
+			) AS relevant
+				ON relevant.provider = job.provider
+				AND relevant.installation_id = job.installation_id
+			WHERE job.provider = ?
 		)
-	`, provider, providerUserID, provider, providerUserID, provider, provider, organizationID).Scan(&synchronizing).Error
+	`,
+		provider, providerUserID,
+		provider, providerUserID,
+		provider, organizationID,
+		provider,
+		provider, VCSProviderRepositorySyncPriorityInteractive,
+		provider,
+	).Scan(&synchronizing).Error
 	return synchronizing, err
 }
 
@@ -464,9 +497,40 @@ func EnqueueVCSProviderInstallationReconciliation(
 			Provider:       provider,
 			InstallationID: installationID,
 			OrganizationID: organizationID,
+			CreatedAt:      updatedAt,
 		}
-		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&requester).Error
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "provider"}, {Name: "installation_id"}, {Name: "organization_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"created_at"}),
+		}).Create(&requester).Error
 	})
+}
+
+// DeleteFinishedVCSProviderInstallationRequesters deletes requester rows whose
+// installation has no reconcile job and no interactive repository sync job
+// left. Background syncs are routine and do not belong to the request.
+// createdBefore keeps new rows while the reconcile job enqueues their syncs.
+func DeleteFinishedVCSProviderInstallationRequesters(tx *gorm.DB, provider string, createdBefore time.Time) error {
+	return tx.
+		Where("provider = ? AND created_at < ?", provider, createdBefore).
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM vcs_provider_installation_reconcile_jobs AS job
+			WHERE job.provider = vcs_provider_installation_reconcile_requesters.provider
+				AND job.installation_id = vcs_provider_installation_reconcile_requesters.installation_id
+		)`).
+		Where(`NOT EXISTS (
+			SELECT 1
+			FROM vcs_provider_repository_sync_jobs AS job
+			JOIN vcs_provider_repositories AS repository
+				ON repository.provider = job.provider
+				AND repository.repository_id = job.repository_id
+			WHERE repository.provider = vcs_provider_installation_reconcile_requesters.provider
+				AND repository.installation_id = vcs_provider_installation_reconcile_requesters.installation_id
+				AND job.priority >= ?
+		)`, VCSProviderRepositorySyncPriorityInteractive).
+		Delete(&VCSProviderInstallationReconcileRequester{}).
+		Error
 }
 
 func ClaimVCSProviderInstallationReconciliation(
@@ -765,14 +829,65 @@ func ReplaceVCSProviderInstallRequests(tx *gorm.DB, provider string, requests []
 	})
 }
 
+// GitHub keeps an approved request in its list for a short time after the
+// installation exists. The row stays, so the setup callback can still tell
+// that an admin approved it, but the account no longer waits for approval.
+const vcsProviderInstallRequestNotInstalled = `NOT EXISTS (
+	SELECT 1
+	FROM vcs_provider_installations AS installation
+	WHERE installation.provider = vcs_provider_install_requests.provider
+		AND (
+			installation.account_id = vcs_provider_install_requests.account_id
+			OR (
+				vcs_provider_install_requests.account_id IS NULL
+				AND LOWER(installation.account_login) = LOWER(vcs_provider_install_requests.account_login)
+			)
+		)
+)`
+
+// ListVCSProviderInstallRequests lists the requests that still wait for
+// approval.
 func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID int64) ([]VCSProviderInstallRequest, error) {
 	var requests []VCSProviderInstallRequest
 	err := tx.
 		Where("provider = ? AND requester_id = ?", provider, requesterID).
+		Where(vcsProviderInstallRequestNotInstalled).
 		Order("requested_at ASC").
 		Find(&requests).
 		Error
 	return requests, err
+}
+
+func HasVCSProviderInstallRequests(tx *gorm.DB, provider string) (bool, error) {
+	var count int64
+	err := tx.Model(&VCSProviderInstallRequest{}).
+		Where("provider = ?", provider).
+		Where(vcsProviderInstallRequestNotInstalled).
+		Limit(1).
+		Count(&count).
+		Error
+	return count > 0, err
+}
+
+func RequestVCSProviderInstallRequestRefresh(tx *gorm.DB, provider string, until time.Time) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	refresh := VCSProviderInstallRequestRefresh{Provider: provider, RefreshUntil: until, UpdatedAt: time.Now()}
+	return tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "provider"}},
+		DoUpdates: clause.AssignmentColumns([]string{"refresh_until", "updated_at"}),
+	}).Create(&refresh).Error
+}
+
+func VCSProviderInstallRequestRefreshRequested(tx *gorm.DB, provider string, now time.Time) (bool, error) {
+	var count int64
+	err := tx.Model(&VCSProviderInstallRequestRefresh{}).
+		Where("provider = ? AND refresh_until > ?", provider, now).
+		Count(&count).
+		Error
+	return count > 0, err
 }
 
 func DeleteVCSProviderInstallRequestsForAccount(
@@ -883,16 +998,9 @@ func enqueueVCSProviderRepositorySync(
 		Columns: []clause.Column{{Name: "provider"}, {Name: "repository_id"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"run_at": repositorySyncRunAtExpression(schedule, runAt),
-			"priority": gorm.Expr(
-				`CASE
-					WHEN vcs_provider_repository_sync_jobs.locked_at IS NOT NULL
-						AND vcs_provider_repository_sync_jobs.updated_at <= vcs_provider_repository_sync_jobs.locked_at
-						THEN ?
-					ELSE GREATEST(vcs_provider_repository_sync_jobs.priority, ?)
-				END`,
-				priority,
-				priority,
-			),
+			// A running interactive sync keeps its priority, so onboarding
+			// still counts it as requested work until it ends.
+			"priority":   gorm.Expr("GREATEST(vcs_provider_repository_sync_jobs.priority, ?)", priority),
 			"last_error": "",
 			"updated_at": gorm.Expr(
 				"GREATEST(?, COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', ?))",

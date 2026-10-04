@@ -148,14 +148,18 @@ func ListLabels(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 }
 
 func ListProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	teamID := ctx.Parameters["team"]
-	if teamID == "" {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	teamID := ctx.Parameters["team"]
+	if teamID == "" {
+		projects, err := client.ListWorkspaceProjects()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list projects: %v", err)
+		}
+		return projectResources(workspaceProjectsAsProjects(projects)), nil
 	}
 
 	projects, err := client.ListTeamProjects(teamID)
@@ -163,6 +167,18 @@ func ListProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 		return nil, fmt.Errorf("failed to list projects: %v", err)
 	}
 
+	return projectResources(projects), nil
+}
+
+func workspaceProjectsAsProjects(projects []WorkspaceProject) []Project {
+	converted := make([]Project, 0, len(projects))
+	for _, project := range projects {
+		converted = append(converted, Project{ID: project.ID, Name: project.Name})
+	}
+	return converted
+}
+
+func projectResources(projects []Project) []core.IntegrationResource {
 	resources := make([]core.IntegrationResource, 0, len(projects))
 	for _, project := range projects {
 		resources = append(resources, core.IntegrationResource{
@@ -171,8 +187,7 @@ func ListProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 			ID:   project.ID,
 		})
 	}
-
-	return resources, nil
+	return resources
 }
 
 // ListAttachments returns the attachments on the issue selected in the sibling

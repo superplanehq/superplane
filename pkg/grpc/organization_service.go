@@ -95,6 +95,14 @@ func (s *OrganizationService) DescribeOrganizationSpendingReport(
 	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
 }
 
+func (s *OrganizationService) ListOrganizationRunnerFleets(
+	ctx context.Context,
+	_ *pb.ListOrganizationRunnerFleetsRequest,
+) (*pb.ListOrganizationRunnerFleetsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListOrganizationRunnerFleets(ctx, orgID)
+}
+
 func (s *OrganizationService) ListHostedLLMModels(
 	ctx context.Context,
 	req *pb.ListHostedLLMModelsRequest,

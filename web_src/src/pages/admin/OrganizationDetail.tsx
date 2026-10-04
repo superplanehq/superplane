@@ -5,11 +5,12 @@ import React, { useState } from "react";
 import { Link, useParams } from "react-router";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
+import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
 import { OrgOverviewPanel } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
 
-const ORGANIZATION_TABS = ["overview", "users", "automations", "features", "credits"] as const;
+const ORGANIZATION_TABS = ["overview", "users", "automations", "connections", "features", "credits"] as const;
 
 type OrganizationTab = (typeof ORGANIZATION_TABS)[number];
 
@@ -49,6 +50,7 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="automations">Automations</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
@@ -60,6 +62,9 @@ const OrganizationDetail: React.FC = () => {
         </TabsContent>
         <TabsContent value="automations" className="mt-3">
           <OrgCanvasesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="connections" className="mt-3">
+          <OrgIntegrationsTable orgId={orgId!} />
         </TabsContent>
         <TabsContent value="features" className="mt-3">
           <OrgExperimentalFeaturesTable orgId={orgId!} />

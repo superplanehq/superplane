@@ -37,6 +37,10 @@ const FeatureFactoryProductiveIntake = "factory_productive_intake"
 // Backlog column menu until the flow is generally available.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
+// FeatureFactoryLinearIntake gates Linear issue intake from the Backlog
+// column menu until the flow is generally available.
+const FeatureFactoryLinearIntake = "factory_linear_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -59,6 +63,10 @@ const FeatureWorkspaceMCP = "workspace_mcp"
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
 
+// FeatureNewRunners routes newly created runner tasks through SuperPlane's
+// integrated runner API. Existing executions keep their persisted backend.
+const FeatureNewRunners = "new_runners"
+
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
 // available.
@@ -67,10 +75,6 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // FeatureFactoryRiskScore gates the merge confidence automation on the Verify
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
-
-// FeatureFactoryTaskConsole gates the unified task popup: one console
-// timeline with a summary panel instead of the Task and Automations tabs.
-const FeatureFactoryTaskConsole = "factory_task_console"
 
 // FeatureSuperPlaneMCPServer gates the public workspace MCP server.
 // Organizations with this flag can authorize Cursor and other MCP clients
@@ -89,15 +93,16 @@ var registry = []Feature{
 	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
+	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
+	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
-	{ID: FeatureFactoryTaskConsole, Label: "Task Console", Description: "Unified task popup with one console timeline instead of the Task and Automations tabs"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
 }
 

@@ -48,3 +48,28 @@ export function enabledToolCount(tools: MCPToolItem[], disabled: string[]): numb
   const blocked = new Set(disabled);
   return tools.filter((tool) => !blocked.has(tool.name)).length;
 }
+
+export function effectiveDisabledTools(
+  workspaceDisabled: string[],
+  enabledOverride: string[],
+  automationDisabled: string[],
+): string[] {
+  const enabled = new Set(enabledOverride);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of workspaceDisabled) {
+    if (!name || enabled.has(name) || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    out.push(name);
+  }
+  for (const name of automationDisabled) {
+    if (!name || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}

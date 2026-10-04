@@ -29,7 +29,10 @@ import { useFactories } from "@/hooks/useFactoryData";
 import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 import { AgentResourcesEditor } from "@/pages/factories/pages/AgentResourcesEditor";
 import { disabledAgentResourceIds } from "@/pages/factories/pages/disabledAgentResourceIds";
-import { disabledAgentResourceTools } from "@/pages/factories/pages/PlanningReviewDisabledTools";
+import {
+  disabledAgentResourceTools,
+  enabledAgentResourceTools,
+} from "@/pages/factories/pages/PlanningReviewDisabledTools";
 import { useParams } from "react-router";
 
 const REQUIRED_FIELD_BADGE_CLASS =
@@ -907,11 +910,15 @@ export function SettingsTab({
               factoryKey={factoryKey}
               disabledIds={disabledAgentResourceIds(nodeConfiguration)}
               disabledTools={disabledAgentResourceTools(nodeConfiguration)}
+              enabledTools={enabledAgentResourceTools(nodeConfiguration)}
               onDisabledIdsChange={(ids) =>
                 setNodeConfiguration((current) => ({ ...current, disabledAgentResourceIds: ids }))
               }
               onDisabledToolsChange={(tools) =>
                 setNodeConfiguration((current) => ({ ...current, disabledAgentResourceTools: tools }))
+              }
+              onEnabledToolsChange={(tools) =>
+                setNodeConfiguration((current) => ({ ...current, enabledAgentResourceTools: tools }))
               }
               compact
             />

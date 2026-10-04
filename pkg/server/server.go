@@ -8,19 +8,22 @@ import (
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/blob"
-	"github.com/superplanehq/superplane/pkg/blob/filesystem"
+	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
 	"github.com/superplanehq/superplane/pkg/config"
@@ -36,11 +39,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
+	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
+	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers"
+	"go.opentelemetry.io/otel"
 	"gorm.io/gorm"
 )
 
@@ -302,6 +309,32 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUNNER_LOG_COMPACTOR") == "yes" {
+		log.Println("Starting Runner Task Log Compactor")
+		installationID, err := models.GetInstallationID(database.Conn())
+		if err != nil {
+			panic(fmt.Sprintf("failed to load installation ID: %v", err))
+		}
+		activeStore := runnerlogs.Current()
+		if activeStore == nil {
+			panic("runner task log compactor requires RUNNER_ACTIVE_LOG_FS_PATH")
+		}
+		w := workers.NewRunnerTaskLogCompactor(
+			blob.Current(),
+			activeStore,
+			installationID,
+			5*time.Second,
+			time.Minute,
+		)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_RUNNER_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Runner Cleanup Worker")
+		w := workers.NewRunnerCleanupWorker(5 * time.Second)
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
@@ -381,22 +414,92 @@ func startFactoryJiraCloseConsumer(
 }
 
 func buildGRPCServices(
-	baseURL, webhooksBaseURL string,
+	baseURL, webhooksBaseURL, runnerAPIBaseURL string,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
+	jwtSigner *jwt.Signer,
 ) (*grpc.Services, error) {
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:         baseURL,
-		WebhooksBaseURL: webhooksBaseURL,
-		Encryptor:       encryptor,
-		AuthService:     authService,
-		Registry:        registry,
-		OIDCProvider:    oidcProvider,
-		AgentService:    agentService,
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
 	})
+}
+
+func startRunnerAPI(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, activeLogStoreName string) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+	if err != nil {
+		log.Fatalf("failed to create runner API server: %v", err)
+	}
+
+	address := fmt.Sprintf("0.0.0.0:%d", lookupPublicAPIPort())
+	log.Printf("Starting Runner API on %s", address)
+	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
+	defer stopNotifications()
+	server.StartControlNotifications(notificationsCtx, uuid.NewString())
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- server.Serve(address) }()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+	select {
+	case err := <-serveDone:
+		if err != nil {
+			log.Fatal(err)
+		}
+	case <-signals:
+		stopNotifications()
+		shutdownRunnerAPI(server)
+		os.Exit(0)
+	}
+}
+
+func registerRunnerAPI(
+	publicServer *public.Server,
+	jwtSigner *jwt.Signer,
+	encryptor crypto.Encryptor,
+	activeLogStoreName string,
+) {
+	server, err := runnerapi.NewServer(jwtSigner, encryptor, activeLogStoreName)
+	if err != nil {
+		log.Fatalf("failed to create integrated runner API server: %v", err)
+	}
+
+	publicServer.Router.PathPrefix("/runner/v1").Handler(server.Handler())
+	notificationsCtx, stopNotifications := context.WithCancel(context.Background())
+	server.StartControlNotifications(notificationsCtx, uuid.NewString())
+
+	go func() {
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+		defer signal.Stop(signals)
+		<-signals
+		stopNotifications()
+		shutdownRunnerAPI(server)
+		os.Exit(0)
+	}()
+}
+
+func shutdownRunnerAPI(server *runnerapi.Server) {
+	if server.ConnectionCount() == 0 {
+		log.Println("Stopping Runner API")
+	} else {
+		log.Println("Stopping Runner API and reconnecting runners")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Runner API graceful shutdown failed: %v", err)
+	}
 }
 
 func startPublicAPI(
@@ -407,6 +510,7 @@ func startPublicAPI(
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
 	grpcServices *grpc.Services,
+	activeLogStoreName string,
 ) {
 	log.Println("Starting Public API with integrated Web Server")
 
@@ -457,6 +561,11 @@ func startPublicAPI(
 		server.RegisterWebSocketRoutes()
 	} else {
 		log.Println("Websocket routes not registered")
+	}
+
+	if os.Getenv("START_RUNNER_API") == "yes" {
+		log.Println("Registering Runner API routes on Public API")
+		registerRunnerAPI(server, jwtSigner, encryptor, activeLogStoreName)
 	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
@@ -613,6 +722,7 @@ func Start() {
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
+	runnerAPIBaseURL := getRunnerAPIBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
@@ -624,6 +734,25 @@ func Start() {
 		panic(fmt.Sprintf("failed to create blob storage provider: %v", err))
 	}
 	blob.SetCurrent(blobProvider)
+
+	activeLogStore, err := newRunnerActiveLogStore()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create runner active log store: %v", err))
+	}
+	if activeLogStore != nil {
+		setupContext := context.Background()
+		if err := activeLogStore.Setup(runnerlogs.SetupContext{
+			Context:       setupContext,
+			MeterProvider: otel.GetMeterProvider(),
+		}); err != nil {
+			panic(fmt.Sprintf("failed to set up runner active log store: %v", err))
+		}
+		runnerlogs.SetCurrent(activeLogStore)
+	}
+	activeLogStoreName := ""
+	if activeLogStore != nil {
+		activeLogStoreName = activeLogStore.Name()
+	}
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
@@ -666,11 +795,13 @@ func Start() {
 		services, err := buildGRPCServices(
 			baseURL,
 			webhooksBaseURL,
+			runnerAPIBaseURL,
 			encryptorInstance,
 			authService,
 			registry,
 			oidcProvider,
 			agentService,
+			jwtSigner,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -686,7 +817,10 @@ func Start() {
 			oidcProvider,
 			authService,
 			grpcServices,
+			activeLogStoreName,
 		)
+	} else if os.Getenv("START_RUNNER_API") == "yes" {
+		go startRunnerAPI(jwtSigner, encryptorInstance, activeLogStoreName)
 	}
 
 	startWorkers(
@@ -715,6 +849,14 @@ func getWebhookBaseURL(baseURL string) string {
 	return webhookBaseURL
 }
 
+func getRunnerAPIBaseURL(baseURL string) string {
+	runnerAPIBaseURL := os.Getenv("RUNNER_API_BASE_URL")
+	if runnerAPIBaseURL == "" {
+		runnerAPIBaseURL = baseURL
+	}
+	return runnerAPIBaseURL
+}
+
 func newBlobProvider() (blob.Provider, error) {
 	name := strings.TrimSpace(os.Getenv("BLOB_STORAGE_PROVIDER"))
 	if name == "" {
@@ -730,10 +872,19 @@ func newBlobProvider() (blob.Provider, error) {
 		return s3blob.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
-		return filesystem.NewProvider()
+		return blobfilesystem.NewProvider()
 	default:
 		return nil, fmt.Errorf("unsupported blob storage provider %q", name)
 	}
+}
+
+func newRunnerActiveLogStore() (runnerlogs.Store, error) {
+	if strings.TrimSpace(os.Getenv("RUNNER_ACTIVE_LOG_FS_PATH")) == "" {
+		return nil, nil
+	}
+
+	log.Println("Creating FS runner active log store")
+	return runnerlogsfs.NewProvider()
 }
 
 /*

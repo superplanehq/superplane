@@ -135,7 +135,14 @@ function timingColumnForPhase(phase: SplitRunPhase): ConsoleColumnId {
   if (isConsoleCreationStage(phase)) {
     return "backlog";
   }
-  return consoleColumnIdForStage({ id: phase.id, name: phase.name, columnKey: phase.columnKey });
+  return consoleColumnIdForStage({
+    id: phase.id,
+    name: phase.name,
+    columnKey: phase.columnKey,
+    appId: phase.appId,
+    componentName: phase.componentName,
+    pullRequestActivity: phase.pullRequestActivity,
+  });
 }
 
 function parseTime(value?: string): number | undefined {

@@ -345,7 +345,7 @@ func Test__CancelOrganizationSubscriptionRejectsTrial(t *testing.T) {
 func Test__CancelOrganizationSubscriptionRejectsAdminPlan(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
@@ -466,7 +466,7 @@ func Test__SyncOrganizationSubscriptionLeavesTrialWhenPolarIsIncomplete(t *testi
 func Test__SyncOrganizationSubscriptionReplacesAdminTrialWithPolarPaid(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanTrial, nil)
 	require.NoError(t, err)
 	periodStart := time.Now().UTC().Truncate(time.Second)
 	periodEnd := periodStart.AddDate(0, 1, 0)
@@ -486,7 +486,7 @@ func Test__SyncOrganizationSubscriptionReplacesAdminTrialWithPolarPaid(t *testin
 func Test__SyncOrganizationSubscriptionLeavesAdminBusinessWhenPolarHasNone(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
-	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+	_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 	require.NoError(t, err)
 	usePolarSubscriptionServer(t, r.Organization.ID.String(), nil)
 

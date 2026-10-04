@@ -1507,7 +1507,7 @@ Runs shell commands on a fleet runner.
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
@@ -1572,7 +1572,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1628,7 +1628,7 @@ Example:
 4. bash — `git push`
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as `ANTHROPIC_API_KEY`.
 - **Model**: Select a model from Organization LLM Models.
@@ -1683,7 +1683,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — a Codex turn. Later prompts continue in the same working directory.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenAI integration used as `OPENAI_API_KEY`.
 - **Model**: Select a model from Organization LLM Models.
@@ -1739,7 +1739,7 @@ function main() {
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Node.js image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1789,7 +1789,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as `OPENROUTER_API_KEY`.
 - **Model**: Required. Select a model from Organization LLM Models.
@@ -1846,7 +1846,7 @@ def main(payload):
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Python image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1897,7 +1897,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — an agent turn. Later prompts continue the same session.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.

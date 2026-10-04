@@ -26,8 +26,7 @@ export function resolveFactoryNodeMetrics({
   if (!section) return null;
 
   const isLiveStatus = status === "running" || status === "cancelling";
-  const liveText =
-    isLiveStatus && liveDurationMs !== null ? formatFactoryNodeDuration(liveDurationMs, { soFar: true }) : null;
+  const liveText = isLiveStatus && liveDurationMs !== null ? formatFactoryNodeDuration(liveDurationMs) : null;
 
   if (section.eventSubtitle) {
     if (section.showAutomaticTime && liveText) {

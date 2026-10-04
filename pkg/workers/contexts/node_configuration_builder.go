@@ -1230,9 +1230,6 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 }
 
 func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
-	if !workOrderRefinementEnabled(b.tx, order) {
-		return "", nil
-	}
 	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
 	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
 		return "", nil

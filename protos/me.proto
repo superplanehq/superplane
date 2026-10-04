@@ -201,6 +201,18 @@ service Me {
       tags: "Me";
     };
   }
+
+  rpc VerifyVCSProviderInstallations(VerifyVCSProviderInstallationsRequest) returns (VerifyVCSProviderInstallationsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/installations:verify"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Verify VCS provider installations";
+      description: "Checks with the VCS provider that the installations the user can see still exist, and removes the installations that were uninstalled";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -276,6 +288,12 @@ message RefreshVCSProviderOnboardingRequest {
 }
 
 message RefreshVCSProviderOnboardingResponse {}
+
+message VerifyVCSProviderInstallationsRequest {
+  string provider = 1;
+}
+
+message VerifyVCSProviderInstallationsResponse {}
 
 message BrowserNotificationPreferences {
   bool enabled = 1;
