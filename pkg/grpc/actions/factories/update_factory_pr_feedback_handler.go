@@ -110,6 +110,9 @@ func applyPRFeedbackSettings(
 			if settings.GetChecks() != nil && settings.GetChecks().MaximumAttempts != nil {
 				updated.MaximumAttempts = int(settings.GetChecks().GetMaximumAttempts())
 			}
+			if settings.GetConflicts() != nil && settings.GetConflicts().MaximumAttempts != nil {
+				updated.MaximumAttempts = int(settings.GetConflicts().GetMaximumAttempts())
+			}
 		}
 		if err := validatePRFeedbackSettingsForSource(tx, canvas.OrganizationID, handler.Source, updated, settings); err != nil {
 			return err
@@ -129,7 +132,7 @@ func applyPRFeedbackSettings(
 		}
 
 		runnerIDs := map[string]bool{graph.RunnerNodeID: true}
-		if !graph.isChecks() {
+		if !graph.isChecks() && !graph.isConflicts() {
 			runnerIDs = graph.discussionRunnerNodeIDs(spec)
 		}
 		factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
@@ -150,7 +153,7 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				if !graph.isChecks() {
+				if !graph.isChecks() && !graph.isConflicts() {
 					configuration["contentFilter"] = updated.Mention
 					configuration["ignoreBots"] = updated.IgnoreBots
 					configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
@@ -210,7 +213,7 @@ func applyPRFeedbackSettings(
 			if configuration == nil {
 				configuration = map[string]any{}
 			}
-			if !graph.isChecks() && independentDiscussionFlows {
+			if !graph.isChecks() && !graph.isConflicts() && independentDiscussionFlows {
 				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID)
 				if !ok {
 					nodes[i].Configuration = configuration
@@ -222,7 +225,8 @@ func applyPRFeedbackSettings(
 			nodes[i].Configuration = configuration
 		}
 
-		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks ||
+			handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
 			if err := handler.SetMaximumAttempts(tx, updated.MaximumAttempts); err != nil {
 				return err
 			}

@@ -1441,6 +1441,7 @@ message FactoryPRFeedbackHandler {
     SOURCE_UNSPECIFIED = 0;
     SOURCE_PULL_REQUEST_DISCUSSION = 1;
     SOURCE_PULL_REQUEST_CHECKS = 2;
+    SOURCE_PULL_REQUEST_CONFLICTS = 3;
   }
 
   message SubjectSettings {
@@ -1460,12 +1461,17 @@ message FactoryPRFeedbackHandler {
     repeated string runner_integration_ids = 3;
   }
 
+  message ConflictSettings {
+    optional int32 maximum_attempts = 1;
+  }
+
   // Settings stored in the canvas graph. This block is a read/write facade
   // over that graph.
   message Settings {
     SubjectSettings subject = 1;
     DiscussionSettings discussion = 2;
     CheckSettings checks = 3;
+    ConflictSettings conflicts = 4;
   }
 
   string id = 1;

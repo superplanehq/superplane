@@ -11,6 +11,7 @@ export interface FactoryPRFeedbackRoute {
 const HANDLER_NAME_BY_SOURCE: Record<string, string> = {
   SOURCE_PULL_REQUEST_DISCUSSION: "Address PR feedback",
   SOURCE_PULL_REQUEST_CHECKS: "Fix pull request checks",
+  SOURCE_PULL_REQUEST_CONFLICTS: "Fix merge conflicts",
 };
 
 function route(pattern: string): RegExp {

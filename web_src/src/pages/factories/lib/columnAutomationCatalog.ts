@@ -153,5 +153,8 @@ export function prFeedbackSentence(sourceId: string): { kind: ColumnAutomationKi
   if (sourceId === "checks") {
     return { kind: "pr-checks", trigger: "On failing pull request check", action: "Fix the checks" };
   }
+  if (sourceId === "conflicts") {
+    return { kind: "pr-conflicts", trigger: "On merge conflict", action: "Resolve the conflict" };
+  }
   return { kind: "pr-discussion", trigger: "On pull request comment", action: "Address the feedback" };
 }

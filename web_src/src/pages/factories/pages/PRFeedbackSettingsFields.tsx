@@ -24,11 +24,21 @@ import {
 } from "./useDiscussionPRFeedbackSetup";
 import { StatusCheckPicker } from "./StatusCheckPicker";
 
-export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
+export function PRFeedbackHealthSection({
+  healthy,
+  checks,
+  conflicts = false,
+}: {
+  healthy: boolean;
+  checks: boolean;
+  conflicts?: boolean;
+}) {
   const helper = healthy
-    ? checks
-      ? PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper
-      : PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
+    ? conflicts
+      ? PR_FEEDBACK_SETTINGS_COPY.healthConflictsReadyHelper
+      : checks
+        ? PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper
+        : PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
     : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper;
 
   return (
@@ -81,6 +91,28 @@ export function PRFeedbackTextField({
         data-testid={id}
       />
     </section>
+  );
+}
+
+export function PRFeedbackConflictsFields({
+  draft,
+  onUpdate,
+}: {
+  draft: PRFeedbackDraftSettings;
+  onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
+}) {
+  return (
+    <PRFeedbackTextField
+      id="pr-feedback-maximum-attempts"
+      label={PR_FEEDBACK_SETTINGS_COPY.maximumAttemptsLabel}
+      helper={PR_FEEDBACK_SETTINGS_COPY.conflictsAttemptsHelper}
+      value={String(draft.maximumAttempts)}
+      type="number"
+      min={1}
+      max={10}
+      step={1}
+      onChange={(value) => onUpdate("maximumAttempts", Number(value))}
+    />
   );
 }
 

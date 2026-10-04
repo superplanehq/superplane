@@ -392,6 +392,29 @@ func splitFactoryMergeMethods(value string) []string {
 	return names
 }
 
+func ListOpenGitHubFactoryPullRequestsInRepository(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	repository string,
+) ([]FactoryPullRequest, error) {
+	repository = strings.TrimSpace(repository)
+	if organizationID == uuid.Nil || repository == "" {
+		return nil, nil
+	}
+
+	var pullRequests []FactoryPullRequest
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("organization_id = ?", organizationID).
+		Where("provider = ?", FactoryPullRequestProviderGitHub).
+		Where("state = ?", FactoryPullRequestStateOpen).
+		Where("repository = ?", repository).
+		Find(&pullRequests).Error
+	if err != nil {
+		return nil, err
+	}
+	return pullRequests, nil
+}
+
 func ListOpenGitHubFactoryPullRequestsForWebhook(
 	tx *gorm.DB,
 	organizationID uuid.UUID,

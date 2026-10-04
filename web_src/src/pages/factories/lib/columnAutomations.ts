@@ -42,6 +42,7 @@ export type ColumnAutomationKind =
   | "custom"
   | "pr-discussion"
   | "pr-checks"
+  | "pr-conflicts"
   | "pr-closure"
   | "risk-score";
 

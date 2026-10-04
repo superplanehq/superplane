@@ -3,8 +3,14 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factoryLineDetailPath,
+  firstFactoryLineId,
+  type PRFeedbackSetupKind,
+} from "../lib/factoryPagePaths";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
+import { ConflictsPRFeedbackSetupDialog } from "./ConflictsPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById, type PRFeedbackSource } from "./prFeedbackSettingsModel";
 
@@ -16,7 +22,11 @@ export function ChecksPRFeedbackSetupPage() {
   return <PRFeedbackSetupPage kind="checks" />;
 }
 
-function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
+export function ConflictsPRFeedbackSetupPage() {
+  return <PRFeedbackSetupPage kind="conflicts" />;
+}
+
+function PRFeedbackSetupPage({ kind }: { kind: PRFeedbackSetupKind }) {
   const layout = useFactoriesLayout();
   const { canAct } = usePermissions();
   const { lineId } = useParams<{ lineId?: string }>();
@@ -39,7 +49,7 @@ function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
 }
 
 function resolvePRFeedbackSetupModel(
-  kind: "comments" | "checks",
+  kind: PRFeedbackSetupKind,
   layout: ResolvedFactoriesLayout,
   canUpdate: boolean,
   lineId: string | undefined,
@@ -48,7 +58,7 @@ function resolvePRFeedbackSetupModel(
   redirectTo: string;
   returnHref: string;
   dialog?: {
-    kind: "comments" | "checks";
+    kind: PRFeedbackSetupKind;
     organizationId: string;
     factoryId: string;
     githubIntegrationId: string;
@@ -61,7 +71,7 @@ function resolvePRFeedbackSetupModel(
   const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = bindings.lines.find((entry) => entry.id === lineId);
   const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
-  const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
+  const source = prFeedbackSourceById(prFeedbackSetupSourceId(kind));
   const titleParts = [prFeedbackSetupPageTitle(kind), bindings.workspaceName];
   const redirectTo = prFeedbackSetupRedirect({
     kind,
@@ -102,15 +112,28 @@ function factoryPRFeedbackSetupBindings(factory: ResolvedFactoriesLayout["factor
   };
 }
 
-function prFeedbackSetupPageTitle(kind: "comments" | "checks"): string {
+function prFeedbackSetupSourceId(kind: PRFeedbackSetupKind) {
+  if (kind === "checks") {
+    return "checks";
+  }
+  if (kind === "conflicts") {
+    return "conflicts";
+  }
+  return "discussion";
+}
+
+function prFeedbackSetupPageTitle(kind: PRFeedbackSetupKind): string {
   if (kind === "checks") {
     return PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleChecks;
+  }
+  if (kind === "conflicts") {
+    return PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleConflicts;
   }
   return PR_FEEDBACK_SETTINGS_COPY.wizardPageTitleComments;
 }
 
 function prFeedbackSetupRedirect(input: {
-  kind: "comments" | "checks";
+  kind: PRFeedbackSetupKind;
   canUpdate: boolean;
   lineId?: string;
   factoryPresent: boolean;
@@ -138,7 +161,7 @@ function PRFeedbackSetupDialogs({
   onClose,
   onCreated,
 }: {
-  kind: "comments" | "checks";
+  kind: PRFeedbackSetupKind;
   organizationId: string;
   factoryId: string;
   githubIntegrationId: string;
@@ -161,6 +184,15 @@ function PRFeedbackSetupDialogs({
     <div className="h-full min-h-0" data-testid={`pr-feedback-setup-page-${kind}`}>
       {kind === "checks" ? (
         <ChecksPRFeedbackSetupDialog {...shared} />
+      ) : kind === "conflicts" ? (
+        <ConflictsPRFeedbackSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          repository={repository}
+          source={source}
+          onClose={onClose}
+          onCreated={onCreated}
+        />
       ) : (
         <DiscussionPRFeedbackSetupDialog {...shared} />
       )}

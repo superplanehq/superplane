@@ -76,6 +76,10 @@ export function LinesBoardSpecHarness({
                     element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
                   />
                   <Route
+                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/conflicts"
+                    element={<div data-testid="conflicts-pr-feedback-setup">Conflicts setup page</div>}
+                  />
+                  <Route
                     path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/github"
                     element={<div data-testid="github-intake-setup">GitHub setup page</div>}
                   />

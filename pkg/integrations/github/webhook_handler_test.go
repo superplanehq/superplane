@@ -73,6 +73,31 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
 	})
+
+	t.Run("updates an existing repository hook", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{"id":456,"name":"web"}`),
+			},
+		}
+
+		metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://app.example/api/v1/webhooks/webhook-id",
+				Secret:        []byte("local-webhook-secret"),
+				Metadata:      Webhook{ID: 456, WebhookName: "web"},
+				Configuration: common.WebhookConfiguration{EventTypes: []string{"pull_request", "push"}, Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: 456, WebhookName: "web"}, metadata)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPatch, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks/456", httpCtx.Requests[0].URL.Path)
+	})
 }
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {

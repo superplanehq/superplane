@@ -609,6 +609,11 @@ func (c *Client) CreateHook(ctx context.Context, repository string, hook *github
 	return c.underlying.Repositories.CreateHook(ctx, owner, name, hook)
 }
 
+func (c *Client) EditHook(ctx context.Context, repository string, hookID int64, hook *github.Hook) (*github.Hook, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.EditHook(ctx, owner, name, hookID, hook)
+}
+
 func (c *Client) DeleteHook(ctx context.Context, repository string, hookID int64) (*github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Repositories.DeleteHook(ctx, owner, name, hookID)

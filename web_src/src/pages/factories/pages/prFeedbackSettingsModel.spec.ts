@@ -120,17 +120,18 @@ describe("takenPRFeedbackSourceIds", () => {
       takenPRFeedbackSourceIds([
         { source: "SOURCE_PULL_REQUEST_DISCUSSION" },
         { source: "SOURCE_PULL_REQUEST_CHECKS" },
+        { source: "SOURCE_PULL_REQUEST_CONFLICTS" },
       ]),
-    ).toEqual(["discussion", "checks"]);
+    ).toEqual(["discussion", "checks", "conflicts"]);
   });
 });
 
 describe("availablePRFeedbackSources", () => {
   it("offers discussion and status-check setup", () => {
-    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion", "checks"]);
+    expect(availablePRFeedbackSources().map((source) => source.id)).toEqual(["discussion", "checks", "conflicts"]);
     expect(hasAvailablePRFeedbackSource([])).toBe(true);
     expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
-    expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
+    expect(hasAvailablePRFeedbackSource(["discussion", "checks", "conflicts"])).toBe(false);
   });
 });
 
@@ -208,6 +209,29 @@ describe("prFeedbackDraftIsValid", () => {
           mention: "",
           checkNames: ["lint"],
           maximumAttempts: 5.5,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("requires a valid attempt limit for merge conflicts", () => {
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "conflicts",
+          name: "Fix merge conflicts",
+          mention: "",
+          maximumAttempts: 3,
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "conflicts",
+          name: "Fix merge conflicts",
+          mention: "",
+          maximumAttempts: 0,
         }),
       ),
     ).toBe(false);
@@ -312,6 +336,17 @@ describe("prFeedbackSettingsToApi", () => {
     ).toEqual({
       subject: { repository: "acme/app" },
       checks: { names: ["lint"], maximumAttempts: 4, runnerIntegrationIds: ["int-1"] },
+    });
+    expect(
+      prFeedbackSettingsToApi(
+        discussionDraft({
+          source: "conflicts",
+          maximumAttempts: 3,
+        }),
+      ),
+    ).toEqual({
+      subject: { repository: "acme/app" },
+      conflicts: { maximumAttempts: 3 },
     });
   });
 });

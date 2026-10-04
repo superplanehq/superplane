@@ -310,6 +310,7 @@ func reconcileFactoryRepository(
 				Edges: liveVersion.Edges,
 			}))
 			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
+			changed = replaceConflictTriggerRepository(nodes, previousAppRepository, repository) || changed
 		}
 		changed = replaceGitHubNodeIntegration(
 			nodes,
@@ -363,6 +364,9 @@ func factoryTemplateGitHubNodeIDs(templateID string) []string {
 }
 
 func addPRFeedbackGitHubNodeIDs(nodeIDs map[string]bool, graph prFeedbackGraph) {
+	if graph.isConflicts() {
+		return
+	}
 	for _, nodeID := range graph.triggerNodeIDs() {
 		nodeIDs[nodeID] = true
 	}
@@ -447,6 +451,10 @@ func replaceTriggerRepository(nodes []models.Node, component, previousRepository
 		changed = true
 	}
 	return changed
+}
+
+func replaceConflictTriggerRepository(nodes []models.Node, previousRepository, repository string) bool {
+	return replaceTriggerRepository(nodes, "onPullRequestConflict", previousRepository, repository)
 }
 
 func replaceGitHubTriggerRepository(nodes []models.Node, previousRepository, repository string) bool {

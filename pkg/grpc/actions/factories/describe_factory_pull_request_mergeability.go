@@ -44,7 +44,7 @@ func DescribeFactoryPullRequestMergeability(
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 	}
 	if !cached {
-		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest, immediateFactoryMergeabilityRefreshOptions())
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 		}
