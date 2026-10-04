@@ -1,4 +1,3 @@
--- Repeat 20261002161651. Databases already past that version skip it.
 BEGIN;
 
 ALTER TABLE organization_llm_credit_grants
