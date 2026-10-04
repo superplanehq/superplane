@@ -57,6 +57,14 @@ const CHECKS_HANDLER: FactoriesFactoryPrFeedbackHandler = {
   healthy: false,
 };
 
+const CONFLICTS_HANDLER: FactoriesFactoryPrFeedbackHandler = {
+  id: "prfb-conflicts",
+  canvasId: "app-pr-conflicts",
+  name: "Fix merge conflicts",
+  source: "SOURCE_PULL_REQUEST_CONFLICTS",
+  healthy: true,
+};
+
 const IMPLEMENT_COLUMN: LinePhaseColumn = {
   stepName: "Implement",
   stepIndex: 0,
@@ -210,7 +218,7 @@ describe("buildColumnAutomations", () => {
   it("builds verify listeners from PR feedback handlers", () => {
     const automations = buildColumnAutomations("verify", {
       columnTitle: "Verify",
-      prFeedbackHandlers: [DISCUSSION_HANDLER, CHECKS_HANDLER],
+      prFeedbackHandlers: [DISCUSSION_HANDLER, CHECKS_HANDLER, CONFLICTS_HANDLER],
     });
 
     expect(automations[0]).toMatchObject({
@@ -224,6 +232,8 @@ describe("buildColumnAutomations", () => {
       action: "Fix the checks",
       health: "needs-repair",
     });
+    expect(automations[2]?.trigger).toBe("On merge conflict");
+    expect(automations[2]?.action).toBe("Resolve the conflict");
   });
 
   it("builds the Done closure automation", () => {
@@ -335,14 +345,26 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion and status-check setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
+  it("offers discussion, status-check, and merge-conflict setup in the verify catalog", () => {
+    const catalog = catalogForColumn("verify");
+    const automations = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      prFeedbackHandlers: [CONFLICTS_HANDLER],
+    });
+    expect(catalog.map((entry) => entry.id)).toEqual(["discussion", "checks", "conflicts"]);
+    expect(takenCatalogIds(automations, catalog)).toEqual(["conflicts"]);
+    expect(catalog.find((entry) => entry.id === "conflicts")).toMatchObject({
+      kind: "pr-conflicts",
+      name: "Merge conflicts",
+      unique: true,
+    });
   });
 
   it("offers risk score in the verify catalog when the feature is on", () => {
     expect(catalogForColumn("verify", { allowRiskScore: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
+      "conflicts",
       "risk-score",
     ]);
   });
@@ -351,6 +373,7 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("verify", { allowCustom: true, allowRiskScore: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
+      "conflicts",
       "risk-score",
       "custom",
     ]);
@@ -386,7 +409,7 @@ describe("catalogForColumn", () => {
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
     const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "conflicts", "risk-score"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {

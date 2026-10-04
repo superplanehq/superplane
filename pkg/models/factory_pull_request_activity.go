@@ -415,6 +415,19 @@ func (p *FactoryPullRequest) reserveAttempt(tx *gorm.DB, activity *FactoryPullRe
 	return true, nil
 }
 
+// ConflictRepairLimitReached reports whether this pull request has used
+// every automatic conflict repair for the handler. A nil limit does not block.
+func (p *FactoryPullRequest) ConflictRepairLimitReached(tx *gorm.DB, handler *FactoryPRFeedbackHandler) (bool, error) {
+	if p == nil || handler == nil || handler.MaximumAttempts == nil || *handler.MaximumAttempts < 1 {
+		return false, nil
+	}
+	count, err := p.countAttemptsSinceReset(tx, handler.ID)
+	if err != nil {
+		return false, err
+	}
+	return count >= *handler.MaximumAttempts, nil
+}
+
 func (p *FactoryPullRequest) countAttemptsSinceReset(tx *gorm.DB, handlerID uuid.UUID) (int, error) {
 	type resetBoundary struct {
 		UpdatedAt time.Time

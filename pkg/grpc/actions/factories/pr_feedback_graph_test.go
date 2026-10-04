@@ -429,6 +429,70 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 	})
 }
 
+func Test__BuildConflictsPRFeedbackCanvas(t *testing.T) {
+	t.Run("a merge conflict starts one repair", func(t *testing.T) {
+		canvas := buildConflictsPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:      "acme/app",
+			MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+		})
+
+		assert.Equal(t, []string{
+			"default:" + prFeedbackConflictTriggerNodeID + "->" + prFeedbackFindNodeID,
+			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
+			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackStartRepairNodeID,
+			"default:" + prFeedbackStartRepairNodeID + "->" + prFeedbackConflictRunnerNodeID,
+			"limitReached:" + prFeedbackStartRepairNodeID + "->" + prFeedbackPauseFixesNodeID,
+		}, yamlEdgeChannels(canvas))
+
+		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
+		assert.Equal(t, "concurrent", activity.Configuration["access"])
+		assert.Equal(t, prFeedbackConflictDetectedTitleExpression(), activity.Configuration["title"])
+
+		repair := findSpecNode(t, canvas, prFeedbackStartRepairNodeID)
+		assert.Equal(t, "exclusive", repair.Configuration["access"])
+		assert.Equal(t, prFeedbackConflictRepairTitleExpression(), repair.Configuration["title"])
+
+		pause := findSpecNode(t, canvas, prFeedbackPauseFixesNodeID)
+		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["title"])
+
+		spec := models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
+		graph := resolvePRFeedbackGraph(spec)
+		assert.Equal(t, prFeedbackConflictTriggerNodeID, graph.ConflictTriggerNodeID)
+		assert.True(t, graph.isConflicts())
+		assert.False(t, graph.isChecks())
+		assert.True(t, graph.Healthy(spec))
+	})
+
+	t.Run("the runner merges the base branch and stops when the remote head changed", func(t *testing.T) {
+		canvas := buildConflictsPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:      "acme/app",
+			MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+		})
+		runner := findSpecNode(t, canvas, prFeedbackConflictRunnerNodeID)
+		assert.Contains(t, runnerEnv(t, runner, "BASE_REF"), "pull_request.base.ref")
+		assert.Contains(t, runnerEnv(t, runner, "PR_REVISION"), "pull_request.head.sha")
+
+		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
+		assert.Contains(t, checkout, `git clone --filter=blob:none "https://github.com/${REPO}.git" repo`)
+		assert.NotContains(t, checkout, "--depth 1")
+		assert.Contains(t, checkout, `git fetch origin "${BASE_REF}"`)
+
+		prompt := runnerStepPrompt(t, runner, "Resolve Merge Conflict")
+		assert.Contains(t, prompt, "git merge origin/")
+		assert.Contains(t, prompt, "Do not rebase.")
+		assert.Contains(t, prompt, "Do not force-push.")
+		assert.Contains(t, prompt, "Do not create a new branch.")
+		assert.Contains(t, prompt, runnerpkg.FactoryCommitIdentityPrompt)
+
+		push := runnerStepCommand(t, runner, "Commit and Push")
+		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
+		assert.Contains(t, push, "Stop without pushing.")
+		assert.Contains(t, push, `git commit -s -m "fix: resolve merge conflict on PR #${PR_NUMBER}"`)
+		assert.NotContains(t, push, "--force")
+		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
+	})
+}
+
 func assertPRFeedbackPerPullRequestConcurrency(t *testing.T, canvas *yaml.Canvas) {
 	t.Helper()
 

@@ -15,6 +15,7 @@ const (
 	FactoryPRFeedbackHandlerSubjectGitHubPullRequest    = "github-pull-request"
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion = "pull-request-discussion"
 	FactoryPRFeedbackHandlerSourcePullRequestChecks     = "pull-request-checks"
+	FactoryPRFeedbackHandlerSourcePullRequestConflicts  = "pull-request-conflicts"
 
 	factoryPRFeedbackHandlerCanvasUniqueConstraint = "idx_factory_pr_feedback_handlers_canvas_id"
 )
@@ -34,6 +35,7 @@ var factoryPRFeedbackHandlerSubjects = []string{
 var factoryPRFeedbackHandlerSources = []string{
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
 	FactoryPRFeedbackHandlerSourcePullRequestChecks,
+	FactoryPRFeedbackHandlerSourcePullRequestConflicts,
 }
 
 // FactoryPRFeedbackHandler declares that a factory canvas addresses pull
@@ -128,6 +130,23 @@ func (f *Factory) FindPRFeedbackHandler(tx *gorm.DB, handlerID uuid.UUID) (*Fact
 		return nil, err
 	}
 
+	return &handler, nil
+}
+
+func (f *Factory) FindPRFeedbackHandlerBySource(tx *gorm.DB, source string) (*FactoryPRFeedbackHandler, error) {
+	var handler FactoryPRFeedbackHandler
+	err := liveCanvasPRFeedbackHandlers(tx).
+		Where("factory_pr_feedback_handlers.organization_id = ? AND factory_pr_feedback_handlers.factory_id = ? AND factory_pr_feedback_handlers.source = ?", f.OrganizationID, f.ID, source).
+		Order("factory_pr_feedback_handlers.created_at ASC").
+		Order("factory_pr_feedback_handlers.id ASC").
+		First(&handler).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return &handler, nil
 }
 

@@ -565,6 +565,20 @@ CREATE TABLE public.factory_planning_sessions (
 
 
 --
+-- Name: factory_pr_conflict_claims; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_pr_conflict_claims (
+    handler_id uuid NOT NULL,
+    pull_request_id uuid NOT NULL,
+    head_sha text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT factory_pr_conflict_claims_head_sha_present CHECK ((btrim(head_sha) <> ''::text))
+);
+
+
+--
 -- Name: factory_pr_feedback_handlers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2220,6 +2234,14 @@ ALTER TABLE ONLY public.factory_planning_session_work_orders
 
 ALTER TABLE ONLY public.factory_planning_sessions
     ADD CONSTRAINT factory_planning_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_pr_conflict_claims factory_pr_conflict_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_conflict_claims
+    ADD CONSTRAINT factory_pr_conflict_claims_pkey PRIMARY KEY (handler_id, pull_request_id);
 
 
 --
@@ -4494,6 +4516,22 @@ ALTER TABLE ONLY public.factory_planning_sessions
 
 
 --
+-- Name: factory_pr_conflict_claims factory_pr_conflict_claims_handler_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_conflict_claims
+    ADD CONSTRAINT factory_pr_conflict_claims_handler_id_fkey FOREIGN KEY (handler_id) REFERENCES public.factory_pr_feedback_handlers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_pr_conflict_claims factory_pr_conflict_claims_pull_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_conflict_claims
+    ADD CONSTRAINT factory_pr_conflict_claims_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES public.factory_pull_requests(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5477,7 +5515,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261003061931	f
+20261004115402	f
 \.
 
 

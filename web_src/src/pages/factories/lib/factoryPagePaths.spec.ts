@@ -190,6 +190,7 @@ describe("factoryPRFeedbackSetupPath", () => {
   it("maps PR feedback source ids to setup path kinds", () => {
     expect(prFeedbackSetupKindFromSourceId("discussion")).toBe("comments");
     expect(prFeedbackSetupKindFromSourceId("checks")).toBe("checks");
+    expect(prFeedbackSetupKindFromSourceId("conflicts")).toBe("conflicts");
   });
 });
 

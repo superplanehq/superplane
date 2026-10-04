@@ -740,10 +740,15 @@ func materializePRFeedbackDefaults(
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID
 	defaults := buildDiscussionPRFeedbackCanvas(request)
-	if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+	switch handler.Source {
+	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 		templateID = prFeedbackChecksTemplateID
 		triggerID = prFeedbackPullRequestTriggerNodeID
 		defaults = buildChecksPRFeedbackCanvas(request)
+	case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+		templateID = prFeedbackConflictsTemplateID
+		triggerID = prFeedbackConflictTriggerNodeID
+		defaults = buildConflictsPRFeedbackCanvas(request)
 	}
 
 	defaults.Metadata.ID = canvas.ID.String()

@@ -63,7 +63,7 @@ export function useAddColumnAutomation(args: {
     if (!column) {
       return;
     }
-    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks") {
+    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "pr-conflicts") {
       openPRFeedbackSetup(entry.id, args, navigate, closePicker);
       return;
     }
@@ -122,7 +122,7 @@ function openPRFeedbackSetup(
   navigate: (path: string) => void,
   close: () => void,
 ) {
-  const sourceId = catalogId === "checks" ? "checks" : "discussion";
+  const sourceId = catalogId === "checks" || catalogId === "conflicts" ? catalogId : "discussion";
   const href = args.lineId
     ? factoryPRFeedbackSetupPath(
         args.organizationId,
