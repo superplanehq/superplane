@@ -1,7 +1,6 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Input, InputGroup } from "@/components/Input/input";
-import { filterModelIds } from "@/lib/hostedLLMModels";
+import { Checkbox } from "@/components/ui/checkbox";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Search } from "lucide-react";
 import { useMemo } from "react";
 
@@ -16,6 +15,7 @@ export function ModelAllowlistEditor({
   searchLabel,
   showCount = false,
   showBulkToggle = false,
+  modelLabels,
 }: {
   modelIds: string[];
   selected: string[];
@@ -27,20 +27,25 @@ export function ModelAllowlistEditor({
   searchLabel: string;
   showCount?: boolean;
   showBulkToggle?: boolean;
+  modelLabels?: Record<string, string>;
 }) {
-  const visibleModels = useMemo(() => filterModelIds(modelIds, query), [modelIds, query]);
+  const visibleModels = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (needle === "") {
+      return modelIds;
+    }
+    return modelIds.filter((id) => (modelLabels?.[id] ?? id).toLowerCase().includes(needle));
+  }, [modelIds, modelLabels, query]);
   const allSelected = modelIds.length > 0 && modelIds.every((model) => selected.includes(model));
 
   return (
     <div className="space-y-3">
-      <InputGroup className="relative">
-        <Search
-          size={14}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <Input
+      <InputGroup>
+        <InputGroupAddon>
+          <Search className="size-3.5" />
+        </InputGroupAddon>
+        <InputGroupInput
           type="search"
-          className="pl-9"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search models..."
@@ -75,7 +80,7 @@ export function ModelAllowlistEditor({
               disabled={disabled}
               onChange={(event) => onToggle(model, event.currentTarget.checked)}
             />
-            <span className="font-mono text-xs">{model}</span>
+            <span className="font-mono text-xs">{modelLabels?.[model] ?? model}</span>
           </label>
         ))}
       </div>
