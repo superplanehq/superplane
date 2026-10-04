@@ -20,6 +20,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -70,6 +71,7 @@ func TestIsGitHubFactoryMergeabilityEvent(t *testing.T) {
 	assert.True(t, IsGitHubFactoryMergeabilityEvent("check_run"))
 	assert.True(t, IsGitHubFactoryMergeabilityEvent("ping"))
 	assert.True(t, IsGitHubFactoryMergeabilityEvent("PULL_REQUEST"))
+	assert.True(t, IsGitHubFactoryMergeabilityEvent("push"))
 	assert.False(t, IsGitHubFactoryMergeabilityEvent("issues"))
 	assert.False(t, IsGitHubFactoryMergeabilityEvent(""))
 }
@@ -111,6 +113,22 @@ func TestEnsureGitHubFactoryMergeabilityWebhook(t *testing.T) {
 	assert.Equal(t, firstID, webhooks[0].ID)
 	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
 	assert.Equal(t, "acme/app", factoryMergeabilityWebhookRepository(webhooks[0].Configuration.Data()))
+
+	require.NoError(t, db.Model(&models.Webhook{}).Where("id = ?", firstID).Updates(map[string]any{
+		"state": models.WebhookStateReady,
+		"configuration": datatypes.NewJSONType(any(map[string]any{
+			"eventTypes":                  []any{"pull_request", "check_run", "check_suite", "status"},
+			"repository":                  "acme/app",
+			factoryMergeabilityWebhookKey: true,
+		})),
+	}).Error)
+	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/app"))
+	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, webhooks, 1)
+	assert.Equal(t, firstID, webhooks[0].ID)
+	assert.Equal(t, models.WebhookStatePending, webhooks[0].State)
+	assert.True(t, factoryMergeabilityWebhookHasEvent(webhooks[0].Configuration.Data(), "push"))
 
 	require.NoError(t, ensureGitHubFactoryMergeabilityWebhook(t.Context(), db, r.Encryptor, integration, "acme/other"))
 	webhooks, err = models.ListIntegrationWebhooks(db, integration.ID)
@@ -278,6 +296,7 @@ func TestRefreshFactoryPullRequestMergeabilityWithRetryStopsWhenLookupCannotClea
 				IntakeDependencies{},
 				factory,
 				pullRequest,
+				factoryMergeabilityRefreshOptions{},
 			)
 			require.ErrorIs(t, err, errFactoryPullRequestMergeabilityUnavailable)
 			assert.NotErrorIs(t, err, errFactoryPullRequestMergeabilityTemporary)

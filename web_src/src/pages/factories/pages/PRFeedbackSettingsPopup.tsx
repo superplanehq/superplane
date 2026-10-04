@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
 import {
   PRFeedbackChecksFields,
+  PRFeedbackConflictsFields,
   PRFeedbackDiscussionFields,
   PRFeedbackHealthSection,
 } from "./PRFeedbackSettingsFields";
@@ -186,13 +187,16 @@ function PRFeedbackGeneralTab({
   onClose: () => void;
 }) {
   const checks = draft.source === "checks";
+  const conflicts = draft.source === "conflicts";
 
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          <PRFeedbackHealthSection healthy={healthy} checks={checks} />
-          {checks ? (
+          <PRFeedbackHealthSection healthy={healthy} checks={checks} conflicts={conflicts} />
+          {conflicts ? (
+            <PRFeedbackConflictsFields draft={draft} onUpdate={onUpdate} />
+          ) : checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}
               githubIntegrationId={githubIntegrationId}

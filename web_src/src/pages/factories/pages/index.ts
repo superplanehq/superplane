@@ -12,7 +12,11 @@ export { OnboardingGate } from "./onboarding/OnboardingGate";
 export { OnboardingPage } from "./onboarding/OnboardingPage";
 export { NewWorkspacePage } from "./onboarding/NewWorkspacePage";
 export { WorkspaceOverviewPage } from "./onboarding/WorkspaceOverviewPage";
-export { ChecksPRFeedbackSetupPage, DiscussionPRFeedbackSetupPage } from "./PRFeedbackSetupPage";
+export {
+  ChecksPRFeedbackSetupPage,
+  ConflictsPRFeedbackSetupPage,
+  DiscussionPRFeedbackSetupPage,
+} from "./PRFeedbackSetupPage";
 export { DatadogIntakeSetupPage } from "./DatadogIntakeSetupPage";
 export { DependabotIntakeSetupPage } from "./DependabotIntakeSetupPage";
 export { GitHubIntakeSetupPage } from "./GitHubIntakeSetupPage";

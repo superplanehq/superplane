@@ -61,9 +61,12 @@ func CreateFactoryPRFeedbackHandler(
 
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
-		if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		switch source {
+		case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 			name = prFeedbackChecksDefaultName
-		} else {
+		case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+			name = prFeedbackConflictsDefaultName
+		default:
 			name = prFeedbackDefaultName
 		}
 	}
@@ -82,7 +85,8 @@ func CreateFactoryPRFeedbackHandler(
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
-	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks ||
+		source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
 		if err := handler.SetMaximumAttempts(db, settings.MaximumAttempts); err != nil {
 			discardIntakeCanvas(db, orgID, canvasID)
 			return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
@@ -126,9 +130,12 @@ func createPRFeedbackCanvas(
 		Agent:                  resolveIntakeAgent(db, factory),
 	}
 	var canvasDoc *yaml.Canvas
-	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+	switch source {
+	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 		canvasDoc = buildChecksPRFeedbackCanvas(request)
-	} else {
+	case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+		canvasDoc = buildConflictsPRFeedbackCanvas(request)
+	default:
 		canvasDoc = buildDiscussionPRFeedbackCanvas(request)
 	}
 

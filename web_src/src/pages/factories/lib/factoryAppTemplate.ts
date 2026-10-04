@@ -16,6 +16,25 @@ export function resolveFactoryAppTemplate(canvas: CanvasesCanvas | null | undefi
   );
 }
 
+const LEGACY_FACTORY_NODE_PAIRS = [
+  ["trigger", "create-work-order"],
+  ["on-issue-labeled", "create-work-order"],
+  ["on-pr-comment", "address-pr-feedback"],
+  ["on-pull-request", "wait-pr-checks"],
+  ["on-pull-request-conflict", "resolve-merge-conflict"],
+] as const;
+
+function hasFactoryTemplateMetadata(canvas: CanvasesCanvas | null | undefined): boolean {
+  return (canvas?.spec?.nodes ?? []).some((node) => {
+    const template = node.metadata?.factoryTemplate;
+    return Boolean(template && typeof template === "object");
+  });
+}
+
+function hasLegacyFactoryNodePair(nodeIds: Set<string | undefined>): boolean {
+  return LEGACY_FACTORY_NODE_PAIRS.some(([triggerId, actionId]) => nodeIds.has(triggerId) && nodeIds.has(actionId));
+}
+
 /**
  * Controls whether the reset action is visible. The backend remains
  * authoritative and materializes the defaults. Stable template metadata is
@@ -25,21 +44,7 @@ export function hasFactoryAppDefaults(canvas: CanvasesCanvas | null | undefined)
   const nodes = canvas?.spec?.nodes ?? [];
   if (resolveFactoryAppTemplate(canvas)) return true;
   if (nodes.some((node) => node.component === "onWorkOrder")) return true;
+  if (hasFactoryTemplateMetadata(canvas)) return true;
 
-  if (
-    nodes.some((node) => {
-      const template = node.metadata?.factoryTemplate;
-      return Boolean(template && typeof template === "object");
-    })
-  ) {
-    return true;
-  }
-
-  const nodeIds = new Set(nodes.map((node) => node.id));
-  return (
-    (nodeIds.has("trigger") && nodeIds.has("create-work-order")) ||
-    (nodeIds.has("on-issue-labeled") && nodeIds.has("create-work-order")) ||
-    (nodeIds.has("on-pr-comment") && nodeIds.has("address-pr-feedback")) ||
-    (nodeIds.has("on-pull-request") && nodeIds.has("wait-pr-checks"))
-  );
+  return hasLegacyFactoryNodePair(new Set(nodes.map((node) => node.id)));
 }

@@ -43,6 +43,7 @@ const (
 
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
 	prFeedbackChecksTemplateID     = "pr-feedback:checks"
+	prFeedbackConflictsTemplateID  = "pr-feedback:conflicts"
 
 	prFeedbackCommentFlowY = 80
 	prFeedbackReviewFlowY  = 360

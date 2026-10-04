@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
+  <LinkCard title="On Merge Conflict" href="#on-merge-conflict" description="Start when a pull request has merge conflicts" />
   <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
   <LinkCard title="On Task" href="#on-task" description="Start when a task is created in this factory" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
@@ -177,6 +178,61 @@ Each emitted event carries:
   },
   "timestamp": "2024-01-01T09:00:00Z",
   "type": "onError.triggered"
+}
+```
+
+<a id="on-merge-conflict"></a>
+
+## On Merge Conflict
+
+**Trigger key:** `onPullRequestConflict`
+
+The On Merge Conflict trigger starts a workflow when SuperPlane detects a merge conflict on a pull request.
+
+SuperPlane emits the event. GitHub does not send a webhook when a sibling pull request becomes conflicted.
+
+### Event Data
+
+Each event has type `pullRequest.conflictDetected`. The payload uses the same pull request fields as a GitHub pull request event:
+
+```
+{
+  "repository": {
+    "full_name": "acme/app",
+    "html_url": "https://github.com/acme/app"
+  },
+  "pull_request": {
+    "number": 12,
+    "html_url": "https://github.com/acme/app/pull/12",
+    "head": { "sha": "abc123", "ref": "feature" },
+    "base": { "ref": "main" }
+  }
+}
+```
+
+### Example Data
+
+```json
+{
+  "data": {
+    "pull_request": {
+      "base": {
+        "ref": "main"
+      },
+      "head": {
+        "ref": "feature",
+        "sha": "abc123def456"
+      },
+      "html_url": "https://github.com/acme/app/pull/12",
+      "number": 12
+    },
+    "repository": {
+      "full_name": "acme/app",
+      "html_url": "https://github.com/acme/app"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "pullRequest.conflictDetected"
 }
 ```
 

@@ -346,7 +346,7 @@ export function editFactoryLinePath(organizationId: string, factoryKey: string, 
   return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
 }
 
-export type PRFeedbackSetupKind = "comments" | "checks";
+export type PRFeedbackSetupKind = "comments" | "checks" | "conflicts";
 
 /** Dedicated setup page for the next-steps banner CTA (comments or checks wizard). */
 export function factoryPRFeedbackSetupPath(
@@ -358,8 +358,14 @@ export function factoryPRFeedbackSetupPath(
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/${kind}`;
 }
 
-export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
-  return sourceId === "checks" ? "checks" : "comments";
+export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks" | "conflicts"): PRFeedbackSetupKind {
+  if (sourceId === "checks") {
+    return "checks";
+  }
+  if (sourceId === "conflicts") {
+    return "conflicts";
+  }
+  return "comments";
 }
 
 /** Dedicated setup page for the Verify risk score automation. */

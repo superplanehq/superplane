@@ -830,9 +830,13 @@ func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicA
 	for index, handler := range handlers {
 		kind := "pr-discussion"
 		name := "Pull request comments"
-		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		switch handler.Source {
+		case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 			kind = "pr-checks"
 			name = "Pull request checks"
+		case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+			kind = "pr-conflicts"
+			name = "Merge conflicts"
 		}
 		if canvasName := strings.TrimSpace(handler.Name()); canvasName != "" {
 			name = canvasName

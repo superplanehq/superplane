@@ -101,6 +101,22 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		return nil, err
 	}
 
+	metadata := Webhook{}
+	if raw := ctx.Webhook.GetMetadata(); raw != nil {
+		if err := mapstructure.Decode(raw, &metadata); err != nil {
+			return nil, fmt.Errorf("error reading webhook metadata: %v", err)
+		}
+	}
+	if metadata.ID != 0 {
+		updated, _, err := client.EditHook(context.Background(), config.Repository, metadata.ID, hook)
+		if err == nil {
+			return &Webhook{ID: updated.GetID(), WebhookName: updated.GetName()}, nil
+		}
+		if !common.IsNotFoundError(err) {
+			return nil, fmt.Errorf("error updating webhook: %v", err)
+		}
+	}
+
 	newHook, _, err := client.CreateHook(context.Background(), config.Repository, hook)
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook: %v", err)
