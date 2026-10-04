@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
@@ -80,9 +81,7 @@ export function ConflictsPRFeedbackSetupDialog(props: ConflictsPRFeedbackSetupDi
         <p className="workspace-body-text mt-2 text-muted-foreground">{props.source.description}</p>
       </div>
       <section>
-        <label className="text-sm font-medium" htmlFor="conflicts-maximum-attempts">
-          {PR_FEEDBACK_SETTINGS_COPY.wizardMaximumAttempts}
-        </label>
+        <Label htmlFor="conflicts-maximum-attempts">{PR_FEEDBACK_SETTINGS_COPY.wizardMaximumAttempts}</Label>
         <p className="workspace-body-text mt-1 text-muted-foreground">
           {PR_FEEDBACK_SETTINGS_COPY.conflictsAttemptsHelper}
         </p>
