@@ -785,6 +785,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}/models", s.adminListHostedLLMProviderModels).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminListOrganizationCreditGrants).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/balances", s.adminSetOrganizationCreditBalance).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
