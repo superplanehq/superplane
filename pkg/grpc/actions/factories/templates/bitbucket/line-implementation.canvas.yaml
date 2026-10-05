@@ -1,0 +1,588 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+  description: Create a branch, implement the task, and open a pull request.
+spec:
+  edges:
+    - channel: default
+      sourceId: onrun-implement
+      targetId: implementation-agent-no-issue
+    - channel: passed
+      sourceId: implementation-agent-no-issue
+      targetId: add-branch-artifact
+    - channel: default
+      sourceId: add-branch-artifact
+      targetId: find-pr
+    - channel: notFound
+      sourceId: find-pr
+      targetId: create-pr
+    - channel: found
+      sourceId: find-pr
+      targetId: update-pr
+    - channel: default
+      sourceId: create-pr
+      targetId: attach-pr-artifact
+    - channel: default
+      sourceId: attach-pr-artifact
+      targetId: has-visual-evidence
+    - channel: "true"
+      sourceId: has-visual-evidence
+      targetId: comment-visual-evidence
+    - channel: default
+      sourceId: update-pr
+      targetId: attach-pr-artifact-updated
+    - channel: default
+      sourceId: attach-pr-artifact-updated
+      targetId: has-visual-evidence-updated
+    - channel: "true"
+      sourceId: has-visual-evidence-updated
+      targetId: comment-visual-evidence-updated
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
+  nodes:
+    - id: onrun-implement
+      name: Start Implementation
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 1542
+        "y": 144
+      isCollapsed: true
+    - id: implementation-agent-no-issue
+      name: Implement From Task Description
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: bitbucket
+        environment:
+          - name: REPO_URL
+            value: "{{ task().repository_url }}"
+            valueSource: literal
+          - name: BASE
+            value: "{{ task().default_branch }}"
+            valueSource: literal
+          - name: COAUTHORS
+            value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        includeVisualEvidence: false
+        machineType: e1-large-amd64
+        model: claude-opus-5-5
+        steps:
+          - name: Clone Repo
+            type: bash
+            command: |-
+              set -euo pipefail
+
+              git config --global user.email "superplaneagent@superplane.com"
+              git config --global user.name "SuperPlane Agent"
+
+              branch="${BASE:-main}"
+              heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
+              if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
+                git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
+              elif [ -z "$heads" ]; then
+                git clone "${REPO_URL}" repo
+              else
+                echo "Remote branch ${branch} not found. The repository has other branches." >&2
+                exit 1
+              fi
+              cd repo
+
+              git config user.email "superplaneagent@superplane.com"
+              git config user.name "SuperPlane Agent"
+              export GIT_AUTHOR_NAME="SuperPlane Agent"
+              export GIT_AUTHOR_EMAIL="superplaneagent@superplane.com"
+              export GIT_COMMITTER_NAME="SuperPlane Agent"
+              export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
+              cat > .git/hooks/prepare-commit-msg <<'HOOK'
+              #!/bin/sh
+              set -u
+
+              msg_file="${1:?}"
+              agent_email='superplaneagent@superplane.com'
+              signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
+              tmp="${msg_file}.sp-identity"
+              coauthors_file="${msg_file}.sp-coauthors"
+              kept_file="${msg_file}.sp-kept"
+              block_file="${msg_file}.sp-block"
+              filtered_file="${msg_file}.sp-filtered"
+
+              email_of() {
+                printf '%s\n' "$1" | sed -n 's/.*<\([^>]*\)>.*/\1/p' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]'
+              }
+
+              is_other_agent_email() {
+                case "$1" in
+                  agent@superplane.com|agent@superplane.ai|opencode@superplane.io)
+                    return 0
+                    ;;
+                esac
+                return 1
+              }
+
+              trailer_key() {
+                printf '%s\n' "$1" | sed -n '1s/^\([A-Za-z0-9-][A-Za-z0-9-]*\)[ \t]*:.*/\1/p' | tr '[:upper:]' '[:lower:]'
+              }
+
+              is_continuation_line() {
+                printf '%s\n' "$1" | grep -q '^[ 	][^ 	]'
+              }
+
+              keep_trailer() {
+                key=$(trailer_key "$1")
+                case "$key" in
+                  signed-off-by|co-authored-by) ;;
+                  *)
+                    return 0
+                    ;;
+                esac
+                email=$(email_of "$1")
+                if is_other_agent_email "$email"; then
+                  return 1
+                fi
+                if [ "$key" = "signed-off-by" ] && [ "$email" = "$agent_email" ]; then
+                  return 1
+                fi
+                if grep -qxF "$1" "$kept_file"; then
+                  return 1
+                fi
+                printf '%s\n' "$1" >> "$kept_file"
+                return 0
+              }
+
+              filter_trailer_block() {
+                block_in="$1"
+                block_out="$2"
+                : > "$block_out"
+                pending=""
+                pending_set=0
+                while IFS= read -r line || [ -n "$line" ]; do
+                  if [ "$pending_set" -eq 1 ] && is_continuation_line "$line"; then
+                    pending="${pending}
+              ${line}"
+                    continue
+                  fi
+                  if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+                    printf '%s\n' "$pending" >> "$block_out"
+                  fi
+                  pending="$line"
+                  pending_set=1
+                done < "$block_in"
+                if [ "$pending_set" -eq 1 ] && keep_trailer "$pending"; then
+                  printf '%s\n' "$pending" >> "$block_out"
+                fi
+              }
+
+              rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"
+              trap 'rm -f "$tmp" "$coauthors_file" "$kept_file" "$block_file" "$filtered_file"' EXIT
+              : > "$kept_file"
+
+              bounds=$(awk '
+              function is_blank(line) { return line ~ /^[ \t]*$/ }
+              function is_divider(line) { return line ~ /^---$/ || line ~ /^---[ \t]/ }
+              function is_comment(line) { return line ~ /^#/ }
+              function is_trailer(line) { return line ~ /^[A-Za-z0-9-]+[ \t]*:/ }
+              function is_continuation(line) { return line ~ /^[ \t][^ \t]/ }
+              {
+                lines[NR] = $0
+              }
+              END {
+                n = NR
+                limit = n + 1
+                for (i = 1; i <= n; i++) {
+                  if (is_divider(lines[i])) {
+                    limit = i
+                    break
+                  }
+                }
+                end = limit - 1
+                while (end >= 1 && is_blank(lines[end])) end--
+                while (end >= 1 && (is_comment(lines[end]) || is_blank(lines[end]))) end--
+                while (end >= 1 && is_blank(lines[end])) end--
+                block_end = end
+                block_start = end + 1
+                while (block_end >= 1 && (is_trailer(lines[block_end]) || is_continuation(lines[block_end]))) {
+                  block_start = block_end
+                  block_end--
+                }
+                block_end = end
+                if (block_start <= block_end && block_start > 1 && is_blank(lines[block_start - 1]) && is_trailer(lines[block_start])) {
+                  print block_start, block_end
+                } else {
+                  print 0, 0
+                }
+              }
+              ' "$msg_file")
+              block_start=${bounds%% *}
+              block_end=${bounds#* }
+
+              : > "$tmp"
+              if [ "$block_start" -eq 0 ]; then
+                cat "$msg_file" > "$tmp"
+              else
+                if [ "$block_start" -gt 1 ]; then
+                  sed -n "1,$((block_start - 1))p" "$msg_file" > "$tmp"
+                fi
+                sed -n "${block_start},${block_end}p" "$msg_file" > "$block_file"
+                filter_trailer_block "$block_file" "$filtered_file"
+                cat "$filtered_file" >> "$tmp"
+                line_count=$(awk 'END { print NR + 0 }' "$msg_file")
+                if [ "$block_end" -lt "$line_count" ]; then
+                  sed -n "$((block_end + 1)),\$p" "$msg_file" >> "$tmp"
+                fi
+              fi
+              mv "$tmp" "$msg_file"
+
+              printf '%s\n' "${COAUTHORS:-}" > "$coauthors_file"
+              while IFS= read -r trailer || [ -n "$trailer" ]; do
+                [ -n "$trailer" ] || continue
+                if is_other_agent_email "$(email_of "$trailer")"; then
+                  continue
+                fi
+                git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$msg_file" || exit 1
+              done < "$coauthors_file"
+
+              git interpret-trailers --in-place --if-exists addIfDifferent \
+                --trailer "$signoff" "$msg_file" || exit 1
+
+              exit 0
+              HOOK
+              chmod +x .git/hooks/prepare-commit-msg
+
+              use_existing_branch() {
+                echo "Another run created ${branch}. Using that branch." >&2
+                git fetch origin "${branch}"
+                git checkout -B "${branch}" "origin/${branch}"
+              }
+
+              if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+                remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                if [ -n "$remote_head" ]; then
+                  use_existing_branch
+                else
+                  echo "Remote has no branches. Creating ${branch}." >&2
+                  git checkout -B "${branch}"
+                  git commit --allow-empty -s -m "chore: Initialize repository"
+                  if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+                    remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+                    if [ -z "$remote_head" ]; then
+                      echo "Failed to create ${branch}." >&2
+                      exit 1
+                    fi
+                    use_existing_branch
+                  fi
+                fi
+              fi
+          - name: Implementation
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are implementing a SuperPlane task. The repository is cloned in the current working directory on {{ task().default_branch }}.
+
+              If the repository had no commits, the clone step already pushed an initial commit on {{ task().default_branch }}. Do not change that commit.
+
+              Repository: {{ task().repository }}
+              Task title: {{ task().title }}
+
+              Task description:
+              {{ task().description }}{{ task().spec != "" ? "\n\nSpec:\n" + task().spec : "" }}
+
+              1/ Create a new branch. Do not commit on {{ task().default_branch }}.
+              2/ Implement the task. Keep the change focused.
+              3/ Commit on the working branch with clear messages.
+              4/ Do not create or open the pull request. Only commit and push to the working branch. The automation opens or updates the pull request after you finish.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Add tests where it makes sense.
+              4/ For UI work, implement and wire the change into the production page or component.
+              5/ A Storybook story, preview, or fixture does not replace the product implementation unless the task explicitly requests a prototype.
+              6/ Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers.
+              7/ Do not invent a token budget, a time budget, a step limit, or a remaining context size. The application does not set one unless the task text sets one. Do not stop early, skip work, or change the setup because of an imagined limit. If the task text sets a limit, follow that limit.
+
+          - name: Commit and Push
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+
+              # Commit leftover uncommitted work if the agent did not commit everything.
+              git add -A
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: implement task via SuperPlane"
+              fi
+
+              # Fail if this branch has no commits ahead of the default branch.
+              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+                echo "No commits to push" >&2
+                exit 1
+              fi
+
+              git push -u origin HEAD
+          - name: Generate PR title and description
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Write the pull request title and description for the change you pushed.
+
+              Task title: {{ task().title }}
+
+              1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
+              2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
+              3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
+              4/ Do not add closing keywords (Closes, Fixes, Resolves).
+              5/ Do not hard-wrap lines. Write each paragraph as a single line. Use blank lines only to separate paragraphs, headings, list items, or other Markdown elements.
+              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+
+              Write clearly, for humans, in ASD-STE100 / Simplified Technical English
+          - name: Push output
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+
+              # Emit branch name plus PR title/description for the next canvas nodes.
+              if [ ! -s /tmp/TITLE ] || [ ! -s /tmp/DESCRIPTION.md ]; then
+                jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
+                  > "$SUPERPLANE_RESULT_FILE"
+                echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
+                exit 1
+              fi
+
+              echo "Title and description found. Using as output"
+              BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+              EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"
+              if [ ! -s "$EVIDENCE_FILE" ]; then
+                EVIDENCE_TMP="${EVIDENCE_FILE}.$$"
+                printf '%s\n' '{"status":"not_applicable","reason":"","artifacts":[]}' > "$EVIDENCE_TMP"
+                mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"
+              fi
+
+              EVIDENCE_MARKDOWN="$(jq -r '
+                if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then
+                  ([.artifacts[].markdown] +
+                    (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |
+                  join("\n\n")
+                else
+                  ""
+                end
+              ' "$EVIDENCE_FILE")"
+              jq -n \
+                --arg branch "$BRANCH" \
+                --rawfile title /tmp/TITLE \
+                --rawfile description /tmp/DESCRIPTION.md \
+                --slurpfile evidence "$EVIDENCE_FILE" \
+                --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \
+                '{
+                  branch: $branch,
+                  title: ($title | gsub("[\\r\\n]"; "") | @base64),
+                  description: ($description | @base64),
+                  visualEvidence: {
+                    status: $evidence[0].status,
+                    reason: ($evidence[0].reason // ""),
+                    attempts: ($evidence[0].attempts // []),
+                    artifacts: $evidence[0].artifacts,
+                    markdown: ($evidenceMarkdown | @base64)
+                  }
+                }' \
+                > "$SUPERPLANE_RESULT_FILE"
+      position:
+        x: 1475
+        "y": 312
+      isCollapsed: false
+    - id: add-branch-artifact
+      name: Add Branch Artifact
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      concurrency:
+        max: 100
+      configuration:
+        artifactType: branch
+        name: '{{ $["Implement From Task Description"].data.result.branch }}'
+        orderId: "{{ task().id }}"
+        repository: "{{ task().repository }}"
+      position:
+        x: 1495
+        "y": 648
+      isCollapsed: true
+    - id: find-pr
+      name: Find Pull Request
+      type: TYPE_ACTION
+      component: bitbucket.findPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        head: '{{ $["Implement From Task Description"].data.result.branch }}'
+        base: "{{ task().default_branch }}"
+        state: open
+      position:
+        x: 1442
+        "y": 816
+      isCollapsed: true
+    - id: create-pr
+      name: Create Pull Request
+      type: TYPE_ACTION
+      component: bitbucket.createPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        base: "{{ task().default_branch }}"
+        body: |-
+          [{{ task().key }}]({{ task().url }})
+
+          {{ fromBase64($["Implement From Task Description"].data.result.description) }}
+
+          ---
+
+          Created via [SuperPlane](https://superplane.com).
+        draft: false
+        head: '{{ $["Implement From Task Description"].data.result.branch }}'
+        repository: "{{ task().repository }}"
+        title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
+      position:
+        x: 1160
+        "y": 984
+      isCollapsed: true
+    - id: update-pr
+      name: Update Pull Request
+      type: TYPE_ACTION
+      component: bitbucket.updatePullRequest
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        pullNumber: '{{ $["Find Pull Request"].data.id }}'
+        title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
+        body: |-
+          [{{ task().key }}]({{ task().url }})
+
+          {{ fromBase64($["Implement From Task Description"].data.result.description) }}
+
+          ---
+
+          Created via [SuperPlane](https://superplane.com).
+      position:
+        x: 1724
+        "y": 984
+      isCollapsed: true
+    - id: attach-pr-artifact
+      name: Attach PR to Task
+      type: TYPE_ACTION
+      component: addPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        orderId: "{{ task().id }}"
+        provider: bitbucket
+        repository: "{{ task().repository }}"
+        number: '{{ $["Create Pull Request"].data.id }}'
+        url: '{{ $["Create Pull Request"].data.links.html.href }}'
+        title: '{{ $["Create Pull Request"].data.title }}'
+        state: open
+      position:
+        x: 1160
+        "y": 1152
+      isCollapsed: true
+    - id: has-visual-evidence
+      name: Has Visual Evidence?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+      position:
+        x: 1160
+        "y": 1320
+      isCollapsed: true
+    - id: comment-visual-evidence
+      name: Comment Visual Evidence
+      type: TYPE_ACTION
+      component: bitbucket.createPullRequestComment
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        pullNumber: '{{ $["Create Pull Request"].data.id }}'
+        body: |-
+          ## Visual evidence
+
+          Captured for commit `{{ $["Create Pull Request"].data.source.commit.hash[:7] }}`.
+
+          {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
+      position:
+        x: 1000
+        "y": 1488
+      isCollapsed: true
+    - id: attach-pr-artifact-updated
+      name: Attach Updated PR to Task
+      type: TYPE_ACTION
+      component: addPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        orderId: "{{ task().id }}"
+        provider: bitbucket
+        repository: "{{ task().repository }}"
+        number: '{{ $["Update Pull Request"].data.id }}'
+        url: '{{ $["Update Pull Request"].data.links.html.href }}'
+        title: '{{ $["Update Pull Request"].data.title }}'
+        state: open
+      position:
+        x: 1724
+        "y": 1152
+      isCollapsed: true
+    - id: has-visual-evidence-updated
+      name: Has Visual Evidence for Updated PR?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: ($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0
+      position:
+        x: 1724
+        "y": 1320
+      isCollapsed: true
+    - id: comment-visual-evidence-updated
+      name: Comment Visual Evidence on Updated PR
+      type: TYPE_ACTION
+      component: bitbucket.createPullRequestComment
+      concurrency:
+        max: 100
+      configuration:
+        repository: "{{ task().repository }}"
+        pullNumber: '{{ $["Update Pull Request"].data.id }}'
+        body: |-
+          ## Visual evidence
+
+          Captured for commit `{{ $["Update Pull Request"].data.source.commit.hash[:7] }}`.
+
+          {{ fromBase64($["Implement From Task Description"].data.result.visualEvidence.markdown) }}
+      position:
+        x: 1884
+        "y": 1488
+      isCollapsed: true
+    - id: add-run-error
+      name: Record Implementation Failure
+      type: TYPE_ACTION
+      component: addRunError
+      configuration:
+        message: The implementation agent failed. Open the agent logs to find the cause.
+      position:
+        x: 1770
+        "y": 648
+      isCollapsed: true

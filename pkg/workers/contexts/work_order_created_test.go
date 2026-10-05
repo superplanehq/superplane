@@ -93,6 +93,28 @@ func TestWorkOrderCreatedPayloadIncludesRepository(t *testing.T) {
 	assert.Equal(t, "develop", workOrder["default_branch"])
 }
 
+func TestWorkOrderCreatedPayloadUsesBitbucketCloneURL(t *testing.T) {
+	r := support.Setup(t)
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	appRepo := "acme/widgets"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &appRepo,
+		VCSProvider:   &provider,
+	}))
+
+	order, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	workOrder, ok := workOrderCreatedPayload(db, order)["workOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "https://bitbucket.org/acme/widgets.git", workOrder["repository_url"])
+}
+
 func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

@@ -71,6 +71,25 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, backlog.Name, defaults.Metadata.Name)
 	})
 
+	t.Run("bitbucket implement install is rejected when the feature is off", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
+		factoryModel := newFactory(t)
+		provider := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSProvider: &provider,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))
+
+		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "line-implementation",
+			AppId:      canvas.ID.String(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+	})
+
 	t.Run("a newly created app materializes its install template", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))

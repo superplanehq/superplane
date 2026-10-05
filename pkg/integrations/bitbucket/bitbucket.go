@@ -66,7 +66,7 @@ func (b *Bitbucket) Icon() string {
 }
 
 func (b *Bitbucket) Description() string {
-	return "React to events in your Bitbucket repositories"
+	return "React to events and manage pull requests in your Bitbucket repositories"
 }
 
 func (b *Bitbucket) Instructions() string {
@@ -120,7 +120,12 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 }
 
 func (b *Bitbucket) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		&FindPullRequest{},
+		&CreatePullRequest{},
+		&UpdatePullRequest{},
+		&CreatePullRequestComment{},
+	}
 }
 
 func (b *Bitbucket) Triggers() []core.Trigger {
