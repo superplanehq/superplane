@@ -1,3 +1,4 @@
+id: local
 superplaneUrl: http://app:8000
 installationAdminToken: ""
 reconcileIntervalSeconds: 2
