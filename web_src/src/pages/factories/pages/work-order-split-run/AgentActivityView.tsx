@@ -32,7 +32,7 @@ export function AgentActivityView({
   live?: boolean;
   /** Refinement chat folds a finished turn. The run console keeps the full transcript. */
   collapseCompleted?: boolean;
-  /** Analysis folds a finished thought. The run console keeps the thought text open. */
+  /** Settled turns fold a finished thought. Live analysis and the run console keep the text open. */
   collapseReasoning?: boolean;
   /** Finished console command rows. The run console uses this for live and settled steps. */
   expandableCommands?: boolean;

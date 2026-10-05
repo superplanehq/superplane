@@ -77,6 +77,7 @@ export function AgentLiveActivity({
       error={stream.hasConnectedOnce ? stream.error : undefined}
       className={className}
       testId={testId}
+      collapseReasoning={false}
     />
   );
 }
