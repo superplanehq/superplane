@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { liveDraftReadiness, startEmphasisForTone, type StartEmphasis } from "../../lib/draftReadiness";
 import { ConfidenceMeter } from "../../workOrders/ConfidenceMeter";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
-import { ComposerPlanStack } from "./ComposerPlanControls";
+import { PlanningReview } from "./PlanningReview";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 
 /**
@@ -115,16 +115,20 @@ function ChipStrip({
 }) {
   const tone = liveDraftReadiness({ clarity, confidence, isAnalyzing }).tone;
   return (
-    <ComposerPlanStack
-      open={open}
-      clarity={{ score: clarity, summary: clarity <= 2 ? CLARITY_TEXT : REVIEW_TEXT }}
-      confidence={{ score: confidence, summary: confidence <= 2 ? LOW_CONFIDENCE_TEXT : CONFIDENCE_TEXT }}
-      isAnalyzing={isAnalyzing}
-      planStatus={open ? undefined : "updated"}
-      onToggle={onToggle}
-      actions={<StripStart emphasis={startEmphasisForTone(tone)} />}
-      modelSelect={<FakeModelSelect />}
-    />
+    <>
+      <PlanningReview
+        open={open}
+        clarity={{ score: clarity, summary: clarity <= 2 ? CLARITY_TEXT : REVIEW_TEXT }}
+        confidence={{ score: confidence, summary: confidence <= 2 ? LOW_CONFIDENCE_TEXT : CONFIDENCE_TEXT }}
+        isAnalyzing={isAnalyzing}
+        planStatus={open ? undefined : "updated"}
+        onToggle={onToggle}
+      />
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <FakeModelSelect />
+        <StripStart emphasis={startEmphasisForTone(tone)} />
+      </div>
+    </>
   );
 }
 
