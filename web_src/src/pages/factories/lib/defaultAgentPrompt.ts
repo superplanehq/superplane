@@ -148,17 +148,54 @@ function promptInsertionIndex(
   if (promptIndex < 0) {
     return fallback;
   }
-  for (let index = promptIndex + 1; index < defaultSteps.length; index += 1) {
-    const anchor = defaultSteps[index];
-    if (anchor.type === "prompt") {
+
+  const afterPreceding = indexAfterPrecedingSteps(defaultSteps, promptIndex, anchorIndexes);
+  const beforeFollowing = indexBeforeFollowingSteps(defaultSteps, promptIndex, anchorIndexes, afterPreceding);
+  if (beforeFollowing !== undefined) {
+    return beforeFollowing;
+  }
+  if (afterPreceding > 0) {
+    return afterPreceding;
+  }
+  return fallback;
+}
+
+function indexAfterPrecedingSteps(
+  defaultSteps: PlanningReviewStep[],
+  promptIndex: number,
+  anchorIndexes: Map<number, number>,
+): number {
+  let after = 0;
+  for (let index = 0; index < promptIndex; index += 1) {
+    if (defaultSteps[index].type === "prompt") {
       continue;
     }
     const position = anchorIndexes.get(index);
     if (position !== undefined) {
-      return position;
+      after = Math.max(after, position + 1);
     }
   }
-  return fallback;
+  return after;
+}
+
+function indexBeforeFollowingSteps(
+  defaultSteps: PlanningReviewStep[],
+  promptIndex: number,
+  anchorIndexes: Map<number, number>,
+  notBefore: number,
+): number | undefined {
+  let earliest: number | undefined;
+  for (let index = promptIndex + 1; index < defaultSteps.length; index += 1) {
+    if (defaultSteps[index].type === "prompt") {
+      continue;
+    }
+    const position = anchorIndexes.get(index);
+    if (position === undefined || position < notBefore) {
+      continue;
+    }
+    earliest = earliest === undefined ? position : Math.min(earliest, position);
+  }
+  return earliest;
 }
 
 function matchedFactoryStepIndexes(

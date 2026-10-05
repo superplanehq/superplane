@@ -217,7 +217,7 @@ describe("applyDefaultAgentPrompts", () => {
     ]);
   });
 
-  it("keeps a restored prompt before a push step that was moved earlier", () => {
+  it("keeps a restored prompt after clone when push was moved ahead of clone", () => {
     const draft = draftWith("implementation-agent-no-issue", [
       { name: "Commit and Push", type: "bash", command: "git push" },
       { name: "Clone Repo", type: "bash", command: "git clone" },
@@ -246,11 +246,41 @@ describe("applyDefaultAgentPrompts", () => {
         ]),
       ),
     ).toEqual([
-      implementation,
       { name: "Commit and Push", type: "bash", command: "git push" },
       { name: "Clone Repo", type: "bash", command: "git clone" },
+      implementation,
       pullRequest,
       { name: "Push output", type: "bash", command: "emit output" },
+    ]);
+  });
+
+  it("keeps a restored prompt before a push step that still follows clone", () => {
+    const draft = draftWith("implementation-agent-no-issue", [
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      { name: "Format JS and Go code", type: "bash", command: "format" },
+    ]);
+    const implementation: PlanningReviewStep = {
+      name: "Implementation",
+      type: "prompt",
+      prompt: IMPLEMENT_PROMPT,
+      workingDirectory: "repo",
+    };
+
+    expect(
+      stepsOf(
+        applyDefaultAgentPrompts(draft, [
+          { name: "Clone Repo", type: "bash", command: "git clone --depth 1" },
+          implementation,
+          { name: "Format JS and Go code", type: "bash", command: "format late" },
+          { name: "Commit and Push", type: "bash", command: "git push -u origin HEAD" },
+        ]),
+      ),
+    ).toEqual([
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      implementation,
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      { name: "Format JS and Go code", type: "bash", command: "format" },
     ]);
   });
 
