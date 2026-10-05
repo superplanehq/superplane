@@ -172,7 +172,7 @@ describe("WorkOrdersHeader", () => {
     expect(screen.getByText("Created manually")).toBeInTheDocument();
   });
 
-  it("shows the applied filter count in red", () => {
+  it("shows the applied filter count as a notification badge", () => {
     window.localStorage.setItem(
       "sp:work-orders:filters:factory-count",
       JSON.stringify({
@@ -202,7 +202,9 @@ describe("WorkOrdersHeader", () => {
 
     const count = screen.getByTestId("work-orders-filter-count");
     expect(count).toHaveTextContent("3");
-    expect(count.className).toContain("text-red-600");
-    expect(count.className).toContain("dark:text-red-400");
+    expect(count).toHaveAttribute("data-slot", "badge");
+    expect(count.className).toContain("bg-destructive");
+    expect(count.className).not.toContain("text-red-600");
+    expect(screen.getByTestId("work-orders-filter-trigger")).toHaveAccessibleName("Filter (3)");
   });
 });
