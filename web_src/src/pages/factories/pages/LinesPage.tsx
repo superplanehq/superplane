@@ -154,6 +154,7 @@ import {
   factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
+  editFactoryLinePath,
   factoryRouteSegment,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
@@ -879,6 +880,7 @@ function LineDetailHeader({
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const factoryKey = factoryRouteSegment(factory);
+  const lineEditHref = canUpdate && line.id ? editFactoryLinePath(organizationId, factoryKey, line.id) : undefined;
 
   return (
     <>
@@ -922,6 +924,7 @@ function LineDetailHeader({
               onViewChange={onAutomationViewChange}
               colorView={colorView}
               onColorViewChange={onColorViewChange}
+              editHref={lineEditHref}
             />
           </>
         }

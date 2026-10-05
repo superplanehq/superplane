@@ -85,16 +85,12 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "user-1", isLoading: false }),
 }));
 
-vi.mock("@/hooks/usePageTitle", () => ({
-  usePageTitle: () => undefined,
-}));
-
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="mobile-test-location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderBoard() {
+function renderBoard(factory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
@@ -108,8 +104,8 @@ function renderBoard() {
                 factoryId: PRIMARY_FACTORY_ID,
                 factoryKey: PRIMARY_FACTORY_KEY,
                 routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
-                factory: REFUND_FACTORY,
-                factories: [REFUND_FACTORY],
+                factory,
+                factories: [factory],
                 openCreateWorkOrder: vi.fn(),
               }}
             >
@@ -138,6 +134,25 @@ describe("MobileBoardPage", () => {
     donePage.mockImplementation(idleBoardPage);
     factoryIntakes.mockReturnValue([]);
     prFeedbackHandlers.mockReturnValue([]);
+  });
+
+  it("sets the tab title from the workspace name, not the line name", () => {
+    renderBoard({ ...REFUND_FACTORY, name: "SuperPlane Prod" });
+
+    expect(document.title).toBe("SuperPlane Prod · SuperPlane");
+    expect(document.title).not.toContain("Plan and Implement");
+  });
+
+  it("opens the line edit page from the board view menu", async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByTestId("lines-board-edit-line"));
+
+    expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}/edit`,
+    );
   });
 
   it("renders every board column as its own full-width snap section with a tab", () => {
