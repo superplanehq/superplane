@@ -91,21 +91,12 @@ existing_object_matches() {
   local remote_checksum
 
   remote_checksum="$(
-    aws s3api head-object \
-      --bucket "${bucket}" \
-      --key "${key}" \
-      --query 'Metadata.sha256' \
-      --output text
+    aws s3 cp \
+      "${S3_BUCKET_URI}/${key}" \
+      - \
+      --only-show-errors |
+      sha256_stream
   )"
-  if [ "${remote_checksum}" = "None" ]; then
-    remote_checksum="$(
-      aws s3 cp \
-        "${S3_BUCKET_URI}/${key}" \
-        - \
-        --only-show-errors |
-        sha256_stream
-    )"
-  fi
   if [ "${remote_checksum}" != "${local_checksum}" ]; then
     echo "Error: immutable object ${S3_BUCKET_URI}/${key} differs from ${source_path}" >&2
     return 1
