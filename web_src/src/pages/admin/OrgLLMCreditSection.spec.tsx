@@ -13,7 +13,7 @@ import {
   ADMIN_TRIAL_ENDS_LABEL,
   OrgLLMCreditSection,
 } from "./OrgLLMCreditSection";
-import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate } from "./useOrgLLMCredit";
+import { CREDIT_BALANCE_CHANGED_COPY, prefilledTrialEndDate, type OrganizationLLMCredit } from "./useOrgLLMCredit";
 import { showErrorToast } from "@/lib/toast";
 
 vi.mock("@/lib/toast", () => ({
@@ -23,7 +23,7 @@ vi.mock("@/lib/toast", () => ({
 
 const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-const credit = {
+const credit: OrganizationLLMCredit = {
   remaining_credit_cents: 9500,
   grant_total_cents: 10000,
   superplane_grant_cents: 7000,
