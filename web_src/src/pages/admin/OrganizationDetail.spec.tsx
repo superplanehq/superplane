@@ -109,6 +109,29 @@ describe("OrganizationDetail", () => {
             enabled: ["factories"],
           });
         }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/spending-report`)) {
+          return jsonResponse({
+            kpiTotals: {
+              costCents: "100",
+              totalTokens: "10",
+              durationSeconds: "5",
+              hostedCostCents: "100",
+              byokCostCents: "0",
+            },
+            explorerTotals: {
+              costCents: "100",
+              totalTokens: "10",
+              durationSeconds: "5",
+              hostedCostCents: "100",
+              byokCostCents: "0",
+            },
+            series: [],
+            seriesKeys: [],
+            breakdown: [],
+            credit: { remainingCreditCents: "5000", grantTotalCents: "5000" },
+            catalogs: { workspaces: [], users: [], models: [], machines: [] },
+          });
+        }
         if (url.includes("/llm-credit")) {
           return jsonResponse({
             remaining_credit_cents: 5000,
@@ -149,6 +172,7 @@ describe("OrganizationDetail", () => {
       "Automations",
       "Connections",
       "Features",
+      "Spending",
       "Credits",
     ]);
     expect(await screen.findByText("Acme")).toBeInTheDocument();
@@ -221,6 +245,30 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByPlaceholderText("Search automations...")).toBeInTheDocument();
     expect(await screen.findByText("Deploy pipeline")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
+  });
+
+  it("loads spending from the admin API after the spending tab opens", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    const urlsBefore = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urlsBefore.some((url) => url.includes("spending-report"))).toBe(false);
+
+    await user.click(screen.getByRole("tab", { name: "Spending" }));
+
+    expect(await screen.findByTestId("spending-redesign-page")).toBeInTheDocument();
+    expect(screen.getByTestId("spending-kpi-hosted")).toBeInTheDocument();
+
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    const spendingCalls = urls.filter((url) => url.includes("spending-report"));
+    expect(spendingCalls.length).toBeGreaterThan(0);
+    expect(spendingCalls.every((url) => url.startsWith(`/admin/api/organizations/${ORG_ID}/spending-report`))).toBe(
+      true,
+    );
+    expect(spendingCalls.some((url) => url.includes("usageKind=model"))).toBe(true);
+    expect(spendingCalls.some((url) => url.includes("usageKind=compute"))).toBe(true);
+    expect(urls.some((url) => url.includes("/api/v1/organizations/"))).toBe(false);
   });
 
   it("does not load credits until the credits tab opens", async () => {
