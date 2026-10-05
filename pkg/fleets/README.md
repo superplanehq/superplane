@@ -13,6 +13,17 @@ extension. The default file path is `/etc/superplane/fleet-manager.yaml`.
 `INSTALLATION_ADMIN_TOKEN` overrides `installationAdminToken` from either
 configuration source.
 
+Set the top-level `id` to a stable identifier for the Fleet Manager
+deployment. AWS providers apply it as the `superplane_fleet_manager_id`
+resource tag and use it with the fleet ID to find owned runners.
+
+Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
+them to runner instances and root volumes. Additional tags cannot override the
+reserved name, Fleet Manager, fleet, runner, runner version, or architecture
+tags. The legacy `superplane_managed_runner` tag is also reserved and omitted
+from new resources. A fleet can define at most 44 additional tags because EC2
+allows 50 tags per resource and Fleet Manager applies six reserved tags.
+
 Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
 their short-lived registration token.
