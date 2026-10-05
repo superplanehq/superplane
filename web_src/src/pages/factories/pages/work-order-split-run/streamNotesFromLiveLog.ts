@@ -34,24 +34,66 @@ function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
   return orderKey === undefined ? {} : { orderKey };
 }
 
-export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
+export function notesFromLiveLogSections(
+  nodeId: string,
+  sections: CommandSection[],
+  runStatus?: SplitRunPhaseStatus,
+): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
     if (section.kind && HIDDEN_KINDS.has(section.kind)) {
       continue;
     }
-    const fallback = fallbackNotesFromPlaintext(nodeId, section);
+    const fallback = fallbackNotesFromPlaintext(nodeId, section, sections, runStatus);
     if (fallback) {
       notes.push(...fallback);
       continue;
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section));
+    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section, sections, runStatus));
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
   return notes;
+}
+
+export function agentStepStatusFromSection(input: {
+  kind?: string;
+  sectionStatus: string;
+  runStatus?: SplitRunPhaseStatus;
+  stoppedTheRun: boolean;
+}): SplitRunPhaseStatus {
+  const status = knownPhaseStatus(input.sectionStatus);
+  if (input.kind !== "prompt" || status !== "failed") {
+    return status;
+  }
+  if (input.runStatus === undefined) {
+    return "failed";
+  }
+  if (input.runStatus === "failed" && input.stoppedTheRun) {
+    return "failed";
+  }
+  return "passed";
+}
+
+function knownPhaseStatus(status: string): SplitRunPhaseStatus {
+  if (
+    status === "failed" ||
+    status === "running" ||
+    status === "passed" ||
+    status === "pending" ||
+    status === "waiting" ||
+    status === "cancelled"
+  ) {
+    return status;
+  }
+  return streamStatus(status);
+}
+
+function sectionStoppedTheRun(section: CommandSection, sections: CommandSection[]): boolean {
+  const visible = sections.filter((candidate) => !candidate.kind || !HIDDEN_KINDS.has(candidate.kind));
+  return visible.at(-1) === section;
 }
 
 function noteFromCommandSection(
@@ -59,6 +101,8 @@ function noteFromCommandSection(
   stepId: string,
   orderKey: number | undefined,
   section: CommandSection,
+  sections: CommandSection[],
+  runStatus?: SplitRunPhaseStatus,
 ): SplitRunStreamLine {
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
@@ -66,6 +110,8 @@ function noteFromCommandSection(
   const distinctPreview = preview !== name ? preview : "";
   const detail = [distinctPreview, output].filter(Boolean).join("\n\n");
   const bashScript = section.kind === "bash" ? preview : "";
+  const sectionStatus = streamStatus(section.status);
+  const prompt = section.kind === "prompt";
   return {
     id: stepId,
     nodeId,
@@ -73,7 +119,15 @@ function noteFromCommandSection(
     note: true,
     componentType: section.kind,
     componentName: name || preview,
-    status: streamStatus(section.status),
+    status: prompt
+      ? agentStepStatusFromSection({
+          kind: "prompt",
+          sectionStatus,
+          runStatus,
+          stoppedTheRun: sectionStoppedTheRun(section, sections),
+        })
+      : sectionStatus,
+    promptStatus: prompt ? sectionStatus : undefined,
     detail: detail || undefined,
     commandScript: bashScript || undefined,
     commandStdout: bashScript ? output || undefined : undefined,
@@ -210,7 +264,12 @@ function noteFromAgentActivityItem(
   };
 }
 
-function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): SplitRunStreamLine[] | undefined {
+function fallbackNotesFromPlaintext(
+  nodeId: string,
+  section: CommandSection,
+  sections: CommandSection[],
+  runStatus?: SplitRunPhaseStatus,
+): SplitRunStreamLine[] | undefined {
   if (section.kind !== "prompt" || section.events.length > 0 || (section.activities?.length ?? 0) > 0) {
     return undefined;
   }
@@ -234,7 +293,13 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
       note: true,
       componentType: step.type || "prompt",
       componentName: section.preview?.trim() || step.name,
-      status: step.status,
+      status: agentStepStatusFromSection({
+        kind: "prompt",
+        sectionStatus: section.status,
+        runStatus,
+        stoppedTheRun: sectionStoppedTheRun(section, sections),
+      }),
+      promptStatus: streamStatus(section.status),
       detail: step.output,
       ...orderKeyProps(orderKey),
     },
@@ -387,7 +452,7 @@ export function notesForLiveStream(input: {
   nodeStatus: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
-    const notes = notesFromLiveLogSections(input.nodeId, input.sections);
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.nodeStatus);
     if (notes.length > 0) {
       return notes;
     }

@@ -131,9 +131,10 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
   const liveNotes = useMemo(() => runners.flatMap((line) => liveByLine[line.id]?.notes ?? []), [liveByLine, runners]);
   const transcriptNotes = useMemo(() => liveNotes.filter((note) => !isWaitingForLogsNote(note)), [liveNotes]);
   const stoppedStatus = stoppedStepStatus(phase?.status, runners);
+  const runStatus = runStatusForAgentSteps(phase?.status, runners);
   const liveSteps = useMemo(
-    () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes), stoppedStatus),
-    [transcriptNotes, stoppedStatus],
+    () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes, runStatus), stoppedStatus),
+    [runStatus, transcriptNotes, stoppedStatus],
   );
   const failedNodes = useMemo(() => failedNonRunnerErrors(stream), [stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
@@ -405,6 +406,22 @@ function isWaitingForLogsNote(note: SplitRunStreamLine): boolean {
 
 function isWaitingForLogNotes(notes: SplitRunStreamLine[]): boolean {
   return notes.length > 0 && notes.every(isWaitingForLogsNote);
+}
+
+function runStatusForAgentSteps(
+  phaseStatus: SplitRunPhaseStatus | undefined,
+  runners: SplitRunStreamLine[],
+): SplitRunPhaseStatus | undefined {
+  if (phaseStatus) {
+    return phaseStatus;
+  }
+  if (runners.some((line) => line.status === "failed")) {
+    return "failed";
+  }
+  if (runners.length > 0 && runners.every((line) => line.status === "passed")) {
+    return "passed";
+  }
+  return undefined;
 }
 
 function stoppedStepStatus(
