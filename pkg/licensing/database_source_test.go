@@ -70,3 +70,29 @@ func TestDatabaseSource(t *testing.T) {
 		require.ErrorIs(t, err, licensing.ErrNotInstalled)
 	})
 }
+
+func TestDatabaseKeyListCache(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	ctx := context.Background()
+	cache := licensing.DatabaseKeyListCache{}
+	root := licensingtest.NewIssuer("root-2026")
+	signer := licensingtest.NewIssuer("signing-2026-01")
+	verified := func(version int64) *licensing.KeyList {
+		list, err := licensing.VerifyKeyList(root.KeyList(version, signer), licensingtest.KeySet(root))
+		require.NoError(t, err)
+		return list
+	}
+
+	document, err := cache.Load(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, document)
+
+	newer := verified(3)
+	require.NoError(t, cache.Save(ctx, newer))
+	require.NoError(t, cache.Save(ctx, verified(2)))
+
+	document, err = cache.Load(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, newer.Document, document, "an older list never replaces a newer one")
+}

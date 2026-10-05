@@ -42,10 +42,15 @@ func (m *memorySource) Clear(context.Context) error {
 	return nil
 }
 
-func wrappedService(t *testing.T, keys *licensing.KeySet, base licensing.Source) *licensing.Service {
+func wrappedService(t *testing.T, issuerKeys *licensing.KeySet, base licensing.Source) *licensing.Service {
 	t.Helper()
-	keys, source, err := devlicense.Wrap(keys, base)
-	require.NoError(t, err)
+	extra, source := devlicense.Wrap(base)
+	keys := licensing.PublicKeys(extra)
+	if issuerKeys != nil {
+		merged, err := extra.Merge(issuerKeys)
+		require.NoError(t, err)
+		keys = merged
+	}
 
 	service := licensing.NewService(licensing.NewVerifier(keys), source)
 	require.NoError(t, service.Refresh(context.Background()))
@@ -64,10 +69,7 @@ func TestEnabledRequiresExplicitTrue(t *testing.T) {
 }
 
 func TestWrapGrantsEveryFeatureWithoutInstalledLicense(t *testing.T) {
-	keys, err := licensing.ProductionKeySet()
-	require.NoError(t, err)
-
-	service := wrappedService(t, keys, &memorySource{})
+	service := wrappedService(t, nil, &memorySource{})
 
 	status := service.Status()
 	assert.Equal(t, licensing.EditionEnterprise, status.Edition)
@@ -92,11 +94,8 @@ func TestWrapKeepsLicenseFileAuthoritative(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("not-a-license"), 0o600))
 	file := licensing.NewFileSource(path)
 
-	keys, err := licensing.ProductionKeySet()
-	require.NoError(t, err)
-	wrappedKeys, source, err := devlicense.Wrap(keys, file)
-	require.NoError(t, err)
-	assert.Same(t, keys, wrappedKeys)
+	extra, source := devlicense.Wrap(file)
+	assert.Nil(t, extra)
 	assert.Same(t, licensing.Source(file), source)
 }
 
@@ -110,14 +109,13 @@ func TestReleaseServerDoesNotContainDevelopmentLicense(t *testing.T) {
 }
 
 func TestProductionKeysRejectDevelopmentLicense(t *testing.T) {
-	keys, err := licensing.ProductionKeySet()
+	keys, err := licensing.TrustedKeyStore(nil)
 	require.NoError(t, err)
-	_, source, err := devlicense.Wrap(keys, &memorySource{})
-	require.NoError(t, err)
+	_, source := devlicense.Wrap(&memorySource{})
 
 	raw, err := source.Read(context.Background())
 	require.NoError(t, err)
 
 	_, err = licensing.NewVerifier(keys).Verify(raw)
-	require.Error(t, err)
+	assert.Equal(t, licensing.ReasonUnknownKey, licensing.ReasonOf(err))
 }

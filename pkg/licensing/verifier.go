@@ -91,16 +91,16 @@ type claims struct {
 	ExpiresAt     *int64    `json:"exp"`
 }
 
-// Verifier checks license signatures and claims fully offline against a
-// bundled key set. It does not check the validity window; callers use
+// Verifier checks license signatures and claims offline against trusted
+// public keys. It does not check the validity window; callers use
 // License.ValidityAt so an expired license can still be reported.
 type Verifier struct {
-	keys     *KeySet
+	keys     PublicKeys
 	issuer   string
 	audience string
 }
 
-func NewVerifier(keys *KeySet) *Verifier {
+func NewVerifier(keys PublicKeys) *Verifier {
 	return &Verifier{
 		keys:     keys,
 		issuer:   ExpectedIssuer,
@@ -124,7 +124,7 @@ func (v *Verifier) Verify(raw []byte) (*License, error) {
 		return nil, err
 	}
 
-	publicKey, ok := v.keys.lookup(header.KeyID)
+	publicKey, ok := v.keys.PublicKey(header.KeyID)
 	if !ok {
 		return nil, invalid(ReasonUnknownKey)
 	}
@@ -153,6 +153,10 @@ func (v *Verifier) Verify(raw []byte) (*License, error) {
 }
 
 func decodeHeader(segment string) (*protectedHeader, error) {
+	return decodeProtectedHeader(segment, TokenType)
+}
+
+func decodeProtectedHeader(segment, tokenType string) (*protectedHeader, error) {
 	data, err := rawURLEncoding.DecodeString(segment)
 	if err != nil {
 		return nil, invalid(ReasonMalformed)
@@ -172,7 +176,7 @@ func decodeHeader(segment string) (*protectedHeader, error) {
 		return nil, invalid(ReasonUnsupportedAlgorithm)
 	}
 
-	if header.Type != TokenType || header.KeyID == "" {
+	if header.Type != tokenType || header.KeyID == "" {
 		return nil, invalid(ReasonMalformed)
 	}
 

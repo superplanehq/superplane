@@ -9,31 +9,29 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// DevKeySetPathEnv points to a JWKS file with local issuer keys. Only binaries
-// built with the licensedev tag read it. Release images never use that tag.
-const DevKeySetPathEnv = "SUPERPLANE_LICENSE_DEV_JWKS_PATH"
+// DevRootKeySetPathEnv points to a JWKS file with the root key of a local
+// issuer. Only binaries built with the licensedev tag read it. Release images
+// never use that tag.
+const DevRootKeySetPathEnv = "SUPERPLANE_LICENSE_DEV_ROOT_JWKS_PATH"
 
-func TrustedKeySet() (*KeySet, error) {
-	production, err := ProductionKeySet()
-	if err != nil {
-		return nil, err
-	}
-
-	path := os.Getenv(DevKeySetPathEnv)
+// TrustedKeyStore trusts a local issuer instead of the production issuer when
+// DevRootKeySetPathEnv is set.
+func TrustedKeyStore(extra *KeySet) (*KeyStore, error) {
+	path := os.Getenv(DevRootKeySetPathEnv)
 	if path == "" {
-		return production, nil
+		return productionKeyStore(extra)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read development license keys: %w", err)
+		return nil, fmt.Errorf("read development root keys: %w", err)
 	}
 
-	development, err := ParseKeySet(data)
+	roots, err := ParseKeySet(data)
 	if err != nil {
-		return nil, fmt.Errorf("parse development license keys: %w", err)
+		return nil, fmt.Errorf("parse development root keys: %w", err)
 	}
 
-	log.Warnf("Licensing: trusting development license keys %v. Do not use this build in production.", development.KeyIDs())
-	return production.Merge(development)
+	log.Warnf("Licensing: trusting development root keys %v. Do not use this build in production.", roots.KeyIDs())
+	return NewKeyStore(roots, nil, extra)
 }
