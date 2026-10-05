@@ -119,6 +119,11 @@ build {
     pause_before    = "15s"
   }
 
+  provisioner "shell" {
+    script          = "${path.root}/scripts/install-media-tools.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+  }
+
   post-processor "manifest" {
     output     = "${path.root}/manifest.json"
     strip_path = true
