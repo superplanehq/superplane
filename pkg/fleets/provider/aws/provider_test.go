@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -141,6 +142,26 @@ func TestNewRejectsResourceTagsThatOverrideReservedTags(t *testing.T) {
 				t.Fatalf("error = %v", err)
 			}
 		})
+	}
+}
+
+func TestNewRejectsTooManyResourceTags(t *testing.T) {
+	resourceTags := make(map[string]string, maxCustomResourceTags+1)
+	for index := range maxCustomResourceTags + 1 {
+		resourceTags[fmt.Sprintf("CustomTag%d", index)] = "value"
+	}
+
+	_, err := New(&fakeEC2{}, Config{
+		FleetManagerID:   "fleet-manager-production",
+		AMI:              "ami-123",
+		InstanceType:     "t3.micro",
+		Architecture:     "amd64",
+		SubnetIDs:        []string{"subnet-a"},
+		SecurityGroupIDs: []string{"sg-a"},
+		ResourceTags:     resourceTags,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "at most 44 entries") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

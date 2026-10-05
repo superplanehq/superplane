@@ -32,6 +32,10 @@ const (
 	maxVolumeIOPS           int32 = 64000
 	minVolumeThroughputMBps int32 = 125
 	maxVolumeThroughputMBps int32 = 1000
+
+	ec2ResourceTagLimit      = 50
+	reservedResourceTagCount = 6
+	maxCustomResourceTags    = ec2ResourceTagLimit - reservedResourceTagCount
 )
 
 type EC2API interface {
@@ -120,6 +124,13 @@ func New(client EC2API, config Config, log *slog.Logger) (*Provider, error) {
 	}
 	if client == nil {
 		return nil, fmt.Errorf("AWS EC2 client is required")
+	}
+	if len(config.ResourceTags) > maxCustomResourceTags {
+		return nil, fmt.Errorf(
+			"AWS resourceTags must contain at most %d entries; Fleet Manager applies %d reserved tags",
+			maxCustomResourceTags,
+			reservedResourceTagCount,
+		)
 	}
 	for key := range config.ResourceTags {
 		if strings.TrimSpace(key) == "" {

@@ -21,7 +21,8 @@ Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
 them to runner instances and root volumes. Additional tags cannot override the
 reserved name, Fleet Manager, fleet, runner, runner version, or architecture
 tags. The legacy `superplane_managed_runner` tag is also reserved and omitted
-from new resources.
+from new resources. A fleet can define at most 44 additional tags because EC2
+allows 50 tags per resource and Fleet Manager applies six reserved tags.
 
 Use a personal API token that belongs to an installation administrator. The
 Fleet Manager sends it as an HTTP bearer token. Runner instances receive only
