@@ -3,6 +3,7 @@ package licensing_test
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ type memoryKeyCache struct {
 	mu       sync.Mutex
 	document string
 	version  int64
+	saveErr  error
 }
 
 func (m *memoryKeyCache) Load(context.Context) (string, error) {
@@ -33,6 +35,9 @@ func (m *memoryKeyCache) Load(context.Context) (string, error) {
 func (m *memoryKeyCache) Save(_ context.Context, list *licensing.KeyList) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.saveErr != nil {
+		return m.saveErr
+	}
 	if list.Version > m.version {
 		m.document, m.version = list.Document, list.Version
 	}
@@ -213,6 +218,24 @@ func TestKeySyncInstallsAnUploadedList(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), list.Version)
 	assert.Equal(t, int64(2), fixture.cache.version)
+}
+
+func TestKeySyncRetriesAFailedCacheWrite(t *testing.T) {
+	fixture := newKeyFixture(t)
+	server := newKeyServer(t, fixture.root.KeyList(2, fixture.first, fixture.next))
+	keySync := licensing.NewKeySync(fixture.store, fixture.cache, server.URL)
+
+	fixture.cache.saveErr = errors.New("database is down")
+	changed, err := keySync.Sync(context.Background())
+	require.Error(t, err)
+	assert.True(t, changed, "this replica already uses the new keys")
+	assert.Equal(t, int64(0), fixture.cache.version)
+
+	fixture.cache.saveErr = nil
+	changed, err = keySync.Sync(context.Background())
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, int64(2), fixture.cache.version, "the retry shares the list with other replicas")
 }
 
 func TestKeySyncOnDemandIsRateLimited(t *testing.T) {

@@ -270,20 +270,24 @@ func (k *KeySync) download(ctx context.Context) (bool, error) {
 	return changed, err
 }
 
-// trust reports a change even when the cache write fails, because this
-// replica already uses the new keys.
+// trust saves the list even when this replica already trusts it, so a retry
+// repairs an earlier failed cache write. It reports a change even when the
+// cache write fails, because this replica already uses the new keys.
 func (k *KeySync) trust(ctx context.Context, list *KeyList) (bool, error) {
 	changed, err := k.store.Update(list)
-	if err != nil || !changed {
+	if err != nil {
 		return false, err
 	}
 
-	log.WithFields(log.Fields{"version": list.Version, "kids": list.Keys.KeyIDs()}).Info("Licensing: trusting a new license key list")
-	if err := k.cache.Save(ctx, list); err != nil {
-		return true, fmt.Errorf("cache license keys: %w", err)
+	if changed {
+		log.WithFields(log.Fields{"version": list.Version, "kids": list.Keys.KeyIDs()}).Info("Licensing: trusting a new license key list")
 	}
 
-	return true, nil
+	if err := k.cache.Save(ctx, list); err != nil {
+		return changed, fmt.Errorf("cache license keys: %w", err)
+	}
+
+	return changed, nil
 }
 
 func (k *KeySync) recordAttempt(err error) {
