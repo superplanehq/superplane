@@ -99,6 +99,7 @@ export interface SplitRunStreamLine {
   at: string;
   componentName: string;
   status: SplitRunPhaseStatus;
+  promptStatus?: SplitRunPhaseStatus;
   duration?: string;
   /** Whether the displayed duration should keep ticking. Defaults to a running status. */
   durationRunning?: boolean;
