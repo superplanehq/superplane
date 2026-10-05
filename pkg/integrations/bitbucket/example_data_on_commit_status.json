@@ -1,0 +1,50 @@
+{
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
+      "type": "user",
+      "nickname": "johndoe",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        },
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        }
+      }
+    },
+    "repository": {
+      "type": "repository",
+      "full_name": "my-workspace/my-repo",
+      "name": "my-repo",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      }
+    },
+    "commit_status": {
+      "type": "build",
+      "key": "BITBUCKETPIPELINE",
+      "name": "Pipeline #128 for main",
+      "state": "SUCCESSFUL",
+      "url": "https://bitbucket.org/my-workspace/my-repo/pipelines/results/128",
+      "description": "Pipeline succeeded",
+      "refname": "main",
+      "created_on": "2024-01-15T10:24:03.118093+00:00",
+      "updated_on": "2024-01-15T10:29:57.774502+00:00",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d/statuses/build/BITBUCKETPIPELINE"
+        },
+        "commit": {
+          "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+        }
+      }
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.commitStatus"
+}

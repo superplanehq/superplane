@@ -1,0 +1,29 @@
+{
+  "data": {
+    "id": 481902337,
+    "created_on": "2026-08-11T09:41:03.774219+00:00",
+    "updated_on": "2026-08-11T09:41:03.774219+00:00",
+    "deleted": false,
+    "content": {
+      "raw": "Preview environment is up: https://pr-42.preview.superplane.dev",
+      "markup": "markdown",
+      "html": "<p>Preview environment is up: <a href=\"https://pr-42.preview.superplane.dev\">https://pr-42.preview.superplane.dev</a></p>"
+    },
+    "user": {
+      "uuid": "{6b0b1d0e-6a1f-4f2f-9a2b-2f1d3a9c7e21}",
+      "account_id": "712020:1f6a0d7c-5d54-4b1e-9a4f-6c2f9e0a7b31",
+      "display_name": "Anthony Foussette",
+      "nickname": "anthony"
+    },
+    "links": {
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/superplane/web/pullrequests/42/comments/481902337"
+      },
+      "html": {
+        "href": "https://bitbucket.org/superplane/web/pull-requests/42/_/diff#comment-481902337"
+      }
+    }
+  },
+  "timestamp": "2026-08-11T09:41:03.812905Z",
+  "type": "bitbucket.pullRequestComment"
+}
