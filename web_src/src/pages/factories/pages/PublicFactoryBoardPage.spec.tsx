@@ -139,6 +139,68 @@ describe("PublicFactoryBoardPage", () => {
     expect(screen.queryByRole("button", { name: "Open refine agents.md" })).not.toBeInTheDocument();
   });
 
+  it("keeps a working public draft on the thinking indicator", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              workspaceName: "Instabot",
+              lineName: "implement",
+              showClarity: true,
+              showConfidence: true,
+              columns: [
+                {
+                  key: "backlog",
+                  title: "Backlog",
+                  cards: [
+                    {
+                      id: "working",
+                      title: "Still writing",
+                      createdAt: "2026-09-29T12:00:00Z",
+                      state: "STATE_DRAFT",
+                      analyzing: true,
+                      confidence: 4,
+                      clarity: 5,
+                      agentQuestion: true,
+                      running: true,
+                    },
+                    {
+                      id: "waiting",
+                      title: "Needs an answer",
+                      createdAt: "2026-09-29T12:00:00Z",
+                      state: "STATE_DRAFT",
+                      confidence: 4,
+                      agentQuestion: true,
+                    },
+                    {
+                      id: "dispatched",
+                      title: "Line is running",
+                      createdAt: "2026-09-29T12:00:00Z",
+                      state: "STATE_OPEN",
+                      running: true,
+                    },
+                  ],
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+
+    renderBoard(false);
+
+    expect(await screen.findByTestId("work-order-card-analyzing-working")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-working")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-agent-question-working")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-agent-question-waiting")).toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-score-waiting-confidence")).toHaveTextContent("Confidence4/5");
+    expect(screen.queryByTestId("work-order-card-analyzing-waiting")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-analyzing-dispatched")).not.toBeInTheDocument();
+  });
+
   it("shows the signed-in user on the rail", async () => {
     vi.stubGlobal(
       "fetch",

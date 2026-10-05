@@ -567,6 +567,43 @@ func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.
 	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
 }
 
+func TestRunnerPlanningSessionSurveyDefersAgentQuestionUntilWait(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+
+	boardReasons := []string{}
+	restoreBoard := messages.SetPlanningBoardPublisherForTest(func(_, _, reason string) error {
+		boardReasons = append(boardReasons, reason)
+		return nil
+	})
+	defer restoreBoard()
+	notifications := []messages.FactoryWorkOrderNotificationMessage{}
+	restoreNotes := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		notifications = append(notifications, message)
+		return nil
+	})
+	defer restoreNotes()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/surveys", bytes.NewReader([]byte(
+		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"]}]}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{factoryevents.EventTypeOrderUpdated}, boardReasons)
+	assert.Empty(t, notifications)
+
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.NoError(t, beginPlanningWaitAndNotify(db, reloaded))
+	assert.Equal(t, []string{factoryevents.EventTypeOrderUpdated, factoryevents.EventTypeOrderAgentQuestion}, boardReasons)
+	require.Len(t, notifications, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderAgentQuestion, notifications[0].EventType)
+	assert.Equal(t, "What is the priority?", notifications[0].QuestionPrompt)
+}
+
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
 	r := support.Setup(t)
 	server, session, _, token := mustPlanningRunnerSession(t, r)
