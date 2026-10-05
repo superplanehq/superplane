@@ -36,10 +36,10 @@ describe("AddIntakePicker", () => {
     expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeEnabled();
     expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
     expect(within(picker).getByTestId("add-intake-template-dependabot-alerts")).toBeEnabled();
-    for (const id of ["jira-issues", "productive-tasks", "datadog", "linear-issues", "notion"]) {
-      expect(within(picker).getByTestId(`add-intake-template-${id}`)).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    for (const id of ["jira-issues", "productive-tasks", "datadog", "linear-issues", "pagerduty-incidents"]) {
+      expect(within(picker).queryByTestId(`add-intake-template-${id}`)).not.toBeInTheDocument();
     }
-    expect(within(picker).queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(within(picker).getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
   });
 
   it("shows a Beta badge on a Beta source that the company can use", () => {
@@ -83,9 +83,9 @@ describe("AddIntakePicker", () => {
     const user = userEvent.setup();
     renderPicker();
 
-    await user.type(screen.getByTestId("add-intake-search"), "jira");
+    await user.type(screen.getByTestId("add-intake-search"), "notion");
 
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-notion")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-github-issues")).not.toBeInTheDocument();
   });
 

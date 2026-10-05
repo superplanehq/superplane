@@ -10,21 +10,18 @@ describe("addIntakeTemplatesFromCatalog", () => {
   it("lists available sources first, then Beta, then coming soon", () => {
     const templates = addIntakeTemplatesFromCatalog(seededIntakeCatalog(["datadog"]));
 
-    expect(ids(templates)).toEqual([
-      "github-issues",
-      "dependabot-alerts",
-      "sentry-exceptions",
-      "datadog",
-      "jira-issues",
-      "linear-issues",
-      "productive-tasks",
-      "notion",
-    ]);
+    expect(ids(templates)).toEqual(["github-issues", "dependabot-alerts", "sentry-exceptions", "datadog", "notion"]);
     expect(templates.find((template) => template.id === "datadog")).toMatchObject({ beta: true, soon: false });
-    expect(templates.find((template) => template.id === "jira-issues")).toMatchObject({ beta: false, soon: true });
+    expect(ids(templates)).not.toContain("jira-issues");
   });
 
-  it("hides Internal and Deprecated sources that the company cannot use", () => {
+  it("keeps a Planned intake as coming soon when the company can see it", () => {
+    const templates = addIntakeTemplatesFromCatalog(seededIntakeCatalog(["linear-issues"]));
+
+    expect(templates.find((template) => template.id === "linear-issues")).toMatchObject({ soon: true, beta: false });
+  });
+
+  it("hides a Deprecated source and shows an Internal source when the company can see it", () => {
     const hidden = addIntakeTemplatesFromCatalog(
       seededIntakeCatalog([], {
         "sentry-exceptions": { status: "deprecated", available: false },

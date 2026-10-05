@@ -19,7 +19,6 @@ import {
   intakeStatusInfo,
   MATURITY_STEPS,
   NOT_IMPLEMENTED_REASON,
-  widensAccess,
   type AdminIntakeEntry,
 } from "./intakeCatalogModel";
 
@@ -58,10 +57,6 @@ export function MaturityStepper({ entry, pending, onChangeStatus }: MaturityStep
 
       <div className="rounded-md bg-slate-50 px-3 py-2.5 text-sm dark:bg-gray-800/60">
         <p className="text-slate-800 dark:text-gray-100">{current.summary}</p>
-        <p className="mt-1 text-slate-500 dark:text-gray-400">
-          <span className="font-medium text-slate-600 dark:text-gray-300">Who can use it: </span>
-          {current.whoCanUse}
-        </p>
         {current.nextStep ? (
           <p className="mt-1 text-slate-500 dark:text-gray-400">
             <span className="font-medium text-slate-600 dark:text-gray-300">Next step: </span>
@@ -183,7 +178,6 @@ function statusChangeTitle(name: string, from: string, to: IntakeStatus): string
 
 function StatusChangeDialog({ entry, target, onCancel, onConfirm }: StatusChangeDialogProps) {
   const info = target ? INTAKE_STATUS_INFO[target] : null;
-  const widens = target ? widensAccess(entry.status, target) : false;
 
   return (
     <Dialog open={target !== null} onOpenChange={(open) => !open && onCancel()}>
@@ -192,14 +186,8 @@ function StatusChangeDialog({ entry, target, onCancel, onConfirm }: StatusChange
           <DialogTitle>{target ? statusChangeTitle(entry.name, entry.status, target) : ""}</DialogTitle>
           <DialogDescription>{info?.summary}</DialogDescription>
         </DialogHeader>
-        <div className="rounded-md bg-slate-50 px-3 py-2.5 text-sm dark:bg-gray-800/60">
-          <span className="font-medium text-slate-700 dark:text-gray-200">Who can use it: </span>
-          <span className="text-slate-600 dark:text-gray-300">{info?.whoCanUse}</span>
-        </div>
-        {!widens && target !== "deprecated" ? (
-          <p className="text-sm text-slate-500 dark:text-gray-400">
-            Some companies can lose access. Their existing intakes continue to run.
-          </p>
+        {target === "deprecated" ? (
+          <p className="text-sm text-slate-500 dark:text-gray-400">Existing intakes continue to run.</p>
         ) : null}
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>

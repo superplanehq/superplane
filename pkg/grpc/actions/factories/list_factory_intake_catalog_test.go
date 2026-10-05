@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -39,12 +40,13 @@ func Test__FactoryIntakeCatalog(t *testing.T) {
 		assert.True(t, catalog[models.FactoryIntakeSourceGitHubIssues].GetAvailable())
 		assert.False(t, catalog[models.FactoryIntakeSourceDatadog].GetAvailable())
 		assert.Equal(t, models.IntakeStatusBeta, catalog[models.FactoryIntakeSourceDatadog].GetStatus())
-		assert.False(t, catalog["gitlab"].GetAvailable())
+		assert.True(t, catalog["gitlab"].GetAvailable())
+		assert.Equal(t, models.IntakeStatusPlanned, catalog["gitlab"].GetStatus())
 
-		entry, err := models.FindIntakeCatalogEntry(db, models.FactoryIntakeSourceDatadog)
-		require.NoError(t, err)
-		require.NoError(t, entry.AddOrganization(db, r.Organization.ID))
-		t.Cleanup(func() { require.NoError(t, entry.RemoveOrganization(db, r.Organization.ID)) })
+		require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryDatadogIntake))
+		t.Cleanup(func() {
+			require.NoError(t, models.DisableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryDatadogIntake))
+		})
 
 		assert.True(t, catalogByKey(t)[models.FactoryIntakeSourceDatadog].GetAvailable())
 	})

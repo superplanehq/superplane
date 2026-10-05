@@ -41,9 +41,8 @@ func TestAdminIntakeCatalog(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			require.NoError(t, db.Model(&models.IntakeCatalogEntry{}).Where("key = ?", original.Key).Updates(map[string]any{
-				"status":          original.Status,
-				"status_note":     original.StatusNote,
-				"enabled_for_all": original.EnabledForAll,
+				"status":      original.Status,
+				"status_note": original.StatusNote,
 			}).Error)
 		})
 	}
@@ -84,48 +83,18 @@ func TestAdminIntakeCatalog(t *testing.T) {
 		assert.False(t, byKey["gitlab"].Implemented)
 	})
 
-	t.Run("updates status, note, and companies, and previews the result", func(t *testing.T) {
+	t.Run("updates status and note", func(t *testing.T) {
 		restoreDatadog(t)
 
 		code, body := request("PATCH", "/admin/api/intake-catalog/datadog", map[string]any{
-			"status":      models.IntakeStatusBeta,
+			"status":      models.IntakeStatusAlpha,
 			"status_note": "Works with US1. EU1 is not tested.",
 		})
 		require.Equal(t, http.StatusOK, code, string(body))
 		entry := decodeEntry(t, body)
+		assert.Equal(t, models.IntakeStatusAlpha, entry.Status)
 		assert.Equal(t, "Works with US1. EU1 is not tested.", entry.StatusNote)
 		assert.Equal(t, r.Account.Name, entry.UpdatedByName)
-
-		code, body = request("POST", "/admin/api/intake-catalog/datadog/organizations/"+r.Organization.ID.String(), nil)
-		require.Equal(t, http.StatusOK, code, string(body))
-		entry = decodeEntry(t, body)
-		require.Len(t, entry.Organizations, 1)
-		assert.Equal(t, r.Organization.Name, entry.Organizations[0].Name)
-
-		var preview adminIntakeCatalogPreview
-		code, body = request("GET", "/admin/api/intake-catalog/datadog/preview?organization_id="+r.Organization.ID.String(), nil)
-		require.Equal(t, http.StatusOK, code)
-		require.NoError(t, json.Unmarshal(body, &preview))
-		assert.True(t, preview.Available)
-
-		code, body = request("GET", "/admin/api/intake-catalog/datadog/preview", nil)
-		require.Equal(t, http.StatusOK, code)
-		require.NoError(t, json.Unmarshal(body, &preview))
-		assert.False(t, preview.Available)
-
-		code, body = request("DELETE", "/admin/api/intake-catalog/datadog/organizations/"+r.Organization.ID.String(), nil)
-		require.Equal(t, http.StatusOK, code)
-		assert.Empty(t, decodeEntry(t, body).Organizations)
-	})
-
-	t.Run("rejects an open internal intake", func(t *testing.T) {
-		restoreDatadog(t)
-
-		code, _ := request("PATCH", "/admin/api/intake-catalog/datadog", map[string]any{
-			"status":          models.IntakeStatusAlpha,
-			"enabled_for_all": true,
-		})
-		assert.Equal(t, http.StatusBadRequest, code)
 	})
 
 	t.Run("creates a planned intake that cannot leave planned or be deleted once used", func(t *testing.T) {

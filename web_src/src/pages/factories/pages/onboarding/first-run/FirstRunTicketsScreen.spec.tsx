@@ -437,7 +437,7 @@ describe("FirstRunTicketsScreen", () => {
     );
 
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linear)).not.toBeInTheDocument();
     expect(screen.getByText("Azure Boards").closest('[data-soon="true"]')).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).toBeInTheDocument();
   });
 });

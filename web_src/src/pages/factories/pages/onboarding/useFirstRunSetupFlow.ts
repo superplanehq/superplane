@@ -423,9 +423,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     linearAvailable,
     installScope,
   });
-  // A saved Jira or Linear choice is not valid when the intake catalog does not
-  // let the organization use it. Clear it only after the catalog loads and
-  // confirms that. A failed lookup must not replace the saved choice.
+  // A saved Jira or Linear choice is not valid when the intake catalog does
+  // not let the organization use that intake. Clear it only after the catalog
+  // loads and confirms that. A failed lookup has no catalog data and must not
+  // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
   const organizationReady = intakeCatalog.loaded;

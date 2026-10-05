@@ -27,9 +27,9 @@ export interface IntakeCatalogItem {
 const STATE_ORDER: Record<IntakeSurfaceState, number> = { available: 0, beta: 1, soon: 2, hidden: 3 };
 
 /**
- * The state that a company sees. A company that cannot use an Internal or a
- * Deprecated intake does not see it. Other intakes it cannot use show as
- * Coming soon.
+ * The state that a company sees. `available` is true when the organization
+ * may see the intake. Status sets the label. A Planned intake is Coming soon.
+ * A Deprecated intake is not offered.
  */
 export function intakeSurfaceState(
   item: Pick<IntakeCatalogItem, "status" | "available"> | undefined,
@@ -37,13 +37,16 @@ export function intakeSurfaceState(
   if (!item) {
     return "soon";
   }
-  if (item.available) {
-    return item.status === "beta" ? "beta" : "available";
-  }
-  if (item.status === "alpha" || item.status === "deprecated") {
+  if (item.status === "deprecated" || !item.available) {
     return "hidden";
   }
-  return "soon";
+  if (item.status === "planned") {
+    return "soon";
+  }
+  if (item.status === "beta") {
+    return "beta";
+  }
+  return "available";
 }
 
 export interface IntakeSurfaceEntry {
