@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
@@ -104,6 +105,7 @@ func (s *Server) handlePublicFactoryBoard(w http.ResponseWriter, r *http.Request
 			return
 		}
 		log.WithError(err).Error("failed to load public factory board")
+		middleware.SetServerError(r.Context(), err, nil)
 		http.Error(w, "Failed to load board", http.StatusInternalServerError)
 		return
 	}
@@ -120,6 +122,7 @@ func (s *Server) handlePublicFactoryBoardWebSocket(w http.ResponseWriter, r *htt
 		outcome := telemetry.WebSocketConnectionOutcomeAuthError
 		if !errors.Is(err, errPublicBoardNotFound) {
 			log.WithError(err).Error("failed to authorize public factory board socket")
+			middleware.SetServerError(r.Context(), err, nil)
 			http.Error(w, "Failed to load board", http.StatusInternalServerError)
 			return
 		}
