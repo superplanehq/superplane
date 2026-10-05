@@ -165,7 +165,8 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
   });
 
-  it("keeps ready Start and the model outside the plan card", () => {
+  it("prioritizes ready Start and reveals the composer through Suggest changes", async () => {
+    const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -192,6 +193,37 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(start).toHaveClass("bg-primary");
     expect(within(settings).getByTestId("split-run-draft-action-group")).not.toHaveClass("border");
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
+    await user.click(within(settings).getByRole("button", { name: "Suggest changes" }));
+    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toHaveFocus();
+    expect(start).toBeEnabled();
+  });
+
+  it.each([
+    { name: "low clarity", clarity: 2 },
+    { name: "active analysis", machineStatus: "running" as const },
+    { name: "missing plan", noPlan: true },
+    { name: "existing draft", composer: "Keep this draft" },
+    { name: "send error", composerError: "The message did not send. Try again." },
+  ])("keeps the composer visible with high confidence and $name", (state) => {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={state.noPlan ? [] : [INTENT]}
+        clarity={{ ...HIGH_CLARITY, score: state.clarity ?? 4 }}
+        confidence={HIGH_CONFIDENCE}
+        resultFooter={<SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} compact />}
+        analysis={analysisChat({
+          composer: state.composer ?? "",
+          composerError: state.composerError,
+          view: { ...WAITING_WITH_PLAN, machineStatus: state.machineStatus ?? "waiting", messages: [] },
+        })}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toHaveValue(
+      state.composer ?? "",
+    );
+    expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
   });
 
   it("quiets Start to an outline when the verdict warns, but keeps it enabled", () => {
@@ -211,6 +243,8 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(start).toHaveClass("border");
     expect(start).toBeEnabled();
     expect(screen.queryByTestId("split-run-intent-settings")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
   });
 
   it("peeks a score summary on hover and pins it on click", async () => {
