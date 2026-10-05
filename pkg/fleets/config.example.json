@@ -21,7 +21,7 @@
         "securityGroupIds": [
           "sg-00000000000000000"
         ],
-        "iamInstanceProfile": "",
+        "iamInstanceProfile": "superplane-runner-instance-profile",
         "keyName": "",
         "volumeSizeGb": 30,
         "volumeIops": 0,

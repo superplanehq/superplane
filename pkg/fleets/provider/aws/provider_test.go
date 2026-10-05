@@ -225,6 +225,8 @@ func TestBuildBootstrapUsesPublicArtifactAndConfiguresCloudWatch(t *testing.T) {
 		`"region":"us-east-1"`,
 		`"log_group_name":"/superplane/runners"`,
 		`"log_stream_name":"{instance_id}"`,
+		"configure_cloudwatch()",
+		"CloudWatch Agent setup failed; runner installation will continue",
 		"set +x",
 		`RUNNER_API_URL="https://superplane.example" \`,
 		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token" \`,

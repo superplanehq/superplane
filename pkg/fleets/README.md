@@ -51,7 +51,12 @@ Set `aws.cloudWatch.logGroupName` on a fleet to send
 contain the Amazon CloudWatch Agent. Fleet Manager writes the runtime agent
 configuration, uses the fleet's `aws.region`, names the stream after the EC2
 instance ID, and starts the agent before it installs and starts the runner.
-The log group must already exist.
+Logging setup is best effort and does not prevent the runner from starting.
+The log group must already exist, and `aws.iamInstanceProfile` must name an
+instance profile that permits `logs:CreateLogStream`, `logs:DescribeLogGroups`,
+`logs:DescribeLogStreams`, and `logs:PutLogEvents` for that log group. The
+example configuration uses a placeholder profile name with this expected
+access.
 
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
