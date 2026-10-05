@@ -118,7 +118,8 @@ describe("PublicFactoryBoardPage", () => {
 
     renderBoard(false);
 
-    expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Implement");
+    expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Instabot");
+    expect(screen.getByTestId("workspace-page-header-title")).not.toHaveTextContent("Implement");
     expect(screen.getByTestId("public-board-badge")).toHaveTextContent("Public view");
     expect(screen.queryByTestId("work-orders-scope")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-trigger")).toBeInTheDocument();
