@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { SPLIT_RUN_CHAT_COLUMN_CLASSNAME } from "./splitRunPopupModel";
 
 export function PlanningImplementationControls({
-  inline = false,
   startDiscouraged = false,
   modelSelect,
   actions,
@@ -13,7 +12,6 @@ export function PlanningImplementationControls({
   showSuggestChanges,
   onSuggestChanges,
 }: {
-  inline?: boolean;
   startDiscouraged?: boolean;
   modelSelect?: ReactNode;
   actions?: ReactNode;
@@ -29,10 +27,8 @@ export function PlanningImplementationControls({
     </div>
   );
   return (
-    <section aria-label="Implementation" className={cn("shrink-0", inline ? "pt-2" : "border-t border-border py-3")}>
-      <div
-        className={cn(!inline && SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "flex flex-wrap items-center justify-between gap-2")}
-      >
+    <section aria-label="Implementation" className="shrink-0 border-t border-border py-3">
+      <div className={cn(SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "flex flex-wrap items-center justify-between gap-2")}>
         {startDiscouraged ? (
           <DiscouragedImplementationOptions>{options}</DiscouragedImplementationOptions>
         ) : (

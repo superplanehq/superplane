@@ -188,7 +188,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
   });
 
-  it("prioritizes ready Start and reveals the composer through Suggest changes", async () => {
+  it("keeps ready Start below the conversation and opens the composer above it", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
@@ -213,14 +213,16 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const start = within(settings).getByRole("button", { name: "Start" });
     expect(plan.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(model.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByTestId("split-run-intent-chat-log")).toContainElement(settings);
+    expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(settings);
     expect(start).toHaveClass("bg-primary");
     expect(settings).not.toHaveTextContent("Starting not recommended");
     expect(within(settings).getByTestId("split-run-draft-action-group")).not.toHaveClass("border");
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
     await user.click(within(settings).getByRole("button", { name: "Suggest changes" }));
-    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toHaveFocus();
+    const composer = screen.getByRole("textbox", { name: "Tell the agent more about this task" });
+    expect(composer).toHaveFocus();
+    expect(composer.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(
       screen.getByRole("region", { name: "Implementation" }),
     );
