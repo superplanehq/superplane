@@ -140,11 +140,26 @@ if (typeof window !== "undefined") {
   environment = sentryWindow.SUPERPLANE_SENTRY_ENVIRONMENT;
 }
 
+const sensitiveRequestKeyDenylist = ["forwarded", "-ip", "remote-", "via", "-user"];
+
 if (dsn) {
   Sentry.init({
     dsn,
     environment,
     ignoreErrors: IGNORED_CONSOLE_MESSAGES,
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: sensitiveRequestKeyDenylist },
+        response: { deny: sensitiveRequestKeyDenylist },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: sensitiveRequestKeyDenylist },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      graphQL: { document: false, variables: false },
+    },
     beforeSend(event) {
       const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
       const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
