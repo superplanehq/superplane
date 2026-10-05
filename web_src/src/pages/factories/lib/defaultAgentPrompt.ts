@@ -122,12 +122,9 @@ function stepsWithRestoredPrompts(
   defaultSteps: PlanningReviewStep[],
   prompts: PlanningReviewStep[],
 ): PlanningReviewStep[] {
-  if (!defaultSteps.some((step) => step.type === "bash")) {
-    return [...steps, ...prompts.map(factoryPromptStep)];
-  }
-
+  const anchorIndexes = matchedFactoryStepIndexes(steps, defaultSteps);
   const insertions = prompts.map((prompt, order) => ({
-    index: promptInsertionIndex(steps, defaultSteps, prompt),
+    index: promptInsertionIndex(defaultSteps, prompt, anchorIndexes, steps.length),
     order,
     step: factoryPromptStep(prompt),
   }));
@@ -142,21 +139,50 @@ function stepsWithRestoredPrompts(
 }
 
 function promptInsertionIndex(
-  steps: PlanningReviewStep[],
   defaultSteps: PlanningReviewStep[],
   prompt: PlanningReviewStep,
+  anchorIndexes: Map<number, number>,
+  fallback: number,
 ): number {
-  const following = defaultSteps.slice(defaultSteps.indexOf(prompt) + 1);
-  for (const anchor of following) {
+  const promptIndex = defaultSteps.indexOf(prompt);
+  if (promptIndex < 0) {
+    return fallback;
+  }
+  for (let index = promptIndex + 1; index < defaultSteps.length; index += 1) {
+    const anchor = defaultSteps[index];
     if (anchor.type === "prompt") {
       continue;
     }
-    const index = steps.findIndex((step) => step.type === anchor.type && step.name === anchor.name);
-    if (index >= 0) {
-      return index;
+    const position = anchorIndexes.get(index);
+    if (position !== undefined) {
+      return position;
     }
   }
-  return steps.length;
+  return fallback;
+}
+
+function matchedFactoryStepIndexes(
+  steps: PlanningReviewStep[],
+  defaultSteps: PlanningReviewStep[],
+): Map<number, number> {
+  const matches = new Map<number, number>();
+  let cursor = 0;
+  defaultSteps.forEach((step, index) => {
+    if (step.type === "prompt") {
+      return;
+    }
+    const found = steps.findIndex((candidate, position) => position >= cursor && sameStepIdentity(candidate, step));
+    if (found < 0) {
+      return;
+    }
+    matches.set(index, found);
+    cursor = found + 1;
+  });
+  return matches;
+}
+
+function sameStepIdentity(left: PlanningReviewStep, right: PlanningReviewStep): boolean {
+  return left.type === right.type && left.name === right.name;
 }
 
 function replaceAssignedPrompts(steps: PlanningReviewStep[], assigned: Map<number, string>): PlanningReviewStep[] {

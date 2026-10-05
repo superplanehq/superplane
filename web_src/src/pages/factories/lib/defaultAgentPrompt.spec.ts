@@ -217,6 +217,36 @@ describe("applyDefaultAgentPrompts", () => {
     ]);
   });
 
+  it("restores a prompt before the later step when an earlier step has the same name", () => {
+    const draft = draftWith("implementation-agent-no-issue", [
+      { name: "Format JS and Go code", type: "bash", command: "format early" },
+      { name: "Checkout branch", type: "bash", command: "git clone" },
+      { name: "Format JS and Go code", type: "bash", command: "format late" },
+    ]);
+    const implementation: PlanningReviewStep = {
+      name: "Implementation",
+      type: "prompt",
+      prompt: IMPLEMENT_PROMPT,
+      workingDirectory: "repo",
+    };
+
+    expect(
+      stepsOf(
+        applyDefaultAgentPrompts(draft, [
+          { name: "Format JS and Go code", type: "bash", command: "format first" },
+          { name: "Checkout branch", type: "bash", command: "git clone --depth 1" },
+          implementation,
+          { name: "Format JS and Go code", type: "bash", command: "format second" },
+        ]),
+      ),
+    ).toEqual([
+      { name: "Format JS and Go code", type: "bash", command: "format early" },
+      { name: "Checkout branch", type: "bash", command: "git clone" },
+      implementation,
+      { name: "Format JS and Go code", type: "bash", command: "format late" },
+    ]);
+  });
+
   it("replaces the prompt step when a bash step has the same name", () => {
     const draft = draftWith("refine-task", [
       { name: "Refine Task", type: "bash", command: "echo keep" },
