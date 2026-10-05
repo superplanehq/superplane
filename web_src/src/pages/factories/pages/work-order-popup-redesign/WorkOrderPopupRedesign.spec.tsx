@@ -305,6 +305,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(await within(dialog).findByTestId("redesign-console-column-verify")).toBeInTheDocument();
+    await user.click(await within(dialog).findByRole("button", { name: "Merge confidence" }));
     expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Verify" })).toBeInTheDocument();
@@ -338,6 +339,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("redesign-console-variant")).toBeInTheDocument();
+    await user.click(await within(dialog).findByRole("button", { name: "Merge confidence" }));
     expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
   }, 20000);
