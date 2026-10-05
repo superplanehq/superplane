@@ -1,5 +1,7 @@
 package authorization
 
+import "github.com/superplanehq/superplane/pkg/licensing"
+
 type contextKey string
 
 const OrganizationContextKey contextKey = "organization"
@@ -22,6 +24,10 @@ type AuthorizationRule struct {
 	// Prefer Action for new checks, and scope legacy actions to the smallest route set possible.
 	LegacyActions                []string
 	RequiredExperimentalFeatures []string
+	// RequiredLicenseFeatures lists Enterprise features that the installation
+	// license must grant. Use it only for operations that create or expand
+	// Enterprise access, never for operations that remove access.
+	RequiredLicenseFeatures []licensing.Feature
 }
 
 func (r AuthorizationRule) AllowedActions() []string {
