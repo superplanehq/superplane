@@ -6,6 +6,7 @@ import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
 import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { groupSplitRunActivities, type PullRequestActivityGroup } from "../splitRunActivityGroups";
 import { groupClaudeSteps, groupSplitRunStream, type ClaudeStepGroup, type StreamNodeGroup } from "../phaseLogStream";
+import { agentStepStatusFromSection } from "../streamNotesFromLiveLog";
 import {
   SPLIT_RUN_CLOSURE_PHASE_ID,
   splitRunStatusLabel,
@@ -58,6 +59,7 @@ export interface AgentStep {
   title: string;
   type: "prompt" | "bash" | "node";
   status: SplitRunPhaseStatus;
+  promptStatus?: SplitRunPhaseStatus;
   duration?: string;
   summary: string;
   toolCount: number;
@@ -282,7 +284,7 @@ export function stagesByConsoleColumn(
 
 export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
   const nodes = groupSplitRunStream(phase.stream);
-  const agentSteps = agentStepsFromNotes(phase.stream);
+  const agentSteps = agentStepsFromNotes(phase.stream, phase.status);
   const plumbing = nodes.map(plumbingNodeFromGroup);
   const cost = parseWorkOrderMetric(phase.costCents);
   const tokens = parseWorkOrderMetric(phase.totalTokens);
@@ -306,7 +308,7 @@ export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
     },
     plumbing,
     agentSteps,
-    steps: runSteps(nodes),
+    steps: runSteps(nodes, phase.status),
     rawLog: rawLogFromSteps(agentSteps),
     columnKey: phase.columnKey,
     pullRequestActivity: phase.pullRequestActivity,
@@ -330,7 +332,11 @@ function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {
  * Flattens a run into one step list. A node with a transcript contributes
  * its transcript steps in its place. Any other node is one `node` step.
  */
-function runSteps(nodes: StreamNodeGroup[]): AgentStep[] {
+function runSteps(nodes: StreamNodeGroup[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
+  return applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+}
+
+function flattenRunSteps(nodes: StreamNodeGroup[]): AgentStep[] {
   return nodes.flatMap((node) => {
     const transcript = groupClaudeSteps(node.notes).map(agentStepFromGroup);
     return transcript.length > 0 ? transcript : [nodeStep(node)];
@@ -352,8 +358,76 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
   };
 }
 
-export function agentStepsFromNotes(notes: SplitRunStreamLine[]): AgentStep[] {
-  return groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
+export function agentStepsFromNotes(
+  notes: SplitRunStreamLine[],
+  runStatus?: SplitRunPhaseStatus,
+  canvasLines?: SplitRunStreamLine[],
+): AgentStep[] {
+  const steps = groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
+  return applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
+}
+
+function applyPromptStepRunStatus(
+  steps: AgentStep[],
+  runStatus?: SplitRunPhaseStatus,
+  stoppedIndex = stoppingStepIndex(steps),
+): AgentStep[] {
+  return steps.map((step, index) => {
+    if (step.type !== "prompt") {
+      return step;
+    }
+    const sectionFailed = step.promptStatus === "failed" || step.status === "failed";
+    const promptStatus = sectionFailed ? "failed" : step.promptStatus;
+    const status =
+      step.status === "failed"
+        ? agentStepStatusFromSection({
+            kind: "prompt",
+            sectionStatus: "failed",
+            runStatus,
+            stoppedTheRun: index === stoppedIndex,
+          })
+        : step.status;
+    if (status === step.status && promptStatus === step.promptStatus) {
+      return step;
+    }
+    return { ...step, status, promptStatus };
+  });
+}
+
+function stoppingIndexForTranscript(
+  notes: SplitRunStreamLine[],
+  transcript: AgentStep[],
+  canvasLines?: SplitRunStreamLine[],
+): number {
+  const lines = canvasLines ? mergeCanvasLines(canvasLines, notes) : notes;
+  const nodes = groupSplitRunStream(lines);
+  if (nodes.length === 0) {
+    return stoppingStepIndex(transcript);
+  }
+  const run = flattenRunSteps(nodes);
+  const stopped = run[stoppingStepIndex(run)];
+  if (!stopped || stopped.type === "node") {
+    return -1;
+  }
+  return transcript.findIndex((step) => step.id === stopped.id);
+}
+
+function mergeCanvasLines(canvasLines: SplitRunStreamLine[], notes: SplitRunStreamLine[]): SplitRunStreamLine[] {
+  const seen = new Set(canvasLines.map((line) => line.id));
+  return [...canvasLines, ...notes.filter((line) => !seen.has(line.id))];
+}
+
+function stoppingStepIndex(steps: AgentStep[]): number {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    const step = steps[index];
+    if (!step || step.status !== "failed") {
+      continue;
+    }
+    if (step.type === "prompt" || step.type === "bash" || step.type === "node") {
+      return index;
+    }
+  }
+  return -1;
 }
 
 /** A canceled or failed stage no longer has a step in progress. */
@@ -371,6 +445,7 @@ function agentStepFromGroup(group: ClaudeStepGroup): AgentStep {
     title: group.line.componentName,
     type: group.line.componentType === "bash" ? "bash" : "prompt",
     status: group.line.status,
+    promptStatus: group.line.promptStatus,
     duration: group.line.duration,
     summary: "",
     toolCount: tools.length,
