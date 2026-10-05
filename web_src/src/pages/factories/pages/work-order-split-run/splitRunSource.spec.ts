@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
+
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
@@ -13,7 +15,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { collectSplitRunArtifacts, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
-import { sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
+import { addedByForSource, sourceTicketLabel, splitRunSourceForOrder } from "./splitRunSource";
 
 describe("sourceTicketLabel", () => {
   it("uses owner/repo#number for GitHub issues", () => {
@@ -34,6 +36,7 @@ describe("sourceTicketLabel", () => {
 
   it("uses the issue key for Jira browse links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/browse/DEV-3")).toBe("DEV-3");
+    expect(sourceTicketLabel("https://linear.app/acme/issue/ENG-142/fix-login-redirect")).toBe("ENG-142");
   });
 
   it("uses the issue key for Jira project issue links", () => {
@@ -173,6 +176,102 @@ describe("splitRunSourceForOrder", () => {
     ).toEqual(expect.objectContaining({ kind: "intake", name: "Jira issues", iconAlt: "Jira" }));
   });
 
+  it("names Dependabot alerts from a package alert link and keeps the stored ticket label", () => {
+    const href = "https://github.com/acme/payments/security/dependabot?q=is:open+package:vitest+ecosystem:npm";
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        title: "Fix Dependabot alerts for vitest (npm)",
+        origin: { url: href, label: "Dependabot: vitest" },
+        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Dependabot alerts",
+        iconSrc: dependabotIcon,
+        iconAlt: "Dependabot",
+        ticket: { label: "Dependabot: vitest", href },
+        addedBy: { kind: "intake", name: "Dependabot alerts" },
+      }),
+    );
+  });
+
+  it("names Dependabot alerts from a single-alert link without inventing a ticket label", () => {
+    const href = "https://github.com/acme/payments/security/dependabot/7";
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: href, label: "Dependabot: lodash" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Dependabot alerts",
+        iconAlt: "Dependabot",
+        ticket: { label: "Dependabot: lodash", href },
+      }),
+    );
+  });
+
+  it("keeps a GitHub issue when the repository path contains security and dependabot", () => {
+    const href = "https://github.com/security/dependabot/issues/12";
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: href },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "GitHub issues",
+        iconAlt: "GitHub",
+        ticket: { label: "security/dependabot#12", href },
+      }),
+    );
+  });
+
+  it("keeps a GitHub issue when the title or label mentions Dependabot", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        title: "Fix Dependabot alerts for vitest (npm)",
+        origin: {
+          url: "https://github.com/acme/payments/issues/12",
+          label: "Dependabot: vitest",
+        },
+        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "GitHub issues",
+        iconAlt: "GitHub",
+        ticket: { label: "Dependabot: vitest", href: "https://github.com/acme/payments/issues/12" },
+        addedBy: { kind: "intake", name: "GitHub issues" },
+      }),
+    );
+  });
+
+  it("names Dependabot alerts when the order has no origin but the automation name contains Dependabot", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: undefined,
+        title: "Fix a package",
+        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Dependabot alerts",
+        iconSrc: dependabotIcon,
+        iconAlt: "Dependabot",
+        addedBy: { kind: "intake", name: "Dependabot alerts" },
+      }),
+    );
+  });
+
   it("uses the person and Created manually when a person opened the task", () => {
     expect(splitRunSourceForOrder(DRAFT_WORK_ORDER)).toEqual(
       expect.objectContaining({
@@ -182,6 +281,21 @@ describe("splitRunSourceForOrder", () => {
         addedBy: { kind: "manual" },
       }),
     );
+  });
+
+  it("names the MCP client when the task has an MCP source", () => {
+    const source = splitRunSourceForOrder({
+      ...DRAFT_WORK_ORDER,
+      mcpClient: { id: "superplane-local", name: "Cursor" },
+    });
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Cursor",
+        iconAlt: "SuperPlane",
+      }),
+    );
+    expect(addedByForSource(source)).toEqual({ kind: "mcp", name: "Cursor" });
   });
 
   it("resolves the source person's avatar from the org members list when one is available", () => {
@@ -230,6 +344,8 @@ describe("splitRunSourceForOrder", () => {
           expect(source.ticket.href, order.id).toMatch(/^https?:/);
           expect(source.ticket.label, order.id).toBeTruthy();
         }
+      } else if (source.kind === "mcp") {
+        expect(source.name, order.id).toBeTruthy();
       } else {
         expect(source.person.name, order.id).toBeTruthy();
         expect(source.detail, order.id).toBe("Created manually");

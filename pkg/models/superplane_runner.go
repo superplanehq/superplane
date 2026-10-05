@@ -184,28 +184,92 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 		return err
 	}
 
+	_, err := ResolveRunnableHostedLLMModel(tx, orgID, factoryID)
+	return err
+}
+
+// ResolveRunnableHostedLLMModel returns the installation default when the
+// organization and workspace allow it. Otherwise it returns another allowed
+// hosted model so excluding the default does not block hosted runs.
+func ResolveRunnableHostedLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) (DefaultHostedLLMModel, error) {
 	defaultModel, err := GetInstallationDefaultHostedLLMModel(tx)
 	if err != nil {
-		return err
+		return DefaultHostedLLMModel{}, err
 	}
 	if !defaultModel.IsSet() {
-		return ErrSuperPlaneRunnerNoModel
+		return DefaultHostedLLMModel{}, ErrSuperPlaneRunnerNoModel
 	}
 	if err := AssertDefaultHostedLLMModelAllowed(tx, defaultModel); err != nil {
 		if errors.Is(err, ErrDefaultHostedModelNotOnAllowlist) {
-			return ErrSuperPlaneRunnerNoModel
+			return DefaultHostedLLMModel{}, ErrSuperPlaneRunnerNoModel
 		}
-		return err
+		return DefaultHostedLLMModel{}, err
 	}
 
 	allowed, err := ModelIsSelectable(tx, orgID, factoryID, defaultModel.Provider, UsageFundingSourceHosted, defaultModel.Model)
 	if err != nil {
-		return err
+		return DefaultHostedLLMModel{}, err
 	}
-	if !allowed {
-		return ErrSuperPlaneRunnerModelNotAllowed
+	if allowed {
+		return defaultModel, nil
 	}
-	return nil
+
+	fallback, found, err := firstSelectableHostedLLMModel(tx, orgID, factoryID, defaultModel.Provider)
+	if err != nil {
+		return DefaultHostedLLMModel{}, err
+	}
+	if !found {
+		return DefaultHostedLLMModel{}, ErrSuperPlaneRunnerModelNotAllowed
+	}
+	return fallback, nil
+}
+
+func firstSelectableHostedLLMModel(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, preferredProvider string) (DefaultHostedLLMModel, bool, error) {
+	for _, provider := range hostedModelProviderOrder(preferredProvider) {
+		canRun, err := hostedProviderCanRun(tx, provider)
+		if err != nil {
+			return DefaultHostedLLMModel{}, false, err
+		}
+		if !canRun {
+			continue
+		}
+		modelIDs, err := ResolveSelectableLLMModels(tx, orgID, factoryID, provider, UsageFundingSourceHosted)
+		if err != nil {
+			return DefaultHostedLLMModel{}, false, err
+		}
+		if len(modelIDs) == 0 {
+			continue
+		}
+		return DefaultHostedLLMModel{Provider: provider, Model: modelIDs[0]}, true, nil
+	}
+	return DefaultHostedLLMModel{}, false, nil
+}
+
+func hostedProviderCanRun(tx *gorm.DB, provider string) (bool, error) {
+	row, err := FindHostedLLMProvider(tx, provider)
+	if err != nil {
+		if errors.Is(err, ErrHostedLLMProviderNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return row.CanRunHosted(), nil
+}
+
+func hostedModelProviderOrder(preferredProvider string) []string {
+	providers := KnownHostedLLMProviders()
+	if preferredProvider == "" {
+		return providers
+	}
+	ordered := make([]string, 0, len(providers))
+	ordered = append(ordered, preferredProvider)
+	for _, provider := range providers {
+		if provider == preferredProvider {
+			continue
+		}
+		ordered = append(ordered, provider)
+	}
+	return ordered
 }
 
 func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID, nodes []Node) error {

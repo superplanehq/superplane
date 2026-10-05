@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { durationLabelMs } from "@/lib/duration";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
@@ -346,9 +347,7 @@ function logStateForExecution(execution: FactoriesWorkOrderExecution): PopupLogS
 }
 
 function logDurationMs(duration: string): number | null {
-  const minutes = duration.match(/(\d+)\s*m/);
-  const seconds = duration.match(/(\d+)\s*s/);
-  const ms = (minutes ? Number(minutes[1]) * 60_000 : 0) + (seconds ? Number(seconds[1]) * 1000 : 0);
+  const ms = durationLabelMs(duration);
   return ms > 0 ? ms : null;
 }
 

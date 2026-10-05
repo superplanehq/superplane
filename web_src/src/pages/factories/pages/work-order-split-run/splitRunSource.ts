@@ -1,11 +1,14 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
@@ -21,17 +24,20 @@ export const CREATED_MANUALLY = "Created manually";
 
 export type SplitRunIntakeKind =
   | "github-issues"
+  | "dependabot-alerts"
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
   | "datadog"
+  | "linear-issues"
   | "slack";
 
 export type SplitRunAddedBy =
   | { kind: "intake"; name: string }
   | { kind: "manual" }
-  | { kind: "imported"; personName: string };
+  | { kind: "imported"; personName: string }
+  | { kind: "mcp"; name: string };
 
 export type SplitRunSource =
   | {
@@ -43,6 +49,12 @@ export type SplitRunSource =
       addedBy?: SplitRunAddedBy;
     }
   | {
+      kind: "mcp";
+      name: string;
+      iconSrc: string;
+      iconAlt: string;
+    }
+  | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
@@ -50,6 +62,9 @@ export type SplitRunSource =
     };
 
 export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
+  if (source.kind === "mcp") {
+    return { kind: "mcp", name: source.name };
+  }
   if (source.addedBy) {
     return source.addedBy;
   }
@@ -72,22 +87,28 @@ const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
 
 export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
+  "dependabot-alerts": { name: "Dependabot alerts", iconSrc: dependabotIcon, iconAlt: "Dependabot" },
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
   "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
   datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
+  "linear-issues": { name: "Linear", iconSrc: linearIcon, iconAlt: "Linear" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
 // Sources an intake app or a ticket link can be recognized by, before the
-// GitHub default applies. GitHub itself needs no hint: its intake app is named
-// after its issues, and its links carry no other marker.
+// GitHub default applies. GitHub issues need no hint: the intake app is named
+// after its issues, and an issue link has no other marker. Dependabot alerts
+// share github.com, so the alert path is classified first. This hint only
+// names an automation when the task has no origin link.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
+  { pattern: /dependabot/i, kind: "dependabot-alerts" },
   { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
   { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
+  { pattern: /linear/i, kind: "linear-issues" },
 ];
 
 export function sourceTicketLabel(url: string): string {
@@ -102,6 +123,10 @@ export function sourceTicketLabel(url: string): string {
   const jira = jiraTicketLabel(parsed);
   if (jira) {
     return jira;
+  }
+  const linear = linearTicketLabel(parsed);
+  if (linear) {
+    return linear;
   }
   const id = hostTicketId(parsed);
   // Productive.io links carry the organization id where other hosts carry a
@@ -141,6 +166,16 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
   if (automation) {
     const source = intakeSourceFromKind(intakeKindForAutomation(automation));
     return { ...source, addedBy: { kind: "intake", name: source.name } };
+  }
+
+  const mcpName = order.mcpClient?.name?.trim();
+  if (mcpName) {
+    return {
+      kind: "mcp",
+      name: mcpName,
+      iconSrc: superplaneIcon,
+      iconAlt: "SuperPlane",
+    };
   }
 
   return {
@@ -209,7 +244,8 @@ function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSou
 }
 
 function intakeKindFromHref(href: string): SplitRunIntakeKind {
-  const host = parseUrl(href)?.hostname ?? "";
+  const parsed = parseUrl(href);
+  const host = parsed?.hostname ?? "";
   if (host.includes("sentry.io")) {
     return "sentry-exceptions";
   }
@@ -219,7 +255,17 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host.includes("atlassian.net") || host.includes("jira.com")) {
     return "jira-issues";
   }
+  if (host === "linear.app" || host.endsWith(".linear.app")) {
+    return "linear-issues";
+  }
+  if (isGitHubDependabotAlertHref(parsed)) {
+    return "dependabot-alerts";
+  }
   return intakeKindFromLabel(host);
+}
+
+function isGitHubDependabotAlertHref(parsed: URL | undefined): boolean {
+  return parsed?.hostname === "github.com" && /^\/[^/]+\/[^/]+\/security\/dependabot(?:\/|$)/i.test(parsed.pathname);
 }
 
 function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
@@ -259,6 +305,18 @@ function githubTicketLabel(parsed: URL): string | undefined {
     return undefined;
   }
   return `${owner}/${repo}#${number}`;
+}
+
+function linearTicketLabel(parsed: URL): string | undefined {
+  if (parsed.hostname !== "linear.app" && !parsed.hostname.endsWith(".linear.app")) {
+    return undefined;
+  }
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  const issueAt = parts.indexOf("issue");
+  if (issueAt >= 0 && parts[issueAt + 1]) {
+    return parts[issueAt + 1];
+  }
+  return undefined;
 }
 
 function jiraTicketLabel(parsed: URL): string | undefined {

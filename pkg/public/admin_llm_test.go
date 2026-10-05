@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -237,6 +238,108 @@ func TestAdminLLMSettings(t *testing.T) {
 	})
 }
 
+func TestAdminOrganizationCreditBalances(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	creditPath := "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit"
+	balancesPath := creditPath + "/balances"
+	setBalance := func(authCookie string, body map[string]any) *httptest.ResponseRecorder {
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		return execRequest(server, requestParams{
+			method:      "PUT",
+			path:        balancesPath,
+			authCookie:  authCookie,
+			body:        encoded,
+			contentType: "application/json",
+		})
+	}
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-credit-balance@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := setBalance(regularToken, map[string]any{"bucket": "grant", "target_cents": 100})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: regularToken})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("admin sets trial balance and sees the adjustment in history", func(t *testing.T) {
+		response := execRequest(server, requestParams{method: "GET", path: creditPath, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, credit.WelcomeRemainingCents)
+		assert.NotNil(t, credit.WelcomeCreditExpiresAt)
+
+		response = setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             1000,
+			"expected_remaining_cents": credit.WelcomeRemainingCents,
+			"note":                     "support",
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, int64(1000), credit.WelcomeRemainingCents)
+		assert.Equal(t, int64(1000), credit.RemainingCreditCents)
+
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var history struct {
+			Grants []map[string]any `json:"grants"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &history))
+		require.Len(t, history.Grants, 2)
+		latest := history.Grants[0]
+		assert.Equal(t, models.LLMCreditGrantKindTrialAdjustment, latest["kind"])
+		assert.Equal(t, "-4000", latest["amountCents"])
+		assert.Equal(t, "support", latest["note"])
+		assert.NotEmpty(t, latest["actorName"])
+	})
+
+	t.Run("stale expected balance returns 409", func(t *testing.T) {
+		response := setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             2000,
+			"expected_remaining_cents": 5000,
+		})
+		assert.Equal(t, http.StatusConflict, response.Code)
+		assert.Contains(t, response.Body.String(), "The balance changed")
+	})
+
+	t.Run("negative target and unknown credit type return 400", func(t *testing.T) {
+		response := setBalance(token, map[string]any{"bucket": "grant", "target_cents": -100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		response = setBalance(token, map[string]any{"bucket": "included", "target_cents": 100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("target outside the safe cent range returns 400", func(t *testing.T) {
+		response := setBalance(token, map[string]any{
+			"bucket":                   "grant",
+			"target_cents":             math.MaxInt64,
+			"expected_remaining_cents": 0,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		response = setBalance(token, map[string]any{
+			"bucket":                   "grant",
+			"target_cents":             math.MinInt64,
+			"expected_remaining_cents": 0,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		response = execRequest(server, requestParams{method: "GET", path: creditPath, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, int64(0), credit.AdminRemainingCents)
+	})
+}
+
 func TestAdminOrganizationBillingPlan(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
@@ -264,7 +367,10 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
 
-		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
 		require.NoError(t, err)
 		response := execRequest(server, requestParams{
 			method:      "PUT",
@@ -336,7 +442,10 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		require.NoError(t, err)
 		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
 
-		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
 		require.NoError(t, err)
 		response := execRequest(server, requestParams{
 			method:      "PUT",
@@ -347,5 +456,118 @@ func TestAdminOrganizationBillingPlan(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "Cancel or change the subscription in Polar")
+	})
+}
+
+func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("PUT trial rejects a missing end", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "trial end date is required")
+	})
+
+	t.Run("PUT trial rejects an end that is not in the future", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "choose a future date")
+	})
+
+	t.Run("PUT trial stores the end and reopens expired welcome credit", func(t *testing.T) {
+		ended := time.Now().Add(-time.Hour)
+		require.NoError(t, database.Conn().Model(&models.OrganizationLLMCreditGrant{}).
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			Update("expires_at", ended).Error)
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+
+		trialEnd := time.Now().Add(18 * 24 * time.Hour).UTC().Truncate(time.Second)
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": trialEnd.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		require.NotNil(t, plan.TrialEndsAt)
+		parsed, err := time.Parse(time.RFC3339, *plan.TrialEndsAt)
+		require.NoError(t, err)
+		assert.True(t, parsed.Equal(trialEnd))
+
+		var welcome models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&welcome).Error)
+		require.NotNil(t, welcome.ExpiresAt)
+		assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+		assert.Equal(t, before.AmountMicros, welcome.AmountMicros)
+
+		summary, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+	})
+
+	t.Run("PUT business and none ignore trial end", func(t *testing.T) {
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+		ignored := time.Now().Add(90 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+		for _, planName := range []string{"business", "none"} {
+			body, err := json.Marshal(map[string]any{
+				"plan":          planName,
+				"trial_ends_at": ignored,
+			})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method:      "PUT",
+				path:        path,
+				authCookie:  token,
+				body:        body,
+				contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusOK, response.Code, planName)
+
+			var welcome models.OrganizationLLMCreditGrant
+			require.NoError(t, database.Conn().
+				Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+				First(&welcome).Error)
+			require.NotNil(t, welcome.ExpiresAt)
+			require.NotNil(t, before.ExpiresAt)
+			assert.True(t, welcome.ExpiresAt.Equal(*before.ExpiresAt), planName)
+		}
 	})
 }

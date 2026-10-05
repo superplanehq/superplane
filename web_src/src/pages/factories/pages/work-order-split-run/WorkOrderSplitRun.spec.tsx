@@ -1056,6 +1056,7 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
+    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
     await user.click(screen.getByTestId("split-run-check-check-risk-review"));
 
     expect(screen.getByRole("heading", { name: "Blast radius" })).toBeInTheDocument();
@@ -1149,6 +1150,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
     const checks = within(summary).getByTestId("redesign-console-checks");
+    const header = within(checks).getByRole("button", { name: "Merge confidence" });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(within(checks).queryByText("Blast radius")).not.toBeInTheDocument();
+    fireEvent.click(header);
     expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
     expect(within(note).queryByText("Blast radius")).not.toBeInTheDocument();
   });
@@ -1887,7 +1892,12 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-intent-confidence")).not.toBeInTheDocument();
     expect(screen.queryByText(/fit for an agent on this factory line/)).toBeNull();
-    expect(within(screen.getByTestId("redesign-console-summary")).getByText("Blast radius")).toBeInTheDocument();
+    const summary = screen.getByTestId("redesign-console-summary");
+    const header = within(summary).getByRole("button", { name: "Merge confidence" });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(within(summary).queryByText("Blast radius")).not.toBeInTheDocument();
+    fireEvent.click(header);
+    expect(within(summary).getByText("Blast radius")).toBeInTheDocument();
   });
 
   it("shows the console when a GitHub automation created the draft", () => {

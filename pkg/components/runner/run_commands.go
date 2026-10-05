@@ -71,7 +71,7 @@ func (c *Runner) Documentation() string {
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via ` + "`docker exec`" + `. The image must include a usable ` + "`sleep`" + ` (common base images do).
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
@@ -90,17 +90,7 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 
 func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     configurationFieldMachineType,
-			Label:    "Machine type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
-				},
-			},
-		},
+		MachineTypeField(configurationFieldMachineType),
 		{
 			Name:        "execution_mode",
 			Label:       "Execution mode",
@@ -300,9 +290,9 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	cmds := normalizeCommands(spec.Commands)
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
@@ -317,12 +307,12 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := broker.CreateTask(params)
+	taskID, err := client.CreateTask(params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *Runner) Hooks() []core.Hook {

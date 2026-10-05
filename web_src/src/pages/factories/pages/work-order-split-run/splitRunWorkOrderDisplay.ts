@@ -51,14 +51,21 @@ export function elapsedForDisplay(
   }
   const start = Date.parse(order?.createdAt ?? "");
   if (!Number.isFinite(start)) {
-    return status === "running" ? "Running" : "";
+    return elapsedWithoutClock(status);
   }
   const end = status === "running" ? now : Date.parse(order?.updatedAt ?? "") || now;
   const label = formatDuration(Math.max(0, end - start), { precision: "second" });
   if (!label) {
-    return status === "running" ? "Running" : "";
+    return elapsedWithoutClock(status);
   }
   return label;
+}
+
+function elapsedWithoutClock(status: WorkOrderDisplayStatus): string {
+  if (status === "running") {
+    return "Running";
+  }
+  return "";
 }
 
 export function durationForStatus(status: SplitRunPhaseStatus): string {

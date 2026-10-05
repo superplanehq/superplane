@@ -25,6 +25,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { WIZARD_STEPS } from "./onboardingFixtures";
 import { afterOnboardingPath } from "./useFinishOnboarding";
+import { useGitHubInstallationChecks } from "./useGitHubOnboarding";
 import {
   useFirstRunSetupFlow,
   type FirstRunScreen,
@@ -52,6 +53,7 @@ const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
 // The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
+  choose: "connect",
   tickets: "choose",
   agent: "tickets",
 };
@@ -179,9 +181,6 @@ function AgentScreen({
 }
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
-  if (target === "choose") {
-    return () => flow.goToScreen(flow.identityConnected ? "welcome" : "connect");
-  }
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
@@ -213,6 +212,9 @@ function TicketsScreenHost({
       jiraAvailable={flow.jiraAvailable}
       jiraFeatureLoading={flow.jiraFeatureLoading}
       jiraChoiceBlock={flow.jiraChoiceBlock}
+      linearAvailable={flow.linearAvailable}
+      linearFeatureLoading={flow.linearFeatureLoading}
+      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -222,10 +224,18 @@ function TicketsScreenHost({
       jiraProjectsLoading={model.jiraProjectsLoading}
       jiraProjectsError={model.jiraProjectsError}
       jiraProjectId={model.jiraProjectId}
+      linearConnected={model.setup.connected.has("linear")}
+      linearProjects={model.linearProjects}
+      linearProjectsLoading={model.linearProjectsLoading}
+      linearProjectsError={model.linearProjectsError}
+      linearProjectIds={model.linearProjectIds}
       onSelectTicketSource={flow.selectTicketSource}
       onConnectJira={() => void flow.connectJira()}
       onSelectJiraProject={model.setJiraProjectId}
       onRetryJiraProjects={model.retryJiraProjects}
+      onConnectLinear={() => void flow.connectLinear()}
+      onToggleLinearProject={model.toggleLinearProject}
+      onRetryLinearProjects={model.retryLinearProjects}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );
@@ -241,6 +251,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
+  useGitHubInstallationChecks(organizationId, flow.screen === "choose" && !destination);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -321,6 +332,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
         onSelectRepository={setup.selectRepo}
+        onClearRepository={setup.clearRepository}
         onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
         onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
         onGrantAccess={() => void flow.grantGitHubAccess()}

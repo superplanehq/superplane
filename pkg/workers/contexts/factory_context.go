@@ -20,6 +20,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -58,6 +59,9 @@ type FactoryContext struct {
 	// readJiraIssueFiles, when set, supplies Jira files without calling the
 	// Jira API.
 	readJiraIssueFiles jiraFileRead
+	// readLinearIssueFiles, when set, supplies Linear files without calling
+	// the Linear API.
+	readLinearIssueFiles linearFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -186,6 +190,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateLinearWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	merged, err := c.mergeDependabotWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -205,6 +217,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
+	c.recordLinearWebhookTask(order)
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
@@ -386,6 +399,26 @@ func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder)
 	}
 }
 
+func (c *FactoryContext) recordLinearWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := linear.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendLinearWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Linear webhook %s", order.ID, receiptID)
+	}
+}
+
 func (c *FactoryContext) recordDatadogWebhookTask(order *models.FactoryWorkOrder) {
 	if c.execution == nil || order == nil {
 		return
@@ -430,6 +463,7 @@ func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) e
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
 	c.ingestJiraFiles(order)
+	c.ingestLinearFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 

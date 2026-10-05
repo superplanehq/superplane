@@ -167,7 +167,40 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 		r = r2
 	}
 
-	gothic.BeginAuthHandler(w, r)
+	a.beginProviderAuth(w, r)
+}
+
+func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
+	if !requestsGitHubAccountPicker(r) {
+		gothic.BeginAuthHandler(w, r)
+		return
+	}
+
+	authURL, err := gothic.GetAuthURL(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, withGitHubAccountPicker(authURL), http.StatusTemporaryRedirect)
+}
+
+// GitHub otherwise authorizes the active browser account, so a user with
+// several signed-in GitHub accounts cannot choose which one to connect.
+func requestsGitHubAccountPicker(r *http.Request) bool {
+	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+}
+
+func withGitHubAccountPicker(authURL string) string {
+	parsed, err := url.Parse(authURL)
+	if err != nil {
+		return authURL
+	}
+
+	query := parsed.Query()
+	query.Set("prompt", "select_account")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func useRealProviderAuthInDevelopment(r *http.Request) bool {

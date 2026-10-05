@@ -23,11 +23,13 @@ const (
 	MachineTypeE1TinyARM64  = "e1-tiny-arm64"
 )
 
-var machineTypeSelectOptions = []configuration.FieldOption{
-	{Label: "Large x64", Value: MachineTypeE1LargeAMD64},
-	{Label: "Large ARM", Value: MachineTypeE1LargeARM64},
-	{Label: "Small x64", Value: MachineTypeE1TinyAMD64},
-	{Label: "Small ARM", Value: MachineTypeE1TinyARM64},
+func MachineTypeField(name string) configuration.Field {
+	return configuration.Field{
+		Name:     name,
+		Label:    "Machine type",
+		Type:     configuration.FieldTypeRunnerFleet,
+		Required: true,
+	}
 }
 
 func requireMachineType(machineType string) (string, error) {

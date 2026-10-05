@@ -291,7 +291,7 @@ export function SpendingKpiRow({
         testId="spending-kpi-hosted"
       />
       <SpendingKpi
-        label="Your keys spend"
+        label="Bring your own key spend"
         value={metrics.byok}
         hint="Estimated. SuperPlane does not bill this."
         testId="spending-kpi-byok"

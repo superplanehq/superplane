@@ -39,12 +39,12 @@ describe("elapsedForDisplay", () => {
     );
   });
 
-  it("rounds a running multi-day duration the same way as a finished one", () => {
+  it("rounds a running multi-day duration to days and hours", () => {
     const now = Date.parse(START) + LONG_RUN;
     expect(elapsedForDisplay("running", { createdAt: START, updatedAt: START }, now)).toBe("5d 8h");
   });
 
-  it("rounds a finished multi-day duration", () => {
+  it("rounds a finished multi-day duration to days and hours", () => {
     const updatedAt = new Date(Date.parse(START) + LONG_RUN).toISOString();
     expect(elapsedForDisplay("completed", { createdAt: START, updatedAt })).toBe("5d 8h");
   });

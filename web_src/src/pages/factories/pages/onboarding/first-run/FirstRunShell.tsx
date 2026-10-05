@@ -50,7 +50,7 @@ export function FirstRunShell({
             )}
             data-testid="first-run-content"
           >
-            <div className="w-full max-w-lg text-left">
+            <div className="mx-auto w-full max-w-lg text-left">
               {children}
               <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
             </div>

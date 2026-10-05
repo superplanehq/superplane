@@ -115,6 +115,15 @@ describe("firstRunBacklogIntake", () => {
     expect(firstRunBacklogIntake(intakes)?.id).toBe("github-1");
   });
 
+  it("selects the Linear intake when GitHub issues are not present", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" },
+      { id: "linear-1", source: "SOURCE_LINEAR_ISSUES" },
+    ];
+
+    expect(firstRunBacklogIntake(intakes)?.id).toBe("linear-1");
+  });
+
   it("selects the Jira intake when GitHub issues are not present", () => {
     const intakes: FactoriesFactoryIntake[] = [
       { id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" },

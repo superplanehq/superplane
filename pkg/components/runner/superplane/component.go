@@ -69,8 +69,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — an agent turn. Later prompts continue the same session.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
-- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
+- **Machine type**: Runner fleet available to the organization (required).
+- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
@@ -88,7 +88,7 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 
 func (c *RunSuperPlane) Configuration() []configuration.Field {
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.SuperPlaneAgentModelField(),
 		runner.AgentStepsField(
 			"Ordered bash commands and SuperPlane agent prompts. Add, reorder, and mix freely.",
@@ -153,9 +153,9 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
@@ -190,7 +190,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       commands,
 		Files:          files,
@@ -206,7 +206,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		}
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *RunSuperPlane) Hooks() []core.Hook {

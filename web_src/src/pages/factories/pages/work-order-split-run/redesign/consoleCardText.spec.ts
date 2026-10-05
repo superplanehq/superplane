@@ -60,7 +60,7 @@ describe("runMetaLine", () => {
     expect(runMetaLine(stage)).toBe("40m 18s");
   });
 
-  it("shows only the elapsed time while a run is still going", () => {
+  it("shows only the duration while a run is live", () => {
     const stage = { ...runningStage("implement"), status: "running" as const, duration: "10m 56s" };
 
     expect(runMetaLine(stage)).toBe("10m 56s");
@@ -85,7 +85,13 @@ describe("runMetaLine", () => {
     expect(runMetaLine(latest, [earlier, latest])).toBe("<1s");
   });
 
-  it("sums a live run with earlier runs and shows only the total", () => {
+  it("keeps less than a second for a legacy running label", () => {
+    const stage = { ...runningStage("implement"), status: "running" as const, duration: "<1s so far" };
+
+    expect(runMetaLine(stage)).toBe("<1s");
+  });
+
+  it("sums a live run with earlier runs", () => {
     const latest = { ...runningStage("implement"), status: "running" as const, duration: "2m" };
     const earlier = { ...latest, id: "r1", status: "passed" as const, duration: "10m" };
 

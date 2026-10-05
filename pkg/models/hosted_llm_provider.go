@@ -69,6 +69,16 @@ func (p HostedLLMProvider) OffersHostedModels() bool {
 	return p.Enabled || p.HasAllowedModel()
 }
 
+func (p HostedLLMProvider) CanRunHosted() bool {
+	if !p.OffersHostedModels() {
+		return false
+	}
+	if p.Provider != UsageProviderOpenRouter {
+		return true
+	}
+	return p.HasManagementKey()
+}
+
 func (p HostedLLMProvider) AllowsModel(model string) bool {
 	normalized := strings.TrimSpace(model)
 	if normalized == "" {
