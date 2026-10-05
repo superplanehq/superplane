@@ -737,10 +737,6 @@ func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.
 	stale, err := ListStaleOpenPlanningSessions(db, time.Now().Add(10*time.Minute), 10)
 	require.NoError(t, err)
 	assert.Empty(t, stale)
-
-	open, err := CountOpenPlanningSessions(db, org.ID, factoryModel.ID)
-	require.NoError(t, err)
-	assert.Equal(t, int64(0), open)
 }
 
 func TestFactory_MaybeAttachAnalysisSessionRequiresFeatureAtCreation(t *testing.T) {

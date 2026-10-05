@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   workspaceMCPClaudeCodeCommand,
   workspaceMCPClientSnippet,
+  workspaceMCPCodexCommand,
   workspaceMCPCursorConfig,
   workspaceMCPServerURL,
   workspaceMCPVSCodeConfig,
@@ -27,6 +28,13 @@ describe("workspaceMCPClientConfig", () => {
     expect(workspaceMCPClaudeCodeCommand(ORIGIN)).toBe(`claude mcp add --transport http superplane ${URL}`);
   });
 
+  it("builds a Codex add command and strips a trailing slash", () => {
+    expect(workspaceMCPCodexCommand(ORIGIN)).toBe(`codex mcp add superplane --url ${URL}`);
+    expect(workspaceMCPCodexCommand("https://app.example.com/")).toBe(
+      "codex mcp add superplane --url https://app.example.com/mcp",
+    );
+  });
+
   it("builds a VS Code mcp.json snippet", () => {
     expect(workspaceMCPVSCodeConfig(ORIGIN)).toBe(
       JSON.stringify({ servers: { superplane: { type: "http", url: URL } } }, null, 2),
@@ -37,5 +45,6 @@ describe("workspaceMCPClientConfig", () => {
     expect(workspaceMCPClientSnippet("cursor", ORIGIN)).toBe(workspaceMCPCursorConfig(ORIGIN));
     expect(workspaceMCPClientSnippet("claudeCode", ORIGIN)).toBe(workspaceMCPClaudeCodeCommand(ORIGIN));
     expect(workspaceMCPClientSnippet("vscode", ORIGIN)).toBe(workspaceMCPVSCodeConfig(ORIGIN));
+    expect(workspaceMCPClientSnippet("codex", ORIGIN)).toBe(workspaceMCPCodexCommand(ORIGIN));
   });
 });
