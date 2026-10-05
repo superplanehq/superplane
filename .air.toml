@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/superplane cmd/server/main.go"
+cmd = "go build -tags licensedev -o ./tmp/superplane cmd/server/main.go"
 bin = "tmp/superplane"
 # Debounce rebuilds when many files change at once (avoids racing builds / missing binary).
 delay = 500

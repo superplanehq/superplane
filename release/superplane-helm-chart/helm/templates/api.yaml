@@ -151,11 +151,20 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
+{{- if .Values.license.secretName }}
+            - name: SUPERPLANE_LICENSE_PATH
+              value: /app/license/license.jws
+{{- end }}
 
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
+{{- if .Values.license.secretName }}
+            - name: license
+              mountPath: /app/license
+              readOnly: true
+{{- end }}
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
@@ -194,6 +203,14 @@ spec:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
+{{- if .Values.license.secretName }}
+        - name: license
+          secret:
+            secretName: {{ .Values.license.secretName }}
+            items:
+              - key: {{ .Values.license.secretKey }}
+                path: license.jws
+{{- end }}
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
