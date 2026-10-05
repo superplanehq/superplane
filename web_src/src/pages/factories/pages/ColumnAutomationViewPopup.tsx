@@ -236,6 +236,7 @@ function ColumnAutomationViewBody({
         organizationId={agent.organizationId}
         factoryId={agent.factoryId}
         factoryKey={agent.factoryKey}
+        automationId={agent.automationId}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -311,6 +312,7 @@ export function ColumnAutomationViewHost({
               organizationId,
               factoryId,
               factoryKey,
+              automationId: canvasId,
               onSave: agent.save,
               showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
