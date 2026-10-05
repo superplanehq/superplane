@@ -65,6 +65,7 @@ export type IntentAnalysisChat = {
   /** Set when backlog analysis stopped because hosted credit is gone. */
   creditVerdict?: ComposerCreditVerdict;
   prioritizeImplementation?: boolean;
+  startDiscouraged?: boolean;
   closedDecision?: ReactNode;
   /** Model selection applies to implementation, separately from the plan. */
   modelSelect?: ReactNode;
@@ -137,6 +138,17 @@ function AnalysisRequestChat({
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
   const composer = usePlanningComposer(analysis, images.pending.length);
+  const implementation = (
+    <PlanningImplementationControls
+      inline={composer.collapsed}
+      startDiscouraged={analysis.startDiscouraged}
+      modelSelect={analysis.modelSelect}
+      actions={analysis.closedDecision}
+      canSend={analysis.canSend}
+      showSuggestChanges={composer.collapsed}
+      onSuggestChanges={composer.expand}
+    />
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -178,6 +190,7 @@ function AnalysisRequestChat({
               onToggle={analysis.onTogglePlan}
               creditVerdict={analysis.creditVerdict}
             />
+            {composer.collapsed ? implementation : null}
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey
                 survey={analysis.view.survey}
@@ -211,13 +224,7 @@ function AnalysisRequestChat({
           {analysis.composerError}
         </p>
       ) : null}
-      <PlanningImplementationControls
-        modelSelect={analysis.modelSelect}
-        actions={analysis.closedDecision}
-        canSend={analysis.canSend}
-        showSuggestChanges={composer.collapsed && !state.showSurvey}
-        onSuggestChanges={composer.expand}
-      />
+      {!composer.collapsed ? implementation : null}
     </div>
   );
 }
