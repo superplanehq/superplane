@@ -20,6 +20,8 @@
 
 ## About
 
+hello world
+
 **Open source factory for one-shot engineering.**
 
 SuperPlane turns high-confidence backlog issues into verified, review-ready
