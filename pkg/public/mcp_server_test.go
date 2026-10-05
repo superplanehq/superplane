@@ -391,3 +391,101 @@ func TestMCPUnauthenticatedGETReturns401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }
+
+func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "OpenCode", "", "OPC")
+	require.NoError(t, err)
+
+	registered := "http://127.0.0.1/callback"
+	requested := "http://127.0.0.1:52291/callback"
+	regReq := httptest.NewRequest(http.MethodPost, "/oauth/register", strings.NewReader(
+		`{"client_name":"OpenCode","redirect_uris":["`+registered+`"]}`,
+	))
+	regReq.Host = "localhost:8000"
+	regReq.Header.Set("Content-Type", "application/json")
+	regRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(regRec, regReq)
+	require.Equal(t, http.StatusCreated, regRec.Code)
+	var registeredClient struct {
+		ClientID string `json:"client_id"`
+	}
+	require.NoError(t, json.Unmarshal(regRec.Body.Bytes(), &registeredClient))
+	require.NotEmpty(t, registeredClient.ClientID)
+
+	query := url.Values{}
+	query.Set("client_id", registeredClient.ClientID)
+	query.Set("redirect_uri", requested)
+	query.Set("response_type", "code")
+	query.Set("code_challenge", mcp.S256Challenge(mcpTestPKCEVerifier))
+	query.Set("code_challenge_method", "S256")
+	query.Set("state", "state-1")
+	authReq := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	authReq.Host = "localhost:8000"
+	authReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	authRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(authRec, authReq)
+	require.Equal(t, http.StatusOK, authRec.Code)
+	consent := mcpConsentToken(t, authRec.Body.String())
+
+	form := url.Values{}
+	form.Set("consent", consent)
+	form.Set("factory_id", factory.ID.String())
+	postReq := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
+	postReq.Host = "localhost:8000"
+	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	postRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(postRec, postReq)
+	require.Equal(t, http.StatusFound, postRec.Code)
+	location, err := url.Parse(postRec.Header().Get("Location"))
+	require.NoError(t, err)
+	require.Equal(t, "127.0.0.1:52291", location.Host)
+	require.Equal(t, "/callback", location.EscapedPath())
+	require.Equal(t, "state-1", location.Query().Get("state"))
+	code := location.Query().Get("code")
+	require.NotEmpty(t, code)
+
+	rejected := exchangeMCPCode(server, code, registeredClient.ClientID, registered)
+	require.Equal(t, http.StatusBadRequest, rejected.Code)
+	require.Contains(t, rejected.Body.String(), "invalid_grant")
+
+	accepted := exchangeMCPCode(server, code, registeredClient.ClientID, requested)
+	require.Equal(t, http.StatusOK, accepted.Code)
+	var tokenBody map[string]any
+	require.NoError(t, json.Unmarshal(accepted.Body.Bytes(), &tokenBody))
+	require.NotEmpty(t, tokenBody["access_token"])
+	require.NotEmpty(t, tokenBody["refresh_token"])
+}
+
+func exchangeMCPCode(server *Server, code, clientID, redirectURI string) *httptest.ResponseRecorder {
+	values := url.Values{}
+	values.Set("grant_type", "authorization_code")
+	values.Set("code", code)
+	values.Set("code_verifier", mcpTestPKCEVerifier)
+	values.Set("client_id", clientID)
+	values.Set("redirect_uri", redirectURI)
+	values.Set("resource", "http://localhost:8000/mcp")
+	req := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(values.Encode()))
+	req.Host = "localhost:8000"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	return rec
+}
+
+func mcpConsentToken(t *testing.T, page string) string {
+	t.Helper()
+	const marker = `name="consent" value="`
+	start := strings.Index(page, marker)
+	require.NotEqual(t, -1, start)
+	rest := page[start+len(marker):]
+	end := strings.Index(rest, `"`)
+	require.NotEqual(t, -1, end)
+	token := rest[:end]
+	require.NotEmpty(t, token)
+	return token
+}

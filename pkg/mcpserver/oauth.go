@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -143,7 +144,95 @@ func redirectAllowed(client *Client, uri string) bool {
 	if slices.Contains(CursorRedirectURIs, uri) {
 		return true
 	}
-	return slices.Contains(client.RedirectURIs, uri)
+	if slices.Contains(client.RedirectURIs, uri) {
+		return true
+	}
+	return ephemeralLoopbackRedirectAllowed(client.RedirectURIs, uri)
+}
+
+func ephemeralLoopbackRedirectAllowed(registered []string, requested string) bool {
+	requestedRedirect, ok := parseLoopbackHTTPRedirect(requested)
+	if !ok {
+		return false
+	}
+	for _, candidate := range registered {
+		if slices.Contains(CursorRedirectURIs, candidate) {
+			continue
+		}
+		registeredRedirect, ok := parseLoopbackHTTPRedirect(candidate)
+		if !ok {
+			continue
+		}
+		if requestedRedirect == registeredRedirect {
+			return true
+		}
+	}
+	return false
+}
+
+type loopbackHTTPRedirect struct {
+	host  string
+	path  string
+	query string
+}
+
+func parseLoopbackHTTPRedirect(raw string) (loopbackHTTPRedirect, bool) {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
+		return loopbackHTTPRedirect{}, false
+	}
+	if parsed.User != nil || redirectHasFragment(raw, parsed) {
+		return loopbackHTTPRedirect{}, false
+	}
+	host := parsed.Hostname()
+	if !exactLoopbackHostname(host) || !numericOrDefaultHTTPPort(parsed.Host) {
+		return loopbackHTTPRedirect{}, false
+	}
+	return loopbackHTTPRedirect{
+		host:  strings.ToLower(host),
+		path:  parsed.EscapedPath(),
+		query: parsed.RawQuery,
+	}, true
+}
+
+func redirectHasFragment(raw string, parsed *url.URL) bool {
+	return parsed.Fragment != "" || parsed.RawFragment != "" || strings.Contains(raw, "#")
+}
+
+func exactLoopbackHostname(host string) bool {
+	switch strings.ToLower(host) {
+	case "127.0.0.1", "::1", "localhost":
+		return true
+	default:
+		return false
+	}
+}
+
+func numericOrDefaultHTTPPort(host string) bool {
+	_, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return hostHasNoPort(host)
+	}
+	return allDigits(port)
+}
+
+func hostHasNoPort(host string) bool {
+	if strings.HasPrefix(host, "[") {
+		return strings.HasSuffix(host, "]")
+	}
+	return host != "" && !strings.Contains(host, ":")
+}
+
+func allDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func fetchClientMetadata(ctx context.Context, httpClient mcp.HTTPDoer, metadataURL string) (*Client, *OAuthError) {
