@@ -11,10 +11,9 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 import { Workflow } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
-import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
@@ -84,18 +83,12 @@ export function PlanningReviewEditor({
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const agentNodeId = draft.components[0]?.id;
-  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
-  const loadRestorePrompt = useCallback(() => {
-    if (!organizationId || !factoryId || !automationId || !agentNodeId) {
-      return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));
-    }
-    return loadDefaultAgentPrompt({ organizationId, factoryId, automationId, agentNodeId });
-  }, [agentNodeId, automationId, factoryId, organizationId]);
   const restore = useRestoreDefaultPrompt({
     draft,
     setDraft,
-    onRestoreDefaultPrompt: restoreEnabled ? loadRestorePrompt : undefined,
+    organizationId,
+    factoryId,
+    automationId,
   });
   const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 

@@ -116,8 +116,8 @@ function defaultSteps(prompt: string): PlanningReviewStep[] {
 }
 
 function deferredSteps() {
-  let resolve: (steps: PlanningReviewStep[] | null) => void = () => undefined;
-  const promise = new Promise<PlanningReviewStep[] | null>((settle) => {
+  let resolve: (steps: PlanningReviewStep[]) => void = () => undefined;
+  const promise = new Promise<PlanningReviewStep[]>((settle) => {
     resolve = settle;
   });
   return { promise, resolve };
@@ -242,7 +242,7 @@ describe("PlanningReviewEditor restore default prompt", () => {
     await waitFor(() => expect(screen.getByTestId("planning-review-save")).toBeDisabled());
     expect(onSave).not.toHaveBeenCalled();
 
-    confirmLoad.resolve(null);
+    confirmLoad.resolve([]);
     expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-save")).toBeEnabled();
 

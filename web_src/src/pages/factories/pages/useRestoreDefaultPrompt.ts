@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -8,17 +8,31 @@ import {
   applyDefaultAgentPrompts,
   RESTORE_DEFAULT_PROMPT_COPY,
 } from "../lib/defaultAgentPrompt";
+import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
 export function useRestoreDefaultPrompt({
   draft,
   setDraft,
-  onRestoreDefaultPrompt,
+  organizationId,
+  factoryId,
+  automationId,
 }: {
   draft: PlanningReviewDraft;
   setDraft: Dispatch<SetStateAction<PlanningReviewDraft>>;
-  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep[] | null>;
+  organizationId?: string;
+  factoryId?: string;
+  automationId?: string;
 }) {
+  const agentNodeId = draft.components[0]?.id;
+  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const loadRestorePrompt = useCallback(() => {
+    if (!organizationId || !factoryId || !automationId || !agentNodeId) {
+      return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));
+    }
+    return loadDefaultAgentPrompt({ organizationId, factoryId, automationId, agentNodeId });
+  }, [agentNodeId, automationId, factoryId, organizationId]);
+  const onRestoreDefaultPrompt = restoreEnabled ? loadRestorePrompt : undefined;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [defaultSteps, setDefaultSteps] = useState<PlanningReviewStep[] | null>(null);
