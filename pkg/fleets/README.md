@@ -35,10 +35,20 @@ AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
 from this layout:
 
 ```text
-<runnerReleaseBaseUrl>/<version>/runner-linux-amd64.tar.gz
-<runnerReleaseBaseUrl>/<version>/runner-linux-arm64.tar.gz
-<runnerReleaseBaseUrl>/<version>/checksums.txt
+<runnerReleaseBaseUrl>/<release-id>/runner-linux-amd64.tar.gz
+<runnerReleaseBaseUrl>/<release-id>/runner-linux-arm64.tar.gz
+<runnerReleaseBaseUrl>/<release-id>/checksums.txt
 ```
+
+Set the fleet's `runnerVersion` to an immutable release ID. Supported IDs are
+`sha:<40-character-lowercase-git-sha>` and `v<semantic-version>`, for example
+`sha:0123456789abcdef0123456789abcdef01234567` or `v1.2.3`.
+SHA builds require a clean checkout whose `HEAD` matches the release ID, and
+the uploader resumes partial SHA releases only after hashing the existing
+object bytes and verifying that they match the local artifacts. A published
+`checksums.txt` marks the release complete and prevents later uploads.
+SHA uploads require an AWS CLI v2 release that supports
+`s3api put-object --if-none-match`.
 
 Each archive contains the runner binary and `install.sh`. Fleet Manager reads
 the selected archive checksum from `checksums.txt`. AWS bootstrap downloads

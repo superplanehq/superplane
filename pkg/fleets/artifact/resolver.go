@@ -16,7 +16,9 @@ import (
 
 const maxChecksumsBytes = 1 << 20
 
-var exactVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
+var exactVersionPattern = regexp.MustCompile(
+	`^(?:sha:[0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$`,
+)
 
 type Artifact struct {
 	Version         string
@@ -67,7 +69,10 @@ func (r *Resolver) Resolve(
 	operatingSystem = strings.ToLower(strings.TrimSpace(operatingSystem))
 	architecture = strings.ToLower(strings.TrimSpace(architecture))
 	if !exactVersionPattern.MatchString(version) {
-		return Artifact{}, fmt.Errorf("runner version %q is not an exact semantic version", version)
+		return Artifact{}, fmt.Errorf(
+			"runner version %q must be a v-prefixed semantic version or sha:<40 lowercase hex characters>",
+			version,
+		)
 	}
 	filename, err := artifactFilename(operatingSystem, architecture)
 	if err != nil {
