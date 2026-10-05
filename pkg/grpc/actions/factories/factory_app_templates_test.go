@@ -574,6 +574,11 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, refinement.Configuration["credentials"])
+	prompt := implementationStep(t, refinement, "Refine Task")
+	text, ok := prompt["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, text, runner.PlanningSessionUserPromptMarkdown())
+	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
 }
 
 func agentPrompt(t *testing.T, agent *yaml.Node) string {
