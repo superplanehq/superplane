@@ -22,11 +22,14 @@ apt-get install -qy --no-install-recommends \
   bash \
   build-essential \
   ca-certificates \
+  cmake \
   coreutils \
   curl \
+  ffmpeg \
   git \
   gnupg \
   jq \
+  libgomp1 \
   lsb-release \
   make \
   openssl \
@@ -93,6 +96,12 @@ export PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 playwright install --with-deps chromium
 chmod -R a+rX "${PLAYWRIGHT_BROWSERS_PATH}"
 
+# Playwright and the global npm installs leave large caches. Remove them before
+# the AWS CLI archive is unpacked to keep the image bake below its disk limit.
+npm cache clean --force
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
 aws_architecture="x86_64"
 if [ "${architecture}" = "arm64" ]; then
   aws_architecture="aarch64"
@@ -125,6 +134,8 @@ codex --version
 playwright --version
 aws --version
 
+ffmpeg -version >/dev/null
+ffprobe -version >/dev/null
 PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
   playwright screenshot about:blank /tmp/playwright-smoke.png
 test -s /tmp/playwright-smoke.png
