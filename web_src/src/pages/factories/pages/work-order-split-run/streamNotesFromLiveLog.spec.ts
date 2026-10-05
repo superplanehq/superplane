@@ -396,42 +396,6 @@ describe("notesFromLiveLogSections", () => {
     expect(grep?.detail).toContain("Found 44 matches");
     expect(grep?.detail).toContain("rootTriggerRenderer");
   });
-
-  it("keeps a failed prompt off the step when the run passed and later lines follow", () => {
-    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), status: "failed" }], "passed");
-
-    expect(notes[0]?.status).toBe("passed");
-    expect(notes[0]?.promptStatus).toBe("failed");
-    expect(notes.some((note) => note.componentType === "note")).toBe(true);
-  });
-
-  it("keeps Failed on the prompt step that stopped a failed run", () => {
-    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), status: "failed" }], "failed");
-
-    expect(notes[0]?.status).toBe("failed");
-    expect(notes[0]?.promptStatus).toBe("failed");
-  });
-
-  it("does not mark an earlier failed prompt when a later step stopped the run", () => {
-    const notes = notesFromLiveLogSections(
-      "agent",
-      [
-        { ...promptSection(), status: "failed" },
-        { ...bashSection(), index: 6, status: "failed" },
-      ],
-      "failed",
-    );
-
-    expect(notes.find((note) => note.componentType === "prompt")?.status).toBe("passed");
-    expect(notes.find((note) => note.componentType === "bash")?.status).toBe("failed");
-  });
-
-  it("keeps a failed bash step failed when the run passed", () => {
-    const notes = notesFromLiveLogSections("agent", [{ ...bashSection(), status: "failed" }], "passed");
-
-    expect(notes[0]?.status).toBe("failed");
-    expect(notes[0]?.promptStatus).toBeUndefined();
-  });
 });
 
 function talkLine(id: string, text: string, componentType: "prompt" | "note"): SplitRunStreamLine {

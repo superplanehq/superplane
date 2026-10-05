@@ -51,7 +51,16 @@ export function notesFromLiveLogSections(
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    notes.push(noteFromCommandSection(nodeId, stepId, orderKey, section, sections, runStatus));
+    notes.push(
+      noteFromCommandSection({
+        nodeId,
+        stepId,
+        orderKey,
+        section,
+        sections,
+        runStatus,
+      }),
+    );
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
@@ -96,14 +105,15 @@ function sectionStoppedTheRun(section: CommandSection, sections: CommandSection[
   return visible.at(-1) === section;
 }
 
-function noteFromCommandSection(
-  nodeId: string,
-  stepId: string,
-  orderKey: number | undefined,
-  section: CommandSection,
-  sections: CommandSection[],
-  runStatus?: SplitRunPhaseStatus,
-): SplitRunStreamLine {
+function noteFromCommandSection(input: {
+  nodeId: string;
+  stepId: string;
+  orderKey: number | undefined;
+  section: CommandSection;
+  sections: CommandSection[];
+  runStatus?: SplitRunPhaseStatus;
+}): SplitRunStreamLine {
+  const { nodeId, stepId, orderKey, section, sections, runStatus } = input;
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
   const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);

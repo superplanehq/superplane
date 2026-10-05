@@ -333,11 +333,14 @@ function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {
  * its transcript steps in its place. Any other node is one `node` step.
  */
 function runSteps(nodes: StreamNodeGroup[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
-  const steps = nodes.flatMap((node) => {
+  return applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+}
+
+function flattenRunSteps(nodes: StreamNodeGroup[]): AgentStep[] {
+  return nodes.flatMap((node) => {
     const transcript = groupClaudeSteps(node.notes).map(agentStepFromGroup);
     return transcript.length > 0 ? transcript : [nodeStep(node)];
   });
-  return applyPromptStepRunStatus(steps, runStatus);
 }
 
 function nodeStep({ line }: StreamNodeGroup): AgentStep {
@@ -355,13 +358,20 @@ function nodeStep({ line }: StreamNodeGroup): AgentStep {
   };
 }
 
-export function agentStepsFromNotes(notes: SplitRunStreamLine[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
+export function agentStepsFromNotes(
+  notes: SplitRunStreamLine[],
+  runStatus?: SplitRunPhaseStatus,
+  canvasLines?: SplitRunStreamLine[],
+): AgentStep[] {
   const steps = groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
-  return applyPromptStepRunStatus(steps, runStatus);
+  return applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
 }
 
-function applyPromptStepRunStatus(steps: AgentStep[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
-  const stoppedIndex = lastAgentStepIndex(steps);
+function applyPromptStepRunStatus(
+  steps: AgentStep[],
+  runStatus?: SplitRunPhaseStatus,
+  stoppedIndex = stoppingStepIndex(steps),
+): AgentStep[] {
   return steps.map((step, index) => {
     if (step.type !== "prompt") {
       return step;
@@ -384,10 +394,33 @@ function applyPromptStepRunStatus(steps: AgentStep[], runStatus?: SplitRunPhaseS
   });
 }
 
-function lastAgentStepIndex(steps: AgentStep[]): number {
+function stoppingIndexForTranscript(
+  notes: SplitRunStreamLine[],
+  transcript: AgentStep[],
+  canvasLines?: SplitRunStreamLine[],
+): number {
+  const lines = canvasLines ? mergeCanvasLines(canvasLines, notes) : notes;
+  const nodes = groupSplitRunStream(lines);
+  if (nodes.length === 0) {
+    return stoppingStepIndex(transcript);
+  }
+  const run = flattenRunSteps(nodes);
+  const stopped = run[stoppingStepIndex(run)];
+  if (stopped?.type === "node") {
+    return -1;
+  }
+  return stoppingStepIndex(transcript);
+}
+
+function mergeCanvasLines(canvasLines: SplitRunStreamLine[], notes: SplitRunStreamLine[]): SplitRunStreamLine[] {
+  const seen = new Set(canvasLines.map((line) => line.id));
+  return [...canvasLines, ...notes.filter((line) => !seen.has(line.id))];
+}
+
+function stoppingStepIndex(steps: AgentStep[]): number {
   for (let index = steps.length - 1; index >= 0; index -= 1) {
     const type = steps[index]?.type;
-    if (type === "prompt" || type === "bash") {
+    if (type === "prompt" || type === "bash" || type === "node") {
       return index;
     }
   }
