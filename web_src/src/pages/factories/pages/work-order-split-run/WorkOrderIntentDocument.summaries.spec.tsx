@@ -80,9 +80,9 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
     expect(screen.queryByText("Review before you start")).not.toBeInTheDocument();
     const implementation = screen.getByRole("region", { name: "Implementation" });
-    const start = within(implementation).getByRole("button", { name: "Start" });
-    expect(start).toBeEnabled();
-    expect(start).not.toHaveClass("bg-primary");
+    expect(within(implementation).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(within(implementation).queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
+    expect(within(implementation).getByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
     expect(implementation).toHaveTextContent("Starting not recommended");
     expect(within(plan).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: /Which customers/ }), "Only paying customers");
@@ -232,18 +232,28 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
   });
 
-  it("quiets Start to an outline when the verdict warns, but keeps it enabled", () => {
+  it("reveals discouraged implementation options without starting and can hide them again", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
         clarity={HIGH_CLARITY}
         confidence={{ ...HIGH_CONFIDENCE, score: 2 }}
-        resultFooter={<SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} compact />}
-        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
+        resultFooter={
+          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
+        }
+        analysis={analysisChat({ view: WAITING_WITH_PLAN, modelSelect: <button type="button">Model: Auto</button> })}
       />,
     );
 
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Override" }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hide options" })).toHaveAttribute("aria-expanded", "true");
     const start = screen.getByRole("button", { name: "Start" });
     expect(start).not.toHaveClass("bg-primary");
     expect(start).toHaveClass("border");
@@ -255,6 +265,12 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByTestId("split-run-intent-settings")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide options" }));
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Override" }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
   });
 
   it("peeks a score summary on hover and pins it on click", async () => {
