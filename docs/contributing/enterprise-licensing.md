@@ -3,7 +3,8 @@
 SuperPlane is one binary. An installation runs in Community mode until an
 installation administrator installs a valid Enterprise license. The license
 enables Enterprise features at runtime. SuperPlane verifies the license
-offline. It never contacts the issuer.
+offline. It downloads signed updates to its trusted keys and keeps working
+without them.
 
 ## License sources
 
@@ -24,6 +25,11 @@ keys or license files.
 
 ## Trusted keys
 
-`pkg/licensing/trustedkeys/production.jwks.json` contains the public keys that
-SuperPlane trusts. Change it only in a reviewed pull request, and run
-`make check.license.keys` before a release. Never reuse a key ID.
+`pkg/licensing/trustedkeys/root.jwks.json` contains the root public keys. They
+sign the list of license signing keys, which SuperPlane downloads every six
+hours and when a license uses an unknown key. Set
+`SUPERPLANE_LICENSE_KEYS_URL=none` to turn downloads off.
+
+`pkg/licensing/trustedkeys/license-keys.jws` is the list at release time. Run
+`make license.keys.update` before a release. Change root keys only in a
+reviewed pull request.

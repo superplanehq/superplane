@@ -387,6 +387,6 @@ func TestVerificationWorksWithoutNetwork(t *testing.T) {
 	require.NoError(t, service.Refresh(context.Background()))
 	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
 
-	_, err := licensing.ProductionKeySet()
+	_, err := licensing.TrustedKeyStore(nil)
 	require.NoError(t, err)
 }

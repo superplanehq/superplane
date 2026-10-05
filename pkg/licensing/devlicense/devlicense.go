@@ -6,7 +6,6 @@ package devlicense
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -24,28 +23,24 @@ func Enabled() bool {
 	return os.Getenv(EnterpriseEnv) == "true"
 }
 
-// Wrap trusts a signing key that exists only in this process and returns a
-// source that supplies a license for every recognized feature when no license
-// is installed. An installed license has priority. A license file stays the
-// only source, so the function does not change a file source.
-func Wrap(keys *licensing.KeySet, source licensing.Source) (*licensing.KeySet, licensing.Source, error) {
+// Wrap returns a signing key that exists only in this process, to trust in
+// addition to the issuer keys, and a source that supplies a license for every
+// recognized feature when no license is installed. An installed license has
+// priority. A license file stays the only source, so the function returns no
+// key and does not change a file source.
+func Wrap(source licensing.Source) (*licensing.KeySet, licensing.Source) {
 	writable, ok := source.(licensing.WritableSource)
 	if !ok {
 		log.Infof("Licensing: %s is ignored because a license file is configured", EnterpriseEnv)
-		return keys, source, nil
+		return nil, source
 	}
 
 	issuer := licensingtest.NewIssuer(keyID)
-	merged, err := keys.Merge(licensingtest.KeySet(issuer))
-	if err != nil {
-		return nil, nil, fmt.Errorf("trust development license key: %w", err)
-	}
-
 	log.Warn("Licensing: development build grants every Enterprise feature when no license is installed. Do not use this build in production.")
-	return merged, &developmentSource{
+	return licensingtest.KeySet(issuer), &developmentSource{
 		WritableSource: writable,
 		license:        issuer.License(licensing.RecognizedFeatures()...),
-	}, nil
+	}
 }
 
 type developmentSource struct {
