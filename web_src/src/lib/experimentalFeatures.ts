@@ -45,3 +45,6 @@ export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
 
 /** Organization experimental feature: mobile workspace shell on phone-width screens. */
 export const FEATURE_MOBILE_FACTORY_BOARD = "mobile_factory_board";
+
+/** Organization experimental feature: new task planning review UI. */
+export const FEATURE_TASK_PLANNING_REVIEW = "task_planning_review";

@@ -1,3 +1,4 @@
+import { FEATURE_TASK_PLANNING_REVIEW } from "@/lib/experimentalFeatures";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -29,8 +30,15 @@ const meta = {
     docs: {
       description: {
         component:
-          "Current task popup for issues #7834 and #7837. Compare pending questions, a free-text request, and a ready plan. These stories preserve current behavior for design review. The Plan control, score details, model menu, and survey use the application components and fixture API.",
+          "Current task popup for issues #7834 and #7837. Compare pending questions, a free-text request, and a ready plan. The planningReviewEnabled control switches the organization feature flag to compare the original and new UI.",
       },
+    },
+  },
+  args: { planningReviewEnabled: true },
+  argTypes: {
+    planningReviewEnabled: {
+      control: "boolean",
+      description: "Enable Task Planning Review for the fixture organization",
     },
   },
   render: (args) => (
@@ -39,9 +47,10 @@ const meta = {
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_FACTORY_LINES[0].id}`}
       factoriesFixture={taskPlanningReviewFixture(args)}
       appFixture={planningCanvasFixture}
+      experimentalFeatures={args.planningReviewEnabled ? [FEATURE_TASK_PLANNING_REVIEW] : []}
     />
   ),
-} satisfies Meta<TaskPlanningReviewOptions>;
+} satisfies Meta<TaskPlanningReviewOptions & { planningReviewEnabled: boolean }>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -79,4 +88,14 @@ export const LowClarityQuestions: Story = {
 export const UpdatingPlan: Story = {
   name: "Updating a plan with previous scores",
   args: { confidence: 2, response: "updating" },
+};
+
+export const OriginalReadyPlan: Story = {
+  name: "Original UI — ready plan (flag off)",
+  args: { confidence: 4, response: "ready", planningReviewEnabled: false },
+};
+
+export const OriginalLowConfidenceQuestions: Story = {
+  name: "Original UI — pending questions (flag off)",
+  args: { confidence: 2, response: "questions", planningReviewEnabled: false },
 };

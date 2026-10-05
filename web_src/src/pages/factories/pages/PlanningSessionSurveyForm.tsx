@@ -11,9 +11,11 @@ import { formatPlanningSurveyReply } from "./planningSessionSurvey";
 export function PlanningSessionSurveyForm({
   survey,
   onSubmit,
+  nextVariant = "ghost",
 }: {
   survey: CreateWithAgentSurvey;
   onSubmit: (text: string) => void;
+  nextVariant?: "default" | "ghost";
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Array<string | null>>(() => survey.questions.map(() => null));
@@ -100,6 +102,7 @@ export function PlanningSessionSurveyForm({
           </div>
         </div>
         <SurveyFormPager
+          nextVariant={nextVariant}
           questionCount={questionCount}
           isFirst={isFirst}
           isLast={isLast}
@@ -150,6 +153,7 @@ function handleSurveyEnter(
 }
 
 function SurveyFormPager({
+  nextVariant,
   questionCount,
   isFirst,
   isLast,
@@ -158,6 +162,7 @@ function SurveyFormPager({
   onNext,
   onSend,
 }: {
+  nextVariant: "default" | "ghost";
   questionCount: number;
   isFirst: boolean;
   isLast: boolean;
@@ -211,9 +216,9 @@ function SurveyFormPager({
       ) : (
         <Button
           type="button"
-          variant="ghost"
+          variant={nextVariant}
           size="sm"
-          className="h-8 text-[13px] text-muted-foreground"
+          className={cn("h-8 text-[13px]", nextVariant === "ghost" && "text-muted-foreground")}
           onClick={onNext}
         >
           {CREATE_WITH_AGENT_COPY.nextQuestion}
