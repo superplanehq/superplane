@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -197,7 +198,8 @@ func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, no
 // AdjustOrganizationLLMCreditBalance appends a signed adjustment row so the
 // remaining balance of one credit type equals the target. It returns nil when
 // the balance already equals the target. An open non-Polar Trial with no live
-// welcome grant receives a welcome grant instead of an adjustment.
+// welcome grant receives a welcome grant sized so remaining trial credit equals
+// the target after hosted usage is charged to that grant.
 func AdjustOrganizationLLMCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdjustment) (*OrganizationLLMCreditGrant, error) {
 	kind, ok := creditAdjustmentKindForBucket(adjustment.Bucket)
 	if !ok {
@@ -308,12 +310,10 @@ func adjustTrialCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdjustment, s
 	if err := SetWelcomeGrantExpiresAt(tx, adjustment.OrganizationID, endsAt); err != nil {
 		return nil, err
 	}
-
-	restored, err := welcomeRemainingMicros(tx, adjustment.OrganizationID)
+	delta, err := trialCreditDeltaForTarget(tx, adjustment.OrganizationID, adjustment.TargetMicros, now)
 	if err != nil {
 		return nil, err
 	}
-	delta := adjustment.TargetMicros - restored
 	if delta == 0 {
 		return nil, nil
 	}
@@ -324,13 +324,20 @@ func insertOpenTrialWelcomeGrant(tx *gorm.DB, adjustment CreditBalanceAdjustment
 	if adjustment.TargetMicros <= 0 {
 		return nil, nil
 	}
+	amount, err := trialCreditDeltaForTarget(tx, adjustment.OrganizationID, adjustment.TargetMicros, now)
+	if err != nil {
+		return nil, err
+	}
+	if amount <= 0 {
+		return nil, nil
+	}
 
 	endsAt := expiresAt.UTC()
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: adjustment.OrganizationID,
 		Kind:           LLMCreditGrantKindWelcome,
-		AmountMicros:   adjustment.TargetMicros,
+		AmountMicros:   amount,
 		Note:           strings.TrimSpace(adjustment.Note),
 		ActorAccountID: adjustment.ActorAccountID,
 		CreatedAt:      now,
@@ -359,12 +366,43 @@ func insertCreditAdjustment(tx *gorm.DB, adjustment CreditBalanceAdjustment, kin
 	return &grant, nil
 }
 
-func welcomeRemainingMicros(tx *gorm.DB, orgID uuid.UUID) (int64, error) {
-	summary, err := DescribeOrganizationLLMCredit(tx, orgID)
+func trialCreditDeltaForTarget(tx *gorm.DB, orgID uuid.UUID, target int64, now time.Time) (int64, error) {
+	grants, err := ListOrganizationLLMCreditGrants(tx, orgID)
 	if err != nil {
 		return 0, err
 	}
-	return summary.WelcomeRemainingMicros, nil
+	billed, err := sumHostedBilledMicros(tx, orgID, nil)
+	if err != nil {
+		return 0, err
+	}
+	billedAtOrBefore, err := billedMicrosAtExpiredGrants(tx, orgID, grants, now)
+	if err != nil {
+		return 0, err
+	}
+
+	needed, ok := checkedAddMicros(target, liveHostedSpendMicros(grants, billed, billedAtOrBefore, now))
+	if !ok {
+		return 0, fmt.Errorf("trial credit amount is too large")
+	}
+	delta, ok := checkedSubMicros(needed, liveWelcomeCapacityMicros(grants, now))
+	if !ok {
+		return 0, fmt.Errorf("trial credit amount is too large")
+	}
+	return delta, nil
+}
+
+func checkedAddMicros(left, right int64) (int64, bool) {
+	if right > 0 && left > math.MaxInt64-right {
+		return 0, false
+	}
+	if right < 0 && left < math.MinInt64-right {
+		return 0, false
+	}
+	return left + right, true
+}
+
+func checkedSubMicros(left, right int64) (int64, bool) {
+	return checkedAddMicros(left, -right)
 }
 
 func findWelcomeGrant(tx *gorm.DB, orgID uuid.UUID) (*OrganizationLLMCreditGrant, error) {

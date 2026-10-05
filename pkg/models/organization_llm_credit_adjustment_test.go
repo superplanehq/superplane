@@ -212,6 +212,58 @@ func Test__AdjustCreditBalanceSetsTrialWhenWelcomeGrantIsMissingOnOpenTrial(t *t
 	assert.False(t, account.HasReceivedWelcomeCredit())
 }
 
+func Test__AdjustCreditBalanceSetsMissingTrialAfterHostedUsage(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Delete(&models.OrganizationLLMCreditGrant{}).Error)
+
+	adminCents := int64(20000)
+	_, err := models.AddAdminLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(adminCents), "", nil)
+	require.NoError(t, err)
+
+	execution := dispatchWorkOrderExecution(t, r)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     20_000_000,
+		TotalTokens:     20_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	before := describeCredit(t, db, r.Organization.ID)
+	require.Greater(t, before.BilledMicros, models.CentsToMicros(5000))
+	require.Less(t, before.BilledMicros, models.CentsToMicros(adminCents))
+	assert.Equal(t, int64(0), before.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(adminCents)-before.BilledMicros, before.AdminRemainingMicros)
+	assert.Equal(t, int64(0), before.PurchasedRemainingMicros)
+
+	target := models.CentsToMicros(5000)
+	grant, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   target,
+		ExpectedMicros: 0,
+		Note:           "restore trial",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, grant)
+	assert.Equal(t, models.LLMCreditGrantKindWelcome, grant.Kind)
+	assert.Equal(t, target+before.BilledMicros, grant.AmountMicros)
+
+	after := describeCredit(t, db, r.Organization.ID)
+	assert.Equal(t, target, after.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(adminCents), after.AdminRemainingMicros)
+	assert.Equal(t, int64(0), after.PurchasedRemainingMicros)
+	assert.Equal(t, int64(0), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindTrialAdjustment))
+}
+
 func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
@@ -248,6 +300,53 @@ func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
 	assert.True(t, welcome.ExpiresAt.Equal(plan.TrialEndsAt.UTC()))
 	assert.Equal(t, target, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
 	assert.Equal(t, int64(1), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindTrialAdjustment))
+}
+
+func Test__AdjustCreditBalanceRaisesExpiredTrialAfterHostedUsage(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
+	expireWelcomeGrant(t, db, r.Organization.ID)
+
+	adminCents := int64(20000)
+	_, err := models.AddAdminLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(adminCents), "", nil)
+	require.NoError(t, err)
+
+	execution := dispatchWorkOrderExecution(t, r)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     20_000_000,
+		TotalTokens:     20_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	before := describeCredit(t, db, r.Organization.ID)
+	require.Greater(t, before.BilledMicros, welcomeBefore.AmountMicros)
+	require.Less(t, before.BilledMicros, models.CentsToMicros(adminCents))
+	assert.Equal(t, int64(0), before.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(adminCents)-before.BilledMicros, before.AdminRemainingMicros)
+
+	target := models.CentsToMicros(5000)
+	adjustment, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   target,
+		ExpectedMicros: 0,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, adjustment)
+	assert.Equal(t, models.LLMCreditGrantKindTrialAdjustment, adjustment.Kind)
+	assert.Equal(t, target+before.BilledMicros-welcomeBefore.AmountMicros, adjustment.AmountMicros)
+
+	after := describeCredit(t, db, r.Organization.ID)
+	assert.Equal(t, target, after.WelcomeRemainingMicros)
+	assert.Equal(t, models.CentsToMicros(adminCents), after.AdminRemainingMicros)
 }
 
 func Test__AdjustCreditBalanceSkipsUnchangedBalance(t *testing.T) {
