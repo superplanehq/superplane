@@ -424,7 +424,24 @@ describe("FactorySettingsMCPPage", () => {
 
     await user.click(screen.getByTestId("superplane-mcp-client-tool-codex"));
     expect(screen.getByText("Open Codex CLI or the IDE extension.")).toBeInTheDocument();
-    expect(screen.getByTestId("superplane-mcp-config-copy-codex")).toHaveAttribute("aria-label", "Copy command");
+    const copyButton = screen.getByTestId("superplane-mcp-config-copy-codex");
+    expect(copyButton).toHaveAttribute("aria-label", "Copy command");
+
+    const writeText = vi.fn(() => Promise.resolve());
+    const previousClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    try {
+      await user.click(copyButton);
+      expect(writeText).toHaveBeenCalledWith(`codex mcp add superplane --url ${window.location.origin}/mcp`);
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: previousClipboard,
+      });
+    }
   }, 10000);
 
   it("lists a connected SuperPlane MCP client and revokes it", async () => {
