@@ -33,7 +33,7 @@ export function ConsoleCheckRows({
   checks: WorkOrderCheckPresentation[];
   testId?: string;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   if (checks.length === 0) {
     return null;
   }

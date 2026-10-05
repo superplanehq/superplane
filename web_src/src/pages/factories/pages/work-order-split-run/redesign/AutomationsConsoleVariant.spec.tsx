@@ -64,6 +64,10 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     );
 
     const checks = within(screen.getByTestId("redesign-console-summary")).getByTestId("redesign-console-checks");
+    const header = within(checks).getByRole("button", { name: "Merge confidence" });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(within(checks).queryByText("Blast radius")).not.toBeInTheDocument();
+    fireEvent.click(header);
     expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
     expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
   });
