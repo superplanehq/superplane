@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -1988,12 +1989,126 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
 }
 
-func factoryContextForCanvas(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
-	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
-	if err != nil || canvas == nil || canvas.FactoryID == nil {
-		return nil
+// lazyWebhookFactory reads the canvas only when a trigger calls it.
+// A webhook must send its response before that lookup.
+type lazyWebhookFactory struct {
+	tx       *gorm.DB
+	canvasID uuid.UUID
+	once     sync.Once
+	inner    core.FactoryContext
+	err      error
+}
+
+func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+}
+
+func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
+	l.once.Do(func() {
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+		if err != nil || canvas == nil || canvas.FactoryID == nil {
+			l.err = errors.New("app is not owned by a factory")
+			return
+		}
+		l.inner = contexts.NewFactoryContext(l.tx, canvas, nil)
+	})
+	return l.inner, l.err
+}
+
+func (l *lazyWebhookFactory) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
 	}
-	return contexts.NewFactoryContext(tx, canvas, nil)
+	return inner.CreateWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
+	}
+	return inner.UpdateWorkOrderStatus(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {
+	inner, err := l.load()
+	if err != nil {
+		return err
+	}
+	return inner.AddWorkOrderComment(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddWorkOrderArtifact(params)
+}
+
+func (l *lazyWebhookFactory) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.ReportWorkOrderCheck(params)
+}
+
+func (l *lazyWebhookFactory) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.SetWorkOrderStatusNote(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequest(params core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequest(params)
+}
+
+func (l *lazyWebhookFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequestActivity(params)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
@@ -2042,7 +2157,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
-		Factory:       factoryContextForCanvas(tx, node.WorkflowID),
+		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }

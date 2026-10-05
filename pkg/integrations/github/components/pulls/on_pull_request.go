@@ -58,6 +58,8 @@ Each PR event includes:
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
+- **pullRequest**: The factory pull request. Present only when **Only pull requests in this factory** is on and the pull request belongs to this factory.
+- **workOrder**: The task for that pull request. Present in the same case.
 
 ## Webhook Setup
 
