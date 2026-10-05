@@ -1,4 +1,5 @@
 {
+  "id": "production",
   "superplaneUrl": "https://superplane.example",
   "installationAdminToken": "replace-with-personal-api-token",
   "runnerReleaseBaseUrl": "https://superplanehq-releases.s3.amazonaws.com/runner",
@@ -24,7 +25,11 @@
         "keyName": "",
         "volumeSizeGb": 30,
         "volumeIops": 0,
-        "volumeThroughputMbps": 0
+        "volumeThroughputMbps": 0,
+        "resourceTags": {
+          "Environment": "production",
+          "ManagedBy": "fleet-manager"
+        }
       }
     }
   ]
