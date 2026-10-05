@@ -386,7 +386,7 @@ func Test__DescribeOrganizationSpendingReport__FiltersAndGroupsByFundingSource(t
 	assert.Positive(t, grouped.ExplorerTotals.HostedCostCents)
 	require.Len(t, grouped.Breakdown, 2)
 	labels := []string{grouped.Breakdown[0].Label, grouped.Breakdown[1].Label}
-	assert.ElementsMatch(t, []string{"SuperPlane-hosted", "Your keys"}, labels)
+	assert.ElementsMatch(t, []string{"SuperPlane-hosted", "Bring your own key"}, labels)
 
 	filtered, err := DescribeOrganizationSpendingReport(
 		context.Background(),
@@ -406,7 +406,7 @@ func Test__DescribeOrganizationSpendingReport__FiltersAndGroupsByFundingSource(t
 	assert.Equal(t, int64(180), filtered.ExplorerTotals.ByokCostCents)
 	assert.Equal(t, int64(0), filtered.ExplorerTotals.HostedCostCents)
 	require.Len(t, filtered.Breakdown, 1)
-	assert.Equal(t, "Your keys", filtered.Breakdown[0].Label)
+	assert.Equal(t, "Bring your own key", filtered.Breakdown[0].Label)
 }
 
 func Test__DescribeOrganizationSpendingReport__RejectsInvalidFundingSource(t *testing.T) {
