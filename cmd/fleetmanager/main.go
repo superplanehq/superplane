@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/superplanehq/superplane/pkg/fleets/adminclient"
@@ -51,7 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 	var awsArtifactResolver reconcile.ArtifactResolver
-	var ec2Client *ec2.Client
+	var awsSDKConfig aws.Config
 	if usesAWS(config) {
 		awsArtifactResolver, err = artifact.NewResolver(
 			config.RunnerReleaseBaseURL,
@@ -61,19 +62,20 @@ func main() {
 			log.Error("create runner artifact resolver", slog.Any("error", err))
 			os.Exit(1)
 		}
-		awsSDKConfig, configErr := awsconfig.LoadDefaultConfig(
-			ctx,
-			awsconfig.WithRegion(config.AWSRegion),
-		)
+		loadedAWSConfig, configErr := awsconfig.LoadDefaultConfig(ctx)
 		if configErr != nil {
 			log.Error("load AWS config", slog.Any("error", configErr))
 			os.Exit(1)
 		}
-		ec2Client = ec2.NewFromConfig(awsSDKConfig)
+		awsSDKConfig = loadedAWSConfig
 	}
 
 	reconcilers := make([]*reconcile.Reconciler, 0, len(config.Fleets))
 	for _, fleet := range config.Fleets {
+		var ec2Client *ec2.Client
+		if fleet.Provider == fleetconfig.ProviderAWS {
+			ec2Client = newEC2Client(awsSDKConfig, fleet.AWS.Region)
+		}
 		resourceProvider, artifactResolver, architecture, err := buildProvider(
 			config.ID,
 			fleet,
@@ -123,6 +125,11 @@ func main() {
 	log.Info("Fleet Manager stopped")
 }
 
+func newEC2Client(config aws.Config, region string) *ec2.Client {
+	config.Region = region
+	return ec2.NewFromConfig(config)
+}
+
 func usesAWS(config *fleetconfig.Config) bool {
 	for _, fleet := range config.Fleets {
 		if fleet.Provider == fleetconfig.ProviderAWS {
@@ -154,6 +161,8 @@ func buildProvider(
 			VolumeIOPS:           fleet.AWS.VolumeIOPS,
 			VolumeThroughputMBps: fleet.AWS.VolumeThroughputMBps,
 			ResourceTags:         fleet.AWS.ResourceTags,
+			CloudWatchRegion:     fleet.AWS.Region,
+			CloudWatchLogGroup:   fleet.AWS.CloudWatch.LogGroupName,
 		}, log)
 		return resourceProvider, awsArtifactResolver, fleet.AWS.Architecture, err
 	case fleetconfig.ProviderDocker:
