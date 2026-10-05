@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -50,8 +51,50 @@ func TestResolveRejectsMutableVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := resolver.Resolve(context.Background(), "latest", "linux", "amd64"); err == nil {
-		t.Fatal("expected mutable version to fail")
+	for _, version := range []string{
+		"latest",
+		"1.2.3",
+		strings.Repeat("a", 40),
+		"sha:" + strings.Repeat("a", 39),
+		"sha:" + strings.Repeat("A", 40),
+	} {
+		t.Run(version, func(t *testing.T) {
+			if _, err := resolver.Resolve(
+				context.Background(),
+				version,
+				"linux",
+				"amd64",
+			); err == nil {
+				t.Fatalf("expected runner release %q to fail", version)
+			}
+		})
+	}
+}
+
+func TestResolveReadsGitSHAReleaseChecksum(t *testing.T) {
+	version := "sha:" + strings.Repeat("a", 40)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/runner/"+version+"/checksums.txt" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  runner-linux-amd64.tar.gz\n",
+		))
+	}))
+	defer server.Close()
+
+	resolver, err := NewResolver(server.URL+"/runner", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolver.Resolve(context.Background(), version, "linux", "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Version != version ||
+		resolved.URL != server.URL+"/runner/"+version+"/runner-linux-amd64.tar.gz" {
+		t.Fatalf("resolved = %#v", resolved)
 	}
 }
 
@@ -67,7 +110,7 @@ func TestResolveRejectsMissingArtifactChecksum(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := resolver.Resolve(context.Background(), "1.2.3", "linux", "arm64"); err == nil {
+	if _, err := resolver.Resolve(context.Background(), "v1.2.3", "linux", "arm64"); err == nil {
 		t.Fatal("expected missing checksum")
 	}
 }

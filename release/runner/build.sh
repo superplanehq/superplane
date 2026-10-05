@@ -4,21 +4,53 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ]; then
-  echo "Usage: release/runner/build.sh <version>"
+  echo "Usage: release/runner/build.sh <release-id>"
   echo ""
-  echo "Example:"
+  echo "Examples:"
   echo "  release/runner/build.sh v0.0.1"
+  echo "  release/runner/build.sh sha:<40-character-git-sha>"
   exit 1
 fi
 
 VERSION="$1"
-if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
-  echo "Error: version must be a v-prefixed semantic version, for example v0.0.1" >&2
+semver_pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+git_sha_pattern='^sha:([0-9a-f]{40})$'
+if [[ ! "${VERSION}" =~ ${semver_pattern} ]] &&
+  [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
+  echo "Error: version must be v<semantic-version> or sha:<40-character-lowercase-git-sha>" >&2
   exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [[ "${VERSION}" =~ ${git_sha_pattern} ]]; then
+  expected_sha="${BASH_REMATCH[1]}"
+  actual_sha="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+  if [ "${actual_sha}" != "${expected_sha}" ]; then
+    echo "Error: checked-out commit ${actual_sha} does not match ${expected_sha}" >&2
+    exit 1
+  fi
+  release_inputs=(
+    go.mod
+    go.sum
+    cmd/runner
+    pkg
+    release/runner/Dockerfile
+    release/runner/build.sh
+    release/runner/install.sh
+  )
+  input_changes="$(
+    git -C "${REPO_ROOT}" status \
+      --porcelain \
+      --untracked-files=all \
+      -- "${release_inputs[@]}"
+  )"
+  if [ -n "${input_changes}" ]; then
+    echo "Error: SHA runner release inputs contain uncommitted changes:" >&2
+    echo "${input_changes}" >&2
+    exit 1
+  fi
+fi
 OUTPUT_DIR="${RUNNER_RELEASE_OUTPUT_DIR:-${REPO_ROOT}/build/runner/${VERSION}}"
 STAGING_DIR="${OUTPUT_DIR}/.staging"
 ARCHITECTURES=(amd64 arm64)
