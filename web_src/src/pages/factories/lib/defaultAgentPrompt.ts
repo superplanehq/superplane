@@ -85,7 +85,7 @@ function stepsWithDefaultPrompts(
 
   const current = steps.flatMap((step, index) => (step.type === "prompt" ? [{ index, name: step.name }] : []));
   if (current.length === 0) {
-    return steps;
+    return [...steps, ...defaults.map(factoryPromptStep)];
   }
 
   const usedDefaults = new Set<number>();
@@ -105,8 +105,6 @@ function stepsWithDefaultPrompts(
     unmatchedCurrent.forEach((entry, order) => {
       assigned.set(entry.index, unmatchedDefaults[order].prompt ?? "");
     });
-  } else if (current.length === 1 && unmatchedCurrent.length === 1 && unmatchedDefaults.length > 0) {
-    assigned.set(unmatchedCurrent[0].index, unmatchedDefaults[0].prompt ?? "");
   }
 
   return replaceAssignedPrompts(steps, assigned);
@@ -123,6 +121,15 @@ function replaceAssignedPrompts(steps: PlanningReviewStep[], assigned: Map<numbe
     return { ...step, prompt };
   });
   return changed ? next : steps;
+}
+
+function factoryPromptStep(step: PlanningReviewStep): PlanningReviewStep {
+  return {
+    name: step.name,
+    type: "prompt",
+    prompt: step.prompt,
+    ...(typeof step.workingDirectory === "string" ? { workingDirectory: step.workingDirectory } : {}),
+  };
 }
 
 function componentSteps(value: unknown): PlanningReviewStep[] {

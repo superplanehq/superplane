@@ -157,6 +157,28 @@ describe("applyDefaultAgentPrompts", () => {
     expect(applyDefaultAgentPrompts(draft, [refineDefault])).toBe(draft);
   });
 
+  it("does not assign the first default when one of two prompts remains and is renamed", () => {
+    const draft = draftWith("implementation-agent-no-issue", [
+      { name: "Describe the change", type: "prompt", prompt: "Custom pr" },
+    ]);
+
+    expect(
+      applyDefaultAgentPrompts(draft, [
+        { name: "Implementation", type: "prompt", prompt: IMPLEMENT_PROMPT },
+        { name: "Generate PR title and description", type: "prompt", prompt: PR_PROMPT },
+      ]),
+    ).toBe(draft);
+  });
+
+  it("restores deleted prompt steps when none remain", () => {
+    const draft = draftWith("refine-task", [{ name: "Clone repository", type: "bash", command: "git clone" }]);
+
+    expect(stepsOf(applyDefaultAgentPrompts(draft, [refineDefault]))).toEqual([
+      { name: "Clone repository", type: "bash", command: "git clone" },
+      refineDefault,
+    ]);
+  });
+
   it("replaces the prompt step when a bash step has the same name", () => {
     const draft = draftWith("refine-task", [
       { name: "Refine Task", type: "bash", command: "echo keep" },
