@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func UpdateGroup(ctx context.Context, domainType string, domainID string, groupName string, groupSpec *pb.Group_Spec, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
+func updateGroup(ctx context.Context, domainType string, domainID string, groupName string, groupSpec *pb.Group_Spec, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
 	if groupName == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "group name must be specified")
 	}

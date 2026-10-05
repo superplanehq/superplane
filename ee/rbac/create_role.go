@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
-func CreateRole(ctx context.Context, domainType string, domainID string, role *pb.Role, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
+func createRole(ctx context.Context, domainType string, domainID string, role *pb.Role, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
 	if role == nil {
 		return nil, grpcerrors.InvalidArgument(nil, "role must be specified")
 	}
