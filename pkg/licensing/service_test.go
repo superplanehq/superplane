@@ -145,8 +145,8 @@ func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
 		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
 	})
 
-	t.Run("install does not grant access that it cannot confirm", func(t *testing.T) {
-		source := &memorySource{}
+	t.Run("replacement grants neither license until a read confirms it", func(t *testing.T) {
+		source := &memorySource{raw: issuer.License(licensing.FeatureCustomRoles)}
 		service := newService(t, issuer, source)
 		require.NoError(t, service.Refresh(context.Background()))
 
@@ -154,7 +154,12 @@ func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
 		_, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
 		require.Error(t, err)
 
+		assert.False(t, service.IsEntitled(licensing.FeatureCustomRoles))
 		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+
+		source.err = nil
+		require.NoError(t, service.Refresh(context.Background()))
+		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
 	})
 }
 

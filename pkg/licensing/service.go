@@ -226,7 +226,7 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		"installed_by": installedBy.String(),
 	}).Info("Licensing: license installed")
 
-	if err := s.refreshLocked(ctx); err != nil {
+	if err := s.refreshAfterChange(ctx); err != nil {
 		return s.Status(), err
 	}
 
@@ -248,14 +248,21 @@ func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, erro
 
 	log.WithField("removed_by", removedBy.String()).Info("Licensing: license removed")
 
-	// A failed reload must not keep the removed license active. Community mode
-	// applies until the next refresh reads the shared state.
-	if err := s.refreshLocked(ctx); err != nil {
-		log.WithError(err).Warn("Licensing: license reload after removal failed; using Community mode")
+	_ = s.refreshAfterChange(ctx)
+	return s.Status(), nil
+}
+
+// refreshAfterChange reads the shared state after a change. When the read
+// fails, neither the previous nor the written license is confirmed, so
+// Community mode applies until the next refresh succeeds.
+func (s *Service) refreshAfterChange(ctx context.Context) error {
+	err := s.refreshLocked(ctx)
+	if err != nil {
+		log.WithError(err).Warn("Licensing: license reload after change failed; using Community mode")
 		s.publish(&snapshot{source: SourceNone})
 	}
 
-	return s.Status(), nil
+	return err
 }
 
 func (s *Service) writableSource() WritableSource {
