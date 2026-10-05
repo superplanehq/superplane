@@ -18,6 +18,9 @@ func Test__PlanningSessionCleanupWorker_EndsStaleSessions(t *testing.T) {
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
+	canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, entrypoint, models.CanvasRunStatePending, "")
+	require.NoError(t, err)
 	now := time.Now()
 	session := &models.FactoryPlanningSession{
 		ID:              uuid.New(),
@@ -27,6 +30,8 @@ func Test__PlanningSessionCleanupWorker_EndsStaleSessions(t *testing.T) {
 		Repository:      "acme/payments",
 		Kind:            models.PlanningSessionKindTaskCreation,
 		State:           models.PlanningSessionStateRunning,
+		CanvasID:        &canvas.ID,
+		CanvasRunID:     &run.ID,
 		HeartbeatAt:     now.Add(-models.PlanningSessionHeartbeatStale - time.Minute),
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -39,4 +44,8 @@ func Test__PlanningSessionCleanupWorker_EndsStaleSessions(t *testing.T) {
 	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+
+	reloadedRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, reloadedRun.State)
 }
