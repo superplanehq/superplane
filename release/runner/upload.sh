@@ -4,18 +4,22 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ] || [ "${2-}" = "" ]; then
-  echo "Usage: release/runner/upload.sh <version> <s3-bucket-uri>"
+  echo "Usage: release/runner/upload.sh <release-id> <s3-bucket-uri>"
   echo ""
-  echo "Example:"
-  echo "  release/runner/upload.sh v0.0.1 s3://superplane-releases"
+  echo "Examples:"
+  echo "  release/runner/upload.sh v0.0.1 s3://superplanehq-releases"
+  echo "  release/runner/upload.sh sha:<40-character-git-sha> s3://superplanehq-releases"
   exit 1
 fi
 
 VERSION="$1"
 S3_BUCKET_URI="${2%/}"
 
-if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
-  echo "Error: version must be a v-prefixed semantic version, for example v0.0.1" >&2
+semver_pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+git_sha_pattern='^sha:[0-9a-f]{40}$'
+if [[ ! "${VERSION}" =~ ${semver_pattern} ]] &&
+  [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
+  echo "Error: version must be v<semantic-version> or sha:<40-character-lowercase-git-sha>" >&2
   exit 1
 fi
 

@@ -35,10 +35,14 @@ AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
 from this layout:
 
 ```text
-<runnerReleaseBaseUrl>/<version>/runner-linux-amd64.tar.gz
-<runnerReleaseBaseUrl>/<version>/runner-linux-arm64.tar.gz
-<runnerReleaseBaseUrl>/<version>/checksums.txt
+<runnerReleaseBaseUrl>/<release-id>/runner-linux-amd64.tar.gz
+<runnerReleaseBaseUrl>/<release-id>/runner-linux-arm64.tar.gz
+<runnerReleaseBaseUrl>/<release-id>/checksums.txt
 ```
+
+Set the fleet's `runnerVersion` to an immutable release ID. Supported IDs are
+`sha:<40-character-lowercase-git-sha>` and `v<semantic-version>`, for example
+`sha:0123456789abcdef0123456789abcdef01234567` or `v1.2.3`.
 
 Each archive contains the runner binary and `install.sh`. Fleet Manager reads
 the selected archive checksum from `checksums.txt`. AWS bootstrap downloads
