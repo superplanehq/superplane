@@ -20,7 +20,7 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
-import { ComposerPlanStack, type ComposerScore } from "./ComposerPlanControls";
+import { PlanningReview, type ComposerScore } from "./PlanningReview";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -34,6 +34,7 @@ import {
   SPLIT_RUN_INTENT_PANE_FOOTER_CLASSNAME,
 } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
+import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
@@ -50,6 +51,7 @@ export type IntentAnalysisChat = {
   onSend: (text?: string) => void | Promise<boolean>;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
   onSubmitSurvey: (text: string) => void;
+  planTitle?: string;
   planPaneOpen?: boolean;
   onTogglePlan?: () => void;
   canTogglePlan?: boolean;
@@ -62,7 +64,7 @@ export type IntentAnalysisChat = {
   /** Set when backlog analysis stopped because hosted credit is gone. */
   creditVerdict?: ComposerCreditVerdict;
   closedDecision?: ReactNode;
-  /** Model select for Start. The strip shows it on the settings row. */
+  /** Model selection applies to implementation, separately from the plan. */
   modelSelect?: ReactNode;
 };
 
@@ -99,11 +101,10 @@ function RequestHeader({ title }: { title: string }) {
 function analysisRequestChatState(analysis: IntentAnalysisChat) {
   const stopped = analysis.view.machineStatus === "failed" || analysis.view.machineStatus === "passed";
   const active = analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running";
-  const latestMessage = analysis.view.messages.at(-1);
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: Boolean(analysis.view.survey && analysis.canSend && !active && latestMessage?.role === "agent"),
+    showSurvey: hasPendingPlanningQuestions(analysis.view),
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -161,8 +162,25 @@ function AnalysisRequestChat({
                 activities={analysis.view.activities}
               />
             ) : null}
+            <PlanningReview
+              open={Boolean(analysis.planPaneOpen)}
+              title={analysis.planTitle}
+              clarity={analysis.clarity}
+              confidence={analysis.confidence}
+              showClarity={analysis.showClarity !== false}
+              showConfidence={analysis.showConfidence !== false}
+              isAnalyzing={chipsWorking}
+              canTogglePlan={Boolean(analysis.canTogglePlan)}
+              planStatus={analysis.planStatus}
+              onToggle={analysis.onTogglePlan}
+              creditVerdict={analysis.creditVerdict}
+            />
             {state.showSurvey && analysis.view.survey ? (
-              <WorkOrderIntentSurvey survey={analysis.view.survey} onSubmit={analysis.onSubmitSurvey} />
+              <WorkOrderIntentSurvey
+                survey={analysis.view.survey}
+                onSubmit={analysis.onSubmitSurvey}
+                disabled={!analysis.canSend}
+              />
             ) : null}
           </div>
         </div>
@@ -170,14 +188,38 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         ) : null}
       </div>
-      <AnalysisComposer
-        analysis={analysis}
-        images={images}
-        placeholder={state.placeholder}
-        chipsWorking={chipsWorking}
-        chatSolo={chatSolo}
-        chatColumnClass={chatColumnClass}
-      />
+      {!state.showSurvey ? (
+        <AnalysisComposer
+          analysis={analysis}
+          images={images}
+          placeholder={state.placeholder}
+          chatSolo={chatSolo}
+          chatColumnClass={chatColumnClass}
+        />
+      ) : null}
+      {analysis.composerError ? (
+        <p
+          role="alert"
+          className={cn(chatColumnClass, "sp-error-shake pb-2 text-[12px] text-destructive")}
+          data-testid="split-run-intent-chat-error"
+        >
+          {analysis.composerError}
+        </p>
+      ) : null}
+      {analysis.modelSelect || analysis.closedDecision ? (
+        <section aria-label="Implementation" className="shrink-0 border-t border-border py-3">
+          <div className={cn(chatColumnClass, "flex flex-wrap items-center justify-between gap-2")}>
+            <span className="text-[12px] text-muted-foreground">Implementation</span>
+            <div
+              className="ml-auto flex flex-wrap items-center justify-end gap-2"
+              data-testid="split-run-intent-settings"
+            >
+              {analysis.modelSelect}
+              {analysis.closedDecision}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -203,14 +245,12 @@ function AnalysisComposer({
   analysis,
   images,
   placeholder,
-  chipsWorking,
   chatSolo,
   chatColumnClass,
 }: {
   analysis: IntentAnalysisChat;
   images: ReturnType<typeof useAnalysisComposerImages>;
   placeholder: string;
-  chipsWorking: boolean;
   chatSolo: boolean;
   chatColumnClass: string;
 }) {
@@ -248,20 +288,6 @@ function AnalysisComposer({
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
         </Label>
         <div className="flex flex-col gap-2">
-          <ComposerPlanStack
-            open={Boolean(analysis.planPaneOpen)}
-            clarity={analysis.clarity}
-            confidence={analysis.confidence}
-            showClarity={analysis.showClarity !== false}
-            showConfidence={analysis.showConfidence !== false}
-            isAnalyzing={chipsWorking}
-            canTogglePlan={Boolean(analysis.canTogglePlan)}
-            planStatus={analysis.planStatus}
-            onToggle={analysis.onTogglePlan}
-            actions={analysis.closedDecision}
-            modelSelect={analysis.modelSelect}
-            creditVerdict={analysis.creditVerdict}
-          />
           <AnalysisComposerField
             analysis={analysis}
             images={images}
@@ -272,11 +298,6 @@ function AnalysisComposer({
             onSend={() => void send()}
           />
         </div>
-        {analysis.composerError ? (
-          <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
-            {analysis.composerError}
-          </p>
-        ) : null}
       </form>
     </div>
   );
