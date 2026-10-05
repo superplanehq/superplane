@@ -22,7 +22,7 @@ const planningCanvasFixture = {
 };
 
 const meta = {
-  title: "Factories/Pages/Task Split Run/Planning states",
+  title: "Factories/Pages/Task Planning",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },
