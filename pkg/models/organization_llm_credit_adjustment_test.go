@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -152,6 +153,9 @@ func Test__AdjustCreditBalanceRejectsTrialWithoutLiveWelcome(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	expireWelcomeGrant(t, db, r.Organization.ID)
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Update("plan", models.BillingPlanNone).Error)
 
 	_, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
 		OrganizationID: r.Organization.ID,
@@ -160,6 +164,90 @@ func Test__AdjustCreditBalanceRejectsTrialWithoutLiveWelcome(t *testing.T) {
 		ExpectedMicros: 0,
 	})
 	require.ErrorIs(t, err, models.ErrTrialCreditNotActive)
+}
+
+func Test__AdjustCreditBalanceSetsTrialWhenWelcomeGrantIsMissingOnOpenTrial(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		Delete(&models.OrganizationLLMCreditGrant{}).Error)
+	require.NoError(t, db.Model(&models.Account{}).
+		Where("id = ?", r.Account.ID).
+		Update("welcome_credit_granted_at", nil).Error)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	require.True(t, plan.IsOpenTrial(time.Now()))
+	require.NotNil(t, plan.TrialEndsAt)
+
+	target := models.CentsToMicros(1500)
+	grant, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   target,
+		ExpectedMicros: 0,
+		Note:           "restore trial",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, grant)
+	assert.Equal(t, models.LLMCreditGrantKindWelcome, grant.Kind)
+	assert.Equal(t, target, grant.AmountMicros)
+	assert.Equal(t, "restore trial", grant.Note)
+	require.NotNil(t, grant.ActorAccountID)
+	assert.Equal(t, r.Account.ID, *grant.ActorAccountID)
+	require.NotNil(t, grant.ExpiresAt)
+	assert.True(t, grant.ExpiresAt.Equal(plan.TrialEndsAt.UTC()))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(plan.TrialEndsAt.UTC()))
+	assert.Equal(t, int64(0), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindTrialAdjustment))
+	assert.Equal(t, target, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+
+	var account models.Account
+	require.NoError(t, db.Where("id = ?", r.Account.ID).First(&account).Error)
+	assert.False(t, account.HasReceivedWelcomeCredit())
+}
+
+func Test__AdjustCreditBalanceRaisesExpiredTrialOnOpenTrial(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	welcomeBefore := requireWelcomeGrant(t, db, r.Organization.ID)
+	expireWelcomeGrant(t, db, r.Organization.ID)
+
+	plan, err := models.FindOrganizationBillingPlan(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	require.True(t, plan.IsOpenTrial(time.Now()))
+	require.NotNil(t, plan.TrialEndsAt)
+	require.Equal(t, int64(0), describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+
+	target := models.CentsToMicros(1000)
+	adjustment, err := models.AdjustOrganizationLLMCreditBalance(db, models.CreditBalanceAdjustment{
+		OrganizationID: r.Organization.ID,
+		Bucket:         models.CreditBalanceBucketTrial,
+		TargetMicros:   target,
+		ExpectedMicros: 0,
+		Note:           "raise expired trial",
+		ActorAccountID: &r.Account.ID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, adjustment)
+	assert.Equal(t, models.LLMCreditGrantKindTrialAdjustment, adjustment.Kind)
+	assert.Equal(t, target-welcomeBefore.AmountMicros, adjustment.AmountMicros)
+	require.NotNil(t, adjustment.ExpiresAt)
+	assert.True(t, adjustment.ExpiresAt.Equal(plan.TrialEndsAt.UTC()))
+
+	welcome := requireWelcomeGrant(t, db, r.Organization.ID)
+	assert.Equal(t, welcomeBefore.AmountMicros, welcome.AmountMicros)
+	require.NotNil(t, welcome.ExpiresAt)
+	assert.True(t, welcome.ExpiresAt.Equal(plan.TrialEndsAt.UTC()))
+	assert.Equal(t, target, describeCredit(t, db, r.Organization.ID).WelcomeRemainingMicros)
+	assert.Equal(t, int64(1), countGrants(t, db, r.Organization.ID, models.LLMCreditGrantKindTrialAdjustment))
 }
 
 func Test__AdjustCreditBalanceSkipsUnchangedBalance(t *testing.T) {

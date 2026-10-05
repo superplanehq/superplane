@@ -81,6 +81,7 @@ function mockOrgCreditFetch(
   options: {
     polarManaged?: boolean;
     planStatus?: number;
+    plan?: ReturnType<typeof billingPlan>;
     creditData?: typeof credit;
     onPutBalance?: (body: unknown) => Response;
     onGetGrants?: () => Response;
@@ -102,7 +103,7 @@ function mockOrgCreditFetch(
       if (options.planStatus) {
         return new Response("failed", { status: options.planStatus });
       }
-      return jsonResponse(billingPlan(options.polarManaged ?? false));
+      return jsonResponse(options.plan ?? billingPlan(options.polarManaged ?? false));
     }
     return new Response("not found", { status: 404 });
   });
@@ -321,11 +322,88 @@ describe("OrgLLMCreditSection balances", () => {
   it("blocks trial changes when the organization has no active trial credit", async () => {
     mockOrgCreditFetch({
       creditData: { ...credit, welcome_remaining_cents: 0, welcome_credit_expires_at: "2020-01-01T00:00:00Z" },
+      plan: billingPlan(false, "2020-01-01T00:00:00Z", "none"),
     });
     render(<OrgLLMCreditSection orgId="org-1" />);
 
     expect(await screen.findByTestId("admin-org-credit-trial-target")).toBeDisabled();
     expect(screen.getByTestId("admin-org-credit-trial-save")).toBeDisabled();
+    expect(screen.getByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).toBeInTheDocument();
+  });
+
+  it("enables Set trial credit on an open Trial when remaining trial credit is zero", async () => {
+    const user = userEvent.setup();
+    const trialEndsAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    const saved = {
+      ...credit,
+      remaining_credit_cents: 0,
+      welcome_remaining_cents: 0,
+      welcome_credit_expires_at: null,
+    };
+    const updated = {
+      ...saved,
+      remaining_credit_cents: 2500,
+      welcome_remaining_cents: 2500,
+      welcome_credit_expires_at: trialEndsAt,
+    };
+    const fetchMock = mockOrgCreditFetch({
+      creditData: saved,
+      plan: billingPlan(false, trialEndsAt, "trial"),
+      onPutBalance: () => jsonResponse(updated),
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    const trial = await screen.findByTestId("admin-org-credit-trial-target");
+    expect(trial).toBeEnabled();
+    expect(screen.getByTestId("admin-org-credit-trial-save")).toBeDisabled();
+    expect(screen.queryByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).not.toBeInTheDocument();
+    expect(screen.getByText("No trial credit.")).toBeInTheDocument();
+
+    await user.clear(trial);
+    await user.type(trial, "25");
+    await user.click(screen.getByTestId("admin-org-credit-trial-save"));
+
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(put).toBeDefined();
+      expect(String(put?.[0])).toBe("/admin/api/organizations/org-1/llm-credit/balances");
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+        bucket: "trial",
+        target_cents: 2500,
+        expected_remaining_cents: 0,
+        note: "",
+      });
+    });
+    expect(screen.getByTestId("admin-org-credit-trial-remaining")).toHaveTextContent("$25.00");
+    expect(screen.queryByText("No trial credit.")).not.toBeInTheDocument();
+    expect(screen.getByText(/Expires on /)).toBeInTheDocument();
+  });
+
+  it("keeps trial credit locked when only the unsaved plan is an open Trial", async () => {
+    const user = userEvent.setup();
+    mockOrgCreditFetch({
+      creditData: { ...credit, welcome_remaining_cents: 0, welcome_credit_expires_at: null },
+      plan: billingPlan(false, null, "none"),
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-credit-trial-target")).toBeDisabled();
+    await user.click(screen.getByTestId("admin-org-billing-plan"));
+    await user.click(await screen.findByRole("option", { name: "Trial" }));
+    expect(screen.getByTestId("admin-org-trial-ends-input")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-org-credit-trial-target")).toBeDisabled();
+    expect(screen.getByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).toBeInTheDocument();
+  });
+
+  it("keeps trial credit locked when Polar manages the saved Trial plan", async () => {
+    const trialEndsAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    mockOrgCreditFetch({
+      creditData: { ...credit, welcome_remaining_cents: 0, welcome_credit_expires_at: null },
+      plan: { ...billingPlan(true, trialEndsAt, "trial"), polar_managed: true },
+    });
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByTestId("admin-org-credit-trial-target")).toBeDisabled();
     expect(screen.getByText(ADMIN_NO_ACTIVE_TRIAL_COPY)).toBeInTheDocument();
   });
 
