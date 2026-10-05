@@ -1647,8 +1647,12 @@ describe("WorkOrderSplitRunPopup", () => {
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: "Start" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: /^Model/ }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
@@ -1667,7 +1671,7 @@ describe("WorkOrderSplitRunPopup", () => {
       "has-[[data-refine-plan-open]]:w-[min(80rem",
     );
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open plan" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-log-pane")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
@@ -1728,8 +1732,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: "Start" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: /^Model/ }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });
@@ -1785,7 +1793,7 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-attention-note")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(true);
-    await userEvent.click(screen.getByRole("button", { name: "Plan" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open plan" }));
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-chat-solo")).toBe(false);
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(true);
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
@@ -1823,7 +1831,7 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    await user.click(screen.getByRole("button", { name: "Plan" }));
+    await user.click(screen.getByRole("button", { name: "Open plan" }));
     const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
     const coverage = screen.getByTestId("split-run-check-comment-check-code-coverage");
     expect(risk).not.toHaveAttribute("open");
@@ -1840,7 +1848,7 @@ describe("WorkOrderSplitRunPopup", () => {
       ),
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "Plan" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open plan" }));
     const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
     const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
     expect(summary.tagName).toBe("P");
