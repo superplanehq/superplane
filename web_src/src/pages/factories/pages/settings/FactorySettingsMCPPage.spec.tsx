@@ -392,11 +392,11 @@ describe("FactorySettingsMCPPage", () => {
     await userEvent.setup().click(screen.getByTestId("superplane-mcp-connect-client"));
     expect(await screen.findByTestId("superplane-mcp-connect-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Codex");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("OpenCode");
+    expect(
+      within(screen.getByTestId("superplane-mcp-client-tools"))
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Cursor", "Claude Code", "VS Code", "Codex", "OpenCode"]);
     expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
