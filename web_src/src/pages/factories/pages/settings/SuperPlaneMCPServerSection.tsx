@@ -25,7 +25,7 @@ import { FactorySettingsCard } from "./FactorySettingsCard";
 import { SuperPlaneMCPClientsEmptyIllustration } from "./SuperPlaneMCPClientsEmptyIllustration";
 import { SUPERPLANE_MCP_SERVER_COPY } from "./superplaneMCPServerCopy";
 
-const MCP_CLIENT_TOOLS: WorkspaceMCPClientTool[] = ["cursor", "claudeCode", "vscode", "codex"];
+const MCP_CLIENT_TOOLS: WorkspaceMCPClientTool[] = ["cursor", "claudeCode", "vscode", "codex", "opencode"];
 
 export function SuperPlaneMCPServerSection({
   organizationId,
