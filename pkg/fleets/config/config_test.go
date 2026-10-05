@@ -101,6 +101,79 @@ fleets:
 	}
 }
 
+func TestLoadEnvironmentConfiguration(t *testing.T) {
+	tests := map[string]string{
+		"JSON": `{
+			"superplaneUrl":"http://app:8000",
+			"fleets":[{
+				"id":"e1-large-amd64",
+				"provider":"docker",
+				"docker":{
+					"image":"runner:dev",
+					"architecture":"amd64"
+				}
+			}]
+		}`,
+		"YAML": `
+superplaneUrl: http://app:8000
+fleets:
+  - id: e1-large-amd64
+    provider: docker
+    docker:
+      image: runner:dev
+      architecture: amd64
+`,
+	}
+
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("FLEET_MANAGER_CONFIG", body)
+			t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
+
+			config, err := Load(filepath.Join(t.TempDir(), "missing.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if config.InstallationAdminToken != "personal-token" {
+				t.Fatalf(
+					"installation admin token = %q",
+					config.InstallationAdminToken,
+				)
+			}
+			if config.Fleets[0].ID != "e1-large-amd64" {
+				t.Fatalf("fleet ID = %q", config.Fleets[0].ID)
+			}
+		})
+	}
+}
+
+func TestLoadEnvironmentConfigurationAppliesInstallationAdminTokenOverride(t *testing.T) {
+	t.Setenv("FLEET_MANAGER_CONFIG", `{
+		"superplaneUrl":"http://app:8000",
+		"installationAdminToken":"config-token",
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{
+				"image":"runner:dev",
+				"architecture":"amd64"
+			}
+		}]
+	}`)
+	t.Setenv("INSTALLATION_ADMIN_TOKEN", "environment-token")
+
+	config, err := Load(filepath.Join(t.TempDir(), "missing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.InstallationAdminToken != "environment-token" {
+		t.Fatalf(
+			"installation admin token = %q",
+			config.InstallationAdminToken,
+		)
+	}
+}
+
 func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	_, err := Load(writeConfig(t, `{
