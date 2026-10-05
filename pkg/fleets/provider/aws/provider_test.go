@@ -89,7 +89,8 @@ func TestCreateTagsAWSResourcesWithRunnerIdentity(t *testing.T) {
 		t.Fatalf("subnet = %q", aws.ToString(input.SubnetId))
 	}
 	if input.MetadataOptions == nil ||
-		input.MetadataOptions.HttpTokens != types.HttpTokensStateRequired {
+		input.MetadataOptions.HttpTokens != types.HttpTokensStateRequired ||
+		aws.ToInt32(input.MetadataOptions.HttpPutResponseHopLimit) != 2 {
 		t.Fatalf("metadata options = %#v", input.MetadataOptions)
 	}
 	if got, err := base64.StdEncoding.DecodeString(aws.ToString(input.UserData)); err != nil || string(got) != "#!/bin/bash\n" {
