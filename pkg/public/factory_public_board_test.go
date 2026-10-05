@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,17 +10,69 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func TestPublicFactoryBoardNotesLoadError(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	vars := map[string]string{
+		"org":    r.Organization.Slug,
+		"key":    "missing-workspace",
+		"lineId": uuid.NewString(),
+	}
+	_, loadErr := loadPublicFactoryBoard(ctx, vars)
+	require.Error(t, loadErr)
+	require.NotErrorIs(t, loadErr, errPublicBoardNotFound)
+
+	request := httptest.NewRequest(http.MethodGet, "/board", nil)
+	request = request.WithContext(ctx)
+	request = grpc.WithServerErrorReport(request)
+	request = mux.SetURLVars(request, vars)
+
+	recorder := httptest.NewRecorder()
+	(&Server{}).handlePublicFactoryBoard(recorder, request)
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Equal(t, "Failed to load board\n", recorder.Body.String())
+	assert.NotContains(t, recorder.Body.String(), loadErr.Error())
+	assertNotedLoadError(t, request, loadErr)
+
+	socket := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	socket = socket.WithContext(ctx)
+	socket = grpc.WithServerErrorReport(socket)
+	socket = mux.SetURLVars(socket, vars)
+	socketRecorder := httptest.NewRecorder()
+	(&Server{}).handlePublicFactoryBoardWebSocket(socketRecorder, socket)
+
+	assert.Equal(t, http.StatusInternalServerError, socketRecorder.Code)
+	assert.Equal(t, "Failed to load board\n", socketRecorder.Body.String())
+	assert.NotContains(t, socketRecorder.Body.String(), loadErr.Error())
+	assertNotedLoadError(t, socket, loadErr)
+}
+
+func assertNotedLoadError(t *testing.T, request *http.Request, loadErr error) {
+	t.Helper()
+
+	noted, ok := grpc.NotedServerErrorFrom(request.Context())
+	require.True(t, ok)
+	require.Error(t, noted.Cause)
+	assert.Equal(t, loadErr, noted.Cause)
+}
 
 func TestPublicFactoryBoardHidesPrivateWorkspace(t *testing.T) {
 	r := support.Setup(t)
