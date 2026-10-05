@@ -31,6 +31,13 @@ function sectionOrder(dialog: HTMLElement) {
   };
 }
 
+async function showMergeConfidenceChecks(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
+  const header = await within(dialog).findByRole("button", { name: "Merge confidence" });
+  if (header.getAttribute("aria-expanded") === "false") {
+    await user.click(header);
+  }
+}
+
 describe("WorkOrderPopupRedesignPlayground", () => {
   it("opens the job report without ticket chrome or an artifact preview", () => {
     renderPlayground();
@@ -305,7 +312,8 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(await within(dialog).findByTestId("redesign-console-column-verify")).toBeInTheDocument();
-    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
+    await showMergeConfidenceChecks(user, dialog);
+    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Verify" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -338,7 +346,8 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("redesign-console-variant")).toBeInTheDocument();
-    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
+    await showMergeConfidenceChecks(user, dialog);
+    expect(within(dialog).getByText("Blast radius")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
   }, 20000);
 
