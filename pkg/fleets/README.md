@@ -43,6 +43,20 @@ from this layout:
 Each archive contains the runner binary and `install.sh`. Fleet Manager reads
 the selected archive checksum from `checksums.txt`. AWS bootstrap downloads
 the archive, verifies its SHA-256, extracts it, and runs the bundled installer.
+Set `aws.region` on every AWS fleet. Fleet Manager currently uses one AWS
+SDK credential configuration and creates a regional EC2 client for each fleet.
+
+Set `aws.cloudWatch.logGroupName` on a fleet to send
+`superplane-runner.service` output to CloudWatch Logs. The runner AMI must
+contain the Amazon CloudWatch Agent. Fleet Manager writes the runtime agent
+configuration, uses the fleet's `aws.region`, names the stream after the EC2
+instance ID, and starts the agent before it installs and starts the runner.
+Logging setup is best effort and does not prevent the runner from starting.
+The log group must already exist, and `aws.iamInstanceProfile` must name an
+instance profile that permits `logs:CreateLogStream`, `logs:DescribeLogGroups`,
+`logs:DescribeLogStreams`, and `logs:PutLogEvents` for that log group. The
+example configuration uses a placeholder profile name with this expected
+access.
 
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich

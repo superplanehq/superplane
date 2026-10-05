@@ -1,6 +1,36 @@
 #!/bin/bash
 set -euxo pipefail
 
+{{if .CloudWatchAgentConfig -}}
+configure_cloudwatch() {
+  local runner_log=/var/log/superplane-runner.log
+  local cloudwatch_config=/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+  install -m 0644 /dev/null "$runner_log" || return 1
+  cat > "$cloudwatch_config" <<'CLOUDWATCH_AGENT_CONFIG' || return 1
+{{.CloudWatchAgentConfig}}
+CLOUDWATCH_AGENT_CONFIG
+
+  install -d -m 0755 /etc/systemd/system/superplane-runner.service.d || return 1
+  cat > /etc/systemd/system/superplane-runner.service.d/20-cloudwatch.conf <<'SYSTEMD_DROP_IN' || return 1
+[Service]
+StandardOutput=append:/var/log/superplane-runner.log
+StandardError=append:/var/log/superplane-runner.log
+SYSTEMD_DROP_IN
+
+  systemctl enable amazon-cloudwatch-agent.service || return 1
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+    -a fetch-config \
+    -m ec2 \
+    -s \
+    -c "file:$cloudwatch_config" || return 1
+}
+
+if ! configure_cloudwatch; then
+  echo "CloudWatch Agent setup failed; runner installation will continue" >&2
+fi
+
+{{end -}}
 bundle_dir=$(mktemp -d)
 trap 'rm -rf "$bundle_dir"' EXIT
 
