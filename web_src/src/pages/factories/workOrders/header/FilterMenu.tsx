@@ -57,7 +57,10 @@ export function FilterMenu({
         >
           <Funnel className="size-3.5" aria-hidden />
           {filterCount > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-foreground">
+            <span
+              className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-red-600 dark:text-red-400"
+              data-testid="work-orders-filter-count"
+            >
               {filterCount}
             </span>
           ) : null}
