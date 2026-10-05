@@ -207,14 +207,22 @@ function CreateMenuSources({
   }
 
   return (
-    <div>
-      <Tabs value={activeSource.intakeId} onValueChange={onFocusedIntakeChange} className="gap-0 px-2.5 pt-1.5">
-        <TabsList data-testid="lines-backlog-create-tabs">
+    <div className="min-w-0 max-w-full">
+      <Tabs
+        value={activeSource.intakeId}
+        onValueChange={onFocusedIntakeChange}
+        className="min-w-0 max-w-full gap-0 px-2.5 pt-1.5"
+      >
+        <TabsList
+          data-testid="lines-backlog-create-tabs"
+          className="max-w-full min-w-0 flex-nowrap justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
+        >
           {sources.map((source) => (
             <TabsTrigger
               key={source.intakeId}
               value={source.intakeId}
               data-testid={`lines-backlog-create-tab-${source.intakeId}`}
+              className="flex-none"
             >
               <IntakeSourceIcon source={source} />
               {source.tabLabel}
