@@ -138,6 +138,104 @@ func TestExchangeAuthorizationCodeRejectsReusedCode(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestResolveClientAllowsEphemeralLoopbackPort(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	tests := []struct {
+		name       string
+		registered string
+		requested  string
+		allowed    bool
+	}{
+		{
+			name:       "ipv4 ephemeral port",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://127.0.0.1:52291/callback",
+			allowed:    true,
+		},
+		{
+			name:       "localhost ephemeral port",
+			registered: "http://localhost/callback",
+			requested:  "http://localhost:52291/callback",
+			allowed:    true,
+		},
+		{
+			name:       "ipv6 ephemeral port",
+			registered: "http://[::1]/callback",
+			requested:  "http://[::1]:52291/callback",
+			allowed:    true,
+		},
+		{
+			name:       "exact redirect",
+			registered: "https://app.example/callback",
+			requested:  "https://app.example/callback",
+			allowed:    true,
+		},
+		{
+			name:       "different path",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://127.0.0.1:52291/other",
+			allowed:    false,
+		},
+		{
+			name:       "different query",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://127.0.0.1:52291/callback?extra=1",
+			allowed:    false,
+		},
+		{
+			name:       "different host",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://127.0.0.2:52291/callback",
+			allowed:    false,
+		},
+		{
+			name:       "userinfo",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://user@127.0.0.1:52291/callback",
+			allowed:    false,
+		},
+		{
+			name:       "fragment",
+			registered: "http://127.0.0.1/callback",
+			requested:  "http://127.0.0.1:52291/callback#code",
+			allowed:    false,
+		},
+		{
+			name:       "non-loopback port change",
+			registered: "https://app.example/callback",
+			requested:  "https://app.example:8443/callback",
+			allowed:    false,
+		},
+		{
+			name:       "https loopback port change",
+			registered: "https://127.0.0.1/callback",
+			requested:  "https://127.0.0.1:8443/callback",
+			allowed:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientID := uuid.NewString()
+			_, err := models.CreateMCPOAuthClient(database.Conn(), clientID, "OpenCode", []string{test.registered})
+			require.NoError(t, err)
+
+			client, oauthErr := ResolveClient(t.Context(), database.Conn(), nil, clientID, test.requested)
+			if !test.allowed {
+				require.Nil(t, client)
+				require.NotNil(t, oauthErr)
+				require.Equal(t, "redirect_uri is not allowed", oauthErr.Error())
+				return
+			}
+			require.Nil(t, oauthErr)
+			require.NotNil(t, client)
+			require.Equal(t, clientID, client.ID)
+		})
+	}
+}
+
 func TestRegisterClientAllowsCursorRedirects(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
