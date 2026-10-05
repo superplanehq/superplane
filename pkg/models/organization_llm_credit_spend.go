@@ -80,36 +80,8 @@ func allocateHostedCreditSpend(
 		}
 	}
 
-	var expired, live []OrganizationLLMCreditGrant
-	for _, grant := range applyNegativeCreditAdjustments(grants) {
-		if grant.IsExpired(now) {
-			expired = append(expired, grant)
-			continue
-		}
-		live = append(live, grant)
-	}
-
-	sort.SliceStable(expired, func(i, j int) bool {
-		return grantExpiresBefore(expired[i], expired[j])
-	})
-	sortGrantsBySpendOrder(live)
-
-	consumedExpired := int64(0)
-	for _, grant := range expired {
-		if grant.AmountMicros <= 0 || grant.ExpiresAt == nil {
-			continue
-		}
-		billed := billedAtOrBefore[grant.ExpiresAt.UTC().UnixNano()]
-		available := billed - consumedExpired
-		if available < 0 {
-			available = 0
-		}
-		take := grant.AmountMicros
-		if take > available {
-			take = available
-		}
-		consumedExpired += take
-	}
+	expired, live := splitCreditGrantsForSpend(grants, now)
+	consumedExpired := consumedExpiredGrantSpend(expired, billedAtOrBefore)
 
 	spend := billedMicros - consumedExpired
 	if spend < 0 {
@@ -161,6 +133,62 @@ func allocateHostedCreditSpend(
 		PurchasedCreditMicros:    purchased,
 		WelcomeCreditExpiresAt:   welcomeExpiresAt,
 	}
+}
+
+func splitCreditGrantsForSpend(grants []OrganizationLLMCreditGrant, now time.Time) (expired, live []OrganizationLLMCreditGrant) {
+	for _, grant := range applyNegativeCreditAdjustments(grants) {
+		if grant.IsExpired(now) {
+			expired = append(expired, grant)
+			continue
+		}
+		live = append(live, grant)
+	}
+	sort.SliceStable(expired, func(i, j int) bool {
+		return grantExpiresBefore(expired[i], expired[j])
+	})
+	sortGrantsBySpendOrder(live)
+	return expired, live
+}
+
+func consumedExpiredGrantSpend(expired []OrganizationLLMCreditGrant, billedAtOrBefore map[int64]int64) int64 {
+	consumed := int64(0)
+	for _, grant := range expired {
+		if grant.AmountMicros <= 0 || grant.ExpiresAt == nil {
+			continue
+		}
+		billed := billedAtOrBefore[grant.ExpiresAt.UTC().UnixNano()]
+		available := billed - consumed
+		if available < 0 {
+			available = 0
+		}
+		take := grant.AmountMicros
+		if take > available {
+			take = available
+		}
+		consumed += take
+	}
+	return consumed
+}
+
+func liveHostedSpendMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, billedAtOrBefore map[int64]int64, now time.Time) int64 {
+	expired, _ := splitCreditGrantsForSpend(grants, now)
+	spend := billedMicros - consumedExpiredGrantSpend(expired, billedAtOrBefore)
+	if spend < 0 {
+		return 0
+	}
+	return spend
+}
+
+func liveWelcomeCapacityMicros(grants []OrganizationLLMCreditGrant, now time.Time) int64 {
+	_, live := splitCreditGrantsForSpend(grants, now)
+	var capacity int64
+	for _, grant := range live {
+		if grantCreditBucket(grant.Kind) != creditBucketWelcome || grant.AmountMicros <= 0 {
+			continue
+		}
+		capacity += grant.AmountMicros
+	}
+	return capacity
 }
 
 // applyNegativeCreditAdjustments returns a copy of grants without negative
