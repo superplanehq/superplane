@@ -13,12 +13,12 @@ func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 		"superplaneUrl":"https://superplane.example",
 		"installationAdminToken":"personal-token",
 		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
-		"awsRegion":"us-east-1",
 		"fleets":[{
 			"id":"linux-amd64",
 			"warmCapacity":1,
 			"maxCapacity":2,
 			"aws":{
+				"region":"us-east-1",
 				"ami":"ami-123",
 				"architecture":"amd64",
 				"subnetIds":["subnet-a"],
@@ -33,6 +33,9 @@ func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	if config.Fleets[0].AWS.InstanceType != "t3.micro" ||
 		config.Fleets[0].AWS.VolumeSizeGB != 30 {
 		t.Fatalf("defaults were not applied: %#v", config.Fleets[0].AWS)
+	}
+	if config.Fleets[0].AWS.Region != "us-east-1" {
+		t.Fatalf("AWS region = %q", config.Fleets[0].AWS.Region)
 	}
 	if config.Fleets[0].MaxCapacity != 2 {
 		t.Fatalf("maximum capacity = %d", config.Fleets[0].MaxCapacity)
@@ -78,10 +81,10 @@ func TestLoadFleetManagerIDAndAWSResourceTags(t *testing.T) {
 		"superplaneUrl":"https://superplane.example",
 		"installationAdminToken":"personal-token",
 		"runnerReleaseBaseUrl":"https://downloads.example/runner",
-		"awsRegion":"us-east-1",
 		"fleets":[{
 			"id":"linux-amd64",
 			"aws":{
+				"region":"us-east-1",
 				"ami":"ami-123",
 				"architecture":"amd64",
 				"subnetIds":["subnet-a"],
@@ -89,6 +92,9 @@ func TestLoadFleetManagerIDAndAWSResourceTags(t *testing.T) {
 				"resourceTags":{
 					"Environment":"production",
 					"CostCenter":"runners"
+				},
+				"cloudWatch":{
+					"logGroupName":" /superplane/runners "
 				}
 			}
 		}]
@@ -102,6 +108,50 @@ func TestLoadFleetManagerIDAndAWSResourceTags(t *testing.T) {
 	if config.Fleets[0].AWS.ResourceTags["Environment"] != "production" ||
 		config.Fleets[0].AWS.ResourceTags["CostCenter"] != "runners" {
 		t.Fatalf("resource tags = %#v", config.Fleets[0].AWS.ResourceTags)
+	}
+	if config.Fleets[0].AWS.CloudWatch.LogGroupName != "/superplane/runners" {
+		t.Fatalf(
+			"CloudWatch log group name = %q",
+			config.Fleets[0].AWS.CloudWatch.LogGroupName,
+		)
+	}
+}
+
+func TestLoadAllowsAWSFleetsInDifferentRegions(t *testing.T) {
+	config, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"fleets":[
+			{
+				"id":"linux-amd64",
+				"aws":{
+					"region":"us-east-1",
+					"ami":"ami-amd64",
+					"architecture":"amd64",
+					"subnetIds":["subnet-a"],
+					"securityGroupIds":["sg-a"]
+				}
+			},
+			{
+				"id":"linux-arm64",
+				"aws":{
+					"region":"us-west-2",
+					"ami":"ami-arm64",
+					"architecture":"arm64",
+					"subnetIds":["subnet-b"],
+					"securityGroupIds":["sg-b"]
+				}
+			}
+		]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Fleets[0].AWS.Region != "us-east-1" ||
+		config.Fleets[1].AWS.Region != "us-west-2" {
+		t.Fatalf("AWS fleet regions = %#v", config.Fleets)
 	}
 }
 
