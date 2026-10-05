@@ -166,6 +166,8 @@ function matchedFactoryStepIndexes(
   defaultSteps: PlanningReviewStep[],
 ): Map<number, number> {
   const matches = new Map<number, number>();
+  const used = new Set<number>();
+  const unmatched: number[] = [];
   let cursor = 0;
   defaultSteps.forEach((step, index) => {
     if (step.type === "prompt") {
@@ -173,12 +175,33 @@ function matchedFactoryStepIndexes(
     }
     const found = steps.findIndex((candidate, position) => position >= cursor && sameStepIdentity(candidate, step));
     if (found < 0) {
+      unmatched.push(index);
       return;
     }
     matches.set(index, found);
+    used.add(found);
     cursor = found + 1;
   });
+  matchReorderedFactorySteps(steps, defaultSteps, unmatched, matches, used);
   return matches;
+}
+
+function matchReorderedFactorySteps(
+  steps: PlanningReviewStep[],
+  defaultSteps: PlanningReviewStep[],
+  unmatched: number[],
+  matches: Map<number, number>,
+  used: Set<number>,
+): void {
+  for (const index of unmatched) {
+    const step = defaultSteps[index];
+    const found = steps.findIndex((candidate, position) => !used.has(position) && sameStepIdentity(candidate, step));
+    if (found < 0) {
+      continue;
+    }
+    matches.set(index, found);
+    used.add(found);
+  }
 }
 
 function sameStepIdentity(left: PlanningReviewStep, right: PlanningReviewStep): boolean {

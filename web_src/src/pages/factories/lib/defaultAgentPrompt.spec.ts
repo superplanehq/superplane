@@ -217,6 +217,43 @@ describe("applyDefaultAgentPrompts", () => {
     ]);
   });
 
+  it("keeps a restored prompt before a push step that was moved earlier", () => {
+    const draft = draftWith("implementation-agent-no-issue", [
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      { name: "Push output", type: "bash", command: "emit output" },
+    ]);
+    const implementation: PlanningReviewStep = {
+      name: "Implementation",
+      type: "prompt",
+      prompt: IMPLEMENT_PROMPT,
+      workingDirectory: "repo",
+    };
+    const pullRequest: PlanningReviewStep = {
+      name: "Generate PR title and description",
+      type: "prompt",
+      prompt: PR_PROMPT,
+    };
+
+    expect(
+      stepsOf(
+        applyDefaultAgentPrompts(draft, [
+          { name: "Clone Repo", type: "bash", command: "git clone --depth 1" },
+          implementation,
+          { name: "Commit and Push", type: "bash", command: "git push -u origin HEAD" },
+          pullRequest,
+          { name: "Push output", type: "bash", command: "jq ." },
+        ]),
+      ),
+    ).toEqual([
+      implementation,
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      pullRequest,
+      { name: "Push output", type: "bash", command: "emit output" },
+    ]);
+  });
+
   it("restores a prompt before the later step when an earlier step has the same name", () => {
     const draft = draftWith("implementation-agent-no-issue", [
       { name: "Format JS and Go code", type: "bash", command: "format early" },
