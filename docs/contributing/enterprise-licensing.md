@@ -14,6 +14,23 @@ without them.
 2. Otherwise, the license that an administrator installs in the UI is the
    source.
 
+## Enterprise code
+
+Code in the `ee/` directory is subject to the SuperPlane Enterprise Edition
+License in `ee/LICENSE`. All other code is licensed under the Apache License,
+Version 2.0. To add an Enterprise feature, follow
+[`ee/README.md`](../../ee/README.md).
+
+The Enterprise features are:
+
+| Feature        | Operations that require the license                    |
+| -------------- | ------------------------------------------------------ |
+| `custom_roles` | Create or update a custom role. Assign a custom role.  |
+| `groups`       | Create or update a group. Add a user to a group.       |
+
+When a license expires, existing custom roles and groups continue to work,
+and administrators can still remove them.
+
 ## Local development
 
 `make dev.server` enables every Enterprise feature when no license is

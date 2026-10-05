@@ -87,7 +87,7 @@ func (c *updateCommand) buildGroup(ctx core.CommandContext) (string, openapi_cli
 	}
 
 	// Only set the fields the user explicitly provided. The backend merges
-	// unspecified fields with the stored values (pkg/grpc/actions/auth/update_group.go).
+	// unspecified fields with the stored values (ee/rbac/update_group.go).
 	spec := openapi_client.GroupsGroupSpec{}
 	if ctx.Cmd.Flags().Changed("display-name") {
 		spec.SetDisplayName(*c.displayName)
