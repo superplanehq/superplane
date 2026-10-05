@@ -1,4 +1,4 @@
-import { ArrowRight, MessageSquare } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export function PlanningImplementationControls({
     </div>
   );
   return (
-    <section aria-label="Implementation" className={cn("shrink-0", !inline && "border-t border-border py-3")}>
+    <section aria-label="Implementation" className={cn("shrink-0", inline ? "pt-2" : "border-t border-border py-3")}>
       <div
         className={cn(!inline && SPLIT_RUN_CHAT_COLUMN_CLASSNAME, "flex flex-wrap items-center justify-between gap-2")}
       >
@@ -38,8 +38,14 @@ export function PlanningImplementationControls({
         ) : (
           <>
             {showSuggestChanges ? (
-              <Button type="button" variant="outline" size="sm" disabled={!canSend} onClick={onSuggestChanges}>
-                <MessageSquare aria-hidden className="size-4" />
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="px-0 text-[12px] font-normal text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                disabled={!canSend}
+                onClick={onSuggestChanges}
+              >
                 Suggest changes
               </Button>
             ) : (
