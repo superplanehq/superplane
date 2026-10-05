@@ -7,9 +7,6 @@ spec:
   edges:
     - channel: default
       sourceId: on-pr-risk
-      targetId: should-assess
-    - channel: "true"
-      sourceId: should-assess
       targetId: find-pull-request
     - channel: found
       sourceId: find-pull-request
@@ -25,19 +22,10 @@ spec:
           - synchronize
           - reopened
           - ready_for_review
+        ignoreDrafts: true
         repository: '{{ install_params.appRepository }}'
       position:
         x: 80
-        "y": 80
-      isCollapsed: true
-    - id: should-assess
-      name: Should Assess?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: 'root().data.pull_request.base.ref == "{{ install_params.defaultBranch }}" && root().data.pull_request.draft != true'
-      position:
-        x: 360
         "y": 80
       isCollapsed: true
     - id: find-pull-request
@@ -50,7 +38,7 @@ spec:
         number: "{{ root().data.pull_request.number }}"
         url: "{{ root().data.pull_request.html_url }}"
       position:
-        x: 640
+        x: 360
         "y": 80
       isCollapsed: true
     - id: assess-risk
@@ -207,6 +195,6 @@ spec:
               Say what you must do to undo the change, or say that a revert is enough.
               Do not repeat the score. Do not write a second sentence.
       position:
-        x: 920
+        x: 640
         "y": 80
       isCollapsed: true
