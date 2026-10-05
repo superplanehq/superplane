@@ -150,14 +150,9 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 		"version": float64(factoryTemplateVersion),
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
-
-	gate := findYAMLNode(t, canvas, "should-assess")
-	assert.Equal(
-		t,
-		`root().data.pull_request.base.ref == "main" && root().data.pull_request.draft != true`,
-		gate.Configuration["expression"],
-	)
+	assert.NotContains(t, result.canvasYAML, "should-assess")
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
@@ -176,7 +171,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, result.canvasYAML, `$["Find Pull Request"].data.workOrder.id`)
 	assert.NotContains(t, result.canvasYAML, "reportWorkOrderCheck")
 	assert.NotContains(t, result.canvasYAML, "merge-confidence.json")
-	assert.Len(t, canvas.Spec.Nodes, 4)
+	assert.Len(t, canvas.Spec.Nodes, 3)
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
