@@ -40,7 +40,7 @@ function stepsOf(draft: PlanningReviewDraft): PlanningReviewStep[] {
 }
 
 describe("defaultAgentPromptSteps", () => {
-  it("reads prompt steps from the matching agent node", () => {
+  it("reads ordered steps from the matching agent node", () => {
     const spec = {
       nodes: [
         {
@@ -64,6 +64,7 @@ describe("defaultAgentPromptSteps", () => {
     } as CanvasesCanvas["spec"];
 
     expect(defaultAgentPromptSteps(spec, "implementation-agent-no-issue")).toEqual([
+      { name: "Clone Repo", type: "bash", command: "git clone" },
       { name: "Implementation", type: "prompt", prompt: IMPLEMENT_PROMPT, workingDirectory: "repo" },
       { name: "Generate PR title and description", type: "prompt", prompt: PR_PROMPT },
     ]);
@@ -176,6 +177,43 @@ describe("applyDefaultAgentPrompts", () => {
     expect(stepsOf(applyDefaultAgentPrompts(draft, [refineDefault]))).toEqual([
       { name: "Clone repository", type: "bash", command: "git clone" },
       refineDefault,
+    ]);
+  });
+
+  it("puts restored prompts back before the bash steps that follow them", () => {
+    const draft = draftWith("implementation-agent-no-issue", [
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      { name: "Push output", type: "bash", command: "emit output" },
+    ]);
+    const implementation: PlanningReviewStep = {
+      name: "Implementation",
+      type: "prompt",
+      prompt: IMPLEMENT_PROMPT,
+      workingDirectory: "repo",
+    };
+    const pullRequest: PlanningReviewStep = {
+      name: "Generate PR title and description",
+      type: "prompt",
+      prompt: PR_PROMPT,
+    };
+
+    expect(
+      stepsOf(
+        applyDefaultAgentPrompts(draft, [
+          { name: "Clone Repo", type: "bash", command: "git clone --depth 1" },
+          implementation,
+          { name: "Commit and Push", type: "bash", command: "git push -u origin HEAD" },
+          pullRequest,
+          { name: "Push output", type: "bash", command: "jq ." },
+        ]),
+      ),
+    ).toEqual([
+      { name: "Clone Repo", type: "bash", command: "git clone" },
+      implementation,
+      { name: "Commit and Push", type: "bash", command: "git push" },
+      pullRequest,
+      { name: "Push output", type: "bash", command: "emit output" },
     ]);
   });
 

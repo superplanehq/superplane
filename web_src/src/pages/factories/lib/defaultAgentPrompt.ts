@@ -27,14 +27,21 @@ export function defaultAgentPromptSteps(
 
   const prompts: PlanningReviewStep[] = [];
   for (const value of steps) {
-    if (!isPromptStep(value)) {
+    if (isPromptStep(value)) {
+      const step: PlanningReviewStep = { name: value.name, type: "prompt", prompt: value.prompt };
+      if (typeof value.workingDirectory === "string") {
+        step.workingDirectory = value.workingDirectory;
+      }
+      prompts.push(step);
       continue;
     }
-    const step: PlanningReviewStep = {
-      name: value.name,
-      type: "prompt",
-      prompt: value.prompt,
-    };
+    if (!isBashStep(value)) {
+      continue;
+    }
+    const step: PlanningReviewStep = { name: value.name, type: "bash" };
+    if (typeof value.command === "string") {
+      step.command = value.command;
+    }
     if (typeof value.workingDirectory === "string") {
       step.workingDirectory = value.workingDirectory;
     }
@@ -85,7 +92,7 @@ function stepsWithDefaultPrompts(
 
   const current = steps.flatMap((step, index) => (step.type === "prompt" ? [{ index, name: step.name }] : []));
   if (current.length === 0) {
-    return [...steps, ...defaults.map(factoryPromptStep)];
+    return stepsWithRestoredPrompts(steps, defaultSteps, defaults);
   }
 
   const usedDefaults = new Set<number>();
@@ -108,6 +115,48 @@ function stepsWithDefaultPrompts(
   }
 
   return replaceAssignedPrompts(steps, assigned);
+}
+
+function stepsWithRestoredPrompts(
+  steps: PlanningReviewStep[],
+  defaultSteps: PlanningReviewStep[],
+  prompts: PlanningReviewStep[],
+): PlanningReviewStep[] {
+  if (!defaultSteps.some((step) => step.type === "bash")) {
+    return [...steps, ...prompts.map(factoryPromptStep)];
+  }
+
+  const insertions = prompts.map((prompt, order) => ({
+    index: promptInsertionIndex(steps, defaultSteps, prompt),
+    order,
+    step: factoryPromptStep(prompt),
+  }));
+  insertions.sort((left, right) => left.index - right.index || left.order - right.order);
+  const next = [...steps];
+  let offset = 0;
+  for (const insertion of insertions) {
+    next.splice(insertion.index + offset, 0, insertion.step);
+    offset += 1;
+  }
+  return next;
+}
+
+function promptInsertionIndex(
+  steps: PlanningReviewStep[],
+  defaultSteps: PlanningReviewStep[],
+  prompt: PlanningReviewStep,
+): number {
+  const following = defaultSteps.slice(defaultSteps.indexOf(prompt) + 1);
+  for (const anchor of following) {
+    if (anchor.type === "prompt") {
+      continue;
+    }
+    const index = steps.findIndex((step) => step.type === anchor.type && step.name === anchor.name);
+    if (index >= 0) {
+      return index;
+    }
+  }
+  return steps.length;
 }
 
 function replaceAssignedPrompts(steps: PlanningReviewStep[], assigned: Map<number, string>): PlanningReviewStep[] {
@@ -151,6 +200,13 @@ function isPromptStep(value: unknown): value is { name: string; prompt: string; 
     return false;
   }
   return value.type === "prompt" && typeof value.prompt === "string";
+}
+
+function isBashStep(value: unknown): value is { name: string; command?: unknown; workingDirectory?: unknown } {
+  if (!isRecord(value) || typeof value.name !== "string") {
+    return false;
+  }
+  return value.type === "bash";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
