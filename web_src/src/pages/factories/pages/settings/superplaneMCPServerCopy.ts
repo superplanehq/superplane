@@ -43,5 +43,13 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
       label: "Codex",
       steps: ["Run this command in a terminal.", "Open Codex CLI or the IDE extension.", "Sign in when Codex asks."],
     },
+    opencode: {
+      label: "OpenCode",
+      steps: [
+        "Open opencode.json.",
+        "Add the superplane server under mcp. Keep other servers.",
+        "Run opencode mcp auth superplane and sign in.",
+      ],
+    },
   },
 } as const;
