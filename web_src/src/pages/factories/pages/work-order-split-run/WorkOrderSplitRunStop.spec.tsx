@@ -177,7 +177,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByRole("region", { name: "Implementation" });
+    const strip = screen.getByTestId("split-run-intent-status-card");
     const settings = within(strip).getByTestId("split-run-intent-settings");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(settings).getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
@@ -271,7 +271,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByRole("region", { name: "Implementation" });
+    const strip = screen.getByTestId("split-run-intent-status-card");
     const settings = within(strip).getByTestId("split-run-intent-settings");
     const model = within(settings).getByRole("button", { name: "Model: Auto Medium" });
     expect(model).toHaveTextContent("Auto Medium");
@@ -305,7 +305,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByRole("region", { name: "Implementation" });
+    const strip = screen.getByTestId("split-run-intent-status-card");
     await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
@@ -333,7 +333,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByRole("region", { name: "Implementation" });
+    const strip = screen.getByTestId("split-run-intent-status-card");
     await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "High" }));
