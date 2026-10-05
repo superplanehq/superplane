@@ -1988,6 +1988,14 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
 }
 
+func factoryContextForCanvas(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, canvasID)
+	if err != nil || canvas == nil || canvas.FactoryID == nil {
+		return nil
+	}
+	return contexts.NewFactoryContext(tx, canvas, nil)
+}
+
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
@@ -2034,6 +2042,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
+		Factory:       factoryContextForCanvas(tx, node.WorkflowID),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }

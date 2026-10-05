@@ -37,8 +37,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 		},
 		Spec: &yaml.CanvasSpec{
 			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: prFeedbackPullRequestTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID},
+				{Channel: "default", SourceID: prFeedbackPullRequestTriggerNodeID, TargetID: prFeedbackActivityNodeID},
 				{Channel: "default", SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackWaitChecksNodeID},
 				{Channel: "passed", SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackMarkPassedNodeID},
 				{Channel: "failed", SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackStartRepairNodeID},
@@ -54,24 +53,12 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeTrigger,
 					Component: "github.onPullRequest",
 					Configuration: map[string]any{
-						"repository": request.Repository,
-						"actions":    []any{"opened", "reopened", "synchronize"},
+						"repository":              request.Repository,
+						"actions":                 []any{"opened", "reopened", "synchronize"},
+						"onlyFactoryPullRequests": true,
 					},
 					Integration: request.Binding.integrationRef(),
 					Position:    yaml.Position{X: 80, Y: 260},
-				},
-				{
-					ID:        prFeedbackFindNodeID,
-					Name:      "Find Pull Request",
-					Type:      yaml.NodeTypeAction,
-					Component: prFeedbackFindComponent,
-					Configuration: map[string]any{
-						"provider":   "github",
-						"repository": "{{ root().data.repository.full_name }}",
-						"number":     "{{ root().data.pull_request.number }}",
-						"url":        "{{ root().data.pull_request.html_url }}",
-					},
-					Position: yaml.Position{X: 360, Y: 260},
 				},
 				{
 					ID:        prFeedbackActivityNodeID,
@@ -79,7 +66,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackActivityComponent,
 					Configuration: map[string]any{
-						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
+						"pullRequestId": `{{ root().data.pullRequest.id }}`,
 						"revision":      prFeedbackPRHeadSHAExpression(),
 						"access":        "concurrent",
 						"title":         prFeedbackChecksWaitingTitleExpression(),

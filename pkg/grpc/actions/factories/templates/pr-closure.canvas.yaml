@@ -7,9 +7,6 @@ spec:
   edges:
     - channel: default
       sourceId: on-pr-closed
-      targetId: find-pull-request
-    - channel: found
-      sourceId: find-pull-request
       targetId: add-pr-activity
     - channel: default
       sourceId: add-pr-activity
@@ -43,30 +40,18 @@ spec:
       configuration:
         actions:
           - closed
+        onlyFactoryPullRequests: true
         repository: '{{ install_params.appRepository }}'
       position:
         x: 1272
         'y': 72
-      isCollapsed: true
-    - id: find-pull-request
-      name: Find Pull Request
-      type: TYPE_ACTION
-      component: findPullRequest
-      configuration:
-        provider: github
-        repository: '{{ root().data.repository.full_name }}'
-        number: '{{ root().data.pull_request.number }}'
-        url: '{{ root().data.pull_request.html_url }}'
-      position:
-        x: 1272
-        'y': 432
       isCollapsed: true
     - id: add-pr-activity
       name: Add Pull Request Activity
       type: TYPE_ACTION
       component: addPullRequestActivity
       configuration:
-        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        pullRequestId: '{{ root().data.pullRequest.id }}'
         description: '{{ "PR #" + string(root().data.pull_request.number) + " was " + (root().data.pull_request.merged == true ? "merged" : "closed") }}'
       position:
         x: 1272
@@ -87,7 +72,7 @@ spec:
       type: TYPE_ACTION
       component: updatePullRequest
       configuration:
-        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        pullRequestId: '{{ root().data.pullRequest.id }}'
         merged: '{{ root().data.pull_request.merged }}'
         mergedAt: '{{ root().data.pull_request.merged_at }}'
         state: '{{ root().data.pull_request.state }}'
@@ -100,7 +85,7 @@ spec:
       type: TYPE_ACTION
       component: updatePullRequest
       configuration:
-        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        pullRequestId: '{{ root().data.pullRequest.id }}'
         closedAt: '{{ root().data.pull_request.closed_at }}'
         merged: '{{ root().data.pull_request.merged }}'
         state: '{{ root().data.pull_request.state }}'
@@ -113,7 +98,7 @@ spec:
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        orderId: '{{ root().data.workOrder.id }}'
         result: completed
         status: closed
       position:
@@ -125,7 +110,7 @@ spec:
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        orderId: '{{ root().data.workOrder.id }}'
         result: rejected
         status: closed
       position:
@@ -137,7 +122,7 @@ spec:
       type: TYPE_ACTION
       component: if
       configuration:
-        expression: $["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2
+        expression: root().data.workOrder.origin != nil && split(root().data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2
       position:
         x: 1132
         'y': 1512
@@ -147,8 +132,8 @@ spec:
       type: TYPE_ACTION
       component: github.createIssueComment
       configuration:
-        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
-        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
+        repository: '{{ split(split(root().data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split(root().data.workOrder.origin.url, "/issues/")[1] }}'
         body: 'SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).'
       position:
         x: 1132
@@ -159,8 +144,8 @@ spec:
       type: TYPE_ACTION
       component: github.updateIssue
       configuration:
-        repository: '{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
-        issueNumber: '{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}'
+        repository: '{{ split(split(root().data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}'
+        issueNumber: '{{ split(root().data.workOrder.origin.url, "/issues/")[1] }}'
         state: closed
       position:
         x: 1132

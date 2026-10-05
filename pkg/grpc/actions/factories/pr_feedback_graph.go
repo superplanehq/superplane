@@ -133,7 +133,7 @@ func resolvePRFeedbackDiscussionFlow(
 }
 
 func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
-	if g.PullRequestTriggerNodeID == "" || g.FindNodeID == "" || g.ActivityNodeID == "" {
+	if g.PullRequestTriggerNodeID == "" || g.ActivityNodeID == "" {
 		return false
 	}
 	if g.WaitChecksNodeID == "" || g.StartRepairNodeID == "" || g.RunnerNodeID == "" {
@@ -142,10 +142,12 @@ func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
 	if g.MarkPassedNodeID == "" || g.PauseFixesNodeID == "" || g.StopWaitingNodeID == "" || g.RecordTimeoutNodeID == "" {
 		return false
 	}
-	if !hasCanvasPath(spec.Edges, g.PullRequestTriggerNodeID, g.FindNodeID) {
-		return false
-	}
-	if !hasCanvasPath(spec.Edges, g.FindNodeID, g.ActivityNodeID) {
+	if g.FindNodeID != "" {
+		if !hasCanvasPath(spec.Edges, g.PullRequestTriggerNodeID, g.FindNodeID) ||
+			!hasCanvasPath(spec.Edges, g.FindNodeID, g.ActivityNodeID) {
+			return false
+		}
+	} else if !hasCanvasPath(spec.Edges, g.PullRequestTriggerNodeID, g.ActivityNodeID) {
 		return false
 	}
 	if !hasCanvasPath(spec.Edges, g.ActivityNodeID, g.WaitChecksNodeID) {
