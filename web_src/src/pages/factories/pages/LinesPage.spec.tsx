@@ -1486,24 +1486,40 @@ describe("LinesPage board editing", () => {
     await resetLinesBoardMocks();
   });
 
-  it("renames the board title on Enter", async () => {
-    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+  it("opens the line edit page from the board view menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-board-title"));
-    const input = await screen.findByTestId("lines-board-title-input");
-    await waitFor(() => expect(input).toHaveFocus());
-    await user.clear(input);
-    await user.type(input, "Refund line");
-    await user.keyboard("{Enter}");
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByTestId("lines-board-edit-line"));
 
-    await waitFor(() => {
-      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
-        lineId: REFUND_LINE_PLAN_ID,
-        name: "Refund line",
-      });
-    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}/edit`,
+    );
+  });
+
+  it("shows the workspace name and does not rename the line", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const title = screen.getByTestId("workspace-page-header-title");
+    expect(title).toHaveTextContent("Semaphore");
+    expect(title).not.toHaveTextContent("Plan and Implement");
+    await user.click(title);
+    expect(screen.queryByTestId("lines-board-title-input")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("shows an emoji workspace name as stored", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "SuperPlane Prod 🚀" });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("SuperPlane Prod 🚀");
+  });
+
+  it("shows Workspace when the workspace name is empty", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "   " });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
   it("renames a column title on Enter", async () => {

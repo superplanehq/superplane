@@ -31,6 +31,7 @@ import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
+  editFactoryLinePath,
   factoryHomePath,
   factoryIntakePath,
   factoryLineDetailPath,
@@ -38,7 +39,6 @@ import {
   firstFactoryLineId,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
-import { humanizeLineName } from "../lib/humanizeLineName";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
@@ -94,7 +94,7 @@ export function MobileBoardPage() {
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const selectedLine = lines.find((line) => line.id === routeLineId) ?? null;
 
-  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
+  usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   if (!selectedLine?.id) {
     return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
@@ -309,6 +309,7 @@ function MobileLineBoard(props: {
         factoryId={factoryId}
         factoryKey={routeSegment}
         canManageClosedStatus={canConfigureFactory}
+        editHref={canConfigureFactory ? editFactoryLinePath(organizationId, routeSegment, lineId) : undefined}
       />
       <MobileColumnCarousel
         columns={model.columns}
