@@ -39,5 +39,9 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
       label: "VS Code",
       steps: ["Open MCP settings in VS Code.", "Paste this object into mcp.json.", "Sign in when VS Code asks."],
     },
+    codex: {
+      label: "Codex",
+      steps: ["Run this command in a terminal.", "Open Codex CLI or the IDE extension.", "Sign in when Codex asks."],
+    },
   },
 } as const;

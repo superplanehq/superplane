@@ -395,6 +395,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Codex");
     expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
@@ -420,6 +421,27 @@ describe("FactorySettingsMCPPage", () => {
     await user.click(screen.getByTestId("superplane-mcp-client-tool-vscode"));
     expect(screen.getByText("Open MCP settings in VS Code.")).toBeInTheDocument();
     expect(screen.getByTestId("superplane-mcp-config-copy-vscode")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-codex"));
+    expect(screen.getByText("Open Codex CLI or the IDE extension.")).toBeInTheDocument();
+    const copyButton = screen.getByTestId("superplane-mcp-config-copy-codex");
+    expect(copyButton).toHaveAttribute("aria-label", "Copy command");
+
+    const writeText = vi.fn(() => Promise.resolve());
+    const previousClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    try {
+      await user.click(copyButton);
+      expect(writeText).toHaveBeenCalledWith(`codex mcp add superplane --url ${window.location.origin}/mcp`);
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: previousClipboard,
+      });
+    }
   }, 10000);
 
   it("lists a connected SuperPlane MCP client and revokes it", async () => {
