@@ -106,6 +106,7 @@ export function IntakeSettingsHost({
               organizationId,
               factoryId,
               factoryKey,
+              automationId: intake.appId,
               onSave: agent.save,
             }
           : undefined
