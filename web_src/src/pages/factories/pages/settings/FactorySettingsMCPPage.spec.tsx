@@ -395,6 +395,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
     expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
+    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Codex");
     expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
@@ -420,6 +421,10 @@ describe("FactorySettingsMCPPage", () => {
     await user.click(screen.getByTestId("superplane-mcp-client-tool-vscode"));
     expect(screen.getByText("Open MCP settings in VS Code.")).toBeInTheDocument();
     expect(screen.getByTestId("superplane-mcp-config-copy-vscode")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-codex"));
+    expect(screen.getByText("Open Codex CLI or the IDE extension.")).toBeInTheDocument();
+    expect(screen.getByTestId("superplane-mcp-config-copy-codex")).toHaveAttribute("aria-label", "Copy command");
   }, 10000);
 
   it("lists a connected SuperPlane MCP client and revokes it", async () => {
