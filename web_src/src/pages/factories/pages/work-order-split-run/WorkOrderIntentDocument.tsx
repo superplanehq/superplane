@@ -152,6 +152,7 @@ function withClosedDecision(
   const startTone = planningStartTone(analysisChat);
   return {
     ...analysisChat,
+    startDiscouraged: !analysisChat.creditVerdict && (startTone === "caution" || startTone === "blocked"),
     prioritizeImplementation:
       Boolean(analysisChat.canTogglePlan) && startTone === "ready" && analysisChat.view.machineStatus === "waiting",
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,

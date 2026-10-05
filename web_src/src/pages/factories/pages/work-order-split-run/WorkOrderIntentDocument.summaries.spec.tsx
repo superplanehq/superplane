@@ -83,6 +83,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const start = within(implementation).getByRole("button", { name: "Start" });
     expect(start).toBeEnabled();
     expect(start).not.toHaveClass("bg-primary");
+    expect(implementation).toHaveTextContent("Starting not recommended");
     expect(within(plan).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: /Which customers/ }), "Only paying customers");
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
@@ -190,13 +191,18 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const start = within(settings).getByRole("button", { name: "Start" });
     expect(plan.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(model.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("split-run-intent-chat-log")).toContainElement(settings);
     expect(start).toHaveClass("bg-primary");
+    expect(settings).not.toHaveTextContent("Starting not recommended");
     expect(within(settings).getByTestId("split-run-draft-action-group")).not.toHaveClass("border");
     expect(screen.queryByTestId("split-run-intent-decision-tip")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
     await user.click(within(settings).getByRole("button", { name: "Suggest changes" }));
     expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toHaveFocus();
-    expect(start).toBeEnabled();
+    expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(
+      screen.getByRole("region", { name: "Implementation" }),
+    );
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
   it.each([
@@ -241,6 +247,10 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const start = screen.getByRole("button", { name: "Start" });
     expect(start).not.toHaveClass("bg-primary");
     expect(start).toHaveClass("border");
+    expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(
+      screen.getByRole("region", { name: "Implementation" }),
+    );
+    expect(screen.getByRole("region", { name: "Implementation" })).toHaveTextContent("Starting not recommended");
     expect(start).toBeEnabled();
     expect(screen.queryByTestId("split-run-intent-settings")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeInTheDocument();
