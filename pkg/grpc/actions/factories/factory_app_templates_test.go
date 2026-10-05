@@ -153,6 +153,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
 	assert.NotContains(t, result.canvasYAML, "should-assess")
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-pr-risk", TargetID: "find-pull-request", Channel: "default"})
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
