@@ -44,7 +44,7 @@ func (s *Service) UpdateRole(ctx context.Context, domainType, domainID, roleName
 }
 
 func (s *Service) CreateGroup(ctx context.Context, domainType, domainID string, group *pbGroups.Group) (*pbGroups.CreateGroupResponse, error) {
-	if err := s.require(licensing.FeatureGroups); err != nil {
+	if err := s.requireGroupRole(domainType, group.GetSpec().GetRole()); err != nil {
 		return nil, err
 	}
 
@@ -52,7 +52,7 @@ func (s *Service) CreateGroup(ctx context.Context, domainType, domainID string, 
 }
 
 func (s *Service) UpdateGroup(ctx context.Context, domainType, domainID, groupName string, spec *pbGroups.Group_Spec) (*pbGroups.UpdateGroupResponse, error) {
-	if err := s.require(licensing.FeatureGroups); err != nil {
+	if err := s.requireGroupRole(domainType, spec.GetRole()); err != nil {
 		return nil, err
 	}
 
@@ -65,6 +65,20 @@ func (s *Service) AddUserToGroup(ctx context.Context, orgID, domainType, domainI
 	}
 
 	return addUserToGroup(ctx, orgID, domainType, domainID, userID, userEmail, groupName, s.authService)
+}
+
+// requireGroupRole also requires custom roles when a group write assigns a
+// custom role, because the group members gain that role.
+func (s *Service) requireGroupRole(domainType, role string) error {
+	if err := s.require(licensing.FeatureGroups); err != nil {
+		return err
+	}
+
+	if role == "" || s.authService.IsDefaultRole(role, domainType) {
+		return nil
+	}
+
+	return s.require(licensing.FeatureCustomRoles)
 }
 
 func (s *Service) require(feature licensing.Feature) error {

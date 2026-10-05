@@ -122,4 +122,20 @@ func Test_ServiceRequiresLicense(t *testing.T) {
 		_, err = service.AddUserToGroup(ctx, orgID, domainType, orgID, r.User.String(), "", "licensed-group")
 		require.NoError(t, err)
 	})
+
+	t.Run("a group cannot grant a custom role without the custom roles feature", func(t *testing.T) {
+		service := NewService(r.AuthService, fakeEntitlements{licensing.FeatureGroups: true})
+
+		group := testGroup("custom-role-group")
+		group.Spec.Role = "licensed-role"
+		_, err := service.CreateGroup(ctx, domainType, orgID, group)
+		assertNotLicensed(t, err)
+
+		_, err = service.UpdateGroup(ctx, domainType, orgID, "licensed-group", &pbGroups.Group_Spec{Role: "licensed-role"})
+		assertNotLicensed(t, err)
+
+		role, err := r.AuthService.GetGroupRole(ctx, orgID, domainType, "licensed-group")
+		require.NoError(t, err)
+		assert.Equal(t, models.RoleOrgOperator, role)
+	})
 }
