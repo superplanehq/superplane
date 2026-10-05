@@ -19,9 +19,19 @@ const KIND_LABEL: Record<PlanningReviewStepKind, string> = { bash: "Bash", promp
 export function PlanningReviewStepList({
   steps,
   onChange,
+  onRestoreDefaultPrompt,
+  restoreDefaultPromptDisabled = false,
+  restoreError,
+  onRetryRestore,
+  restoreRetryDisabled = false,
 }: {
   steps: PlanningReviewStep[];
   onChange: (steps: PlanningReviewStep[]) => void;
+  onRestoreDefaultPrompt?: () => void;
+  restoreDefaultPromptDisabled?: boolean;
+  restoreError?: string;
+  onRetryRestore?: () => void;
+  restoreRetryDisabled?: boolean;
 }) {
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [openStep, setOpenStep] = useState("");
@@ -55,11 +65,44 @@ export function PlanningReviewStepList({
           {steps.length}
         </span>
         <span className="flex-1" />
+        {onRestoreDefaultPrompt ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={onRestoreDefaultPrompt}
+            disabled={restoreDefaultPromptDisabled}
+            data-testid="planning-review-restore-default-prompt"
+          >
+            Restore default prompt
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" size="sm" onClick={addStep} data-testid="planning-review-add-step">
           <Plus aria-hidden />
           Add step
         </Button>
       </header>
+      {restoreError ? (
+        <div className="flex items-center gap-3 border-b border-border px-5 py-2.5">
+          <p className="text-sm text-destructive" data-testid="planning-review-restore-default-prompt-error">
+            {restoreError}
+          </p>
+          {onRetryRestore ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={onRetryRestore}
+              disabled={restoreRetryDisabled}
+              data-testid="planning-review-restore-default-prompt-retry"
+            >
+              Retry
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {steps.length === 0 ? (
         <p className="px-5 py-10 text-center text-sm text-muted-foreground" data-testid="planning-review-steps-empty">
           This agent has no steps yet. Add a step to tell the runner what to do.
