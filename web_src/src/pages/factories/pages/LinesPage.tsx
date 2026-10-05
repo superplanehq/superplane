@@ -38,7 +38,6 @@ import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
-import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -170,7 +169,6 @@ import {
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
-import { humanizeLineName } from "../lib/humanizeLineName";
 import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
   factoryKanbanPageClassName,
@@ -441,7 +439,7 @@ export function LinesPage() {
     peekHint,
   );
 
-  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
+  usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
@@ -861,7 +859,6 @@ function LineDetailHeader({
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
-  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
@@ -878,39 +875,17 @@ function LineDetailHeader({
       ),
     [entries, orgUsers],
   );
-  const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const factoryKey = factoryRouteSegment(factory);
-
-  const handleRename = async (name: string) => {
-    if (!line.id) {
-      return;
-    }
-    try {
-      await updateLine.mutateAsync({ lineId: line.id, name });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to rename line"));
-    }
-  };
 
   return (
     <>
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         data-testid="lines-detail-header"
-        title={
-          <ClickToRename
-            value={title}
-            onSave={(name) => void handleRename(name)}
-            canEdit={canUpdate && Boolean(line.id)}
-            busy={updateLine.isPending}
-            testId="lines-board-title"
-            ariaLabel="Line name"
-            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-          />
-        }
+        title={factory?.name?.trim() || "Workspace"}
         leading={
           nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
