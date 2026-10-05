@@ -217,7 +217,7 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     const pendingChips = screen.getByTestId("split-run-intent-composer-chips");
     expect(within(pendingChips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
-    expect(within(pendingChips).getByRole("button", { name: CREATE_WITH_AGENT_COPY.plan })).toBeInTheDocument();
+    expect(within(pendingChips).getByRole("button", { name: /^(Open|Hide) plan$/ })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(
       within(pendingChips).getByTestId("split-run-intent-plan-chip-analyzing").querySelector(".t-matrix"),
