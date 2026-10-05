@@ -305,8 +305,12 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(await within(dialog).findByTestId("redesign-console-column-verify")).toBeInTheDocument();
-    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
-    expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
+    const verifyChecks = await within(dialog).findByTestId("redesign-console-checks");
+    const verifyHeader = within(verifyChecks).getByRole("button", { name: "Merge confidence" });
+    expect(verifyHeader).toHaveAttribute("aria-expanded", "false");
+    await user.click(verifyHeader);
+    expect(within(verifyChecks).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(verifyChecks).getByText("Code quality")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Verify" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
 
@@ -338,8 +342,12 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("redesign-console-variant")).toBeInTheDocument();
-    expect(await within(dialog).findByText("Blast radius")).toBeInTheDocument();
-    expect(within(dialog).getByText("Code quality")).toBeInTheDocument();
+    const doneChecks = await within(dialog).findByTestId("redesign-console-checks");
+    const doneHeader = within(doneChecks).getByRole("button", { name: "Merge confidence" });
+    expect(doneHeader).toHaveAttribute("aria-expanded", "false");
+    await user.click(doneHeader);
+    expect(within(doneChecks).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(doneChecks).getByText("Code quality")).toBeInTheDocument();
   }, 20000);
 
   it("dispatches a draft task to the open line", async () => {
