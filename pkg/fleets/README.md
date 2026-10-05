@@ -44,7 +44,9 @@ Set the fleet's `runnerVersion` to an immutable release ID. Supported IDs are
 `sha:<40-character-lowercase-git-sha>` and `v<semantic-version>`, for example
 `sha:0123456789abcdef0123456789abcdef01234567` or `v1.2.3`.
 SHA builds require a clean checkout whose `HEAD` matches the release ID, and
-the uploader refuses to write any SHA release prefix that already exists.
+the uploader resumes partial SHA releases only when existing objects match the
+local artifacts. A published `checksums.txt` marks the release complete and
+prevents later uploads.
 SHA uploads require an AWS CLI v2 release that supports
 `s3api put-object --if-none-match`.
 
