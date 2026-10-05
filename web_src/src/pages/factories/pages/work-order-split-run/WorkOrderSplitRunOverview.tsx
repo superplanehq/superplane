@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_TASK_PLANNING_REVIEW } from "@/lib/experimentalFeatures";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
@@ -72,6 +74,7 @@ export function WorkOrderSplitRunOverview({
   onDescriptionSave?: (next: string) => void | Promise<void>;
   sidebarNote?: ReactNode;
 }) {
+  const planningReviewEnabled = useExperimentalFeature(organizationId).has(FEATURE_TASK_PLANNING_REVIEW);
   if (sourceOnly) {
     return (
       <SourceOnlyOverview
@@ -100,6 +103,7 @@ export function WorkOrderSplitRunOverview({
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-work-order-tab">
       <WorkOrderIntentDocument
+        planningReviewEnabled={planningReviewEnabled}
         title={title}
         description={description}
         streamKey={orderId ?? orderNumber}

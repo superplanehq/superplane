@@ -493,3 +493,26 @@ func Test__Linear__Definition(t *testing.T) {
 	assert.Equal(t, "linear.onIssueLabel", triggers[2].Name())
 	assert.Equal(t, "linear.onIssueAttachment", triggers[3].Name())
 }
+
+func Test__Linear__Instructions(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "")
+
+	text := (&Linear{}).Instructions()
+	assert.Contains(t, text, "Administration")
+	assert.Contains(t, text, "API")
+	assert.Contains(t, text, "admin")
+	assert.Contains(t, text, "Client ID")
+	assert.Contains(t, text, "read")
+	assert.Contains(t, text, "write")
+}
+
+func Test__Linear__Instructions__Hosted(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "hosted-client")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "hosted-secret")
+
+	text := (&Linear{}).Instructions()
+	assert.Contains(t, text, "Connect")
+	assert.Contains(t, text, "Client ID")
+	assert.Contains(t, text, "admin")
+}

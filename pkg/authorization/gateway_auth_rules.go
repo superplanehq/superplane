@@ -434,6 +434,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/hosted-llm-models"}: {
 			Resource:   "org",
 			Action:     "read",
@@ -445,6 +450,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/byok-models"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/hosted-models"}: {
 			Resource:   "org",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
@@ -980,6 +990,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/byok-models"}: {
+			Resource:   "org",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/hosted-models"}: {
 			Resource:   "org",
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,

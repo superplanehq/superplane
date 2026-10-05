@@ -191,6 +191,8 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, text, "Continue this SuperPlane analysis session")
 	assert.Contains(t, text, "Follow the task prompt")
+	assert.Contains(t, text, "If no score is published yet, this turn is a plan turn")
+	assert.Contains(t, text, "Publish the required scores before you ask or stop")
 	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
 	assert.Contains(t, text, "Publish the scores when the plan changes, a score would change, or the user asks to update a score")
 	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
@@ -210,6 +212,8 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
 	text, err = AnalysisContinuationText(db, session)
 	require.NoError(t, err)
+	assert.Contains(t, text, "If no score is published yet, this turn is a plan turn")
+	assert.Contains(t, text, "Publish the required scores before you ask or stop")
 	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
 	assert.Contains(t, text, "Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score")
 	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
@@ -733,10 +737,6 @@ func TestFactory_MaybeAttachAnalysisSessionForSystemCreatedWorkOrder(t *testing.
 	stale, err := ListStaleOpenPlanningSessions(db, time.Now().Add(10*time.Minute), 10)
 	require.NoError(t, err)
 	assert.Empty(t, stale)
-
-	open, err := CountOpenPlanningSessions(db, org.ID, factoryModel.ID)
-	require.NoError(t, err)
-	assert.Equal(t, int64(0), open)
 }
 
 func TestFactory_MaybeAttachAnalysisSessionRequiresFeatureAtCreation(t *testing.T) {

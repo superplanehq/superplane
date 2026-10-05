@@ -39,6 +39,15 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory linear intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryLinearIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryLinearIntake, f.ID)
+		assert.Equal(t, "Factory Linear Intake", f.Label)
+		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -116,6 +125,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns mobile board feature", func(t *testing.T) {
+		f, ok := Get(FeatureMobileFactoryBoard)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureMobileFactoryBoard, f.ID)
+		assert.Equal(t, "Mobile Board", f.Label)
+		assert.Equal(t, "Show the mobile workspace shell on phone-width screens", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -152,6 +170,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
+	assert.True(t, Exists(FeatureFactoryLinearIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
@@ -161,6 +180,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
+	assert.True(t, Exists(FeatureMobileFactoryBoard))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))

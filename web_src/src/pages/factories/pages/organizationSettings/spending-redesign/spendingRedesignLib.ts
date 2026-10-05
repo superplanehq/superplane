@@ -92,7 +92,7 @@ export const EMPTY_SPENDING_FILTERS: SpendingFilters = {
 
 export const SPENDING_FUNDING_SOURCE_OPTIONS: SpendingCatalogItem[] = [
   { id: "hosted", label: "SuperPlane-hosted" },
-  { id: "byok", label: "Your keys" },
+  { id: "byok", label: "Bring your own key" },
 ];
 
 export const SPENDING_PERIOD_PRESETS: Array<{
@@ -260,7 +260,8 @@ export function spendingUsageCopy(kind: SpendingUsageKind): {
   if (kind === "model") {
     return {
       title: "Model usage",
-      description: "SuperPlane-hosted model usage uses hosted credit. Your keys usage is estimated and is not billed.",
+      description:
+        "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed.",
       emptyMessage: "No model usage is recorded for this period.",
       testIdPrefix: "spending-model",
       breakdownOptions: MODEL_BREAKDOWN_OPTIONS,

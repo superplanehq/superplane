@@ -65,7 +65,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
 - **Model**: Required. Select a model from Organization LLM Models.
@@ -86,7 +86,7 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 	model := runner.AgentModelField("openrouter")
 	model.Required = true
 	return []configuration.Field{
-		runner.AgentMachineTypeField(),
+		runner.MachineTypeField("machineType"),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
 			SecretLabel:      "OpenRouter API Key",
 			IntegrationName:  "openrouter",
@@ -140,13 +140,17 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	client, backend, err := runner.NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
+	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	if err != nil {
+		return err
+	}
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
@@ -159,10 +163,11 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task = applyPlanningFollowUp(task, environment, spec)
 	task = attachPlanningSessionFiles(task, environment)
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
+	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
@@ -175,7 +180,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID)
+	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {

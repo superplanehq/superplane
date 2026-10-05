@@ -1,16 +1,27 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { OrganizationSpendingExplorer } from "@/pages/factories/pages/organizationSettings/spending-redesign/OrganizationSpendingExplorer";
 import { ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import { Link, useParams } from "react-router";
+
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
 import { OrgOverviewPanel } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
+import { useAdminOrganizationSpendingReport } from "./useAdminOrganizationSpendingReport";
 
-const ORGANIZATION_TABS = ["overview", "users", "automations", "connections", "features", "credits"] as const;
+const ORGANIZATION_TABS = [
+  "overview",
+  "users",
+  "automations",
+  "connections",
+  "features",
+  "spending",
+  "credits",
+] as const;
 
 type OrganizationTab = (typeof ORGANIZATION_TABS)[number];
 
@@ -22,6 +33,7 @@ const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
   const [tab, setTab] = useState<OrganizationTab>("overview");
   const [creditsVisited, setCreditsVisited] = useState(false);
+  const [spendingVisited, setSpendingVisited] = useState(false);
 
   useReportPageReady(true);
 
@@ -43,6 +55,9 @@ const OrganizationDetail: React.FC = () => {
           if (nextTab === "credits") {
             setCreditsVisited(true);
           }
+          if (nextTab === "spending") {
+            setSpendingVisited(true);
+          }
           setTab(nextTab);
         }}
       >
@@ -52,6 +67,7 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="automations">Automations</TabsTrigger>
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="spending">Spending</TabsTrigger>
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-3">
@@ -68,6 +84,17 @@ const OrganizationDetail: React.FC = () => {
         </TabsContent>
         <TabsContent value="features" className="mt-3">
           <OrgExperimentalFeaturesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent
+          value="spending"
+          forceMount={spendingVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
+          <OrganizationSpendingExplorer
+            organizationId={orgId!}
+            setDocumentTitle={false}
+            useReport={useAdminOrganizationSpendingReport}
+          />
         </TabsContent>
         <TabsContent
           value="credits"

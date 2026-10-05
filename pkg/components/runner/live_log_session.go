@@ -42,6 +42,7 @@ type LiveLogStreamTokenClaims struct {
 
 // LiveLogSession is returned to the browser after SuperPlane authorizes log access.
 type LiveLogSession struct {
+	Backend   string    `json:"backend"`
 	StreamURL string    `json:"stream_url"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -50,6 +51,7 @@ type LiveLogSession struct {
 // LiveLogAccessContext is the resolved runner execution context for live log access.
 type LiveLogAccessContext struct {
 	BrokerTaskID string
+	TaskBackend  string
 }
 
 func IsRunnerComponent(name string) bool {
@@ -111,7 +113,10 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 		return nil, ErrLiveLogBrokerTaskMissing
 	}
 
-	return &LiveLogAccessContext{BrokerTaskID: brokerTaskID}, nil
+	return &LiveLogAccessContext{
+		BrokerTaskID: brokerTaskID,
+		TaskBackend:  TaskBackendFromExecutionMetadata(execution.Metadata.Data()),
+	}, nil
 }
 
 func taskBrokerBaseURL() (string, error) {
@@ -220,6 +225,7 @@ func newLiveLogSession(brokerTaskID string, now time.Time, streamURL func(string
 	}
 
 	return &LiveLogSession{
+		Backend:   "legacy",
 		StreamURL: url,
 		Token:     token,
 		ExpiresAt: expiresAt,

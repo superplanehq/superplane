@@ -1,5 +1,0 @@
-# Packer variables for local dev / manual builds.
-# Copy this to runner.pkrvars.hcl and fill in values.
-# In CI these are passed via -var flags.
-
-aws_region = "us-east-1"

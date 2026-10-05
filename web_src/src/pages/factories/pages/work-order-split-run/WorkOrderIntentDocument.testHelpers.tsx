@@ -10,6 +10,7 @@ import type { CreateWithAgentView } from "../createWithAgentTypes";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 
 export const INTENT_DOC = {
+  planningReviewEnabled: true,
   title: "Show a clearer empty state",
   description: "Imported from GitHub: billing empty state is unclear.",
 };

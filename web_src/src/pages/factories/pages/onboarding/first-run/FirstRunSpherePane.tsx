@@ -123,7 +123,7 @@ export function FirstRunSpherePane({
     <div
       data-testid={testId}
       className={cn(
-        "relative hidden overflow-hidden border-l border-border lg:flex lg:w-[44%]",
+        "relative hidden shrink-0 overflow-hidden border-l border-border lg:flex lg:w-[44%] lg:max-w-[720px]",
         "bg-[radial-gradient(ellipse_at_50%_45%,#faf9fd_0%,#f1eff7_70%)]",
         "dark:bg-[radial-gradient(ellipse_at_50%_45%,#14100a_0%,#0d0c08_70%)]",
       )}

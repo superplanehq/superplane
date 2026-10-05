@@ -157,6 +157,17 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       "{{ root().data.title }}",
 		createDescription: "{{ root().data.description }}",
 	},
+	models.FactoryIntakeSourceLinearIssues: {
+		name:             "Linear issues",
+		description:      "Create a work order when a Linear issue is added to a selected project.",
+		triggerComponent: "linear.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"actions": []any{"create", "update"},
+		},
+		createTitle:       `{{ root().data.data.identifier }}: {{ root().data.data.title }}`,
+		createDescription: `{{ root().data.data.description }}`,
+	},
 }
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
@@ -443,6 +454,15 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	if request.Source == models.FactoryIntakeSourceProductiveTasks {
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
+	if request.Source == models.FactoryIntakeSourceLinearIssues {
+		projects := request.Settings.LinearProjectIDs
+		if len(projects) == 0 {
+			projects = configurationStrings(configuration["projects"])
+		}
+		configuration["projects"] = configurationAnyStrings(projects)
+		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
+		configuration["actions"] = []any{"create", "update"}
+	}
 
 	return configuration
 }
@@ -472,6 +492,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceDatadog {
 		return defaultDatadogIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return defaultLinearIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }
@@ -548,7 +571,22 @@ func intakeAnalysisCloneCommand() string {
 		"fi",
 		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
 		"rm -rf repo",
-		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+		cloneRepositoryCommand(),
+	}, "\n")
+}
+
+func cloneRepositoryCommand() string {
+	return strings.Join([]string{
+		`branch="${BASE:-main}"`,
+		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
+		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
+		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
+		`elif [ -z "$heads" ]; then`,
+		`  git clone "${REPO_URL}" repo`,
+		`else`,
+		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
+		`  exit 1`,
+		`fi`,
 	}, "\n")
 }
 

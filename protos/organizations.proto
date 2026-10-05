@@ -140,6 +140,17 @@ service Organizations {
     };
   }
 
+  rpc ListOrganizationRunnerFleets(ListOrganizationRunnerFleetsRequest) returns (ListOrganizationRunnerFleetsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/fleets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization runner fleets";
+      description: "Returns the runner fleets that the organization can select";
+      tags: "Organization";
+    };
+  }
+
   rpc ListHostedLLMModels(ListHostedLLMModelsRequest) returns (ListHostedLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/hosted-llm-models"
@@ -181,6 +192,29 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update BYOK LLM models";
       description: "Replaces the organization selected-model list for one BYOK provider";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListOrganizationHostedLLMModels(ListOrganizationHostedLLMModelsRequest) returns (ListOrganizationHostedLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization hosted models";
+      description: "Returns installation model candidates and the organization selection for every hosted provider";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateOrganizationHostedLLMModels(UpdateOrganizationHostedLLMModelsRequest) returns (UpdateOrganizationHostedLLMModelsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/hosted-models"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update organization hosted models";
+      description: "Replaces the organization selection for every hosted provider";
       tags: "Organization";
     };
   }
@@ -685,6 +719,32 @@ message UpdateBYOKLLMModelsResponse {
   repeated HostedLLMModel selected = 1;
 }
 
+message OrganizationHostedLLMModel {
+  string key = 1;
+  string label = 2;
+  string provider = 3;
+}
+
+message ListOrganizationHostedLLMModelsRequest {
+  string id = 1;
+}
+
+message ListOrganizationHostedLLMModelsResponse {
+  repeated OrganizationHostedLLMModel candidates = 1;
+  // Effective organization selection, including inherited candidates for unsaved providers.
+  repeated OrganizationHostedLLMModel selected = 2;
+}
+
+message UpdateOrganizationHostedLLMModelsRequest {
+  string id = 1;
+  // Selectable keys from the installation candidates. An empty list disables all hosted models.
+  repeated string allowed_models = 2;
+}
+
+message UpdateOrganizationHostedLLMModelsResponse {
+  repeated OrganizationHostedLLMModel selected = 1;
+}
+
 message ListHostedCreditProductsRequest {
   string id = 1;
 }
@@ -736,6 +796,29 @@ message OrganizationCreditGrant {
 
 message ListOrganizationCreditGrantsResponse {
   repeated OrganizationCreditGrant grants = 1;
+}
+
+message ListOrganizationRunnerFleetsRequest {
+  string id = 1;
+}
+
+message OrganizationRunnerFleetSpec {
+  string operating_system = 1;
+  string architecture = 2;
+  int32 cpu_millicores = 3;
+  int32 memory_mb = 4;
+  int32 disk_gb = 5;
+  repeated string capabilities = 6;
+}
+
+message OrganizationRunnerFleet {
+  string id = 1;
+  string scope = 2;
+  OrganizationRunnerFleetSpec spec = 3;
+}
+
+message ListOrganizationRunnerFleetsResponse {
+  repeated OrganizationRunnerFleet fleets = 1;
 }
 
 message DescribeOrganizationBillingRequest {

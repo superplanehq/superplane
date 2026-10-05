@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
-    "@dash0/sdk-web": "^0.22.1",
+    "@dash0/sdk-web": "^0.27.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@floating-ui/react": "^0.27.12",
@@ -80,7 +80,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "dompurify": "^3.4.14",
+    "dompurify": "^3.4.16",
     "elkjs": "^0.10.0",
     "embla-carousel-react": "^8.6.0",
     "html-to-image": "^1.11.11",
@@ -161,7 +161,7 @@
       "fflate": "0.4.9"
     },
     "monaco-editor": {
-      "dompurify": "^3.4.14"
+      "dompurify": "^3.4.16"
     },
     "eslint-plugin-import": {
       "eslint": "$eslint"

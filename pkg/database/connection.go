@@ -195,7 +195,15 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			runner_task_log_lifecycles,
+			runner_registrations,
+			runner_credentials,
+			runner_tasks,
+			runners,
+			runner_fleets,
 			vcs_provider_installation_reconcile_requesters,
+			vcs_provider_install_requests,
+			vcs_provider_install_request_refreshes,
 			vcs_provider_installation_reconcile_jobs,
 			vcs_provider_reconcile_jobs,
 			vcs_provider_installations,
