@@ -1,6 +1,6 @@
 const MCP_PATH = "/mcp";
 
-export type WorkspaceMCPClientTool = "cursor" | "claudeCode" | "vscode" | "codex";
+export type WorkspaceMCPClientTool = "cursor" | "claudeCode" | "vscode" | "codex" | "opencode";
 
 /** Streamable HTTP URL for the SuperPlane workspace MCP server. */
 export function workspaceMCPServerURL(origin: string): string {
@@ -48,6 +48,23 @@ export function workspaceMCPVSCodeConfig(origin: string): string {
   );
 }
 
+/** OpenCode config snippet for the SuperPlane workspace MCP URL. */
+export function workspaceMCPOpenCodeConfig(origin: string): string {
+  return JSON.stringify(
+    {
+      mcp: {
+        superplane: {
+          type: "remote",
+          url: workspaceMCPServerURL(origin),
+          enabled: true,
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
+
 export function workspaceMCPClientSnippet(tool: WorkspaceMCPClientTool, origin: string): string {
   switch (tool) {
     case "claudeCode":
@@ -58,5 +75,7 @@ export function workspaceMCPClientSnippet(tool: WorkspaceMCPClientTool, origin: 
       return workspaceMCPVSCodeConfig(origin);
     case "cursor":
       return workspaceMCPCursorConfig(origin);
+    case "opencode":
+      return workspaceMCPOpenCodeConfig(origin);
   }
 }
