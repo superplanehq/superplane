@@ -152,6 +152,8 @@ function withClosedDecision(
   const startTone = planningStartTone(analysisChat);
   return {
     ...analysisChat,
+    prioritizeImplementation:
+      Boolean(analysisChat.canTogglePlan) && startTone === "ready" && analysisChat.view.machineStatus === "waiting",
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }

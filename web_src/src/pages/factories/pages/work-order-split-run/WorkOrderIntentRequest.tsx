@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
@@ -20,6 +20,7 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
+import { PlanningImplementationControls } from "./PlanningImplementationControls";
 import { PlanningReview, type ComposerScore } from "./PlanningReview";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
@@ -63,6 +64,7 @@ export type IntentAnalysisChat = {
   isAnalyzing?: boolean;
   /** Set when backlog analysis stopped because hosted credit is gone. */
   creditVerdict?: ComposerCreditVerdict;
+  prioritizeImplementation?: boolean;
   closedDecision?: ReactNode;
   /** Model selection applies to implementation, separately from the plan. */
   modelSelect?: ReactNode;
@@ -134,6 +136,7 @@ function AnalysisRequestChat({
     onUploadFiles: analysis.onUploadFiles,
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
+  const composer = usePlanningComposer(analysis, images.pending.length);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -188,10 +191,12 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         ) : null}
       </div>
-      {!state.showSurvey ? (
+      {!state.showSurvey && !composer.collapsed ? (
         <AnalysisComposer
           analysis={analysis}
           images={images}
+          focusOnMount={composer.expanded}
+          onFocus={composer.expand}
           placeholder={state.placeholder}
           chatSolo={chatSolo}
           chatColumnClass={chatColumnClass}
@@ -206,22 +211,28 @@ function AnalysisRequestChat({
           {analysis.composerError}
         </p>
       ) : null}
-      {analysis.modelSelect || analysis.closedDecision ? (
-        <section aria-label="Implementation" className="shrink-0 border-t border-border py-3">
-          <div className={cn(chatColumnClass, "flex flex-wrap items-center justify-between gap-2")}>
-            <span className="text-[12px] text-muted-foreground">Implementation</span>
-            <div
-              className="ml-auto flex flex-wrap items-center justify-end gap-2"
-              data-testid="split-run-intent-settings"
-            >
-              {analysis.modelSelect}
-              {analysis.closedDecision}
-            </div>
-          </div>
-        </section>
-      ) : null}
+      <PlanningImplementationControls
+        modelSelect={analysis.modelSelect}
+        actions={analysis.closedDecision}
+        canSend={analysis.canSend}
+        showSuggestChanges={composer.collapsed && !state.showSurvey}
+        onSuggestChanges={composer.expand}
+      />
     </div>
   );
+}
+
+function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number) {
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = Boolean(
+    analysis.prioritizeImplementation &&
+      !expanded &&
+      !analysis.composer &&
+      !analysis.composerError &&
+      !analysis.isUploading &&
+      pendingFiles === 0,
+  );
+  return { expanded, collapsed, expand: () => setExpanded(true) };
 }
 
 function useAnalysisComposerDictation(composer: string, onComposerChange: (next: string) => void) {
@@ -247,12 +258,16 @@ function AnalysisComposer({
   placeholder,
   chatSolo,
   chatColumnClass,
+  focusOnMount,
+  onFocus,
 }: {
   analysis: IntentAnalysisChat;
   images: ReturnType<typeof useAnalysisComposerImages>;
   placeholder: string;
   chatSolo: boolean;
   chatColumnClass: string;
+  focusOnMount: boolean;
+  onFocus: () => void;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
   const { composerRef, dictation } = useAnalysisComposerDictation(analysis.composer, analysis.onComposerChange);
@@ -283,6 +298,7 @@ function AnalysisComposer({
           "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0 pb-0",
         )}
         onSubmit={handleSubmit}
+        onFocusCapture={onFocus}
       >
         <Label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
@@ -292,6 +308,7 @@ function AnalysisComposer({
             analysis={analysis}
             images={images}
             dictation={dictation}
+            focusOnMount={focusOnMount}
             placeholder={placeholder}
             canSubmit={canSubmit}
             composerRef={composerRef}
@@ -309,6 +326,7 @@ function AnalysisComposerField({
   dictation,
   placeholder,
   canSubmit,
+  focusOnMount,
   composerRef,
   onSend,
 }: {
@@ -317,10 +335,15 @@ function AnalysisComposerField({
   dictation: UseSpeechDictationResult;
   placeholder: string;
   canSubmit: boolean;
+  focusOnMount: boolean;
   composerRef: { current: string };
   onSend: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusInitially = useRef(focusOnMount);
+  useEffect(() => {
+    if (focusInitially.current) textareaRef.current?.focus();
+  }, []);
   const skillKeyboardRef = useRef<((event: KeyboardEvent) => boolean) | null>(null);
   const [cursor, setCursor] = useState(0);
   const insertSkill = (next: { value: string; cursor: number }) => {
