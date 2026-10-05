@@ -45,7 +45,7 @@ func (p *OnPullRequest) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
-- **Ignore draft pull requests**: Do not start a run when the pull request is a draft. Also select Ready for review to start a run when a draft becomes ready.
+- **Ignore draft pull requests**: Do not start a run when the pull request is a draft.
 
 ## Event Data
 
@@ -123,7 +123,7 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "Do not start a run when the pull request is a draft. Also select Ready for review to start a run when a draft becomes ready.",
+			Description: "Do not start a run when the pull request is a draft.",
 		},
 	}
 }
