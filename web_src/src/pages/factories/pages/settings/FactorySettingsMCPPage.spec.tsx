@@ -381,7 +381,7 @@ describe("FactorySettingsMCPPage", () => {
 
     expect(
       await screen.findByText(
-        "Connect from Cursor, Claude, Codex, or any other external service.",
+        "Connect from Cursor, Claude, Codex, OpenCode, or any other external service.",
         {},
         { timeout: 8000 },
       ),
@@ -392,10 +392,11 @@ describe("FactorySettingsMCPPage", () => {
     await userEvent.setup().click(screen.getByTestId("superplane-mcp-connect-client"));
     expect(await screen.findByTestId("superplane-mcp-connect-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("superplane-mcp-server-url")).toHaveTextContent("/mcp");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Cursor");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Claude Code");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("VS Code");
-    expect(screen.getByTestId("superplane-mcp-client-tools")).toHaveTextContent("Codex");
+    expect(
+      within(screen.getByTestId("superplane-mcp-client-tools"))
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Cursor", "Claude Code", "VS Code", "Codex", "OpenCode"]);
     expect(screen.getByTestId("superplane-mcp-config-copy-cursor")).toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-add-connection")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resources-connections-empty")).not.toBeInTheDocument();
@@ -436,6 +437,57 @@ describe("FactorySettingsMCPPage", () => {
     try {
       await user.click(copyButton);
       expect(writeText).toHaveBeenCalledWith(`codex mcp add superplane --url ${window.location.origin}/mcp`);
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: previousClipboard,
+      });
+    }
+  }, 10000);
+
+  it("shows OpenCode setup and copies the configuration", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={superplaneMcpServerPath}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+      />,
+    );
+
+    expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(screen.getByTestId("superplane-mcp-connect-client"));
+    expect(await screen.findByTestId("superplane-mcp-connect-dialog")).toBeInTheDocument();
+    await user.click(screen.getByTestId("superplane-mcp-client-tool-opencode"));
+    expect(screen.getByText("Open opencode.json.")).toBeInTheDocument();
+    expect(screen.getByText("Add the superplane server under mcp. Keep other servers.")).toBeInTheDocument();
+    expect(screen.getByText("Run opencode mcp auth superplane and sign in.")).toBeInTheDocument();
+    const copyButton = screen.getByTestId("superplane-mcp-config-copy-opencode");
+    expect(copyButton).toHaveAttribute("aria-label", "Copy MCP configuration");
+
+    const writeText = vi.fn(() => Promise.resolve());
+    const previousClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    try {
+      await user.click(copyButton);
+      expect(writeText).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            mcp: {
+              superplane: {
+                type: "remote",
+                url: `${window.location.origin}/mcp`,
+                enabled: true,
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
     } finally {
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
