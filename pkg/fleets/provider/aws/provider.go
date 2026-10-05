@@ -322,6 +322,11 @@ func (p *Provider) runInstancesInput(
 		SubnetId:                          aws.String(subnetID),
 		SecurityGroupIds:                  p.config.SecurityGroupIDs,
 		InstanceInitiatedShutdownBehavior: types.ShutdownBehaviorTerminate,
+		MetadataOptions: &types.InstanceMetadataOptionsRequest{
+			HttpTokens: types.HttpTokensStateRequired,
+			// Allow IMDSv2 token responses to cross the Docker network hop.
+			HttpPutResponseHopLimit: aws.Int32(2),
+		},
 		BlockDeviceMappings: []types.BlockDeviceMapping{{
 			DeviceName: aws.String("/dev/sda1"),
 			Ebs:        p.rootVolume(),
