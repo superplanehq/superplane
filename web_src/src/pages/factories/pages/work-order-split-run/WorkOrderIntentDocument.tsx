@@ -154,7 +154,10 @@ function withClosedDecision(
     ...analysisChat,
     startDiscouraged: !analysisChat.creditVerdict && (startTone === "caution" || startTone === "blocked"),
     prioritizeImplementation:
-      Boolean(analysisChat.canTogglePlan) && startTone === "ready" && analysisChat.view.machineStatus === "waiting",
+      Boolean(analysisChat.canTogglePlan) &&
+      startTone === "ready" &&
+      analysisChat.view.machineStatus === "waiting" &&
+      !hasPendingPlanningQuestions(analysisChat.view),
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }
@@ -162,9 +165,6 @@ function withClosedDecision(
 function planningStartTone(analysis: IntentAnalysisChat): DraftReadinessTone {
   if (analysis.creditVerdict) {
     return "blocked";
-  }
-  if (hasPendingPlanningQuestions(analysis.view)) {
-    return "caution";
   }
   return liveDraftReadiness({
     clarity: analysis.showClarity !== false ? analysis.clarity?.score : undefined,

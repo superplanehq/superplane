@@ -49,15 +49,23 @@ describe("WorkOrderIntentDocument score evidence", () => {
     resetStreamMemoryForTests();
   });
 
-  it.each([2, 4])("prioritizes pending questions over Start at confidence %s", async (score) => {
+  it.each([
+    { score: 2, clarity: 4, discouraged: true },
+    { score: 4, clarity: 4, discouraged: false },
+    { score: 4, clarity: 2, discouraged: true },
+  ])("shows pending questions with confidence $score and clarity $clarity", async ({ score, clarity, discouraged }) => {
     const user = userEvent.setup();
     const onSubmitSurvey = vi.fn();
+    const onStart = vi.fn();
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
         artifacts={[INTENT]}
+        clarity={{ ...HIGH_CLARITY, score: clarity }}
         confidence={{ ...HIGH_CONFIDENCE, score }}
-        resultFooter={<SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} compact />}
+        resultFooter={
+          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
+        }
         analysis={analysisChat({
           onSubmitSurvey,
           modelSelect: <button type="button">Model: Auto</button>,
@@ -80,11 +88,25 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.queryByRole("textbox", { name: "Tell the agent more about this task" })).not.toBeInTheDocument();
     expect(screen.queryByText("Review before you start")).not.toBeInTheDocument();
     const implementation = screen.getByRole("region", { name: "Implementation" });
-    expect(within(implementation).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-    expect(within(implementation).queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
-    expect(within(implementation).getByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
-    expect(implementation).toHaveTextContent("Starting not recommended");
+    expect(screen.getByTestId("split-run-intent-chat-log")).not.toContainElement(implementation);
     expect(within(plan).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Suggest changes" })).not.toBeInTheDocument();
+    if (!discouraged) {
+      expect(within(implementation).getByRole("button", { name: "Model: Auto" })).toBeVisible();
+      expect(within(implementation).queryByRole("button", { name: "Override" })).not.toBeInTheDocument();
+      expect(implementation).not.toHaveTextContent("Starting not recommended");
+      await user.click(within(implementation).getByRole("button", { name: "Start" }));
+      expect(onStart).toHaveBeenCalledTimes(1);
+    }
+    if (discouraged) {
+      expect(within(implementation).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+      expect(within(implementation).queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
+      expect(within(implementation).getByRole("button", { name: "Override" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(implementation).toHaveTextContent("Starting not recommended");
+    }
     await user.type(screen.getByRole("textbox", { name: /Which customers/ }), "Only paying customers");
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
     expect(onSubmitSurvey).toHaveBeenCalledWith(expect.stringContaining("Only paying customers"));
