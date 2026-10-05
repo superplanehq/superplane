@@ -203,5 +203,6 @@ describe("WorkOrdersHeader", () => {
     const count = screen.getByTestId("work-orders-filter-count");
     expect(count).toHaveTextContent("3");
     expect(count.className).toContain("text-red-600");
+    expect(count.className).toContain("dark:text-red-400");
   });
 });
