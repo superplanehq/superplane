@@ -1486,18 +1486,6 @@ describe("LinesPage board editing", () => {
     await resetLinesBoardMocks();
   });
 
-  it("opens the line edit page from the board view menu", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-edit-line"));
-
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}/edit`,
-    );
-  });
-
   it("shows the workspace name and does not rename the line", async () => {
     const user = userEvent.setup();
     renderLinesBoard();

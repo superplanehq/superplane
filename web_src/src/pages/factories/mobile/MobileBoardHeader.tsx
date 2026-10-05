@@ -54,7 +54,6 @@ export function MobileBoardHeader({
   factoryId,
   factoryKey,
   canManageClosedStatus,
-  editHref,
 }: {
   state: WorkOrderListState;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -75,7 +74,6 @@ export function MobileBoardHeader({
   factoryId: string;
   factoryKey: string;
   canManageClosedStatus: boolean;
-  editHref?: string;
 }) {
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
 
@@ -104,7 +102,7 @@ export function MobileBoardHeader({
           >
             <Search className="size-3.5" aria-hidden />
           </Button>
-          <LineBoardViewMenu colorView={colorView} onColorViewChange={onColorViewChange} editHref={editHref} />
+          <LineBoardViewMenu colorView={colorView} onColorViewChange={onColorViewChange} />
           <MobileBoardMenu
             intakes={intakes}
             prFeedbackHandlers={prFeedbackHandlers}

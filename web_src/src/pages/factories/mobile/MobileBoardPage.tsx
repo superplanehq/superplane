@@ -31,7 +31,6 @@ import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
-  editFactoryLinePath,
   factoryHomePath,
   factoryIntakePath,
   factoryLineDetailPath,
@@ -309,7 +308,6 @@ function MobileLineBoard(props: {
         factoryId={factoryId}
         factoryKey={routeSegment}
         canManageClosedStatus={canConfigureFactory}
-        editHref={canConfigureFactory ? editFactoryLinePath(organizationId, routeSegment, lineId) : undefined}
       />
       <MobileColumnCarousel
         columns={model.columns}

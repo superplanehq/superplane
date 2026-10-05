@@ -1,4 +1,3 @@
-import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,13 +5,12 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuPortal,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { Check, Pencil, Settings } from "lucide-react";
+import { Check, Settings } from "lucide-react";
 
 import type { ColumnAutomationView } from "../lib/columnAutomationViewPreference";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
@@ -42,13 +40,11 @@ export function LineBoardViewMenu({
   onViewChange,
   colorView,
   onColorViewChange,
-  editHref,
 }: {
   view?: ColumnAutomationView;
   onViewChange?: (view: ColumnAutomationView) => void;
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
-  editHref?: string;
 }) {
   const showAutomationView = Boolean(view && onViewChange);
 
@@ -84,17 +80,6 @@ export function LineBoardViewMenu({
           options={COLOR_VIEW_OPTIONS}
           onValueChange={onColorViewChange}
         />
-        {editHref ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className={MENU_ITEM_CLASSNAME} data-testid="lines-board-edit-line">
-              <Link href={editHref}>
-                <Pencil className="size-3.5" aria-hidden />
-                Edit line
-              </Link>
-            </DropdownMenuItem>
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

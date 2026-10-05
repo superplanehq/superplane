@@ -143,18 +143,6 @@ describe("MobileBoardPage", () => {
     expect(document.title).not.toContain("Plan and Implement");
   });
 
-  it("opens the line edit page from the board view menu", async () => {
-    const user = userEvent.setup();
-    renderBoard();
-
-    await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByTestId("lines-board-edit-line"));
-
-    expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}/edit`,
-    );
-  });
-
   it("renders every board column as its own full-width snap section with a tab", () => {
     renderBoard();
 
