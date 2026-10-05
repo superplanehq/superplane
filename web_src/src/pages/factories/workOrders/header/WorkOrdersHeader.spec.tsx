@@ -171,4 +171,40 @@ describe("WorkOrdersHeader", () => {
     expect(screen.queryByText("Source is GitHub issues")).not.toBeInTheDocument();
     expect(screen.getByText("Created manually")).toBeInTheDocument();
   });
+
+  it("shows the applied filter count as a notification badge", () => {
+    window.localStorage.setItem(
+      "sp:work-orders:filters:factory-count",
+      JSON.stringify({
+        statuses: ["failed"],
+        labels: ["review"],
+        lineIds: [],
+        sourceIds: ["manual"],
+        assigneeIds: [],
+      }),
+    );
+    function CountHarness() {
+      const state = useWorkOrderListState("factory-count");
+      return (
+        <WorkOrdersHeader
+          state={state}
+          entries={[]}
+          factoryLines={[]}
+          intakes={[{ id: "github-1", source: "SOURCE_GITHUB_ISSUES" }]}
+          onCreateWorkOrder={vi.fn()}
+          canCreate
+          permissionsLoading={false}
+        />
+      );
+    }
+
+    render(<CountHarness />);
+
+    const count = screen.getByTestId("work-orders-filter-count");
+    expect(count).toHaveTextContent("3");
+    expect(count).toHaveAttribute("data-slot", "badge");
+    expect(count.className).toContain("bg-destructive");
+    expect(count.className).not.toContain("text-red-600");
+    expect(screen.getByTestId("work-orders-filter-trigger")).toHaveAccessibleName("Filter (3)");
+  });
 });

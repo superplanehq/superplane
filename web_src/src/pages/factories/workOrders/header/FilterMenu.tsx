@@ -1,3 +1,4 @@
+import { Badge } from "@/components/reui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -51,15 +52,22 @@ export function FilterMenu({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Filter"
+          aria-label={filterCount > 0 ? `Filter (${filterCount})` : "Filter"}
           className="relative size-8 shrink-0 text-muted-foreground"
           data-testid="work-orders-filter-trigger"
         >
           <Funnel className="size-3.5" aria-hidden />
           {filterCount > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-foreground">
+            <Badge
+              variant="destructive"
+              size="xs"
+              radius="full"
+              className="absolute -top-1 -right-1"
+              data-testid="work-orders-filter-count"
+              aria-hidden
+            >
               {filterCount}
-            </span>
+            </Badge>
           ) : null}
         </Button>
       </DropdownMenuTrigger>
