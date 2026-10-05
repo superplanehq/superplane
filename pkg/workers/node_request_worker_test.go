@@ -886,6 +886,93 @@ func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExe
 	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
 }
 
+func Test__NodeRequestWorker_DoesNotSaveStaleExecutionAfterHookFindsPersistedExecutionCancelling(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentName := "cancelling_execution_after_hook_" + uuid.New().String()
+	var executionID uuid.UUID
+	var cancelledAt time.Time
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			//
+			// The hook does not write the execution row. While it runs, a user
+			// cancels the execution in another transaction, which commits.
+			//
+			var cancelled models.CanvasNodeExecution
+			require.NoError(t, database.Conn().Where("id = ?", executionID).First(&cancelled).Error)
+			require.NoError(t, cancelled.RequestCancellation(database.Conn(), &r.User))
+			require.NotNil(t, cancelled.CancelledAt)
+			cancelledAt = *cancelled.CancelledAt
+
+			return nil
+		},
+	})
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+	executionID = execution.ID
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedExecution models.CanvasNodeExecution
+	require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+	require.NotNil(t, updatedExecution.CancelledAt)
+	assert.WithinDuration(t, cancelledAt, *updatedExecution.CancelledAt, time.Second)
+	require.NotNil(t, updatedExecution.CancelledBy)
+	assert.Equal(t, r.User, *updatedExecution.CancelledBy)
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State)
+
+	//
+	// The committed cancellation must remain visible to the execution
+	// terminator, which finds its work through ListCancellingNodeExecutions.
+	//
+	cancelling, err := models.ListCancellingNodeExecutions(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, cancelling, 1)
+	assert.Equal(t, execution.ID, cancelling[0].ID)
+}
+
 func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {
 	cancelCalled := false
 	componentName := "cancel_failing_" + uuid.New().String()
