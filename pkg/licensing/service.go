@@ -205,6 +205,9 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		return s.Status(), invalid(ReasonNotYetValid)
 	}
 
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {
 		return s.Status(), err
 	}
@@ -215,10 +218,7 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		"installed_by": installedBy.String(),
 	}).Info("Licensing: license installed")
 
-	if err := s.Refresh(ctx); err != nil {
-		return s.Status(), err
-	}
-
+	s.reloadAfterChange(ctx, &snapshot{source: writable.Kind(), license: license})
 	return s.Status(), nil
 }
 
@@ -228,17 +228,31 @@ func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, erro
 		return s.Status(), ErrManagedByFile
 	}
 
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
 	if err := writable.Clear(ctx); err != nil {
 		return s.Status(), err
 	}
 
 	log.WithField("removed_by", removedBy.String()).Info("Licensing: license removed")
 
-	if err := s.Refresh(ctx); err != nil {
-		return s.Status(), err
+	s.reloadAfterChange(ctx, &snapshot{source: SourceNone})
+	return s.Status(), nil
+}
+
+// reloadAfterChange reads the state that a successful change produced. The
+// caller holds refreshMu. When the read fails, the written state applies, so a
+// removed license never stays active because of a read error.
+func (s *Service) reloadAfterChange(ctx context.Context, written *snapshot) {
+	next, err := s.load(ctx)
+	if err != nil {
+		log.WithError(err).Warn("Licensing: license reload after change failed; using the changed state")
+		next = written
 	}
 
-	return s.Status(), nil
+	previous := s.current.Swap(next)
+	logTransition(previous, next)
 }
 
 func (s *Service) writableSource() WritableSource {

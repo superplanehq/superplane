@@ -122,6 +122,9 @@ func decode(data []byte) (map[string]publicKey, error) {
 
 	keys := make(map[string]publicKey, len(set.Keys))
 	for _, key := range set.Keys {
+		if _, exists := keys[key.KeyID]; exists {
+			return nil, fmt.Errorf("duplicate key ID %q", key.KeyID)
+		}
 		keys[key.KeyID] = key
 	}
 

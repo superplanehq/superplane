@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -126,6 +127,64 @@ func TestServiceKeepsLastStateOnTemporaryDatabaseError(t *testing.T) {
 	require.Error(t, service.Refresh(context.Background()))
 
 	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+}
+
+func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
+	issuer := licensingtest.NewIssuer("test-2026-01")
+
+	t.Run("remove stops access", func(t *testing.T) {
+		source := &memorySource{raw: issuer.License(licensing.FeatureGroups)}
+		service := newService(t, issuer, source)
+		require.NoError(t, service.Refresh(context.Background()))
+
+		source.err = errors.New("connection refused")
+		status, err := service.Remove(context.Background(), uuid.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, licensing.EditionCommunity, status.Edition)
+		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	})
+
+	t.Run("install grants access", func(t *testing.T) {
+		source := &memorySource{}
+		service := newService(t, issuer, source)
+		require.NoError(t, service.Refresh(context.Background()))
+
+		source.err = errors.New("connection refused")
+		status, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, licensing.EditionEnterprise, status.Edition)
+		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	})
+}
+
+func TestServiceConcurrentChangesMatchStoredState(t *testing.T) {
+	issuer := licensingtest.NewIssuer("test-2026-01")
+	raw := issuer.License(licensing.FeatureGroups)
+	source := &memorySource{}
+	service := newService(t, issuer, source)
+	require.NoError(t, service.Refresh(context.Background()))
+
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			status, err := service.Install(context.Background(), raw, uuid.New())
+			assert.NoError(t, err)
+			assert.Equal(t, licensing.EditionEnterprise, status.Edition, "install reports the license that it stored")
+		}()
+		go func() {
+			defer wg.Done()
+			status, err := service.Remove(context.Background(), uuid.New())
+			assert.NoError(t, err)
+			assert.Equal(t, licensing.EditionCommunity, status.Edition, "remove reports the removal")
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, source.raw != nil, service.IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceRefreshPicksUpChangesFromOtherReplicas(t *testing.T) {
@@ -305,6 +364,7 @@ func (f failingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestVerificationWorksWithoutNetwork(t *testing.T) {
 	originalTransport := http.DefaultTransport
 	originalDial := net.DefaultResolver.Dial
+	originalPreferGo := net.DefaultResolver.PreferGo
 	http.DefaultTransport = failingTransport{t: t}
 	net.DefaultResolver.PreferGo = true
 	net.DefaultResolver.Dial = func(context.Context, string, string) (net.Conn, error) {
@@ -314,7 +374,7 @@ func TestVerificationWorksWithoutNetwork(t *testing.T) {
 	t.Cleanup(func() {
 		http.DefaultTransport = originalTransport
 		net.DefaultResolver.Dial = originalDial
-		net.DefaultResolver.PreferGo = false
+		net.DefaultResolver.PreferGo = originalPreferGo
 	})
 
 	issuer := licensingtest.NewIssuer("test-2026-01")
