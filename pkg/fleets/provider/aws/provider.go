@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,11 +20,13 @@ import (
 )
 
 const (
-	TagKeyManaged       = "superplane_managed_runner"
-	TagKeyFleetID       = "superplane_fleet_id"
-	TagKeyRunnerID      = "superplane_runner_id"
-	TagKeyRunnerVersion = "superplane_runner_version"
-	TagKeyArchitecture  = "superplane_runner_arch"
+	TagKeyFleetManagerID = "superplane_fleet_manager_id"
+	TagKeyFleetID        = "superplane_fleet_id"
+	TagKeyRunnerID       = "superplane_runner_id"
+	TagKeyRunnerVersion  = "superplane_runner_version"
+	TagKeyArchitecture   = "superplane_runner_arch"
+	tagKeyName           = "Name"
+	tagKeyLegacyManaged  = "superplane_managed_runner"
 
 	minVolumeIOPS           int32 = 3000
 	maxVolumeIOPS           int32 = 64000
@@ -50,6 +53,7 @@ type EC2API interface {
 }
 
 type Config struct {
+	FleetManagerID       string
 	AMI                  string
 	InstanceType         string
 	Architecture         string
@@ -60,6 +64,7 @@ type Config struct {
 	VolumeSizeGB         int32
 	VolumeIOPS           int32
 	VolumeThroughputMBps int32
+	ResourceTags         map[string]string
 }
 
 type Provider struct {
@@ -69,9 +74,13 @@ type Provider struct {
 }
 
 func New(client EC2API, config Config, log *slog.Logger) (*Provider, error) {
+	config.FleetManagerID = strings.TrimSpace(config.FleetManagerID)
 	config.AMI = strings.TrimSpace(config.AMI)
 	config.InstanceType = strings.TrimSpace(config.InstanceType)
 	config.Architecture = strings.ToLower(strings.TrimSpace(config.Architecture))
+	if config.FleetManagerID == "" {
+		return nil, fmt.Errorf("Fleet Manager ID is required")
+	}
 	if config.AMI == "" {
 		return nil, fmt.Errorf("AWS AMI is required")
 	}
@@ -112,6 +121,14 @@ func New(client EC2API, config Config, log *slog.Logger) (*Provider, error) {
 	if client == nil {
 		return nil, fmt.Errorf("AWS EC2 client is required")
 	}
+	for key := range config.ResourceTags {
+		if strings.TrimSpace(key) == "" {
+			return nil, fmt.Errorf("AWS resource tag key must not be empty")
+		}
+		if isReservedTag(key) {
+			return nil, fmt.Errorf("reserved AWS resource tag %q cannot be overridden", key)
+		}
+	}
 	if log == nil {
 		log = slog.Default()
 	}
@@ -125,7 +142,10 @@ func (p *Provider) Name() string {
 func (p *Provider) List(ctx context.Context, fleetID string) ([]provider.Resource, error) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []types.Filter{
-			{Name: aws.String("tag:" + TagKeyManaged), Values: []string{"true"}},
+			{
+				Name:   aws.String("tag:" + TagKeyFleetManagerID),
+				Values: []string{p.config.FleetManagerID},
+			},
 			{Name: aws.String("tag:" + TagKeyFleetID), Values: []string{fleetID}},
 			{
 				Name: aws.String("instance-state-name"),
@@ -260,12 +280,26 @@ func (p *Provider) runInstancesInput(
 	subnetID string,
 ) *ec2.RunInstancesInput {
 	tags := []types.Tag{
-		{Key: aws.String("Name"), Value: aws.String("superplane-runner")},
-		{Key: aws.String(TagKeyManaged), Value: aws.String("true")},
+		{Key: aws.String(tagKeyName), Value: aws.String("superplane-runner")},
+		{
+			Key:   aws.String(TagKeyFleetManagerID),
+			Value: aws.String(p.config.FleetManagerID),
+		},
 		{Key: aws.String(TagKeyFleetID), Value: aws.String(request.FleetID)},
 		{Key: aws.String(TagKeyRunnerID), Value: aws.String(request.RunnerID)},
 		{Key: aws.String(TagKeyRunnerVersion), Value: aws.String(request.RunnerVersion)},
 		{Key: aws.String(TagKeyArchitecture), Value: aws.String(p.config.Architecture)},
+	}
+	resourceTagKeys := make([]string, 0, len(p.config.ResourceTags))
+	for key := range p.config.ResourceTags {
+		resourceTagKeys = append(resourceTagKeys, key)
+	}
+	sort.Strings(resourceTagKeys)
+	for _, key := range resourceTagKeys {
+		tags = append(tags, types.Tag{
+			Key:   aws.String(key),
+			Value: aws.String(p.config.ResourceTags[key]),
+		})
 	}
 	input := &ec2.RunInstancesInput{
 		ImageId:                           aws.String(p.config.AMI),
@@ -339,6 +373,21 @@ func nonEmpty(values []string) []string {
 		}
 	}
 	return cleaned
+}
+
+func isReservedTag(key string) bool {
+	switch key {
+	case tagKeyName,
+		tagKeyLegacyManaged,
+		TagKeyFleetManagerID,
+		TagKeyFleetID,
+		TagKeyRunnerID,
+		TagKeyRunnerVersion,
+		TagKeyArchitecture:
+		return true
+	default:
+		return false
+	}
 }
 
 func clientToken(runnerID, subnetID string) string {

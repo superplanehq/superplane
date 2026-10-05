@@ -27,6 +27,7 @@ const (
 )
 
 type Config struct {
+	ID                       string  `json:"id"`
 	SuperPlaneURL            string  `json:"superplaneUrl"`
 	InstallationAdminToken   string  `json:"installationAdminToken"`
 	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
@@ -46,16 +47,17 @@ type Fleet struct {
 }
 
 type AWS struct {
-	AMI                  string   `json:"ami"`
-	InstanceType         string   `json:"instanceType"`
-	Architecture         string   `json:"architecture"`
-	SubnetIDs            []string `json:"subnetIds"`
-	SecurityGroupIDs     []string `json:"securityGroupIds"`
-	IAMInstanceProfile   string   `json:"iamInstanceProfile"`
-	KeyName              string   `json:"keyName"`
-	VolumeSizeGB         int32    `json:"volumeSizeGb"`
-	VolumeIOPS           int32    `json:"volumeIops"`
-	VolumeThroughputMBps int32    `json:"volumeThroughputMbps"`
+	AMI                  string            `json:"ami"`
+	InstanceType         string            `json:"instanceType"`
+	Architecture         string            `json:"architecture"`
+	SubnetIDs            []string          `json:"subnetIds"`
+	SecurityGroupIDs     []string          `json:"securityGroupIds"`
+	IAMInstanceProfile   string            `json:"iamInstanceProfile"`
+	KeyName              string            `json:"keyName"`
+	VolumeSizeGB         int32             `json:"volumeSizeGb"`
+	VolumeIOPS           int32             `json:"volumeIops"`
+	VolumeThroughputMBps int32             `json:"volumeThroughputMbps"`
+	ResourceTags         map[string]string `json:"resourceTags"`
 }
 
 type Docker struct {
@@ -135,6 +137,7 @@ func (c *Config) RequestTimeout() time.Duration {
 }
 
 func (c *Config) applyDefaults() {
+	c.ID = strings.TrimSpace(c.ID)
 	c.RunnerReleaseBaseURL = strings.TrimRight(
 		strings.TrimSpace(c.RunnerReleaseBaseURL),
 		"/",
@@ -179,6 +182,8 @@ func (c *Config) validate() error {
 	switch {
 	case strings.TrimSpace(c.SuperPlaneURL) == "":
 		return fmt.Errorf("superplaneUrl is required")
+	case c.ID == "":
+		return fmt.Errorf("id is required")
 	case strings.TrimSpace(c.InstallationAdminToken) == "":
 		return fmt.Errorf("installationAdminToken is required")
 	case c.ReconcileIntervalSeconds < 1:

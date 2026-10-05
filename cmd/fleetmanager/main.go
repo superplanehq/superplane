@@ -75,6 +75,7 @@ func main() {
 	reconcilers := make([]*reconcile.Reconciler, 0, len(config.Fleets))
 	for _, fleet := range config.Fleets {
 		resourceProvider, artifactResolver, architecture, err := buildProvider(
+			config.ID,
 			fleet,
 			ec2Client,
 			awsArtifactResolver,
@@ -132,6 +133,7 @@ func usesAWS(config *fleetconfig.Config) bool {
 }
 
 func buildProvider(
+	fleetManagerID string,
 	fleet fleetconfig.Fleet,
 	ec2Client *ec2.Client,
 	awsArtifactResolver reconcile.ArtifactResolver,
@@ -140,6 +142,7 @@ func buildProvider(
 	switch fleet.Provider {
 	case fleetconfig.ProviderAWS:
 		resourceProvider, err := awsprovider.New(ec2Client, awsprovider.Config{
+			FleetManagerID:       fleetManagerID,
 			AMI:                  fleet.AWS.AMI,
 			InstanceType:         fleet.AWS.InstanceType,
 			Architecture:         fleet.AWS.Architecture,
@@ -150,6 +153,7 @@ func buildProvider(
 			VolumeSizeGB:         fleet.AWS.VolumeSizeGB,
 			VolumeIOPS:           fleet.AWS.VolumeIOPS,
 			VolumeThroughputMBps: fleet.AWS.VolumeThroughputMBps,
+			ResourceTags:         fleet.AWS.ResourceTags,
 		}, log)
 		return resourceProvider, awsArtifactResolver, fleet.AWS.Architecture, err
 	case fleetconfig.ProviderDocker:

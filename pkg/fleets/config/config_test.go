@@ -9,6 +9,7 @@ import (
 
 func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	body := `{
+		"id":"fleet-manager",
 		"superplaneUrl":"https://superplane.example",
 		"installationAdminToken":"personal-token",
 		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
@@ -71,8 +72,60 @@ func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
 	}
 }
 
+func TestLoadFleetManagerIDAndAWSResourceTags(t *testing.T) {
+	config, err := Load(writeConfig(t, `{
+		"id":" fleet-manager-production ",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"awsRegion":"us-east-1",
+		"fleets":[{
+			"id":"linux-amd64",
+			"aws":{
+				"ami":"ami-123",
+				"architecture":"amd64",
+				"subnetIds":["subnet-a"],
+				"securityGroupIds":["sg-a"],
+				"resourceTags":{
+					"Environment":"production",
+					"CostCenter":"runners"
+				}
+			}
+		}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.ID != "fleet-manager-production" {
+		t.Fatalf("Fleet Manager ID = %q", config.ID)
+	}
+	if config.Fleets[0].AWS.ResourceTags["Environment"] != "production" ||
+		config.Fleets[0].AWS.ResourceTags["CostCenter"] != "runners" {
+		t.Fatalf("resource tags = %#v", config.Fleets[0].AWS.ResourceTags)
+	}
+}
+
+func TestLoadRejectsMissingFleetManagerID(t *testing.T) {
+	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
+	_, err := Load(writeConfig(t, `{
+		"superplaneUrl":"http://app:8000",
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{
+				"image":"runner:dev",
+				"architecture":"amd64"
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "id is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestLoadYAML(t *testing.T) {
 	body := `
+id: fleet-manager
 superplaneUrl: http://app:8000
 installationAdminToken: personal-token
 fleets:
@@ -104,6 +157,7 @@ fleets:
 func TestLoadEnvironmentConfiguration(t *testing.T) {
 	tests := map[string]string{
 		"JSON": `{
+			"id":"fleet-manager",
 			"superplaneUrl":"http://app:8000",
 			"fleets":[{
 				"id":"e1-large-amd64",
@@ -115,6 +169,7 @@ func TestLoadEnvironmentConfiguration(t *testing.T) {
 			}]
 		}`,
 		"YAML": `
+id: fleet-manager
 superplaneUrl: http://app:8000
 fleets:
   - id: e1-large-amd64
@@ -149,6 +204,7 @@ fleets:
 
 func TestLoadEnvironmentConfigurationAppliesInstallationAdminTokenOverride(t *testing.T) {
 	t.Setenv("FLEET_MANAGER_CONFIG", `{
+		"id":"fleet-manager",
 		"superplaneUrl":"http://app:8000",
 		"installationAdminToken":"config-token",
 		"fleets":[{
@@ -177,6 +233,7 @@ func TestLoadEnvironmentConfigurationAppliesInstallationAdminTokenOverride(t *te
 func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	_, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
 		"superplaneUrl":"http://app:8000",
 		"fleets":[{
 			"id":"e1-large-amd64",
@@ -200,6 +257,7 @@ func TestLoadRejectsWarmCapacityAboveMaximum(t *testing.T) {
 func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	t.Setenv("INSTALLATION_ADMIN_TOKEN", "personal-token")
 	config, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
 		"superplaneUrl":"http://app:8000",
 		"installationAdminToken":"",
 		"fleets":[{
