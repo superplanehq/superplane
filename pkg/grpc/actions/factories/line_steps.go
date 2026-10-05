@@ -114,9 +114,11 @@ func parseLineStep(
 var factoryLineColumnColorIDs = map[string]bool{
 	"lime":   true,
 	"yellow": true,
+	"orange": true,
 	"teal":   true,
 	"sky":    true,
 	"purple": true,
+	"pink":   true,
 	"slate":  true,
 }
 
