@@ -117,10 +117,27 @@ and user/system impact, not implementation tourism.>
   (`Adds…`, `Fixes…`, `Removes…`), not a diary of what you did yesterday.
 - **Scannable.** Short paragraphs or bullets; no wall of implementation notes
   that duplicate the diff.
+- **Concrete product ideas.** For product changes, use a few bullets that say
+  what users see or do differently and why. Assume the reviewer has not read
+  the conversation. Prefer “Hide the chat box while questions need answers”
+  over “Improve the planning interaction hierarchy.”
+- **Proportional scope.** A PR that adds stories can simply say which states
+  it adds and which issue they help explore. Do not imply it changes the app
+  or resolves the issue.
 - **Honest scope.** Call out follow-ups, known gaps, or intentional
   non-goals when relevant.
 - **Link context.** Reference issues (`Closes #123`) when they exist; do not
   invent ticket IDs.
+
+### UI review context
+
+- For visual changes, include screenshots of the most useful states. Two or
+  three usually suffice. Crop to the relevant area and label each state.
+  Use images from the final UI, with URLs that reviewers can access.
+- When Storybook covers the change, list the exact sidebar path and story
+  names. Identify relevant edge cases so reviewers can find them directly.
+- Scale this context to the change. Do not add screenshots or extra sections
+  when they do not help reviewers understand or verify it.
 
 ### Avoid
 
