@@ -35,42 +35,12 @@ In Helm, set `license.secretName` to mount a license from a Kubernetes secret.
 
 ## Local development
 
-`make dev.server` builds with the `licensedev` tag. Release images never use
-the tag, and release binaries do not contain the development license code.
+`make dev.server` enables every Enterprise feature when no license is
+installed. To test Community mode, set `SUPERPLANE_LICENSE_DEV_ENTERPRISE=false`
+in `.env` and restart the server.
 
-### All Enterprise features in development
-
-The development server grants every Enterprise feature when no license is
-installed. `docker-compose.dev.yml` sets `SUPERPLANE_LICENSE_DEV_ENTERPRISE`
-to `true`. At startup, the server makes a signing key that exists only in
-memory, trusts it, and signs a license for all recognized features. The
-License page shows this license as installed.
-
-- An installed license has priority. When you remove it, the development
-  license applies again.
-- When `SUPERPLANE_LICENSE_PATH` is set, the file stays the only source and
-  the development license does not apply.
-- To test Community mode, set `SUPERPLANE_LICENSE_DEV_ENTERPRISE=false` in
-  `.env` and restart `make dev.server`.
-
-### Licenses from a local issuer
-
-Only the `licensedev` tag reads `SUPERPLANE_LICENSE_DEV_JWKS_PATH`, which adds
-the keys of a local licensing issuer. Use it to test a real issued license.
-
-1. Start the licensing repository and activate its local signing key.
-2. Export the local keys:
-
-   ```text
-   curl -s http://localhost:8100/.well-known/jwks.json > tmp/license-dev.jwks.json
-   ```
-
-3. Set `SUPERPLANE_LICENSE_DEV_JWKS_PATH=/app/tmp/license-dev.jwks.json` in
-   `.env` and restart `make dev.server`.
-4. Issue a license in the local issuer and install it in SuperPlane.
-
-Tests sign licenses with ephemeral keys from `pkg/licensing/licensingtest`.
-Do not commit private keys.
+Tests sign licenses with `pkg/licensing/licensingtest`. Do not commit private
+keys or license files.
 
 ## Signing-key rotation
 
