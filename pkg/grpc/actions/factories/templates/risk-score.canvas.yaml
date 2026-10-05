@@ -14,39 +14,6 @@ spec:
     - channel: found
       sourceId: find-pull-request
       targetId: assess-risk
-    - channel: passed
-      sourceId: assess-risk
-      targetId: format-merge-confidence
-    - channel: passed
-      sourceId: format-merge-confidence
-      targetId: should-report-risk
-    - channel: "true"
-      sourceId: should-report-risk
-      targetId: report-risk-score
-    - channel: passed
-      sourceId: format-merge-confidence
-      targetId: should-report-performance
-    - channel: "true"
-      sourceId: should-report-performance
-      targetId: report-performance
-    - channel: passed
-      sourceId: format-merge-confidence
-      targetId: should-report-security
-    - channel: "true"
-      sourceId: should-report-security
-      targetId: report-security
-    - channel: passed
-      sourceId: format-merge-confidence
-      targetId: should-report-drift
-    - channel: "true"
-      sourceId: should-report-drift
-      targetId: report-drift
-    - channel: passed
-      sourceId: format-merge-confidence
-      targetId: should-report-reversibility
-    - channel: "true"
-      sourceId: should-report-reversibility
-      targetId: report-reversibility
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -116,6 +83,9 @@ spec:
           - name: BASE
             value: "{{ root().data.pull_request.base.ref }}"
             valueSource: literal
+          - name: SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID
+            value: '{{ $["Find Pull Request"].data.workOrder.id }}'
+            valueSource: literal
         steps:
           - name: Checkout Pull Request
             type: bash
@@ -153,25 +123,15 @@ spec:
               Task title: {{ $["Find Pull Request"].data.workOrder.title }}
               Task description: {{ $["Find Pull Request"].data.workOrder.description }}
 
-              Write ONLY valid JSON to /tmp/merge-confidence.json. No markdown fences.
-
-              JSON schema:
-              {
-                "risk": { "enabled": true, "score": 1, "summary": "one sentence" },
-                "performance": { "enabled": true, "score": 1, "summary": "one sentence" },
-                "security": { "enabled": true, "score": 1, "summary": "one sentence" },
-                "drift": { "enabled": true, "score": 1, "summary": "one sentence" },
-                "reversibility": { "enabled": true, "score": 1, "summary": "one sentence" }
-              }
+              Report each enabled check with the report_merge_check tool.
+              Call the tool once for every check named in Enabled checks.
+              Do not call the tool for a check that is not named.
+              When Enabled checks is none, do not call the tool.
+              Pass check, score, and summary.
+              check is risk, performance, security, drift, or reversibility.
+              Do not write a file.
 
               Enabled checks: {{ install_params.enabledChecks }}.
-
-              Always include risk, performance, security, drift, and reversibility.
-              Set enabled to true for every check named in Enabled checks.
-              Do not set enabled to false for a named check.
-              A named check stays on even when no practice in the repository applies to the diff.
-              For a check that is not named, set enabled to false, score to 0, and summary to an empty string.
-              When Enabled checks is none, set enabled to false for every check.
 
               Risk. Use this section only when risk is enabled.
               score is an integer from 1 to 5. A higher score means more risk.
@@ -209,19 +169,19 @@ spec:
               3 means the change follows some practices and breaks one that applies.
               2 means the change breaks a practice that applies.
               1 means the change breaks more than one practice that applies.
-              If no performance practice applies, keep enabled true and use 5.
+              If no performance practice applies, report the check with 5.
               summary is one sentence.
               Name the practice and say whether the change follows it or breaks it.
               If no practice applies, say that no performance practice in this repository applies.
-              Do not turn the check off. Do not repeat the score. Do not write a second sentence.
+              Do not skip the check. Do not repeat the score. Do not write a second sentence.
 
               Security. Use this section only when security is enabled.
               Use the same rules as Performance, for the security practices in this repository.
               Read the repository for the security practices it already states.
               Do not use a generic checklist from outside this repository.
-              If no security practice applies, keep enabled true and use 5.
+              If no security practice applies, report the check with 5.
               Say that no security practice in this repository applies.
-              Do not turn the check off.
+              Do not skip the check.
 
               Drift. Use this section only when drift is enabled.
               score is an integer from 1 to 5. A higher score means the change moved farther from the original task.
@@ -246,201 +206,7 @@ spec:
               summary is one sentence.
               Say what you must do to undo the change, or say that a revert is enough.
               Do not repeat the score. Do not write a second sentence.
-          - name: Emit Review
-            type: bash
-            command: |-
-              set -euo pipefail
-              if [ ! -s /tmp/merge-confidence.json ]; then
-                echo "Missing /tmp/merge-confidence.json" >&2
-                exit 1
-              fi
-              jq -e 'has("risk") and has("performance") and has("security") and has("drift") and has("reversibility")' /tmp/merge-confidence.json >/dev/null
-              cp /tmp/merge-confidence.json "$SUPERPLANE_RESULT_FILE"
       position:
         x: 920
         "y": 80
-      isCollapsed: true
-    - id: format-merge-confidence
-      name: Format Merge Confidence
-      type: TYPE_ACTION
-      component: runnerJS
-      configuration:
-        execution_mode: host
-        execution_timeout_seconds: 120
-        machine_type: e1-tiny-amd64
-        script: |-
-          function main() {
-            const review = ($["Assess Merge Confidence"] && $["Assess Merge Confidence"].data && $["Assess Merge Confidence"].data.result) || {};
-            return {
-              risk: normalizeCheck(review.risk),
-              performance: normalizeCheck(review.performance),
-              security: normalizeCheck(review.security),
-              drift: normalizeCheck(review.drift),
-              reversibility: normalizeCheck(review.reversibility),
-            };
-          }
-
-          function normalizeCheck(value) {
-            const item = value || {};
-            const summary = String(item.summary || "").trim();
-            return {
-              enabled: item.enabled === true,
-              score: clampScore(item.score),
-              summary: summary,
-            };
-          }
-
-          function clampScore(value) {
-            const score = Number(value);
-            if (!Number.isFinite(score)) return 1;
-            return Math.max(1, Math.min(5, Math.round(score)));
-          }
-      position:
-        x: 1200
-        "y": 80
-      isCollapsed: true
-    - id: should-report-risk
-      name: Report Risk?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '$["Format Merge Confidence"].data.result.risk.enabled == true'
-      position:
-        x: 1480
-        "y": 80
-      isCollapsed: true
-    - id: report-risk-score
-      name: Report Risk Score
-      type: TYPE_ACTION
-      component: reportWorkOrderCheck
-      configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
-        checkKey: risk-review
-        name: Blast radius
-        format: fraction
-        score: '{{ string($["Format Merge Confidence"].data.result.risk.score) }}'
-        maxScore: "5"
-        direction: lowerIsBetter
-        cautionAt: 3
-        criticalAt: 4
-        summary: '{{ $["Format Merge Confidence"].data.result.risk.summary }}'
-      position:
-        x: 1760
-        "y": 80
-      isCollapsed: true
-    - id: should-report-performance
-      name: Report Performance?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '$["Format Merge Confidence"].data.result.performance.enabled == true'
-      position:
-        x: 1480
-        "y": 260
-      isCollapsed: true
-    - id: report-performance
-      name: Report Performance
-      type: TYPE_ACTION
-      component: reportWorkOrderCheck
-      configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
-        checkKey: performance-review
-        name: Performance
-        format: fraction
-        score: '{{ string($["Format Merge Confidence"].data.result.performance.score) }}'
-        maxScore: "5"
-        direction: higherIsBetter
-        cautionAt: 3
-        criticalAt: 2
-        summary: '{{ $["Format Merge Confidence"].data.result.performance.summary }}'
-      position:
-        x: 1760
-        "y": 260
-      isCollapsed: true
-    - id: should-report-security
-      name: Report Security?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '$["Format Merge Confidence"].data.result.security.enabled == true'
-      position:
-        x: 1480
-        "y": 440
-      isCollapsed: true
-    - id: report-security
-      name: Report Security
-      type: TYPE_ACTION
-      component: reportWorkOrderCheck
-      configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
-        checkKey: security-review
-        name: Security
-        format: fraction
-        score: '{{ string($["Format Merge Confidence"].data.result.security.score) }}'
-        maxScore: "5"
-        direction: higherIsBetter
-        cautionAt: 3
-        criticalAt: 2
-        summary: '{{ $["Format Merge Confidence"].data.result.security.summary }}'
-      position:
-        x: 1760
-        "y": 440
-      isCollapsed: true
-    - id: should-report-drift
-      name: Report Drift?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '$["Format Merge Confidence"].data.result.drift.enabled == true'
-      position:
-        x: 1480
-        "y": 620
-      isCollapsed: true
-    - id: report-drift
-      name: Report Drift
-      type: TYPE_ACTION
-      component: reportWorkOrderCheck
-      configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
-        checkKey: drift-review
-        name: Drift from Specification
-        format: fraction
-        score: '{{ string($["Format Merge Confidence"].data.result.drift.score) }}'
-        maxScore: "5"
-        direction: lowerIsBetter
-        cautionAt: 3
-        criticalAt: 4
-        summary: '{{ $["Format Merge Confidence"].data.result.drift.summary }}'
-      position:
-        x: 1760
-        "y": 620
-      isCollapsed: true
-    - id: should-report-reversibility
-      name: Report Reversibility?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '$["Format Merge Confidence"].data.result.reversibility.enabled == true'
-      position:
-        x: 1480
-        "y": 800
-      isCollapsed: true
-    - id: report-reversibility
-      name: Report Reversibility
-      type: TYPE_ACTION
-      component: reportWorkOrderCheck
-      configuration:
-        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
-        checkKey: reversibility-review
-        name: Reversibility
-        format: fraction
-        score: '{{ string($["Format Merge Confidence"].data.result.reversibility.score) }}'
-        maxScore: "5"
-        direction: higherIsBetter
-        cautionAt: 3
-        criticalAt: 2
-        summary: '{{ $["Format Merge Confidence"].data.result.reversibility.summary }}'
-      position:
-        x: 1760
-        "y": 800
       isCollapsed: true

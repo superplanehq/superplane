@@ -50,6 +50,26 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
 }
 
+func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+	}, "gpt-5", "/task/merge_confidence_mcp.js")
+
+	joined := strings.Join(args, " ")
+	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
+}
+
+func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { superplaneMCPScript } = require(process.argv[1]); process.stdout.write(superplaneMCPScript("/task", { SUPERPLANE_MERGE_CONFIDENCE_TOKEN: "token" }));`, script)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "/task/merge_confidence_mcp.js", string(out))
+}
+
 func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
