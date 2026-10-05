@@ -6,7 +6,8 @@ set -euxo pipefail
 
 WHISPER_VERSION="${WHISPER_VERSION:-v1.9.2}"
 WHISPER_REPO="${WHISPER_REPO:-https://github.com/ggml-org/whisper.cpp.git}"
-WHISPER_MODEL_URL="${WHISPER_MODEL_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin}"
+WHISPER_MODEL_REVISION="${WHISPER_MODEL_REVISION:-5359861c739e955e79d9a303bcbc70fb988958b1}"
+WHISPER_MODEL_URL="${WHISPER_MODEL_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REVISION}/ggml-tiny.bin}"
 WHISPER_MODEL_SHA256="${WHISPER_MODEL_SHA256:-be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21}"
 PREFIX="${PREFIX:-/usr/local}"
 MODEL_DIR="${MODEL_DIR:-/usr/local/share/whisper}"
@@ -25,20 +26,19 @@ cd "${workdir}"
 
 git clone --depth 1 --branch "${WHISPER_VERSION}" "${WHISPER_REPO}" whisper.cpp
 
-# GCC 12 -mcpu=native on aarch64 reports +fp16fml and then drops dotprod,
-# i8mm, and sve when those runtime probes fail. ggml still compiles the FP16
-# NEON path, and vfmaq_f16 fails to inline. Pin a baseline that includes +fp16.
-# Apple Silicon and Graviton 2 (t4g) implement armv8.2-a+dotprod+fp16.
+# Fleet CPUs can differ from the Packer build CPU. Disable native tuning so the
+# baked binary does not require instruction sets that are absent at runtime.
 cmake_args=(
   -DCMAKE_BUILD_TYPE=Release
   -DBUILD_SHARED_LIBS=OFF
+  -DGGML_NATIVE=OFF
   -DWHISPER_BUILD_EXAMPLES=ON
   -DWHISPER_SDL2=OFF
   -DWHISPER_CURL=OFF
 )
 if [ "$(uname -m)" = "aarch64" ]; then
+  # Apple Silicon and Graviton 2 (t4g) implement this portable ARM baseline.
   cmake_args+=(
-    -DGGML_NATIVE=OFF
     -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16
   )
 fi
