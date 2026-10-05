@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -233,4 +234,62 @@ func TestAccountLicenseHidesStateFromNonAdmins(t *testing.T) {
 	status.State = licensing.StateExpired
 	expired := accountLicense(status, false)
 	assert.Equal(t, []string{}, expired.Features)
+}
+
+func TestAdminLicenseKeyList(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	root := licensingtest.NewIssuer("root-key")
+	first := licensingtest.NewIssuer("signing-key-1")
+	next := licensingtest.NewIssuer("signing-key-2")
+	store, err := licensing.NewKeyStore(licensingtest.KeySet(root), root.KeyList(1, first), nil)
+	require.NoError(t, err)
+	keySync := licensing.NewKeySync(store, licensing.DatabaseKeyListCache{}, "")
+	server.SetLicenseService(licensing.NewService(
+		licensing.NewVerifier(store),
+		licensing.NewDatabaseSource(crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))),
+		licensing.WithKeySync(keySync),
+	))
+
+	put := func(path string, body []byte, cookie string) *httptest.ResponseRecorder {
+		return execRequest(server, requestParams{method: http.MethodPut, path: path, body: body, contentType: "application/json", authCookie: cookie})
+	}
+	keyListBody := func(raw []byte) []byte {
+		body, err := json.Marshal(installKeyListRequest{KeyList: string(raw)})
+		require.NoError(t, err)
+		return body
+	}
+
+	status := decodeLicenseResponse(t, execRequest(server, requestParams{method: http.MethodGet, path: licensePath, authCookie: token}).Body)
+	require.NotNil(t, status.TrustedKeys)
+	assert.Equal(t, "disabled", status.TrustedKeys.State)
+	assert.Equal(t, int64(1), status.TrustedKeys.Version)
+
+	response := put(licensePath, licenseBody(t, next.License(licensing.FeatureGroups)), token)
+	assert.Equal(t, http.StatusUnprocessableEntity, response.Code)
+
+	account, err := models.CreateAccount("Regular User", "regular-keys@example.com")
+	require.NoError(t, err)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, put(licensePath+"/keys", keyListBody(root.KeyList(2, next)), regularToken).Code)
+
+	response = put(licensePath+"/keys", keyListBody(licensingtest.NewIssuer("root-key").KeyList(2, next)), token)
+	assert.Equal(t, http.StatusUnprocessableEntity, response.Code)
+	assert.Contains(t, response.Body.String(), "not valid")
+
+	response = put(licensePath+"/keys", keyListBody(root.KeyList(2, first, next)), token)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	status = decodeLicenseResponse(t, response.Body)
+	assert.Equal(t, int64(2), status.TrustedKeys.Version)
+	assert.Equal(t, "synced", status.TrustedKeys.State)
+
+	response = put(licensePath, licenseBody(t, next.License(licensing.FeatureGroups)), token)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Equal(t, "active", decodeLicenseResponse(t, response.Body).State)
+
+	response = put(licensePath+"/keys", keyListBody(root.KeyList(1, first)), token)
+	assert.Equal(t, http.StatusUnprocessableEntity, response.Code)
+	assert.Contains(t, response.Body.String(), "older")
+
+	assert.Equal(t, http.StatusBadRequest, put(licensePath+"/keys", []byte(`{"key_list":" "}`), token).Code)
 }

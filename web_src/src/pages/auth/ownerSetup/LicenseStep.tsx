@@ -2,7 +2,7 @@ import superplaneLogo from "@/assets/superplane.svg";
 import { LicenseInstallForm } from "@/components/License/LicenseInstallForm";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { ENTERPRISE_FEATURES, fetchInstallationLicense, type InstallationLicense } from "@/lib/license";
+import { ENTERPRISE_FEATURES, fetchInstallationLicenseWhenKeysReady, type InstallationLicense } from "@/lib/license";
 import { CheckCircle2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -34,7 +34,7 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
   const [license, setLicense] = useState<InstallationLicense | null>(null);
 
   useEffect(() => {
-    fetchInstallationLicense()
+    fetchInstallationLicenseWhenKeysReady()
       .then((status) => {
         if (status.managed_by_configuration) {
           onContinue();
@@ -46,7 +46,12 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
   }, [onContinue]);
 
   if (!license) {
-    return null;
+    return (
+      <div className="flex flex-col items-center space-y-4 py-8" data-testid="owner-setup-license-loading">
+        <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
+        <Text className="text-gray-500 dark:text-gray-400">Preparing license verification...</Text>
+      </div>
+    );
   }
 
   if (license.edition === "enterprise") {

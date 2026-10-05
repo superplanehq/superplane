@@ -118,4 +118,28 @@ describe("InstallationLicense", () => {
     await waitFor(() => expect(screen.getByTestId("license-state")).toHaveTextContent("Invalid"));
     expect(screen.getByText(/does not trust the key/)).toBeInTheDocument();
   });
+
+  it("uploads a key list when automatic key updates are off", async () => {
+    const withKeys = (version: number) => ({
+      ...communityStatus,
+      trusted_keys: { state: version > 1 ? "synced" : "disabled", version },
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === "PUT" ? jsonResponse(withKeys(2)) : jsonResponse(withKeys(1)),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+
+    expect(await screen.findByTestId("license-trusted-keys-state")).toHaveTextContent("Automatic updates are off");
+    fireEvent.change(screen.getByTestId("license-key-list-input"), { target: { value: " a.b.c " } });
+    fireEvent.click(screen.getByTestId("license-key-list-upload"));
+
+    await waitFor(() => expect(screen.getByTestId("license-trusted-keys-state")).toHaveTextContent("Up to date"));
+    expect(screen.queryByTestId("license-key-list-input")).not.toBeInTheDocument();
+
+    const putCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(String(putCall?.[0])).toBe("/admin/api/installation/license/keys");
+    expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({ key_list: "a.b.c" });
+  });
 });

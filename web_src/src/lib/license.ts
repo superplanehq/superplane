@@ -1,6 +1,13 @@
 export type LicenseEdition = "community" | "enterprise";
 export type LicenseState = "none" | "active" | "expired" | "not_yet_valid" | "invalid";
 export type LicenseSource = "none" | "file" | "database";
+export type TrustedKeysState = "disabled" | "syncing" | "synced" | "failed";
+
+export type TrustedKeys = {
+  state: TrustedKeysState;
+  version: number;
+  synced_at?: string;
+};
 
 export type InstallationLicense = {
   edition: LicenseEdition;
@@ -16,6 +23,7 @@ export type InstallationLicense = {
     valid_from: string;
     expires_at: string;
   };
+  trusted_keys?: TrustedKeys;
 };
 
 export type AccountLicense = {
@@ -33,13 +41,17 @@ export const ENTERPRISE_FEATURES = [
 export const LICENSE_EXPIRY_WARNING_DAYS = 30;
 
 const LICENSE_PATH = "/admin/api/installation/license";
+const KEY_LIST_PATH = `${LICENSE_PATH}/keys`;
+const KEY_SYNC_WAIT_MS = 15_000;
+const KEY_SYNC_POLL_MS = 1_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const reasonMessages: Record<string, string> = {
   malformed: "The license is not in a valid format.",
   unsupported_algorithm: "The license signature is not valid.",
   invalid_signature: "The license signature is not valid.",
-  unknown_key: "This SuperPlane version does not trust the key that signed the license.",
+  unknown_key:
+    "SuperPlane does not trust the key that signed the license. Upload the latest key list, or check that SuperPlane can download license key updates.",
   invalid_claims: "The license is not valid for self-hosted SuperPlane.",
   expired: "The license has expired.",
   not_yet_valid: "The license is not valid yet.",
@@ -93,6 +105,36 @@ const parseLicenseResponse = async (response: Response, fallback: string): Promi
 
 export const fetchInstallationLicense = async () =>
   parseLicenseResponse(await fetch(LICENSE_PATH, { credentials: "include" }), "Failed to load the license");
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Waits up to 15 seconds while the server downloads the license keys for the
+// first time, so that a new license is not rejected only because the keys are
+// not ready yet. Then it returns the status as it is.
+export const fetchInstallationLicenseWhenKeysReady = async (
+  waitMs: number = KEY_SYNC_WAIT_MS,
+  pollMs: number = KEY_SYNC_POLL_MS,
+) => {
+  const deadline = Date.now() + waitMs;
+  let status = await fetchInstallationLicense();
+  while (status.trusted_keys?.state === "syncing" && Date.now() < deadline) {
+    await delay(pollMs);
+    status = await fetchInstallationLicense();
+  }
+
+  return status;
+};
+
+export const uploadLicenseKeyList = async (keyList: string) =>
+  parseLicenseResponse(
+    await fetch(KEY_LIST_PATH, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ key_list: keyList.trim() }),
+    }),
+    "Failed to upload the key list",
+  );
 
 export const installInstallationLicense = async (license: string) =>
   parseLicenseResponse(

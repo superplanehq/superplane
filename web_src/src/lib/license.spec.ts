@@ -1,6 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 
-import { daysUntil, licenseExpiryWarning, licenseReasonMessage } from "./license";
+import {
+  daysUntil,
+  fetchInstallationLicenseWhenKeysReady,
+  licenseExpiryWarning,
+  licenseReasonMessage,
+  type TrustedKeysState,
+} from "./license";
 
 const now = new Date("2026-10-05T12:00:00Z");
 const inDays = (days: number) => new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
@@ -48,5 +54,45 @@ describe("licenseReasonMessage", () => {
     expect(licenseReasonMessage("expired")).toBe("The license has expired.");
     expect(licenseReasonMessage("something_else")).toBe("The license could not be read.");
     expect(licenseReasonMessage(undefined)).toBe("The license could not be read.");
+  });
+});
+
+describe("fetchInstallationLicenseWhenKeysReady", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const statusWithKeys = (state: TrustedKeysState) =>
+    new Response(
+      JSON.stringify({
+        edition: "community",
+        state: "none",
+        source: "database",
+        managed_by_configuration: false,
+        trusted_keys: { state, version: 1 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  it("waits until the first key download finishes", async () => {
+    const states: TrustedKeysState[] = ["syncing", "syncing", "synced"];
+    const fetchMock = vi.fn(async () => statusWithKeys(states.shift() ?? "synced"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const status = await fetchInstallationLicenseWhenKeysReady(1_000, 1);
+
+    expect(status.trusted_keys?.state).toBe("synced");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops waiting after the time limit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => statusWithKeys("syncing")),
+    );
+
+    const status = await fetchInstallationLicenseWhenKeysReady(20, 5);
+
+    expect(status.trusted_keys?.state).toBe("syncing");
   });
 });

@@ -51,6 +51,21 @@ describe("LicenseStep", () => {
     await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
   });
 
+  it("shows a loading state until the license keys are ready", async () => {
+    const states = ["syncing", "synced"];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ ...communityStatus, trusted_keys: { state: states.shift() ?? "synced", version: 1 } }),
+      ),
+    );
+
+    render(<LicenseStep onContinue={vi.fn()} />);
+
+    expect(screen.getByTestId("owner-setup-license-loading")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("owner-setup-license")).toBeInTheDocument(), { timeout: 3000 });
+  });
+
   it("confirms activation after a license is installed", async () => {
     vi.stubGlobal(
       "fetch",

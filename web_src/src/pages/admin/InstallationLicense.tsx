@@ -1,4 +1,5 @@
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
+import { KeyListUploadForm } from "@/components/License/KeyListUploadForm";
 import { LicenseInstallForm } from "@/components/License/LicenseInstallForm";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,13 @@ import {
   ENTERPRISE_FEATURES,
   LICENSE_EXPIRY_WARNING_DAYS,
   daysUntil,
-  fetchInstallationLicense,
+  fetchInstallationLicenseWhenKeysReady,
   licenseReasonMessage,
   removeInstallationLicense,
   type InstallationLicense as InstallationLicenseStatus,
   type LicenseState,
+  type TrustedKeys,
+  type TrustedKeysState,
 } from "@/lib/license";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { CheckCircle2, Lock } from "lucide-react";
@@ -167,6 +170,42 @@ const ManagedByConfigurationNote = () => (
   </section>
 );
 
+const trustedKeysLabels: Record<TrustedKeysState, string> = {
+  synced: "Up to date",
+  syncing: "Updating",
+  failed: "Update failed",
+  disabled: "Automatic updates are off",
+};
+
+type TrustedKeysSectionProps = {
+  keys: TrustedKeys;
+  onUploaded: (status: InstallationLicenseStatus) => void;
+};
+
+const TrustedKeysSection = ({ keys, onUploaded }: TrustedKeysSectionProps) => (
+  <section className={sectionClass} data-testid="license-trusted-keys">
+    <p className={eyebrowClass}>License keys</p>
+    <Text className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+      SuperPlane downloads signed updates to the keys that verify licenses.
+    </Text>
+    <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+      <DetailRow label="Status">
+        <span data-testid="license-trusted-keys-state">{trustedKeysLabels[keys.state]}</span>
+      </DetailRow>
+      <DetailRow label="Version">{keys.version > 0 ? keys.version : "—"}</DetailRow>
+      <DetailRow label="Last updated">{keys.synced_at ? formatDate(keys.synced_at) : "—"}</DetailRow>
+    </dl>
+    {keys.state === "failed" || keys.state === "disabled" ? (
+      <div className="mt-5 max-w-2xl">
+        <Text className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+          If this server cannot download updates, upload the key list that you receive with your license.
+        </Text>
+        <KeyListUploadForm onUploaded={onUploaded} />
+      </div>
+    ) : null}
+  </section>
+);
+
 type RemoveLicenseDialogProps = {
   open: boolean;
   removing: boolean;
@@ -232,7 +271,7 @@ const useInstallationLicense = () => {
   const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
-    fetchInstallationLicense()
+    fetchInstallationLicenseWhenKeysReady()
       .then(setStatus)
       .catch((error: unknown) => setLoadError(error instanceof Error ? error.message : "Failed to load the license"));
   }, []);
@@ -241,6 +280,15 @@ const useInstallationLicense = () => {
     (next: InstallationLicenseStatus) => {
       setStatus(next);
       showSuccessToast("License installed");
+      void refreshAccount();
+    },
+    [refreshAccount],
+  );
+
+  const handleKeysUploaded = useCallback(
+    (next: InstallationLicenseStatus) => {
+      setStatus(next);
+      showSuccessToast("Key list uploaded");
       void refreshAccount();
     },
     [refreshAccount],
@@ -259,11 +307,11 @@ const useInstallationLicense = () => {
     }
   }, [refreshAccount]);
 
-  return { status, loadError, removing, handleInstalled, remove };
+  return { status, loadError, removing, handleInstalled, handleKeysUploaded, remove };
 };
 
 const InstallationLicense: React.FC = () => {
-  const { status, loadError, removing, handleInstalled, remove } = useInstallationLicense();
+  const { status, loadError, removing, handleInstalled, handleKeysUploaded, remove } = useInstallationLicense();
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
 
   useReportPageReady(status !== null || loadError !== null);
@@ -299,6 +347,9 @@ const InstallationLicense: React.FC = () => {
               onRemoveClick={() => setConfirmingRemoval(true)}
             />
           )}
+          {status.trusted_keys ? (
+            <TrustedKeysSection keys={status.trusted_keys} onUploaded={handleKeysUploaded} />
+          ) : null}
         </div>
       ) : null}
 

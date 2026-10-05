@@ -25,6 +25,15 @@ type installationLicenseResponse struct {
 	// license. Administrators cannot change it in the UI.
 	ManagedByConfiguration bool                        `json:"managed_by_configuration"`
 	License                *installationLicenseDetails `json:"license,omitempty"`
+	TrustedKeys            *trustedKeysResponse        `json:"trusted_keys,omitempty"`
+}
+
+// trustedKeysResponse describes the key list that verifies licenses. The
+// state is syncing until the first download finishes.
+type trustedKeysResponse struct {
+	State    string     `json:"state"`
+	Version  int64      `json:"version"`
+	SyncedAt *time.Time `json:"synced_at,omitempty"`
 }
 
 type installationLicenseDetails struct {
@@ -38,6 +47,10 @@ type installationLicenseDetails struct {
 
 type installLicenseRequest struct {
 	License string `json:"license"`
+}
+
+type installKeyListRequest struct {
+	KeyList string `json:"key_list"`
 }
 
 func (s *Server) licenseStatus() licensing.Status {
@@ -84,8 +97,21 @@ func featureKeys(features []licensing.Feature) []string {
 	return keys
 }
 
+func (s *Server) installationLicenseResponse(status licensing.Status) installationLicenseResponse {
+	response := installationLicenseResponseFrom(status)
+	if s.licenseService == nil {
+		return response
+	}
+
+	if keys, ok := s.licenseService.TrustedKeys(); ok {
+		response.TrustedKeys = &trustedKeysResponse{State: string(keys.State), Version: keys.Version, SyncedAt: keys.SyncedAt}
+	}
+
+	return response
+}
+
 func (s *Server) adminGetInstallationLicense(w http.ResponseWriter, _ *http.Request) {
-	respondJSON(w, installationLicenseResponseFrom(s.licenseStatus()))
+	respondJSON(w, s.installationLicenseResponse(s.licenseStatus()))
 }
 
 func (s *Server) adminInstallInstallationLicense(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +153,7 @@ func (s *Server) adminInstallInstallationLicense(w http.ResponseWriter, r *http.
 		return
 	}
 
-	respondJSON(w, installationLicenseResponseFrom(status))
+	respondJSON(w, s.installationLicenseResponse(status))
 }
 
 func (s *Server) adminRemoveInstallationLicense(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +174,43 @@ func (s *Server) adminRemoveInstallationLicense(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondJSON(w, installationLicenseResponseFrom(status))
+	respondJSON(w, s.installationLicenseResponse(status))
+}
+
+func (s *Server) adminInstallLicenseKeyList(w http.ResponseWriter, r *http.Request) {
+	if s.licenseService == nil {
+		http.Error(w, "License management is not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, MaxLicenseRequestBytes+licensing.MaxKeyListBytes)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	var req installKeyListRequest
+	if err := decoder.Decode(&req); err != nil || strings.TrimSpace(req.KeyList) == "" {
+		http.Error(w, "Paste a key list to upload", http.StatusBadRequest)
+		return
+	}
+
+	err := s.licenseService.InstallKeyList(r.Context(), []byte(req.KeyList))
+	switch {
+	case errors.Is(err, licensing.ErrInvalidKeyList):
+		http.Error(w, "The key list is not valid.", http.StatusUnprocessableEntity)
+		return
+	case errors.Is(err, licensing.ErrKeyListDowngrade):
+		http.Error(w, "The key list is older than the trusted keys.", http.StatusUnprocessableEntity)
+		return
+	case errors.Is(err, licensing.ErrKeySyncUnavailable):
+		http.Error(w, "License key updates are not available", http.StatusServiceUnavailable)
+		return
+	case err != nil:
+		log.WithError(err).Error("admin: failed to upload the license key list")
+		http.Error(w, "Failed to upload the key list", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, s.installationLicenseResponse(s.licenseStatus()))
 }
 
 func writeLicenseError(w http.ResponseWriter, err error) {
@@ -172,7 +234,7 @@ func licenseReasonMessage(reason licensing.Reason) string {
 	case licensing.ReasonMalformed:
 		return "The license is not in a valid format. Paste the complete license."
 	case licensing.ReasonUnknownKey:
-		return "This SuperPlane version does not trust the key that signed the license. Upgrade SuperPlane, or contact SuperPlane support."
+		return "SuperPlane does not trust the key that signed the license. Make sure that SuperPlane can download license key updates, or upload the latest key list."
 	case licensing.ReasonUnsupportedAlgorithm, licensing.ReasonInvalidSignature:
 		return "The license signature is not valid."
 	case licensing.ReasonInvalidClaims:
