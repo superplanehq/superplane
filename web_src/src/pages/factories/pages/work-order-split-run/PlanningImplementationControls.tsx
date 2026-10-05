@@ -73,7 +73,7 @@ function DiscouragedImplementationOptions({ children }: { children: ReactNode })
           {!expanded ? <ArrowRight aria-hidden className="size-3" /> : null}
         </Button>
       </div>
-      <div id={optionsId} hidden={!expanded} className="ml-auto">
+      <div id={optionsId} aria-hidden={!expanded} inert={!expanded} className={cn("ml-auto", !expanded && "invisible")}>
         {children}
       </div>
     </>
