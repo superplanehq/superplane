@@ -58,6 +58,14 @@ instance profile that permits `logs:CreateLogStream`, `logs:DescribeLogGroups`,
 example configuration uses a placeholder profile name with this expected
 access.
 
+The same instance profile enables Session Manager access when its EC2 role
+allows `ssm:UpdateInstanceInformation` and the
+`ssmmessages:CreateControlChannel`, `ssmmessages:CreateDataChannel`,
+`ssmmessages:OpenControlChannel`, and `ssmmessages:OpenDataChannel` actions.
+Its trust policy must allow EC2 to assume the role. The example sets
+`aws.iamInstanceProfile` to `superplane-runner-instance-profile` and leaves
+`aws.keyName` empty because Session Manager does not require an SSH key.
+
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
