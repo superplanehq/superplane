@@ -7,7 +7,9 @@ binary or registration credentials.
 Fleet Manager selects the AMI for each fleet. Instance userdata downloads the
 configured runner release, verifies its checksum, and runs the release
 `install.sh`. The AMIs include the Amazon CloudWatch Agent, but Fleet Manager
-supplies its region and log-group configuration at instance launch.
+supplies its region and log-group configuration at instance launch. They also
+include the enabled Amazon SSM Agent for administrator access through Session
+Manager; no SSH key is required.
 
 ## Build
 
