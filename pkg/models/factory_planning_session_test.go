@@ -12,62 +12,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestFactory_StartPlanningSession(t *testing.T) {
+func TestTaskCreationSessionRequiresCreator(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-start")
+	org, _, factoryModel := setupFactoryWithUser(t, "plan-creator")
 	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 
-	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, session)
-	assert.Equal(t, PlanningSessionStateRunning, session.State)
-	assert.Equal(t, "acme/payments", session.Repository)
-	assert.Equal(t, canvas.ID, *session.CanvasID)
-	require.NotNil(t, session.CanvasRunID)
-	assert.Equal(t, userID, *session.CreatedByUserID)
-	assert.Empty(t, session.Messages)
-
-	var run CanvasRun
-	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
-	assert.Equal(t, canvas.ID, run.WorkflowID)
-	assert.Equal(t, entrypoint, run.NodeID)
-	assert.Equal(t, CanvasRunStatePending, run.State)
-}
-
-func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-repo")
-	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-
-	_, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
-	})
-	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-}
-
-func TestFactory_StartPlanningSession_RequiresCreator(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-creator")
-	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-
-	_, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		Repository: "acme/payments",
-		CanvasID:   canvas.ID,
-		Entrypoint: entrypoint,
-	})
-	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-
-	err = db.Create(&FactoryPlanningSession{
+	err := db.Create(&FactoryPlanningSession{
 		ID:             uuid.New(),
 		OrganizationID: org.ID,
 		FactoryID:      factoryModel.ID,
@@ -78,70 +28,6 @@ func TestFactory_StartPlanningSession_RequiresCreator(t *testing.T) {
 	}).Error
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "factory_planning_sessions_task_creation_creator_check")
-}
-
-func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-start")
-	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
-	require.NoError(t, err)
-
-	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
-		WorkOrderID:     order.ID,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, order.Title, session.Draft().Title)
-	assert.Equal(t, order.Description, session.Draft().Description)
-	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	assert.Equal(t, order.ID.String(), ids[0])
-
-	var run CanvasRun
-	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
-	planning := planningSessionInputFromRun(t, run)
-	assert.Equal(t, factoryModel.WorkOrderKey(order.Number), planning["refine_key"])
-	assert.Equal(t, order.Title, planning["refine_title"])
-	assert.Equal(t, order.Description, planning["refine_description"])
-}
-
-func TestFactory_StartPlanningSession_RejectsOpenWorkOrder(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-open-start")
-	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
-	require.NoError(t, err)
-	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
-		ToState: FactoryWorkOrderStateOpen,
-		Actor:   &userID,
-	})
-	require.NoError(t, err)
-
-	_, err = factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
-		WorkOrderID:     order.ID,
-	})
-	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-}
-
-func planningSessionInputFromRun(t *testing.T, run CanvasRun) map[string]any {
-	t.Helper()
-	input, ok := run.Input.Data().(map[string]any)
-	require.True(t, ok)
-	planning, ok := input["planning_session"].(map[string]any)
-	require.True(t, ok)
-	return planning
 }
 
 func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
@@ -220,12 +106,12 @@ func TestFactoryPlanningSession_SendUserMessageStoresUserID(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-sender")
 	db := database.DB(t.Context())
-	userID := *session.CreatedByUserID
+	sender := createOrgUser(t, session.OrganizationID, "plan-sender-user")
 
-	require.NoError(t, session.SendUserMessage(db, "Add refund retries", userID))
+	require.NoError(t, session.SendUserMessage(db, "Add refund retries", sender.ID))
 	require.Len(t, session.Messages, 1)
 	require.NotNil(t, session.Messages[0].UserID)
-	assert.Equal(t, userID, *session.Messages[0].UserID)
+	assert.Equal(t, sender.ID, *session.Messages[0].UserID)
 
 	require.NoError(t, session.SendUserMessage(db, "Skip the color field", uuid.Nil))
 	require.Len(t, session.Messages, 2)
@@ -270,49 +156,6 @@ func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
 	assert.Equal(t, "Add a puppy color field", result.Text)
-	assert.Equal(t, PlanningWaitIdle, session.WaitState)
-}
-
-func TestFactoryPlanningSession_CreateDraftBeforeWaitIsKept(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-create-early")
-	db := database.DB(t.Context())
-	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-	assert.Equal(t, PlanningWaitKindCreated, session.Wait().Kind)
-	assert.Equal(t, order.ID.String(), session.Wait().WorkOrderID)
-
-	require.NoError(t, session.BeginWait(db))
-	result, err := session.ConsumeWait(db)
-	require.NoError(t, err)
-	assert.Equal(t, PlanningWaitKindCreated, result.Kind)
-	assert.Equal(t, order.ID.String(), result.WorkOrderID)
-	assert.Equal(t, PlanningWaitIdle, session.WaitState)
-}
-
-func TestFactoryPlanningSession_SkipDraftBeforeWaitIsKept(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-skip-early")
-	db := database.DB(t.Context())
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	require.NoError(t, session.SkipDraft(db))
-	assert.Equal(t, PlanningWaitKindSkipped, session.Wait().Kind)
-
-	require.NoError(t, session.BeginWait(db))
-	result, err := session.ConsumeWait(db)
-	require.NoError(t, err)
-	assert.Equal(t, PlanningWaitKindSkipped, result.Kind)
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
 }
 
@@ -365,201 +208,28 @@ func TestFactoryPlanningSession_ProposeSurveyReplacesPrevious(t *testing.T) {
 	assert.Equal(t, "New?", session.CurrentSurvey().Questions[0].Prompt)
 }
 
-func TestFactoryPlanningSession_ProposeAndSkipDraft(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-draft")
-	db := database.DB(t.Context())
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	assert.Equal(t, "Retry refunds", session.Draft().Title)
-
-	require.NoError(t, session.UpdateDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds once",
-		Description: "Edited.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SkipDraft(db))
-	assert.Equal(t, "", session.Draft().Title)
-	assert.Equal(t, PlanningWaitKindSkipped, session.Wait().Kind)
-}
-
-func TestFactoryPlanningSession_ProposeDraftRequiresDescription(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-draft-desc")
-	db := database.DB(t.Context())
-
-	err := session.ProposeDraft(db, PlanningSessionDraft{Title: "Add flight transportation mode"})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-	assert.Equal(t, "", session.Draft().Title)
-}
-
-func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-create")
-	db := database.DB(t.Context())
-	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-	assert.Equal(t, FactoryWorkOrderStateDraft, order.State)
-	assert.Equal(t, "Retry refunds", order.Title)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	assert.Equal(t, order.ID.String(), ids[0])
-	assert.Equal(t, PlanningWaitKindCreated, session.Wait().Kind)
-	assert.Equal(t, "", session.Draft().Title)
-}
-
-func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-refine-ready")
-	db := database.DB(t.Context())
-	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-	_, err = session.ConsumeWait(db)
-	require.NoError(t, err)
-
-	require.NoError(t, session.BeginWait(db))
-	note := PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)
-	require.NoError(t, session.SendUserMessage(db, note, uuid.Nil))
-	assert.Equal(t, note, lastTextMessage(session, PlanningSessionMessageRoleUser))
-	result := session.Wait()
-	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
-	assert.Contains(t, result.Text, factoryModel.WorkOrderKey(order.Number))
-	assert.Contains(t, result.Text, "Retry refunds")
-	assert.Contains(t, result.Text, "Stop double charges.")
-	assert.Contains(t, result.Text, "ready to refine")
-	assert.Contains(t, result.Text, "Do not call propose_draft")
-	assert.NotEqual(t, note, result.Text)
-}
-
-func TestFactoryPlanningSession_FollowUpKeepsCurrentDraftInWaitText(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-follow-draft")
-	db := database.DB(t.Context())
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Add a color field with a visual color picker to the Puppy entity",
-		Description: "Add a color attribute and a picker on the Puppy form.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, "I actually want this to be about size and not color", uuid.Nil))
-	assert.Equal(t, "I actually want this to be about size and not color", lastTextMessage(session, PlanningSessionMessageRoleUser))
-	result := session.Wait()
-	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
-	assert.Contains(t, result.Text, "Add a color field with a visual color picker to the Puppy entity")
-	assert.Contains(t, result.Text, "Add a color attribute and a picker on the Puppy form.")
-	assert.Contains(t, result.Text, "I actually want this to be about size and not color")
-	assert.Contains(t, result.Text, "this draft")
-	assert.NotEqual(t, "I actually want this to be about size and not color", result.Text)
-}
-
-func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-refine")
-	db := database.DB(t.Context())
-	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title), uuid.Nil))
-	assert.Equal(t, order.Title, session.Draft().Title)
-	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
-
-	require.NoError(t, session.UpdateDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds once",
-		Description: "One retry only.",
-	}))
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds once",
-		Description: "Agent edit.",
-	}))
-	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
-
-	updated, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-	assert.Equal(t, order.ID, updated.ID)
-	assert.Equal(t, "Retry refunds once", updated.Title)
-	assert.Equal(t, "Agent edit.", updated.Description)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
-}
-
-func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-refine-skip")
-	db := database.DB(t.Context())
-	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds",
-		Description: "Stop double charges.",
-	}))
-	require.NoError(t, session.BeginWait(db))
-	order, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-
-	require.NoError(t, session.BeginWait(db))
-	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title), uuid.Nil))
-	require.NoError(t, session.SkipDraft(db))
-	assert.Equal(t, "", session.Draft().Title)
-	assert.Equal(t, "", session.Draft().WorkOrderID)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	assert.Equal(t, order.ID.String(), ids[0])
-}
-
 func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-chat")
 	db := database.DB(t.Context())
+	original := session.Draft().WorkOrderID
 
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Refine checkout: please.", uuid.Nil))
 	assert.Equal(t, "Refine checkout: please.", lastTextMessage(session, PlanningSessionMessageRoleUser))
 	assert.Equal(t, "Refine checkout: please.", session.Wait().Text)
-	assert.Equal(t, "", session.Draft().WorkOrderID)
+	assert.Equal(t, original, session.Draft().WorkOrderID)
 }
 
-func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdatesSameTask(t *testing.T) {
+func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraft(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-backlog")
 	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
+	creator := createOrgUser(t, session.OrganizationID, "plan-refine-backlog-user")
 
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", session.CreatedByUserID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &creator.ID, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, session.BeginWait(db))
@@ -567,25 +237,6 @@ func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdates
 	assert.Equal(t, order.Title, session.Draft().Title)
 	assert.Equal(t, order.Description, session.Draft().Description)
 	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
-	assert.Equal(t, order.ID.String(), ids[0])
-
-	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
-		Title:       "Retry refunds once",
-		Description: "Agent edit.",
-	}))
-	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
-
-	updated, err := session.CreateDraftWorkOrder(db, factoryModel, *session.CreatedByUserID)
-	require.NoError(t, err)
-	assert.Equal(t, order.ID, updated.ID)
-	assert.Equal(t, "Retry refunds once", updated.Title)
-	assert.Equal(t, "Agent edit.", updated.Description)
-	ids, err = session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	require.Len(t, ids, 1)
 }
 
 func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
@@ -594,12 +245,14 @@ func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
+	creator := createOrgUser(t, session.OrganizationID, "plan-refine-open-user")
+	original := session.Draft().WorkOrderID
 
-	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", session.CreatedByUserID, nil, nil)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &creator.ID, nil, nil)
 	require.NoError(t, err)
 	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 		ToState: FactoryWorkOrderStateOpen,
-		Actor:   session.CreatedByUserID,
+		Actor:   &creator.ID,
 	})
 	require.NoError(t, err)
 
@@ -607,10 +260,7 @@ func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, note, uuid.Nil))
 	assert.Equal(t, note, session.Wait().Text)
-	assert.Equal(t, "", session.Draft().WorkOrderID)
-	ids, err := session.CreatedWorkOrderIDs(db)
-	require.NoError(t, err)
-	assert.Empty(t, ids)
+	assert.Equal(t, original, session.Draft().WorkOrderID)
 }
 
 func TestEndPlanningSessionForFinishedRun(t *testing.T) {
@@ -658,8 +308,8 @@ func TestEndPlanningSessionForFinishedRun_NoSession(t *testing.T) {
 
 func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-list-stale")
-	fresh := startTestPlanningSession(t, "plan-list-fresh")
+	session := insertTaskCreationSession(t, "plan-list-stale")
+	fresh := insertTaskCreationSession(t, "plan-list-fresh")
 	db := database.DB(t.Context())
 
 	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-6*time.Minute)).Error)
@@ -695,14 +345,39 @@ func startTestPlanningSession(t *testing.T, prefix string) *FactoryPlanningSessi
 	t.Helper()
 	org, userID, factoryModel := setupFactoryWithUser(t, prefix)
 	db := database.DB(t.Context())
-	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
-		CreatedByUserID: userID,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
+	canvas, _ := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	run, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	session, err := factoryModel.AttachAnalysisSession(db, AttachAnalysisSessionParams{
+		Repository:  "acme/payments",
+		CanvasID:    canvas.ID,
+		CanvasRunID: run.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
+	return session
+}
+
+func insertTaskCreationSession(t *testing.T, prefix string) *FactoryPlanningSession {
+	t.Helper()
+	org, userID, factoryModel := setupFactoryWithUser(t, prefix)
+	db := database.DB(t.Context())
+	now := time.Now()
+	session := &FactoryPlanningSession{
+		ID:              uuid.New(),
+		OrganizationID:  org.ID,
+		FactoryID:       factoryModel.ID,
+		CreatedByUserID: &userID,
+		Repository:      "acme/payments",
+		Kind:            PlanningSessionKindTaskCreation,
+		State:           PlanningSessionStateRunning,
+		HeartbeatAt:     now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, db.Create(session).Error)
 	return session
 }
 
@@ -716,7 +391,7 @@ func createPlanningCanvas(t *testing.T, orgID, factoryID, userID uuid.UUID) (*Ca
 		OrganizationID: orgID,
 		LiveVersionID:  &liveVersionID,
 		FactoryID:      &factoryID,
-		Name:           PlanningCanvasName,
+		Name:           "planning-" + uuid.NewString(),
 		CreatedBy:      &userID,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,

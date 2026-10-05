@@ -146,12 +146,14 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 	}
 	require.NoError(t, models.CreateAgentSessionInTransaction(db, session))
 
-	planningCanvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
-	planningSession, err := factoryModel.StartPlanningSession(db, models.StartPlanningSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/app",
-		CanvasID:        planningCanvas.ID,
-		Entrypoint:      entrypoint,
+	planningCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	planningRun, err := models.CreateCanvasRunInTransaction(db, planningCanvas.ID, "start", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	planningSession, err := factoryModel.AttachAnalysisSession(db, models.AttachAnalysisSessionParams{
+		Repository:  "acme/app",
+		CanvasID:    planningCanvas.ID,
+		CanvasRunID: planningRun.ID,
+		WorkOrderID: order.ID,
 	})
 	require.NoError(t, err)
 	require.NoError(t, planningSession.SendUserMessage(db, "Plan the empty state.", uuid.Nil))
