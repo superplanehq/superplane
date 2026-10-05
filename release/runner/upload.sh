@@ -39,6 +39,55 @@ source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
 
 require_command aws "Install and authenticate the AWS CLI."
 
+is_git_sha_release=false
+if [[ "${VERSION}" =~ ${git_sha_pattern} ]]; then
+  is_git_sha_release=true
+  put_object_skeleton="$(aws s3api put-object --generate-cli-skeleton input)"
+  if [[ "${put_object_skeleton}" != *'"IfNoneMatch"'* ]]; then
+    echo "Error: AWS CLI must support s3api put-object --if-none-match for SHA releases" >&2
+    exit 1
+  fi
+  bucket="${S3_BUCKET_URI#s3://}"
+  prefix="runner/${VERSION}/"
+  existing_key_count="$(
+    aws s3api list-objects-v2 \
+      --bucket "${bucket}" \
+      --prefix "${prefix}" \
+      --max-keys 1 \
+      --query KeyCount \
+      --output text
+  )"
+  if [ "${existing_key_count}" != "0" ]; then
+    echo "Error: immutable runner release ${DESTINATION}/ already exists" >&2
+    exit 1
+  fi
+fi
+
+upload_artifact() {
+  local source_path="$1"
+  local object_name="$2"
+  local content_type="$3"
+
+  if [ "${is_git_sha_release}" = "true" ]; then
+    aws s3api put-object \
+      --bucket "${bucket}" \
+      --key "${prefix}${object_name}" \
+      --body "${source_path}" \
+      --content-type "${content_type}" \
+      --cache-control "public,max-age=31536000,immutable" \
+      --if-none-match "*" \
+      >/dev/null
+    return
+  fi
+
+  aws s3 cp \
+    "${source_path}" \
+    "${DESTINATION}/${object_name}" \
+    --content-type "${content_type}" \
+    --cache-control "public,max-age=31536000,immutable" \
+    --only-show-errors
+}
+
 for artifact in "${ARCHIVES[@]}" checksums.txt; do
   if [ ! -f "${OUTPUT_DIR}/${artifact}" ]; then
     echo "Error: ${OUTPUT_DIR}/${artifact} does not exist." >&2
@@ -59,21 +108,11 @@ echo "* Verifying runner release checksums"
 
 for archive in "${ARCHIVES[@]}"; do
   echo "* Uploading ${archive}"
-  aws s3 cp \
-    "${OUTPUT_DIR}/${archive}" \
-    "${DESTINATION}/${archive}" \
-    --content-type "application/gzip" \
-    --cache-control "public,max-age=31536000,immutable" \
-    --only-show-errors
+  upload_artifact "${OUTPUT_DIR}/${archive}" "${archive}" "application/gzip"
 done
 
 echo "* Uploading checksums.txt"
-aws s3 cp \
-  "${OUTPUT_DIR}/checksums.txt" \
-  "${DESTINATION}/checksums.txt" \
-  --content-type "text/plain" \
-  --cache-control "public,max-age=31536000,immutable" \
-  --only-show-errors
+upload_artifact "${OUTPUT_DIR}/checksums.txt" "checksums.txt" "text/plain"
 
 echo ""
 echo "Runner release ${VERSION} uploaded to ${DESTINATION}/"

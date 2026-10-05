@@ -30,6 +30,26 @@ if [[ "${VERSION}" =~ ${git_sha_pattern} ]]; then
     echo "Error: checked-out commit ${actual_sha} does not match ${expected_sha}" >&2
     exit 1
   fi
+  release_inputs=(
+    go.mod
+    go.sum
+    cmd/runner
+    pkg
+    release/runner/Dockerfile
+    release/runner/build.sh
+    release/runner/install.sh
+  )
+  input_changes="$(
+    git -C "${REPO_ROOT}" status \
+      --porcelain \
+      --untracked-files=all \
+      -- "${release_inputs[@]}"
+  )"
+  if [ -n "${input_changes}" ]; then
+    echo "Error: SHA runner release inputs contain uncommitted changes:" >&2
+    echo "${input_changes}" >&2
+    exit 1
+  fi
 fi
 OUTPUT_DIR="${RUNNER_RELEASE_OUTPUT_DIR:-${REPO_ROOT}/build/runner/${VERSION}}"
 STAGING_DIR="${OUTPUT_DIR}/.staging"
