@@ -194,7 +194,7 @@ function ModelThinkingSelect({
           variant="outline"
           disabled={readOnly}
           data-testid={fieldName ? toTestId(`field-${fieldName}-hosted-model`) : undefined}
-          className="h-8 w-full justify-between px-2.5 font-normal shadow-xs"
+          className="h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800"
         >
           <span className="min-w-0 truncate">{selectedLabel}</span>
           <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
