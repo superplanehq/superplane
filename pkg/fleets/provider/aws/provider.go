@@ -322,6 +322,9 @@ func (p *Provider) runInstancesInput(
 		SubnetId:                          aws.String(subnetID),
 		SecurityGroupIds:                  p.config.SecurityGroupIDs,
 		InstanceInitiatedShutdownBehavior: types.ShutdownBehaviorTerminate,
+		MetadataOptions: &types.InstanceMetadataOptionsRequest{
+			HttpTokens: types.HttpTokensStateRequired,
+		},
 		BlockDeviceMappings: []types.BlockDeviceMapping{{
 			DeviceName: aws.String("/dev/sda1"),
 			Ebs:        p.rootVolume(),

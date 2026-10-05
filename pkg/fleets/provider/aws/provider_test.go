@@ -88,6 +88,10 @@ func TestCreateTagsAWSResourcesWithRunnerIdentity(t *testing.T) {
 	if aws.ToString(input.SubnetId) != "subnet-a" {
 		t.Fatalf("subnet = %q", aws.ToString(input.SubnetId))
 	}
+	if input.MetadataOptions == nil ||
+		input.MetadataOptions.HttpTokens != types.HttpTokensStateRequired {
+		t.Fatalf("metadata options = %#v", input.MetadataOptions)
+	}
 	if got, err := base64.StdEncoding.DecodeString(aws.ToString(input.UserData)); err != nil || string(got) != "#!/bin/bash\n" {
 		t.Fatalf("user data = %q, err = %v", got, err)
 	}
