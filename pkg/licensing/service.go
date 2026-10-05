@@ -156,11 +156,7 @@ func (s *Service) Start(ctx context.Context) {
 // Refresh reloads the trusted keys and the license. A temporary database
 // error keeps the last known state instead of removing Enterprise access.
 func (s *Service) Refresh(ctx context.Context) error {
-	if s.keySync != nil {
-		if _, err := s.keySync.Reload(ctx); err != nil {
-			log.WithError(err).Warn("Licensing: cached license keys were not loaded")
-		}
-	}
+	s.reloadKeys(ctx)
 
 	if err := s.reloadLicense(ctx); err != nil {
 		return err
@@ -171,6 +167,21 @@ func (s *Service) Refresh(ctx context.Context) error {
 	}
 
 	return s.reloadLicense(ctx)
+}
+
+// reloadKeys trusts a newer key list that another replica saved. It reports
+// whether the trusted keys changed.
+func (s *Service) reloadKeys(ctx context.Context) bool {
+	if s.keySync == nil {
+		return false
+	}
+
+	changed, err := s.keySync.Reload(ctx)
+	if err != nil {
+		log.WithError(err).Warn("Licensing: cached license keys were not loaded")
+	}
+
+	return changed
 }
 
 // syncKeysOnDemand downloads the key list when a license names an unknown
@@ -257,6 +268,10 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 	}
 
 	license, err := s.verifier.Verify(raw)
+	if ReasonOf(err) == ReasonUnknownKey && s.reloadKeys(ctx) {
+		license, err = s.verifier.Verify(raw)
+	}
+
 	if ReasonOf(err) == ReasonUnknownKey && s.syncKeysOnDemand(ctx) {
 		license, err = s.verifier.Verify(raw)
 	}

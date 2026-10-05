@@ -151,15 +151,22 @@ func (k *KeySync) Start(ctx context.Context, onChange func()) {
 }
 
 // Reload trusts the cached key list when it is newer. Another replica may have
-// saved it. It reports whether the trusted keys changed.
+// saved it. When the cache is older, Reload saves the trusted list, which
+// repairs an earlier failed cache write. It reports whether the trusted keys
+// changed.
 func (k *KeySync) Reload(ctx context.Context) (bool, error) {
 	document, err := k.cache.Load(ctx)
-	if err != nil || document == "" {
+	if err != nil {
 		return false, err
 	}
 
-	if current := k.store.Current(); current != nil && current.Document == document {
+	current := k.store.Current()
+	if current != nil && current.Document == document {
 		return false, nil
+	}
+
+	if document == "" {
+		return false, k.share(ctx, current)
 	}
 
 	list, err := VerifyKeyList([]byte(document), k.store.Roots())
@@ -169,10 +176,22 @@ func (k *KeySync) Reload(ctx context.Context) (bool, error) {
 
 	changed, err := k.store.Update(list)
 	if errors.Is(err, ErrKeyListDowngrade) {
-		return false, nil
+		return false, k.share(ctx, current)
 	}
 
 	return changed, err
+}
+
+func (k *KeySync) share(ctx context.Context, list *KeyList) error {
+	if list == nil {
+		return nil
+	}
+
+	if err := k.cache.Save(ctx, list); err != nil {
+		return fmt.Errorf("cache license keys: %w", err)
+	}
+
+	return nil
 }
 
 // Sync downloads the key list and trusts it when it is newer. It reports
@@ -283,11 +302,7 @@ func (k *KeySync) trust(ctx context.Context, list *KeyList) (bool, error) {
 		log.WithFields(log.Fields{"version": list.Version, "kids": list.Keys.KeyIDs()}).Info("Licensing: trusting a new license key list")
 	}
 
-	if err := k.cache.Save(ctx, list); err != nil {
-		return changed, fmt.Errorf("cache license keys: %w", err)
-	}
-
-	return changed, nil
+	return changed, k.share(ctx, list)
 }
 
 func (k *KeySync) recordAttempt(err error) {

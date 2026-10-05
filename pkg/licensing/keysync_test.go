@@ -177,10 +177,11 @@ func TestKeySyncReloadsTheSharedCache(t *testing.T) {
 	keySync := licensing.NewKeySync(fixture.store, fixture.cache, "")
 	assert.Equal(t, licensing.KeySyncDisabled, keySync.Status().State)
 
-	t.Run("ignores an empty cache", func(t *testing.T) {
+	t.Run("fills an empty cache", func(t *testing.T) {
 		changed, err := keySync.Reload(context.Background())
 		require.NoError(t, err)
 		assert.False(t, changed)
+		assert.Equal(t, int64(1), fixture.cache.version)
 	})
 
 	t.Run("rejects a tampered cache", func(t *testing.T) {
@@ -198,12 +199,13 @@ func TestKeySyncReloadsTheSharedCache(t *testing.T) {
 		assert.Equal(t, int64(2), fixture.store.Current().Version)
 	})
 
-	t.Run("ignores an older cached list", func(t *testing.T) {
-		fixture.cache.document = string(fixture.root.KeyList(1, fixture.first))
+	t.Run("replaces an older cached list", func(t *testing.T) {
+		fixture.cache.document, fixture.cache.version = string(fixture.root.KeyList(1, fixture.first)), 1
 		changed, err := keySync.Reload(context.Background())
 		require.NoError(t, err)
 		assert.False(t, changed)
 		assert.Equal(t, int64(2), fixture.store.Current().Version)
+		assert.Equal(t, int64(2), fixture.cache.version)
 	})
 }
 
@@ -232,10 +234,10 @@ func TestKeySyncRetriesAFailedCacheWrite(t *testing.T) {
 	assert.Equal(t, int64(0), fixture.cache.version)
 
 	fixture.cache.saveErr = nil
-	changed, err = keySync.Sync(context.Background())
+	changed, err = keySync.Reload(context.Background())
 	require.NoError(t, err)
 	assert.False(t, changed)
-	assert.Equal(t, int64(2), fixture.cache.version, "the retry shares the list with other replicas")
+	assert.Equal(t, int64(2), fixture.cache.version, "the next reload shares the list with other replicas")
 }
 
 func TestKeySyncOnDemandIsRateLimited(t *testing.T) {
@@ -298,6 +300,17 @@ func TestServiceSyncsKeysForALicenseFromANewKey(t *testing.T) {
 
 		require.NoError(t, service.Refresh(context.Background()))
 		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	})
+
+	t.Run("on install with a list that another replica saved", func(t *testing.T) {
+		fixture := newKeyFixture(t)
+		keySync := licensing.NewKeySync(fixture.store, fixture.cache, "")
+		service := licensing.NewService(licensing.NewVerifier(fixture.store), &memorySource{}, licensing.WithKeySync(keySync))
+		fixture.cache.document, fixture.cache.version = string(fixture.root.KeyList(2, fixture.first, fixture.next)), 2
+
+		status, err := service.Install(context.Background(), fixture.next.License(licensing.FeatureGroups), uuid.New())
+		require.NoError(t, err)
+		assert.Equal(t, licensing.StateActive, status.State)
 	})
 
 	t.Run("an unknown key stays invalid when the issuer does not list it", func(t *testing.T) {
