@@ -69,6 +69,8 @@ type Config struct {
 	VolumeIOPS           int32
 	VolumeThroughputMBps int32
 	ResourceTags         map[string]string
+	CloudWatchRegion     string
+	CloudWatchLogGroup   string
 }
 
 type Provider struct {
@@ -82,6 +84,8 @@ func New(client EC2API, config Config, log *slog.Logger) (*Provider, error) {
 	config.AMI = strings.TrimSpace(config.AMI)
 	config.InstanceType = strings.TrimSpace(config.InstanceType)
 	config.Architecture = strings.ToLower(strings.TrimSpace(config.Architecture))
+	config.CloudWatchRegion = strings.TrimSpace(config.CloudWatchRegion)
+	config.CloudWatchLogGroup = strings.TrimSpace(config.CloudWatchLogGroup)
 	if config.FleetManagerID == "" {
 		return nil, fmt.Errorf("Fleet Manager ID is required")
 	}
@@ -139,6 +143,9 @@ func New(client EC2API, config Config, log *slog.Logger) (*Provider, error) {
 		if isReservedTag(key) {
 			return nil, fmt.Errorf("reserved AWS resource tag %q cannot be overridden", key)
 		}
+	}
+	if config.CloudWatchLogGroup != "" && config.CloudWatchRegion == "" {
+		return nil, fmt.Errorf("AWS CloudWatch region is required when logging is configured")
 	}
 	if log == nil {
 		log = slog.Default()
@@ -205,7 +212,7 @@ func (p *Provider) List(ctx context.Context, fleetID string) ([]provider.Resourc
 }
 
 func (p *Provider) BuildBootstrap(request provider.RunnerBootstrap) ([]byte, error) {
-	return buildUserData(request)
+	return buildUserData(request, p.config.CloudWatchRegion, p.config.CloudWatchLogGroup)
 }
 
 func (p *Provider) Create(

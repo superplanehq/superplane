@@ -31,7 +31,6 @@ type Config struct {
 	SuperPlaneURL            string  `json:"superplaneUrl"`
 	InstallationAdminToken   string  `json:"installationAdminToken"`
 	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
-	AWSRegion                string  `json:"awsRegion"`
 	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
 	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
 	Fleets                   []Fleet `json:"fleets"`
@@ -47,6 +46,7 @@ type Fleet struct {
 }
 
 type AWS struct {
+	Region               string            `json:"region"`
 	AMI                  string            `json:"ami"`
 	InstanceType         string            `json:"instanceType"`
 	Architecture         string            `json:"architecture"`
@@ -58,6 +58,11 @@ type AWS struct {
 	VolumeIOPS           int32             `json:"volumeIops"`
 	VolumeThroughputMBps int32             `json:"volumeThroughputMbps"`
 	ResourceTags         map[string]string `json:"resourceTags"`
+	CloudWatch           CloudWatch        `json:"cloudWatch"`
+}
+
+type CloudWatch struct {
+	LogGroupName string `json:"logGroupName"`
 }
 
 type Docker struct {
@@ -161,9 +166,13 @@ func (c *Config) applyDefaults() {
 			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
 		}
 		fleet.ID = strings.TrimSpace(fleet.ID)
+		fleet.AWS.Region = strings.TrimSpace(fleet.AWS.Region)
 		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
 		fleet.AWS.SubnetIDs = nonEmpty(fleet.AWS.SubnetIDs)
 		fleet.AWS.SecurityGroupIDs = nonEmpty(fleet.AWS.SecurityGroupIDs)
+		fleet.AWS.CloudWatch.LogGroupName = strings.TrimSpace(
+			fleet.AWS.CloudWatch.LogGroupName,
+		)
 		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
 		fleet.Docker.Architecture = strings.ToLower(
 			strings.TrimSpace(fleet.Docker.Architecture),
@@ -202,8 +211,6 @@ func (c *Config) validate() error {
 			"latest",
 		):
 			return fmt.Errorf("runnerReleaseBaseUrl must not use latest")
-		case strings.TrimSpace(c.AWSRegion) == "":
-			return fmt.Errorf("awsRegion is required")
 		}
 	}
 
@@ -237,6 +244,8 @@ func (c *Config) validate() error {
 			)
 		case fleet.Provider == ProviderDocker:
 			break
+		case fleet.AWS.Region == "":
+			return fmt.Errorf("%s.aws.region is required", prefix)
 		case strings.TrimSpace(fleet.AWS.AMI) == "":
 			return fmt.Errorf("%s.aws.ami is required", prefix)
 		case fleet.AWS.Architecture != "amd64" && fleet.AWS.Architecture != "arm64":

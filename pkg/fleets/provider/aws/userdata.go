@@ -3,6 +3,7 @@ package awsprovider
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -18,7 +19,43 @@ var userDataTemplate = template.Must(template.New("userdata").Funcs(template.Fun
 	"shellQuote": strconv.Quote,
 }).Parse(userDataTemplateSource))
 
-func buildUserData(request provider.RunnerBootstrap) ([]byte, error) {
+type userData struct {
+	provider.RunnerBootstrap
+	CloudWatchAgentConfig string
+}
+
+type cloudWatchAgentConfig struct {
+	Agent cloudWatchAgentSettings `json:"agent"`
+	Logs  cloudWatchLogs          `json:"logs"`
+}
+
+type cloudWatchAgentSettings struct {
+	Region string `json:"region"`
+}
+
+type cloudWatchLogs struct {
+	LogsCollected cloudWatchLogsCollected `json:"logs_collected"`
+}
+
+type cloudWatchLogsCollected struct {
+	Files cloudWatchLogFiles `json:"files"`
+}
+
+type cloudWatchLogFiles struct {
+	CollectList []cloudWatchLogFile `json:"collect_list"`
+}
+
+type cloudWatchLogFile struct {
+	FilePath      string `json:"file_path"`
+	LogGroupName  string `json:"log_group_name"`
+	LogStreamName string `json:"log_stream_name"`
+}
+
+func buildUserData(
+	request provider.RunnerBootstrap,
+	cloudWatchRegion string,
+	cloudWatchLogGroup string,
+) ([]byte, error) {
 	switch {
 	case strings.TrimSpace(request.RunnerID) == "":
 		return nil, fmt.Errorf("runner ID is required")
@@ -34,8 +71,31 @@ func buildUserData(request provider.RunnerBootstrap) ([]byte, error) {
 		return nil, fmt.Errorf("runner artifact SHA-256 is invalid")
 	}
 
+	templateData := userData{RunnerBootstrap: request}
+	if cloudWatchLogGroup != "" {
+		config := cloudWatchAgentConfig{
+			Agent: cloudWatchAgentSettings{Region: cloudWatchRegion},
+			Logs: cloudWatchLogs{
+				LogsCollected: cloudWatchLogsCollected{
+					Files: cloudWatchLogFiles{
+						CollectList: []cloudWatchLogFile{{
+							FilePath:      "/var/log/superplane-runner.log",
+							LogGroupName:  cloudWatchLogGroup,
+							LogStreamName: "{instance_id}",
+						}},
+					},
+				},
+			},
+		}
+		encoded, err := json.Marshal(config)
+		if err != nil {
+			return nil, fmt.Errorf("encode CloudWatch Agent config: %w", err)
+		}
+		templateData.CloudWatchAgentConfig = string(encoded)
+	}
+
 	var output bytes.Buffer
-	if err := userDataTemplate.Execute(&output, request); err != nil {
+	if err := userDataTemplate.Execute(&output, templateData); err != nil {
 		return nil, fmt.Errorf("render AWS runner bootstrap: %w", err)
 	}
 	return output.Bytes(), nil
