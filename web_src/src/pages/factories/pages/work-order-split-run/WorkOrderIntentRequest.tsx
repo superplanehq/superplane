@@ -20,8 +20,9 @@ import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
+import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
-import { PlanningReview, type ComposerScore } from "./PlanningReview";
+import type { ComposerScore } from "./PlanningReview";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
@@ -41,6 +42,7 @@ import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 export type IntentAnalysisChat = {
+  planningReviewEnabled?: boolean;
   organizationId: string;
   factoryId?: string;
   view: CreateWithAgentView;
@@ -107,7 +109,9 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: hasPendingPlanningQuestions(analysis.view),
+    showSurvey: analysis.planningReviewEnabled
+      ? hasPendingPlanningQuestions(analysis.view)
+      : Boolean(analysis.view.survey && analysis.canSend && !active && analysis.view.messages.at(-1)?.role === "agent"),
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -137,7 +141,7 @@ function AnalysisRequestChat({
     onUploadFiles: analysis.onUploadFiles,
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
-  const composer = usePlanningComposer(analysis, images.pending.length);
+  const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -166,23 +170,12 @@ function AnalysisRequestChat({
                 activities={analysis.view.activities}
               />
             ) : null}
-            <PlanningReview
-              open={Boolean(analysis.planPaneOpen)}
-              title={analysis.planTitle}
-              clarity={analysis.clarity}
-              confidence={analysis.confidence}
-              showClarity={analysis.showClarity !== false}
-              showConfidence={analysis.showConfidence !== false}
-              isAnalyzing={chipsWorking}
-              canTogglePlan={Boolean(analysis.canTogglePlan)}
-              planStatus={analysis.planStatus}
-              onToggle={analysis.onTogglePlan}
-              creditVerdict={analysis.creditVerdict}
-            />
+            <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey
                 survey={analysis.view.survey}
                 onSubmit={analysis.onSubmitSurvey}
+                planningReviewEnabled={analysis.planningReviewEnabled}
                 disabled={!analysis.canSend}
               />
             ) : null}
@@ -192,18 +185,19 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         ) : null}
       </div>
-      {!state.showSurvey && !composer.collapsed ? (
+      {composer.visible ? (
         <AnalysisComposer
           analysis={analysis}
           images={images}
-          focusOnMount={composer.expanded}
-          onFocus={composer.expand}
+          chipsWorking={chipsWorking}
+          focusOnMount={composer.focusOnMount}
+          onFocus={composer.onFocus}
           placeholder={state.placeholder}
           chatSolo={chatSolo}
           chatColumnClass={chatColumnClass}
         />
       ) : null}
-      {analysis.composerError ? (
+      {analysis.planningReviewEnabled && analysis.composerError ? (
         <p
           role="alert"
           className={cn(chatColumnClass, "sp-error-shake pb-2 text-[12px] text-destructive")}
@@ -212,29 +206,39 @@ function AnalysisRequestChat({
           {analysis.composerError}
         </p>
       ) : null}
-      <PlanningImplementationControls
-        startDiscouraged={analysis.startDiscouraged}
-        modelSelect={analysis.modelSelect}
-        actions={analysis.closedDecision}
-        canSend={analysis.canSend}
-        showSuggestChanges={composer.collapsed}
-        onSuggestChanges={composer.expand}
-      />
+      {analysis.planningReviewEnabled ? (
+        <PlanningImplementationControls
+          startDiscouraged={analysis.startDiscouraged}
+          modelSelect={analysis.modelSelect}
+          actions={analysis.closedDecision}
+          canSend={analysis.canSend}
+          showSuggestChanges={composer.collapsed}
+          onSuggestChanges={composer.expand}
+        />
+      ) : null}
     </div>
   );
 }
 
-function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number) {
+function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number, showSurvey: boolean) {
   const [expanded, setExpanded] = useState(false);
   const collapsed = Boolean(
-    analysis.prioritizeImplementation &&
+    analysis.planningReviewEnabled &&
+      analysis.prioritizeImplementation &&
       !expanded &&
       !analysis.composer &&
       !analysis.composerError &&
       !analysis.isUploading &&
       pendingFiles === 0,
   );
-  return { expanded, collapsed, expand: () => setExpanded(true) };
+  const expand = () => setExpanded(true);
+  return {
+    collapsed,
+    expand,
+    visible: !analysis.planningReviewEnabled || (!showSurvey && !collapsed),
+    focusOnMount: Boolean(analysis.planningReviewEnabled && expanded),
+    onFocus: analysis.planningReviewEnabled ? expand : undefined,
+  };
 }
 
 function useAnalysisComposerDictation(composer: string, onComposerChange: (next: string) => void) {
@@ -262,6 +266,7 @@ function AnalysisComposer({
   chatColumnClass,
   focusOnMount,
   onFocus,
+  chipsWorking,
 }: {
   analysis: IntentAnalysisChat;
   images: ReturnType<typeof useAnalysisComposerImages>;
@@ -269,7 +274,8 @@ function AnalysisComposer({
   chatSolo: boolean;
   chatColumnClass: string;
   focusOnMount: boolean;
-  onFocus: () => void;
+  onFocus?: () => void;
+  chipsWorking: boolean;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
   const { composerRef, dictation } = useAnalysisComposerDictation(analysis.composer, analysis.onComposerChange);
@@ -306,6 +312,7 @@ function AnalysisComposer({
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
         </Label>
         <div className="flex flex-col gap-2">
+          <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="composer" />
           <AnalysisComposerField
             analysis={analysis}
             images={images}
@@ -317,6 +324,11 @@ function AnalysisComposer({
             onSend={() => void send()}
           />
         </div>
+        {!analysis.planningReviewEnabled && analysis.composerError ? (
+          <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
+            {analysis.composerError}
+          </p>
+        ) : null}
       </form>
     </div>
   );
