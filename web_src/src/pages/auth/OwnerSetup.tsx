@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { LicenseStep } from "./ownerSetup/LicenseStep";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -8,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
+
+type OwnerSetupStep = "owner" | "license" | "survey";
 
 function isEmailValid(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,8 +70,7 @@ async function submitOwnerSetup(args: {
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setPendingOrganizationSlug: (slug: string | null) => void;
-  setActiveSurvey: (survey: PostHogSurvey | null) => void;
-  setStep: (step: "owner" | "survey") => void;
+  setStep: (step: OwnerSetupStep) => void;
 }) {
   args.setError(null);
   args.setLoading(true);
@@ -103,35 +105,40 @@ async function submitOwnerSetup(args: {
     }
 
     const data: { organization_id: string; organization_slug: string } = await response.json();
-    const orgSlug = data.organization_slug;
-
-    if (!isPostHogEnabled) {
-      window.location.href = newOrganizationLandingPath(orgSlug);
-      return;
-    }
-
-    args.setPendingOrganizationSlug(orgSlug);
-    posthog.getActiveMatchingSurveys((surveys) => {
-      const usableSurveys = (surveys as PostHogSurvey[]).filter(
-        (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
-      );
-
-      const selectedSurvey =
-        usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
-
-      if (!selectedSurvey) {
-        window.location.href = newOrganizationLandingPath(orgSlug);
-        return;
-      }
-
-      args.setActiveSurvey(selectedSurvey);
-      args.setStep("survey");
-    });
+    args.setPendingOrganizationSlug(data.organization_slug);
+    args.setStep("license");
   } catch {
     args.setError("Network error occurred");
   } finally {
     args.setLoading(false);
   }
+}
+
+function continueAfterOwnerSetup(args: {
+  orgSlug: string;
+  setActiveSurvey: (survey: PostHogSurvey | null) => void;
+  setStep: (step: OwnerSetupStep) => void;
+}) {
+  if (!isPostHogEnabled) {
+    window.location.href = newOrganizationLandingPath(args.orgSlug);
+    return;
+  }
+
+  posthog.getActiveMatchingSurveys((surveys) => {
+    const usableSurveys = (surveys as PostHogSurvey[]).filter(
+      (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
+    );
+
+    const selectedSurvey = usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
+
+    if (!selectedSurvey) {
+      window.location.href = newOrganizationLandingPath(args.orgSlug);
+      return;
+    }
+
+    args.setActiveSurvey(selectedSurvey);
+    args.setStep("survey");
+  });
 }
 
 const OwnerSetup: React.FC = () => {
@@ -140,7 +147,7 @@ const OwnerSetup: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [step, setStep] = useState<"owner" | "survey">("owner");
+  const [step, setStep] = useState<OwnerSetupStep>("owner");
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const [loading, setLoading] = useState(false);
@@ -164,10 +171,15 @@ const OwnerSetup: React.FC = () => {
       setError,
       setLoading,
       setPendingOrganizationSlug,
-      setActiveSurvey,
       setStep,
     });
   };
+
+  const handleLicenseContinue = useCallback(() => {
+    if (pendingOrganizationSlug) {
+      continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
+    }
+  }, [pendingOrganizationSlug]);
 
   return (
     <div
@@ -198,6 +210,8 @@ const OwnerSetup: React.FC = () => {
             onSubmit={handleOwnerSubmit}
           />
         )}
+
+        {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={handleLicenseContinue} />}
 
         {step === "survey" && activeSurvey && pendingOrganizationSlug && (
           <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
