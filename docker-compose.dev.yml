@@ -249,7 +249,7 @@ services:
     image: superplane-fleet-manager-local:dev
     build:
       context: .
-      dockerfile: cmd/fleetmanager/Dockerfile
+      dockerfile: release/fleet-manager/Dockerfile
       target: local
     environment:
       FLEET_MANAGER_CONFIG: ${FLEET_MANAGER_CONFIG:-}
