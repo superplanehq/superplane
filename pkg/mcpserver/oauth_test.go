@@ -236,6 +236,25 @@ func TestResolveClientAllowsEphemeralLoopbackPort(t *testing.T) {
 	}
 }
 
+func TestResolveClientKeepsCursorCallbackExact(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	_, oauthErr := ResolveClient(t.Context(), database.Conn(), nil, LocalClientID, "http://localhost:52291/callback")
+	require.NotNil(t, oauthErr)
+	require.Equal(t, "redirect_uri is not allowed", oauthErr.Error())
+
+	client, oauthErr := ResolveClient(t.Context(), database.Conn(), nil, LocalClientID, CursorRedirectURIs[0])
+	require.Nil(t, oauthErr)
+	require.Equal(t, LocalClientID, client.ID)
+
+	registered, oauthErr := RegisterClient(database.Conn(), []byte(`{"client_name":"Cursor","redirect_uris":["cursor://anysphere.cursor-mcp/oauth/callback"]}`))
+	require.Nil(t, oauthErr)
+	_, oauthErr = ResolveClient(t.Context(), database.Conn(), nil, registered.ID, "http://localhost:52291/callback")
+	require.NotNil(t, oauthErr)
+	require.Equal(t, "redirect_uri is not allowed", oauthErr.Error())
+}
+
 func TestRegisterClientAllowsCursorRedirects(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

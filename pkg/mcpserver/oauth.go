@@ -156,6 +156,9 @@ func ephemeralLoopbackRedirectAllowed(registered []string, requested string) boo
 		return false
 	}
 	for _, candidate := range registered {
+		if slices.Contains(CursorRedirectURIs, candidate) {
+			continue
+		}
 		registeredRedirect, ok := parseLoopbackHTTPRedirect(candidate)
 		if !ok {
 			continue
