@@ -149,6 +149,7 @@ import {
   factoryIntakePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
@@ -583,6 +584,12 @@ export function LinesPage() {
     if (template.id === "datadog") {
       if (selectedLine.id) {
         navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "linear-issues") {
+      if (selectedLine.id) {
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -78,4 +79,11 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	owner, err := models.FindAccountByEmail("owner@example.com")
 	require.NoError(t, err)
 	assert.True(t, owner.HasReceivedWelcomeCredit())
+
+	var fleets []models.RunnerFleet
+	require.NoError(t, database.Conn().
+		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
+		Find(&fleets).Error)
+	require.Empty(t, fleets)
+	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }

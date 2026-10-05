@@ -18,7 +18,7 @@ export interface OrganizationSpendingReportQuery {
   groupBy: SpendingBreakdown;
 }
 
-function spendingReportQueryParams(query: OrganizationSpendingReportQuery) {
+export function spendingReportQueryParams(query: OrganizationSpendingReportQuery) {
   const { filters, groupBy, range, usageKind } = query;
   return {
     startTime: range.start.toISOString(),

@@ -15,6 +15,7 @@ const intakeJiraAppName = "jira"
 const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
 const intakeDatadogAppName = "datadog"
+const intakeLinearAppName = "linear"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -72,6 +73,9 @@ func resolveIntakeBinding(
 	}
 	if source == models.FactoryIntakeSourceDatadog {
 		return resolveDatadogIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return resolveLinearIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
@@ -222,6 +226,47 @@ func resolveDatadogIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"service": serviceName},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveLinearIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	resourceID string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	projectIDs := linearProjectIDsFromResource(resourceID)
+	if integrationID == "" && len(projectIDs) == 0 {
+		return nil, nil
+	}
+	if integrationID == "" || len(projectIDs) == 0 {
+		return nil, invalidArgument("Linear integration and project are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Linear integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Linear integration was not found")
+	}
+	if integration.AppName != intakeLinearAppName {
+		return nil, invalidArgument("selected integration is not Linear")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Linear integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"projects": projectIDs},
 		Installation:  integration,
 	}, nil
 }

@@ -13,6 +13,9 @@ var localBillingNonWelcomeGrantKinds = []string{
 	LLMCreditGrantKindIncluded,
 	LLMCreditGrantKindTopup,
 	LLMCreditGrantKindTopupRefund,
+	LLMCreditGrantKindTrialAdjustment,
+	LLMCreditGrantKindTopupAdjustment,
+	LLMCreditGrantKindAdminAdjustment,
 }
 
 // ResetLocalAfterOnboarding wipes factory runtime data and restores trial

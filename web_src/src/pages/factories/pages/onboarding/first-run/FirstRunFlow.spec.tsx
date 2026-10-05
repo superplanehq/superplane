@@ -6,7 +6,7 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunFlow } from "./FirstRunFlow";
 
 describe("FirstRunFlow", () => {
-  it("walks welcome, GitHub, repository, tickets, then analysis", async () => {
+  it("walks welcome, GitHub, organization, repository, tickets, then analysis", async () => {
     const user = userEvent.setup();
     render(<FirstRunFlow />);
 
@@ -16,6 +16,7 @@ describe("FirstRunFlow", () => {
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.choose.useOrganization("acme") }));
     await user.click(screen.getByRole("option", { name: /acme\/payments-service/ }));
     await user.click(screen.getByTestId("first-run-continue-to-tickets"));
 

@@ -12,15 +12,24 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
+const executionKVTaskBackend = "runner_task_backend"
+
+func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID, backend string) error {
+	backend = normalizeTaskBackend(backend)
 	if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
-	if err := storeRunnerFleetKV(ctx, ""); err != nil {
+	if err := ctx.ExecutionState.SetKV(executionKVTaskBackend, backend); err != nil {
+		return fmt.Errorf("set runner task backend in kv: %w", err)
+	}
+	if err := storeRunnerFleetKV(ctx, "", backend); err != nil {
 		return fmt.Errorf("set runner fleet kv: %w", err)
 	}
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
+	}
+	if err := mergeRunnerTaskBackend(ctx.Metadata, backend); err != nil {
+		return fmt.Errorf("runner task backend metadata: %w", err)
 	}
 	return scheduleBrokerPoll(ctx.Requests, taskID, ctx.OrganizationID)
 }
@@ -36,7 +45,11 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	}
 	organizationID, _ := ctx.Parameters["organization_id"].(string)
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	client, err := taskClientForBackend(
+		taskBackendFromState(ctx.ExecutionState),
+		ctx.HTTP,
+		ctx.RunnerTasks,
+	)
 	if err != nil {
 		if ctx.ExecutionState.IsFinished() {
 			revokeOpenRouterChildKeyOrReschedule(ctx)
@@ -45,7 +58,7 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	task, err := broker.FetchTaskStatus(taskID)
+	task, err := client.FetchTaskStatus(taskID)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
@@ -207,16 +220,20 @@ func cancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error
 		return fmt.Errorf("get task_id kv: %w", err)
 	}
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	client, err := taskClientForBackend(
+		taskBackendFromState(ctx.ExecutionState),
+		ctx.HTTP,
+		ctx.RunnerTasks,
+	)
 	if err != nil {
 		return err
 	}
 
-	if err := broker.CancelTask(taskID); err != nil {
+	if err := client.CancelTask(taskID); err != nil {
 		return fmt.Errorf("cancel task: %w", err)
 	}
 
-	if err := recordTerminalBrokerUsage(ctx, broker, taskID, finishedEventType); err != nil {
+	if err := recordTerminalBrokerUsage(ctx, client, taskID, finishedEventType); err != nil {
 		_ = revokeOpenRouterChildKey(ctx.HTTP, ctx.ExecutionState, ctx.HostedLLM, ctx.Logger)
 		return err
 	}
@@ -225,8 +242,8 @@ func cancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error
 	return nil
 }
 
-func recordTerminalBrokerUsage(ctx core.ExecutionContext, broker *BrokerClient, taskID, finishedEventType string) error {
-	task, err := broker.FetchTaskStatus(taskID)
+func recordTerminalBrokerUsage(ctx core.ExecutionContext, client TaskClient, taskID, finishedEventType string) error {
+	task, err := client.FetchTaskStatus(taskID)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Warn("runner: fetch after cancel failed")
@@ -245,6 +262,17 @@ func recordTerminalBrokerUsage(ctx core.ExecutionContext, broker *BrokerClient, 
 		ctx.Usage,
 		ctx.Configuration,
 	)
+}
+
+func taskBackendFromState(state core.ExecutionStateContext) string {
+	if state == nil {
+		return core.RunnerTaskBackendLegacy
+	}
+	backend, err := state.GetKV(executionKVTaskBackend)
+	if err != nil {
+		return core.RunnerTaskBackendLegacy
+	}
+	return normalizeTaskBackend(backend)
 }
 
 func scheduleBrokerPoll(requests core.RequestContext, taskID, organizationID string) error {

@@ -156,4 +156,87 @@ describe("HostedCreditHeaderKicker", () => {
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     },
   );
+
+  describe("compact", () => {
+    it("keeps trial status, days, and balance, and hides Subscribe", () => {
+      const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
+      render(
+        <MemoryRouter>
+          <HostedCreditHeaderKicker
+            compact
+            spendingHref={billingHref}
+            welcomeCreditExpiresAt={expiresAt.toISOString()}
+            remainingCreditCents={4124}
+          />
+        </MemoryRouter>,
+      );
+
+      const kicker = screen.getByTestId("hosted-credit-header-kicker");
+      expect(kicker).toHaveTextContent("Trial");
+      expect(kicker).toHaveTextContent(welcomeCreditHeaderLabel(expiresAt));
+      expect(kicker).toHaveTextContent("$41.24");
+      expect(kicker).not.toHaveTextContent("Subscribe");
+      expect(kicker).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
+      expect(kicker).not.toHaveClass("shrink-0");
+      expect(kicker.querySelector(".truncate")).not.toBeNull();
+      expect(
+        screen.getByRole("link", {
+          name: `Trial, ${welcomeCreditHeaderLabel(expiresAt)}, $41.24, Subscribe`,
+        }),
+      ).toHaveAttribute("href", billingHref);
+    });
+
+    it.each([
+      ["trial-expired", "Trial ended", "Subscribe"],
+      ["lapsed", "No plan", "Subscribe"],
+      ["empty", "No credit", "Add credits"],
+    ] as const)("hides the %s action pill and keeps the billing link", (kind, label, actionLabel) => {
+      render(
+        <MemoryRouter>
+          <HostedCreditHeaderKicker compact kind={kind} spendingHref={billingHref} />
+        </MemoryRouter>,
+      );
+
+      const kicker = screen.getByTestId("hosted-credit-header-kicker");
+      expect(kicker).toHaveTextContent(label);
+      expect(kicker).not.toHaveTextContent(actionLabel);
+      expect(screen.getByRole("link", { name: `${label}, ${actionLabel}` })).toHaveAttribute("href", billingHref);
+    });
+
+    it("keeps the low-credit balance and announces Add credits", () => {
+      render(
+        <MemoryRouter>
+          <HostedCreditHeaderKicker compact kind="low" remainingCreditCents={1500} spendingHref={billingHref} />
+        </MemoryRouter>,
+      );
+
+      const kicker = screen.getByTestId("hosted-credit-header-kicker");
+      expect(kicker).toHaveTextContent("Credit low");
+      expect(kicker).toHaveTextContent("$15.00");
+      expect(kicker).not.toHaveTextContent("Add credits");
+      expect(screen.getByRole("link", { name: "Credit low, $15.00, Add credits" })).toHaveAttribute(
+        "href",
+        billingHref,
+      );
+    });
+
+    it.each(["low", "empty"] as const)("keeps the %s chip as plain text when credit cannot be added", (kind) => {
+      render(
+        <MemoryRouter>
+          <HostedCreditHeaderKicker
+            compact
+            kind={kind}
+            remainingCreditCents={kind === "low" ? 1500 : 0}
+            spendingHref={billingHref}
+            canAddCredit={false}
+          />
+        </MemoryRouter>,
+      );
+
+      const kicker = screen.getByTestId("hosted-credit-header-kicker");
+      expect(kicker.tagName).toBe("SPAN");
+      expect(kicker).not.toHaveTextContent("Add credits");
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+  });
 });

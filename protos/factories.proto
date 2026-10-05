@@ -1222,6 +1222,7 @@ message FactoryIntake {
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
+    SOURCE_LINEAR_ISSUES = 8;
   }
 
   enum InitialImportStatus {
@@ -1313,6 +1314,12 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
+    // Projects that still create a task. Required for a Linear intake.
+    // Linear issue intakes only.
+    repeated string linear_project_ids = 21;
+    // Label names that still create a task. Empty means every label.
+    // Linear issue intakes only.
+    repeated string linear_labels = 22;
   }
 
   string id = 1;
