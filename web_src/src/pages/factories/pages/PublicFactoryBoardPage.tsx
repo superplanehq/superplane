@@ -9,7 +9,6 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
 import type { buildAssigneeFilterOptions, buildSourceFilterOptions } from "../lib/workOrderFilterOptions";
 import { factoryRouteSegment, replaceFactoryKeySegment } from "../lib/factoryKeyResolution";
-import { humanizeLineName } from "../lib/humanizeLineName";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
@@ -265,7 +264,7 @@ function PublicBoardView({
           <WorkspacePageHeader
             className={factorySectionHeaderClassName}
             data-testid="public-board-header"
-            title={humanizeLineName(board.lineName)}
+            title={board.workspaceName?.trim() || "Workspace"}
             leading={<PublicViewBadge />}
             actions={
               <>
