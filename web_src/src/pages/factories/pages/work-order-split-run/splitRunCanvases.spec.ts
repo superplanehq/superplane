@@ -127,9 +127,7 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.nodes.map((node) => node.id)).not.toContain("find-pull-request");
     expect(canvas.nodes.length).toBeGreaterThanOrEqual(5);
     expect(stream.filter((line) => !line.note).length).toBe(canvas.nodes.length);
-    expect(stream.filter((line) => line.nodeId === "on-pr-closed").map((line) => line.id)).toEqual([
-      "on-pr-closed",
-    ]);
+    expect(stream.filter((line) => line.nodeId === "on-pr-closed").map((line) => line.id)).toEqual(["on-pr-closed"]);
     expect(stream.some((line) => line.pullRequest)).toBe(true);
     expect(
       stream.some(
