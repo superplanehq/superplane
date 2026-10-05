@@ -177,6 +177,27 @@ describe("PlanningReviewForm model options", () => {
     } as unknown as ReturnType<typeof useFactoryAgentResources>);
   });
 
+  it("shows the thinking word on the closed model control in agent settings", () => {
+    vi.mocked(useComponent).mockReturnValue({
+      data: { name: "runnerSuperPlane", configuration: [superPlaneModelField] },
+    } as ReturnType<typeof useComponent>);
+    const draft = superPlaneDraft();
+    draft.components[0].configuration = {
+      ...draft.components[0].configuration,
+      model: "hosted::openrouter::qwen/qwen3.7-max",
+      thinkingLevel: "high",
+    };
+
+    renderForm(draft);
+
+    const control = screen.getByTestId("field-model-hosted-model");
+    const settings = screen.getByTestId("planning-review-settings");
+    expect(settings).toContainElement(control);
+    expect(control.querySelector(".truncate")).toHaveTextContent("qwen/qwen3.7-max");
+    expect(control.querySelector(".truncate")).not.toHaveTextContent("High");
+    expect(control.querySelector(".text-muted-foreground")).toHaveTextContent("High");
+  });
+
   it("lists hosted SuperPlane models when the automation agent is Run SuperPlane Agent", async () => {
     const user = userEvent.setup();
     vi.mocked(useComponent).mockReturnValue({
