@@ -3,14 +3,14 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { parseCanvasYamlForImport } from "@/pages/app/lib/workflow-spec-files";
 
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
-import { PLANNING_SETTINGS_COPY } from "../pages/planningSettingsCopy";
-import { defaultRefineTaskStep } from "./refinementPrompt";
+import { defaultAgentPromptSteps, RESTORE_DEFAULT_PROMPT_COPY } from "./defaultAgentPrompt";
 
-export async function loadDefaultRefinementPrompt(input: {
+export async function loadDefaultAgentPrompt(input: {
   organizationId: string;
   factoryId: string;
   automationId: string;
-}): Promise<PlanningReviewStep> {
+  agentNodeId: string;
+}): Promise<PlanningReviewStep[]> {
   const response = await factoriesMaterializeFactoryAutomationDefaults(
     withOrganizationHeader({
       organizationId: input.organizationId,
@@ -20,12 +20,12 @@ export async function loadDefaultRefinementPrompt(input: {
   );
   const parsed = parseCanvasYamlForImport(response.data?.canvasYaml ?? "");
   if (!parsed.ok) {
-    throw new Error(PLANNING_SETTINGS_COPY.restorePromptError);
+    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
   }
 
-  const step = defaultRefineTaskStep(parsed.spec);
-  if (!step?.prompt) {
-    throw new Error(PLANNING_SETTINGS_COPY.restorePromptError);
+  const steps = defaultAgentPromptSteps(parsed.spec, input.agentNodeId);
+  if (!steps?.some((step) => step.prompt)) {
+    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
   }
-  return step;
+  return steps;
 }

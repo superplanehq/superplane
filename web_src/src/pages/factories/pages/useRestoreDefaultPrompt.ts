@@ -3,9 +3,12 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 
-import { applyDefaultRefinementPrompt, refinementPromptMatchesDefault } from "../lib/refinementPrompt";
+import {
+  agentPromptsMatchDefault,
+  applyDefaultAgentPrompts,
+  RESTORE_DEFAULT_PROMPT_COPY,
+} from "../lib/defaultAgentPrompt";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
-import { PLANNING_SETTINGS_COPY } from "./planningSettingsCopy";
 
 export function useRestoreDefaultPrompt({
   draft,
@@ -14,32 +17,32 @@ export function useRestoreDefaultPrompt({
 }: {
   draft: PlanningReviewDraft;
   setDraft: Dispatch<SetStateAction<PlanningReviewDraft>>;
-  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep | null>;
+  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep[] | null>;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [defaultStep, setDefaultStep] = useState<PlanningReviewStep | null>(null);
+  const [defaultSteps, setDefaultSteps] = useState<PlanningReviewStep[] | null>(null);
   const [restoreError, setRestoreError] = useState<string | undefined>();
   const [applyOnRetry, setApplyOnRetry] = useState(false);
   const restoreLoaderRef = useRef(onRestoreDefaultPrompt);
   restoreLoaderRef.current = onRestoreDefaultPrompt;
-  const promptMatchesDefault = defaultStep != null && refinementPromptMatchesDefault(draft, defaultStep);
-  const showRestore = Boolean(onRestoreDefaultPrompt) && !restoreError && !promptMatchesDefault && defaultStep != null;
+  const promptMatchesDefault = defaultSteps != null && agentPromptsMatchDefault(draft, defaultSteps);
+  const showRestore = Boolean(onRestoreDefaultPrompt) && !restoreError && !promptMatchesDefault && defaultSteps != null;
 
   useEffect(() => {
     if (!onRestoreDefaultPrompt) {
       return;
     }
     let cancelled = false;
-    void loadDefaultStep(restoreLoaderRef)
-      .then((step) => {
+    void loadDefaultSteps(restoreLoaderRef)
+      .then((steps) => {
         if (!cancelled) {
-          rememberDefaultStep(step, setDefaultStep, setRestoreError);
+          rememberDefaultSteps(steps, setDefaultSteps, setRestoreError);
         }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          rememberRestoreError(error, setDefaultStep, setRestoreError);
+          rememberRestoreError(error, setDefaultSteps, setRestoreError);
         }
       });
     return () => {
@@ -55,13 +58,13 @@ export function useRestoreDefaultPrompt({
     setIsRestoring(true);
     setRestoreError(undefined);
     try {
-      const step = await loadDefaultStep(restoreLoaderRef);
-      setDefaultStep(step);
+      const steps = await loadDefaultSteps(restoreLoaderRef);
+      setDefaultSteps(steps);
       setApplyOnRetry(false);
-      setDraft((current) => applyDefaultRefinementPrompt(current, step));
+      setDraft((current) => applyDefaultAgentPrompts(current, steps));
     } catch (error) {
       setApplyOnRetry(true);
-      const message = rememberRestoreError(error, setDefaultStep, setRestoreError);
+      const message = rememberRestoreError(error, setDefaultSteps, setRestoreError);
       showErrorToast(message);
     } finally {
       setIsRestoring(false);
@@ -77,9 +80,9 @@ export function useRestoreDefaultPrompt({
       return;
     }
     setIsRestoring(true);
-    void loadDefaultStep(restoreLoaderRef)
-      .then((step) => rememberDefaultStep(step, setDefaultStep, setRestoreError))
-      .catch((error: unknown) => rememberRestoreError(error, setDefaultStep, setRestoreError))
+    void loadDefaultSteps(restoreLoaderRef)
+      .then((steps) => rememberDefaultSteps(steps, setDefaultSteps, setRestoreError))
+      .catch((error: unknown) => rememberRestoreError(error, setDefaultSteps, setRestoreError))
       .finally(() => setIsRestoring(false));
   };
 
@@ -94,36 +97,36 @@ export function useRestoreDefaultPrompt({
   };
 }
 
-function rememberDefaultStep(
-  step: PlanningReviewStep,
-  setDefaultStep: (step: PlanningReviewStep) => void,
+function rememberDefaultSteps(
+  steps: PlanningReviewStep[],
+  setDefaultSteps: (steps: PlanningReviewStep[]) => void,
   setRestoreError: (error: string | undefined) => void,
 ) {
-  setDefaultStep(step);
+  setDefaultSteps(steps);
   setRestoreError(undefined);
 }
 
 function rememberRestoreError(
   error: unknown,
-  setDefaultStep: (step: PlanningReviewStep | null) => void,
+  setDefaultSteps: (steps: PlanningReviewStep[] | null) => void,
   setRestoreError: (error: string | undefined) => void,
 ) {
-  const message = getApiErrorMessage(error, PLANNING_SETTINGS_COPY.restorePromptError);
-  setDefaultStep(null);
+  const message = getApiErrorMessage(error, RESTORE_DEFAULT_PROMPT_COPY.error);
+  setDefaultSteps(null);
   setRestoreError(message);
   return message;
 }
 
-async function loadDefaultStep(restoreLoaderRef: {
-  current: (() => Promise<PlanningReviewStep | null>) | undefined;
-}): Promise<PlanningReviewStep> {
+async function loadDefaultSteps(restoreLoaderRef: {
+  current: (() => Promise<PlanningReviewStep[] | null>) | undefined;
+}): Promise<PlanningReviewStep[]> {
   const loader = restoreLoaderRef.current;
   if (!loader) {
-    throw new Error(PLANNING_SETTINGS_COPY.restorePromptError);
+    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
   }
-  const step = await loader();
-  if (!step?.prompt) {
-    throw new Error(PLANNING_SETTINGS_COPY.restorePromptError);
+  const steps = await loader();
+  if (!steps?.some((step) => step.prompt)) {
+    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
   }
-  return step;
+  return steps;
 }

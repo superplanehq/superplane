@@ -132,11 +132,11 @@ export function PlanningSettingsPopup({
           organizationId={agent.organizationId}
           factoryId={agent.factoryId}
           factoryKey={agent.factoryKey}
+          automationId={agent.automationId}
           isLoading={agent.isLoading}
           showAutomationNote={false}
           showCancel={false}
           showVisualEvidenceSetting={agent.showVisualEvidenceSetting}
-          onRestoreDefaultPrompt={agent.onRestoreDefaultPrompt}
         />
       ) : (
         <PlanningGeneralTab

@@ -11,15 +11,12 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 import { Workflow } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
+import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
-import {
-  PLANNING_REVIEW_DRAFT,
-  singleAgentDraft,
-  type PlanningReviewDraft,
-  type PlanningReviewStep,
-} from "./planningReviewMockup";
+import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
 import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
 
@@ -52,9 +49,9 @@ export type PlanningReviewAgentSlot = {
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  automationId?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   showVisualEvidenceSetting?: boolean;
-  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep | null>;
 };
 
 /** Agent editor body. The column menu popup and the automation view Agent tab share this. */
@@ -65,12 +62,12 @@ export function PlanningReviewEditor({
   organizationId,
   factoryId,
   factoryKey,
+  automationId,
   automationHref,
   isLoading = false,
   showAutomationNote = true,
   showCancel = true,
   showVisualEvidenceSetting = false,
-  onRestoreDefaultPrompt,
 }: {
   initialDraft?: PlanningReviewDraft;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -78,16 +75,28 @@ export function PlanningReviewEditor({
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  automationId?: string;
   automationHref?: string;
   isLoading?: boolean;
   showAutomationNote?: boolean;
   showCancel?: boolean;
   showVisualEvidenceSetting?: boolean;
-  onRestoreDefaultPrompt?: () => Promise<PlanningReviewStep | null>;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const restore = useRestoreDefaultPrompt({ draft, setDraft, onRestoreDefaultPrompt });
+  const agentNodeId = draft.components[0]?.id;
+  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const loadRestorePrompt = useCallback(() => {
+    if (!organizationId || !factoryId || !automationId || !agentNodeId) {
+      return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));
+    }
+    return loadDefaultAgentPrompt({ organizationId, factoryId, automationId, agentNodeId });
+  }, [agentNodeId, automationId, factoryId, organizationId]);
+  const restore = useRestoreDefaultPrompt({
+    draft,
+    setDraft,
+    onRestoreDefaultPrompt: restoreEnabled ? loadRestorePrompt : undefined,
+  });
   const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 
   const handleSave = async () => {
@@ -173,16 +182,13 @@ function RestoreDefaultPromptDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent data-testid="planning-review-restore-default-prompt-dialog">
         <AlertDialogHeader>
-          <AlertDialogTitle>Restore the default prompt?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This replaces the current Refine Task prompt with the factory default. The change applies only after you
-            click Save Agent.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{RESTORE_DEFAULT_PROMPT_COPY.confirmTitle}</AlertDialogTitle>
+          <AlertDialogDescription>{RESTORE_DEFAULT_PROMPT_COPY.confirmDescription}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel data-testid="planning-review-restore-default-prompt-cancel">Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} data-testid="planning-review-restore-default-prompt-confirm">
-            Restore default prompt
+            {RESTORE_DEFAULT_PROMPT_COPY.confirmAction}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
