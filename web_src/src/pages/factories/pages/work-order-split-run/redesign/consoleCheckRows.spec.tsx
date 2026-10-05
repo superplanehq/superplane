@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
 
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
@@ -19,6 +19,14 @@ function check(
   };
 }
 
+function mergeConfidenceHeader() {
+  return screen.getByRole("button", { name: "Merge confidence" });
+}
+
+function openChecks() {
+  fireEvent.click(mergeConfidenceHeader());
+}
+
 describe("ConsoleCheckRows", () => {
   it("lists each check with its score and status", () => {
     render(
@@ -30,15 +38,40 @@ describe("ConsoleCheckRows", () => {
       />,
     );
 
-    const header = screen.getByRole("button", { name: "Merge confidence" });
-    expect(header).toHaveAttribute("aria-expanded", "true");
+    const header = mergeConfidenceHeader();
+    expect(header).toHaveAttribute("aria-expanded", "false");
     expect(header.querySelectorAll("[data-bar-filled='true']")).toHaveLength(1);
     expect(screen.getByText("1 of 2 indicates high caution")).toBeInTheDocument();
     expect(screen.queryByText("A check failed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-check-confidence")).not.toBeInTheDocument();
+
+    openChecks();
+
+    expect(header).toHaveAttribute("aria-expanded", "true");
     expect(filledBars("confidence")).toHaveLength(3);
     expect(filledBars("risk")).toHaveLength(1);
+    expect(screen.getByText("Blast radius")).toBeInTheDocument();
     expect(screen.queryByText("High")).not.toBeInTheDocument();
     expect(screen.queryByText("4/5")).not.toBeInTheDocument();
+
+    openChecks();
+
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+  });
+
+  it("starts closed again after the section leaves the page", () => {
+    const checks = [check({ id: "risk", key: "risk-review", name: "Risk score", level: "critical" })];
+    const view = render(<ConsoleCheckRows checks={checks} />);
+    openChecks();
+    expect(screen.getByText("Blast radius")).toBeInTheDocument();
+
+    view.unmount();
+    render(<ConsoleCheckRows checks={checks} />);
+
+    expect(mergeConfidenceHeader()).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
   it("uses a result word for drift, performance, and security", () => {
@@ -51,6 +84,8 @@ describe("ConsoleCheckRows", () => {
         ]}
       />,
     );
+
+    openChecks();
 
     expect(filledBars("drift")).toHaveLength(3);
     expect(filledBars("performance")).toHaveLength(3);
