@@ -406,10 +406,10 @@ function stoppingIndexForTranscript(
   }
   const run = flattenRunSteps(nodes);
   const stopped = run[stoppingStepIndex(run)];
-  if (stopped?.type === "node") {
+  if (!stopped || stopped.type === "node") {
     return -1;
   }
-  return stoppingStepIndex(transcript);
+  return transcript.findIndex((step) => step.id === stopped.id);
 }
 
 function mergeCanvasLines(canvasLines: SplitRunStreamLine[], notes: SplitRunStreamLine[]): SplitRunStreamLine[] {
@@ -419,8 +419,11 @@ function mergeCanvasLines(canvasLines: SplitRunStreamLine[], notes: SplitRunStre
 
 function stoppingStepIndex(steps: AgentStep[]): number {
   for (let index = steps.length - 1; index >= 0; index -= 1) {
-    const type = steps[index]?.type;
-    if (type === "prompt" || type === "bash" || type === "node") {
+    const step = steps[index];
+    if (!step || step.status !== "failed") {
+      continue;
+    }
+    if (step.type === "prompt" || step.type === "bash" || step.type === "node") {
       return index;
     }
   }

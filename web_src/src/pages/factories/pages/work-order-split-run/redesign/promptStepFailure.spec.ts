@@ -118,6 +118,25 @@ describe("prompt step failure", () => {
     expect(steps[0]).toMatchObject({ status: "passed", promptStatus: "failed" });
   });
 
+  it("keeps Failed on the prompt when a later passed node did not stop the run", () => {
+    const stream = [
+      canvasNode("agent", "Run agent", "failed"),
+      failedPromptNote(),
+      canvasNode("other", "Other branch", "passed"),
+    ];
+    const stage = stageFromPhase(phase(stream));
+
+    expect(stage.agentSteps[0]).toMatchObject({ status: "failed", promptStatus: "failed" });
+    expect(stage.steps.map((step) => [step.type, step.status])).toEqual([
+      ["prompt", "failed"],
+      ["node", "passed"],
+    ]);
+    expect(agentStepsFromNotes([failedPromptNote()], "failed", stream)[0]).toMatchObject({
+      status: "failed",
+      promptStatus: "failed",
+    });
+  });
+
   it("keeps Failed on the prompt when an earlier node did not stop the run", () => {
     const steps = agentStepsFromNotes(
       [canvasNode("trigger", "Webhook", "passed"), canvasNode("agent", "Run agent", "failed"), failedPromptNote()],
