@@ -32,8 +32,7 @@ export function StatusGuide() {
           <thead className="text-slate-500 dark:text-gray-400">
             <tr>
               <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-2 py-2 font-medium">Meaning</th>
-              <th className="px-4 py-2 font-medium">Who can use it</th>
+              <th className="px-4 py-2 font-medium">Meaning</th>
             </tr>
           </thead>
           <tbody>
@@ -42,8 +41,7 @@ export function StatusGuide() {
                 <td className="px-4 py-2">
                   <IntakeStatusPill status={status} withTooltip={false} />
                 </td>
-                <td className="px-2 py-2 text-slate-700 dark:text-gray-200">{INTAKE_STATUS_INFO[status].summary}</td>
-                <td className="px-4 py-2 text-slate-500 dark:text-gray-400">{INTAKE_STATUS_INFO[status].whoCanUse}</td>
+                <td className="px-4 py-2 text-slate-700 dark:text-gray-200">{INTAKE_STATUS_INFO[status].summary}</td>
               </tr>
             ))}
           </tbody>

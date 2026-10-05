@@ -9,13 +9,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { INTAKE_CATEGORIES, type IntakeCategory } from "@/lib/intakeCatalog";
 
 import { CreateIntakeDialog } from "./CreateIntakeDialog";
-import {
-  countBy,
-  filterIntakeEntries,
-  intakeAccessSummary,
-  intakeCategoryLabel,
-  type AdminIntakeEntry,
-} from "./intakeCatalogModel";
+import { countBy, filterIntakeEntries, intakeCategoryLabel, type AdminIntakeEntry } from "./intakeCatalogModel";
 import { CategoryRail, StatusGuide, SurfaceIcons } from "./IntakeListParts";
 import { IntakeIcon, IntakeStatusPill } from "./IntakeStatusPill";
 
@@ -148,7 +142,6 @@ function IntakeRow({ entry }: { entry: AdminIntakeEntry }) {
           {note ? <p className="truncate text-xs text-slate-500 dark:text-gray-400">{note}</p> : null}
         </div>
         <SurfaceIcons intakeKey={entry.key} category={entry.category} />
-        <span className="w-32 text-right text-xs text-slate-500 dark:text-gray-400">{intakeAccessSummary(entry)}</span>
         <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 dark:text-gray-600" />
       </Link>
     </li>

@@ -4,7 +4,6 @@ import type { IntakeSurface } from "@/lib/intakePresentation";
 export interface IntakeStatusInfo {
   label: string;
   summary: string;
-  whoCanUse: string;
   /** The condition to move to the next step. Empty for the last steps. */
   nextStep: string;
   pillClassName: string;
@@ -14,8 +13,7 @@ export interface IntakeStatusInfo {
 export const INTAKE_STATUS_INFO: Record<IntakeStatus, IntakeStatusInfo> = {
   planned: {
     label: "Planned",
-    summary: "The intake is not built yet. We plan to build it.",
-    whoCanUse: "Nobody. Companies see Coming soon.",
+    summary: "The intake is not built yet. Companies see Coming soon.",
     nextStep: "The code is merged and works for SuperPlane.",
     pillClassName:
       "border-slate-300 bg-slate-100 text-slate-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200",
@@ -23,8 +21,7 @@ export const INTAKE_STATUS_INFO: Record<IntakeStatus, IntakeStatusInfo> = {
   },
   alpha: {
     label: "Internal",
-    summary: "SuperPlane uses the intake every day to test it.",
-    whoCanUse: "Only the companies that you add. Add SuperPlane companies only.",
+    summary: "SuperPlane uses the intake to test it.",
     nextStep: "It works for our own work and the known errors are fixed.",
     pillClassName:
       "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-200",
@@ -32,8 +29,7 @@ export const INTAKE_STATUS_INFO: Record<IntakeStatus, IntakeStatusInfo> = {
   },
   beta: {
     label: "Beta",
-    summary: "Outside testers use the intake and send feedback. We do not promise that it works.",
-    whoCanUse: "The companies that you add, or all companies for an open beta.",
+    summary: "Outside testers use the intake. We do not promise that it works.",
     nextStep: "Outside testers use it with no new errors, and we are ready to support paying customers.",
     pillClassName:
       "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
@@ -42,7 +38,6 @@ export const INTAKE_STATUS_INFO: Record<IntakeStatus, IntakeStatusInfo> = {
   ga: {
     label: "Generally available",
     summary: "The intake is ready for paying customers. We support it.",
-    whoCanUse: "All companies.",
     nextStep: "",
     pillClassName:
       "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
@@ -50,8 +45,7 @@ export const INTAKE_STATUS_INFO: Record<IntakeStatus, IntakeStatusInfo> = {
   },
   deprecated: {
     label: "Deprecated",
-    summary: "We plan to remove the intake. Existing intakes continue to run.",
-    whoCanUse: "Nobody can create a new intake. Existing intakes continue to run.",
+    summary: "Companies cannot create a new intake. Existing intakes continue to run.",
     nextStep: "",
     pillClassName: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-200",
     dotClassName: "bg-red-500",
@@ -75,25 +69,9 @@ export const INTAKE_SURFACE_LABELS: Record<IntakeSurface, string> = {
   onboardingRepository: "Onboarding: repository",
 };
 
-export const CREATE_INTAKE_HELP = "New intakes start as Planned. Nobody can use a Planned intake.";
+export const CREATE_INTAKE_HELP = "New intakes start as Planned. Companies see Coming soon.";
 export const STATUS_NOTE_HELP = "Tell other admins what works, what is tested, and what is known to fail.";
-export const INTERNAL_ALL_COMPANIES_REASON =
-  "Internal intakes are only for SuperPlane companies. Move the intake to Beta to give access to all companies.";
-export const ONLY_BETA_FOR_ALL_REASON = "Only a Beta intake can be open to all companies.";
 export const NOT_IMPLEMENTED_REASON = "The code for this intake does not exist yet. The status stays Planned.";
-export const NO_COMPANIES_EMPTY = "No companies can use this intake. Add a company to start.";
-
-/** Why a surface does not show the intake to the selected company. */
-export function previewNotShownReason(surface: IntakeSurface, listed: boolean, status: string): string {
-  const label = INTAKE_SURFACE_LABELS[surface];
-  if (!listed) {
-    return `Not shown in ${label}. The code does not support this intake here.`;
-  }
-  if (status === "deprecated") {
-    return `Not shown in ${label}. Companies cannot create new Deprecated intakes.`;
-  }
-  return `Not shown in ${label}. Only the companies that you add can see an Internal intake.`;
-}
 
 export function isIntakeStatus(value: string): value is IntakeStatus {
   return (INTAKE_STATUSES as readonly string[]).includes(value);
@@ -111,55 +89,17 @@ export function intakeCategoryLabel(category: string): string {
   return isIntakeCategory(category) ? INTAKE_CATEGORY_LABELS[category] : category;
 }
 
-export interface AdminIntakeOrganization {
-  id: string;
-  name: string;
-  added_at: string;
-}
-
 export interface AdminIntakeEntry {
   key: string;
   name: string;
   category: string;
   status: string;
   status_note: string;
-  enabled_for_all: boolean;
   implemented: boolean;
   deletable: boolean;
   created_at: string;
   updated_at: string;
   updated_by_name: string;
-  organizations: AdminIntakeOrganization[];
-}
-
-/** One line that tells which companies can use the entry. */
-export function intakeAccessSummary(entry: AdminIntakeEntry): string {
-  if (!entry.implemented) {
-    return "Not implemented";
-  }
-  if (entry.status === "planned" || entry.status === "deprecated") {
-    return "No new intakes";
-  }
-  if (entry.status === "ga" || entry.enabled_for_all) {
-    return "All companies";
-  }
-  const count = entry.organizations.length;
-  if (count === 0) {
-    return "No companies";
-  }
-  return count === 1 ? "1 company" : `${count} companies`;
-}
-
-/**
- * Tells if a move to the next status gives access to more companies. The
- * admin must confirm such a change.
- */
-export function widensAccess(from: string, to: string): boolean {
-  const rank: Record<IntakeStatus, number> = { deprecated: 0, planned: 0, alpha: 1, beta: 2, ga: 3 };
-  if (!isIntakeStatus(from) || !isIntakeStatus(to)) {
-    return false;
-  }
-  return rank[to] > rank[from];
 }
 
 /** A key from a name: lowercase, with dashes between words. */

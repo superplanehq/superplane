@@ -1,5 +1,21 @@
 import type { IntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { intakeSurfaceEntries, intakeSurfaceState, type IntakeCatalogItem } from "@/lib/intakeCatalog";
+import {
+  FEATURE_FACTORY_DATADOG_INTAKE,
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
+  FEATURE_FACTORY_PAGERDUTY_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+} from "@/lib/experimentalFeatures";
+
+/** Intake keys whose visibility is an organization feature flag. */
+const INTAKE_FEATURE_FLAGS: Record<string, string> = {
+  "jira-issues": FEATURE_FACTORY_JIRA_INTAKE,
+  "productive-tasks": FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  datadog: FEATURE_FACTORY_DATADOG_INTAKE,
+  "pagerduty-incidents": FEATURE_FACTORY_PAGERDUTY_INTAKE,
+  "linear-issues": FEATURE_FACTORY_LINEAR_INTAKE,
+};
 
 const SEED: readonly Omit<IntakeCatalogItem, "available">[] = [
   { key: "github-issues", name: "GitHub issues", category: "issue_tracking", status: "ga" },
@@ -16,10 +32,20 @@ const SEED: readonly Omit<IntakeCatalogItem, "available">[] = [
   { key: "bitbucket", name: "Bitbucket", category: "repository_provider", status: "planned" },
 ];
 
+function intakeVisible(key: string, status: string, granted: readonly string[]): boolean {
+  if (status === "deprecated") {
+    return false;
+  }
+  const flag = INTAKE_FEATURE_FLAGS[key];
+  if (!flag) {
+    return true;
+  }
+  return granted.includes(key);
+}
+
 /**
- * The seeded catalog as one company sees it. Generally available entries are
- * available. Keys in `granted` are available too, as if an admin added the
- * company. `overrides` change single entries.
+ * The seeded catalog as one company sees it. Keys in `granted` are the intakes
+ * whose feature flag is on for that company. `overrides` change single entries.
  */
 export function seededIntakeCatalog(
   granted: readonly string[] = [],
@@ -27,19 +53,22 @@ export function seededIntakeCatalog(
 ): IntakeCatalogItem[] {
   const items = SEED.map((item) => ({
     ...item,
-    available: item.status === "ga" || granted.includes(item.key),
+    available: intakeVisible(item.key, item.status, granted),
     ...overrides[item.key],
   }));
   const extra = Object.entries(overrides)
     .filter(([key]) => !SEED.some((item) => item.key === key))
-    .map(([key, item]) => ({
-      key,
-      name: key,
-      category: "issue_tracking",
-      status: "planned",
-      available: false,
-      ...item,
-    }));
+    .map(([key, item]) => {
+      const status = item.status ?? "planned";
+      return {
+        key,
+        name: key,
+        category: "issue_tracking",
+        status,
+        available: item.available ?? intakeVisible(key, status, granted),
+        ...item,
+      };
+    });
   return [...items, ...extra];
 }
 

@@ -3,20 +3,16 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import {
-  useAddAdminIntakeOrganization,
   useAdminIntakeCatalog,
   useDeleteAdminIntake,
-  useRemoveAdminIntakeOrganization,
   useUpdateAdminIntake,
   type UpdateAdminIntakeInput,
 } from "@/hooks/useAdminIntakeCatalog";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { showErrorToast } from "@/lib/toast";
 
-import { IntakeAccessCard } from "./IntakeAccessCard";
 import type { AdminIntakeEntry } from "./intakeCatalogModel";
 import { DeleteDialog, DetailCard, EntryMenu, MetadataRail, RenameDialog, StatusNoteEditor } from "./IntakeDetailParts";
-import { IntakePreviewCard } from "./IntakePreviewCard";
 import { IntakeIcon, IntakeStatusPill } from "./IntakeStatusPill";
 import { MaturityStepper } from "./MaturityStepper";
 
@@ -41,8 +37,6 @@ export function IntakeDetailPage() {
 function IntakeDetail({ entry }: { entry: AdminIntakeEntry }) {
   const navigate = useNavigate();
   const update = useUpdateAdminIntake(entry.key);
-  const addOrganization = useAddAdminIntakeOrganization(entry.key);
-  const removeOrganization = useRemoveAdminIntakeOrganization(entry.key);
   const deleteEntry = useDeleteAdminIntake(entry.key);
   const [noteSavedAt, setNoteSavedAt] = useState<number | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -51,8 +45,6 @@ function IntakeDetail({ entry }: { entry: AdminIntakeEntry }) {
   const onError = (error: Error) => showErrorToast(error.message);
   const patch = (input: UpdateAdminIntakeInput, onSuccess?: () => void) =>
     update.mutate(input, { onError, onSuccess: () => onSuccess?.() });
-  const accessPending = update.isPending || addOrganization.isPending || removeOrganization.isPending;
-
   return (
     <div className="flex flex-col gap-5">
       <Link
@@ -87,21 +79,6 @@ function IntakeDetail({ entry }: { entry: AdminIntakeEntry }) {
               savedAt={noteSavedAt}
               onSave={(note) => patch({ status_note: note }, () => setNoteSavedAt(Date.now()))}
             />
-          </DetailCard>
-          <DetailCard title="Access" description="Select the companies that can create this intake.">
-            <IntakeAccessCard
-              entry={entry}
-              pending={accessPending}
-              onSetEnabledForAll={(enabled) => patch({ enabled_for_all: enabled })}
-              onAddOrganization={(organizationId) => addOrganization.mutate(organizationId, { onError })}
-              onRemoveOrganization={(organizationId) => removeOrganization.mutate(organizationId, { onError })}
-            />
-          </DetailCard>
-          <DetailCard
-            title="What companies see"
-            description="Pick a company to see this intake as that company sees it in the factory."
-          >
-            <IntakePreviewCard entry={entry} />
           </DetailCard>
         </div>
         <MetadataRail entry={entry} disabled={update.isPending} onChangeCategory={(category) => patch({ category })} />

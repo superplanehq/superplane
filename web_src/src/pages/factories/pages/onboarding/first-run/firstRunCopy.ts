@@ -78,17 +78,13 @@ export const FIRST_RUN_COPY = {
     jiraProjectHeading: "Choose a Jira project",
     jiraLookupLoading: "Checking whether Jira is available…",
     jiraLookupFailed: "SuperPlane could not confirm that Jira is available. Choose GitHub Issues to continue.",
-<<<<<<< HEAD
-    linearHelper: "Scan your Linear backlog.",
-    intakeSoonHelper: "SuperPlane cannot scan this backlog yet.",
-    beta: "Beta",
-=======
     linearHelper: "Connect Linear and choose projects.",
     linearSoonHelper: "Linear intake is not available yet.",
     linearProjectHeading: "Choose Linear projects",
     linearLookupLoading: "Checking whether Linear is available…",
     linearLookupFailed: "SuperPlane could not confirm that Linear is available. Choose GitHub Issues to continue.",
->>>>>>> origin/main
+    intakeSoonHelper: "SuperPlane cannot scan this backlog yet.",
+    beta: "Beta",
     analyze: "Scan my backlog",
     continue: "Continue",
     saving: "Saving ticket source…",

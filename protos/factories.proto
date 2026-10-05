@@ -1393,7 +1393,8 @@ message FactoryIntakeCatalogEntry {
   // One of planned, alpha, beta, ga, deprecated.
   string status = 4;
   string status_note = 5;
-  // True when the organization can create this intake or connect this provider.
+  // True when the organization may see this intake. Status still decides
+  // Coming soon, Beta, and whether a new intake can be created.
   bool available = 6;
 }
 
