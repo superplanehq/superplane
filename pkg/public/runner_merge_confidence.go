@@ -111,7 +111,7 @@ func mergeConfidenceAutomation(db *gorm.DB, scope *runneraction.MergeConfidenceS
 		}
 		return nil, err
 	}
-	if execution.RunID != scope.CanvasRunID {
+	if execution.RunID != scope.CanvasRunID || execution.State != models.CanvasNodeExecutionStateStarted {
 		return nil, errMergeConfidenceScope
 	}
 	ref := &factoryevents.AutomationRef{

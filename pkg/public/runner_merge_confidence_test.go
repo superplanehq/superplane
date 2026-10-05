@@ -39,6 +39,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
 	require.NoError(t, err)
 	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 
 	token, err := runneraction.MintMergeConfidenceToken(signer, runneraction.MergeConfidenceScope{
 		OrganizationID:  r.Organization.ID,
@@ -107,4 +108,18 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, "Merge confidence", automation.AppName)
 	assert.Equal(t, nodeID, automation.NodeID)
 	assert.Equal(t, "Assess risk", automation.NodeName)
+
+	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
+	late := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
+		`{"check":"risk","score":1,"summary":"Lower risk because the pull request is introducing user interface changes only."}`,
+	)))
+	late.Header.Set("Authorization", "Bearer "+token)
+	lateRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(lateRec, late)
+	assert.Equal(t, http.StatusNotFound, lateRec.Code)
+
+	checks, err = order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, 4.0, checks[0].Score)
 }
