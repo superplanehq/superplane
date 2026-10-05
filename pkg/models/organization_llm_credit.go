@@ -196,7 +196,8 @@ func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, no
 
 // AdjustOrganizationLLMCreditBalance appends a signed adjustment row so the
 // remaining balance of one credit type equals the target. It returns nil when
-// the balance already equals the target.
+// the balance already equals the target. An open non-Polar Trial with no live
+// welcome grant receives a welcome grant instead of an adjustment.
 func AdjustOrganizationLLMCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdjustment) (*OrganizationLLMCreditGrant, error) {
 	kind, ok := creditAdjustmentKindForBucket(adjustment.Bucket)
 	if !ok {
@@ -224,32 +225,25 @@ func AdjustOrganizationLLMCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdj
 		if SignedMicrosToCents(current) != SignedMicrosToCents(adjustment.ExpectedMicros) {
 			return ErrCreditBalanceChanged
 		}
-		delta := adjustment.TargetMicros - current
-		if delta == 0 {
+		if adjustment.TargetMicros == current {
 			return nil
 		}
 
 		now := time.Now()
-		grant := OrganizationLLMCreditGrant{
-			ID:             uuid.New(),
-			OrganizationID: adjustment.OrganizationID,
-			Kind:           kind,
-			AmountMicros:   delta,
-			Note:           strings.TrimSpace(adjustment.Note),
-			ActorAccountID: adjustment.ActorAccountID,
-			CreatedAt:      now,
-		}
 		if kind == LLMCreditGrantKindTrialAdjustment {
-			welcome, err := findLiveWelcomeGrant(inner, adjustment.OrganizationID, now)
+			grant, err := adjustTrialCreditBalance(inner, adjustment, current, now)
 			if err != nil {
 				return err
 			}
-			grant.ExpiresAt = welcome.ExpiresAt
+			created = grant
+			return nil
 		}
-		if err := inner.Create(&grant).Error; err != nil {
+
+		grant, err := insertCreditAdjustment(inner, adjustment, kind, adjustment.TargetMicros-current, nil, now)
+		if err != nil {
 			return err
 		}
-		created = &grant
+		created = grant
 		return nil
 	})
 	if err != nil {
@@ -282,19 +276,118 @@ func remainingMicrosForBucket(summary OrganizationLLMCreditSummary, bucket strin
 	}
 }
 
-func findLiveWelcomeGrant(tx *gorm.DB, orgID uuid.UUID, now time.Time) (*OrganizationLLMCreditGrant, error) {
+func adjustTrialCreditBalance(tx *gorm.DB, adjustment CreditBalanceAdjustment, seenRemaining int64, now time.Time) (*OrganizationLLMCreditGrant, error) {
+	welcome, err := findWelcomeGrant(tx, adjustment.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	if welcome != nil && welcomeExpiryIsLive(welcome, now) {
+		delta := adjustment.TargetMicros - seenRemaining
+		return insertCreditAdjustment(
+			tx,
+			adjustment,
+			LLMCreditGrantKindTrialAdjustment,
+			delta,
+			welcome.ExpiresAt,
+			now,
+		)
+	}
+
+	plan, err := lockOrganizationBillingPlan(tx, adjustment.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	if !isOpenNonPolarTrial(plan, now) || plan.TrialEndsAt == nil {
+		return nil, ErrTrialCreditNotActive
+	}
+
+	endsAt := plan.TrialEndsAt.UTC()
+	if welcome == nil {
+		return insertOpenTrialWelcomeGrant(tx, adjustment, endsAt, now)
+	}
+	if err := SetWelcomeGrantExpiresAt(tx, adjustment.OrganizationID, endsAt); err != nil {
+		return nil, err
+	}
+
+	restored, err := welcomeRemainingMicros(tx, adjustment.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	delta := adjustment.TargetMicros - restored
+	if delta == 0 {
+		return nil, nil
+	}
+	return insertCreditAdjustment(tx, adjustment, LLMCreditGrantKindTrialAdjustment, delta, &endsAt, now)
+}
+
+func insertOpenTrialWelcomeGrant(tx *gorm.DB, adjustment CreditBalanceAdjustment, expiresAt time.Time, now time.Time) (*OrganizationLLMCreditGrant, error) {
+	if adjustment.TargetMicros <= 0 {
+		return nil, nil
+	}
+
+	endsAt := expiresAt.UTC()
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: adjustment.OrganizationID,
+		Kind:           LLMCreditGrantKindWelcome,
+		AmountMicros:   adjustment.TargetMicros,
+		Note:           strings.TrimSpace(adjustment.Note),
+		ActorAccountID: adjustment.ActorAccountID,
+		CreatedAt:      now,
+		ExpiresAt:      &endsAt,
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func insertCreditAdjustment(tx *gorm.DB, adjustment CreditBalanceAdjustment, kind string, delta int64, expiresAt *time.Time, now time.Time) (*OrganizationLLMCreditGrant, error) {
+	grant := OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: adjustment.OrganizationID,
+		Kind:           kind,
+		AmountMicros:   delta,
+		Note:           strings.TrimSpace(adjustment.Note),
+		ActorAccountID: adjustment.ActorAccountID,
+		CreatedAt:      now,
+		ExpiresAt:      expiresAt,
+	}
+	if err := tx.Create(&grant).Error; err != nil {
+		return nil, err
+	}
+	return &grant, nil
+}
+
+func welcomeRemainingMicros(tx *gorm.DB, orgID uuid.UUID) (int64, error) {
+	summary, err := DescribeOrganizationLLMCredit(tx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	return summary.WelcomeRemainingMicros, nil
+}
+
+func findWelcomeGrant(tx *gorm.DB, orgID uuid.UUID) (*OrganizationLLMCreditGrant, error) {
 	var welcome OrganizationLLMCreditGrant
 	err := tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).First(&welcome).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrTrialCreditNotActive
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if welcome.IsExpired(now) {
-		return nil, ErrTrialCreditNotActive
-	}
 	return &welcome, nil
+}
+
+func welcomeExpiryIsLive(welcome *OrganizationLLMCreditGrant, now time.Time) bool {
+	return welcome != nil && welcome.ExpiresAt != nil && welcome.ExpiresAt.After(now)
+}
+
+func isOpenNonPolarTrial(plan *OrganizationBillingPlan, now time.Time) bool {
+	if plan == nil || !plan.IsOpenTrial(now) {
+		return false
+	}
+	return !OrganizationBillingIsPolarManaged(plan)
 }
 
 func AddPolarLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, polarOrderID string) (*OrganizationLLMCreditGrant, error) {
