@@ -117,6 +117,14 @@ curl --fail --location --silent --show-error \
   --output /tmp/amazon-cloudwatch-agent.deb
 dpkg -i /tmp/amazon-cloudwatch-agent.deb
 
+if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
+  snap install amazon-ssm-agent --classic
+fi
+snap start --enable amazon-ssm-agent
+systemctl is-enabled --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
+systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
+/snap/amazon-ssm-agent/current/amazon-ssm-agent -version
+
 git --version
 gh --version
 jq --version
