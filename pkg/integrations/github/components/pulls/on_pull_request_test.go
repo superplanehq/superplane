@@ -209,6 +209,123 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, eventContext.Count(), 0)
 	})
+
+	t.Run("ignoreDrafts filters draft pull requests", func(t *testing.T) {
+		ignoreDrafts := true
+		keepDrafts := false
+
+		cases := []struct {
+			name         string
+			body         string
+			actions      []string
+			ignoreDrafts *bool
+			wantEvents   int
+		}{
+			{
+				name:         "toggle on and opened draft does not emit",
+				body:         `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   0,
+			},
+			{
+				name:         "toggle on and opened non-draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":false}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and ready_for_review emits",
+				body:         `{"action":"ready_for_review","pull_request":{"draft":false}}`,
+				actions:      []string{"ready_for_review"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and converted_to_draft does not emit",
+				body:         `{"action":"converted_to_draft","pull_request":{"draft":true}}`,
+				actions:      []string{"converted_to_draft"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   0,
+			},
+			{
+				name:         "toggle off and opened draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &keepDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:       "omitted toggle and opened draft emits",
+				body:       `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:    []string{"opened"},
+				wantEvents: 1,
+			},
+			{
+				name:         "toggle on and missing draft emits",
+				body:         `{"action":"opened","pull_request":{"title":"Ready"}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and missing pull_request emits",
+				body:         `{"action":"opened"}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and non-boolean draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":"true"}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				configuration := map[string]any{
+					"repository": "test",
+					"actions":    tc.actions,
+				}
+				if tc.ignoreDrafts != nil {
+					configuration["ignoreDrafts"] = *tc.ignoreDrafts
+				}
+
+				code, events, err := handleSignedPullRequestWebhook([]byte(tc.body), configuration)
+
+				assert.Equal(t, http.StatusOK, code)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantEvents, events.Count())
+			})
+		}
+	})
+}
+
+func handleSignedPullRequestWebhook(body []byte, configuration map[string]any) (int, *contexts.EventContext, error) {
+	secret := "test-secret"
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(body)
+	signature := fmt.Sprintf("%x", h.Sum(nil))
+
+	headers := http.Header{}
+	headers.Set("X-Hub-Signature-256", "sha256="+signature)
+	headers.Set("X-GitHub-Event", "pull_request")
+
+	eventContext := &contexts.EventContext{}
+	code, _, err := (&OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
+		Body:          body,
+		Headers:       headers,
+		Logger:        logrus.NewEntry(logrus.New()),
+		Configuration: configuration,
+		Webhook:       &contexts.NodeWebhookContext{Secret: secret},
+		Events:        eventContext,
+	})
+
+	return code, eventContext, err
 }
 
 func Test__OnPullRequest__Setup(t *testing.T) {

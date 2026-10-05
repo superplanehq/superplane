@@ -14,8 +14,9 @@ import (
 type OnPullRequest struct{}
 
 type OnPullRequestConfiguration struct {
-	Repository string   `json:"repository" mapstructure:"repository"`
-	Actions    []string `json:"actions" mapstructure:"actions"`
+	Repository   string   `json:"repository" mapstructure:"repository"`
+	Actions      []string `json:"actions" mapstructure:"actions"`
+	IgnoreDrafts bool     `json:"ignoreDrafts" mapstructure:"ignoreDrafts"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -44,6 +45,7 @@ func (p *OnPullRequest) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
+- **Ignore draft pull requests**: Do not start a run when the pull request is a draft. Also select Ready for review to start a run when a draft becomes ready.
 
 ## Event Data
 
@@ -114,6 +116,14 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "ignoreDrafts",
+			Label:       "Ignore draft pull requests",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Do not start a run when the pull request is a draft. Also select Ready for review to start a run when a draft becomes ready.",
 		},
 	}
 }
@@ -195,6 +205,11 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		return http.StatusOK, nil, nil
 	}
 
+	if config.IgnoreDrafts && pullRequestIsDraft(data) {
+		ctx.Logger.Info("Ignoring event - pull request is a draft")
+		return http.StatusOK, nil, nil
+	}
+
 	err = ctx.Events.Emit("github.pullRequest", data)
 
 	if err != nil {
@@ -207,4 +222,14 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 
 func (p *OnPullRequest) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func pullRequestIsDraft(data map[string]any) bool {
+	pullRequest, ok := data["pull_request"].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	draft, ok := pullRequest["draft"].(bool)
+	return ok && draft
 }
