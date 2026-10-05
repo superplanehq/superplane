@@ -145,17 +145,16 @@ func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
 		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
 	})
 
-	t.Run("install grants access", func(t *testing.T) {
+	t.Run("install does not grant access that it cannot confirm", func(t *testing.T) {
 		source := &memorySource{}
 		service := newService(t, issuer, source)
 		require.NoError(t, service.Refresh(context.Background()))
 
 		source.err = errors.New("connection refused")
-		status, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
-		require.NoError(t, err)
+		_, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
+		require.Error(t, err)
 
-		assert.Equal(t, licensing.EditionEnterprise, status.Edition)
-		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
 	})
 }
 

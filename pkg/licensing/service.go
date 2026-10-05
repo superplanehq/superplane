@@ -137,14 +137,22 @@ func (s *Service) Refresh(ctx context.Context) error {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
 
+	return s.refreshLocked(ctx)
+}
+
+func (s *Service) refreshLocked(ctx context.Context) error {
 	next, err := s.load(ctx)
 	if err != nil {
 		return err
 	}
 
+	s.publish(next)
+	return nil
+}
+
+func (s *Service) publish(next *snapshot) {
 	previous := s.current.Swap(next)
 	logTransition(previous, next)
-	return nil
 }
 
 func (s *Service) Status() Status {
@@ -198,15 +206,15 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		return s.Status(), err
 	}
 
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
 	switch license.ValidityAt(s.now()) {
 	case ValidityExpired:
 		return s.Status(), invalid(ReasonExpired)
 	case ValidityNotYetValid:
 		return s.Status(), invalid(ReasonNotYetValid)
 	}
-
-	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {
 		return s.Status(), err
@@ -218,7 +226,10 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		"installed_by": installedBy.String(),
 	}).Info("Licensing: license installed")
 
-	s.reloadAfterChange(ctx, &snapshot{source: writable.Kind(), license: license})
+	if err := s.refreshLocked(ctx); err != nil {
+		return s.Status(), err
+	}
+
 	return s.Status(), nil
 }
 
@@ -237,22 +248,14 @@ func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, erro
 
 	log.WithField("removed_by", removedBy.String()).Info("Licensing: license removed")
 
-	s.reloadAfterChange(ctx, &snapshot{source: SourceNone})
-	return s.Status(), nil
-}
-
-// reloadAfterChange reads the state that a successful change produced. The
-// caller holds refreshMu. When the read fails, the written state applies, so a
-// removed license never stays active because of a read error.
-func (s *Service) reloadAfterChange(ctx context.Context, written *snapshot) {
-	next, err := s.load(ctx)
-	if err != nil {
-		log.WithError(err).Warn("Licensing: license reload after change failed; using the changed state")
-		next = written
+	// A failed reload must not keep the removed license active. Community mode
+	// applies until the next refresh reads the shared state.
+	if err := s.refreshLocked(ctx); err != nil {
+		log.WithError(err).Warn("Licensing: license reload after removal failed; using Community mode")
+		s.publish(&snapshot{source: SourceNone})
 	}
 
-	previous := s.current.Swap(next)
-	logTransition(previous, next)
+	return s.Status(), nil
 }
 
 func (s *Service) writableSource() WritableSource {
