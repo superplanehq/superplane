@@ -252,6 +252,7 @@ services:
       dockerfile: cmd/fleetmanager/Dockerfile
       target: local
     environment:
+      FLEET_MANAGER_CONFIG: ${FLEET_MANAGER_CONFIG:-}
       FLEET_MANAGER_CONFIG_FILE: /etc/superplane/fleet-manager.yaml
       INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
       DB_HOST: db

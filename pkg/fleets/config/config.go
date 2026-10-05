@@ -19,6 +19,9 @@ const (
 	defaultInstanceType             = "t3.micro"
 	defaultVolumeSizeGB             = 30
 
+	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
+	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
+
 	ProviderAWS    = "aws"
 	ProviderDocker = "docker"
 )
@@ -65,21 +68,27 @@ type Docker struct {
 }
 
 func Load(path string) (*Config, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return nil, fmt.Errorf("config path is required")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open config: %w", err)
-	}
-	defer file.Close()
-
 	var config Config
-	if err := decode(file, filepath.Ext(path), &config); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
+	if body := strings.TrimSpace(os.Getenv(fleetManagerConfigEnvironment)); body != "" {
+		if err := decode(strings.NewReader(body), ".yaml", &config); err != nil {
+			return nil, fmt.Errorf("decode %s: %w", fleetManagerConfigEnvironment, err)
+		}
+	} else {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return nil, fmt.Errorf("config path is required")
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("open config: %w", err)
+		}
+		defer file.Close()
+
+		if err := decode(file, filepath.Ext(path), &config); err != nil {
+			return nil, fmt.Errorf("decode config: %w", err)
+		}
 	}
-	if token := strings.TrimSpace(os.Getenv("INSTALLATION_ADMIN_TOKEN")); token != "" {
+	if token := strings.TrimSpace(os.Getenv(installationTokenEnvironment)); token != "" {
 		config.InstallationAdminToken = token
 	}
 	config.applyDefaults()
