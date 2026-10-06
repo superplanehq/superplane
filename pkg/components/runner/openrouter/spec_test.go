@@ -205,6 +205,7 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
 	require.Equal(t, runner.PlanningSessionProtocolFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.js").Content)
 	require.Equal(t, runner.PlanningSessionProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.md").Content)
+	require.Equal(t, runner.PlanningSessionReviewProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol_review.md").Content)
 	require.Equal(t, runner.AttachmentLimitFile().Content, requireTaskFile(t, got.Files, "attachment_limit.js").Content)
 }
 

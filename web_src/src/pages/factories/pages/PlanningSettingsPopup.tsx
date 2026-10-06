@@ -39,6 +39,7 @@ interface PlanningSettingsPopupProps {
   onClose: () => void;
   fixed?: boolean;
   initialTab?: PlanningSettingsTab;
+  planningReviewEnabled?: boolean;
 }
 
 export function PlanningSettingsPopup({
@@ -59,6 +60,7 @@ export function PlanningSettingsPopup({
   onClose,
   fixed = true,
   initialTab = "general",
+  planningReviewEnabled,
 }: PlanningSettingsPopupProps) {
   const tabs = planningSettingsTabs(Boolean(agent));
   const [draft, setDraft] = useState(settings);
@@ -147,6 +149,7 @@ export function PlanningSettingsPopup({
           onUpdate={update}
           onSave={onSave}
           onClose={onClose}
+          planningReviewEnabled={planningReviewEnabled}
         />
       )}
     </PopupShell>
@@ -161,6 +164,7 @@ function PlanningGeneralTab({
   onUpdate,
   onSave,
   onClose,
+  planningReviewEnabled,
 }: {
   draft: PlanningDraftSettings;
   lines: PlanningAutoStartLine[];
@@ -169,13 +173,19 @@ function PlanningGeneralTab({
   onUpdate: <K extends keyof PlanningDraftSettings>(key: K, value: PlanningDraftSettings[K]) => void;
   onSave: (next: PlanningDraftSettings) => Promise<void> | void;
   onClose: () => void;
+  planningReviewEnabled?: boolean;
 }) {
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           <PlanningHealthSection enabled={draft.enabled} />
-          <PlanningSettingsFields draft={draft} lines={lines} onUpdate={onUpdate} />
+          <PlanningSettingsFields
+            draft={draft}
+            lines={lines}
+            onUpdate={onUpdate}
+            planningReviewEnabled={planningReviewEnabled}
+          />
         </div>
       </div>
       <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">

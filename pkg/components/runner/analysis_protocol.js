@@ -4,12 +4,20 @@ const fs = require("fs");
 const path = require("path");
 
 const ANALYSIS_PROTOCOL = fs.readFileSync(path.join(__dirname, "analysis_protocol.md"), "utf8").trim();
+const ANALYSIS_PROTOCOL_REVIEW = fs.readFileSync(path.join(__dirname, "analysis_protocol_review.md"), "utf8").trim();
 
 function envFlagDefaultTrue(env, name) {
   const raw = String((env && env[name]) || "true")
     .trim()
     .toLowerCase();
   return raw !== "false" && raw !== "0" && raw !== "no" && raw !== "off";
+}
+
+function envFlagDefaultFalse(env, name) {
+  const raw = String((env && env[name]) || "")
+    .trim()
+    .toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes" || raw === "on";
 }
 
 function planningClarityEnabled(env = process.env) {
@@ -20,7 +28,14 @@ function planningConfidenceEnabled(env = process.env) {
   return envFlagDefaultTrue(env, "SUPERPLANE_PLANNING_CONFIDENCE");
 }
 
+function planningReviewEnabled(env = process.env) {
+  return envFlagDefaultFalse(env, "SUPERPLANE_PLANNING_REVIEW");
+}
+
 function analysisProtocol(env = process.env) {
+  if (planningReviewEnabled(env)) {
+    return ANALYSIS_PROTOCOL_REVIEW;
+  }
   const clarity = planningClarityEnabled(env);
   const confidence = planningConfidenceEnabled(env);
   if (clarity && confidence) {
@@ -96,6 +111,9 @@ function withoutEmbeddedAnalysisProtocol(prompt, env = process.env) {
   if (value.includes(ANALYSIS_PROTOCOL)) {
     return value.replace(ANALYSIS_PROTOCOL, "").trimStart();
   }
+  if (value.includes(ANALYSIS_PROTOCOL_REVIEW)) {
+    return value.replace(ANALYSIS_PROTOCOL_REVIEW, "").trimStart();
+  }
   return value;
 }
 
@@ -121,10 +139,12 @@ function isCompactStatusText(text) {
 
 module.exports = {
   ANALYSIS_PROTOCOL,
+  ANALYSIS_PROTOCOL_REVIEW,
   analysisProtocol,
   withoutEmbeddedAnalysisProtocol,
   withAnalysisContinuation,
   isCompactStatusText,
   planningClarityEnabled,
   planningConfidenceEnabled,
+  planningReviewEnabled,
 };

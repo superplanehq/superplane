@@ -107,8 +107,15 @@ const ANALYSIS_BASE_ALLOWED_TOOLS = [
 ];
 
 function analysisAllowedTools(env = process.env) {
-  const tools = [...ANALYSIS_BASE_ALLOWED_TOOLS];
   const protocol = loadAnalysisProtocolModule();
+  const reviewEnabled =
+    typeof protocol.planningReviewEnabled === "function"
+      ? protocol.planningReviewEnabled(env)
+      : false;
+  if (reviewEnabled) {
+    return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
+  }
+  const tools = [...ANALYSIS_BASE_ALLOWED_TOOLS];
   const clarityEnabled =
     typeof protocol.planningClarityEnabled === "function"
       ? protocol.planningClarityEnabled(env)
