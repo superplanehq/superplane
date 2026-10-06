@@ -171,7 +171,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
 
   return (
-    <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere}>
+    <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.intro}</p>
       </FirstRunHeading>
