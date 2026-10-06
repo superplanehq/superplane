@@ -252,6 +252,7 @@ function PRFeedbackSettingsLoaded({
               organizationId,
               factoryId,
               factoryKey,
+              automationId: canvasId,
               onSave: agent.save,
               showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
             }
