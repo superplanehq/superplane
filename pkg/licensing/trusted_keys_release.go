@@ -2,8 +2,8 @@
 
 package licensing
 
-// TrustedKeySet returns the keys that verify licenses in this binary. Release
-// builds trust only the bundled production keys.
-func TrustedKeySet() (*KeySet, error) {
-	return ProductionKeySet()
+// TrustedKeyStore returns the keys that verify licenses in this binary.
+// Release builds trust only key lists signed by the embedded root keys.
+func TrustedKeyStore(extra *KeySet) (*KeyStore, error) {
+	return productionKeyStore(extra)
 }

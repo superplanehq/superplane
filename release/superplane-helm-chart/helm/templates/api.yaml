@@ -155,6 +155,10 @@ spec:
             - name: SUPERPLANE_LICENSE_PATH
               value: /app/license/license.jws
 {{- end }}
+{{- if .Values.license.keysURL }}
+            - name: SUPERPLANE_LICENSE_KEYS_URL
+              value: {{ .Values.license.keysURL | quote }}
+{{- end }}
 
           volumeMounts:
             - name: oidc-keys
