@@ -14,6 +14,13 @@ without them.
 2. Otherwise, the license that an administrator installs in the UI is the
    source.
 
+## Installing a license
+
+Installation administrators manage the license on the **Installation Admin >
+License** page, and the owner can install one during owner setup. SuperPlane
+accepts only a license that is valid now. To renew a license or add features,
+install the new license.
+
 ## Enterprise code
 
 Code in the `ee/` directory is subject to the SuperPlane Enterprise Edition
