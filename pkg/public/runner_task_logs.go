@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -17,6 +18,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 )
+
+const runnerLogSignedURLTTL = 15 * time.Minute
 
 func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
@@ -201,6 +204,18 @@ func (s *Server) serveFinalRunnerTaskLog(
 		return
 	}
 	if err != nil {
+		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		return
+	}
+
+	signedURL, signErr := provider.SignedGetURL(r.Context(), key, runnerLogSignedURLTTL)
+	if signErr == nil {
+		writeRunnerLogState(w, models.RunnerTaskLogStateArchived, cursor)
+		w.Header().Set(runnerlogs.HeaderURL, signedURL)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if !errors.Is(signErr, blob.ErrSignedURLUnsupported) {
 		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
 		return
 	}

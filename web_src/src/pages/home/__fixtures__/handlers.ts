@@ -190,6 +190,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "superplane_mcp_server",
               label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
+              released: true,
             },
             {
               id: "mobile_factory_board",

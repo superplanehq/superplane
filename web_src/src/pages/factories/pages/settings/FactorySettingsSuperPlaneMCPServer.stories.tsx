@@ -49,6 +49,14 @@ const CONFIGURED_MCP_CLIENTS: FactoriesFactoryMcpClient[] = [
     createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
   },
   {
+    id: "mcp-client-codex",
+    clientName: "https://chatgpt.com/oauth/codex/workspace-example/client.json",
+    userId: STORYBOOK_ME_USER_ID,
+    userName: STORYBOOK_ME_USER_NAME,
+    userAvatarUrl: mcpClientUserAvatarUrl(STORYBOOK_ME_USER_ID),
+    createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  },
+  {
     id: "mcp-client-claude",
     clientName: "Claude Code",
     userId: STORYBOOK_ME_USER_ID,
