@@ -19,6 +19,7 @@ import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
 import { factoryListPath, factorySettingsPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { MobileSettingsBottomBar } from "../../mobile/MobileSettingsBottomBar";
+import { PinnedPhoneShell } from "../../mobile/PinnedPhoneShell";
 import { MOBILE_SETTINGS_COPY } from "../../mobile/mobileCopy";
 import { useMobileFactoryShell } from "../../mobile/useMobileFactoryShell";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
@@ -150,7 +151,7 @@ function FactorySettingsLayoutContent({
   */
   const main = (
     <main
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-sidebar dark:bg-background"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-none bg-sidebar dark:bg-background"
       data-testid="factory-settings-main"
     >
       <Outlet />
@@ -162,10 +163,7 @@ function FactorySettingsLayoutContent({
       <OrganizationSettingsPathsProvider paths={organizationSettingsPaths}>
         <IntegrationsBasePathProvider basePath={integrationsPath}>
           {isMobile ? (
-            <div
-              className="flex h-dvh w-full flex-col bg-background text-foreground [--workspace-navigation-width:0px]"
-              data-testid="factory-settings-layout"
-            >
+            <PinnedPhoneShell testId="factory-settings-layout">
               {isSettingsIndex ? null : <MobileSettingsBar href={settingsIndexPath} />}
               {main}
               {showMobileBottomBar ? (
@@ -177,7 +175,7 @@ function FactorySettingsLayoutContent({
                   factories={factories}
                 />
               ) : null}
-            </div>
+            </PinnedPhoneShell>
           ) : (
             <div className="flex h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
               <FactoriesSidebar
