@@ -273,6 +273,8 @@ export interface CanvasPageProps {
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
   showBottomStatusControls?: boolean;
+  /** Fit-view and command search on the zoom bar. Hidden on read-only previews. */
+  showCanvasFindControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
@@ -1620,6 +1622,7 @@ function CanvasPage(props: CanvasPageProps) {
                 workflowNodes={props.workflowNodes}
                 setCurrentTab={setCurrentTab}
                 showBottomStatusControls={props.showBottomStatusControls}
+                showCanvasFindControls={props.showCanvasFindControls}
                 isRunInspectionMode={props.isRunInspectionMode}
                 runNodeDetailRun={props.runNodeDetailRun}
                 isEditing={props.isEditing}
@@ -2252,6 +2255,7 @@ function CanvasContent({
   workflowNodes,
   setCurrentTab,
   showBottomStatusControls = true,
+  showCanvasFindControls = true,
   isRunInspectionMode = false,
   runNodeDetailRun = null,
   isEditing = false,
@@ -2317,6 +2321,7 @@ function CanvasContent({
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
+  showCanvasFindControls?: boolean;
   isRunInspectionMode?: boolean;
   runNodeDetailRun?: CanvasesCanvasRun | null;
   isEditing?: boolean;
@@ -3452,6 +3457,7 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
+                  showFitView={showCanvasFindControls}
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                   isAutoLayoutOnUpdateEnabled={
@@ -3465,7 +3471,7 @@ function CanvasContent({
                   isAutoFocusEnabled={isAutoFocusEnabled}
                   onAutoFocusToggle={onToggleAutoFocus}
                 >
-                  {zoomSliderContent}
+                  {showCanvasFindControls ? zoomSliderContent : null}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5 dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700">
@@ -3478,6 +3484,7 @@ function CanvasContent({
                             "h-7 items-center text-xs font-medium",
                             unacknowledgedErrorCount > 0 && "text-red-500",
                           )}
+                          aria-label="Errors"
                           onClick={() => handleLogButtonClick("errors")}
                         >
                           <CircleX
@@ -3506,6 +3513,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-7 items-center text-xs font-medium"
+                          aria-label="Warnings"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <CircleAlert

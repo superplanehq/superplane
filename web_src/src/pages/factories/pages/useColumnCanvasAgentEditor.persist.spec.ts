@@ -10,7 +10,7 @@ import {
   prFeedbackCanvas,
   stagingSaveDeps,
 } from "./useColumnCanvasAgentEditor.testHelpers";
-import { persistColumnAgent } from "./useColumnCanvasAgentEditor";
+import { persistColumnAgent, persistNodeConfiguration } from "./useColumnCanvasAgentEditor";
 
 vi.mock("@/hooks/useCanvasData", () => ({
   canvasKeys: { detail: (organizationId: string, canvasId: string) => ["canvas", organizationId, canvasId] },
@@ -455,5 +455,88 @@ describe("persistColumnAgent", () => {
     expect(stageYaml.mock.calls[2][0].expectedCanvasYaml).toBe("yaml-1");
     expect(showSuccessToast).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalled();
+  });
+});
+
+describe("persistNodeConfiguration", () => {
+  it("stays quiet when the step is already saved", async () => {
+    const { showErrorToast, showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showErrorToast).mockClear();
+    vi.mocked(showSuccessToast).mockClear();
+    const commit = vi.fn().mockRejectedValue(new Error("no staged changes to commit"));
+
+    await persistNodeConfiguration({
+      appId: "app-refund-implementer",
+      canvas: agentCanvas,
+      update: {
+        nodeId: "onrun-implement",
+        name: "On run",
+        configuration: {},
+      },
+      stageYaml: vi.fn().mockResolvedValue({}),
+      commit,
+      invalidate: vi.fn(),
+      ...stagingSaveDeps(),
+    });
+
+    expect(commit).toHaveBeenCalled();
+    expect(showErrorToast).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
+  });
+
+  it("stages one step and leaves the other steps unchanged", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showSuccessToast).mockClear();
+    const stageYaml = vi.fn().mockResolvedValue({});
+    const commit = vi.fn().mockResolvedValue({});
+    const invalidate = vi.fn().mockResolvedValue({});
+    const staging = stagingSaveDeps();
+
+    await persistNodeConfiguration({
+      appId: "app-refund-implementer",
+      canvas: agentCanvas,
+      update: {
+        nodeId: "onrun-implement",
+        name: "On work order",
+        configuration: { repository: "operately/website" },
+      },
+      stageYaml,
+      commit,
+      invalidate,
+      ...staging,
+    });
+
+    const canvasYaml = stageYaml.mock.calls[0][0].canvasYaml as string;
+    const spec = dematerializeCanvasSpec(canvasYaml);
+    const trigger = spec?.nodes?.find((node) => node.id === "onrun-implement");
+    const agent = spec?.nodes?.find((node) => node.id === "implementation-agent");
+    expect(trigger?.name).toBe("On work order");
+    expect(trigger?.configuration).toMatchObject({ repository: "operately/website" });
+    expect(agent?.configuration).toMatchObject({ model: "sonnet" });
+    expect(commit).toHaveBeenCalledWith("Update step");
+    expect(invalidate).toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Step saved.");
+  });
+
+  it("stays quiet when the merge confidence window saves a step", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showSuccessToast).mockClear();
+
+    await persistNodeConfiguration({
+      appId: "app-refund-implementer",
+      canvas: agentCanvas,
+      update: {
+        nodeId: "onrun-implement",
+        name: "On work order",
+        configuration: { repository: "operately/website" },
+      },
+      stageYaml: vi.fn().mockResolvedValue({}),
+      commit: vi.fn().mockResolvedValue({}),
+      invalidate: vi.fn(),
+      notify: false,
+      ...stagingSaveDeps(),
+    });
+
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 });

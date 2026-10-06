@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -165,10 +166,14 @@ func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (
 	}
 
 	content := strings.ReplaceAll(string(raw), factoryCanvasIDPlaceholder, input.appID)
-	content = substituteFactoryInstallParams(content, normalizeFactoryInstallParams(input.installParams))
+	params := normalizeFactoryInstallParams(input.installParams)
+	content = substituteFactoryInstallParams(content, params)
 	canvas, err := yaml.CanvasFromYAML([]byte(content))
 	if err != nil {
 		return nil, fmt.Errorf("parse factory app template: %w", err)
+	}
+	if template.id == "risk-score" {
+		filterDisabledMergeChecks(canvas, params["enabledChecks"])
 	}
 
 	canvas.Metadata.ID = input.appID
@@ -191,6 +196,43 @@ func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (
 		canvasYAML:  string(canvasYAML),
 		consoleYAML: consoleYAML,
 	}, nil
+}
+
+// A check step stays only when setup turned that check on.
+func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
+	allowed := map[string]bool{}
+	if strings.TrimSpace(enabled) != "none" {
+		for _, name := range strings.Split(enabled, ",") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				allowed[name] = true
+			}
+		}
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		if node.ID != "assess-risk" {
+			continue
+		}
+		steps, ok := node.Configuration["steps"].([]any)
+		if !ok {
+			return
+		}
+		kept := make([]any, 0, len(steps))
+		for _, step := range steps {
+			item, isMap := step.(map[string]any)
+			if !isMap {
+				kept = append(kept, step)
+				continue
+			}
+			prompt, _ := item["prompt"].(string)
+			id := runner.MergeCheckID(prompt)
+			if id == "" || allowed[id] {
+				kept = append(kept, step)
+			}
+		}
+		node.Configuration["steps"] = kept
+	}
 }
 
 func normalizeFactoryInstallParams(params map[string]string) map[string]string {

@@ -232,7 +232,7 @@ describe("ColumnAutomationViewPopup", () => {
     expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
     expect(screen.getByTestId("planning-review-settings")).toBeInTheDocument();
     expect(screen.getByText("Concurrency")).toBeInTheDocument();
-    expect(screen.getByText("Model used")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-step-kind-0")).toHaveTextContent("Bash");
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     expect(screen.queryByTestId("planning-review-automation-note")).not.toBeInTheDocument();

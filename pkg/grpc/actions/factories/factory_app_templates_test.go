@@ -162,10 +162,14 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, agent.Configuration, "credentials")
 	assert.NotContains(t, agent.Configuration, "model")
 	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Merge check: risk.")
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
-	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift, reversibility.")
 	assert.Contains(t, prompt, "report_merge_check")
+	assert.Contains(t, prompt, "check is risk.")
+	for _, name := range []string{"Checkout Pull Request", "Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+		implementationStep(t, agent, name)
+	}
 	assert.NotContains(t, prompt, "install_params.riskRules")
 	assert.NotContains(t, prompt, "install_params.enabledChecks")
 	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
@@ -185,6 +189,39 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, result.consoleYAML, "app-risk")
 
 	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Merge confidence",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+			"enabledChecks": "risk",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	implementationStep(t, agent, "Checkout Pull Request")
+	implementationStep(t, agent, "Blast radius")
+	steps, ok := agent.Configuration["steps"].([]any)
+	require.True(t, ok)
+	for _, step := range steps {
+		item, isMap := step.(map[string]any)
+		require.True(t, isMap)
+		assert.NotEqual(t, "Performance", item["name"])
+		assert.NotEqual(t, "Security", item["name"])
+	}
 }
 
 func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
@@ -582,7 +619,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 
 func agentPrompt(t *testing.T, agent *yaml.Node) string {
 	t.Helper()
-	prompt, ok := implementationStep(t, agent, "Review Pull Request")["prompt"].(string)
+	prompt, ok := implementationStep(t, agent, "Blast radius")["prompt"].(string)
 	require.True(t, ok)
 	return prompt
 }
