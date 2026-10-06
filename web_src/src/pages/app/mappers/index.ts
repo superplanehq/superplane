@@ -141,7 +141,11 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import {
+  componentMappers as bitbucketComponentMappers,
+  triggerRenderers as bitbucketTriggerRenderers,
+  eventStateRegistry as bitbucketEventStateRegistry,
+} from "./bitbucket/index";
 import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
@@ -338,6 +342,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
+  bitbucket: bitbucketComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
   jira: jiraComponentMappers,
@@ -441,6 +446,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
+  bitbucket: bitbucketEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   productive: productiveEventStateRegistry,

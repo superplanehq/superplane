@@ -996,6 +996,19 @@ func (c *FactoryContext) currentFactory() (*models.Factory, error) {
 	return models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
 }
 
+// VCSProvider returns the stored Git host. An empty value means GitHub.
+// A canvas that is not owned by a factory has no provider.
+func (c *FactoryContext) VCSProvider() (string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return "", nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return "", err
+	}
+	return factory.OnboardingConfigValue().VCSProvider, nil
+}
+
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {

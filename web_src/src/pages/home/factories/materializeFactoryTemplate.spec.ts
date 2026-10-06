@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import yaml from "js-yaml";
 
-import { getFactoryDefinition } from "./index";
+import { getFactoryDefinition, onboardingEventAppsFor } from "./index";
 import {
   FACTORY_CANVAS_ID_PLACEHOLDER,
   buildFactoryRunParameters,
@@ -164,6 +164,23 @@ spec:
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("{{ install_params.");
     expect(definition.integrations).toEqual(["github", "claude"]);
+  });
+
+  it("uses the Bitbucket integration type for a Bitbucket workspace", () => {
+    const definition = getFactoryDefinition("line-implementation", "bitbucket");
+
+    expect(definition.integrations).toEqual(["bitbucket", "claude"]);
+    expect(Object.keys(definition.componentIntegrations).sort()).toEqual([
+      "bitbucket.createPullRequest",
+      "bitbucket.createPullRequestComment",
+      "bitbucket.findPullRequest",
+      "bitbucket.updatePullRequest",
+    ]);
+  });
+
+  it("installs no GitHub event apps for a Bitbucket workspace", () => {
+    expect(onboardingEventAppsFor("bitbucket")).toEqual([]);
+    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure"]);
   });
 
   it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {

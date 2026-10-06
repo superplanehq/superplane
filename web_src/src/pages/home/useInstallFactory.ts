@@ -47,6 +47,8 @@ export interface InstallFactoryInput {
    * and non-Anthropic providers.
    */
   agentRewrite?: FactoryAgentRewrite;
+  /** Workspace Git host. Empty means GitHub. */
+  vcsProvider?: string;
 }
 
 export type InstallFactoryResult = FactoryCanvasHandle;
@@ -124,7 +126,7 @@ export function useInstallFactory({ organizationId: organizationIdOverride }: Us
         return;
       }
 
-      const definition = getFactoryDefinition(input.factoryId);
+      const definition = getFactoryDefinition(input.factoryId, input.vcsProvider);
       const navigateOnComplete = input.navigateOnComplete !== false;
       const startInitialRun = input.startInitialRun !== false;
       isInstallingRef.current = true;

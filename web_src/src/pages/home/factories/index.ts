@@ -36,10 +36,26 @@ function buildSoftwareFactory(): FactoryDefinition {
 // Onboarding provisions a factory line as focused apps. Each app exposes a
 // single onRun entrypoint that the line calls in order, passing the task
 // through.
-const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.createIssueComment": "github",
-  "github.createPullRequest": "github",
-};
+export type FactoryVCSProvider = "github" | "bitbucket";
+
+export function factoryVCSProvider(provider?: string): FactoryVCSProvider {
+  return provider === "bitbucket" ? "bitbucket" : "github";
+}
+
+function lineAppComponentIntegrations(provider: FactoryVCSProvider): Record<string, string> {
+  if (provider === "bitbucket") {
+    return {
+      "bitbucket.createPullRequest": "bitbucket",
+      "bitbucket.createPullRequestComment": "bitbucket",
+      "bitbucket.findPullRequest": "bitbucket",
+      "bitbucket.updatePullRequest": "bitbucket",
+    };
+  }
+  return {
+    "github.createIssueComment": "github",
+    "github.createPullRequest": "github",
+  };
+}
 
 function buildOnboardingApp(args: {
   id: string;
@@ -68,23 +84,21 @@ function buildOnboardingApp(args: {
   };
 }
 
-function buildLineApp(args: {
-  id: string;
-  title: string;
-  description: string;
-  entrypointNodeId: string;
-}): FactoryDefinition {
+function buildLineApp(
+  args: {
+    id: string;
+    title: string;
+    description: string;
+    entrypointNodeId: string;
+  },
+  provider: FactoryVCSProvider = "github",
+): FactoryDefinition {
   return buildOnboardingApp({
     ...args,
-    integrations: ["github", "claude"],
-    componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
+    integrations: [provider, "claude"],
+    componentIntegrations: lineAppComponentIntegrations(provider),
   });
 }
-
-const EVENT_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.onIssue": "github",
-  "github.onPullRequest": "github",
-};
 
 function buildEventApp(args: {
   id: string;
@@ -97,7 +111,10 @@ function buildEventApp(args: {
     title: args.title,
     description: args.description,
     integrations: ["github"],
-    componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
+    componentIntegrations: {
+      "github.onIssue": "github",
+      "github.onPullRequest": "github",
+    },
     entrypointNodeId: args.triggerNodeId,
   });
 }
@@ -120,6 +137,11 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 // GitHub events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
 export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
+
+// Event apps listen for GitHub webhooks. Other providers have no event app templates yet.
+export function onboardingEventAppsFor(vcsProvider?: string): readonly string[] {
+  return factoryVCSProvider(vcsProvider) === "github" ? ONBOARDING_EVENT_APPS : [];
+}
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -145,12 +167,28 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
 
 export const DEFAULT_FACTORY_ID = "software-factory";
 
-export function getFactoryDefinition(id: string = DEFAULT_FACTORY_ID): FactoryDefinition {
-  const definition = FACTORY_BY_ID[id];
+export function getFactoryDefinition(id: string = DEFAULT_FACTORY_ID, vcsProvider?: string): FactoryDefinition {
+  const provider = factoryVCSProvider(vcsProvider);
+  const definition = provider === "github" ? FACTORY_BY_ID[id] : factoryDefinitionForProvider(id, provider);
   if (!definition) {
     throw new Error(`Unknown factory definition: ${id}`);
   }
   return definition;
+}
+
+function factoryDefinitionForProvider(id: string, provider: FactoryVCSProvider): FactoryDefinition | undefined {
+  if (id === "line-implementation") {
+    return buildLineApp(
+      {
+        id: "line-implementation",
+        title: "Implement",
+        description: "Create a branch, implement the task, and open a pull request.",
+        entrypointNodeId: "onrun-implement",
+      },
+      provider,
+    );
+  }
+  return FACTORY_BY_ID[id];
 }
 
 export function listFactoryDefinitions(): FactoryDefinition[] {

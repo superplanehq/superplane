@@ -39,7 +39,7 @@ export function sphereFor(
 ): FirstRunSphereProps {
   const copy = FIRST_RUN_COPY.sphere;
   if (screen === "welcome") return { level: 0.14, caption: copy.captionSetup };
-  if (screen === "connect") {
+  if (screen === "host" || screen === "connect") {
     return {
       level: 0.24,
       caption: copy.captionConnect,

@@ -15,7 +15,7 @@ import (
 )
 
 func TestMaterializeFactoryTemplate(t *testing.T) {
-	result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Implement refunds",
 		installParams: map[string]string{
@@ -40,8 +40,9 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 
 	entrypoint := findYAMLNode(t, canvas, "onrun-implement")
 	assert.Equal(t, map[string]any{
-		"id":      "line-implementation",
-		"version": float64(factoryTemplateVersion),
+		"id":       "line-implementation",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 
 	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
@@ -123,7 +124,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 }
 
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
-	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
 		appID:   "app-risk",
 		appName: "Merge confidence",
 		installParams: map[string]string{
@@ -146,8 +147,9 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
 	assert.Equal(t, map[string]any{
-		"id":      "risk-score",
-		"version": float64(factoryTemplateVersion),
+		"id":       "risk-score",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
@@ -227,7 +229,7 @@ func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
 func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
-			seed, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+			seed, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 				appID:   "app-1",
 				appName: "Implement",
 			})
@@ -239,7 +241,7 @@ func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
 			includeVisualEvidence := canvasAgentIncludesVisualEvidence(live.Nodes())
 			assert.Equal(t, enabled, includeVisualEvidence)
 
-			result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+			result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 				appID:                 "app-1",
 				appName:               "Implement",
 				includeVisualEvidence: &includeVisualEvidence,
@@ -270,7 +272,7 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 						"includeVisualEvidence": enabled,
 					},
 				}}},
-				factoryAppTemplates["line-implementation"],
+				mustFactoryAppTemplate(t, "line-implementation"),
 			)
 			require.NotNil(t, input.includeVisualEvidence)
 			assert.Equal(t, enabled, *input.includeVisualEvidence)
@@ -303,7 +305,7 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 		nil,
 		&models.Canvas{ID: uuid.New(), Name: "Implement"},
 		&models.CanvasVersion{Nodes: nodes},
-		factoryAppTemplates["line-implementation"],
+		mustFactoryAppTemplate(t, "line-implementation"),
 	)
 	require.NotNil(t, input.includeVisualEvidence)
 	assert.False(t, *input.includeVisualEvidence)
@@ -404,7 +406,7 @@ func visualEvidenceCaseName(enabled bool) string {
 }
 
 func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
-	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("pr-closure", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "PR Closure",
 		installParams: map[string]string{
@@ -451,12 +453,19 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.NotContains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "reject-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
 }
 
+func mustFactoryAppTemplate(t *testing.T, id string) factoryAppTemplate {
+	t.Helper()
+	template, ok := lookupFactoryAppTemplate(id, "")
+	require.True(t, ok)
+	return template
+}
+
 func TestMaterializeFactoryTemplates(t *testing.T) {
-	for id := range factoryAppTemplates {
-		t.Run(id, func(t *testing.T) {
-			result, err := materializeFactoryTemplate(id, factoryTemplateInput{
+	for key, template := range factoryAppTemplates {
+		t.Run(key.provider+"/"+key.id, func(t *testing.T) {
+			result, err := materializeFactoryTemplate(template.id, template.provider, factoryTemplateInput{
 				appID:   "app-1",
-				appName: id,
+				appName: template.id,
 				installParams: map[string]string{
 					"appRepository":     "acme/app",
 					"backlogRepository": "acme/backlog",
@@ -475,8 +484,49 @@ func TestMaterializeFactoryTemplates(t *testing.T) {
 	}
 }
 
+func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
+	result, err := materializeFactoryTemplate("line-implementation", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-1",
+		appName: "Implement",
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	entrypoint := findYAMLNode(t, canvas, "onrun-implement")
+	assert.Equal(t, models.ProviderBitbucket, entrypoint.Metadata[factoryTemplateMetadataKey].(map[string]any)["provider"])
+
+	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
+	assert.Equal(t, []any{map[string]any{
+		"source":      "integration",
+		"integration": map[string]any{"name": "acme-bitbucket"},
+	}}, agent.Configuration["environmentFrom"])
+
+	bitbucket := &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}
+	for nodeID, component := range map[string]string{
+		"find-pr":                         "bitbucket.findPullRequest",
+		"create-pr":                       "bitbucket.createPullRequest",
+		"update-pr":                       "bitbucket.updatePullRequest",
+		"comment-visual-evidence":         "bitbucket.createPullRequestComment",
+		"comment-visual-evidence-updated": "bitbucket.createPullRequestComment",
+	} {
+		node := findYAMLNode(t, canvas, nodeID)
+		assert.Equal(t, component, node.Component, nodeID)
+		assert.Equal(t, bitbucket, node.Integration, nodeID)
+	}
+
+	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
+	assert.Equal(t, "bitbucket", attach.Configuration["provider"])
+	assert.Equal(t, `{{ $["Create Pull Request"].data.links.html.href }}`, attach.Configuration["url"])
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+}
+
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
-	_, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
+	_, err := materializeFactoryTemplate("line-planning", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Plan",
 	})
