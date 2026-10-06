@@ -1092,7 +1092,11 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not resolve the workspace: %w", err)
 	}
 	config := owningFactory.OnboardingConfigValue()
-	repository, defaultBranch := resolveOrderRepository(order, config)
+	repository, defaultBranch, repositoryFromOrder := resolveOrderRepository(order, config)
+	provider := config.EffectiveVCSProvider()
+	if repositoryFromOrder {
+		provider = orderRepositoryProvider(order)
+	}
 	payload := map[string]any{
 		"id":             order.ID.String(),
 		"title":          order.Title,
@@ -1101,7 +1105,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
-		"repository_url": models.VCSRepositoryCloneURL(config.EffectiveVCSProvider(), repository),
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository),
 		"default_branch": defaultBranch,
 		// Keep this compatibility value until stored canvases no longer reference it.
 		"visual_evidence_enabled": false,
@@ -1272,11 +1276,11 @@ func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[s
 
 // resolveOrderRepository keeps orders created before repository snapshots
 // compatible with workflow templates that use order().repository.
-func resolveOrderRepository(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) (string, string) {
+func resolveOrderRepository(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) (string, string, bool) {
 	repository := stringValue(order.Repository)
 	defaultBranch := stringValue(order.DefaultBranch)
 	if repository != "" && defaultBranch != "" {
-		return repository, defaultBranch
+		return repository, defaultBranch, true
 	}
 
 	// Repository and branch are one snapshot. Do not combine a saved value
@@ -1287,7 +1291,7 @@ func resolveOrderRepository(order *models.FactoryWorkOrder, config models.Factor
 		defaultBranch = "main"
 	}
 
-	return repository, defaultBranch
+	return repository, defaultBranch, false
 }
 
 func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {

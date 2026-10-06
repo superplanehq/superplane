@@ -115,6 +115,56 @@ func TestWorkOrderCreatedPayloadUsesBitbucketCloneURL(t *testing.T) {
 	assert.Equal(t, "https://bitbucket.org/acme/widgets.git", workOrder["repository_url"])
 }
 
+func TestWorkOrderCreatedPayloadKeepsRepositoryHost(t *testing.T) {
+	r := support.Setup(t)
+
+	db := database.Conn()
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	appRepo := "acme/widgets"
+	defaultBranch := "main"
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AppRepository: &appRepo,
+		DefaultBranch: &defaultBranch,
+	}))
+
+	githubOrder, err := factoryModel.CreateWorkOrder(db, "Score this", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	bitbucket := models.ProviderBitbucket
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &bitbucket,
+	}))
+
+	githubOrder, err = factoryModel.FindWorkOrder(db, githubOrder.ID)
+	require.NoError(t, err)
+	githubPayload, ok := workOrderCreatedPayload(db, githubOrder)["workOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "acme/widgets", githubPayload["repository"])
+	assert.Equal(t, "https://github.com/acme/widgets.git", githubPayload["repository_url"])
+
+	bitbucketOrder, err := factoryModel.CreateWorkOrder(db, "Score that", "A ticket", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	github := models.ProviderGitHub
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &github,
+	}))
+
+	bitbucketOrder, err = factoryModel.FindWorkOrder(db, bitbucketOrder.ID)
+	require.NoError(t, err)
+	bitbucketPayload, ok := workOrderCreatedPayload(db, bitbucketOrder)["workOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "https://bitbucket.org/acme/widgets.git", bitbucketPayload["repository_url"])
+
+	githubOrder, err = factoryModel.FindWorkOrder(db, githubOrder.ID)
+	require.NoError(t, err)
+	githubPayload, ok = workOrderCreatedPayload(db, githubOrder)["workOrder"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/acme/widgets.git", githubPayload["repository_url"])
+}
+
 func TestWorkOrderCreatedPayloadSnapshotsTaskRefinementFeature(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
