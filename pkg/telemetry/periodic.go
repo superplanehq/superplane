@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -136,6 +137,7 @@ func (p *Periodic) reportPendingExecutions() {
 func (p *Periodic) reportRunnerCounts() {
 	counts, err := models.ListRunnerCountsByFleetState(database.DB(p.ctx))
 	if err != nil {
+		log.WithError(err).Error("failed to report runner counts")
 		return
 	}
 
@@ -147,6 +149,7 @@ func (p *Periodic) reportRunnerCounts() {
 func (p *Periodic) reportRunnerTaskCounts() {
 	counts, err := models.ListRunnerTaskCountsByFleetState(database.DB(p.ctx))
 	if err != nil {
+		log.WithError(err).Error("failed to report runner task counts")
 		return
 	}
 

@@ -22,15 +22,20 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 	require.NoError(t, err)
 
 	db := database.DB(t.Context())
-	fleet := &models.RunnerFleet{
-		ID:            uuid.New(),
-		Slug:          "metrics-amd64",
-		ScopeType:     models.RunnerFleetScopeInstallation,
-		Enabled:       true,
-		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
-		RunnerVersion: "0.1.0",
+	createFleet := func(slug string) *models.RunnerFleet {
+		fleet := &models.RunnerFleet{
+			ID:            uuid.New(),
+			Slug:          slug,
+			ScopeType:     models.RunnerFleetScopeInstallation,
+			Enabled:       true,
+			Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+			RunnerVersion: "0.1.0",
+		}
+		require.NoError(t, fleet.Create(db))
+		return fleet
 	}
-	require.NoError(t, fleet.Create(db))
+	fleet := createFleet("metrics-amd64")
+	secondFleet := createFleet("metrics-arm64")
 
 	now := time.Now()
 	for _, state := range []string{
@@ -56,6 +61,16 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 		UpdatedAt:     now,
 		TerminatedAt:  &now,
 	}).Error)
+	for range 2 {
+		require.NoError(t, db.Create(&models.Runner{
+			ID:            uuid.New(),
+			FleetID:       secondFleet.ID,
+			State:         models.RunnerStateIdle,
+			RunnerVersion: secondFleet.RunnerVersion,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}).Error)
+	}
 
 	for _, state := range []string{
 		models.RunnerTaskStateQueued,
@@ -86,6 +101,19 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}).Error)
+	for range 2 {
+		require.NoError(t, db.Create(&models.RunnerTask{
+			ID:                uuid.New(),
+			OrganizationID:    organization.ID,
+			FleetID:           secondFleet.ID,
+			Backend:           models.RunnerTaskBackendIntegrated,
+			State:             models.RunnerTaskStateReserved,
+			PayloadCiphertext: []byte("ciphertext"),
+			QueuedAt:          now,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}).Error)
+	}
 
 	reader := sdkmetric.NewManualReader()
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
@@ -116,6 +144,18 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 		models.RunnerTaskStateReserved: 0,
 		models.RunnerTaskStateRunning:  1,
 	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, fleet))
+
+	require.Equal(t, map[string]int64{
+		models.RunnerStatePending: 0,
+		models.RunnerStateIdle:    2,
+		models.RunnerStateBusy:    0,
+	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, secondFleet))
+
+	require.Equal(t, map[string]int64{
+		models.RunnerTaskStateQueued:   0,
+		models.RunnerTaskStateReserved: 2,
+		models.RunnerTaskStateRunning:  0,
+	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, secondFleet))
 }
 
 func gaugeStateCounts(
@@ -143,7 +183,9 @@ func gaugeStateCounts(
 				require.True(t, hasFleetID)
 				require.True(t, hasFleetSlug)
 				require.True(t, hasState)
-				require.Equal(t, fleet.ID.String(), fleetID.AsString())
+				if fleetID.AsString() != fleet.ID.String() {
+					continue
+				}
 				require.Equal(t, fleet.Slug, fleetSlug.AsString())
 				counts[state.AsString()] = point.Value
 			}
