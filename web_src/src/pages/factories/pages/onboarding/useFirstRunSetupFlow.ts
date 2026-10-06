@@ -1,7 +1,11 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_BITBUCKET,
+  FEATURE_FACTORY_JIRA_INTAKE,
+  FEATURE_FACTORY_LINEAR_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -13,7 +17,7 @@ import {
   issuesChoiceForTicketSource,
   ticketSourceFromIssuesChoice,
 } from "./first-run/firstRunTicketSource";
-import { type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import { type IntegrationId, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 import {
   onboardingAgentGate,
   type OnboardingAgentCredentialChoice,
@@ -39,7 +43,7 @@ import {
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
-export type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
+export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent";
 export { DEFAULT_TICKET_SOURCE };
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
@@ -49,6 +53,7 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   name: "agent",
 };
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
+  host: "vcs",
   connect: "vcs",
   choose: "repo",
   tickets: "issues",
@@ -87,6 +92,22 @@ function screenWithGitHubConnection(
   return screen;
 }
 
+// The host screen comes before any connection. A Bitbucket workspace does not
+// need GitHub, and its repository screen connects Bitbucket itself.
+function screenWithVcsConnection(
+  screen: FirstRunScreen,
+  vcsHost: VcsHostId | null,
+  github: Parameters<typeof screenWithGitHubConnection>[1],
+  bitbucket: { available: boolean; loading: boolean },
+): FirstRunScreen {
+  if (screen === "host") return screen;
+  if (vcsHost === "bitbucket") {
+    if (!bitbucket.loading && !bitbucket.available && screen !== "welcome") return "host";
+    return screen === "connect" ? "choose" : screen;
+  }
+  return screenWithGitHubConnection(screen, github);
+}
+
 function screenWithoutAgent(screen: FirstRunScreen, agentGate: OnboardingAgentGate): FirstRunScreen {
   if (screen !== "agent" || agentGate === "show" || agentGate === "first") return screen;
   return "tickets";
@@ -120,6 +141,7 @@ function useFirstRunNavigation(
   agentGate: OnboardingAgentGate,
   connection: GitHubConnectionState,
   githubReady: boolean,
+  bitbucket: { available: boolean; loading: boolean },
 ) {
   const [searchParams] = useSearchParams();
   const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(() =>
@@ -142,12 +164,17 @@ function useFirstRunNavigation(
     setRequestedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const availableScreen = screenWithGitHubConnection(openedScreen, {
-    pending: connection.onboarding.isPending,
-    identity: Boolean(connection.identity),
-    ready: githubReady,
-    stayOnConnect,
-  });
+  const availableScreen = screenWithVcsConnection(
+    openedScreen,
+    model.setup.vcsHost,
+    {
+      pending: connection.onboarding.isPending,
+      identity: Boolean(connection.identity),
+      ready: githubReady,
+      stayOnConnect,
+    },
+    bitbucket,
+  );
 
   const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
@@ -208,19 +235,47 @@ function useFirstRunCommands(args: {
   blocking: FirstRunBlocking;
   jiraAvailable: boolean;
   linearAvailable: boolean;
+  bitbucketAvailable: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable, linearAvailable, installScope } = args;
+  const {
+    model,
+    agentGate,
+    connection,
+    navigation,
+    blocking,
+    jiraAvailable,
+    linearAvailable,
+    bitbucketAvailable,
+    installScope,
+  } = args;
   const location = useLocation();
+  const saveRepository = async (): Promise<boolean> => {
+    const selectedRepo = model.setup.selectedRepo;
+    if (!selectedRepo) return false;
+    if (model.setup.vcsHost === "bitbucket") {
+      model.setup.commitRepoStep();
+      return model.selectBitbucketRepository(selectedRepo);
+    }
+    const repository = connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
+    if (!repository) return false;
+    model.setup.commitRepoStep();
+    return model.selectCatalogRepository(repository);
+  };
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
-      const repository = connection.repositories.find((candidate) => candidate.fullName === model.setup.selectedRepo);
-      if (!repository) return;
-      model.setup.commitRepoStep();
-      if (await model.selectCatalogRepository(repository)) {
+      if (await saveRepository()) {
         navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
       }
     });
+  const chooseVcsHost = (host: VcsHostId) => {
+    if (host === "gitlab" || (host === "bitbucket" && !bitbucketAvailable)) return;
+    model.setup.selectVcsHost(host);
+    navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
+  };
+  const connectBitbucket = () => {
+    void model.requestConnect("bitbucket");
+  };
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
       const issuesChoice = selectedIssuesChoice(model, jiraAvailable, linearAvailable);
@@ -288,6 +343,8 @@ function useFirstRunCommands(args: {
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
   return {
+    chooseVcsHost,
+    connectBitbucket,
     connectGitHub,
     connectJira,
     connectLinear,
@@ -406,13 +463,15 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const linearFeatureLoading = intakeFeatureLoading;
   const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
   const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
+  const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
+  const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady);
+  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, bitbucket);
   const commands = useFirstRunCommands({
     model,
     agentGate,
@@ -421,6 +480,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
     jiraAvailable,
     linearAvailable,
+    bitbucketAvailable,
     installScope,
   });
   // A saved Jira choice is not valid when the organization does not have the
@@ -453,6 +513,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   return {
     ...navigation,
     ...commands,
+    vcsHost: model.setup.vcsHost,
+    bitbucketAvailable,
+    bitbucketFeatureLoading: intakeFeatureLoading,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
