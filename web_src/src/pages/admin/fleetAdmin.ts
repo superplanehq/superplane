@@ -49,6 +49,7 @@ export type BrokerTask = {
 };
 
 export const REFRESH_INTERVAL_MS = 5000;
+export const FLEET_REQUEST_TIMEOUT_MS = 30_000;
 export const PAGE_SIZE = 50;
 export const RUNNER_STATES = ["idle", "busy"];
 export const TASK_STATES = ["queued", "reserved", "running"];
@@ -133,15 +134,15 @@ export const nextCursor = (current: string[], lastId: string | undefined, hasNex
 
 export const previousCursor = (current: string[]) => current.slice(0, -1);
 
-const adminFetch = (url: string) => fetch(url, { credentials: "include" });
+const adminFetch = (url: string, signal?: AbortSignal) => fetch(url, { credentials: "include", signal });
 
 const readError = async (response: Response, fallback: string) => {
   const text = await response.text();
   return text.trim() || fallback;
 };
 
-export const fetchInstallationFleets = async () => {
-  const response = await adminFetch("/admin/api/installation/fleets");
+export const fetchInstallationFleets = async (signal?: AbortSignal) => {
+  const response = await adminFetch("/admin/api/installation/fleets", signal);
   if (!response.ok) {
     throw new Error(await readError(response, "Failed to load fleets"));
   }
@@ -180,11 +181,12 @@ export const fetchFleetDetails = async (
   fleetId: string,
   runnerCursor: string | null,
   taskCursor: string | null,
+  signal?: AbortSignal,
 ): Promise<FleetDetails> => {
   const [capacityResponse, runnerResponse, taskResponse] = await Promise.all([
-    adminFetch(fleetURL(fleetId, "/capacity")),
-    adminFetch(`${fleetURL(fleetId, "/runners")}?${listQuery(RUNNER_STATES, runnerCursor)}`),
-    adminFetch(`${fleetURL(fleetId, "/tasks")}?${listQuery(TASK_STATES, taskCursor)}`),
+    adminFetch(fleetURL(fleetId, "/capacity"), signal),
+    adminFetch(`${fleetURL(fleetId, "/runners")}?${listQuery(RUNNER_STATES, runnerCursor)}`, signal),
+    adminFetch(`${fleetURL(fleetId, "/tasks")}?${listQuery(TASK_STATES, taskCursor)}`, signal),
   ]);
   if (!capacityResponse.ok || !runnerResponse.ok || !taskResponse.ok) {
     throw new Error("Failed to load fleet");

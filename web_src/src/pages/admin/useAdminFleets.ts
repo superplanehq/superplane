@@ -2,6 +2,7 @@ import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
+  FLEET_REQUEST_TIMEOUT_MS,
   REFRESH_INTERVAL_MS,
   type BrokerTask,
   type FleetCapacity,
@@ -15,6 +16,69 @@ import {
   selectedFleetIdAfterRefresh,
 } from "./fleetAdmin";
 
+type ActivePoll = {
+  generation: number;
+  inFlight: boolean;
+  abort: AbortController | null;
+  timeout: ReturnType<typeof window.setTimeout> | null;
+};
+
+type DetailQuery = {
+  fleetId: string;
+  runnerCursor: string | null;
+  taskCursor: string | null;
+};
+
+const createPoll = (): ActivePoll => ({
+  generation: 0,
+  inFlight: false,
+  abort: null,
+  timeout: null,
+});
+
+const stopPoll = (poll: ActivePoll) => {
+  poll.generation += 1;
+  poll.inFlight = false;
+  poll.abort?.abort();
+  poll.abort = null;
+  if (poll.timeout !== null) {
+    window.clearTimeout(poll.timeout);
+    poll.timeout = null;
+  }
+};
+
+const startPoll = (poll: ActivePoll) => {
+  stopPoll(poll);
+  const abort = new AbortController();
+  const requestID = poll.generation;
+  poll.abort = abort;
+  poll.inFlight = true;
+  poll.timeout = window.setTimeout(() => {
+    if (poll.generation !== requestID) {
+      return;
+    }
+    stopPoll(poll);
+  }, FLEET_REQUEST_TIMEOUT_MS);
+  return { requestID, signal: abort.signal };
+};
+
+const isCurrentPoll = (poll: ActivePoll, requestID: number) => poll.generation === requestID;
+
+const finishPoll = (poll: ActivePoll, requestID: number) => {
+  if (!isCurrentPoll(poll, requestID)) {
+    return;
+  }
+  poll.inFlight = false;
+  poll.abort = null;
+  if (poll.timeout !== null) {
+    window.clearTimeout(poll.timeout);
+    poll.timeout = null;
+  }
+};
+
+const sameDetailQuery = (left: DetailQuery, right: DetailQuery) =>
+  left.fleetId === right.fleetId && left.runnerCursor === right.runnerCursor && left.taskCursor === right.taskCursor;
+
 export const useAdminFleets = () => {
   const catalog = useFleetCatalog();
   const records = useFleetRecords(catalog.selectedFleetId);
@@ -27,6 +91,7 @@ const useFleetCatalog = () => {
   const [selectedFleetId, setSelectedFleetId] = useState<string | null>(null);
   const [fleetLoadFailed, setFleetLoadFailed] = useState(false);
   const selectedFleetIdRef = useRef<string | null>(null);
+  const catalogPoll = useRef(createPoll()).current;
 
   const chooseFleet = useCallback((fleetId: string | null) => {
     if (selectedFleetIdRef.current === fleetId) {
@@ -36,42 +101,39 @@ const useFleetCatalog = () => {
     setSelectedFleetId(fleetId);
   }, []);
 
-  const catalogRequest = useRef(0);
-  const catalogInFlight = useRef(false);
-
   const loadFleets = useCallback(async () => {
-    if (catalogInFlight.current) {
+    if (catalogPoll.inFlight) {
       return;
     }
-    catalogInFlight.current = true;
-    const requestID = ++catalogRequest.current;
+    const { requestID, signal } = startPoll(catalogPoll);
     try {
-      const nextFleets = await fetchInstallationFleets();
-      if (requestID !== catalogRequest.current) {
+      const nextFleets = await fetchInstallationFleets(signal);
+      if (!isCurrentPoll(catalogPoll, requestID)) {
         return;
       }
       setFleetLoadFailed(false);
       setFleets(nextFleets);
       chooseFleet(selectedFleetIdAfterRefresh(selectedFleetIdRef.current, nextFleets));
     } catch (error) {
-      if (requestID !== catalogRequest.current) {
+      if (!isCurrentPoll(catalogPoll, requestID) || signal.aborted) {
         return;
       }
       showErrorToast(error instanceof Error ? error.message : "Failed to load fleets");
       setFleetLoadFailed(true);
       setFleets((current) => current ?? []);
     } finally {
-      if (requestID === catalogRequest.current) {
-        catalogInFlight.current = false;
-      }
+      finishPoll(catalogPoll, requestID);
     }
-  }, [chooseFleet]);
+  }, [catalogPoll, chooseFleet]);
 
   useEffect(() => {
     void loadFleets();
     const interval = window.setInterval(() => void loadFleets(), REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [loadFleets]);
+    return () => {
+      window.clearInterval(interval);
+      stopPoll(catalogPoll);
+    };
+  }, [catalogPoll, loadFleets]);
 
   return { fleets, selectedFleetId, fleetLoadFailed, chooseFleet };
 };
@@ -83,15 +145,17 @@ const useFleetRecords = (selectedFleetId: string | null) => {
   const [runners, setRunners] = useState<RecordPage<FleetRunner> | null>(null);
   const [tasks, setTasks] = useState<RecordPage<FleetTask> | null>(null);
   const [cursorFleetId, setCursorFleetId] = useState<string | null>(null);
-  const detailsRequest = useRef(0);
-  const detailsInFlight = useRef(false);
+  const detailsPoll = useRef(createPoll()).current;
+  const detailsQuery = useRef<DetailQuery | null>(null);
   const selectedFleetIdRef = useRef(selectedFleetId);
+  const runnerCursorRef = useRef<string | null>(null);
+  const taskCursorRef = useRef<string | null>(null);
   selectedFleetIdRef.current = selectedFleetId;
 
   useLayoutEffect(() => {
-    detailsRequest.current += 1;
-    detailsInFlight.current = false;
-  }, [selectedFleetId]);
+    stopPoll(detailsPoll);
+    detailsQuery.current = null;
+  }, [detailsPoll, selectedFleetId]);
 
   useEffect(() => {
     setCursorFleetId(selectedFleetId);
@@ -102,34 +166,43 @@ const useFleetRecords = (selectedFleetId: string | null) => {
     setCapacity(null);
   }, [selectedFleetId]);
 
-  const loadDetails = useCallback(async (fleetId: string, runnerCursor: string | null, taskCursor: string | null) => {
-    if (detailsInFlight.current) {
-      return;
-    }
-    detailsInFlight.current = true;
-    const requestID = ++detailsRequest.current;
-    try {
-      const details = await fetchFleetDetails(fleetId, runnerCursor, taskCursor);
-      if (requestID !== detailsRequest.current || fleetId !== selectedFleetIdRef.current) {
+  const loadDetails = useCallback(
+    async (fleetId: string, runnerCursor: string | null, taskCursor: string | null) => {
+      const query = { fleetId, runnerCursor, taskCursor };
+      if (detailsPoll.inFlight && detailsQuery.current && sameDetailQuery(detailsQuery.current, query)) {
         return;
       }
-      setCapacity(details.capacity);
-      setRunners(details.runners);
-      setTasks(details.tasks);
-    } catch (error) {
-      if (requestID !== detailsRequest.current || fleetId !== selectedFleetIdRef.current) {
-        return;
+      const { requestID, signal } = startPoll(detailsPoll);
+      detailsQuery.current = query;
+      const matchesQuery = () =>
+        isCurrentPoll(detailsPoll, requestID) &&
+        fleetId === selectedFleetIdRef.current &&
+        runnerCursor === runnerCursorRef.current &&
+        taskCursor === taskCursorRef.current;
+      try {
+        const details = await fetchFleetDetails(fleetId, runnerCursor, taskCursor, signal);
+        if (!matchesQuery()) {
+          return;
+        }
+        setCapacity(details.capacity);
+        setRunners(details.runners);
+        setTasks(details.tasks);
+      } catch (error) {
+        if (!matchesQuery() || signal.aborted) {
+          return;
+        }
+        showErrorToast(error instanceof Error ? error.message : "Failed to load fleet");
+      } finally {
+        finishPoll(detailsPoll, requestID);
       }
-      showErrorToast(error instanceof Error ? error.message : "Failed to load fleet");
-    } finally {
-      if (requestID === detailsRequest.current) {
-        detailsInFlight.current = false;
-      }
-    }
-  }, []);
+    },
+    [detailsPoll],
+  );
 
   const runnerCursor = runnerCursors.at(-1) ?? null;
   const taskCursor = taskCursors.at(-1) ?? null;
+  runnerCursorRef.current = runnerCursor;
+  taskCursorRef.current = taskCursor;
   const cursorsReady = cursorFleetId === selectedFleetId;
 
   useEffect(() => {
@@ -140,8 +213,12 @@ const useFleetRecords = (selectedFleetId: string | null) => {
     const interval = window.setInterval(() => {
       void loadDetails(selectedFleetId, runnerCursor, taskCursor);
     }, REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [cursorsReady, loadDetails, runnerCursor, selectedFleetId, taskCursor]);
+    return () => {
+      window.clearInterval(interval);
+      stopPoll(detailsPoll);
+      detailsQuery.current = null;
+    };
+  }, [cursorsReady, detailsPoll, loadDetails, runnerCursor, selectedFleetId, taskCursor]);
 
   return { capacity, runners, tasks, runnerCursors, taskCursors, setRunnerCursors, setTaskCursors };
 };
