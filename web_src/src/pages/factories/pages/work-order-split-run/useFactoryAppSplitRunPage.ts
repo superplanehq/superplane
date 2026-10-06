@@ -22,6 +22,7 @@ import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
 import { columnAppsFromFactoryApps } from "./splitRunMocks";
+import { useColumnAppCheckRuns } from "./useColumnAppCheckRuns";
 import {
   fixtureForSplitRunPage,
   phaseForSplitRunCanvas,
@@ -69,7 +70,18 @@ function useSplitRunWorkOrderExtras(
   // is known to be analyzing before its run appears in `analysisRuns`, so the
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
-  return { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing };
+  const columnApps = useMemo(() => columnAppsFromFactoryApps(factoryApps), [factoryApps]);
+  const columnAppCheckRuns = useColumnAppCheckRuns(orderChecks, columnApps, pullRequests);
+  return {
+    orderChecks,
+    artifacts,
+    prFeedbackRuns,
+    analysisRuns,
+    factoryApps,
+    isAnalyzing,
+    columnApps,
+    columnAppCheckRuns,
+  };
 }
 
 export function useFactoryAppSplitRunPage() {
@@ -80,24 +92,32 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
-  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, factoryApps, isAnalyzing } = useSplitRunWorkOrderExtras(
-    organizationId,
-    factoryId,
-    order,
-    liveWorkOrder.data,
-  );
+  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, columnApps, columnAppCheckRuns } =
+    useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
         prFeedbackRuns,
         analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
+        columnApps,
         artifacts,
         isAnalyzing,
         resolveUser,
+        columnAppRuns: columnAppCheckRuns.lookup,
       }),
-    [order, orderChecks, artifacts, factoryApps, prFeedbackRuns, analysisRuns, isAnalyzing, query.lineId, resolveUser],
+    [
+      order,
+      orderChecks,
+      artifacts,
+      columnApps,
+      prFeedbackRuns,
+      analysisRuns,
+      isAnalyzing,
+      query.lineId,
+      resolveUser,
+      columnAppCheckRuns.lookup,
+    ],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
@@ -168,6 +188,7 @@ export function useFactoryAppSplitRunPage() {
     streamLoading: live.isLoading,
     subtitle: resolveFactoryAppCanvasSubtitle({ factoryName: factory?.name }),
     files: liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined,
+    columnAppRunQueries: columnAppCheckRuns.queries,
   };
 }
 
