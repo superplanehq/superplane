@@ -55,6 +55,10 @@ authentication:
     enabled: true
     clientId: ""
     clientSecret: ""
+  bitbucket:
+    enabled: false
+    clientId: ""
+    clientSecret: ""
   google:
     enabled: true
     clientId: ""

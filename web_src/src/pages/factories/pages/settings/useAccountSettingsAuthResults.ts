@@ -19,10 +19,12 @@ export function useAccountSettingsAuthResults(refreshAccount: () => Promise<void
     }
 
     if (error === "linked_account_in_use") {
-      showErrorToast("Another member in one of your organizations already uses this GitHub account.");
+      showErrorToast(
+        `Another member in one of your organizations already uses this ${linkedAccountProviderLabel(params.get("provider"))} account.`,
+      );
     }
     if (linkedAccount === "linked") {
-      showSuccessToast("GitHub account linked.");
+      showSuccessToast(`${linkedAccountProviderLabel(params.get("provider"))} account linked.`);
       void refreshAccount();
     }
 
@@ -34,4 +36,8 @@ export function useAccountSettingsAuthResults(refreshAccount: () => Promise<void
   }, [location.pathname, location.search, navigate, refreshAccount]);
 
   return location;
+}
+
+function linkedAccountProviderLabel(provider: string | null): "GitHub" | "Bitbucket" {
+  return provider === "bitbucket" ? "Bitbucket" : "GitHub";
 }

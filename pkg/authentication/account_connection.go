@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -27,7 +28,12 @@ const (
 // connectableProviders lists the services that hold activity SuperPlane can
 // attribute to a member. A linked account is not a sign-in method, so a
 // provider that only proves identity does not belong here.
-var connectableProviders = []string{models.ProviderGitHub}
+var connectableProviders = []string{models.ProviderGitHub, models.ProviderBitbucket}
+
+// connectOnlyProviders can be linked, but they never start a sign-in.
+var connectOnlyProviders = []string{models.ProviderBitbucket}
+
+const connectOnlySignInRejected = "Bitbucket is not a sign-in method"
 
 type connectState struct {
 	AccountID string
@@ -43,6 +49,20 @@ func isConnectableProvider(provider string) bool {
 	return slices.ContainsFunc(connectableProviders, func(candidate string) bool {
 		return strings.EqualFold(candidate, provider)
 	})
+}
+
+func isConnectOnlyProvider(provider string) bool {
+	return slices.ContainsFunc(connectOnlyProviders, func(candidate string) bool {
+		return strings.EqualFold(candidate, provider)
+	})
+}
+
+func rejectsConnectOnlySignIn(r *http.Request) bool {
+	return isConnectOnlyProvider(mux.Vars(r)["provider"]) && !isConnectIntent(r)
+}
+
+func rejectConnectOnlySignIn(w http.ResponseWriter) {
+	http.Error(w, connectOnlySignInRejected, http.StatusForbidden)
 }
 
 func (a *Handler) signConnectState(accountID, provider, redirectURL string) (string, error) {
@@ -116,9 +136,9 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Provider returned no username", http.StatusBadGateway)
 		return
 	}
-	providerID := strings.TrimSpace(gothUser.UserID)
-	if numericID, parseErr := strconv.ParseInt(providerID, 10, 64); parseErr != nil || numericID <= 0 {
-		http.Error(w, "GitHub returned an invalid user ID", http.StatusBadGateway)
+	providerID, err := linkedAccountProviderID(gothUser)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -168,6 +188,23 @@ func (a *Handler) finishAccountConnection(w http.ResponseWriter, r *http.Request
 	}
 
 	a.completeAccountConnection(w, r, gothUser, state)
+}
+
+func linkedAccountProviderID(gothUser goth.User) (string, error) {
+	providerID := strings.TrimSpace(gothUser.UserID)
+	if strings.EqualFold(gothUser.Provider, models.ProviderBitbucket) {
+		parsed, err := uuid.Parse(providerID)
+		if err != nil {
+			return "", errors.New("Bitbucket returned an invalid account UUID")
+		}
+		return parsed.String(), nil
+	}
+
+	numericID, err := strconv.ParseInt(providerID, 10, 64)
+	if err != nil || numericID <= 0 {
+		return "", errors.New("GitHub returned an invalid user ID")
+	}
+	return providerID, nil
 }
 
 func connectSuccessRedirectURL(redirect, provider string) string {

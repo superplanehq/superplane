@@ -239,10 +239,20 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	// GitHub
 	if githubKey := os.Getenv("GITHUB_CLIENT_ID"); githubKey != "" {
 		if githubSecret := os.Getenv("GITHUB_CLIENT_SECRET"); githubSecret != "" {
-			providers["github"] = authentication.ProviderConfig{
+			providers[models.ProviderGitHub] = authentication.ProviderConfig{
 				Key:         githubKey,
 				Secret:      githubSecret,
 				CallbackURL: fmt.Sprintf("%s/auth/github/callback", baseURL),
+			}
+		}
+	}
+
+	if bitbucketKey := os.Getenv("BITBUCKET_CLIENT_ID"); bitbucketKey != "" {
+		if bitbucketSecret := os.Getenv("BITBUCKET_CLIENT_SECRET"); bitbucketSecret != "" {
+			providers[models.ProviderBitbucket] = authentication.ProviderConfig{
+				Key:         bitbucketKey,
+				Secret:      bitbucketSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/bitbucket/callback", baseURL),
 			}
 		}
 	}

@@ -206,6 +206,8 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	// Test with no providers configured
 	os.Unsetenv("GITHUB_CLIENT_ID")
 	os.Unsetenv("GITHUB_CLIENT_SECRET")
+	os.Unsetenv("BITBUCKET_CLIENT_ID")
+	os.Unsetenv("BITBUCKET_CLIENT_SECRET")
 	os.Unsetenv("GOOGLE_CLIENT_ID")
 	os.Unsetenv("GOOGLE_CLIENT_SECRET")
 
@@ -223,6 +225,17 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Equal(t, "test-client-secret", providers["github"].Secret)
 	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers["github"].CallbackURL)
 
+	os.Setenv("BITBUCKET_CLIENT_ID", "bitbucket-client-id")
+	providers = getOAuthProviders()
+	assert.NotContains(t, providers, "bitbucket")
+
+	os.Setenv("BITBUCKET_CLIENT_SECRET", "bitbucket-client-secret")
+	providers = getOAuthProviders()
+	assert.Contains(t, providers, "bitbucket")
+	assert.Equal(t, "bitbucket-client-id", providers["bitbucket"].Key)
+	assert.Equal(t, "bitbucket-client-secret", providers["bitbucket"].Secret)
+	assert.Equal(t, "http://localhost:8000/auth/bitbucket/callback", providers["bitbucket"].CallbackURL)
+
 	// Test with Google configured
 	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
 	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
@@ -236,7 +249,8 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	// Test with both providers configured
 	assert.Contains(t, providers, "github")
 	assert.Contains(t, providers, "google")
-	assert.Len(t, providers, 2)
+	assert.Contains(t, providers, "bitbucket")
+	assert.Len(t, providers, 3)
 }
 
 func TestServer_AuthIntegration(t *testing.T) {

@@ -99,6 +99,9 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
+		case models.ProviderBitbucket:
+			gothProviders = append(gothProviders, newBitbucketConnectProvider(config))
+			log.Infof("Bitbucket OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
 			log.Infof("Google OAuth provider initialized")
@@ -144,6 +147,11 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if rejectsConnectOnlySignIn(r) {
+		rejectConnectOnlySignIn(w)
+		return
+	}
+
 	if !isConnectIntent(r) {
 		gothUser, err := gothic.CompleteUserAuth(w, r)
 		if err == nil {
@@ -171,6 +179,14 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
+	provider := mux.Vars(r)["provider"]
+	if isConnectOnlyProvider(provider) {
+		if _, err := goth.GetProvider(provider); err != nil {
+			http.Error(w, "Bitbucket is not configured", http.StatusBadRequest)
+			return
+		}
+	}
+
 	if !requestsGitHubAccountPicker(r) {
 		gothic.BeginAuthHandler(w, r)
 		return
@@ -204,10 +220,15 @@ func withGitHubAccountPicker(authURL string) string {
 }
 
 func useRealProviderAuthInDevelopment(r *http.Request) bool {
-	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+	return isConnectableProvider(mux.Vars(r)["provider"]) && isConnectIntent(r)
 }
 
 func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
+	if rejectsConnectOnlySignIn(r) {
+		rejectConnectOnlySignIn(w)
+		return
+	}
+
 	if useRealProviderAuthInDevelopment(r) {
 		a.handleAuth(w, r)
 		return
@@ -224,6 +245,10 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
+	if isConnectOnlyProvider(provider) {
+		rejectConnectOnlySignIn(w)
+		return
+	}
 	providerUserID := "dev-user-123"
 	if provider == models.ProviderGitHub {
 		providerUserID = "123456789"
@@ -300,6 +325,11 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	if isConnectOnlyProvider(mux.Vars(r)["provider"]) {
+		a.completeConnectOnlyCallback(w, r)
+		return
+	}
+
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
@@ -309,7 +339,46 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	a.completeProviderAuth(w, r, gothUser)
 }
 
+func (a *Handler) completeConnectOnlyCallback(w http.ResponseWriter, r *http.Request) {
+	state, ok := a.connectOnlyStateForSession(w, r)
+	if !ok {
+		return
+	}
+
+	gothUser, err := gothic.CompleteUserAuth(w, r)
+	if err != nil {
+		http.Error(w, "Authentication failed", http.StatusUnauthorized)
+		return
+	}
+	gothUser.AccessToken = ""
+	gothUser.RefreshToken = ""
+	gothUser.ExpiresAt = time.Time{}
+	a.completeAccountConnection(w, r, gothUser, state)
+}
+
+func (a *Handler) connectOnlyStateForSession(w http.ResponseWriter, r *http.Request) (*connectState, bool) {
+	provider := mux.Vars(r)["provider"]
+	state, err := a.parseConnectState(linkStateFromRequest(r))
+	if err != nil || !strings.EqualFold(state.Provider, provider) {
+		rejectConnectOnlySignIn(w)
+		return nil, false
+	}
+
+	sessionAccount, err := a.sessionAccountFromCookie(r)
+	if err != nil || sessionAccount.ID.String() != state.AccountID {
+		rejectConnectOnlySignIn(w)
+		return nil, false
+	}
+
+	return state, true
+}
+
 func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	if isConnectOnlyProvider(gothUser.Provider) || isConnectOnlyProvider(mux.Vars(r)["provider"]) {
+		rejectConnectOnlySignIn(w)
+		return
+	}
+
 	rawState := linkStateFromRequest(r)
 	if strings.HasPrefix(rawState, authConnectStatePrefix) {
 		state, err := a.parseConnectState(rawState)
@@ -409,6 +478,9 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
 	for name := range providers {
+		if isConnectOnlyProvider(name) {
+			continue
+		}
 		providerNames = append(providerNames, name)
 	}
 	sort.Strings(providerNames)
