@@ -8,6 +8,8 @@ export interface MonacoWorkers {
   typescript: MonacoWorkerConstructor;
 }
 
+export type MonacoWorkerUrls = Record<keyof MonacoWorkers, string>;
+
 export interface MonacoLoader<Editor> {
   config(options: { monaco: Editor }): void;
 }
@@ -30,12 +32,45 @@ interface MonacoEnvironmentHost {
   };
 }
 
-export function workerConstructorForLabel(workers: MonacoWorkers, label: string): MonacoWorkerConstructor {
-  const key = WORKER_KEY_BY_LABEL[label] ?? "editor";
-  return workers[key];
+function workerKeyForLabel(label: string): keyof MonacoWorkers {
+  return WORKER_KEY_BY_LABEL[label] ?? "editor";
 }
 
-export function setupMonacoEditor<Editor>(editor: Editor, loader: MonacoLoader<Editor>, workers: MonacoWorkers): void {
+export function workerConstructorForLabel(workers: MonacoWorkers, label: string): MonacoWorkerConstructor {
+  return workers[workerKeyForLabel(label)];
+}
+
+function isSecurityError(error: unknown): boolean {
+  return error instanceof Error && error.name === "SecurityError";
+}
+
+function absoluteWorkerUrl(scriptUrl: string, pageLocation: Pick<Location, "href">): string {
+  return new URL(scriptUrl, pageLocation.href).href;
+}
+
+function classicWorker(scriptUrl: string, pageLocation: Pick<Location, "href">): Worker {
+  const source = `importScripts(${JSON.stringify(absoluteWorkerUrl(scriptUrl, pageLocation))});`;
+  const blob = new Blob([source], { type: "application/javascript" });
+  return new Worker(URL.createObjectURL(blob));
+}
+
+function startWorker(create: MonacoWorkerConstructor, scriptUrl: string): Worker {
+  try {
+    return new create();
+  } catch (error) {
+    if (!isSecurityError(error)) {
+      throw error;
+    }
+    return classicWorker(scriptUrl, location);
+  }
+}
+
+export function setupMonacoEditor<Editor>(
+  editor: Editor,
+  loader: MonacoLoader<Editor>,
+  workers: MonacoWorkers,
+  urls: MonacoWorkerUrls,
+): void {
   loader.config({ monaco: editor });
 
   const host = globalThis as typeof globalThis & MonacoEnvironmentHost;
@@ -43,7 +78,8 @@ export function setupMonacoEditor<Editor>(editor: Editor, loader: MonacoLoader<E
   host.MonacoEnvironment = {
     ...current,
     getWorker(_workerId, label) {
-      return new (workerConstructorForLabel(workers, label))();
+      const key = workerKeyForLabel(label);
+      return startWorker(workers[key], urls[key]);
     },
   };
 }
