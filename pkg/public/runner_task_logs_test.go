@@ -3,6 +3,8 @@ package public
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -165,4 +167,32 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, gzipReader.Close())
 	assert.Equal(t, "final\n", string(content))
+
+	t.Run("records a final log read error for the error tracker", func(t *testing.T) {
+		const forcedError = "blob head refused the log object"
+		transport := bindTestSentryHub(t)
+		previous := blob.Current()
+		blob.SetCurrent(headErrorBlob{Provider: previous, err: errors.New(forcedError)})
+		t.Cleanup(func() { blob.SetCurrent(previous) })
+
+		response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+
+		require.Equal(t, http.StatusInternalServerError, response.Code)
+		assert.Equal(t, "Could not read task logs\n", response.Body.String())
+		assert.NotContains(t, response.Body.String(), forcedError)
+
+		events := transport.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, forcedError, capturedExceptionText(events[0]))
+		assert.NotContains(t, events[0].Message, "HTTP 500")
+	})
+}
+
+type headErrorBlob struct {
+	blob.Provider
+	err error
+}
+
+func (p headErrorBlob) Head(context.Context, string) (*blob.ObjectInfo, error) {
+	return nil, p.err
 }
