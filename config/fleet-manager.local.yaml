@@ -6,7 +6,7 @@ requestTimeoutSeconds: 60
 fleets:
   - id: e1-large-amd64
     provider: docker
-    maxCapacity: 1
+    maxCapacity: 10
     docker:
       image: superplane-runner-local:dev
       architecture: amd64
