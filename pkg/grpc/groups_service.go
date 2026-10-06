@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
@@ -12,28 +13,33 @@ import (
 
 type GroupsService struct {
 	pb.UnimplementedGroupsServer
-	authService   authorization.Authorization
-	accessControl EnterpriseAccessControl
+	authService authorization.Authorization
+	rbac        enterprise.Rbac
 }
 
-func NewGroupsService(authService authorization.Authorization, accessControl EnterpriseAccessControl) *GroupsService {
-	return &GroupsService{
-		authService:   authService,
-		accessControl: accessControl,
+func NewGroupsService(authService authorization.Authorization, registry *enterprise.Registry) (*GroupsService, error) {
+	rbac, err := enterprise.Get[enterprise.Rbac](registry, enterprise.RBAC)
+	if err != nil {
+		return nil, err
 	}
+
+	return &GroupsService{
+		authService: authService,
+		rbac:        rbac,
+	}, nil
 }
 
 func (s *GroupsService) CreateGroup(ctx context.Context, req *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return s.accessControl.CreateGroup(ctx, domainType, domainID, req.Group)
+	return s.rbac.CreateGroup(ctx, domainType, domainID, req.Group)
 }
 
 func (s *GroupsService) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (*pb.AddUserToGroupResponse, error) {
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return s.accessControl.AddUserToGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName)
+	return s.rbac.AddUserToGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName)
 }
 
 func (s *GroupsService) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (*pb.RemoveUserFromGroupResponse, error) {
@@ -69,7 +75,7 @@ func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequ
 		return nil, status.Error(codes.InvalidArgument, "group must be specified")
 	}
 
-	return s.accessControl.UpdateGroup(ctx, domainType, domainID, req.GroupName, req.Group.Spec)
+	return s.rbac.UpdateGroup(ctx, domainType, domainID, req.GroupName, req.Group.Spec)
 }
 
 func (s *GroupsService) DeleteGroup(ctx context.Context, req *pb.DeleteGroupRequest) (*pb.DeleteGroupResponse, error) {

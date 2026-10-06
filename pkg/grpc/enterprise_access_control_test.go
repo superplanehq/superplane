@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
@@ -43,10 +44,13 @@ func TestCommunityAccessControlDeniesEnterpriseOperations(t *testing.T) {
 	orgID := r.Organization.ID.String()
 	ctx := organizationContext(orgID, r.User.String())
 
-	roles := NewRoleService(r.AuthService, licensing.Community, communityAccessControl{})
-	groups := NewGroupsService(r.AuthService, communityAccessControl{})
+	registry := enterprise.NewRegistry()
+	roles, err := NewRoleService(r.AuthService, licensing.Community, registry)
+	require.NoError(t, err)
+	groups, err := NewGroupsService(r.AuthService, registry)
+	require.NoError(t, err)
 
-	_, err := roles.CreateRole(ctx, &pbRoles.CreateRoleRequest{Role: &pbRoles.Role{
+	_, err = roles.CreateRole(ctx, &pbRoles.CreateRoleRequest{Role: &pbRoles.Role{
 		Metadata: &pbRoles.Role_Metadata{Name: "custom-role"},
 		Spec:     &pbRoles.Role_Spec{DisplayName: "Custom role"},
 	}})
@@ -113,9 +117,10 @@ func TestAssignRoleRequiresLicenseForCustomRoles(t *testing.T) {
 	newUser := support.CreateUser(t, r, r.Organization.ID)
 
 	t.Run("Community assigns built-in roles", func(t *testing.T) {
-		roles := NewRoleService(r.AuthService, licensing.Community, communityAccessControl{})
+		roles, err := NewRoleService(r.AuthService, licensing.Community, enterprise.NewRegistry())
+		require.NoError(t, err)
 
-		_, err := roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
+		_, err = roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
 			RoleName: models.RoleOrgOperator,
 			UserId:   newUser.ID.String(),
 		})
@@ -123,9 +128,10 @@ func TestAssignRoleRequiresLicenseForCustomRoles(t *testing.T) {
 	})
 
 	t.Run("Community rejects custom roles", func(t *testing.T) {
-		roles := NewRoleService(r.AuthService, licensing.Community, communityAccessControl{})
+		roles, err := NewRoleService(r.AuthService, licensing.Community, enterprise.NewRegistry())
+		require.NoError(t, err)
 
-		_, err := roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
+		_, err = roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
 			RoleName: "custom-role",
 			UserId:   newUser.ID.String(),
 		})
@@ -133,13 +139,14 @@ func TestAssignRoleRequiresLicenseForCustomRoles(t *testing.T) {
 	})
 
 	t.Run("Enterprise assigns custom roles", func(t *testing.T) {
-		roles := NewRoleService(
+		roles, err := NewRoleService(
 			r.AuthService,
 			fakeEntitlements{licensing.FeatureCustomRoles: true},
-			communityAccessControl{},
+			enterprise.NewRegistry(),
 		)
+		require.NoError(t, err)
 
-		_, err := roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
+		_, err = roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
 			RoleName: "custom-role",
 			UserId:   newUser.ID.String(),
 		})

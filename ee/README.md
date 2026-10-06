@@ -11,11 +11,13 @@ verification, and the admin endpoints, see
 
 ## Rules
 
-- Core code must not import `ee/`. Only `pkg/server` connects an Enterprise
-  implementation to a core interface.
-- The core has a Community implementation of each interface. It refuses every
-  Enterprise operation. When no Enterprise implementation is set, the core
-  uses it.
+- Core code must not import `ee/`. Only `pkg/server` registers an Enterprise
+  implementation.
+- `licensing.Service` answers whether a license grants a feature.
+  `enterprise.Registry` answers which code runs. Keep those separate.
+- The core registers a Community implementation of each capability. It refuses
+  every Enterprise operation. `pkg/server` replaces that registration with the
+  `ee/` implementation.
 - Check the license two times. Each `ee/` method checks the license, and the
   HTTP gateway rule checks `RequiredLicenseFeatures`. Do not remove one check
   because the other check exists.
@@ -32,10 +34,16 @@ verification, and the admin endpoints, see
    Do not rename or reuse a key. Ask a licensing administrator to create a
    feature with the same key in the license issuer.
 
-2. **Define the core interface.** Put the interface and its Community
-   implementation in the core package that uses it. For an example, see
-   `EnterpriseAccessControl` and `communityAccessControl` in
-   `pkg/grpc/enterprise_access_control.go`.
+2. **Define the core interface and register it.** Put the interface in
+   `pkg/enterprise`. Add a Community implementation that refuses the
+   operation, and register it from `NewRegistry` under a new key. Callers
+   resolve it with `enterprise.Get`. `Rbac` is the example: `custom_roles`
+   and `groups` share that one implementation. A new feature gets its own
+   interface and key. Do not add its methods to `Rbac`.
+
+   ```go
+   impl, err := enterprise.Get[Thing](registry, enterprise.Things)
+   ```
 
 3. **Implement the feature in `ee/`.** Add a package such as
    `ee/<feature>/`. Each public method checks the license before it does
@@ -51,9 +59,13 @@ verification, and the admin endpoints, see
    }
    ```
 
-4. **Connect the implementation.** In `pkg/server`, pass the `ee/`
-   implementation and the license service to the core configuration. This is
-   the only place that imports the new package.
+4. **Register the implementation.** In `pkg/server`, register the `ee/`
+   service on the enterprise registry under the key from step 2. This is the
+   only place that imports the new package.
+
+   ```go
+   features.Register(enterprise.Things, thing.NewService(licenseService))
+   ```
 
 5. **Tag the gateway rules.** Add the feature to `RequiredLicenseFeatures` on
    each rule in `pkg/authorization/gateway_auth_rules.go` that creates or

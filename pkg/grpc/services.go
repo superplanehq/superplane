@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -59,10 +60,10 @@ type ServicesConfig struct {
 	AgentService     agentsActions.AgentsService
 	JWTSigner        *jwt.Signer
 
-	// Entitlements and EnterpriseAccessControl default to Community mode, so
-	// a missing value never grants Enterprise features.
-	Entitlements            licensing.Entitlements
-	EnterpriseAccessControl EnterpriseAccessControl
+	// Entitlements defaults to Community mode. Enterprise defaults to a
+	// registry whose Community implementations refuse every operation.
+	Entitlements licensing.Entitlements
+	Enterprise   *enterprise.Registry
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
@@ -75,15 +76,24 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		entitlements = licensing.Community
 	}
 
-	var accessControl EnterpriseAccessControl = communityAccessControl{}
-	if cfg.EnterpriseAccessControl != nil {
-		accessControl = cfg.EnterpriseAccessControl
+	featureRegistry := cfg.Enterprise
+	if featureRegistry == nil {
+		featureRegistry = enterprise.NewRegistry()
+	}
+
+	groups, err := NewGroupsService(cfg.AuthService, featureRegistry)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := NewRoleService(cfg.AuthService, entitlements, featureRegistry)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
-		Groups: NewGroupsService(cfg.AuthService, accessControl),
-		Roles:  NewRoleService(cfg.AuthService, entitlements, accessControl),
+		Groups: groups,
+		Roles:  roles,
 		Organizations: NewOrganizationService(
 			cfg.AuthService,
 			cfg.Registry,

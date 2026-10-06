@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -19,6 +20,8 @@ type Service struct {
 	authService  authorization.Authorization
 	entitlements licensing.Entitlements
 }
+
+var _ enterprise.Rbac = (*Service)(nil)
 
 func NewService(authService authorization.Authorization, entitlements licensing.Entitlements) *Service {
 	return &Service{

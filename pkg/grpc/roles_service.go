@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
@@ -13,21 +15,30 @@ import (
 
 type RoleService struct {
 	pb.UnimplementedRolesServer
-	authService   authorization.Authorization
-	entitlements  licensing.Entitlements
-	accessControl EnterpriseAccessControl
+	authService  authorization.Authorization
+	entitlements licensing.Entitlements
+	rbac         enterprise.Rbac
 }
 
 func NewRoleService(
 	authService authorization.Authorization,
 	entitlements licensing.Entitlements,
-	accessControl EnterpriseAccessControl,
-) *RoleService {
-	return &RoleService{
-		authService:   authService,
-		entitlements:  entitlements,
-		accessControl: accessControl,
+	registry *enterprise.Registry,
+) (*RoleService, error) {
+	rbac, err := enterprise.Get[enterprise.Rbac](registry, enterprise.RBAC)
+	if err != nil {
+		return nil, err
 	}
+
+	return &RoleService{
+		authService:  authService,
+		entitlements: entitlements,
+		rbac:         rbac,
+	}, nil
+}
+
+func notLicensed() error {
+	return grpcerrors.PermissionDenied(licensing.ErrNotLicensed, licensing.ErrNotLicensed.Error())
 }
 
 func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest) (*pb.AssignRoleResponse, error) {
@@ -59,7 +70,7 @@ func (s *RoleService) DescribeRole(ctx context.Context, req *pb.DescribeRoleRequ
 func (s *RoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return s.accessControl.CreateRole(ctx, domainType, domainID, req.Role)
+	return s.rbac.CreateRole(ctx, domainType, domainID, req.Role)
 }
 
 func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
@@ -70,7 +81,7 @@ func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest)
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
-	return s.accessControl.UpdateRole(ctx, domainType, domainID, req.RoleName, req.Role.Spec)
+	return s.rbac.UpdateRole(ctx, domainType, domainID, req.RoleName, req.Role.Spec)
 }
 
 func (s *RoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {

@@ -30,6 +30,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -455,18 +456,21 @@ func buildGRPCServices(
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
 ) (*grpc.Services, error) {
+	features := enterprise.NewRegistry()
+	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:                 baseURL,
-		WebhooksBaseURL:         webhooksBaseURL,
-		RunnerAPIBaseURL:        runnerAPIBaseURL,
-		Encryptor:               encryptor,
-		AuthService:             authService,
-		Registry:                registry,
-		OIDCProvider:            oidcProvider,
-		AgentService:            agentService,
-		JWTSigner:               jwtSigner,
-		Entitlements:            licenseService,
-		EnterpriseAccessControl: rbac.NewService(authService, licenseService),
+		BaseURL:          baseURL,
+		WebhooksBaseURL:  webhooksBaseURL,
+		RunnerAPIBaseURL: runnerAPIBaseURL,
+		Encryptor:        encryptor,
+		AuthService:      authService,
+		Registry:         registry,
+		OIDCProvider:     oidcProvider,
+		AgentService:     agentService,
+		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
