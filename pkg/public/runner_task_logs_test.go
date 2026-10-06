@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
@@ -186,6 +187,44 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 		assert.Equal(t, forcedError, capturedExceptionText(events[0]))
 		assert.NotContains(t, events[0].Message, "HTTP 500")
 	})
+}
+
+func TestHandleRunnerTaskLogsRecordsUnexpectedLookupFailure(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	server, signer := mustRunnerLiveLogServer(t, resource)
+	canvasID, executionID := createCanvasWithComponentExecution(
+		t,
+		resource,
+		runneraction.ComponentName,
+		"runner-logs-lookup",
+		nil,
+	)
+
+	const forcedError = "canvas lookup connection refused"
+	transport := bindTestSentryHub(t)
+	db := database.Conn()
+	const callbackName = "test:runner-log-canvas-lookup-failure"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if _, ok := tx.Statement.Dest.(*models.Canvas); !ok {
+			return
+		}
+		tx.AddError(errors.New(forcedError))
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, db.Callback().Query().Remove(callbackName))
+	})
+
+	response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+
+	require.Equal(t, http.StatusInternalServerError, response.Code)
+	assert.Equal(t, "Lookup failed\n", response.Body.String())
+	assert.NotContains(t, response.Body.String(), forcedError)
+
+	events := transport.Events()
+	require.Len(t, events, 1)
+	assert.Contains(t, capturedExceptionText(events[0]), forcedError)
+	assert.NotContains(t, events[0].Message, "HTTP 500")
 }
 
 type headErrorBlob struct {
