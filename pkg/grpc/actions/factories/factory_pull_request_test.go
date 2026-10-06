@@ -161,7 +161,10 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		activity := resp.GetOrder().GetPullRequests()[0].GetActivities()[0]
 		assert.Equal(t, int64(1_000_000), activity.GetTotalTokens())
 		assert.Greater(t, activity.GetCostCents(), int64(0))
-		assert.Equal(t, int64(1_000_000), resp.GetOrder().GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+		assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, activity.GetModels())
+		linkedRun := resp.GetOrder().GetPullRequests()[0].GetRuns()[0]
+		assert.Equal(t, int64(1_000_000), linkedRun.GetTotalTokens())
+		assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, linkedRun.GetModels())
 	})
 
 	t.Run("degrades to zero usage when usage rollup is unavailable", func(t *testing.T) {
@@ -240,6 +243,7 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		require.Len(t, degraded[order.ID][0].GetRuns(), 1)
 		assert.EqualValues(t, 0, degraded[order.ID][0].GetRuns()[0].GetTotalTokens())
 		assert.EqualValues(t, 0, degraded[order.ID][0].GetRuns()[0].GetCostCents())
+		assert.Empty(t, degraded[order.ID][0].GetRuns()[0].GetModels())
 	})
 
 	t.Run("updates a tracked pull request", func(t *testing.T) {
