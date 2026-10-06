@@ -112,6 +112,10 @@ describe("FactorySettingsLayout at phone width", () => {
     );
 
     const bottomBar = await screen.findByTestId("mobile-bottom-bar", {}, { timeout: 8000 });
+    const shell = screen.getByTestId("factory-settings-layout");
+    expect(shell.className).not.toContain("h-dvh");
+    expect(shell).toHaveStyle({ position: "fixed", left: "0px", right: "0px" });
+    expect(shell.style.bottom).toBe("");
     expect(within(bottomBar).getByTestId("mobile-tab-settings")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("factory-settings-mobile-bar")).toBeInTheDocument();
   }, 10000);
