@@ -270,7 +270,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
-    await user.click(within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"));
+    await user.click(
+      within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
+    );
 
     expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
@@ -289,7 +291,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
-    await user.click(within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"));
+    await user.click(
+      within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
+    );
 
     expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
