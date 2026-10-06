@@ -20,7 +20,7 @@ type ActivePoll = {
   generation: number;
   inFlight: boolean;
   abort: AbortController | null;
-  timeout: ReturnType<typeof window.setTimeout> | null;
+  timeout: number | null;
 };
 
 type DetailQuery = {
