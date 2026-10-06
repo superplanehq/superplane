@@ -2,7 +2,7 @@
 title: "Bitbucket"
 ---
 
-React to events in your Bitbucket repositories
+React to events and manage pull requests in your Bitbucket repositories
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -10,6 +10,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Push" href="#on-push" description="Listen to Bitbucket push events" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a pull request in a Bitbucket repository" />
+  <LinkCard title="Create Pull Request Comment" href="#create-pull-request-comment" description="Add a comment to a Bitbucket pull request" />
+  <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find a pull request in a Bitbucket repository by branch" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update the title or description of a Bitbucket pull request" />
 </CardGrid>
 
 ## Instructions
@@ -154,6 +163,271 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
   },
   "timestamp": "2024-01-15T10:30:00Z",
   "type": "bitbucket.push"
+}
+```
+
+<a id="create-pull-request"></a>
+
+## Create Pull Request
+
+**Component key:** `bitbucket.createPullRequest`
+
+The Create Pull Request component opens a pull request in a Bitbucket repository.
+
+### Configuration
+
+- **Repository**: The Bitbucket repository, in workspace/repository format
+- **Head**: The source branch that contains the changes
+- **Base**: The destination branch. Defaults to "main".
+- **Title**: The pull request title. Supports expressions.
+- **Body**: Optional pull request description. Supports Markdown and expressions.
+- **Draft**: Create the pull request as a draft
+
+### Output
+
+Emits the pull request that Bitbucket returns. Use `id` for the pull request number and `links.html.href` for its URL.
+
+### Limitations
+
+Only pull requests inside one repository are supported. Pull requests from forks are not supported.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    },
+    "created_on": "2026-04-22T10:00:00.000000+00:00",
+    "description": "Adds retry handling to the worker.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "f6e5d4c3b2a1"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/acme/widgets/pull-requests/42"
+      }
+    },
+    "source": {
+      "branch": {
+        "name": "feat/retry-handling"
+      },
+      "commit": {
+        "hash": "a1b2c3d4e5f6"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "state": "OPEN",
+    "title": "feat: Add retry handling",
+    "type": "pullrequest",
+    "updated_on": "2026-04-22T10:00:00.000000+00:00"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="create-pull-request-comment"></a>
+
+## Create Pull Request Comment
+
+**Component key:** `bitbucket.createPullRequestComment`
+
+The Create Pull Request Comment component adds a comment to a pull request in a Bitbucket repository.
+
+### Configuration
+
+- **Repository**: The Bitbucket repository, in workspace/repository format
+- **Pull Request ID**: The pull request number. Supports expressions.
+- **Body**: The comment text. Supports Markdown and expressions.
+
+### Output
+
+Emits the comment that Bitbucket returns.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "content": {
+      "markup": "markdown",
+      "raw": "## Visual evidence"
+    },
+    "created_on": "2026-04-22T10:05:00.000000+00:00",
+    "id": 7001,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/acme/widgets/pull-requests/42#comment-7001"
+      }
+    },
+    "pullrequest": {
+      "id": 42,
+      "title": "feat: Add retry handling"
+    },
+    "type": "pullrequest_comment",
+    "user": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    }
+  },
+  "timestamp": "2026-04-22T10:05:00.000000000Z",
+  "type": "bitbucket.pullRequestComment"
+}
+```
+
+<a id="find-pull-request"></a>
+
+## Find Pull Request
+
+**Component key:** `bitbucket.findPullRequest`
+
+The Find Pull Request component looks up a pull request in a Bitbucket repository by its source branch. Use it to decide if a workflow must create a new pull request or update an existing one.
+
+### Configuration
+
+- **Repository**: The Bitbucket repository, in workspace/repository format
+- **Head Branch**: The source branch of the pull request
+- **Base Branch**: Optional. When set, only pull requests into this branch match.
+- **State**: Which pull requests to consider: Open, Merged, Declined, or All. Defaults to Open.
+
+### Output Channels
+
+- **Found**: Emits the first matching pull request
+- **Not Found**: Emits when no pull request matches
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    },
+    "created_on": "2026-04-22T10:00:00.000000+00:00",
+    "description": "Adds retry handling to the worker.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "f6e5d4c3b2a1"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/acme/widgets/pull-requests/42"
+      }
+    },
+    "source": {
+      "branch": {
+        "name": "feat/retry-handling"
+      },
+      "commit": {
+        "hash": "a1b2c3d4e5f6"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "state": "OPEN",
+    "title": "feat: Add retry handling",
+    "type": "pullrequest",
+    "updated_on": "2026-04-22T10:00:00.000000+00:00"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="update-pull-request"></a>
+
+## Update Pull Request
+
+**Component key:** `bitbucket.updatePullRequest`
+
+The Update Pull Request component changes the title or description of a pull request in a Bitbucket repository.
+
+### Configuration
+
+- **Repository**: The Bitbucket repository, in workspace/repository format
+- **Pull Request ID**: The pull request number. Supports expressions.
+- **Title**: Optional new title
+- **Body**: Optional new description. Supports Markdown and expressions.
+
+Set at least one of Title or Body. Empty values are not sent.
+
+### Output
+
+Emits the updated pull request that Bitbucket returns.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    },
+    "created_on": "2026-04-22T10:00:00.000000+00:00",
+    "description": "Adds retry handling to the worker.",
+    "destination": {
+      "branch": {
+        "name": "main"
+      },
+      "commit": {
+        "hash": "f6e5d4c3b2a1"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "draft": false,
+    "id": 42,
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/acme/widgets/pull-requests/42"
+      }
+    },
+    "source": {
+      "branch": {
+        "name": "feat/retry-handling"
+      },
+      "commit": {
+        "hash": "a1b2c3d4e5f6"
+      },
+      "repository": {
+        "full_name": "acme/widgets"
+      }
+    },
+    "state": "OPEN",
+    "title": "feat: Add retry handling",
+    "type": "pullrequest",
+    "updated_on": "2026-04-22T10:00:00.000000+00:00"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "bitbucket.pullRequest"
 }
 ```
 

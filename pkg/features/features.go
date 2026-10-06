@@ -44,6 +44,10 @@ const FeatureFactoryPagerDutyIntake = "factory_pagerduty_intake"
 // it for the organization.
 const FeatureFactoryLinearIntake = "factory_linear_intake"
 
+// FeatureFactoryBitbucket gates Bitbucket as a workspace Git host until the
+// flow is generally available.
+const FeatureFactoryBitbucket = "factory_bitbucket"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -79,9 +83,9 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
 
-// FeatureSuperPlaneMCPServer gates the public workspace MCP server.
-// Organizations with this flag can authorize Cursor and other MCP clients
-// against one workspace. Without it, POST /mcp returns 404.
+// FeatureSuperPlaneMCPServer is released. Every organization can authorize
+// Cursor and other MCP clients against one workspace. The factories flag
+// still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
 // FeatureMobileFactoryBoard gates the mobile-first workspace shell: a
@@ -102,11 +106,12 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Enable Jira issue intake in factories"},
-	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Enable Productive task intake in factories"},
-	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Enable Datadog Error Tracking intake in factories"},
-	{ID: FeatureFactoryPagerDutyIntake, Label: "Factory PagerDuty Intake", Description: "Enable PagerDuty incident intake in factories"},
-	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Enable Linear issue intake in factories"},
+	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
+	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
+	{ID: FeatureFactoryPagerDutyIntake, Label: "Factory PagerDuty Intake", Description: "Add PagerDuty intake from the Backlog column menu"},
+	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
+	{ID: FeatureFactoryBitbucket, Label: "Bitbucket Workspaces", Description: "Connect a Bitbucket workspace and open pull requests from Implement"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
@@ -116,7 +121,7 @@ var registry = []Feature{
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
-	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
 }
 

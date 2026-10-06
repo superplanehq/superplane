@@ -135,6 +135,27 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "payments", intake.GetResourceId())
 		assert.True(t, intake.GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_OK, intake.GetHealth())
+		assert.Equal(t, []string{"payments"}, intake.GetSettings().GetSentryProjectIds())
+	})
+
+	t.Run("a Sentry intake listens only to the selected projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "sentry")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			IntegrationId: integrationID,
+			ResourceId:    "payments,growth",
+			Settings: &pb.FactoryIntake_Settings{
+				SentryProjectIds: []string{"payments", "growth"},
+			},
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments", "growth"}, trigger.Configuration["projects"])
+		assert.Equal(t, "payments,growth", intake.GetResourceId())
+		assert.Equal(t, []string{"payments", "growth"}, intake.GetSettings().GetSentryProjectIds())
 	})
 
 	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {

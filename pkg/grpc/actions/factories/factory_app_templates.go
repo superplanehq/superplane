@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -30,11 +31,17 @@ const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2
 // defaultMergeConfidenceChecks is every check, in prompt order. "none" turns them all off.
 const defaultMergeConfidenceChecks = "risk, performance, security, drift, reversibility"
 
-//go:embed templates/*.yaml
+//go:embed templates/github/*.yaml templates/bitbucket/*.yaml
 var factoryTemplateFiles embed.FS
+
+type factoryTemplateKey struct {
+	id       string
+	provider string
+}
 
 type factoryAppTemplate struct {
 	id                    string
+	provider              string
 	entrypointNodeID      string
 	canvasFile            string
 	consoleFile           string
@@ -43,49 +50,80 @@ type factoryAppTemplate struct {
 	columnKey string
 }
 
-var factoryAppTemplates = map[string]factoryAppTemplate{
-	"line-implementation": {
+func githubFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
+	template.provider = models.ProviderGitHub
+	return template
+}
+
+func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
+	template.provider = models.ProviderBitbucket
+	return template
+}
+
+var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
+	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "line-implementation",
 		entrypointNodeID: "onrun-implement",
-		canvasFile:       "templates/line-implementation.canvas.yaml",
-		consoleFile:      "templates/line-app.console.yaml",
+		canvasFile:       "templates/github/line-implementation.canvas.yaml",
+		consoleFile:      "templates/github/line-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"github.createIssueComment": "github",
 			"github.createPullRequest":  "github",
 			"github.findPullRequest":    "github",
 			"github.updatePullRequest":  "github",
 		},
-	},
-	"pr-closure": {
+	}),
+	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
+		id:               "line-implementation",
+		entrypointNodeID: "onrun-implement",
+		canvasFile:       "templates/bitbucket/line-implementation.canvas.yaml",
+		consoleFile:      "templates/bitbucket/line-app.console.yaml",
+		componentIntegrations: map[string]string{
+			"bitbucket.createPullRequest":        "bitbucket",
+			"bitbucket.createPullRequestComment": "bitbucket",
+			"bitbucket.findPullRequest":          "bitbucket",
+			"bitbucket.updatePullRequest":        "bitbucket",
+		},
+	}),
+	{id: "pr-closure", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "pr-closure",
 		entrypointNodeID: "on-pr-closed",
-		canvasFile:       "templates/pr-closure.canvas.yaml",
-		consoleFile:      "templates/event-app.console.yaml",
+		canvasFile:       "templates/github/pr-closure.canvas.yaml",
+		consoleFile:      "templates/github/event-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"github.createIssueComment": "github",
 			"github.onPullRequest":      "github",
 			"github.updateIssue":        "github",
 		},
-	},
-	"issue-intake": {
+	}),
+	{id: "issue-intake", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "issue-intake",
 		entrypointNodeID: "on-issue-labeled",
-		canvasFile:       "templates/issue-intake.canvas.yaml",
-		consoleFile:      "templates/event-app.console.yaml",
+		canvasFile:       "templates/github/issue-intake.canvas.yaml",
+		consoleFile:      "templates/github/event-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"github.onIssue": "github",
 		},
-	},
-	"risk-score": {
+	}),
+	{id: "risk-score", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "risk-score",
 		entrypointNodeID: "on-pr-risk",
-		canvasFile:       "templates/risk-score.canvas.yaml",
-		consoleFile:      "templates/risk-score.console.yaml",
+		canvasFile:       "templates/github/risk-score.canvas.yaml",
+		consoleFile:      "templates/github/risk-score.console.yaml",
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.onPullRequest": "github",
 		},
-	},
+	}),
+}
+
+func lookupFactoryAppTemplate(id, provider string) (factoryAppTemplate, bool) {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		provider = models.ProviderGitHub
+	}
+	template, ok := factoryAppTemplates[factoryTemplateKey{id: id, provider: provider}]
+	return template, ok
 }
 
 type factoryTemplateInput struct {
@@ -142,8 +180,8 @@ type materializedFactoryTemplate struct {
 	consoleYAML string
 }
 
-func attachFactoryTemplateColumn(tx *gorm.DB, canvas *models.Canvas, templateID string) error {
-	template, ok := factoryAppTemplates[templateID]
+func attachFactoryTemplateColumn(tx *gorm.DB, canvas *models.Canvas, templateID, provider string) error {
+	template, ok := lookupFactoryAppTemplate(templateID, provider)
 	if !ok || template.columnKey == "" || canvas == nil {
 		return nil
 	}
@@ -153,8 +191,8 @@ func attachFactoryTemplateColumn(tx *gorm.DB, canvas *models.Canvas, templateID 
 	return canvas.SetColumnKey(tx, template.columnKey)
 }
 
-func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (*materializedFactoryTemplate, error) {
-	template, ok := factoryAppTemplates[templateID]
+func materializeFactoryTemplate(templateID, provider string, input factoryTemplateInput) (*materializedFactoryTemplate, error) {
+	template, ok := lookupFactoryAppTemplate(templateID, provider)
 	if !ok {
 		return nil, invalidArgument("unknown factory app template")
 	}
@@ -165,10 +203,14 @@ func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (
 	}
 
 	content := strings.ReplaceAll(string(raw), factoryCanvasIDPlaceholder, input.appID)
-	content = substituteFactoryInstallParams(content, normalizeFactoryInstallParams(input.installParams))
+	params := normalizeFactoryInstallParams(input.installParams)
+	content = substituteFactoryInstallParams(content, params)
 	canvas, err := yaml.CanvasFromYAML([]byte(content))
 	if err != nil {
 		return nil, fmt.Errorf("parse factory app template: %w", err)
+	}
+	if template.id == "risk-score" {
+		filterDisabledMergeChecks(canvas, params["enabledChecks"])
 	}
 
 	canvas.Metadata.ID = input.appID
@@ -191,6 +233,43 @@ func materializeFactoryTemplate(templateID string, input factoryTemplateInput) (
 		canvasYAML:  string(canvasYAML),
 		consoleYAML: consoleYAML,
 	}, nil
+}
+
+// A check step stays only when setup turned that check on.
+func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
+	allowed := map[string]bool{}
+	if strings.TrimSpace(enabled) != "none" {
+		for _, name := range strings.Split(enabled, ",") {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				allowed[name] = true
+			}
+		}
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		if node.ID != "assess-risk" {
+			continue
+		}
+		steps, ok := node.Configuration["steps"].([]any)
+		if !ok {
+			return
+		}
+		kept := make([]any, 0, len(steps))
+		for _, step := range steps {
+			item, isMap := step.(map[string]any)
+			if !isMap {
+				kept = append(kept, step)
+				continue
+			}
+			prompt, _ := item["prompt"].(string)
+			id := runner.MergeCheckID(prompt)
+			if id == "" || allowed[id] {
+				kept = append(kept, step)
+			}
+		}
+		node.Configuration["steps"] = kept
+	}
 }
 
 func normalizeFactoryInstallParams(params map[string]string) map[string]string {
@@ -332,7 +411,7 @@ func markFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate) {
 		if node.Metadata == nil {
 			node.Metadata = map[string]any{}
 		}
-		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadata(template.id, factoryTemplateVersion))
+		maps.Copy(node.Metadata, models.FactoryAppTemplateMetadataFor(template.id, factoryTemplateVersion, template.provider))
 		return
 	}
 }
@@ -387,20 +466,31 @@ func factoryTemplateInputFromRequest(req *pb.MaterializeFactoryAppTemplateReques
 
 func resolveFactoryTemplate(nodes []models.Node) (factoryAppTemplate, bool) {
 	for _, node := range nodes {
-		if metadata, ok := node.Metadata[factoryTemplateMetadataKey].(map[string]any); ok {
-			if id, ok := metadata["id"].(string); ok {
-				template, found := factoryAppTemplates[id]
-				if found {
-					return template, true
-				}
-			}
+		metadata, ok := node.Metadata[factoryTemplateMetadataKey].(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := metadata["id"].(string)
+		if id == "" {
+			continue
+		}
+		provider, _ := metadata["provider"].(string)
+		if template, found := lookupFactoryAppTemplate(id, provider); found {
+			return template, true
 		}
 	}
+	for _, node := range nodes {
+		if template, found := lookupFactoryAppTemplateByEntrypoint(node.ID, models.ProviderGitHub); found {
+			return template, true
+		}
+	}
+	return factoryAppTemplate{}, false
+}
+
+func lookupFactoryAppTemplateByEntrypoint(nodeID, provider string) (factoryAppTemplate, bool) {
 	for _, template := range factoryAppTemplates {
-		for _, node := range nodes {
-			if node.ID == template.entrypointNodeID {
-				return template, true
-			}
+		if template.provider == provider && template.entrypointNodeID == nodeID {
+			return template, true
 		}
 	}
 	return factoryAppTemplate{}, false
@@ -654,9 +744,9 @@ func materializeBacklogDefaults(
 	version *models.CanvasVersion,
 ) (*materializedFactoryTemplate, error) {
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
-		Name:       canvas.Name,
-		Agent:      resetFactoryIntakeAgent(tx, factory, version.Nodes),
-		GitHubName: resolveGitHubInstallationName(tx, factory),
+		Name:    canvas.Name,
+		Agent:   resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSName: resolveVCSInstallationName(tx, factory),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {
@@ -824,12 +914,15 @@ func materializeNonIntakeFactoryAppDefaults(
 	if onWorkOrderNodeIDFromSpec(models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}) != "" {
 		return materializeBacklogDefaults(tx, factory, canvas, version)
 	}
-	template, ok := resolveFactoryTemplate(version.Nodes)
+	resolved, ok := resolveFactoryTemplate(version.Nodes)
 	if !ok {
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
+	// Reset uses the provider saved on the app. A later workspace host change
+	// must not select a template the app was not installed with.
 	return materializeFactoryTemplate(
-		template.id,
-		deriveFactoryTemplateInput(tx, factory, canvas, version, template),
+		resolved.id,
+		resolved.provider,
+		deriveFactoryTemplateInput(tx, factory, canvas, version, resolved),
 	)
 }

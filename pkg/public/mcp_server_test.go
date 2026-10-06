@@ -233,18 +233,28 @@ func TestMCPBlockedAccountReturns401(t *testing.T) {
 	assert.Contains(t, rec.Header().Get("WWW-Authenticate"), "http://localhost:8000/.well-known/oauth-protected-resource/mcp")
 }
 
-func TestMCPAuthenticatedWithoutFeatureFlagReturns404(t *testing.T) {
+func TestMCPToolsListSucceedsWithoutMCPServerFlag(t *testing.T) {
 	r, server, signer := mcpEnabledServer(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
-	token, err := mcpserver.MintAccessToken(signer, mcpAccessClaims(r, uuid.New()), time.Hour)
+	claims := mcpAccessClaims(r, uuid.New())
+	insertMCPAccessGrant(t, claims)
+	token, err := mcpserver.MintAccessToken(signer, claims, time.Hour)
 	require.NoError(t, err)
 
 	req := mcpRequest(http.MethodPost, "/mcp", `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	server.Router.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusNotFound, rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Nil(t, body["error"])
+	result, ok := body["result"].(map[string]any)
+	require.True(t, ok)
+	tools, ok := result["tools"].([]any)
+	require.True(t, ok)
+	assert.NotEmpty(t, tools)
 }
 
 func TestMCPDiscoveryListsAreEmpty(t *testing.T) {

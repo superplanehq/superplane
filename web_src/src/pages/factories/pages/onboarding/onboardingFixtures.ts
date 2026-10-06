@@ -1,6 +1,15 @@
-export type VcsHostId = "github" | "gitlab";
+export type VcsHostId = "github" | "bitbucket" | "gitlab";
 /** Matches SuperPlane integration registry names (Claude = `claude`, not anthropic). */
-export type IntegrationId = "github" | "gitlab" | "claude" | "openai" | "openrouter" | "customLlm" | "linear" | "jira";
+export type IntegrationId =
+  | "github"
+  | "bitbucket"
+  | "gitlab"
+  | "claude"
+  | "openai"
+  | "openrouter"
+  | "customLlm"
+  | "linear"
+  | "jira";
 export type AgentHarnessId = "claude-code" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
 export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
@@ -13,8 +22,10 @@ export type IntegrationOption = {
   soon?: boolean;
 };
 
-export const VCS_OPTIONS: IntegrationOption[] = [
+export const VCS_OPTIONS: (IntegrationOption & { id: VcsHostId })[] = [
   { id: "github", label: "GitHub", detail: "Connect GitHub to list repositories and open pull requests." },
+  { id: "bitbucket", label: "Bitbucket", detail: "Connect Bitbucket to list repositories and open pull requests." },
+  { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
 
 export const AGENT_OPTIONS: IntegrationOption[] = [
@@ -63,6 +74,7 @@ export const FIXTURE_REPOS: Record<VcsHostId, string[]> = {
     "acme/data-pipeline",
     "acme/ml-serving",
   ],
+  bitbucket: ["acme-team/api", "acme-team/web", "acme-team/payments-service", "acme-team/infra"],
   gitlab: [
     "acme-ops/backend",
     "acme-ops/frontend",
@@ -109,7 +121,7 @@ export const WIZARD_STEPS = [
   {
     id: "vcs" as const,
     label: "VCS",
-    purpose: "Choose GitHub or GitLab and connect it. Agents use this host for the app repository.",
+    purpose: "Choose GitHub or Bitbucket and connect it. Agents use this host for the app repository.",
   },
   {
     id: "repo" as const,
@@ -135,13 +147,15 @@ export const WIZARD_STEPS = [
 ] as const;
 
 export function vcsLabel(host: VcsHostId) {
-  return host === "github" ? "GitHub" : "GitLab";
+  return integrationLabel(host);
 }
 
 export function integrationLabel(id: IntegrationId) {
   switch (id) {
     case "github":
       return "GitHub";
+    case "bitbucket":
+      return "Bitbucket";
     case "gitlab":
       return "GitLab";
     case "claude":

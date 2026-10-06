@@ -22,6 +22,9 @@ export const FEATURE_FACTORY_PAGERDUTY_INTAKE = "factory_pagerduty_intake";
 /** Organization experimental feature: Linear issue intake. */
 export const FEATURE_FACTORY_LINEAR_INTAKE = "factory_linear_intake";
 
+/** Organization experimental feature: Bitbucket as a workspace Git host. */
+export const FEATURE_FACTORY_BITBUCKET = "factory_bitbucket";
+
 /** Organization experimental feature: workspace MCP servers. */
 export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
 

@@ -132,6 +132,19 @@ describe("lineIntakeModel", () => {
     expect(intake?.source.id).toBe("sentry-exceptions");
   });
 
+  it("selects the current Sentry project when settings have no project ids", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-sentry",
+        canvasId: "canvas-sentry",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        resourceId: "payments",
+      },
+    ]);
+
+    expect(intake?.settings.sentryProjectIds).toEqual(["payments"]);
+  });
+
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
     const fixture = intakeTicketAnalysisFixture({
       id: "gh-issue-1",

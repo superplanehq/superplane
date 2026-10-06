@@ -28,7 +28,7 @@ COMPOSE_UP_EXTRA := --quiet-build
 endif
 endif
 
-PKG_TEST_PACKAGES := ./pkg/...
+PKG_TEST_PACKAGES := ./pkg/... ./ee/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
@@ -337,6 +337,7 @@ check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.test.ui.browser:
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_monaco_worker_startup.sh"
 	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_backlog_create_tabs.sh"
 
 check.format.js:

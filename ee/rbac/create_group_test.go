@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -30,7 +30,7 @@ func Test_CreateGroup(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateGroup(ctx, "org", orgID, req.Group, r.AuthService)
+		resp, err := createGroup(ctx, "org", orgID, req.Group, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -55,7 +55,7 @@ func Test_CreateGroup(t *testing.T) {
 			},
 		}
 
-		_, err := CreateGroup(ctx, "org", orgID, req.Group, r.AuthService)
+		_, err := createGroup(ctx, "org", orgID, req.Group, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

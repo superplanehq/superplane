@@ -525,6 +525,25 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Step settings graph. Warm paper, so the pane does not use the cool canvas dots. */
+.theme-factories .settings-graph {
+  background-color: #f4f1ea;
+  background-image:
+    linear-gradient(to right, #e4dccf 1px, transparent 1px),
+    linear-gradient(to bottom, #e4dccf 1px, transparent 1px);
+  background-size: 14px 14px, 14px 14px;
+}
+
+.theme-factories .settings-graph .react-flow,
+.theme-factories .settings-graph .react-flow__background {
+  background: transparent !important;
+}
+
+.theme-factories .settings-graph .react-flow__background pattern,
+.theme-factories .settings-graph .react-flow__background rect {
+  display: none;
+}
+
 .theme-factories.dark,
 .dark .theme-factories {
   --background: #14120b;
@@ -594,6 +613,15 @@
 
   --work-order-mention-fg: #4493f8;
   --work-order-mention-bg: rgba(56, 139, 253, 0.15);
+}
+
+.theme-factories.dark .settings-graph,
+.dark .theme-factories .settings-graph {
+  background-color: #17150f;
+  background-image:
+    linear-gradient(to right, #2e2b24 1px, transparent 1px),
+    linear-gradient(to bottom, #2e2b24 1px, transparent 1px);
+  background-size: 14px 14px, 14px 14px;
 }
 
 /*

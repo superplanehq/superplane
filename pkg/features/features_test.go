@@ -20,7 +20,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
 		assert.Equal(t, "Factory Jira Intake", f.Label)
-		assert.Equal(t, "Enable Jira issue intake in factories", f.Description)
+		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
@@ -28,7 +28,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
 		assert.Equal(t, "Factory Productive Intake", f.Label)
-		assert.Equal(t, "Enable Productive task intake in factories", f.Description)
+		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory datadog intake feature", func(t *testing.T) {
@@ -36,7 +36,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryDatadogIntake, f.ID)
 		assert.Equal(t, "Factory Datadog Intake", f.Label)
-		assert.Equal(t, "Enable Datadog Error Tracking intake in factories", f.Description)
+		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory PagerDuty intake feature", func(t *testing.T) {
@@ -44,7 +44,7 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryPagerDutyIntake, f.ID)
 		assert.Equal(t, "Factory PagerDuty Intake", f.Label)
-		assert.Equal(t, "Enable PagerDuty incident intake in factories", f.Description)
+		assert.Equal(t, "Add PagerDuty intake from the Backlog column menu", f.Description)
 	})
 
 	t.Run("known id returns factory linear intake feature", func(t *testing.T) {
@@ -52,7 +52,15 @@ func Test__Get(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryLinearIntake, f.ID)
 		assert.Equal(t, "Factory Linear Intake", f.Label)
-		assert.Equal(t, "Enable Linear issue intake in factories", f.Description)
+		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
+		assert.Nil(t, f.Released)
+	})
+	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryBitbucket)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryBitbucket, f.ID)
+		assert.Equal(t, "Bitbucket Workspaces", f.Label)
+		assert.Equal(t, "Connect a Bitbucket workspace and open pull requests from Implement", f.Description)
 		assert.Nil(t, f.Released)
 	})
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
@@ -129,7 +137,7 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
 		assert.Equal(t, "MCP Server", f.Label)
 		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
-		assert.Nil(t, f.Released)
+		assert.True(t, IsReleased(FeatureSuperPlaneMCPServer))
 	})
 
 	t.Run("known id returns mobile board feature", func(t *testing.T) {
@@ -179,6 +187,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureFactoryPagerDutyIntake))
 	assert.True(t, Exists(FeatureFactoryLinearIntake))
+	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))

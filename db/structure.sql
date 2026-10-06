@@ -878,6 +878,7 @@ CREATE TABLE public.factory_work_orders (
     auto_start_line_id uuid,
     mcp_client_id text,
     mcp_client_name text,
+    vcs_provider text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 

@@ -77,6 +77,7 @@ type FactoryWorkOrder struct {
 	OriginLabel     *string
 	Repository      *string
 	DefaultBranch   *string
+	VCSProvider     *string // Git host saved with the repository. Empty means a legacy GitHub row.
 	AutoStartLineID *uuid.UUID
 	MCPClientID     *string
 	MCPClientName   *string

@@ -99,6 +99,7 @@ import {
 import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
+  boardLineIdFromNavigationState,
   canonicalWorkOrderNumber,
   displayedBoardLineId,
   peekOrderFromNavigationState,
@@ -329,21 +330,21 @@ export function LinesPage() {
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
-  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const navigationLineId = boardLineIdFromNavigationState(locationState);
+  const lineSources = { routeLineId, queryLineId: boardLineId, navigationLineId, lines };
+  const knownBoardLineId = displayedBoardLineId(lineSources);
+  const taskLineOrderId = !knownBoardLineId && routeOrderNumber ? routeOrderNumber : "";
   const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
     organizationId,
     factoryId,
     taskLineOrderId,
   );
   const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
-  const selectedLineId = displayedBoardLineId(
-    routeLineId,
-    boardLineId,
-    lines,
-    taskForBoardLine,
-    taskLinePending ? undefined : firstFactoryLineId(factory),
-  );
+  const selectedLineId = displayedBoardLineId({
+    ...lineSources,
+    order: taskForBoardLine,
+    fallbackLineId: taskLinePending ? undefined : firstFactoryLineId(factory),
+  });
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -621,8 +622,8 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
-      state: { peekOrder: target },
+    navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+      state: { peekOrder: target, lineId: selectedLine.id },
     });
   };
 

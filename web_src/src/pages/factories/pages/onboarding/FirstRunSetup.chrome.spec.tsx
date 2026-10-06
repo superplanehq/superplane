@@ -109,6 +109,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,

@@ -934,3 +934,44 @@ func datadogSeedSearchPage() string {
 
 	return `{"data":[` + strings.Join(results, ",") + `],"included":[` + strings.Join(included, ",") + `]}`
 }
+
+func Test__newestSentrySeedIssues__QueriesEachProjectAndCapsTheTotal(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	payments := sentrySeedIssuePage(1, 6, now)
+	growth := sentrySeedIssuePage(7, 6, now.Add(-2*time.Hour))
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(payments))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(growth))},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	issues, err := newestSentrySeedIssues(client, []string{"payments", "growth"})
+	require.NoError(t, err)
+	require.Len(t, issues, intakeSentrySeedSize)
+	assert.Equal(t, "1", issues[0].ID)
+	assert.Equal(t, "10", issues[len(issues)-1].ID)
+	require.Len(t, httpContext.Requests, 2)
+	assert.Contains(t, httpContext.Requests[0].URL.Path, "/projects/example/payments/issues/")
+	assert.Contains(t, httpContext.Requests[1].URL.Path, "/projects/example/growth/issues/")
+	assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "limit=10")
+}
+
+func sentrySeedIssuePage(start, count int, newest time.Time) string {
+	issues := make([]string, 0, count)
+	for offset := 0; offset < count; offset++ {
+		seen := newest.Add(-time.Duration(offset) * time.Minute).Format(time.RFC3339)
+		issues = append(issues, fmt.Sprintf(
+			`{"id":"%d","title":"issue %d","lastSeen":"%s"}`,
+			start+offset,
+			start+offset,
+			seen,
+		))
+	}
+	return "[" + strings.Join(issues, ",") + "]"
+}

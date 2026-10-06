@@ -483,9 +483,9 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -554,9 +554,9 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
     await waitFor(() => {
