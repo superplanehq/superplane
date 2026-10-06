@@ -7,16 +7,19 @@ export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 /** Organization experimental feature: SetupProvider wizard for GitHub and similar integrations. */
 export const FEATURE_NEW_INTEGRATION_SETUP_FLOW = "new_integration_setup_flow";
 
-/** Organization experimental feature: manual "Add intake" entry for Jira in the Backlog column menu. */
+/** Organization experimental feature: Jira issue intake. */
 export const FEATURE_FACTORY_JIRA_INTAKE = "factory_jira_intake";
 
-/** Organization experimental feature: manual "Add intake" entry for Productive.io in the Backlog column menu. */
+/** Organization experimental feature: Productive task intake. */
 export const FEATURE_FACTORY_PRODUCTIVE_INTAKE = "factory_productive_intake";
 
-/** Organization experimental feature: Datadog Error Tracking intake from the Backlog column menu. */
+/** Organization experimental feature: Datadog Error Tracking intake. */
 export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 
-/** Organization experimental feature: Linear issue intake from the Backlog column menu. */
+/** Organization experimental feature: PagerDuty incident intake. */
+export const FEATURE_FACTORY_PAGERDUTY_INTAKE = "factory_pagerduty_intake";
+
+/** Organization experimental feature: Linear issue intake. */
 export const FEATURE_FACTORY_LINEAR_INTAKE = "factory_linear_intake";
 
 /** Organization experimental feature: workspace MCP servers. */
