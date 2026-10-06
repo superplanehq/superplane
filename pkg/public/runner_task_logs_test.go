@@ -177,6 +177,82 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	assert.Empty(t, signed.Body.String())
 }
 
+func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	server, signer := mustRunnerLiveLogServer(t, resource)
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	previousProvider := blob.Current()
+	blob.SetCurrent(provider)
+	t.Cleanup(func() { blob.SetCurrent(previousProvider) })
+
+	fleet := models.RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          "task-log-not-ready",
+		ScopeType:     models.RunnerFleetScopeInstallation,
+		Enabled:       true,
+		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+		RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(database.Conn()))
+
+	queued := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateQueued)
+	canvasID, executionID := createCanvasWithComponentExecution(
+		t,
+		resource,
+		runneraction.ComponentName,
+		"runner-logs-queued",
+		map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: queued.ID.String(),
+			runneraction.ExecutionMetadataTaskBackend:  "integrated",
+		},
+	)
+
+	waiting := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+	require.Equal(t, http.StatusNotFound, waiting.Code)
+	assert.Equal(t, runneraction.LiveLogSessionNotReadyErrorCode, waiting.Header().Get(runneraction.LiveLogErrorCodeHeader))
+	assert.Contains(t, waiting.Body.String(), "Logs are not available for this execution yet")
+
+	finished := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateSucceeded)
+	finishedCanvasID, finishedExecutionID := createCanvasWithComponentExecution(
+		t,
+		resource,
+		runneraction.ComponentName,
+		"runner-logs-finished",
+		map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: finished.ID.String(),
+			runneraction.ExecutionMetadataTaskBackend:  "integrated",
+		},
+	)
+	missing := runnerTaskLogsGET(t, server, signer, resource, finishedCanvasID, finishedExecutionID, "")
+	require.Equal(t, http.StatusNotFound, missing.Code)
+	assert.Empty(t, missing.Header().Get(runneraction.LiveLogErrorCodeHeader))
+	assert.Contains(t, missing.Body.String(), "Task logs not found")
+}
+
+func createRunnerTaskForLogTest(
+	t *testing.T,
+	resource *support.ResourceRegistry,
+	fleetID uuid.UUID,
+	state string,
+) models.RunnerTask {
+	t.Helper()
+	task := models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleetID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             state,
+		PayloadCiphertext: []byte("{}"),
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	require.NoError(t, database.Conn().Create(&task).Error)
+	return task
+}
+
 type signingBlobProvider struct {
 	blob.Provider
 	signedURL string
