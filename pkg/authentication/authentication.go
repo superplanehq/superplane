@@ -19,7 +19,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-	"github.com/markbates/goth/providers/bitbucket"
 	"github.com/markbates/goth/providers/github"
 	"github.com/markbates/goth/providers/google"
 	log "github.com/sirupsen/logrus"
@@ -101,7 +100,7 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
 		case models.ProviderBitbucket:
-			gothProviders = append(gothProviders, bitbucket.New(config.Key, config.Secret, config.CallbackURL, "account"))
+			gothProviders = append(gothProviders, newBitbucketProvider(config.Key, config.Secret, config.CallbackURL))
 			log.Infof("Bitbucket OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
@@ -321,6 +320,11 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
+		log.WithError(err).Warn("provider authentication failed")
+		if a.isDev {
+			http.Error(w, "Authentication failed: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
 		return
 	}

@@ -146,13 +146,19 @@ func numericDate(value any) (time.Time, bool) {
 	}
 }
 
+// decodeJWKPart reads a JWK field. Forge publishes padded base64url.
+func decodeJWKPart(value string) ([]byte, error) {
+	value = strings.TrimSpace(value)
+	return base64.RawURLEncoding.DecodeString(strings.TrimRight(value, "="))
+}
+
 // RSAPublicKey builds a verification key from a JWKS entry.
 func RSAPublicKey(modulus, exponent string) (*rsa.PublicKey, error) {
-	nBytes, err := base64.RawURLEncoding.DecodeString(modulus)
+	nBytes, err := decodeJWKPart(modulus)
 	if err != nil {
 		return nil, fmt.Errorf("decode forge key modulus: %w", err)
 	}
-	eBytes, err := base64.RawURLEncoding.DecodeString(exponent)
+	eBytes, err := decodeJWKPart(exponent)
 	if err != nil {
 		return nil, fmt.Errorf("decode forge key exponent: %w", err)
 	}

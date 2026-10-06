@@ -9,59 +9,62 @@
 # valid for at least two hours. Do not route that trigger through a function.
 modules:
   trigger:
-    - key: lifecycle
+    - key: lifecycle-trigger
       endpoint: lifecycle
       events:
         - avi:forge:installed:app
         - avi:forge:upgraded:app
   preUninstall:
-    - key: uninstall
+    - key: uninstall-hook
       endpoint: uninstall
   scheduledTrigger:
-    - key: token-refresh
+    - key: token-refresh-trigger
       endpoint: token-refresh
       interval: hour
   webtrigger:
-    - key: bootstrap
+    - key: bootstrap-trigger
       function: bootstrap
-
-function:
-  - key: bootstrap
-    handler: index.bootstrap
-
-endpoint:
-  - key: lifecycle
-    remote: superplane
-    route:
-      path: /api/v1/bitbucket/forge/lifecycle
-    auth:
-      appSystemToken:
-        enabled: true
-  - key: token-refresh
-    remote: superplane
-    route:
-      path: /api/v1/bitbucket/forge/scheduled
-    auth:
-      appSystemToken:
-        enabled: true
-  - key: uninstall
-    remote: superplane
-    route:
-      path: /api/v1/bitbucket/forge/uninstall
-    auth:
-      appSystemToken:
-        enabled: true
-  - key: bootstrap-remote
-    remote: superplane
-    route:
-      path: /api/v1/bitbucket/forge/bootstrap
-    auth:
-      appSystemToken:
-        enabled: true
+  function:
+    - key: bootstrap
+      handler: index.bootstrap
+  endpoint:
+    - key: lifecycle
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/lifecycle
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: token-refresh
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/scheduled
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: uninstall
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/uninstall
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: bootstrap-remote
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/bootstrap
+      auth:
+        appSystemToken:
+          enabled: true
 
 remotes:
   - key: superplane
     baseUrl: https://example.invalid
+    operations:
+      - compute
+    auth:
+      appSystemToken:
+        enabled: true
 
 permissions:
   scopes:

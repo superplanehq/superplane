@@ -3,6 +3,8 @@ package bitbucketapp
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
+	"math/big"
 	"testing"
 	"time"
 
@@ -27,6 +29,18 @@ func TestParseInvocationAcceptsSignedFitAndReadsSystemTokenExpiry(t *testing.T) 
 	assert.Equal(t, workspaceID, invocation.WorkspaceUUID)
 	assert.Equal(t, systemToken, invocation.SystemToken)
 	assert.WithinDuration(t, expires, invocation.SystemTokenExpires, time.Second)
+}
+
+func TestRSAPublicKeyAcceptsPaddedForgeModulus(t *testing.T) {
+	key := testRSAKey(t)
+	modulus := base64.URLEncoding.EncodeToString(key.N.Bytes())
+	require.Contains(t, modulus, "=")
+	exponent := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.E)).Bytes())
+
+	parsed, err := RSAPublicKey(modulus, exponent)
+	require.NoError(t, err)
+	assert.Equal(t, 0, key.N.Cmp(parsed.N))
+	assert.Equal(t, key.E, parsed.E)
 }
 
 func TestParseInvocationRejectsADifferentApp(t *testing.T) {
