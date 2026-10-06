@@ -118,8 +118,10 @@ func copyReleaseAssetHeaders(w http.ResponseWriter, resp *http.Response) {
 	}
 	if cacheControl := resp.Header.Get("Cache-Control"); cacheControl != "" {
 		w.Header().Set("Cache-Control", cacheControl)
-	} else {
+	} else if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
 		w.Header().Set("Cache-Control", "public, max-age=31536000")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
 	}
 	if etag := resp.Header.Get("ETag"); etag != "" {
 		w.Header().Set("ETag", etag)

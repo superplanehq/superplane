@@ -51,6 +51,67 @@ func TestReleaseAssetProxyServesHistoricalWorker(t *testing.T) {
 	}
 }
 
+func TestReleaseAssetProxyCachesOnlySuccessfulAssets(t *testing.T) {
+	const workerPath = "/releases/abc1234/assets/json.worker.js"
+	cases := []struct {
+		name          string
+		status        int
+		upstreamCache string
+		wantCache     string
+	}{
+		{
+			name:      "success without cache control",
+			status:    http.StatusOK,
+			wantCache: "public, max-age=31536000",
+		},
+		{
+			name:          "success keeps upstream cache control",
+			status:        http.StatusOK,
+			upstreamCache: "public, max-age=60",
+			wantCache:     "public, max-age=60",
+		},
+		{
+			name:      "not found is not cached",
+			status:    http.StatusNotFound,
+			wantCache: "no-store",
+		},
+		{
+			name:      "unavailable is not cached",
+			status:    http.StatusServiceUnavailable,
+			wantCache: "no-store",
+		},
+		{
+			name:          "error keeps upstream cache control",
+			status:        http.StatusNotFound,
+			upstreamCache: "max-age=0",
+			wantCache:     "max-age=0",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.upstreamCache != "" {
+					w.Header().Set("Cache-Control", tc.upstreamCache)
+				}
+				w.WriteHeader(tc.status)
+			}))
+			t.Cleanup(cdn.Close)
+
+			handler := newTestReleaseAssetProxy(t, cdn.URL)
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, workerPath, nil))
+
+			if recorder.Code != tc.status {
+				t.Fatalf("status = %d, want %d", recorder.Code, tc.status)
+			}
+			if got := recorder.Header().Get("Cache-Control"); got != tc.wantCache {
+				t.Fatalf("cache control = %q, want %q", got, tc.wantCache)
+			}
+		})
+	}
+}
+
 func TestReleaseAssetProxyRejectsPathsOutsideReleaseAssets(t *testing.T) {
 	var upstreamHits int
 	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
