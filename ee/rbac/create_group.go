@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+func createGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
 	if group == nil {
 		return nil, grpcerrors.InvalidArgument(nil, "group must be specified")
 	}

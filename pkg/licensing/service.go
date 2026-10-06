@@ -71,6 +71,19 @@ func Allows(entitlements Entitlements, feature Feature) bool {
 	return entitlements.IsEntitled(feature)
 }
 
+// ErrNotLicensed reports that the installation license does not grant an
+// Enterprise feature.
+var ErrNotLicensed = errors.New("this action requires a SuperPlane Enterprise license")
+
+// Require returns ErrNotLicensed unless the entitlements grant the feature.
+func Require(entitlements Entitlements, feature Feature) error {
+	if !Allows(entitlements, feature) {
+		return ErrNotLicensed
+	}
+
+	return nil
+}
+
 type snapshot struct {
 	source  SourceKind
 	license *License

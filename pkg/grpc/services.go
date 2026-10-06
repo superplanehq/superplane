@@ -8,6 +8,7 @@ import (
 	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -57,6 +58,11 @@ type ServicesConfig struct {
 	OIDCProvider     oidc.Provider
 	AgentService     agentsActions.AgentsService
 	JWTSigner        *jwt.Signer
+
+	// Entitlements and EnterpriseAccessControl default to Community mode, so
+	// a missing value never grants Enterprise features.
+	Entitlements            licensing.Entitlements
+	EnterpriseAccessControl EnterpriseAccessControl
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
@@ -64,10 +70,20 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		return nil, errors.New("JWT signer is required")
 	}
 
+	entitlements := cfg.Entitlements
+	if entitlements == nil {
+		entitlements = licensing.Community
+	}
+
+	var accessControl EnterpriseAccessControl = communityAccessControl{}
+	if cfg.EnterpriseAccessControl != nil {
+		accessControl = cfg.EnterpriseAccessControl
+	}
+
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
-		Groups: NewGroupsService(cfg.AuthService),
-		Roles:  NewRoleService(cfg.AuthService),
+		Groups: NewGroupsService(cfg.AuthService, accessControl),
+		Roles:  NewRoleService(cfg.AuthService, entitlements, accessControl),
 		Organizations: NewOrganizationService(
 			cfg.AuthService,
 			cfg.Registry,
