@@ -25,11 +25,24 @@ keys or license files.
 
 ## Trusted keys
 
-`pkg/licensing/trustedkeys/root.jwks.json` contains the root public keys. They
-sign the list of license signing keys, which SuperPlane downloads every six
-hours and when a license uses an unknown key. Set
-`SUPERPLANE_LICENSE_KEYS_URL=none` to turn downloads off.
+SuperPlane verifies a license offline with the signing keys it already trusts.
+It learns those keys from a signed list. The trust anchor for that list is
+`pkg/licensing/trustedkeys/root.jwks.json`, which ships in the binary. A
+downloaded list is accepted only when one of those public keys signed it and
+the list version is newer than the list already trusted. The accepted list is
+stored in the database. A failed download leaves that list in place.
 
-`pkg/licensing/trustedkeys/license-keys.jws` is the list at release time. Run
-`make license.keys.update` before a release. Change root keys only in a
-reviewed pull request.
+The default list URL is `https://licensing.superplane.com/.well-known/license-keys.jws`.
+`SUPERPLANE_LICENSE_KEYS_URL` selects another `https` URL. Set it to `none` to
+turn downloads off. An installation administrator can upload a signed list when
+the installation cannot download one.
+
+`pkg/licensing/trustedkeys/license-keys.jws` is the list shipped with a
+release. After a reviewed change to the trust anchor, run
+`make license.keys.update` so the shipped list verifies with that anchor.
+
+This is the same shape as a [trust anchor](https://datatracker.ietf.org/doc/html/rfc5280#section-6.1.1)
+and the [TUF root role](https://theupdateframework.github.io/specification/latest/#the-root-role):
+the application ships the key that verifies later key material. Creating,
+publishing, and rotating that key are issuer operations. They are documented
+in the licensing repository.
