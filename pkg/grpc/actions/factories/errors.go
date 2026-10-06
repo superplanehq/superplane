@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -134,6 +135,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
 	case errors.Is(err, errCannotCloseBitbucketPullRequest):
 		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, vcs.ErrNotSupported):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane does not support this for Bitbucket.")
 	case errors.Is(err, errCannotClosePullRequest):
 		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
