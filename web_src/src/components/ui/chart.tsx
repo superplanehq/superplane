@@ -39,6 +39,46 @@ function useChart() {
   return context;
 }
 
+type ChartBoxSize = {
+  width: number;
+  height: number;
+};
+
+function readPositiveChartBox(element: Element): ChartBoxSize | null {
+  const { width, height } = element.getBoundingClientRect();
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  return { width, height };
+}
+
+function useMeasuredChartBox<T extends Element>() {
+  const ref = React.useRef<T | null>(null);
+  const [size, setSize] = React.useState<ChartBoxSize>({ width: 0, height: 0 });
+
+  React.useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      const next = readPositiveChartBox(element);
+      if (!next) {
+        return;
+      }
+      setSize((current) => (current.width === next.width && current.height === next.height ? current : next));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, width: size.width, height: size.height };
+}
+
 function ChartContainer({
   id,
   className,
@@ -56,6 +96,8 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId();
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`;
+  const { ref, width, height } = useMeasuredChartBox<HTMLDivElement>();
+  const hasPositiveSize = width > 0 && height > 0;
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -67,11 +109,14 @@ function ChartContainer({
           className,
         )}
         {...props}
+        ref={ref}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer initialDimension={initialDimension}>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        {hasPositiveSize ? (
+          <RechartsPrimitive.ResponsiveContainer width={width} height={height} initialDimension={initialDimension}>
+            {children}
+          </RechartsPrimitive.ResponsiveContainer>
+        ) : null}
       </div>
     </ChartContext.Provider>
   );
