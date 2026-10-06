@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestListConsentWorkspacesRequiresMCPServerFlag(t *testing.T) {
+func TestListConsentWorkspacesListsWorkspaceWithFactories(t *testing.T) {
 	r := support.Setup(t)
 	ctx := t.Context()
 	db := database.DB(ctx)
@@ -20,11 +20,6 @@ func TestListConsentWorkspacesRequiresMCPServerFlag(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
-	hidden, err := ListConsentWorkspaces(ctx, r.Account)
-	require.NoError(t, err)
-	assert.Empty(t, hidden)
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
 	visible, err := ListConsentWorkspaces(ctx, r.Account)
 	require.NoError(t, err)
 	require.Len(t, visible, 1)
