@@ -140,6 +140,9 @@ func isObjectStorageHost(host string) bool {
 	if host == "storage.googleapis.com" || strings.HasSuffix(host, ".storage.googleapis.com") {
 		return true
 	}
+	if strings.HasSuffix(host, ".blob.core.windows.net") {
+		return true
+	}
 	if host == "s3.amazonaws.com" || strings.HasSuffix(host, ".s3.amazonaws.com") {
 		return true
 	}
