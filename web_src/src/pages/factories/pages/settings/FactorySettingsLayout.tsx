@@ -18,7 +18,9 @@ import {
 import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
 import { factoryListPath, factorySettingsPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
+import { MobileSettingsBottomBar } from "../../mobile/MobileSettingsBottomBar";
 import { MOBILE_SETTINGS_COPY } from "../../mobile/mobileCopy";
+import { useMobileFactoryShell } from "../../mobile/useMobileFactoryShell";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import {
   factorySettingsNavGroupHeading,
@@ -101,6 +103,7 @@ function FactorySettingsLayoutContent({
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
   const isMobile = useIsMobile();
+  const showMobileBottomBar = useMobileFactoryShell(organizationId);
   const { pathname } = useLocation();
   const { data: describedFactory, isLoading, error } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
@@ -165,6 +168,15 @@ function FactorySettingsLayoutContent({
             >
               {isSettingsIndex ? null : <MobileSettingsBar href={settingsIndexPath} />}
               {main}
+              {showMobileBottomBar ? (
+                <MobileSettingsBottomBar
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  routeSegment={factoryKey}
+                  factory={factory}
+                  factories={factories}
+                />
+              ) : null}
             </div>
           ) : (
             <div className="flex h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">

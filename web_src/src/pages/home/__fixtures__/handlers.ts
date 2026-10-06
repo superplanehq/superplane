@@ -191,6 +191,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
             },
+            {
+              id: "mobile_factory_board",
+              label: "Mobile Factory Board",
+              description: "Phone layout for workspace boards",
+            },
           ],
         },
       }),
