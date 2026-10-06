@@ -270,7 +270,7 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-search-input")).toBeInTheDocument();
   });
 
-  it("opens a task as a full-screen route with the board line in the URL", async () => {
+  it("opens a task without a line id in the URL", async () => {
     const user = userEvent.setup();
     boardWorkOrders.mockReturnValue([
       {
@@ -289,8 +289,8 @@ describe("MobileBoardPage", () => {
       }),
     );
 
-    expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("mobile-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
+    expect(location).not.toHaveTextContent("lineId=");
   });
 });

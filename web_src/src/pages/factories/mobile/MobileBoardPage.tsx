@@ -111,7 +111,9 @@ export function MobileBoardPage() {
       onOpenWorkOrder={(order) => {
         const number = canonicalWorkOrderNumber(order);
         if (number) {
-          navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id));
+          navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+            state: { peekOrder: order, lineId: selectedLine.id },
+          });
         }
       }}
     />
