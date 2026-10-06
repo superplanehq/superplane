@@ -433,6 +433,11 @@ export type SplitRunFixtureOptions = {
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
   /**
+   * Pull requests that decide whether a column-app check run is already linked.
+   * The card reads this list. Omit it to use the task's own pull requests.
+   */
+  pullRequests?: FactoriesFactoryPullRequest[];
+  /**
    * Described canvas runs for column-app checks that are not linked on the
    * pull request. A linked entry already has duration, tokens, cost, and models.
    * Duration stays blank while an unlinked run id is still loading.
@@ -781,7 +786,7 @@ function phasesForOrder(
   return [
     ...knownPhases,
     ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases, {
-      pullRequests: order.pullRequests,
+      pullRequests: options?.pullRequests ?? order.pullRequests,
       canvasRuns: options?.columnAppRuns,
     }),
   ];

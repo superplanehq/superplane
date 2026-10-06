@@ -75,6 +75,7 @@ function useSplitRunWorkOrderExtras(
   return {
     orderChecks,
     artifacts,
+    pullRequests,
     prFeedbackRuns,
     analysisRuns,
     factoryApps,
@@ -92,8 +93,16 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const liveWorkOrder = useWorkOrder(organizationId, factoryId, order?.id ?? "");
-  const { orderChecks, artifacts, prFeedbackRuns, analysisRuns, isAnalyzing, columnApps, columnAppCheckRuns } =
-    useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
+  const {
+    orderChecks,
+    artifacts,
+    pullRequests,
+    prFeedbackRuns,
+    analysisRuns,
+    isAnalyzing,
+    columnApps,
+    columnAppCheckRuns,
+  } = useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
     () =>
@@ -104,6 +113,7 @@ export function useFactoryAppSplitRunPage() {
         artifacts,
         isAnalyzing,
         resolveUser,
+        pullRequests,
         columnAppRuns: columnAppCheckRuns.lookup,
       }),
     [
@@ -114,6 +124,7 @@ export function useFactoryAppSplitRunPage() {
       prFeedbackRuns,
       analysisRuns,
       isAnalyzing,
+      pullRequests,
       query.lineId,
       resolveUser,
       columnAppCheckRuns.lookup,

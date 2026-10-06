@@ -1,4 +1,9 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderCheck } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderCheck,
+} from "@/api-client";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
@@ -54,6 +59,8 @@ export type FixtureForSplitRunPageOptions = {
   resolveUser?: OrgUserDisplayLookup;
   /** Canvas runs for column-app checks that are not on the pull request. */
   columnAppRuns?: ColumnAppCanvasRunLookup;
+  /** Same pull requests used to decide which check runs still need a lookup. */
+  pullRequests?: FactoriesFactoryPullRequest[];
 };
 
 export function fixtureForSplitRunPage(
@@ -76,6 +83,7 @@ export function fixtureForSplitRunPage(
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
     columnAppRuns: options?.columnAppRuns,
+    pullRequests: options?.pullRequests,
   });
 }
 
