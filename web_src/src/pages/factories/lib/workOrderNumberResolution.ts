@@ -90,21 +90,30 @@ export function findWorkOrderByRunId(
   return orders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === id));
 }
 
+export type DisplayedBoardLineInput = {
+  routeLineId?: string;
+  queryLineId?: string | null;
+  navigationLineId?: string | null;
+  lines: ReadonlyArray<{ id?: string }>;
+  order?: FactoriesWorkOrder | null;
+  fallbackLineId?: string;
+};
+
 /**
- * Line the board shows. A task URL can keep `?lineId=` after that line
- * is deleted. Ignore that id. Use the route line, a line that still
- * exists, the task dispatch line, then the first line.
+ * Line the board shows. Ignore a query or navigation line id that no
+ * longer exists. Use the route line, a live query line, a live navigation
+ * line, the task dispatch line, then the first line.
  */
-export function displayedBoardLineId(
-  routeLineId: string | undefined,
-  requestedLineId: string | null | undefined,
-  lines: ReadonlyArray<{ id?: string }>,
-  order: FactoriesWorkOrder | null | undefined,
-  fallbackLineId: string | undefined,
-): string | undefined {
-  const searchLineId =
-    requestedLineId && lines.some((line) => line.id === requestedLineId) ? requestedLineId : undefined;
-  return routeLineId ?? searchLineId ?? latestDispatchForLine(order ?? undefined)?.line?.id ?? fallbackLineId;
+export function displayedBoardLineId(input: DisplayedBoardLineInput): string | undefined {
+  const liveLineId = (lineId: string | null | undefined) =>
+    lineId && input.lines.some((line) => line.id === lineId) ? lineId : undefined;
+  return (
+    input.routeLineId ??
+    liveLineId(input.queryLineId) ??
+    liveLineId(input.navigationLineId) ??
+    latestDispatchForLine(input.order ?? undefined)?.line?.id ??
+    input.fallbackLineId
+  );
 }
 
 /** Latest dispatch on this line, or the latest dispatch on the order. */
@@ -130,6 +139,19 @@ export function canonicalWorkOrderNumber(order: FactoriesWorkOrder | null): stri
   }
   const parsed = Number(order.number);
   return Number.isFinite(parsed) ? String(parsed) : null;
+}
+
+/** Line id stashed on `navigate(..., { state })` when a board card opens a task. */
+export function boardLineIdFromNavigationState(state: unknown): string | undefined {
+  if (!state || typeof state !== "object" || !("lineId" in state)) {
+    return undefined;
+  }
+  const lineId = (state as { lineId?: unknown }).lineId;
+  if (typeof lineId !== "string") {
+    return undefined;
+  }
+  const trimmed = lineId.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
