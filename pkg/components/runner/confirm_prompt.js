@@ -166,10 +166,25 @@ function commandBlocked(pid, line) {
   return activity;
 }
 
-function signalTree(pid, signal) {
-  for (const id of descendantPids(pid).reverse()) {
+function collectTargets(roots) {
+  const pids = [];
+  const seen = new Set();
+  for (const root of roots) {
+    for (const id of descendantPids(root)) {
+      if (seen.has(id)) {
+        continue;
+      }
+      seen.add(id);
+      pids.push(id);
+    }
+  }
+  return pids;
+}
+
+function signalPids(pids, signal) {
+  for (let i = pids.length - 1; i >= 0; i -= 1) {
     try {
-      process.kill(Number(id), signal);
+      process.kill(Number(pids[i]), signal);
     } catch (_err) {
       continue;
     }
@@ -177,18 +192,31 @@ function signalTree(pid, signal) {
 }
 
 function stopChild(child, stopped, signal = "SIGTERM") {
-  if (!child || !child.pid || stopped.current) {
+  if (!child || !child.pid) {
+    return;
+  }
+  const pid = child.pid;
+  stopped.targets = collectTargets([pid, ...(stopped.targets || [])]);
+  if (signal === "SIGKILL") {
+    if (stopped.timer) {
+      clearTimeout(stopped.timer);
+      stopped.timer = null;
+    }
+    signalPids(stopped.targets, "SIGKILL");
+    stopped.current = true;
+    return;
+  }
+  if (stopped.current) {
     return;
   }
   stopped.current = true;
-  const pid = child.pid;
-  signalTree(pid, signal);
-  if (signal === "SIGKILL") {
-    return;
-  }
-  const timer = setTimeout(() => signalTree(pid, "SIGKILL"), 200);
-  if (timer.unref) {
-    timer.unref();
+  signalPids(stopped.targets, signal);
+  stopped.timer = setTimeout(() => {
+    stopped.targets = collectTargets([pid, ...(stopped.targets || [])]);
+    signalPids(stopped.targets, "SIGKILL");
+  }, 200);
+  if (stopped.timer.unref) {
+    stopped.timer.unref();
   }
 }
 
@@ -248,6 +276,9 @@ function runConfirmPromptGuard(script, io = process) {
     }, 100);
     const finish = (code) => {
       clearInterval(timer);
+      if (stopped.current) {
+        halt("SIGKILL");
+      }
       process.removeListener("SIGTERM", onSignal);
       process.removeListener("SIGINT", onSignal);
       process.removeListener("SIGHUP", onSignal);
