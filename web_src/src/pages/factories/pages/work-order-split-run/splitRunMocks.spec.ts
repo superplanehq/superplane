@@ -2362,7 +2362,7 @@ describe("line board work-order examples", () => {
     expect(phase?.model).toBe("anthropic/claude-sonnet-4-6");
   });
 
-  it("shows the described model when the linked pull request has tokens and cost but no models", () => {
+  it("shows the model from the linked pull request without describing the run", () => {
     const fixture = splitRunFixtureForWorkOrder(
       {
         ...OPEN_WORK_ORDER,
@@ -2373,6 +2373,7 @@ describe("line board work-order examples", () => {
               {
                 totalTokens: "46200",
                 costCents: "45",
+                models: ["anthropic/claude-sonnet-4-6"],
                 run: {
                   id: "run-merge",
                   canvasId: "app-merge",
@@ -2390,25 +2391,6 @@ describe("line board work-order examples", () => {
         demoArtifacts: false,
         checks: [mergeConfidenceCheck()],
         columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
-        columnAppRuns: {
-          runsById: new Map([
-            [
-              "run-merge",
-              {
-                id: "run-merge",
-                canvasId: "app-merge",
-                state: "STATE_FINISHED",
-                result: "RESULT_PASSED",
-                createdAt: "2026-08-26T11:00:00Z",
-                finishedAt: "2026-08-26T11:18:08Z",
-                totalTokens: "46200",
-                costCents: "45",
-                models: ["anthropic/claude-sonnet-4-6"],
-              },
-            ],
-          ]),
-          loadingIds: new Set(),
-        },
       },
     );
 
@@ -2420,13 +2402,17 @@ describe("line board work-order examples", () => {
     });
   });
 
-  it("describes linked column-app check runs so the card can show the model", () => {
-    const checks = [mergeConfidenceCheck(), { ...mergeConfidenceCheck(), id: "check-linked", runId: "run-linked" }];
+  it("does not describe a column-app check run that the pull request already links", () => {
+    const checks = [mergeConfidenceCheck(), { ...mergeConfidenceCheck(), id: "check-missing", runId: "run-missing" }];
     const columnApps = [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }];
+    const pullRequests = [
+      {
+        runs: [{ run: { id: "run-merge" } }],
+      },
+    ];
 
-    expect(columnAppCheckRunsToDescribe(columnApps, checks)).toEqual([
-      { appId: "app-merge", runId: "run-merge" },
-      { appId: "app-merge", runId: "run-linked" },
+    expect(columnAppCheckRunsToDescribe(columnApps, checks, pullRequests)).toEqual([
+      { appId: "app-merge", runId: "run-missing" },
     ]);
   });
 

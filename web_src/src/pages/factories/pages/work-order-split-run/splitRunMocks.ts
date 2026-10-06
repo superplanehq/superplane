@@ -433,8 +433,8 @@ export type SplitRunFixtureOptions = {
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
   /**
-   * Described canvas runs for column-app checks. A linked pull request has
-   * tokens and cost but no models, so those runs are described too.
+   * Described canvas runs for column-app checks that are not linked on the
+   * pull request. A linked entry already has duration, tokens, cost, and models.
    * Duration stays blank while an unlinked run id is still loading.
    */
   columnAppRuns?: ColumnAppCanvasRunLookup;
@@ -451,15 +451,19 @@ export type ColumnAppCheckRunTarget = {
 };
 
 /**
- * Column-app check runs that need DescribeRun. Linked pull-request entries
- * have tokens and cost but no models, so they are included.
+ * Column-app check runs that are not already linked on the pull request.
+ * Linked entries already include duration, tokens, cost, and models.
  */
 export function columnAppCheckRunsToDescribe(
   columnApps: SplitRunColumnApp[],
   checks: FactoriesWorkOrderCheck[] | undefined,
+  pullRequests: FactoriesFactoryPullRequest[] | undefined,
 ): ColumnAppCheckRunTarget[] {
   const targets: ColumnAppCheckRunTarget[] = [];
-  for (const [, runChecks] of columnAppChecksByRun(columnApps, checks)) {
+  for (const [runId, runChecks] of columnAppChecksByRun(columnApps, checks)) {
+    if (canvasRunForCheck(runId, pullRequests)) {
+      continue;
+    }
     const ref = columnAppCheckRef(runChecks[0]);
     if (ref) {
       targets.push(ref);
