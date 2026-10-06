@@ -427,6 +427,17 @@ export function savedLinearChoiceBlock(args: {
   });
 }
 
+function useImportExistingIssues(selectedRepo: string | null) {
+  const [importExistingIssues, setImportExistingIssues] = useState(false);
+  const importChoiceRepository = useRef(selectedRepo);
+  useEffect(() => {
+    if (importChoiceRepository.current === selectedRepo) return;
+    importChoiceRepository.current = selectedRepo;
+    setImportExistingIssues(false);
+  }, [selectedRepo]);
+  return { importExistingIssues, setImportExistingIssues };
+}
+
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
@@ -450,7 +461,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady);
-  const [importExistingIssues, setImportExistingIssues] = useState(false);
+  const { importExistingIssues, setImportExistingIssues } = useImportExistingIssues(model.setup.selectedRepo);
   const commands = useFirstRunCommands({
     model,
     agentGate,

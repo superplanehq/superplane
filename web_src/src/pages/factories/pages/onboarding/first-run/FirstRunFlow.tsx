@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
@@ -42,6 +42,7 @@ export function FirstRunFlow({
   const [jiraProjectId, setJiraProjectId] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [progress, setProgress] = useState<FirstRunAnalysisProgress>({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
+  const importChoiceRepository = useRef(selectedRepository);
 
   const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
@@ -50,6 +51,12 @@ export function FirstRunFlow({
     stepIndex,
     onBack,
   });
+
+  useEffect(() => {
+    if (importChoiceRepository.current === selectedRepository) return;
+    importChoiceRepository.current = selectedRepository;
+    setImportExistingIssues(false);
+  }, [selectedRepository]);
 
   useEffect(() => {
     if (screen !== "analysis") return;

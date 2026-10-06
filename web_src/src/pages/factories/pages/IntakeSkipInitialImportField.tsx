@@ -25,7 +25,9 @@ export function IntakeSkipInitialImportField({
     <div
       className={cn(
         "flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card",
+        !disabled && !checked && "hover:border-foreground/15",
+        disabled && "cursor-not-allowed",
       )}
     >
       <Checkbox
@@ -36,7 +38,10 @@ export function IntakeSkipInitialImportField({
         onChange={(event) => onCheckedChange(event.target.checked)}
         data-testid={testId}
       />
-      <Label htmlFor={inputId} className="min-w-0 cursor-pointer flex-col items-start">
+      <Label
+        htmlFor={inputId}
+        className={cn("min-w-0 flex-col items-start", disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer")}
+      >
         <span className="block text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
         <span className="mt-0.5 block text-[12px] font-normal text-muted-foreground">{helper}</span>
       </Label>

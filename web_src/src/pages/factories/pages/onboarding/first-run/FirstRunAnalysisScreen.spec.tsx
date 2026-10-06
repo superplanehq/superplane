@@ -109,6 +109,24 @@ describe("FirstRunAnalysisScreen", () => {
     expect(onGoToBoard).toHaveBeenCalled();
   });
 
+  it("shows later issue progress without claiming an import", () => {
+    render(
+      <FirstRunAnalysisScreen
+        progress={{ total: 1, scored: 1, ready: 1, stageIndex: 2, skipped: true }}
+        failed
+        sourceName="GitHub issues"
+        onGoToBoard={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-analysis-skipped")).toHaveTextContent(FIRST_RUN_COPY.analysis.skippedImport);
+    expect(screen.getByText(FIRST_RUN_COPY.analysis.stageScored(1))).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-ready-count")).toHaveTextContent(FIRST_RUN_COPY.analysis.readyCount(1));
+    expect(screen.queryByText(FIRST_RUN_COPY.analysis.stageImported(1, "GitHub issues"))).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.analysis.failure)).not.toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).not.toBeInTheDocument();
+  });
+
   it("omits the ready counter when no ticket scored above the threshold", () => {
     render(
       <FirstRunAnalysisScreen progress={{ total: 3, scored: 3, ready: 0, stageIndex: 2 }} onGoToBoard={vi.fn()} />,

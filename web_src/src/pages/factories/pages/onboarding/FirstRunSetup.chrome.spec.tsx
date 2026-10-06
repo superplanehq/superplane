@@ -90,7 +90,6 @@ function setupState(): OnboardingSetupApi {
 
 function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
   return {
-    setup: setupState(),
     hostedAgentReady: false,
     hostedModelsAvailable: false,
     hostedModelsAvailableLoading: false,
@@ -128,6 +127,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     linearProjectsError: false,
     retryLinearProjects: vi.fn(),
     ...overrides,
+    setup: overrides.setup ?? setupState(),
   };
 }
 
@@ -135,6 +135,31 @@ function withRepository(): OnboardingSetupApi {
   return { ...setupState(), selectedRepo: "acme/api" };
 }
 
+function LiveRepositorySetup({ finish }: { finish: ReturnType<typeof vi.fn> }) {
+  const setup = useOnboardingSetupState("Payments Service", {
+    simulateDiscovery: false,
+    initial: { vcsHost: "github", selectedRepo: "acme/api", issuesChoice: "vcs" },
+  });
+  const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>("hosted");
+  return (
+    <>
+      <button type="button" onClick={() => setup.selectRepo("acme/other")}>
+        Change repository
+      </button>
+      <FirstRunSetup
+        model={pageModel({
+          hostedAgentReady: true,
+          hostedModelsAvailable: true,
+          bringYourOwnKey: true,
+          agentCredentialChoice: choice,
+          setAgentCredentialChoice: setChoice,
+          finish,
+          setup,
+        })}
+      />
+    </>
+  );
+}
 function StatefulSetup({ model }: { model: OnboardingPageModel }) {
   const [choice, setChoice] = useState<OnboardingAgentCredentialChoice | null>(null);
   return <FirstRunSetup model={{ ...model, agentCredentialChoice: choice, setAgentCredentialChoice: setChoice }} />;
@@ -358,6 +383,26 @@ describe("FirstRunSetup chrome", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
     expect(model.finish).not.toHaveBeenCalledWith("vcs", { skipInitialImport: true });
+  });
+
+  it("clears the import choice when the repository changes", async () => {
+    const user = userEvent.setup();
+    const finish = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+        <LiveRepositorySetup finish={finish} />
+      </MemoryRouter>,
+    );
+
+    const choice = screen.getByRole("checkbox", { name: /Import existing issues/ });
+    await user.click(choice);
+    expect(choice).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "Change repository" }));
+
+    expect(screen.getByRole("checkbox", { name: /Import existing issues/ })).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+    await waitFor(() => expect(finish).toHaveBeenCalledWith("vcs", { skipInitialImport: true }));
   });
 
   it("hides the model source from an organization without the bring-your-own-key flag", async () => {

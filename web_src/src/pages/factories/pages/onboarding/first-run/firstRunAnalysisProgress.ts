@@ -97,11 +97,13 @@ export function firstRunAnalysisProgress(
   importSettled = false,
   initialImport: FirstRunInitialImport = {},
 ): FirstRunAnalysisProgress {
-  if (importWasSkipped(initialImport)) {
+  const skipped = importWasSkipped(initialImport);
+  // A skipped import is finished, but a later issue can still arrive and score.
+  if (skipped && (!runs || runs.length === 0)) {
     return { total: 0, scored: 0, ready: 0, stageIndex: 0, empty: false, skipped: true };
   }
 
-  const importedItemCount = completedImportItemCount(initialImport);
+  const importedItemCount = skipped ? undefined : completedImportItemCount(initialImport);
 
   if (!runs || runs.length === 0) {
     return initialProgress(Boolean(runs), importedItemCount, legacyImportIsEmpty(initialImport, importSettled));
@@ -111,5 +113,11 @@ export function firstRunAnalysisProgress(
   // an intake confidence percentage or a finished Backlog analysis run.
   const ready = runs.filter((run) => READY.includes(String(run.placement)) && isScored(run, scoredOrderIds)).length;
   const total = Math.max(runs.length, importedItemCount ?? 0);
-  return { total, scored, ready, stageIndex: scored === total ? 2 : 1 };
+  return {
+    total,
+    scored,
+    ready,
+    stageIndex: scored === total ? 2 : 1,
+    ...(skipped ? { skipped: true } : {}),
+  };
 }

@@ -82,6 +82,20 @@ describe("firstRunAnalysisProgress", () => {
     });
   });
 
+  it("keeps a skipped import and reports a later issue", () => {
+    const runs = [run("PLACEMENT_BACKLOG", { confidencePct: 80, workOrderId: "wo-1" })];
+
+    expect(
+      firstRunAnalysisProgress(runs, new Set(), true, { status: "INITIAL_IMPORT_STATUS_SKIPPED", itemCount: 0 }),
+    ).toEqual({
+      total: 1,
+      scored: 1,
+      ready: 1,
+      stageIndex: 2,
+      skipped: true,
+    });
+  });
+
   // An intake without an analysis node places items on the backlog the
   // moment the import creates them. That placement is not a score.
   it("does not count a backlog placement without a score signal as scored", () => {

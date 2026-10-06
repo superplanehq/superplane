@@ -44,6 +44,7 @@ function stageRows(
   sourceName?: string,
 ): Array<{ label: string; state: StageState; count?: string }> {
   const copy = FIRST_RUN_COPY.analysis;
+  if (progress.skipped) return skippedImportRows(progress);
   if (progress.empty) {
     return [{ label: copy.emptyImport(sourceName), state: "empty" }];
   }
@@ -53,13 +54,31 @@ function stageRows(
       { label: copy.stageScoringPending, state: "pending" },
     ];
   }
+  return importedRows(progress, sourceName);
+}
+
+function scoredRow(progress: FirstRunAnalysisProgress): { label: string; state: StageState; count?: string } {
+  const copy = FIRST_RUN_COPY.analysis;
   const count = progress.ready > 0 ? copy.readyCount(progress.ready) : undefined;
-  return [
-    { label: copy.stageImported(progress.total, sourceName), state: "done" },
-    progress.stageIndex === 2
-      ? { label: copy.stageScored(progress.total), state: "done", count }
-      : { label: copy.stageScoring, state: "done", count },
-  ];
+  return progress.stageIndex === 2
+    ? { label: copy.stageScored(progress.total), state: "done", count }
+    : { label: copy.stageScoring, state: "done", count };
+}
+
+/** Later issues can score after a skip. Do not claim that the initial import ran. */
+function skippedImportRows(
+  progress: FirstRunAnalysisProgress,
+): Array<{ label: string; state: StageState; count?: string }> {
+  if (progress.total === 0) return [];
+  return [scoredRow(progress)];
+}
+
+function importedRows(
+  progress: FirstRunAnalysisProgress,
+  sourceName?: string,
+): Array<{ label: string; state: StageState; count?: string }> {
+  const copy = FIRST_RUN_COPY.analysis;
+  return [{ label: copy.stageImported(progress.total, sourceName), state: "done" }, scoredRow(progress)];
 }
 
 export function FirstRunAnalysisScreen({
@@ -79,7 +98,7 @@ export function FirstRunAnalysisScreen({
   onGoToBoard: () => void;
 }) {
   const copy = FIRST_RUN_COPY.analysis;
-  const rows = progress.skipped ? [] : stageRows(progress, sourceName);
+  const rows = stageRows(progress, sourceName);
 
   return (
     <FirstRunShell testId="first-run-analysis" chrome={chrome} sphere={sphere}>
@@ -91,8 +110,10 @@ export function FirstRunAnalysisScreen({
         <p className="mt-8 text-[13px] text-foreground" data-testid="first-run-analysis-skipped">
           {copy.skippedImport}
         </p>
-      ) : (
-        <ol className="mt-8 space-y-3">
+      ) : null}
+
+      {rows.length > 0 ? (
+        <ol className={cn("space-y-3", progress.skipped ? "mt-3" : "mt-8")}>
           {rows.map(({ label, state, count }) => (
             <li key={label} className="flex items-center gap-3 text-[13px]">
               <StageIcon state={state} />
@@ -108,7 +129,7 @@ export function FirstRunAnalysisScreen({
             </li>
           ))}
         </ol>
-      )}
+      ) : null}
 
       {progress.empty && !progress.skipped ? (
         <p className="mt-4 text-[13px] text-muted-foreground" data-testid="first-run-analysis-empty">
