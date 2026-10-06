@@ -529,7 +529,10 @@ describe("FactorySettingsMCPPage", () => {
       connectedMcpClient(longClientId, longClientName),
     ]);
 
-    const longRow = await screen.findByTestId(`superplane-mcp-client-${longClientId}`, {}, { timeout: 8000 });
+    const table = await screen.findByRole("table", { name: "Connected clients" }, { timeout: 8000 });
+    const longRow = within(table).getByRole("row", { name: (name) => name.includes(longClientName) });
+    expect(within(longRow).getAllByRole("cell")).toHaveLength(4);
+    expect(within(table).getByRole("columnheader", { name: "Client" })).toBeInTheDocument();
     const longName = within(longRow).getByTestId(`superplane-mcp-client-name-${longClientId}`);
     expect(screen.getByTestId("superplane-mcp-client-mcp-client-cursor")).toHaveTextContent("Cursor");
     expect(longName).toHaveAttribute("title", longClientName);

@@ -169,19 +169,43 @@ function SuperPlaneMCPClientsTable({
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
-        <div
-          className="grid w-full min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)_minmax(0,7.25rem)_max-content] gap-x-3"
-          data-testid="superplane-mcp-clients-list"
-        >
-          {filteredClients.map((client) => (
-            <SuperPlaneMCPClientRow
-              key={client.id}
-              client={client}
-              canUpdate={canUpdate}
-              isRevoking={isRevoking && pendingRevokeId === client.id}
-              onRevoke={() => onRevoke(client)}
-            />
-          ))}
+        <div className="min-w-0">
+          <table className="w-full table-fixed text-left" data-testid="superplane-mcp-clients-list">
+            <caption className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsTableLabel}</caption>
+            <colgroup>
+              <col style={{ width: "7rem" }} />
+              <col />
+              <col style={{ width: "8.5rem" }} />
+              <col style={{ width: "5.5rem" }} />
+            </colgroup>
+            <thead>
+              <tr className="h-0">
+                <th scope="col" className="h-0 p-0 font-normal">
+                  <span className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsColumnUser}</span>
+                </th>
+                <th scope="col" className="h-0 p-0 font-normal">
+                  <span className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsColumnClient}</span>
+                </th>
+                <th scope="col" className="h-0 p-0 font-normal">
+                  <span className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsColumnConnected}</span>
+                </th>
+                <th scope="col" className="h-0 p-0 font-normal">
+                  <span className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsColumnAction}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.map((client) => (
+                <SuperPlaneMCPClientRow
+                  key={client.id}
+                  client={client}
+                  canUpdate={canUpdate}
+                  isRevoking={isRevoking && pendingRevokeId === client.id}
+                  onRevoke={() => onRevoke(client)}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -328,34 +352,37 @@ function SuperPlaneMCPClientRow({
   const absoluteWhen = client.createdAt ? formatTimestampInUserTimezone(client.createdAt) : undefined;
 
   return (
-    <div
-      className="col-span-4 grid grid-cols-subgrid items-center border-b border-border py-2.5 last:border-b-0"
-      data-testid={`superplane-mcp-client-${client.id}`}
-    >
-      <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-        <Avatar
-          src={client.userAvatarUrl?.trim() || undefined}
-          initials={getUserInitials(userName)}
-          alt={userName}
-          className="size-6 shrink-0 bg-muted text-[10px] text-muted-foreground"
-        />
-        <span className="truncate text-[13px] font-medium text-foreground">{userName}</span>
-      </div>
-      <div
-        className="min-w-0 truncate text-[13px] text-foreground"
-        title={clientName}
-        data-testid={`superplane-mcp-client-name-${client.id}`}
-      >
-        {clientName}
-      </div>
-      <div
-        className="min-w-0 truncate text-[13px] text-muted-foreground"
-        title={absoluteWhen}
-        data-testid={`superplane-mcp-client-time-${client.id}`}
-      >
-        {when}
-      </div>
-      <div className="justify-self-end">
+    <tr className="border-b border-border last:border-b-0" data-testid={`superplane-mcp-client-${client.id}`}>
+      <td className="overflow-hidden py-2.5 pr-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Avatar
+            src={client.userAvatarUrl?.trim() || undefined}
+            initials={getUserInitials(userName)}
+            alt={userName}
+            className="size-6 shrink-0 bg-muted text-[10px] text-muted-foreground"
+          />
+          <span className="truncate text-[13px] font-medium text-foreground">{userName}</span>
+        </div>
+      </td>
+      <td className="overflow-hidden py-2.5 pr-3">
+        <div
+          className="truncate text-[13px] text-foreground"
+          title={clientName}
+          data-testid={`superplane-mcp-client-name-${client.id}`}
+        >
+          {clientName}
+        </div>
+      </td>
+      <td className="overflow-hidden py-2.5 pr-3">
+        <div
+          className="truncate text-[13px] text-muted-foreground"
+          title={absoluteWhen}
+          data-testid={`superplane-mcp-client-time-${client.id}`}
+        >
+          {when}
+        </div>
+      </td>
+      <td className="py-2.5 text-right whitespace-nowrap">
         <PermissionTooltip allowed={canUpdate} message={SUPERPLANE_MCP_SERVER_COPY.noUpdatePermission}>
           <Button
             type="button"
@@ -368,8 +395,8 @@ function SuperPlaneMCPClientRow({
             {SUPERPLANE_MCP_SERVER_COPY.revoke}
           </Button>
         </PermissionTooltip>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
 
