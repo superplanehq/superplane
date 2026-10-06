@@ -1,9 +1,5 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { isIntakeSelectable } from "@/lib/intakeCatalog";
-import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -31,6 +27,7 @@ import {
 } from "./githubInstallReturn";
 import { githubConnectReturnPath } from "./onboardingGitHubConnect";
 import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
+import { useFirstRunIntakeAvailability } from "./useFirstRunIntakeAvailability";
 import {
   githubOnboardingMessage,
   navigateGitHubWindow,
@@ -445,32 +442,23 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
-  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
-  const intakeCatalogLoading = intakeCatalog.loading;
-  const jiraFeatureLoading = intakeCatalogLoading;
-  const linearFeatureLoading = intakeCatalogLoading;
-  const jiraAvailable = isIntakeSelectable(intakeCatalog.stateOf("jira-issues"));
-  const linearAvailable = isIntakeSelectable(intakeCatalog.stateOf("linear-issues"));
-  const intakeFeatures = useExperimentalFeature(organizationId);
-  const bitbucketFeatureLoading = intakeFeatures.isLoading;
-  const bitbucketAvailable = !bitbucketFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
-  const bitbucket = { available: bitbucketAvailable, loading: bitbucketFeatureLoading };
+  const intake = useFirstRunIntakeAvailability(organizationId);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, bitbucket);
+  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, intake.bitbucket);
   const commands = useFirstRunCommands({
     model,
     agentGate,
     connection,
     navigation,
     blocking,
-    jiraAvailable,
-    linearAvailable,
-    bitbucketAvailable,
+    jiraAvailable: intake.jiraAvailable,
+    linearAvailable: intake.linearAvailable,
+    bitbucketAvailable: intake.bitbucketAvailable,
     installScope,
   });
   // A saved Jira or Linear choice is not valid when the intake catalog does
@@ -479,17 +467,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeCatalog.loaded;
+  const organizationReady = intake.organizationReady;
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeCatalogLoading,
-    jiraAvailable,
+    featureLoading: intake.intakesLoading,
+    jiraAvailable: intake.jiraAvailable,
     organizationReady,
   };
   const linearChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeCatalogLoading,
-    linearAvailable,
+    featureLoading: intake.intakesLoading,
+    linearAvailable: intake.linearAvailable,
     organizationReady,
   };
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
@@ -504,8 +492,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...navigation,
     ...commands,
     vcsHost: model.setup.vcsHost,
-    bitbucketAvailable,
-    bitbucketFeatureLoading,
+    bitbucketAvailable: intake.bitbucketAvailable,
+    bitbucketFeatureLoading: intake.bitbucketFeatureLoading,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
@@ -514,14 +502,14 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
-    jiraAvailable,
-    intakeState: intakeCatalog.stateOf,
-    intakesLoading: jiraFeatureLoading,
-    ticketIntakes: intakeCatalog.loaded ? intakeCatalog.entriesFor("onboardingTickets") : null,
-    jiraFeatureLoading,
+    jiraAvailable: intake.jiraAvailable,
+    intakeState: intake.intakeState,
+    intakesLoading: intake.intakesLoading,
+    ticketIntakes: intake.ticketIntakes,
+    jiraFeatureLoading: intake.jiraFeatureLoading,
     jiraChoiceBlock,
-    linearAvailable,
-    linearFeatureLoading,
+    linearAvailable: intake.linearAvailable,
+    linearFeatureLoading: intake.linearFeatureLoading,
     linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
