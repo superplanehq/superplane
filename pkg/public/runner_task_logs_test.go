@@ -211,6 +211,7 @@ func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
 
 	waiting := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusNotFound, waiting.Code)
+	assert.Equal(t, "no-store", waiting.Header().Get("Cache-Control"))
 	assert.Equal(t, runneraction.LiveLogSessionNotReadyErrorCode, waiting.Header().Get(runneraction.LiveLogErrorCodeHeader))
 	assert.Contains(t, waiting.Body.String(), "Logs are not available for this execution yet")
 

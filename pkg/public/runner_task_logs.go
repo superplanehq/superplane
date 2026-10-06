@@ -173,6 +173,7 @@ func writeRunnerLogState(w http.ResponseWriter, state, cursor string) {
 }
 
 func writeRunnerLogNotReady(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set(runneraction.LiveLogErrorCodeHeader, runneraction.LiveLogSessionNotReadyErrorCode)
 	http.Error(
 		w,
