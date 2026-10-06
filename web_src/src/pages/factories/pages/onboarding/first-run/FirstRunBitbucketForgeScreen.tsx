@@ -23,85 +23,122 @@ type FirstRunBitbucketForgeScreenProps = {
   saving?: boolean;
   loading?: boolean;
   loadError?: boolean;
+  lookupFailed?: boolean;
+  retrying?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
+  onRetryLookup?: () => void;
   onGrantAccess: () => void;
   onSelectRepository: (repository: string) => void;
   onContinue: () => void;
 };
 
-export function FirstRunBitbucketForgeScreen({
-  phase,
-  connectHref,
+export function FirstRunBitbucketForgeScreen(props: FirstRunBitbucketForgeScreenProps) {
+  if (props.loading) return <BitbucketLoadingScreen {...props} />;
+  if (props.lookupFailed) return <BitbucketLookupFailedScreen {...props} />;
+  if (props.phase === "connect") return <BitbucketConnectScreen {...props} />;
+  if (props.phase === "grant") return <BitbucketGrantScreen {...props} />;
+  return <BitbucketChooseRepositoryScreen {...props} />;
+}
+
+function BitbucketLoadingScreen({ chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
+  return (
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+      <p className="text-[13px] text-muted-foreground" role="status">
+        {copy.loading}
+      </p>
+    </FirstRunShell>
+  );
+}
+
+function BitbucketLookupFailedScreen({
+  retrying = false,
+  chrome,
+  sphere,
+  onRetryLookup = () => undefined,
+}: FirstRunBitbucketForgeScreenProps) {
+  return (
+    <FirstRunShell testId="first-run-bitbucket-lookup-failed" chrome={chrome} sphere={sphere}>
+      <FirstRunHeading headline={copy.connectHeadline}>
+        <p className="text-[13px] text-destructive">{copy.lookupFailed}</p>
+      </FirstRunHeading>
+      <div className="mt-8">
+        <LoadingButton
+          type="button"
+          onClick={onRetryLookup}
+          loading={retrying}
+          loadingText={copy.retrying}
+          data-testid="first-run-bitbucket-retry"
+        >
+          {copy.retry}
+        </LoadingButton>
+      </div>
+    </FirstRunShell>
+  );
+}
+
+function BitbucketConnectScreen({ connectHref, chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
+  return (
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+      <FirstRunHeading headline={copy.connectHeadline}>
+        <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectAccountBody}</p>
+      </FirstRunHeading>
+      <div className="mt-8">
+        <Button asChild>
+          <a href={connectHref} data-testid="first-run-bitbucket-oauth">
+            {copy.connectAction}
+          </a>
+        </Button>
+      </div>
+    </FirstRunShell>
+  );
+}
+
+function BitbucketGrantScreen({
   installUrl,
-  repositories,
-  selectedRepository,
   granting = false,
-  saving = false,
-  loading = false,
   loadError = false,
   chrome,
   sphere,
   onGrantAccess,
+}: FirstRunBitbucketForgeScreenProps) {
+  return (
+    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting}>
+      <FirstRunHeading headline={copy.connectHeadline}>
+        <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
+      </FirstRunHeading>
+      <div className="mt-8 space-y-4">
+        <LoadingButton
+          type="button"
+          onClick={onGrantAccess}
+          loading={granting}
+          loadingText={copy.openingBitbucket}
+          data-testid="first-run-bitbucket-install"
+        >
+          {copy.grantAction}
+        </LoadingButton>
+        {installUrl ? <InstallationLink url={installUrl} /> : null}
+        {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
+      </div>
+    </FirstRunShell>
+  );
+}
+
+function BitbucketChooseRepositoryScreen({
+  repositories,
+  selectedRepository,
+  saving = false,
+  loadError = false,
+  chrome,
+  sphere,
   onSelectRepository,
   onContinue,
 }: FirstRunBitbucketForgeScreenProps) {
-  if (loading) {
-    return (
-      <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
-        <p className="text-[13px] text-muted-foreground" role="status">
-          {copy.loading}
-        </p>
-      </FirstRunShell>
-    );
-  }
-
-  if (phase === "connect") {
-    return (
-      <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
-        <FirstRunHeading headline={copy.connectHeadline}>
-          <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectAccountBody}</p>
-        </FirstRunHeading>
-        <div className="mt-8">
-          <Button asChild>
-            <a href={connectHref} data-testid="first-run-bitbucket-oauth">
-              {copy.connectAction}
-            </a>
-          </Button>
-        </div>
-      </FirstRunShell>
-    );
-  }
-
-  if (phase === "grant") {
-    return (
-      <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting}>
-        <FirstRunHeading headline={copy.connectHeadline}>
-          <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
-        </FirstRunHeading>
-        <div className="mt-8 space-y-4">
-          <LoadingButton
-            type="button"
-            onClick={onGrantAccess}
-            loading={granting}
-            loadingText={copy.openingBitbucket}
-            data-testid="first-run-bitbucket-install"
-          >
-            {copy.grantAction}
-          </LoadingButton>
-          {installUrl ? <InstallationLink url={installUrl} /> : null}
-          {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
-        </div>
-      </FirstRunShell>
-    );
-  }
-
-  const busy = saving;
   return (
     <FirstRunShell
       testId="first-run-bitbucket-choose"
       chrome={chrome}
-      busy={busy}
+      busy={saving}
       contentSpacing="compact"
       sphere={sphere}
     >
@@ -117,7 +154,7 @@ export function FirstRunBitbucketForgeScreen({
             host="bitbucket"
             repos={repositories}
             selectedRepo={selectedRepository}
-            disabled={busy}
+            disabled={saving}
             listClassName="max-h-48"
             onSelect={onSelectRepository}
           />
@@ -126,7 +163,7 @@ export function FirstRunBitbucketForgeScreen({
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!selectedRepository || busy}
+            disabled={!selectedRepository || saving}
             loading={saving}
             loadingText={chooseCopy.saving}
             onClick={onContinue}

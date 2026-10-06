@@ -22,6 +22,8 @@ const experimental = vi.hoisted(() => ({
 }));
 
 const bitbucketOnboarding = vi.hoisted(() => ({
+  loaded: true,
+  refetch: (() => undefined) as () => unknown,
   providerConfigured: false,
   identity: undefined as { login?: string; providerUserId?: string } | undefined,
   repositories: [] as Array<{ fullName?: string }>,
@@ -49,14 +51,17 @@ vi.mock("@/hooks/useIntegrations", () => ({
 
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
-    data: {
-      providerConfigured: bitbucketOnboarding.providerConfigured,
-      identity: bitbucketOnboarding.identity,
-      repositories: bitbucketOnboarding.repositories,
-      installUrl: bitbucketOnboarding.installUrl,
-    },
+    data: bitbucketOnboarding.loaded
+      ? {
+          providerConfigured: bitbucketOnboarding.providerConfigured,
+          identity: bitbucketOnboarding.identity,
+          repositories: bitbucketOnboarding.repositories,
+          installUrl: bitbucketOnboarding.installUrl,
+        }
+      : undefined,
     isPending: bitbucketOnboarding.isPending,
     error: bitbucketOnboarding.error,
+    refetch: bitbucketOnboarding.refetch,
     startInstallation: { mutateAsync: vi.fn() },
   }),
 }));
@@ -176,6 +181,8 @@ async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
 describe("FirstRunSetup Bitbucket", () => {
   beforeEach(() => {
     resources.calls = [];
+    bitbucketOnboarding.loaded = true;
+    bitbucketOnboarding.refetch = vi.fn();
     bitbucketOnboarding.providerConfigured = false;
     bitbucketOnboarding.identity = undefined;
     bitbucketOnboarding.repositories = [];
@@ -237,6 +244,22 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(
       screen.getByText("Connect your Bitbucket account. SuperPlane uses it to find repositories you can open."),
     ).toBeInTheDocument();
+  });
+
+  it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
+    bitbucketOnboarding.loaded = false;
+    bitbucketOnboarding.error = new Error("network error");
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-connect-bitbucket")).not.toBeInTheDocument();
+    expect(screen.getByText("SuperPlane could not check the Bitbucket setup. Try again.")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-bitbucket-retry"));
+    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+    expect(requestConnect).not.toHaveBeenCalled();
   });
 
   it("saves the chosen Bitbucket repository and opens the ticket screen", async () => {

@@ -273,7 +273,7 @@ function BitbucketChooseHost({
     enabled: connected && !flow.bitbucketForgeConfigured,
   });
   const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
-  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured) {
+  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
     return (
       <FirstRunBitbucketForgeScreen
         phase={bitbucketForgePhase(flow.bitbucketIdentityLinked, flow.bitbucketRepositories.length)}
@@ -285,8 +285,11 @@ function BitbucketChooseHost({
         saving={flow.blockingAction === "saving-repository"}
         loading={flow.bitbucketOnboardingPending}
         loadError={flow.bitbucketLoadError}
+        lookupFailed={flow.bitbucketLookupFailed}
+        retrying={flow.bitbucketLookupRetrying}
         chrome={chrome}
         sphere={sphere}
+        onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
         onSelectRepository={model.setup.selectRepo}
         onContinue={() => void flow.continueFromRepository()}

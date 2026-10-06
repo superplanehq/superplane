@@ -31,6 +31,9 @@ export function useFirstRunBitbucket(args: {
     repositories: (onboarding.data?.repositories ?? []).map((repository) => repository.fullName ?? "").filter(Boolean),
     identityLinked: Boolean(onboarding.data?.identity?.login || onboarding.data?.identity?.providerUserId),
     loadError: Boolean(onboarding.error),
+    lookupFailed: Boolean(onboarding.error) && !onboarding.data,
+    lookupRetrying: Boolean(onboarding.isFetching),
+    retryLookup: () => void onboarding.refetch(),
     connectHref: linkedAccountConnectHref(
       "bitbucket",
       onboardingStepPath(`${location.pathname}${location.search}`, "repo"),

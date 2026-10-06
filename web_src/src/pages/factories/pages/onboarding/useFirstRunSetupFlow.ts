@@ -442,6 +442,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketRepositories: bitbucketConnect.repositories,
     bitbucketIdentityLinked: bitbucketConnect.identityLinked,
     bitbucketLoadError: bitbucketConnect.loadError,
+    bitbucketLookupFailed: bitbucketConnect.lookupFailed,
+    bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
+    retryBitbucketLookup: bitbucketConnect.retryLookup,
     bitbucketConnectHref: bitbucketConnect.connectHref,
     grantBitbucketAccess: bitbucketConnect.grantAccess,
     // The ticket screen is the last screen, so it finishes setup.

@@ -41,6 +41,9 @@ export const FIRST_RUN_COPY = {
     repositoryHelper: "SuperPlane opens pull requests in this Bitbucket repository for review.",
     loading: "Loading Bitbucket repositories…",
     loadError: "SuperPlane could not load the Bitbucket repositories. Check the connection and try again.",
+    lookupFailed: "SuperPlane could not check the Bitbucket setup. Try again.",
+    retry: "Try again",
+    retrying: "Checking…",
     empty: "SuperPlane cannot see repositories in this Bitbucket workspace.",
   },
   connect: {
