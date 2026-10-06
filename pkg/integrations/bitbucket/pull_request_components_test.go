@@ -20,7 +20,10 @@ func bitbucketResponse(status int, body string) *http.Response {
 func workspaceTokenIntegration() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
 		Configuration: map[string]any{"token": "workspace-token"},
-		Metadata:      Metadata{AuthType: AuthTypeWorkspaceAccessToken},
+		Metadata: Metadata{
+			AuthType:  AuthTypeWorkspaceAccessToken,
+			Workspace: &WorkspaceMetadata{Slug: "acme"},
+		},
 	}
 }
 
@@ -164,6 +167,84 @@ func Test__Bitbucket__ListResources__DefaultBranch(t *testing.T) {
 	assert.Equal(t, "/2.0/repositories/acme/widgets", httpCtx.Requests[0].URL.Path)
 	require.Len(t, resources, 1)
 	assert.Equal(t, "develop", resources[0].Name)
+}
+
+func TestPullRequestActionsRejectRepositoryOutsideWorkspace(t *testing.T) {
+	integration := workspaceTokenIntegration()
+	cases := []struct {
+		name    string
+		execute func(httpCtx *contexts.HTTPContext) error
+	}{
+		{
+			name: "find",
+			execute: func(httpCtx *contexts.HTTPContext) error {
+				return (&FindPullRequest{}).Execute(core.ExecutionContext{
+					Configuration:  map[string]any{"repository": "other/widgets", "head": "feat/retry", "base": "main"},
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: &contexts.ExecutionStateContext{},
+				})
+			},
+		},
+		{
+			name: "create",
+			execute: func(httpCtx *contexts.HTTPContext) error {
+				return (&CreatePullRequest{}).Execute(core.ExecutionContext{
+					Configuration: map[string]any{
+						"repository": "other/widgets",
+						"head":       "feat/retry",
+						"base":       "main",
+						"title":      "feat: Retry",
+					},
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: &contexts.ExecutionStateContext{},
+				})
+			},
+		},
+		{
+			name: "update",
+			execute: func(httpCtx *contexts.HTTPContext) error {
+				return (&UpdatePullRequest{}).Execute(core.ExecutionContext{
+					Configuration:  map[string]any{"repository": "other/widgets", "pullNumber": "42", "title": "feat: Retry"},
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: &contexts.ExecutionStateContext{},
+				})
+			},
+		},
+		{
+			name: "comment",
+			execute: func(httpCtx *contexts.HTTPContext) error {
+				return (&CreatePullRequestComment{}).Execute(core.ExecutionContext{
+					Configuration:  map[string]any{"repository": "other/widgets", "pullNumber": "42", "body": "hello"},
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: &contexts.ExecutionStateContext{},
+				})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpCtx := &contexts.HTTPContext{}
+			err := tc.execute(httpCtx)
+			require.ErrorContains(t, err, "not accessible to workspace")
+			assert.Empty(t, httpCtx.Requests)
+		})
+	}
+}
+
+func Test__Bitbucket__ListResources__DefaultBranchRejectsOtherWorkspace(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{}
+	_, err := (&Bitbucket{}).ListResources("default_branch", core.ListResourcesContext{
+		HTTP:        httpCtx,
+		Integration: workspaceTokenIntegration(),
+		Parameters:  map[string]string{"repository": "other/widgets"},
+	})
+	require.ErrorContains(t, err, "not accessible to workspace")
+	assert.Empty(t, httpCtx.Requests)
 }
 
 func Test__CreatePullRequestComment__Execute(t *testing.T) {

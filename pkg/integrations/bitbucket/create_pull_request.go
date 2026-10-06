@@ -126,6 +126,9 @@ func (c *CreatePullRequest) Execute(ctx core.ExecutionContext) error {
 	if config.Head == config.Base {
 		return errors.New("head and base branches must be different")
 	}
+	if err := requireRepositoryInWorkspace(ctx.Integration, config.Repository); err != nil {
+		return err
+	}
 
 	client, err := newIntegrationClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

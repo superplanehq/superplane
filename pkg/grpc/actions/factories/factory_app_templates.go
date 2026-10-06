@@ -876,17 +876,11 @@ func materializeNonIntakeFactoryAppDefaults(
 	if !ok {
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
-	provider := models.ProviderGitHub
-	if factory != nil {
-		provider = factory.OnboardingConfigValue().EffectiveVCSProvider()
-	}
-	template, ok := lookupFactoryAppTemplate(resolved.id, provider)
-	if !ok {
-		return nil, invalidArgument("factory app has no bundled defaults")
-	}
+	// Reset uses the provider saved on the app. A later workspace host change
+	// must not select a template the app was not installed with.
 	return materializeFactoryTemplate(
-		template.id,
-		provider,
-		deriveFactoryTemplateInput(tx, factory, canvas, version, template),
+		resolved.id,
+		resolved.provider,
+		deriveFactoryTemplateInput(tx, factory, canvas, version, resolved),
 	)
 }

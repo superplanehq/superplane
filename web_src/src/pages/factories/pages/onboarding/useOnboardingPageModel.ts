@@ -340,6 +340,7 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     simulateDiscovery: false,
     initial: initialSetupState(onboarding),
+    persistVcsHostKey: args.factoryId,
   });
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();

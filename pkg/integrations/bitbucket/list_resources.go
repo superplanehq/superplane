@@ -29,7 +29,7 @@ func (b *Bitbucket) ListResources(resourceType string, ctx core.ListResourcesCon
 	}
 
 	if resourceType == resourceTypeDefaultBranch {
-		return listDefaultBranch(client, ctx.Parameters["repository"])
+		return listDefaultBranch(ctx.Integration, client, ctx.Parameters["repository"])
 	}
 
 	repositories, err := client.ListRepositories(metadata.Workspace.Slug)
@@ -49,10 +49,13 @@ func (b *Bitbucket) ListResources(resourceType string, ctx core.ListResourcesCon
 	return resources, nil
 }
 
-func listDefaultBranch(client *Client, repository string) ([]core.IntegrationResource, error) {
+func listDefaultBranch(integration core.IntegrationContext, client *Client, repository string) ([]core.IntegrationResource, error) {
 	repository = strings.TrimSpace(repository)
 	if repository == "" {
 		return []core.IntegrationResource{}, nil
+	}
+	if err := requireRepositoryInWorkspace(integration, repository); err != nil {
+		return nil, err
 	}
 
 	branch, err := client.GetMainBranch(repository)

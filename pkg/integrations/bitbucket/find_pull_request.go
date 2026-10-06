@@ -127,6 +127,9 @@ func (c *FindPullRequest) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	if err := requireRepositoryInWorkspace(ctx.Integration, config.Repository); err != nil {
+		return err
+	}
 
 	client, err := newIntegrationClient(ctx.HTTP, ctx.Integration)
 	if err != nil {

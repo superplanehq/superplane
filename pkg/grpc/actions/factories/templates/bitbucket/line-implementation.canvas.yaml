@@ -321,6 +321,14 @@ spec:
             command: |-
               set -euo pipefail
 
+              # Do not commit or push while HEAD is still the default branch.
+              default_branch="${BASE:-main}"
+              branch="$(git rev-parse --abbrev-ref HEAD)"
+              if [ "$branch" = "HEAD" ] || [ "$branch" = "$default_branch" ]; then
+                echo "Create a working branch before you push. The current branch is ${branch}." >&2
+                exit 1
+              fi
+
               # Commit leftover uncommitted work if the agent did not commit everything.
               git add -A
               if ! git diff --cached --quiet; then

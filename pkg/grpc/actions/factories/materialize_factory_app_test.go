@@ -226,6 +226,36 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, codes.FailedPrecondition, code)
 	})
 
+	t.Run("a GitHub app resets with its saved provider after the workspace uses Bitbucket", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
+		factoryModel := newFactory(t)
+		provider := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSProvider: &provider,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("PR Closure"))
+		require.NoError(t, database.DB(t.Context()).Model(&models.CanvasVersion{}).
+			Where("id = ?", *canvas.LiveVersionID).
+			Update("nodes", datatypes.NewJSONSlice([]models.Node{{
+				ID:       "on-pr-closed",
+				Name:     "On Pull Request Closed",
+				Type:     models.NodeTypeTrigger,
+				Ref:      models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}},
+				Metadata: models.FactoryAppTemplateMetadataFor("pr-closure", 1, models.ProviderGitHub),
+			}})).Error)
+
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: canvas.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "pr-closure", response.GetTemplateId())
+
+		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		assert.Equal(t, "github.onPullRequest", findYAMLNode(t, defaults, "on-pr-closed").Component)
+	})
+
 	t.Run("an app from another factory reports not found", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		other := newFactory(t)
