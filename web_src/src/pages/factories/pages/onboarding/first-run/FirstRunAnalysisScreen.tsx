@@ -79,7 +79,7 @@ export function FirstRunAnalysisScreen({
   onGoToBoard: () => void;
 }) {
   const copy = FIRST_RUN_COPY.analysis;
-  const rows = stageRows(progress, sourceName);
+  const rows = progress.skipped ? [] : stageRows(progress, sourceName);
 
   return (
     <FirstRunShell testId="first-run-analysis" chrome={chrome} sphere={sphere}>
@@ -87,30 +87,36 @@ export function FirstRunAnalysisScreen({
         <p className="text-[13px] text-muted-foreground">{copy.body}</p>
       </FirstRunHeading>
 
-      <ol className="mt-8 space-y-3">
-        {rows.map(({ label, state, count }) => (
-          <li key={label} className="flex items-center gap-3 text-[13px]">
-            <StageIcon state={state} />
-            <span className={state === "pending" ? "text-muted-foreground" : "text-foreground"}>{label}</span>
-            {count ? (
-              <span
-                className="ml-auto shrink-0 rounded-full border border-emerald-600/25 bg-emerald-600/10 px-2 py-0.5 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400"
-                data-testid="first-run-ready-count"
-              >
-                {count}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ol>
+      {progress.skipped ? (
+        <p className="mt-8 text-[13px] text-foreground" data-testid="first-run-analysis-skipped">
+          {copy.skippedImport}
+        </p>
+      ) : (
+        <ol className="mt-8 space-y-3">
+          {rows.map(({ label, state, count }) => (
+            <li key={label} className="flex items-center gap-3 text-[13px]">
+              <StageIcon state={state} />
+              <span className={state === "pending" ? "text-muted-foreground" : "text-foreground"}>{label}</span>
+              {count ? (
+                <span
+                  className="ml-auto shrink-0 rounded-full border border-emerald-600/25 bg-emerald-600/10 px-2 py-0.5 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400"
+                  data-testid="first-run-ready-count"
+                >
+                  {count}
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      )}
 
-      {progress.empty ? (
+      {progress.empty && !progress.skipped ? (
         <p className="mt-4 text-[13px] text-muted-foreground" data-testid="first-run-analysis-empty">
           {copy.emptyNext}
         </p>
       ) : null}
 
-      {failed ? <p className="mt-4 text-[13px] text-muted-foreground">{copy.failure}</p> : null}
+      {failed && !progress.skipped ? <p className="mt-4 text-[13px] text-muted-foreground">{copy.failure}</p> : null}
 
       <Button type="button" className="mt-8 min-w-44" onClick={onGoToBoard} data-testid="first-run-go-to-board">
         {copy.goToBoard}

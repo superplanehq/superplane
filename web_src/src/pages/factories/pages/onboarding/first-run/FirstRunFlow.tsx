@@ -37,6 +37,7 @@ export function FirstRunFlow({
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
+  const [importExistingIssues, setImportExistingIssues] = useState(false);
   const [jiraConnected, setJiraConnected] = useState(false);
   const [jiraProjectId, setJiraProjectId] = useState("");
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
@@ -111,6 +112,8 @@ export function FirstRunFlow({
           setJiraConnected(true);
         }}
         onSelectJiraProject={setJiraProjectId}
+        importExistingIssues={importExistingIssues}
+        onImportExistingIssuesChange={setImportExistingIssues}
         onAnalyzeTickets={() => {
           if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
           setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });

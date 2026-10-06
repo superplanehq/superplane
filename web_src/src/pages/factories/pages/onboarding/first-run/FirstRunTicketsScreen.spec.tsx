@@ -29,6 +29,53 @@ describe("FirstRunTicketsScreen", () => {
     expect(onAnalyzeTickets).not.toHaveBeenCalled();
   });
 
+  it("asks before importing existing GitHub issues and leaves the choice off", async () => {
+    const user = userEvent.setup();
+    const onImportExistingIssuesChange = vi.fn();
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+        onImportExistingIssuesChange={onImportExistingIssuesChange}
+      />,
+    );
+
+    const choice = screen.getByRole("checkbox", { name: /Import existing issues/ });
+    expect(choice).not.toBeChecked();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.importExistingHelperOff)).toBeInTheDocument();
+
+    await user.click(choice);
+    expect(onImportExistingIssuesChange).toHaveBeenCalledWith(true);
+  });
+
+  it("explains that an enabled import scores the 30 newest open issues", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        importExistingIssues
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: /Import existing issues/ })).toBeChecked();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.importExistingHelperOn)).toBeInTheDocument();
+  });
+
+  it("hides the import choice for Jira and Linear", () => {
+    const { rerender } = render(
+      <FirstRunTicketsScreen ticketSource="jira" onSelectTicketSource={vi.fn()} onAnalyzeTickets={vi.fn()} />,
+    );
+
+    expect(screen.queryByRole("checkbox", { name: /Import existing issues/ })).not.toBeInTheDocument();
+
+    rerender(<FirstRunTicketsScreen ticketSource="linear" onSelectTicketSource={vi.fn()} onAnalyzeTickets={vi.fn()} />);
+
+    expect(screen.queryByRole("checkbox", { name: /Import existing issues/ })).not.toBeInTheDocument();
+  });
+
   it("starts analysis from the button after a ticket system is selected", async () => {
     const user = userEvent.setup();
     const onAnalyzeTickets = vi.fn();

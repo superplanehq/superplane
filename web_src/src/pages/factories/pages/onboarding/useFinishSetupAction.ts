@@ -5,7 +5,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { firstFactoryLineId } from "../../lib/factoryPagePaths";
 import type { OnboardingRepo } from "./onboardingMocks";
 import type { IssuesChoiceId } from "./onboardingFixtures";
-import { afterOnboardingPath } from "./useFinishOnboarding";
+import { afterOnboardingPath, type FinishOnboardingOptions } from "./useFinishOnboarding";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -32,8 +32,8 @@ export function useFinishSetupAction(args: {
   factoryKey: string;
   factory: FactoriesFactory | null;
   setup: OnboardingSetupApi;
-  finish: (issuesChoice?: IssuesChoiceId) => void | Promise<void>;
-}): (issuesChoice?: IssuesChoiceId) => void | Promise<void> {
+  finish: (issuesChoice?: IssuesChoiceId, options?: FinishOnboardingOptions) => void | Promise<void>;
+}): (issuesChoice?: IssuesChoiceId, options?: FinishOnboardingOptions) => void | Promise<void> {
   const onboarding = useOnboardingStorybook();
   const navigate = useNavigate();
 

@@ -223,6 +223,34 @@ describe("provisionGithubIntake", () => {
     expect(intake.id).toBe("intake-1");
   });
 
+  it("skips the initial import when the user leaves existing issues out", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+
+    await provisionGithubIntake({ listIntakes, createIntake, skipInitialImport: true });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE, skipInitialImport: true });
+  });
+
+  it("omits the skip flag when the user imports existing issues", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+
+    await provisionGithubIntake({ listIntakes, createIntake, skipInitialImport: false });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+  });
+
+  it("returns an existing GitHub intake and does not reseed it", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE }]);
+    const createIntake = vi.fn();
+
+    const intake = await provisionGithubIntake({ listIntakes, createIntake, skipInitialImport: true });
+
+    expect(createIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
+  });
+
   it("creates the GitHub intake next to an intake of another source", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: "SOURCE_SENTRY_EXCEPTIONS" }]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-2" } as FactoriesFactoryIntake);
@@ -365,6 +393,22 @@ describe("provisionOnboardingIntake", () => {
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
     expect(deleteIntake).not.toHaveBeenCalled();
     expect(intake?.id).toBe("intake-1");
+  });
+
+  it("creates a GitHub intake that skips existing issues when asked", async () => {
+    const listIntakes = vi.fn().mockResolvedValue([]);
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
+    const deleteIntake = vi.fn();
+
+    await provisionOnboardingIntake({
+      listIntakes,
+      createIntake,
+      deleteIntake,
+      issuesChoice: "vcs",
+      skipInitialImport: true,
+    });
+
+    expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE, skipInitialImport: true });
   });
 
   it("creates a Jira intake when the ticket source is Jira", async () => {

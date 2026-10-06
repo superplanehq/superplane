@@ -86,6 +86,9 @@ export const FIRST_RUN_COPY = {
     analyze: "Scan my backlog",
     continue: "Continue",
     saving: "Saving ticket source…",
+    importExisting: "Import existing issues",
+    importExistingHelperOff: "SuperPlane does not import existing issues. New issues still arrive.",
+    importExistingHelperOn: "SuperPlane imports the 30 newest open issues and scores them. Scoring uses credits.",
   },
   agent: {
     headline: "Connect agent",
@@ -121,6 +124,7 @@ export const FIRST_RUN_COPY = {
     readyCount: (count: number) => (count === 1 ? "1 ready to run" : `${count} ready to run`),
     goToBoard: "Go to your board",
     failure: "SuperPlane could not read the scoring progress. Your board still works.",
+    skippedImport: "SuperPlane did not import existing issues. New issues still become tasks.",
   },
   sphere: {
     phases: ["01 Plan", "02 Build", "03 Check", "04 Review"],
