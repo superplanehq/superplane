@@ -254,6 +254,37 @@ describe("LiveLogStream integrated polling", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("downloads an archived log from the signed URL", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ backend: "integrated", stream_url: "/runner-logs" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 204,
+          headers: {
+            "X-SuperPlane-Log-Cursor": "cursor-final",
+            "X-SuperPlane-Log-State": "archived",
+            "X-SuperPlane-Log-URL": "https://storage.example/logs",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(new Response('{"type":"line","text":"from-blob"}\n', { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const onLogLine = vi.fn();
+      const final = await new LiveLogStream("organization-1", "canvas-1", "execution-1", 0).pump(handlers({ onLogLine }));
+
+      expect(final).toBe(true);
+      expect(fetchMock.mock.calls[2]?.[0]).toBe("https://storage.example/logs");
+      expect(onLogLine).toHaveBeenCalledWith("from-blob");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("LiveLogStream session errors", () => {
