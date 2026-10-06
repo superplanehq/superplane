@@ -15,6 +15,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
+import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { PhaseGlyph } from "../pages/linePhaseGlyph";
@@ -46,6 +47,21 @@ const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
   cancelled: "cancelled",
 };
 
+function taskBackLineId(
+  search: string,
+  locationState: unknown,
+  factory: { lines?: Array<{ id?: string }> } | null | undefined,
+  order: FactoriesWorkOrder | undefined,
+): string | undefined {
+  return displayedBoardLineId({
+    queryLineId: workOrderBoardLineIdFromSearch(search),
+    navigationLineId: boardLineIdFromNavigationState(locationState),
+    lines: factory?.lines ?? [],
+    order,
+    fallbackLineId: firstFactoryLineId(factory),
+  });
+}
+
 /**
  * Full-screen task view for the phone shell. Everything stacks in one
  * scrolling column so titles, notes, and the activity log stay readable on a
@@ -54,10 +70,10 @@ const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
 export function MobileTaskDetailPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { orderNumber = "" } = useParams<{ orderNumber?: string }>();
-  const { search } = useLocation();
+  const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
-  const boardLineId = workOrderBoardLineIdFromSearch(search) ?? firstFactoryLineId(factory);
   const { data: order, isLoading, isError } = useWorkOrder(organizationId, factoryId, orderNumber);
+  const boardLineId = taskBackLineId(search, locationState, factory, order);
   const backToBoard = () => navigate(factoryHomePath(organizationId, routeSegment, boardLineId));
 
   usePageTitle([order?.title ?? "Task", factory?.name ?? "Workspace"]);
