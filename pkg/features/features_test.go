@@ -15,14 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryJiraIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
-		assert.Equal(t, "Factory Jira Intake", f.Label)
-		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
-	})
-
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryProductiveIntake)
 		assert.True(t, ok)
@@ -166,6 +158,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
+	t.Run("retired jira intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_jira_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
 	t.Run("retired task console flag is absent", func(t *testing.T) {
 		feature, ok := Get("factory_task_console")
 		assert.False(t, ok)
@@ -176,7 +174,6 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureFactoryLinearIntake))
@@ -195,6 +192,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("factory_dependabot_intake"))
+	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
@@ -208,6 +206,12 @@ func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
 func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
 	for _, feature := range All() {
 		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
+	}
+}
+
+func Test__All_omitsRetiredJiraIntakeFlag(t *testing.T) {
+	for _, feature := range All() {
+		assert.NotEqual(t, "factory_jira_intake", feature.ID)
 	}
 }
 
