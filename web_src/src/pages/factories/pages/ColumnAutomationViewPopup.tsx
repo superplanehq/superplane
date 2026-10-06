@@ -297,7 +297,7 @@ export function ColumnAutomationViewHost({
         onClose={onClose}
         factoryId={factoryId}
         factoryKey={factoryKey}
-        onSaveNode={agent.saveNode}
+        onSaveNode={(update) => agent.saveNode(update, { notify: false })}
         onDelete={onDelete}
         deletePending={deletePending}
       />

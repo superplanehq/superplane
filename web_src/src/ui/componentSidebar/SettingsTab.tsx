@@ -84,6 +84,8 @@ interface SettingsTabProps {
   booleanControl?: "switch" | "checkbox";
   /** Groups visible fields under section labels. Omitted fields stay in the list. */
   fieldGroups?: readonly { label: string; fieldNames: readonly string[] }[];
+  /** Shown after the grouped fields. Not part of the saved configuration. */
+  trailingContent?: ReactNode;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -169,6 +171,7 @@ export function SettingsTab({
   leadingContent,
   booleanControl = "switch",
   fieldGroups,
+  trailingContent,
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
@@ -899,6 +902,7 @@ export function SettingsTab({
               {fieldGroups
                 ? renderGroupedConfigurationFields(fieldGroups, configurationFields, renderConfigurationField)
                 : configurationFields.map((field) => renderConfigurationField(field))}
+              {trailingContent}
             </div>
           )}
 

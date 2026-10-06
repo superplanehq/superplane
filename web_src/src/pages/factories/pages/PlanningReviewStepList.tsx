@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useListFieldDragReorder } from "@/ui/configurationFieldRenderer/useListFieldDragReorder";
 
+import { mergeCheckPromptBody, withMergeCheckHeader } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 import { PlanningReviewStepBody } from "./PlanningReviewStepBody";
 
@@ -25,6 +26,7 @@ export function PlanningReviewStepList({
   restoreError,
   onRetryRestore,
   restoreRetryDisabled = false,
+  createStep,
 }: {
   appearance?: "card" | "fields";
   steps: PlanningReviewStep[];
@@ -34,6 +36,7 @@ export function PlanningReviewStepList({
   restoreError?: string;
   onRetryRestore?: () => void;
   restoreRetryDisabled?: boolean;
+  createStep?: (steps: PlanningReviewStep[]) => PlanningReviewStep;
 }) {
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [openStep, setOpenStep] = useState("");
@@ -50,7 +53,8 @@ export function PlanningReviewStepList({
     onChange(steps.map((step, position) => (position === index ? next : step)));
 
   const addStep = () => {
-    onChange([...steps, { name: "", type: "bash", command: "" }]);
+    const next = createStep ? createStep(steps) : { name: "", type: "bash" as const, command: "" };
+    onChange([...steps, next]);
     setOpenStep(String(steps.length));
   };
 
@@ -103,7 +107,10 @@ export function PlanningReviewStepList({
       ) : (
         <ol className={fields ? "flex flex-col gap-2" : "divide-y divide-border"}>
           {(renderedItems as PlanningReviewStep[]).map((step, index) => (
-            <li key={index} className={fields ? "overflow-hidden rounded-lg border border-border bg-card" : undefined}>
+            <li
+              key={index}
+              className={fields ? "overflow-hidden rounded-lg border border-foreground/20 bg-card" : undefined}
+            >
               <StepRow
                 step={step}
                 position={index}
@@ -121,7 +128,22 @@ export function PlanningReviewStepList({
           ))}
         </ol>
       )}
+      {fields ? <AddStepLink onAdd={addStep} /> : null}
     </section>
+  );
+}
+
+function AddStepLink({ onAdd }: { onAdd: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      data-testid="planning-review-add-step"
+      className="inline-flex w-fit items-center gap-1.5 py-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <Plus className="size-3.5" aria-hidden />
+      Add step
+    </button>
   );
 }
 
@@ -143,15 +165,11 @@ function StepListHeader({
       className={fields ? "flex items-center gap-2" : "flex items-center gap-2.5 border-b border-border px-5 py-3.5"}
     >
       <h3 className={fields ? "workspace-section-title" : "text-sm font-semibold text-foreground"}>Steps</h3>
-      <span
-        className={
-          fields
-            ? "text-sm tabular-nums text-muted-foreground"
-            : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground"
-        }
-      >
-        {count}
-      </span>
+      {fields ? null : (
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      )}
       <span className="flex-1" />
       {onRestoreDefaultPrompt ? (
         <Button
@@ -166,10 +184,12 @@ function StepListHeader({
           Restore default prompt
         </Button>
       ) : null}
-      <Button type="button" variant="outline" size="sm" onClick={onAdd} data-testid="planning-review-add-step">
-        <Plus aria-hidden />
-        Add step
-      </Button>
+      {fields ? null : (
+        <Button type="button" variant="outline" size="sm" onClick={onAdd} data-testid="planning-review-add-step">
+          <Plus aria-hidden />
+          Add step
+        </Button>
+      )}
     </header>
   );
 }
@@ -253,8 +273,14 @@ function StepRow({
         <div id={bodyId} className="px-3 pb-3">
           <PlanningReviewStepBody
             kind={kind}
-            value={(kind === "prompt" ? step.prompt : step.command) ?? ""}
-            onChange={(next) => onChange(kind === "prompt" ? { ...step, prompt: next } : { ...step, command: next })}
+            value={kind === "prompt" ? mergeCheckPromptBody(step.prompt) : (step.command ?? "")}
+            onChange={(next) =>
+              onChange(
+                kind === "prompt"
+                  ? { ...step, prompt: withMergeCheckHeader(step.prompt, next) }
+                  : { ...step, command: next },
+              )
+            }
             label={`${KIND_LABEL[kind]} for ${label}`}
             testId={`planning-review-step-body-${position}`}
           />

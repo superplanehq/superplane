@@ -485,6 +485,8 @@ describe("persistNodeConfiguration", () => {
   });
 
   it("stages one step and leaves the other steps unchanged", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showSuccessToast).mockClear();
     const stageYaml = vi.fn().mockResolvedValue({});
     const commit = vi.fn().mockResolvedValue({});
     const invalidate = vi.fn().mockResolvedValue({});
@@ -513,5 +515,28 @@ describe("persistNodeConfiguration", () => {
     expect(agent?.configuration).toMatchObject({ model: "sonnet" });
     expect(commit).toHaveBeenCalledWith("Update step");
     expect(invalidate).toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Step saved.");
+  });
+
+  it("stays quiet when the merge confidence window saves a step", async () => {
+    const { showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showSuccessToast).mockClear();
+
+    await persistNodeConfiguration({
+      appId: "app-refund-implementer",
+      canvas: agentCanvas,
+      update: {
+        nodeId: "onrun-implement",
+        name: "On work order",
+        configuration: { repository: "operately/website" },
+      },
+      stageYaml: vi.fn().mockResolvedValue({}),
+      commit: vi.fn().mockResolvedValue({}),
+      invalidate: vi.fn(),
+      notify: false,
+      ...stagingSaveDeps(),
+    });
+
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 });

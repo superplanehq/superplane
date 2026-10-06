@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -96,6 +96,31 @@ vi.mock("@/hooks/useIntegrations", () => {
                 },
               ],
             },
+            {
+              type: "TYPE_TRIGGER",
+              name: "github.onIssue",
+              label: "On Issue",
+              configuration: [
+                { name: "customName", label: "Run title", type: "string" },
+                { name: "repository", label: "Repository", type: "string", required: true },
+                {
+                  name: "actions",
+                  label: "Actions",
+                  type: "multi-select",
+                  typeOptions: {
+                    multiSelect: {
+                      options: [
+                        { label: "Opened", value: "opened" },
+                        { label: "Edited", value: "edited" },
+                        { label: "Reopened", value: "reopened" },
+                        { label: "Labeled", value: "labeled" },
+                        { label: "Closed", value: "closed" },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
           ],
         },
       ],
@@ -181,7 +206,60 @@ function confidenceGraph(): IntakeAutomationGraph {
   };
 }
 
-function renderModal(onDelete: () => void = vi.fn()) {
+function issueGraph(): IntakeAutomationGraph {
+  const { nodes, edges } = prepareData({
+    workflow: {
+      metadata: { id: "github-issues", name: "GitHub issues", factoryId: "factory-1" },
+      spec: {
+        nodes: [
+          {
+            id: "on-issue",
+            name: "On Issue",
+            type: "TYPE_TRIGGER",
+            component: "github.onIssue",
+            configuration: {
+              repository: "{{ install_params.appRepository }}",
+              actions: ["opened", "edited"],
+            },
+          },
+        ],
+        edges: [],
+      },
+    },
+    triggers: [{ name: "github.onIssue", label: "On Issue" }],
+    components: [],
+    nodeEventsMap: {},
+    nodeExecutionsMap: {},
+    nodeQueueItemsMap: {},
+    workflowId: "github-issues",
+    queryClient: new QueryClient(),
+    user: null,
+    canvasMode: "live",
+  });
+  return {
+    nodes,
+    edges,
+    factoryId: "factory-1",
+    specNodes: [
+      {
+        id: "on-issue",
+        name: "On Issue",
+        type: "TYPE_TRIGGER",
+        component: "github.onIssue",
+        configuration: {
+          repository: "{{ install_params.appRepository }}",
+          actions: ["opened", "edited"],
+        },
+      },
+    ],
+  };
+}
+
+function renderModal(
+  onDelete: () => void = vi.fn(),
+  onSaveNode = vi.fn(),
+  graph: IntakeAutomationGraph = confidenceGraph(),
+) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -189,10 +267,10 @@ function renderModal(onDelete: () => void = vi.fn()) {
           <TooltipProvider>
             <MergeConfidenceConfigModal
               title="Merge confidence"
-              graph={confidenceGraph()}
+              graph={graph}
               canvasId="merge-confidence"
               onClose={vi.fn()}
-              onSaveNode={vi.fn()}
+              onSaveNode={onSaveNode}
               onDelete={onDelete}
             />
           </TooltipProvider>
@@ -238,21 +316,106 @@ describe("MergeConfidenceConfigModal", () => {
     await user.click(screen.getByText("Assess Merge Confidence"));
 
     expect(screen.getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(screen.getByTestId("merge-confidence-config-body").firstElementChild).toBe(
+      screen.getByTestId("merge-confidence-config-form"),
+    );
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
     expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
     const form = screen.getByTestId("merge-confidence-config-form");
     expect(within(form).getByRole("heading", { name: "Assess Merge Confidence" })).toBeInTheDocument();
-    expect(within(form).getByText("Concurrency")).toBeInTheDocument();
-    expect(within(form).getByText("Model used")).toBeInTheDocument();
+    expect(within(form).queryByText("Concurrency")).not.toBeInTheDocument();
+    expect(within(form).getByText("Model")).toBeInTheDocument();
     expect(within(form).getByDisplayValue("sonnet")).toBeInTheDocument();
     expect(within(form).getByRole("region", { name: "Steps" })).toBeInTheDocument();
     expect(within(form).queryByText("MCP servers")).not.toBeInTheDocument();
     expect(within(form).queryByText("Skills")).not.toBeInTheDocument();
-    expect(within(form).getByRole("button", { name: "Save Agent" })).toBeDisabled();
+    expect(within(form).queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
     expect(within(form).queryByTestId("node-name-input")).not.toBeInTheDocument();
     expect(within(form).queryByText("Integration")).not.toBeInTheDocument();
     expect(within(form).queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-footer")).not.toBeInTheDocument();
+  });
+
+  it("widens the step settings when you drag the split", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(screen.getByText("Assess Merge Confidence"));
+
+    const form = screen.getByTestId("merge-confidence-config-form");
+    const handle = screen.getByRole("separator", { name: "Resize step settings" });
+    expect(form).toHaveStyle({ width: "50%" });
+
+    const body = screen.getByTestId("merge-confidence-config-body");
+    vi.spyOn(body, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 800,
+      right: 1000,
+      width: 1000,
+      height: 800,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(handle, { clientX: 500, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 640, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 640, pointerId: 1 });
+
+    expect(form).toHaveStyle({ width: "64%" });
+  });
+
+  it("saves a new step immediately and a step name when you leave the field", async () => {
+    const user = userEvent.setup();
+    const onSaveNode = vi.fn();
+    renderModal(vi.fn(), onSaveNode);
+
+    await user.click(screen.getByText("Assess Merge Confidence"));
+    const form = screen.getByTestId("merge-confidence-config-form");
+    await user.click(within(form).getByRole("button", { name: "Add step" }));
+
+    expect(onSaveNode).toHaveBeenCalledTimes(1);
+    await user.type(within(form).getByTestId("planning-review-step-name-0"), "Review");
+    expect(onSaveNode).toHaveBeenCalledTimes(1);
+
+    await user.tab();
+
+    expect(onSaveNode).toHaveBeenCalledTimes(2);
+    expect(onSaveNode).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        nodeId: "assess-risk",
+        configuration: expect.objectContaining({
+          steps: [expect.objectContaining({ name: "Review", type: "bash" })],
+        }),
+      }),
+    );
+  });
+
+  it("opens On Issue with the intake event checks", async () => {
+    const user = userEvent.setup();
+    renderModal(vi.fn(), vi.fn(), issueGraph());
+
+    await user.click(screen.getByTestId("factory-node-on-issue"));
+
+    const form = screen.getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Issue" })).toBeInTheDocument();
+    expect(within(form).getByText("Repository")).toBeInTheDocument();
+    expect(within(form).getByText("Application repository")).toBeInTheDocument();
+    expect(within(form).getByText("Start a run when:")).toBeInTheDocument();
+    expect(within(form).getByText("Filters")).toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "Issue has one of these labels" })).toBeDisabled();
+    expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeDisabled();
+    expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
+    expect(
+      within(form).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).not.toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "Edited" })).toBeChecked();
+    expect(within(form).queryByRole("checkbox", { name: "Closed" })).not.toBeInTheDocument();
+    expect(within(form).queryByText("Actions")).not.toBeInTheDocument();
+    expect(within(form).queryByTestId("node-name-input")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Integration")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Customize run title")).not.toBeInTheDocument();
   });
 
   it("opens the trigger settings from the component fields and can close them", async () => {

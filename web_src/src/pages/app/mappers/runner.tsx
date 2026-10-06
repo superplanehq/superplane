@@ -1,5 +1,6 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { useMergeConfidenceCanvas } from "@/lib/mergeConfidenceCanvas";
 import { getColorClass } from "@/lib/colors";
 import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
@@ -233,10 +234,18 @@ export const agentHarnessMapper: ComponentBaseMapper = {
     const steps = agentRunnerStepTitles(context.node.configuration);
     return {
       ...props,
-      factoryBody: steps.length > 0 ? <FactoryNodeStepList steps={steps} /> : undefined,
+      factoryBody: steps.length > 0 ? <AgentHarnessSteps configuration={context.node.configuration} /> : undefined,
     };
   },
 };
+
+function AgentHarnessSteps({ configuration }: { configuration: unknown }) {
+  const steps = agentRunnerStepTitles(configuration, { expandMergeChecks: useMergeConfidenceCanvas() });
+  if (steps.length === 0) {
+    return null;
+  }
+  return <FactoryNodeStepList steps={steps} />;
+}
 
 function runnerEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) return undefined;

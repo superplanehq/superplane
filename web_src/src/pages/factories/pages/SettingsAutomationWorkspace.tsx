@@ -1,5 +1,6 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
+import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
@@ -33,6 +34,7 @@ interface SettingsAutomationWorkspaceProps {
   /** Keep the chosen run when this workspace unmounts. */
   selectedRunId?: string | null;
   onSelectedRunIdChange?: (runId: string | null) => void;
+  className?: string;
 }
 
 const DEFAULT_EDIT_LABEL = "Edit automation";
@@ -89,6 +91,7 @@ export function SettingsAutomationWorkspace({
   layoutFitNonce = null,
   selectedRunId: controlledRunId,
   onSelectedRunIdChange,
+  className,
 }: SettingsAutomationWorkspaceProps) {
   const runs = useAutomationRuns({
     graph,
@@ -115,6 +118,7 @@ export function SettingsAutomationWorkspace({
       focusNonce={focusNonce}
       layoutFitNonce={layoutFitNonce}
       runs={runs}
+      className={className}
     />
   );
 }
@@ -175,6 +179,7 @@ function AutomationWorkspaceLayout({
   focusNonce,
   layoutFitNonce,
   runs,
+  className,
 }: {
   graph: IntakeAutomationGraph;
   testId: string;
@@ -190,10 +195,11 @@ function AutomationWorkspaceLayout({
   focusNonce: number;
   layoutFitNonce: number | null;
   runs: ReturnType<typeof useAutomationRuns>;
+  className?: string;
 }) {
   return (
     <section
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+      className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}
       aria-label="Automation"
       data-testid={testId}
       data-selected-run-id={runs.selectedRunId ?? undefined}

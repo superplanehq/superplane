@@ -4,22 +4,27 @@ import type {
   OrganizationsIntegration,
   SuperplaneComponentsNode,
 } from "@/api-client";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useComponents } from "@/hooks/useComponentData";
 import { useTriggers, useWidgets } from "@/hooks/useCanvasData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SettingsTab } from "@/ui/componentSidebar/SettingsTab";
+import { factorySidebarCloseButtonClassName } from "@/ui/factoryNodeChrome";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { ChevronsRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { PanelLeftClose } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
+import { INTAKE_SETTINGS_COPY } from "./intakeSourceSettingsModel";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
 const PULL_REQUEST_TRIGGER = "github.onPullRequest";
-const PULL_REQUEST_HIDDEN_FIELDS = ["repository", "customName"] as const;
+const ISSUE_TRIGGER = "github.onIssue";
+const SIMPLIFIED_HIDDEN_FIELDS = ["repository", "customName"] as const;
 
 const ONLY_FACTORY_PULL_REQUESTS = "onlyFactoryPullRequests";
 const PULL_REQUEST_ACTIONS_FIELD = "actions";
@@ -29,6 +34,12 @@ const PULL_REQUEST_ACTIONS = [
   { value: "synchronize", label: "New commits are pushed" },
   { value: "reopened", label: "A pull request is reopened" },
   { value: "ready_for_review", label: "A pull request is ready for review" },
+] as const;
+
+const ISSUE_ACTIONS = [
+  { value: "opened", label: INTAKE_SETTINGS_COPY.newIssues },
+  { value: "reopened", label: INTAKE_SETTINGS_COPY.reopenedIssues },
+  { value: "labeled", label: INTAKE_SETTINGS_COPY.superplaneLabelAdded },
 ] as const;
 
 const NODE_CONFIG_COPY = {
@@ -46,6 +57,10 @@ const PULL_REQUEST_FIELD_GROUPS = [
   { label: NODE_CONFIG_COPY.filters, fieldNames: ["ignoreDrafts", ONLY_FACTORY_PULL_REQUESTS] },
 ] as const;
 
+const ISSUE_FIELD_GROUPS = [
+  { label: NODE_CONFIG_COPY.startRunWhen, fieldNames: [PULL_REQUEST_ACTIONS_FIELD] },
+] as const;
+
 type CatalogEntry = {
   name?: string;
   label?: string;
@@ -57,6 +72,7 @@ export function NodeConfigPanel({
   organizationId,
   factoryId,
   factoryKey,
+  widthPercent = 50,
   onClose,
   onSave,
 }: {
@@ -64,6 +80,7 @@ export function NodeConfigPanel({
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  widthPercent?: number;
   onClose: () => void;
   onSave: (update: NodeConfigurationUpdate) => Promise<void> | void;
 }) {
@@ -74,21 +91,27 @@ export function NodeConfigPanel({
   return (
     <>
       <aside
-        className="relative flex w-1/2 min-w-0 shrink-0 flex-col border-l border-border bg-background"
+        className="relative flex min-w-0 shrink-0 flex-col border-r border-border bg-background"
+        style={{ width: `${widthPercent}%` }}
         aria-label={catalog.nodeName}
         data-testid="merge-confidence-config-form"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={NODE_CONFIG_COPY.collapseStep}
-          data-testid="merge-confidence-config-form-collapse"
-          className="absolute top-5 left-0 z-10 flex h-8 w-7 -translate-x-[calc(100%-1px)] items-center justify-center rounded-l-md border border-r-0 border-border bg-background text-muted-foreground hover:bg-accent"
-        >
-          <ChevronsRight className="size-4" aria-hidden />
-        </button>
-        <header className="flex shrink-0 items-center px-10 pt-6">
-          <h2 className="truncate text-[15px] font-semibold text-foreground">{catalog.nodeName}</h2>
+        <header className="flex shrink-0 items-center gap-3 px-10 pt-6">
+          <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">{catalog.nodeName}</h2>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={NODE_CONFIG_COPY.collapseStep}
+                data-testid="merge-confidence-config-form-collapse"
+                className={factorySidebarCloseButtonClassName}
+              >
+                <PanelLeftClose className="h-4 w-4" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{NODE_CONFIG_COPY.collapseStep}</TooltipContent>
+          </Tooltip>
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           {catalog.loading ? (
@@ -109,6 +132,7 @@ export function NodeConfigPanel({
               fieldGroups={settings.fieldGroups}
               hiddenFieldNames={settings.hiddenFieldNames}
               leadingContent={settings.leadingContent}
+              trailingContent={settings.trailingContent}
               mode="edit"
               nodeId={node.id}
               nodeName={catalog.nodeName}
@@ -213,26 +237,78 @@ function nodeDisplayName(node: SuperplaneComponentsNode) {
 
 function nodeSettingsProps(node: SuperplaneComponentsNode, definition: CatalogEntry | undefined) {
   const configuration = node.configuration ?? {};
-  if (node.component !== PULL_REQUEST_TRIGGER) {
-    return {
-      chrome: "full" as const,
-      booleanControl: "switch" as const,
-      fieldGroups: undefined,
-      hiddenFieldNames: undefined,
-      leadingContent: undefined,
+  const fields = definition?.configuration ?? [];
+  if (node.component === PULL_REQUEST_TRIGGER) {
+    return simplifiedTriggerSettings(
       configuration,
-      configurationFields: definition?.configuration ?? [],
-    };
+      presentPullRequestFields(fields, configuration),
+      PULL_REQUEST_FIELD_GROUPS,
+    );
   }
+  if (node.component === ISSUE_TRIGGER) {
+    return simplifiedTriggerSettings(
+      configuration,
+      presentIssueFields(fields, configuration),
+      ISSUE_FIELD_GROUPS,
+      issueFilterPlaceholders(),
+    );
+  }
+  return {
+    chrome: "full" as const,
+    booleanControl: "switch" as const,
+    fieldGroups: undefined,
+    hiddenFieldNames: undefined,
+    leadingContent: undefined,
+    trailingContent: undefined,
+    configuration,
+    configurationFields: fields,
+  };
+}
+
+function simplifiedTriggerSettings(
+  configuration: Record<string, unknown>,
+  fields: ConfigurationField[],
+  fieldGroups: readonly { label: string; fieldNames: readonly string[] }[],
+  trailingContent?: ReactNode,
+) {
   return {
     chrome: "fields" as const,
     booleanControl: "checkbox" as const,
-    fieldGroups: PULL_REQUEST_FIELD_GROUPS,
-    hiddenFieldNames: PULL_REQUEST_HIDDEN_FIELDS,
+    fieldGroups,
+    hiddenFieldNames: SIMPLIFIED_HIDDEN_FIELDS,
     leadingContent: repositoryLine(repositoryDisplay(configuration.repository)),
+    trailingContent,
     configuration,
-    configurationFields: presentPullRequestFields(definition?.configuration ?? [], configuration),
+    configurationFields: fields,
   };
+}
+
+/** The issue trigger cannot store these filters yet. */
+function issueFilterPlaceholders() {
+  return (
+    <fieldset className="min-w-0">
+      <legend className="workspace-section-title">{NODE_CONFIG_COPY.filters}</legend>
+      <div className="mt-2 flex flex-col gap-2">
+        <PlaceholderFilter label={INTAKE_SETTINGS_COPY.filterByLabel} />
+        <PlaceholderFilter label={INTAKE_SETTINGS_COPY.authorsWithAccess} />
+      </div>
+    </fieldset>
+  );
+}
+
+function PlaceholderFilter({ label }: { label: string }) {
+  return (
+    <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+      <Checkbox
+        checked={false}
+        disabled
+        onChange={() => undefined}
+        aria-label={label}
+        className="disabled:opacity-100"
+      />
+      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
+    </label>
+  );
 }
 
 function repositoryLine(label: string | undefined) {
@@ -349,30 +425,54 @@ function presentPullRequestFields(
     if (field.name !== PULL_REQUEST_ACTIONS_FIELD) {
       return field;
     }
-    return {
-      ...field,
-      description: undefined,
-      typeOptions: {
-        ...field.typeOptions,
-        multiSelect: {
-          ...field.typeOptions?.multiSelect,
-          options: pullRequestActionOptions(field, configuration.actions),
-        },
-      },
-    };
+    return withListedActions(field, configuration.actions, PULL_REQUEST_ACTIONS);
   });
 }
 
-function pullRequestActionOptions(field: ConfigurationField, selected: unknown): { label: string; value: string }[] {
+function presentIssueFields(
+  fields: ConfigurationField[],
+  configuration: Record<string, unknown>,
+): ConfigurationField[] {
+  return fields.map((field) => {
+    if (field.name !== PULL_REQUEST_ACTIONS_FIELD) {
+      return field;
+    }
+    return withListedActions(field, configuration.actions, ISSUE_ACTIONS);
+  });
+}
+
+function withListedActions(
+  field: ConfigurationField,
+  selected: unknown,
+  actions: readonly { value: string; label: string }[],
+): ConfigurationField {
+  return {
+    ...field,
+    description: undefined,
+    typeOptions: {
+      ...field.typeOptions,
+      multiSelect: {
+        ...field.typeOptions?.multiSelect,
+        options: listedActionOptions(field, selected, actions),
+      },
+    },
+  };
+}
+
+function listedActionOptions(
+  field: ConfigurationField,
+  selected: unknown,
+  actions: readonly { value: string; label: string }[],
+): { label: string; value: string }[] {
   const catalog = new Map(
     (field.typeOptions?.multiSelect?.options ?? [])
       .filter((option) => option.value)
       .map((option) => [option.value as string, option.label || option.value || ""]),
   );
   const chosen = Array.isArray(selected) ? selected.filter((item): item is string => typeof item === "string") : [];
-  const shown = new Set<string>(PULL_REQUEST_ACTIONS.map((action) => action.value));
+  const shown = new Set<string>(actions.map((action) => action.value));
   return [
-    ...PULL_REQUEST_ACTIONS.map((action) => ({ value: action.value, label: action.label })),
+    ...actions.map((action) => ({ value: action.value, label: action.label })),
     ...chosen.filter((value) => !shown.has(value)).map((value) => ({ value, label: catalog.get(value) || value })),
   ];
 }

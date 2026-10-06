@@ -23,6 +23,24 @@ func TestParseMergeConfidenceChecks(t *testing.T) {
 	assert.Empty(t, runner.ParseMergeConfidenceChecks([]string{"No checks line."}))
 }
 
+func TestMergeConfidenceChecksFromSteps(t *testing.T) {
+	risk := "Merge check: risk.\nScore the change."
+	custom := "Merge check: api-latency.\nScore the query."
+	ids, labels := runner.MergeConfidenceChecksFromSteps([]runner.AgentStep{
+		{Name: "Blast radius", Type: runner.AgentStepPrompt, Prompt: &risk},
+		{Name: "API latency", Type: runner.AgentStepPrompt, Prompt: &custom},
+	})
+	assert.Equal(t, []string{"risk", "api-latency"}, ids)
+	assert.Equal(t, map[string]string{"risk": "Blast radius", "api-latency": "API latency"}, labels)
+
+	legacy := "Enabled checks: risk, drift.\n"
+	ids, labels = runner.MergeConfidenceChecksFromSteps([]runner.AgentStep{
+		{Name: "Review Pull Request", Type: runner.AgentStepPrompt, Prompt: &legacy},
+	})
+	assert.Equal(t, []string{"risk", "drift"}, ids)
+	assert.Nil(t, labels)
+}
+
 func TestMergeConfidenceTokenRoundTrip(t *testing.T) {
 	signer := jwt.NewSigner("merge-secret")
 	scope := runner.MergeConfidenceScope{

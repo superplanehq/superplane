@@ -27,6 +27,7 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   enableRealtimeValidation?: boolean;
   /** `checkbox` draws a check row. The canvas editor uses `switch`. */
   booleanControl?: "switch" | "checkbox";
+  hideLabel?: boolean;
 }
 
 type ConfigurationField = FieldRendererProps["field"];
@@ -123,6 +124,8 @@ export const ConfigurationFieldRenderer = ({
   expressionErrorMessage,
   expressionTemplateValue,
   booleanControl = "switch",
+  hideLabel = false,
+  triggerClassName,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -295,6 +298,7 @@ export const ConfigurationFieldRenderer = ({
     expressionPreviewContext,
     expressionErrorMessage,
     expressionTemplateValue,
+    triggerClassName,
   };
 
   if (readOnly && !shouldRenderFieldForReadOnly(field)) {
@@ -474,23 +478,25 @@ export const ConfigurationFieldRenderer = ({
 
   // For all other field types, render label above field
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-        <Label className="block text-left flex-1 min-w-0">
-          {fieldLabel}
-          {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
-          {hasFieldError &&
-            ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
-              (!enableRealtimeValidation &&
-                validationErrors &&
-                isRequired &&
-                (value === undefined || value === null || value === ""))) && (
-              <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
-            )}
-        </Label>
-        <div ref={labelRightRef} className="ml-auto shrink-0" />
-      </div>
+    <div className={hideLabel ? undefined : "space-y-2"}>
+      {hideLabel ? null : (
+        <div className="flex items-center gap-3">
+          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
+          <Label className="block text-left flex-1 min-w-0">
+            {fieldLabel}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
+              )}
+          </Label>
+          <div ref={labelRightRef} className="ml-auto shrink-0" />
+        </div>
+      )}
       {isEnabled && (
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">{renderField()}</div>

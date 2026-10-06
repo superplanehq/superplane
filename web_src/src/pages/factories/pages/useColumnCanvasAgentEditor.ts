@@ -133,10 +133,11 @@ export function useColumnCanvasAgentEditor(
     });
   };
 
-  const saveNode = async (update: NodeConfigurationUpdate) => {
+  const saveNode = async (update: NodeConfigurationUpdate, options?: { notify?: boolean }) => {
     await persistNodeConfiguration({
       ...canvasEditDeps,
       update,
+      notify: options?.notify,
     });
   };
 
@@ -216,8 +217,10 @@ export async function persistNodeConfiguration(args: {
   readStagingSummary: () => Promise<CanvasDraftSummary | undefined>;
   refreshCanvas: () => Promise<CanvasesCanvas | undefined>;
   readStagedCanvas: () => Promise<StagedAgentCanvas | undefined>;
+  /** Merge confidence saves stay quiet. Other step saves still announce. */
+  notify?: boolean;
 }) {
-  const { canvas, appId, update } = args;
+  const { canvas, appId, update, notify = true } = args;
   if (!canvas || !update.nodeId || !appId) {
     throw new Error(CANVAS_NOT_LOADED_MESSAGE);
   }
@@ -232,7 +235,7 @@ export async function persistNodeConfiguration(args: {
       toYaml: (current) => serializeNodeConfiguration(current, update),
     },
     commitMessage: UPDATE_STEP_COMMIT_MESSAGE,
-    successNotice: STEP_SAVED_NOTICE,
+    successNotice: notify ? STEP_SAVED_NOTICE : undefined,
     failureFallback: "Failed to save step",
   });
 }
@@ -249,7 +252,7 @@ async function persistCanvasChange(args: {
   canvas: CanvasesCanvas;
   change: CanvasChange;
   commitMessage: string;
-  successNotice: string;
+  successNotice?: string;
   failureFallback: string;
   stageYaml: StageCanvasYaml;
   commit: (message: string) => Promise<unknown>;
@@ -296,7 +299,9 @@ async function persistCanvasChange(args: {
     }
     await commit(commitMessage);
     await invalidate();
-    showSuccessToast(successNotice);
+    if (successNotice) {
+      showSuccessToast(successNotice);
+    }
   } catch (error) {
     if (isNoStagedChangesError(error)) {
       return;

@@ -12,8 +12,10 @@ import {
   AlertDialogTitle,
 } from "@/ui/alertDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
+import { cn } from "@/lib/utils";
 import { Ellipsis } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -22,6 +24,7 @@ import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import { SettingsAutomationHeaderRow, SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+import { useSplitRunPanePercent } from "./work-order-split-run/useSplitRunPanePercent";
 
 interface MergeConfidenceConfigModalProps {
   title: string;
@@ -37,6 +40,7 @@ interface MergeConfidenceConfigModalProps {
   onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   deletePending?: boolean;
+  deleteError?: string;
 }
 
 type MergeConfidenceConfigTab = "automation" | "runs";
@@ -56,6 +60,7 @@ export function MergeConfidenceConfigModal({
   onSaveNode,
   onDelete,
   deletePending = false,
+  deleteError,
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<MergeConfidenceConfigTab>("automation");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -64,6 +69,7 @@ export function MergeConfidenceConfigModal({
   const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const panelWasOpen = useRef(false);
+  const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
   const selectedNode =
     tab === "automation" && selectedNodeId ? graph?.specNodes?.find((node) => node.id === selectedNodeId) : undefined;
 
@@ -84,83 +90,124 @@ export function MergeConfidenceConfigModal({
   }, [selectedNodeId, tab]);
 
   return (
-    <PopupShell testId="merge-confidence-config" canvas fixed onDismiss={onClose}>
-      <PopupHeader
-        title={title}
-        onClose={onClose}
-        actions={onDelete ? <MergeConfidenceActionsMenu onDelete={() => setConfirmDelete(true)} /> : null}
-      >
-        <SettingsAutomationHeaderRow
-          tabs={
-            <Tabs value={tab} onValueChange={(value) => setTab(value as MergeConfidenceConfigTab)}>
-              <TabsList aria-label={MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
-                <TabsTrigger value="automation" data-testid="merge-confidence-config-tab-automation">
-                  {MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
-                </TabsTrigger>
-                <TabsTrigger value="runs" data-testid="merge-confidence-config-tab-runs">
-                  {MERGE_CONFIDENCE_CONFIG_COPY.runsTab}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          }
-        />
-      </PopupHeader>
-      <div
-        className="flex min-h-0 min-w-0 flex-1"
-        data-testid="merge-confidence-config-body"
-        data-split={selectedNode ? "true" : "false"}
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {tab === "runs" ? (
-            <MergeConfidenceCanvas
-              graph={graph}
-              loading={loading}
-              error={error}
-              onRetry={onRetry}
-              canvasId={canvasId}
-              runHrefFor={runHrefFor}
-              showRuns
-              selectLatestRun
-              selectedRunId={selectedRunId}
-              onSelectedRunIdChange={setSelectedRunId}
-              onNodeSelect={() => undefined}
+    <MergeConfidenceCanvasProvider>
+      <PopupShell testId="merge-confidence-config" canvas fixed onDismiss={onClose}>
+        <PopupHeader
+          title={title}
+          onClose={onClose}
+          actions={onDelete ? <MergeConfidenceActionsMenu onDelete={() => setConfirmDelete(true)} /> : null}
+        >
+          <SettingsAutomationHeaderRow tabs={<ConfigTabs tab={tab} onTabChange={setTab} />} />
+        </PopupHeader>
+        <div
+          ref={split.containerRef}
+          className="flex min-h-0 min-w-0 flex-1"
+          data-testid="merge-confidence-config-body"
+          data-split={selectedNode ? "true" : "false"}
+        >
+          {selectedNode ? (
+            <NodeConfigPanel
+              node={selectedNode}
+              organizationId={graph?.organizationId}
+              factoryId={panelFactoryId(factoryId, graph)}
+              factoryKey={factoryKey}
+              widthPercent={split.percent}
+              onClose={() => setSelectedNodeId(null)}
+              onSave={onSaveNode}
             />
-          ) : (
-            <MergeConfidenceCanvas
-              graph={graph}
-              loading={loading}
-              error={error}
-              onRetry={onRetry}
-              canvasId={canvasId}
-              runHrefFor={runHrefFor}
-              showRuns={false}
-              onNodeSelect={setSelectedNodeId}
-              focusNodeId={selectedNodeId}
-              focusNonce={focusNonce}
-              layoutFitNonce={layoutFitNonce}
-            />
-          )}
+          ) : null}
+          {selectedNode ? <ConfigResizeHandle isResizing={split.isResizing} onPointerDown={split.startResize} /> : null}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {tab === "runs" ? (
+              <MergeConfidenceCanvas
+                graph={graph}
+                loading={loading}
+                error={error}
+                onRetry={onRetry}
+                canvasId={canvasId}
+                runHrefFor={runHrefFor}
+                showRuns
+                selectLatestRun
+                selectedRunId={selectedRunId}
+                onSelectedRunIdChange={setSelectedRunId}
+                onNodeSelect={() => undefined}
+              />
+            ) : (
+              <MergeConfidenceCanvas
+                graph={graph}
+                loading={loading}
+                error={error}
+                onRetry={onRetry}
+                canvasId={canvasId}
+                runHrefFor={runHrefFor}
+                showRuns={false}
+                onNodeSelect={setSelectedNodeId}
+                focusNodeId={selectedNodeId}
+                focusNonce={focusNonce}
+                layoutFitNonce={layoutFitNonce}
+              />
+            )}
+          </div>
         </div>
-        {selectedNode ? (
-          <NodeConfigPanel
-            node={selectedNode}
-            organizationId={graph?.organizationId}
-            factoryId={panelFactoryId(factoryId, graph)}
-            factoryKey={factoryKey}
-            onClose={() => setSelectedNodeId(null)}
-            onSave={onSaveNode}
+        {onDelete ? (
+          <MergeConfidenceDeleteDialog
+            open={confirmDelete}
+            pending={deletePending}
+            error={deleteError}
+            onOpenChange={setConfirmDelete}
+            onConfirm={onDelete}
           />
         ) : null}
-      </div>
-      {onDelete ? (
-        <MergeConfidenceDeleteDialog
-          open={confirmDelete}
-          pending={deletePending}
-          onOpenChange={setConfirmDelete}
-          onConfirm={onDelete}
-        />
-      ) : null}
-    </PopupShell>
+      </PopupShell>
+    </MergeConfidenceCanvasProvider>
+  );
+}
+
+function ConfigResizeHandle({
+  isResizing,
+  onPointerDown,
+}: {
+  isResizing: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize step settings"
+      data-testid="merge-confidence-config-resize"
+      onPointerDown={onPointerDown}
+      className="group relative z-10 w-2 shrink-0 cursor-col-resize touch-none"
+    >
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-foreground/30",
+          isResizing && "bg-foreground/30",
+        )}
+      />
+    </div>
+  );
+}
+
+function ConfigTabs({
+  tab,
+  onTabChange,
+}: {
+  tab: MergeConfidenceConfigTab;
+  onTabChange: (tab: MergeConfidenceConfigTab) => void;
+}) {
+  return (
+    <Tabs value={tab} onValueChange={(value) => onTabChange(value as MergeConfidenceConfigTab)}>
+      <TabsList aria-label={MERGE_CONFIDENCE_CONFIG_COPY.tabsLabel}>
+        <TabsTrigger value="automation" data-testid="merge-confidence-config-tab-automation">
+          {MERGE_CONFIDENCE_CONFIG_COPY.automationTab}
+        </TabsTrigger>
+        <TabsTrigger value="runs" data-testid="merge-confidence-config-tab-runs">
+          {MERGE_CONFIDENCE_CONFIG_COPY.runsTab}
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
   );
 }
 
@@ -202,7 +249,7 @@ function MergeConfidenceCanvas({
   if (!graph || graph.nodes.length === 0) {
     return (
       <section
-        className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+        className="settings-graph relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
         aria-label="Automation"
         data-testid="merge-confidence-config-canvas"
       >
@@ -232,6 +279,7 @@ function MergeConfidenceCanvas({
       focusNodeId={focusNodeId}
       focusNonce={focusNonce}
       layoutFitNonce={layoutFitNonce}
+      className="settings-graph"
     />
   );
 }
@@ -268,11 +316,13 @@ function MergeConfidenceActionsMenu({ onDelete }: { onDelete: () => void }) {
 function MergeConfidenceDeleteDialog({
   open,
   pending,
+  error,
   onOpenChange,
   onConfirm,
 }: {
   open: boolean;
   pending: boolean;
+  error?: string;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => Promise<void> | void;
 }) {
@@ -289,6 +339,11 @@ function MergeConfidenceDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{COLUMN_AUTOMATIONS_COPY.deleteLabel}</AlertDialogTitle>
           <AlertDialogDescription>{COLUMN_AUTOMATIONS_COPY.confirmDelete}</AlertDialogDescription>
+          {error ? (
+            <p className="text-sm text-destructive" data-testid="merge-confidence-config-delete-error">
+              {error}
+            </p>
+          ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{COLUMN_AUTOMATIONS_COPY.keepLabel}</AlertDialogCancel>
