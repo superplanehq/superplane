@@ -57,26 +57,28 @@ export function WorkspaceUsageByModelTable({ byModel }: { byModel: UsageByModel[
           No factory LLM usage is recorded for this period.
         </p>
       ) : (
-        <table className="mt-2 w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="px-4 py-2 font-medium">Provider</th>
-              <th className="px-4 py-2 font-medium">Model</th>
-              <th className="px-4 py-2 font-medium">Tokens</th>
-              <th className="px-4 py-2 font-medium">Spend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byModel.map((row) => (
-              <tr key={`${row.provider}-${row.model}`} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{row.provider}</td>
-                <td className="px-4 py-2">{row.model}</td>
-                <td className="px-4 py-2">{formatCompactTokens(parseWorkOrderMetric(row.totalTokens))}</td>
-                <td className="px-4 py-2">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
+        <div className="overflow-x-auto">
+          <table className="mt-2 w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Provider</th>
+                <th className="px-4 py-2 font-medium">Model</th>
+                <th className="px-4 py-2 font-medium">Tokens</th>
+                <th className="px-4 py-2 font-medium">Spend</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {byModel.map((row) => (
+                <tr key={`${row.provider}-${row.model}`} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2">{row.provider}</td>
+                  <td className="px-4 py-2">{row.model}</td>
+                  <td className="px-4 py-2">{formatCompactTokens(parseWorkOrderMetric(row.totalTokens))}</td>
+                  <td className="px-4 py-2">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -91,24 +93,26 @@ export function WorkspaceUsageByMachineTypeTable({ byMachineType }: { byMachineT
           No factory VM usage is recorded for this period.
         </p>
       ) : (
-        <table className="mt-2 w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="px-4 py-2 font-medium">Machine type</th>
-              <th className="px-4 py-2 font-medium">Time</th>
-              <th className="px-4 py-2 font-medium">Spend</th>
-            </tr>
-          </thead>
-          <tbody>
-            {byMachineType.map((row) => (
-              <tr key={row.machineType} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{row.machineType}</td>
-                <td className="px-4 py-2">{formatDurationSeconds(parseWorkOrderMetric(row.durationSeconds))}</td>
-                <td className="px-4 py-2">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
+        <div className="overflow-x-auto">
+          <table className="mt-2 w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Machine type</th>
+                <th className="px-4 py-2 font-medium">Time</th>
+                <th className="px-4 py-2 font-medium">Spend</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {byMachineType.map((row) => (
+                <tr key={row.machineType} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2">{row.machineType}</td>
+                  <td className="px-4 py-2">{formatDurationSeconds(parseWorkOrderMetric(row.durationSeconds))}</td>
+                  <td className="px-4 py-2">{formatUsdCents(parseWorkOrderMetric(row.costCents))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -46,8 +46,10 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 		require.NoError(t, browser.Close())
 	})
 
+	// Phone settings hide both sidebars below 768px, so a 760px viewport is a
+	// wide card. 800px stays on the desktop shell and still squeezes the list.
 	page, err := browser.NewPage(pw.BrowserNewPageOptions{
-		Viewport: &pw.Size{Width: 760, Height: 900},
+		Viewport: &pw.Size{Width: 800, Height: 900},
 	})
 	require.NoError(t, err)
 
@@ -59,12 +61,12 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 	require.NoError(t, revoke.ScrollIntoViewIfNeeded())
 
 	narrow := waitForMCPClientRowLayout(t, page, func(layout mcpClientRowLayout) error {
-		if layout.ListWidth >= 432 {
+		if layout.ListWidth >= 480 {
 			return fmt.Errorf("client list is %.1f px wide; viewport does not reproduce a narrow card", layout.ListWidth)
 		}
 		return mcpClientRevokeInsideCard(layout)
 	})
-	require.Less(t, narrow.ListWidth, 432.0)
+	require.Less(t, narrow.ListWidth, 480.0)
 	require.True(t, narrow.ButtonHit)
 	require.True(t, narrow.NameTruncated)
 
