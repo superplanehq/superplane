@@ -654,9 +654,17 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
+	s.CreatePublished(nil, nil)
+}
+
+// CreatePublished inserts a live canvas version with the given nodes and edges,
+// then opens the canvas page. Use this when the test is not about building the
+// graph in the UI.
+func (s *CanvasSteps) CreatePublished(nodes []models.CanvasNode, edges []models.Edge) {
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
-	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nodes, edges)
 	s.WorkflowID = canvas.ID
 
 	err = database.Conn().
@@ -669,13 +677,10 @@ func (s *CanvasSteps) Create() {
 }
 
 func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
-	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
-	require.NoError(s.t, err)
-
 	startNodeID := "start-trigger"
 	outputNodeID := "noop-output"
 
-	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+	s.CreatePublished([]models.CanvasNode{
 		{
 			NodeID: startNodeID,
 			Name:   "Start",
@@ -714,15 +719,6 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 	}, []models.Edge{
 		{SourceID: startNodeID, TargetID: outputNodeID, Channel: "default"},
 	})
-	s.WorkflowID = canvas.ID
-
-	err = database.Conn().
-		Model(&models.Canvas{}).
-		Where("id = ?", s.WorkflowID).
-		Update("name", s.CanvasName).Error
-	require.NoError(s.t, err)
-
-	s.Visit()
 }
 
 func (s *CanvasSteps) Visit() {
