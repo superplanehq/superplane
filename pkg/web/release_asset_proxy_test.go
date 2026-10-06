@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +21,7 @@ func TestReleaseAssetProxyServesHistoricalWorker(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/javascript")
 		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Header().Set("ETag", `"worker"`)
 		w.Header().Set("Set-Cookie", "secret=1")
 		_, _ = io.WriteString(w, workerBody)
 	}))
@@ -48,6 +50,9 @@ func TestReleaseAssetProxyServesHistoricalWorker(t *testing.T) {
 	}
 	if recorder.Header().Get("Content-Type") != "text/javascript" {
 		t.Fatalf("content type = %q", recorder.Header().Get("Content-Type"))
+	}
+	if recorder.Header().Get("ETag") != `"worker"` {
+		t.Fatalf("etag = %q", recorder.Header().Get("ETag"))
 	}
 }
 
@@ -109,6 +114,85 @@ func TestReleaseAssetProxyCachesOnlySuccessfulAssets(t *testing.T) {
 				t.Fatalf("cache control = %q, want %q", got, tc.wantCache)
 			}
 		})
+	}
+}
+
+func TestAssetCDNOriginUsesDefaultOrConfiguredHost(t *testing.T) {
+	t.Setenv("ASSET_CDN_ORIGIN", "   ")
+	if got := AssetCDNOrigin(); got != DefaultAssetCDNOrigin {
+		t.Fatalf("origin = %q, want %q", got, DefaultAssetCDNOrigin)
+	}
+
+	t.Setenv("ASSET_CDN_ORIGIN", "  https://cdn.example  ")
+	if got := AssetCDNOrigin(); got != "https://cdn.example" {
+		t.Fatalf("origin = %q", got)
+	}
+}
+
+func TestReleaseAssetProxyRejectsOtherMethods(t *testing.T) {
+	var upstreamHits int
+	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamHits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(cdn.Close)
+
+	handler := newTestReleaseAssetProxy(t, cdn.URL)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/releases/abc1234/assets/json.worker.js", nil))
+
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	if recorder.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("allow = %q", recorder.Header().Get("Allow"))
+	}
+	if upstreamHits != 0 {
+		t.Fatalf("upstream hits = %d", upstreamHits)
+	}
+}
+
+func TestReleaseAssetProxyHeadOmitsBody(t *testing.T) {
+	const workerPath = "/releases/abc1234/assets/json.worker.js"
+	var sawMethod string
+	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawMethod = r.Method
+		w.Header().Set("Content-Type", "text/javascript")
+		_, _ = io.WriteString(w, "export const worker = true;")
+	}))
+	t.Cleanup(cdn.Close)
+
+	handler := newTestReleaseAssetProxy(t, cdn.URL)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodHead, workerPath, nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	if sawMethod != http.MethodHead {
+		t.Fatalf("upstream method = %q", sawMethod)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("body = %q", recorder.Body.String())
+	}
+	if recorder.Header().Get("Content-Type") != "text/javascript" {
+		t.Fatalf("content type = %q", recorder.Header().Get("Content-Type"))
+	}
+}
+
+func TestReleaseAssetProxyReportsUpstreamFailure(t *testing.T) {
+	cdn := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	cdn.Close()
+
+	handler := newTestReleaseAssetProxy(t, cdn.URL)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/releases/abc1234/assets/json.worker.js", nil))
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if strings.TrimSpace(recorder.Body.String()) != "asset unavailable" {
+		t.Fatalf("body = %q", recorder.Body.String())
 	}
 }
 
