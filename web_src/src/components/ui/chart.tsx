@@ -52,12 +52,29 @@ function readPositiveChartBox(element: Element): ChartBoxSize | null {
   return { width, height };
 }
 
-function useMeasuredChartBox<T extends Element>() {
-  const ref = React.useRef<T | null>(null);
+function assignElementRef<T>(ref: React.Ref<T> | undefined, node: T | null) {
+  if (typeof ref === "function") {
+    ref(node);
+    return;
+  }
+  if (ref) {
+    ref.current = node;
+  }
+}
+
+function useMeasuredChartBox<T extends Element>(forwardedRef?: React.Ref<T>) {
+  const elementRef = React.useRef<T | null>(null);
   const [size, setSize] = React.useState<ChartBoxSize>({ width: 0, height: 0 });
+  const ref = React.useCallback(
+    (node: T | null) => {
+      elementRef.current = node;
+      assignElementRef(forwardedRef, node);
+    },
+    [forwardedRef],
+  );
 
   React.useEffect(() => {
-    const element = ref.current;
+    const element = elementRef.current;
     if (!element) {
       return;
     }
@@ -85,6 +102,7 @@ function ChartContainer({
   children,
   config,
   initialDimension = INITIAL_DIMENSION,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<"div"> & {
   config: ChartConfig;
@@ -96,7 +114,7 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId();
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`;
-  const { ref, width, height } = useMeasuredChartBox<HTMLDivElement>();
+  const { ref, width, height } = useMeasuredChartBox<HTMLDivElement>(forwardedRef);
   const hasPositiveSize = width > 0 && height > 0;
 
   return (

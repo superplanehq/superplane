@@ -1,6 +1,7 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { createElement } from "react";
+import { createElement, createRef } from "react";
+import { Bar, BarChart } from "recharts";
 
 import { ChartContainer } from "./chart";
 import { toChartColorVarName } from "./chartColorVarName";
@@ -32,20 +33,27 @@ describe("ChartContainer", () => {
     warnSpy?.mockRestore();
   });
 
-  it("draws only after the outer box has a positive width and height", async () => {
+  it("draws a real chart only after the outer box has a positive size", async () => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     installChartBoxMeasurement(box, (notify) => {
       notifyResize = notify;
     });
+    const callerRef = createRef<HTMLDivElement>();
 
-    render(
+    const view = render(
       createElement(ChartContainer, {
+        ref: callerRef,
         config: { spend: { label: "Spend", color: "#2563eb" } },
-        children: createElement("div", { "data-testid": "chart-child" }, "drawn"),
+        children: createElement(
+          BarChart,
+          { data: [{ label: "Mon", spend: 12 }] },
+          createElement(Bar, { dataKey: "spend" }),
+        ),
       }),
     );
 
-    expect(screen.queryByTestId("chart-child")).not.toBeInTheDocument();
+    expect(callerRef.current?.getAttribute("data-slot")).toBe("chart");
+    expect(view.container.querySelector(".recharts-surface")).toBeNull();
     expect(hasChartSizeWarning(warnSpy)).toBe(false);
 
     box.width = 760;
@@ -54,7 +62,7 @@ describe("ChartContainer", () => {
       notifyResize();
     });
 
-    expect(screen.getByTestId("chart-child")).toBeInTheDocument();
+    expect(view.container.querySelector(".recharts-surface")).not.toBeNull();
     expect(hasChartSizeWarning(warnSpy)).toBe(false);
 
     box.width = 0;
@@ -63,7 +71,7 @@ describe("ChartContainer", () => {
       notifyResize();
     });
 
-    expect(screen.getByTestId("chart-child")).toBeInTheDocument();
+    expect(view.container.querySelector(".recharts-surface")).not.toBeNull();
     expect(hasChartSizeWarning(warnSpy)).toBe(false);
   });
 });
@@ -73,6 +81,10 @@ function installChartBoxMeasurement(box: { width: number; height: number }, setN
   HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
     if (this.getAttribute("data-slot") === "chart") {
       return chartDomRect(box.width, box.height);
+    }
+    const className = typeof this.className === "string" ? this.className : String(this.className ?? "");
+    if (className.includes("recharts")) {
+      return chartDomRect(0, 0);
     }
     return originalGetBoundingClientRect.call(this);
   };
