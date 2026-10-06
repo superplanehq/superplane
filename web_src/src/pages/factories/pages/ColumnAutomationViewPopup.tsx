@@ -14,13 +14,9 @@ import {
   type ColumnAutomationViewTab,
 } from "../lib/columnAutomations";
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
-import { mergeConfidenceFromDraft } from "./mergeConfidenceChecks";
-import { MergeConfidenceSettingsForm } from "./MergeConfidenceSettingsForm";
-import type { PlanningReviewDraft } from "./planningReviewMockup";
-import { riskScoreCategoriesFromDraft } from "./riskScoreCategories";
-import { RiskScoreSettingsForm } from "./RiskScoreSettingsForm";
 import {
   SettingsAutomationCanvasEdit,
   SettingsAutomationHeaderRow,
@@ -286,12 +282,27 @@ export function ColumnAutomationViewHost({
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
   const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
   const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
-  const riskScoreGeneral = mergeConfidenceGeneral({
-    allow: allowRiskScore,
-    isCanvas: isRiskScoreCanvas,
-    draft: agent.draft,
-    onSave: agent.save,
-  });
+  if (allowRiskScore && isRiskScoreCanvas) {
+    return (
+      <MergeConfidenceConfigModal
+        title={automation.name?.trim() || title}
+        graph={automation.graph}
+        loading={automation.isLoading}
+        error={automation.isError}
+        onRetry={() => void automation.refetch()}
+        canvasId={canvasId}
+        runHrefFor={(runId) =>
+          factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
+        }
+        onClose={onClose}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        onSaveNode={(update) => agent.saveNode(update, { notify: false })}
+        onDelete={onDelete}
+        deletePending={deletePending}
+      />
+    );
+  }
   return (
     <ColumnAutomationViewPopup
       title={automation.name?.trim() || title}
@@ -303,7 +314,7 @@ export function ColumnAutomationViewHost({
       canvasId={canvasId}
       runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
-      general={general ?? riskScoreGeneral}
+      general={general}
       agent={
         agent.agentNode
           ? {
@@ -323,29 +334,6 @@ export function ColumnAutomationViewHost({
       deletePending={deletePending}
     />
   );
-}
-
-function mergeConfidenceGeneral({
-  allow,
-  isCanvas,
-  draft,
-  onSave,
-}: {
-  allow: boolean;
-  isCanvas: boolean;
-  draft: PlanningReviewDraft | null | undefined;
-  onSave: (next: PlanningReviewDraft) => Promise<void> | void;
-}): ReactNode {
-  if (!allow || !isCanvas || !draft) {
-    return undefined;
-  }
-  if (mergeConfidenceFromDraft(draft)) {
-    return <MergeConfidenceSettingsForm draft={draft} onSave={onSave} />;
-  }
-  if (riskScoreCategoriesFromDraft(draft)) {
-    return <RiskScoreSettingsForm draft={draft} onSave={onSave} />;
-  }
-  return undefined;
 }
 
 function AutomationViewBody({
