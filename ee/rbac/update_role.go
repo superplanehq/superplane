@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
-func UpdateRole(ctx context.Context, domainType string, domainID string, roleName string, roleSpec *pb.Role_Spec, authService authorization.Authorization) (*pb.UpdateRoleResponse, error) {
+func updateRole(ctx context.Context, domainType string, domainID string, roleName string, roleSpec *pb.Role_Spec, authService authorization.Authorization) (*pb.UpdateRoleResponse, error) {
 	if roleName == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "role name must be specified")
 	}

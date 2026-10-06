@@ -76,6 +76,8 @@ ARG FRONTEND_PREBUILT=0
 
 WORKDIR /app
 COPY pkg /app/pkg
+COPY ee /app/ee
+COPY LICENSE NOTICE /app/
 COPY cmd /app/cmd
 COPY go.mod /app/go.mod
 COPY go.sum /app/go.sum
@@ -159,6 +161,8 @@ COPY --from=builder /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
+COPY --from=builder /app/LICENSE /app/NOTICE /app/
+COPY --from=builder /app/ee/LICENSE /app/ee/LICENSE
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
@@ -207,6 +211,8 @@ COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/as
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
 COPY --from=builder --chown=nobody:root /app/rbac /app/rbac
 COPY --from=builder --chown=nobody:root /app/templates /app/templates
+COPY --from=builder --chown=nobody:root /app/LICENSE /app/NOTICE /app/
+COPY --from=builder --chown=nobody:root /app/ee/LICENSE /app/ee/LICENSE
 
 USER nobody
 
