@@ -123,19 +123,20 @@ func serializeFactoryWithLineMetrics(
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 	config := factory.OnboardingConfigValue()
 	onboarding := &pb.FactoryOnboarding{
-		VcsIntegrationId:    config.VCSIntegrationID,
-		AgentIntegrationId:  config.AgentIntegrationID,
-		AppRepository:       config.AppRepository,
-		AppRepositoryId:     config.AppRepositoryID,
-		BacklogRepository:   config.BacklogRepository,
-		BacklogRepositoryId: config.BacklogRepositoryID,
-		DefaultBranch:       config.DefaultBranch,
-		IssuesSource:        serializeFactoryOnboardingIssuesSource(config.IssuesSource),
-		AgentHarness:        serializeFactoryOnboardingAgentHarness(config.AgentHarness),
-		ProvisionedAppId:    config.ProvisionedAppID,
-		ProvisionedLineId:   config.ProvisionedLineID,
-		Initial:             factory.IsInitialOnboarding(),
-		VcsProvider:         config.VCSProvider,
+		VcsIntegrationId:        config.VCSIntegrationID,
+		AgentIntegrationId:      config.AgentIntegrationID,
+		AppRepository:           config.AppRepository,
+		AppRepositoryId:         config.AppRepositoryID,
+		AppRepositoryExternalId: config.AppRepositoryExternalID,
+		BacklogRepository:       config.BacklogRepository,
+		BacklogRepositoryId:     config.BacklogRepositoryID,
+		DefaultBranch:           config.DefaultBranch,
+		IssuesSource:            serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:            serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:        config.ProvisionedAppID,
+		ProvisionedLineId:       config.ProvisionedLineID,
+		Initial:                 factory.IsInitialOnboarding(),
+		VcsProvider:             config.VCSProvider,
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)

@@ -1,0 +1,7 @@
+{
+  "name": "superplane-bitbucket",
+  "private": true,
+  "dependencies": {
+    "@forge/api": "^6.0.0"
+  }
+}
