@@ -8,7 +8,8 @@ import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME } from "../../../lib/confidenceScore";
+import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
+import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
@@ -173,11 +174,14 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    // Every check on the task except Confidence score. That score belongs
-    // to planning. A stage list would drop Risk score when no verify step
-    // ran, because only that step copies checks onto a card.
+    // Every check on the task except planning scores. Those belong on the
+    // Backlog card. A stage list would drop Risk when no verify step ran.
     checks: fixture.checks.filter(
-      (check) => check.key !== CONFIDENCE_CHECK_KEY && check.name !== CONFIDENCE_CHECK_NAME,
+      (check) =>
+        !isPlanningReviewMetric(check) &&
+        !isScoreCheckName(check.name) &&
+        check.key !== CONFIDENCE_CHECK_KEY &&
+        check.name !== CONFIDENCE_CHECK_NAME,
     ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };
