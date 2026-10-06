@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -176,18 +176,18 @@ func closePreviousPullRequests(
 		}
 	}
 
-	client, err := newFactoryGitHubAPI(db, deps, factory)
-	if err != nil {
-		return err
-	}
-
-	closed := github.Ptr("closed")
+	provider := openFactoryVCS(db, deps, factory)
 	for i := range pullRequests {
-		_, _, err := client.EditPullRequest(ctx, pullRequests[i].Repository, int(pullRequests[i].Number), &github.PullRequest{
-			State: closed,
+		err := provider.ClosePullRequest(ctx, vcs.PullRequestRef{
+			Provider:   pullRequests[i].Provider,
+			Repository: pullRequests[i].Repository,
+			Number:     pullRequests[i].Number,
 		})
 		if err != nil {
-			return errors.Join(errCannotClosePullRequest, err)
+			if errors.Is(err, vcs.ErrNotSupported) {
+				return errors.Join(errCannotCloseBitbucketPullRequest, err)
+			}
+			return err
 		}
 		if err := stampClosedPullRequests(db, pullRequests[i:i+1]); err != nil {
 			return err

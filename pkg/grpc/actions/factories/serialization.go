@@ -31,7 +31,22 @@ func serializeFactory(factory *models.Factory) *pb.Factory {
 	if factory.PublicBadgeToken != nil {
 		serialized.PublicBadgeToken = *factory.PublicBadgeToken
 	}
+	serialized.VcsCapabilities = serializeFactoryVCSCapabilities(factory.OnboardingConfigValue().EffectiveVCSProvider())
 	return serialized
+}
+
+func serializeFactoryVCSCapabilities(provider string) *pb.FactoryVCSCapabilities {
+	capabilities := models.FactoryVCSCapabilitiesFor(provider)
+	return &pb.FactoryVCSCapabilities{
+		PrClosure:       capabilities.PRClosure,
+		PrFeedback:      capabilities.PRFeedback,
+		PrChecks:        capabilities.PRChecks,
+		MergeConfidence: capabilities.MergeConfidence,
+		Velocity:        capabilities.Velocity,
+		BoardMerge:      capabilities.BoardMerge,
+		BoardClose:      capabilities.BoardClose,
+		VcsIssueIntake:  capabilities.VCSIssueIntake,
+	}
 }
 
 func serializeFactoryPlanning(planning models.FactoryPlanning) *pb.FactoryPlanning {
@@ -120,6 +135,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		ProvisionedAppId:    config.ProvisionedAppID,
 		ProvisionedLineId:   config.ProvisionedLineID,
 		Initial:             factory.IsInitialOnboarding(),
+		VcsProvider:         config.VCSProvider,
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
