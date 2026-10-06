@@ -172,9 +172,15 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 	}
 }
 
-func resolveGitHubInstallationName(tx *gorm.DB, factory *models.Factory) string {
+// resolveVCSInstallationName returns the integration name that runner steps
+// read repository credentials from.
+func resolveVCSInstallationName(tx *gorm.DB, factory *models.Factory) string {
 	if tx == nil || factory == nil {
 		return intakeGitHubAppName
+	}
+
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket {
+		return bitbucketInstallationNameFromVCS(tx, factory)
 	}
 
 	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) != "" {
@@ -217,6 +223,21 @@ func githubInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) string 
 	}
 
 	return strings.TrimSpace(integration.InstallationName)
+}
+
+func bitbucketInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) string {
+	id, err := uuid.Parse(strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID))
+	if err != nil {
+		return models.ProviderBitbucket
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil || integration.AppName != models.ProviderBitbucket {
+		return models.ProviderBitbucket
+	}
+	if name := strings.TrimSpace(integration.InstallationName); name != "" {
+		return name
+	}
+	return models.ProviderBitbucket
 }
 
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
