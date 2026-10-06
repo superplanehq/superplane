@@ -21,6 +21,7 @@ import {
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
 import { onboardingStepPath } from "./onboardingStepPath";
+import type { FinishOnboardingOptions } from "./useFinishOnboarding";
 import {
   clearGitHubInstallStarted,
   githubAccessKeys,
@@ -171,6 +172,31 @@ function useFirstRunNavigation(
   };
 }
 
+function githubSkipInitialImport(
+  issuesChoice: IssuesChoiceId | null | undefined,
+  importExistingIssues: boolean,
+): FinishOnboardingOptions | undefined {
+  if (issuesChoice !== "vcs" || importExistingIssues) return undefined;
+  return { skipInitialImport: true };
+}
+
+async function finishWorkspace(
+  finish: (issuesChoice?: IssuesChoiceId, options?: FinishOnboardingOptions) => void | Promise<void>,
+  issuesChoice: IssuesChoiceId | undefined,
+  importExistingIssues: boolean,
+) {
+  const options = githubSkipInitialImport(issuesChoice, importExistingIssues);
+  if (issuesChoice && options) {
+    await finish(issuesChoice, options);
+    return;
+  }
+  if (issuesChoice) {
+    await finish(issuesChoice);
+    return;
+  }
+  await finish();
+}
+
 function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
@@ -209,8 +235,19 @@ function useFirstRunCommands(args: {
   jiraAvailable: boolean;
   linearAvailable: boolean;
   installScope: GitHubInstallScope;
+  importExistingIssues: boolean;
 }) {
-  const { model, agentGate, connection, navigation, blocking, jiraAvailable, linearAvailable, installScope } = args;
+  const {
+    model,
+    agentGate,
+    connection,
+    navigation,
+    blocking,
+    jiraAvailable,
+    linearAvailable,
+    installScope,
+    importExistingIssues,
+  } = args;
   const location = useLocation();
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
@@ -231,7 +268,7 @@ function useFirstRunCommands(args: {
       if (agentGate === "pending") return;
       if (agentGate === "show") return navigation.goToScreen("agent");
       blocking.setAction("finishing-setup");
-      await model.finish(issuesChoice);
+      await finishWorkspace(model.finish, issuesChoice, importExistingIssues);
     });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
@@ -275,7 +312,7 @@ function useFirstRunCommands(args: {
     });
   const finishSetup = () =>
     blocking.run("finishing-setup", async () => {
-      await model.finish();
+      await finishWorkspace(model.finish, model.setup.issuesChoice ?? undefined, importExistingIssues);
     });
   const continueFromAgent = () => {
     if (agentGate === "first") return navigation.goToScreen("tickets");
@@ -413,6 +450,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
   const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady);
+  const [importExistingIssues, setImportExistingIssues] = useState(false);
   const commands = useFirstRunCommands({
     model,
     agentGate,
@@ -422,6 +460,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     jiraAvailable,
     linearAvailable,
     installScope,
+    importExistingIssues,
   });
   // A saved Jira choice is not valid when the organization does not have the
   // Jira intake feature. Clear it only after the organization lookup confirms
@@ -467,6 +506,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     linearAvailable,
     linearFeatureLoading,
     linearChoiceBlock,
+    importExistingIssues,
+    setImportExistingIssues,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,

@@ -8,6 +8,8 @@ export type FirstRunAnalysisProgress = {
   stageIndex: 0 | 1 | 2;
   /** The import finished and the ticket source had no open tickets. */
   empty?: boolean;
+  /** The user chose not to import existing issues. New issues still arrive. */
+  skipped?: boolean;
 };
 
 export type FirstRunInitialImport = {
@@ -41,8 +43,12 @@ export function initialImportFailed(
   status: FactoryIntakeInitialImportStatus | undefined,
   importSettled: boolean,
 ): boolean {
-  if (status === "INITIAL_IMPORT_STATUS_FAILED" || status === "INITIAL_IMPORT_STATUS_SKIPPED") return true;
+  if (status === "INITIAL_IMPORT_STATUS_FAILED") return true;
   return status === "INITIAL_IMPORT_STATUS_PENDING" && importSettled;
+}
+
+function importWasSkipped(initialImport: FirstRunInitialImport): boolean {
+  return initialImport.status === "INITIAL_IMPORT_STATUS_SKIPPED";
 }
 
 function completedImportItemCount(initialImport: FirstRunInitialImport): number | undefined {
@@ -91,6 +97,10 @@ export function firstRunAnalysisProgress(
   importSettled = false,
   initialImport: FirstRunInitialImport = {},
 ): FirstRunAnalysisProgress {
+  if (importWasSkipped(initialImport)) {
+    return { total: 0, scored: 0, ready: 0, stageIndex: 0, empty: false, skipped: true };
+  }
+
   const importedItemCount = completedImportItemCount(initialImport);
 
   if (!runs || runs.length === 0) {

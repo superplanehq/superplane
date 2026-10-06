@@ -204,7 +204,7 @@ describe("FirstRunSetup Jira intake feature", () => {
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledTimes(1);
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    expect(model.finish).toHaveBeenCalledWith("vcs");
+    expect(model.finish).toHaveBeenCalledWith("vcs", { skipInitialImport: true });
   });
 
   it("keeps a saved Jira choice when the organization lookup fails", async () => {
@@ -240,7 +240,7 @@ describe("FirstRunSetup Jira intake feature", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    expect(model.finish).toHaveBeenCalledWith("vcs");
+    expect(model.finish).toHaveBeenCalledWith("vcs", { skipInitialImport: true });
   });
 
   it("does not mark Jira as coming soon while the feature lookup is loading", () => {

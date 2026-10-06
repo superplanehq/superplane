@@ -148,6 +148,7 @@ export async function provisionWorkspace(args: {
   agentIntegrationId?: string;
   jira?: { integrationId: string; projectId: string; settings?: FactoriesFactoryIntakeSettings };
   linear?: { integrationId: string; projectIds: string[] };
+  skipInitialImport?: boolean;
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -200,6 +201,7 @@ export async function provisionWorkspace(args: {
     issuesChoice: args.issuesChoice,
     jira: args.jira,
     linear: args.linear,
+    skipInitialImport: args.skipInitialImport,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
@@ -237,6 +239,14 @@ function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: Integr
   return selections[plan.integrationName]?.id;
 }
 
+function skipInitialImportFlag(options?: FinishOnboardingOptions): boolean | undefined {
+  return options?.skipInitialImport;
+}
+
+export type FinishOnboardingOptions = {
+  skipInitialImport?: boolean;
+};
+
 export function useFinishOnboarding(args: {
   organizationId: string;
   factoryId: string;
@@ -273,7 +283,7 @@ export function useFinishOnboarding(args: {
   // the click, so it would still read the answer the user had before this
   // click, and provisioning would save that stale (often empty) answer over
   // the one `saveIssues` already stored.
-  return async (issuesChoiceOverride?: IssuesChoiceId) => {
+  return async (issuesChoiceOverride?: IssuesChoiceId, options?: FinishOnboardingOptions) => {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
@@ -320,6 +330,7 @@ export function useFinishOnboarding(args: {
         agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),
         jira: jiraIntakeBinding(issuesChoice, jira?.id, args.jiraProjectId, args.jiraCompletion),
         linear: linearIntakeBinding(issuesChoice, linear?.id, args.linearProjectIds),
+        skipInitialImport: skipInitialImportFlag(options),
       });
       await afterWorkspaceProvisioned({
         factory: args.factory,

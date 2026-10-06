@@ -340,7 +340,24 @@ describe("FirstRunSetup chrome", () => {
     renderSetup(model);
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
+    await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs", { skipInitialImport: true }));
+  });
+
+  it("imports existing GitHub issues only when the choice is on", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      bringYourOwnKey: true,
+      agentCredentialChoice: "hosted",
+    });
+
+    renderSetup(model);
+    await user.click(screen.getByRole("checkbox", { name: /Import existing issues/ }));
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
     await waitFor(() => expect(model.finish).toHaveBeenCalledWith("vcs"));
+    expect(model.finish).not.toHaveBeenCalledWith("vcs", { skipInitialImport: true });
   });
 
   it("hides the model source from an organization without the bring-your-own-key flag", async () => {

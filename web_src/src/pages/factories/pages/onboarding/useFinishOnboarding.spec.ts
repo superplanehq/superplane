@@ -117,6 +117,17 @@ describe("provisionWorkspace", () => {
     expect(issuesSourceCalls).toEqual(["ISSUES_SOURCE_VCS"]);
   });
 
+  it("skips the GitHub import when finish asks to leave existing issues out", async () => {
+    const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" });
+
+    await provisionWorkspace(provisionArgs({ issuesChoice: "vcs", createIntake, skipInitialImport: true }));
+
+    expect(createIntake).toHaveBeenCalledWith({
+      source: "SOURCE_GITHUB_ISSUES",
+      skipInitialImport: true,
+    });
+  });
+
   it("still provisions a repository with no issues, because zero issues is not a blocker", async () => {
     const updateOnboarding = vi.fn().mockResolvedValue({});
 

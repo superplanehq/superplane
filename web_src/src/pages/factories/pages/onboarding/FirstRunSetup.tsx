@@ -236,6 +236,8 @@ function TicketsScreenHost({
       onConnectLinear={() => void flow.connectLinear()}
       onToggleLinearProject={model.toggleLinearProject}
       onRetryLinearProjects={model.retryLinearProjects}
+      importExistingIssues={flow.importExistingIssues}
+      onImportExistingIssuesChange={flow.setImportExistingIssues}
       onAnalyzeTickets={() => void flow.continueFromTickets()}
     />
   );
