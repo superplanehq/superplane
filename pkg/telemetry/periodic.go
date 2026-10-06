@@ -5,11 +5,14 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 //
 // Reports metrics at periodic intervals.
 //
+
+const periodicMetricsInterval = 60 * time.Second
 
 type Periodic struct {
 	ctx                  context.Context
@@ -24,14 +27,21 @@ func NewPeriodic(ctx context.Context) *Periodic {
 }
 
 func (p *Periodic) Start() {
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
+	go p.reportEvery(periodicMetricsInterval, p.report)
+}
 
-		for range ticker.C {
-			p.report()
+func (p *Periodic) reportEvery(interval time.Duration, report func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			report()
 		}
-	}()
+	}
 }
 
 func (p *Periodic) report() {
@@ -41,6 +51,8 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+	p.reportRunnerCounts()
+	p.reportRunnerTaskCounts()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -119,6 +131,28 @@ func (p *Periodic) reportPendingExecutions() {
 	}
 
 	RecordPendingExecutionsCount(p.ctx, count)
+}
+
+func (p *Periodic) reportRunnerCounts() {
+	counts, err := models.ListRunnerCountsByFleetState(database.DB(p.ctx))
+	if err != nil {
+		return
+	}
+
+	for _, count := range counts {
+		recordRunnerCount(p.ctx, count)
+	}
+}
+
+func (p *Periodic) reportRunnerTaskCounts() {
+	counts, err := models.ListRunnerTaskCountsByFleetState(database.DB(p.ctx))
+	if err != nil {
+		return
+	}
+
+	for _, count := range counts {
+		recordRunnerTaskCount(p.ctx, count)
+	}
 }
 
 func countStuckQueueNodes() (int64, error) {

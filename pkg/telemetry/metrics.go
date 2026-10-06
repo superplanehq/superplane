@@ -522,6 +522,11 @@ func InitMetrics(ctx context.Context) error {
 		return err
 	}
 
+	err = registerRunnerMetrics()
+	if err != nil {
+		return err
+	}
+
 	StartPeriodicMetricsReporter()
 
 	metricsReady.Store(true)
